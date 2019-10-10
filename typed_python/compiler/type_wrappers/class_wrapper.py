@@ -15,13 +15,16 @@
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
+from typed_python.compiler.type_wrappers.arithmetic_wrapper import FloatWrapper, IntWrapper
 
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, OneOf, PointerTo, Bool
+from typed_python import NoneType, _types, OneOf, PointerTo, Bool, Int32, String
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
+from typed_python.compiler.native_ast import VoidPtr
+from math import trunc, floor, ceil
 
 
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
@@ -108,6 +111,10 @@ class ClassWrapper(RefcountedWrapper):
                 return True
             elif self.typeRepresentation in otherType.typeRepresentation.MRO:
                 return "Maybe"
+        if isinstance(otherType, IntWrapper):
+            return "Maybe"
+        if isinstance(otherType, FloatWrapper):
+            return "Maybe"
 
         return False
 
@@ -147,6 +154,25 @@ class ClassWrapper(RefcountedWrapper):
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_cast(self, context, e, target_type):
+        if isinstance(target_type, IntWrapper):
+            y = self.generate_method_call(context, "__int__", (e,))
+            if y is not None:
+                return y.convert_to_type(target_type)
+
+        if isinstance(target_type, FloatWrapper):
+            y = self.generate_method_call(context, "__float__", (e,))
+            if y is not None:
+                return y.convert_to_type(target_type)
+
+        if target_type.typeRepresentation == String:
+            return super().convert_cast(context, e, target_type)
+        if target_type.typeRepresentation == Bool:
+            return super().convert_cast(context, e, target_type)
+        if isinstance(target_type, ClassWrapper):
+            return super().convert_cast(context, e, target_type)
+        return None
 
     def get_layout_pointer(self, nonref_expr):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.
@@ -314,10 +340,8 @@ class ClassWrapper(RefcountedWrapper):
             ix = attribute
 
         if ix is None:
-            return context.pushException(
-                AttributeError,
-                "Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation)
-            )
+            return self.generate_method_call(context, "__getattr__", (instance, context.constant(attribute))) \
+                or super().convert_attribute(context, instance, attribute)
 
         if not nocheck:
             with context.ifelse(self.isInitializedNativeExpr(instance, ix)) as (ifTrue, ifFalse):
@@ -754,6 +778,14 @@ class ClassWrapper(RefcountedWrapper):
 
         return True
 
+    def convert_getitem(self, context, instance, item):
+        return self.generate_method_call(context, "__getitem__", (instance, item)) \
+            or super().convert_getitem(context, instance, item)
+
+    def convert_setitem(self, context, instance, item, value):
+        return self.generate_method_call(context, "__setitem__", (instance, item, value)) \
+            or super().convert_setitem(context, instance, item, value)
+
     def convert_set_attribute(self, context, instance, attribute, value):
         if not isinstance(attribute, int):
             ix = self.nameToIndex.get(attribute)
@@ -761,10 +793,11 @@ class ClassWrapper(RefcountedWrapper):
             ix = attribute
 
         if ix is None:
-            return context.pushException(
-                AttributeError,
-                "Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation)
-            )
+            if value is None:
+                return self.generate_method_call(context, "__delattr__", (instance, context.constant(attribute))) \
+                    or super().convert_set_attribute(context, instance, attribute, value)
+            return self.generate_method_call(context, "__setattr__", (instance, context.constant(attribute), value)) \
+                or super().convert_set_attribute(context, instance, attribute, value)
 
         attr_type = typeWrapper(self.typeRepresentation.MemberTypes[ix])
 
@@ -850,3 +883,156 @@ class ClassWrapper(RefcountedWrapper):
                     "Can't construct a " + self.typeRepresentation.__qualname__ +
                     " with positional arguments because it doesn't have an __init__"
                 )
+
+    def convert_call(self, context, expr, args, kwargs):
+        return self.generate_method_call(context, "__call__", [expr] + args)
+
+    def convert_len(self, context, expr):
+        return self.generate_method_call(context, "__len__", (expr,))
+
+    def convert_abs(self, context, expr):
+        return self.generate_method_call(context, "__abs__", (expr,))
+
+    def convert_builtin(self, f, context, expr, a1=None):
+        # handle builtins with additional arguments here:
+        if f is format:
+            if a1 is not None:
+                return self.generate_method_call(context, "__format__", (expr, a1))
+            else:
+                return self.generate_method_call(context, "__format__", (expr, context.constant(''))) \
+                    or self.generate_method_call(context, "__str__", (expr,)) \
+                    or expr.convert_cast(str)
+        if f is round:
+            if a1 is not None:
+                return self.generate_method_call(context, "__round__", (expr, a1)) \
+                    or context.pushPod(
+                        float,
+                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
+                )
+            else:
+                return self.generate_method_call(context, "__round__", (expr, context.constant(0))) \
+                    or context.pushPod(
+                        float,
+                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, context.constant(0))
+                )
+        if a1 is not None:
+            return None
+        # handle builtins with no additional arguments here:
+        if f is bytes:
+            return self.generate_method_call(context, "__bytes__", (expr,))
+        if f is trunc:
+            return self.generate_method_call(context, "__trunc__", (expr,)) \
+                or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
+        if f is floor:
+            expr_float = expr.convert_cast(float)
+            return self.generate_method_call(context, "__floor__", (expr,)) \
+                or (expr_float and context.pushPod(float, runtime_functions.floor_float64.call(expr_float.nonref_expr)))
+        if f is ceil:
+            expr_float = expr.convert_cast(float)
+            return self.generate_method_call(context, "__ceil__", (expr,)) \
+                or (expr_float and context.pushPod(float, runtime_functions.ceil_float64.call(expr_float.nonref_expr)))
+        if f is complex:
+            return self.generate_method_call(context, "__complex__", (expr,))
+        if f is dir:
+            return self.generate_method_call(context, "__dir__", (expr,)) \
+                or super().convert_builtin(f, context, expr)
+
+        return super().convert_builtin(f, context, expr, a1)
+
+    def convert_unary_op(self, context, expr, op):
+        magic = "__pos__" if op.matches.UAdd else \
+            "__neg__" if op.matches.USub else \
+            "__invert__" if op.matches.Invert else \
+            "__not__" if op.matches.Not else \
+            ""
+        return self.generate_method_call(context, magic, (expr,)) or super().convert_unary_op(context, expr, op)
+
+    def convert_bin_op(self, context, l, op, r, inplace):
+        magic = "__add__" if op.matches.Add else \
+            "__sub__" if op.matches.Sub else \
+            "__mul__" if op.matches.Mult else \
+            "__truediv__" if op.matches.Div else \
+            "__floordiv__" if op.matches.FloorDiv else \
+            "__mod__" if op.matches.Mod else \
+            "__matmul__" if op.matches.MatMult else \
+            "__pow__" if op.matches.Pow else \
+            "__lshift__" if op.matches.LShift else \
+            "__rshift__" if op.matches.RShift else \
+            "__or__" if op.matches.BitOr else \
+            "__xor__" if op.matches.BitXor else \
+            "__and__" if op.matches.BitAnd else \
+            "__eq__" if op.matches.Eq else \
+            "__ne__" if op.matches.NotEq else \
+            "__lt__" if op.matches.Lt else \
+            "__gt__" if op.matches.Gt else \
+            "__le__" if op.matches.LtE else \
+            "__ge__" if op.matches.GtE else \
+            ""
+
+        magic_inplace = '__i' + magic[2:] if magic and inplace else None
+
+        return (magic_inplace and self.generate_method_call(context, magic_inplace, (l, r))) \
+            or self.generate_method_call(context, magic, (l, r)) \
+            or self.convert_comparison(context, l, op, r) \
+            or super().convert_bin_op(context, l, op, r, inplace)
+
+    def convert_comparison(self, context, left, op, right):
+        # TODO: provide nicer translation from op to Py_ comparison codes
+        py_code = 2 if op.matches.Eq else \
+            3 if op.matches.NotEq else \
+            0 if op.matches.Lt else \
+            4 if op.matches.Gt else \
+            1 if op.matches.LtE else \
+            5 if op.matches.GtE else -1
+        if py_code < 0:
+            return None
+        tp_left = context.getTypePointer(left.expr_type.typeRepresentation)
+        tp_right = context.getTypePointer(right.expr_type.typeRepresentation)
+        if tp_left and tp_left == tp_right:
+            if not left.isReference:
+                left = context.push(left.expr_type, lambda x: x.convert_copy_initialize(left))
+            if not right.isReference:
+                right = context.push(right.expr_type, lambda x: x.convert_copy_initialize(right))
+            return context.pushPod(
+                Bool,
+                runtime_functions.class_cmp.call(
+                    tp_left,
+                    left.expr.cast(VoidPtr),
+                    right.expr.cast(VoidPtr),
+                    py_code
+                )
+            )
+        return None
+
+    def convert_bin_op_reverse(self, context, r, op, l, inplace):
+        if op.matches.In:
+            ret = self.generate_method_call(context, "__contains__", (r, l))
+            return (ret and ret.toBool()) \
+                or super().convert_bin_op_reverse(context, r, op, l, inplace)
+
+        magic = "__radd__" if op.matches.Add else \
+            "__rsub__" if op.matches.Sub else \
+            "__rmul__" if op.matches.Mult else \
+            "__rtruediv__" if op.matches.Div else \
+            "__rfloordiv__" if op.matches.FloorDiv else \
+            "__rmod__" if op.matches.Mod else \
+            "__rmatmul__" if op.matches.MatMult else \
+            "__rpow__" if op.matches.Pow else \
+            "__rlshift__" if op.matches.LShift else \
+            "__rrshift__" if op.matches.RShift else \
+            "__ror__" if op.matches.BitOr else \
+            "__rxor__" if op.matches.BitXor else \
+            "__rand__" if op.matches.BitAnd else \
+            ""
+
+        return self.generate_method_call(context, magic, (r, l)) \
+            or super().convert_bin_op_reverse(context, r, op, l, inplace)
+
+    def convert_hash(self, context, expr):
+        y = self.generate_method_call(context, "__hash__", (expr,))
+        if y is not None:
+            return y
+        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
+        if tp:
+            return context.pushPod(Int32, runtime_functions.hash_class.call(expr.nonref_expr.cast(VoidPtr), tp))
+        return None

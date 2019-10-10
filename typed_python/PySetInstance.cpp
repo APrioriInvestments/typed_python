@@ -601,7 +601,7 @@ void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, in
             setType->destroy(tgt);
         }
 
-        throw;
+        throw PythonExceptionSet();
     }
 }
 

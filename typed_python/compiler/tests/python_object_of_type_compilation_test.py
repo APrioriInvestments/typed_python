@@ -17,7 +17,8 @@ from typed_python import (
     Alternative, OneOf, NoneType, Bool,
     Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
-    Float32, Float64, Final
+    Float32, Float64, Final,
+    PointerTo
 )
 
 import unittest
@@ -220,7 +221,8 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (OneOf(String, Int64), "ab"),
             (OneOf(String, Int64), 34),
             (NT1, NT1(a=1, b=2.3, c="c", d="d")),
-            (NT2, NT2(s="xyz", t=tuple(range(10000))))
+            (NT2, NT2(s="xyz", t=tuple(range(10000)))),
+            (PointerTo(int), PointerTo(int)() + 4),
         ]
 
         for T, v in cases:
@@ -305,6 +307,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (Bytes, b""), (Bytes, b"0"), (Bytes, b"\x00"), (Bytes, b"\x01"),
             (IDict, IDict()), (IDict, IDict({0: 0})), (IDict, IDict({1: 1, 2: 4})),
             (IConstDict, IConstDict()), (IConstDict, IConstDict({0: 0})), (IConstDict, IConstDict({1: 1, 2: 4})),
+
             (NamedTuple0, NamedTuple0()),
             (NamedTuple1, NamedTuple1(a=0)), (NamedTuple1, NamedTuple1(a=1)),
             (OneOf2, OneOf2(0)), (OneOf2, OneOf2("")),
@@ -362,6 +365,9 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (B4, B4.a(s='')),
             (B4, B4.a(s='a')),
             (B5, B5.a(s='')),
+            # TODO: The line below segfaults in the specialized entrypoint case,
+            # due to attempting set iteration on this type
+            # (PointerTo(Int64), x0.pointerUnsafe(0)),
         ]
 
         @Entrypoint

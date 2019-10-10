@@ -323,11 +323,16 @@ PyObject* PyInstance::pyUnaryOperator(PyObject* lhs, const char* op, const char*
 
 PyObject* PyInstance::pyOperator(PyObject* lhs, PyObject* rhs, const char* op, const char* opErrRep) {
     return translateExceptionToPyObject([&]() {
+        PyObject* ret = nullptr;
         if (extractTypeFrom(lhs->ob_type)) {
-            return specializeForType(lhs, [&](auto& subtype) {
+            ret = specializeForType(lhs, [&](auto& subtype) {
                 return subtype.pyOperatorConcrete(rhs, op, opErrRep);
             });
         }
+
+        if (ret && ret != Py_NotImplemented) {
+            return ret;
+            }
 
         if (extractTypeFrom(rhs->ob_type)) {
             return specializeForType(rhs, [&](auto& subtype) {
@@ -346,15 +351,20 @@ PyObject* PyInstance::pyOperator(PyObject* lhs, PyObject* rhs, const char* op, c
 }
 
 PyObject* PyInstance::pyTernaryOperator(PyObject* lhs, PyObject* rhs, PyObject* thirdArg, const char* op, const char* opErrRep) {
+    // only supporting binary version of ternary __pow__
     return translateExceptionToPyObject([&]() {
+        PyObject* ret = nullptr;
         if (extractTypeFrom(lhs->ob_type)) {
-            return specializeForType(lhs, [&](auto& subtype) {
+            ret = specializeForType(lhs, [&](auto& subtype) {
                 return subtype.pyTernaryOperatorConcrete(rhs, thirdArg, op, opErrRep);
             });
         }
 
-        // only supporting binary version of ternary __pow__
-        if (extractTypeFrom(rhs->ob_type)) {
+        if (ret && ret != Py_NotImplemented) {
+            return ret;
+        }
+
+        if (thirdArg == Py_None && extractTypeFrom(rhs->ob_type)) {
             return specializeForType(rhs, [&](auto& subtype) {
                 return subtype.pyOperatorConcreteReverse(lhs, op, opErrRep);
             });
@@ -594,13 +604,15 @@ PyTypeObject* PyInstance::typeObj(Type* inType) {
 // static
 PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
     if (    t->getTypeCategory() == Type::TypeCategory::catAlternative ||
-            t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+            t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative ||
+            t->getTypeCategory() == Type::TypeCategory::catClass
+            ) {
         PySequenceMethods* res =
             new PySequenceMethods {0,0,0,0,0,0,0,0};
             res->sq_contains = (objobjproc)PyInstance::sq_contains;
             res->sq_length = (lenfunc)PyInstance::mp_and_sq_length;
-            res->sq_item = (ssizeargfunc)PyInstance::sq_item;
-            res->sq_ass_item = (ssizeobjargproc)PyInstance::sq_ass_item;
+            //res->sq_item = (ssizeargfunc)PyInstance::sq_item;
+            //res->sq_ass_item = (ssizeobjargproc)PyInstance::sq_ass_item;
         return res;
     }
 
@@ -745,6 +757,8 @@ PyMappingMethods* PyInstance::mappingMethods(Type* t) {
         t->getTypeCategory() == Type::TypeCategory::catSet ||
         t->getTypeCategory() == Type::TypeCategory::catTupleOf ||
         t->getTypeCategory() == Type::TypeCategory::catListOf ||
+        t->getTypeCategory() == Type::TypeCategory::catAlternative ||
+        t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative ||
         t->getTypeCategory() == Type::TypeCategory::catClass) {
         return res;
     }
@@ -1017,7 +1031,8 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_iter = inType->getTypeCategory() == Type::TypeCategory::catConstDict ||
                         inType->getTypeCategory() == Type::TypeCategory::catDict ||
                         inType->getTypeCategory() == Type::TypeCategory::catSet ||
-                        inType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative
+                        inType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative ||
+                        inType->getTypeCategory() == Type::TypeCategory::catClass
                          ?
                 PyInstance::tp_iter
             :   0,                                      // getiterfunc tp_iter;
@@ -1140,6 +1155,8 @@ Py_hash_t PyInstance::tp_hash(PyObject *o) {
         int64_t h = -1;
         if (self_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
             h = ((PyConcreteAlternativeInstance*)o)->tryCallHashMethod();
+        } else if (self_type->getTypeCategory() == Type::TypeCategory::catClass) {
+            h = ((PyClassInstance*)o)->tryCallHashMemberFunction();
         }
         if (h == -1) {
             h = self_type->hash(w->dataPtr());

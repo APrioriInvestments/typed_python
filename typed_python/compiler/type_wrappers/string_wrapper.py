@@ -69,18 +69,18 @@ class StringWrapper(RefcountedWrapper):
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
+    def convert_hash(self, context, expr):
+        return context.pushPod(Int32, runtime_functions.hash_string.call(expr.nonref_expr.cast(VoidPtr)))
+
+    def getNativeLayoutType(self):
+        return self.layoutType
+
     def convert_default_initialize(self, context, target):
         context.pushEffect(
             target.expr.store(
                 self.layoutType.zero()
             )
         )
-
-    def convert_hash(self, context, expr):
-        return context.pushPod(Int32, runtime_functions.hash_string.call(expr.nonref_expr.cast(VoidPtr)))
-
-    def getNativeLayoutType(self):
-        return self.layoutType
 
     def on_refcount_zero(self, context, instance):
         assert instance.isReference
