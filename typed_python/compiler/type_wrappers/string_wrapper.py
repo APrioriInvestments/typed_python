@@ -60,6 +60,17 @@ class StringWrapper(RefcountedWrapper):
             ('data', native_ast.UInt8)
         ), name='StringLayout').pointer()
 
+    # TODO: verify this is appropriate for Strings
+    def convert_default_initialize(self, context, target):
+        self.convert_copy_initialize(
+            context,
+            target,
+            typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+                context,
+                self.typeRepresentation()
+            )
+        )
+
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:
             return context.push(self, lambda x: x.convert_default_initialize())

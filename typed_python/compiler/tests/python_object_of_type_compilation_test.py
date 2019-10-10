@@ -17,7 +17,8 @@ from typed_python import (
     Alternative, OneOf, NoneType, Bool,
     Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
-    Float32, Float64, Final
+    Float32, Float64, Final,
+    PointerTo
 )
 
 import unittest
@@ -220,7 +221,8 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (OneOf(String, Int64), "ab"),
             (OneOf(String, Int64), 34),
             (NT1, NT1(a=1, b=2.3, c="c", d="d")),
-            (NT2, NT2(s="xyz", t=tuple(range(10000))))
+            (NT2, NT2(s="xyz", t=tuple(range(10000)))),
+            (PointerTo(int), PointerTo(int)() + 4),
         ]
 
         for T, v in cases:
@@ -362,6 +364,8 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (B4, B4.a(s='')),
             (B4, B4.a(s='a')),
             (B5, B5.a(s='')),
+            (PointerTo(int), PointerTo(int)()),
+            (PointerTo(int), PointerTo(int)() + 4),
         ]
 
         @Entrypoint

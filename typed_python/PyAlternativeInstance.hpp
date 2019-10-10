@@ -24,12 +24,6 @@ public:
 
     Alternative* type();
 
-    PyObject* pyTernaryOperatorConcrete(PyObject* rhs, PyObject* ternary, const char* op, const char* opErr);
-
-    PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
-
-    PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
-
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
 
     static void mirrorTypeInformationIntoPyTypeConcrete(Alternative* alt, PyTypeObject* pyType);
@@ -59,6 +53,7 @@ public:
     PyObject* pyTernaryOperatorConcrete(PyObject* rhs, PyObject* ternary, const char* op, const char* opErr);
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
+    PyObject* pyOperatorConcreteReverse(PyObject* rhs, const char* op, const char* opErr);
 
     PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
 
@@ -78,8 +73,8 @@ public:
 
     Py_ssize_t mp_and_sq_length_concrete();
 
-    PyObject* sq_item_concrete(Py_ssize_t ix);
-    int sq_ass_item_concrete(Py_ssize_t ix, PyObject* v);
+    PyObject* mp_subscript_concrete(PyObject* item);
+    int mp_ass_subscript_concrete(PyObject* item, PyObject* v);
 
     PyObject* tp_iter_concrete();
 

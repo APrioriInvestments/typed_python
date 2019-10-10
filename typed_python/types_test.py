@@ -18,8 +18,8 @@ from typed_python import (
     UInt8, UInt16, UInt32, UInt64,
     Float32, Float64,
     NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
-    ConstDict, Alternative, serialize, deserialize, Class, Member,
-    TypeFilter, Function, Forward, Set, Final
+    ConstDict, Alternative, serialize, deserialize, Class,
+    TypeFilter, Function, Forward, Set, PointerTo
 )
 from typed_python.type_promotion import computeArithmeticBinaryResultType
 from typed_python.test_util import currentMemUsageMb
@@ -269,36 +269,6 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             two = alt.Two()
             two()
-
-    def test_callable_class(self):
-        class CallableClass(Class, Final):
-            x = Member(int)
-
-            def __call__(self, x):
-                return self.x + x
-
-            def __call__(self):  # noqa: F811
-                return -1
-
-        class RegularClass(Class, Final):
-            x = Member(int)
-
-            def call(self, x):
-                return self.x + x
-
-        obj = CallableClass(x=42)
-        self.assertEqual(obj(0), 42)
-        self.assertEqual(obj(1), 43)
-        self.assertEqual(obj(), -1 )
-
-        exceptionMsg = "Cannot find a valid overload of '__call__' with arguments of type"
-        with self.assertRaisesRegex(TypeError, exceptionMsg):
-            obj(1, 2, 3)
-
-        obj = RegularClass(x=42)
-        self.assertEqual(obj.call(5), 47)
-        with self.assertRaises(TypeError):
-            obj()
 
     def test_object_bytecounts(self):
         self.assertEqual(_types.bytecount(NoneType), 0)
@@ -1345,6 +1315,22 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(a+a, (a, a))
 
+    def test_alternatives_radd_operator(self):
+        alt = Alternative(
+            "Alt",
+            child_ints={'x': int, 'y': int},
+            __radd__=lambda lhs, rhs: "radd"
+        )
+
+        a = alt.child_ints(x=0, y=2)
+
+        values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
+                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"})]
+        for v in values:
+            self.assertEqual(v + a, "radd")
+            with self.assertRaises(Exception):
+                print(a + v)
+
     def test_alternatives_perf(self):
         alt = Alternative(
             "Alt",
@@ -1692,22 +1678,6 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             a.HasOne(a.HasTwo(a='1', b='b'))
 
-    def test_recursive_classes_repr(self):
-        A0 = Forward("A0")
-
-        class ASelfRecursiveClass(Class):
-            x = Member(OneOf(None, A0))
-
-        A0 = A0.define(ASelfRecursiveClass)
-
-        a = ASelfRecursiveClass()
-        a.x = a
-
-        b = ASelfRecursiveClass()
-        b.x = b
-
-        print(repr(a))
-
     def test_unsafe_pointers_to_list_internals(self):
         x = ListOf(int)()
         x.resize(100)
@@ -2015,44 +1985,6 @@ class NativeTypesTests(unittest.TestCase):
     def test_list_of_indexing_with_numpy_ints(self):
         x = ListOf(ListOf(int))([[1, 2, 3], [4, 5, 6]])
         self.assertEqual(x[numpy.int64(0)][numpy.int64(0)], 1)
-
-    def test_dispatch_tries_without_conversion_first(self):
-        class ClassWithForcedConversion(Class, Final):
-            def f(self, x: float):
-                return "float"
-
-        class ClassWithBoth(Class, Final):
-            def f(self, x: float):
-                return "float"
-
-            def f(self, x: int):  # noqa: F811
-                return "int"
-
-            def f(self, x: bool):  # noqa: F811
-                return "bool"
-
-        # swap the order
-        class ClassWithBoth2(Class, Final):
-            def f(self, x: bool):
-                return "bool"
-
-            def f(self, x: int):  # noqa: F811
-                return "int"
-
-            def f(self, x: float):  # noqa: F811
-                return "float"
-
-        self.assertEqual(ClassWithForcedConversion().f(10), "float")
-        self.assertEqual(ClassWithForcedConversion().f(10.5), "float")
-        self.assertEqual(ClassWithForcedConversion().f(True), "float")
-
-        self.assertEqual(ClassWithBoth().f(10), "int")
-        self.assertEqual(ClassWithBoth().f(10.5), "float")
-        self.assertEqual(ClassWithBoth().f(True), "bool")
-
-        self.assertEqual(ClassWithBoth2().f(10), "int")
-        self.assertEqual(ClassWithBoth2().f(10.5), "float")
-        self.assertEqual(ClassWithBoth2().f(True), "bool")
 
     def test_error_message_on_bad_dispatch(self):
         @Function
@@ -2833,3 +2765,122 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(repr(NT(x="asdf\rbsdf")), '(x="asdf\\rbsdf",)')
         self.assertEqual(repr(NT(x="asdf\tbsdf")), '(x="asdf\\tbsdf",)')
         self.assertEqual(repr(NT(x="asdf\x12bsdf")), '(x="asdf\\x12bsdf",)')
+
+    def test_alternative_reverse_operators(self):
+
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __radd__=lambda lhs, rhs: "radd",
+                        __rsub__=lambda lhs, rhs: "rsub",
+                        __rmul__=lambda lhs, rhs: "rmul",
+                        __rmatmul__=lambda lhs, rhs: "rmatmul",
+                        __rtruediv__=lambda lhs, rhs: "rtruediv",
+                        __rfloordiv__=lambda lhs, rhs: "rfloordiv",
+                        __rmod__=lambda lhs, rhs: "rmod",
+                        __rpow__=lambda lhs, rhs: "rpow",
+                        __rlshift__=lambda lhs, rhs: "rlshift",
+                        __rrshift__=lambda lhs, rhs: "rrshift",
+                        __rand__=lambda lhs, rhs: "rand",
+                        __rxor__=lambda lhs, rhs: "rxor",
+                        __ror__=lambda lhs, rhs: "ror"
+                        )
+
+        values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
+                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"}), PointerTo(int)()]
+        for v in values:
+            self.assertEqual(v + A.a(), "radd")
+            self.assertEqual(v - A.a(), "rsub")
+            self.assertEqual(v * A.a(), "rmul")
+            self.assertEqual(v @ A.a(), "rmatmul")
+            self.assertEqual(v / A.a(), "rtruediv")
+            self.assertEqual(v // A.a(), "rfloordiv")
+            if type(v) != str:
+                self.assertEqual(v % A.a(), "rmod")
+            self.assertEqual(v ** A.a(), "rpow")
+            self.assertEqual(v << A.a(), "rlshift")
+            self.assertEqual(v >> A.a(), "rrshift")
+            self.assertEqual(v & A.a(), "rand")
+            self.assertEqual(v ^ A.a(), "rxor")
+            self.assertEqual(v | A.a(), "ror")
+            with self.assertRaises(Exception):
+                A.a() + v
+            with self.assertRaises(Exception):
+                A.a() - v
+            with self.assertRaises(Exception):
+                A.a() * v
+            with self.assertRaises(Exception):
+                A.a() @ v
+            with self.assertRaises(Exception):
+                A.a() / v
+            with self.assertRaises(Exception):
+                A.a() // v
+            with self.assertRaises(Exception):
+                A.a() % v
+            with self.assertRaises(Exception):
+                A.a() ** v
+            with self.assertRaises(Exception):
+                A.a() << v
+            with self.assertRaises(Exception):
+                A.a() >> v
+            with self.assertRaises(Exception):
+                A.a() & v
+            with self.assertRaises(Exception):
+                A.a() ^ v
+            with self.assertRaises(Exception):
+                A.a() | v
+
+    def test_alternative_missing_inplace_operators_fallback(self):
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __add__=lambda self, other: "worked",
+                        __sub__=lambda self, other: "worked",
+                        __mul__=lambda self, other: "worked",
+                        __matmul__=lambda self, other: "worked",
+                        __truediv__=lambda self, other: "worked",
+                        __floordiv__=lambda self, other: "worked",
+                        __mod__=lambda self, other: "worked",
+                        __pow__=lambda self, other: "worked",
+                        __lshift__=lambda self, other: "worked",
+                        __rshift__=lambda self, other: "worked",
+                        __and__=lambda self, other: "worked",
+                        __or__=lambda self, other: "worked",
+                        __xor__=lambda self, other: "worked",
+                        )
+
+        v = A.a()
+        v += 10
+        self.assertEqual(v, "worked")
+        v = A.a()
+        v -= 10
+        self.assertEqual(v, "worked")
+        v = A.a()
+        v *= 10
+        self.assertEqual(v, "worked")
+        v = A.a()
+        v @= 10
+        self.assertEqual(v, "worked")
+        v = A.a()
+        v /= 10
+        self.assertEqual(v, "worked")
+        v = A.a()
+        v //= 10
+        self.assertEqual(v, "worked")
+        v = A.a()
+        v %= 10
+        self.assertEqual(v, "worked")
+        v = A.a()
+        v **= 10
+        self.assertEqual(v, "worked")
+        v = A.a()
+        v <<= 10
+        self.assertEqual(v, "worked")
+        v = A.a()
+        v >>= 10
+        self.assertEqual(v, "worked")
+        v = A.a()
+        v &= 10
+        self.assertEqual(v, "worked")
+        v = A.a()
+        v |= 10
+        self.assertEqual(v, "worked")
+        v = A.a()
+        v ^= 10
+        self.assertEqual(v, "worked")

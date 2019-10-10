@@ -404,8 +404,10 @@ public:
 
     static void copyConstructFromPythonInstanceConcrete(RegisterType<T>* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         Type::TypeCategory cat = eltType->getTypeCategory();
+        Type* other = extractTypeFrom(pyRepresentation->ob_type);
+        Type::TypeCategory otherCat = other ? other->getTypeCategory() : Type::TypeCategory::catNone;
 
-        if (Type* other = extractTypeFrom(pyRepresentation->ob_type)) {
+        if (other) {
             Type::TypeCategory otherCat = other->getTypeCategory();
 
             if (otherCat == cat || isExplicit) {
@@ -470,7 +472,10 @@ public:
                 return;
             }
 
-            if (isInteger(cat)) {
+            bool otherIsAlternativeOrClass = otherCat == Type::TypeCategory::catConcreteAlternative
+                    || otherCat == Type::TypeCategory::catClass;
+
+            if (isInteger(cat) && !otherIsAlternativeOrClass) {
                 int64_t l = PyLong_AsLongLong(pyRepresentation);
                 if (l == -1 && PyErr_Occurred()) {
                     PyErr_Clear();
@@ -487,7 +492,7 @@ public:
                 return;
             }
 
-            if (isFloat(cat)) {
+            if (isFloat(cat) && !otherIsAlternativeOrClass) {
                 double d = PyFloat_AsDouble(pyRepresentation);
                 if (d == -1.0 && PyErr_Occurred()) {
                     throw PythonExceptionSet();
@@ -972,6 +977,4 @@ public:
             {NULL, NULL}
             };
         }
-
 };
-
