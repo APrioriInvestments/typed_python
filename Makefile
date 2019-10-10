@@ -48,7 +48,7 @@ TESTTYPES2 = $(DT_SRC_PATH)/ClientToServer0.hpp
 .PHONY: install
 install: $(VIRTUAL_ENV) testcert.cert testcert.key
 	. $(VIRTUAL_ENV)/bin/activate; \
-		pip3 install pipenv==2018.11.26; \
+		pip install pipenv==2018.11.26; \
 		pipenv install --dev --deploy;
 
 .PHONY: test
