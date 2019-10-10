@@ -22,7 +22,7 @@ from typed_python import (
 )
 
 
-class DefaultVal(Class):
+class DefaultVal(Class, Final):
     x0 = Member(int)
     x1 = Member(int, 5)
 
@@ -39,12 +39,12 @@ class DefaultVal(Class):
     s1 = Member(str, "abc")
 
 
-class Interior(Class):
+class Interior(Class, Final):
     x = Member(int)
     y = Member(int)
 
 
-class Exterior(Class):
+class Exterior(Class, Final):
     x = Member(int)
     i = Member(Interior)
     iTup = Member(NamedTuple(x=Interior, y=Interior))
@@ -57,7 +57,7 @@ ClassWithInit = Forward("ClassWithInit")
 
 
 @ClassWithInit.define
-class ClassWithInit(Class):
+class ClassWithInit(Class, Final):
     x = Member(int)
     y = Member(float)
     z = Member(str)
@@ -78,10 +78,10 @@ class ClassWithInit(Class):
 class ClassWithComplexDispatch(Class):
     x = Member(int)
 
-    def f(self, x):
+    def f(self, x) -> str:
         return 'x'
 
-    def f(self, y):  # noqa: F811
+    def f(self, y) -> str:  # noqa: F811
         return 'y'
 
 
@@ -110,6 +110,28 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.f(10), 'x')
         self.assertEqual(c.f(x=10), 'x')
         self.assertEqual(c.f(y=10), 'y')
+
+    def test_nonfinal_classes_require_type_annotations(self):
+        # nonfinal classes _MUST_ declare their types, because otherwise
+        # we don't know what return type would come out, and if we subclass,
+        # then code compiled against the base class will have no idea what to
+        # do. So, we require that if you really mean 'object', put object!
+        class GoodNonfinalClass(Class):
+            def f(self) -> object:
+                return 0
+
+        # not putting 'object' will cause an exception at define time.
+        with self.assertRaisesRegex(TypeError, "BadNonfinalClass.f has no return type"):
+            class BadNonfinalClass(Class):
+                def f(self):
+                    return 0
+
+        # this is OK, because the class is final. we don't need
+        # to know what the return type is because we can figure it out
+        # from the source.
+        class FinalClass(Class, Final):
+            def f(self):
+                return 0
 
     def test_class_with_uninitializable(self):
         c = ClassWithInit()
@@ -160,7 +182,7 @@ class NativeClassTypesTests(unittest.TestCase):
             class A0(Class):
                 x = Member((1, 2, 3))
 
-        class A(Class):
+        class A(Class, Final):
             x = Member(int)
 
             y = int  # not a member. Just a value.
@@ -199,7 +221,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(str(Interior()), "Interior(x=0, y=0)")
 
     def test_class_functions_work(self):
-        class C(Class):
+        class C(Class, Final):
             x = Member(int)
 
             def setX(self, x):
@@ -212,7 +234,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.x, 20)
 
     def test_class_functions_return_types(self):
-        class C(Class):
+        class C(Class, Final):
             def returnsInt(self, x) -> int:
                 return x
 
@@ -231,7 +253,7 @@ class NativeClassTypesTests(unittest.TestCase):
         c.returnsFloat(1)
 
     def test_class_function_dispatch_on_arity(self):
-        class C(Class):
+        class C(Class, Final):
             def f(self):
                 return 0
 
@@ -255,7 +277,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.f(1, 2, 3), 3)
 
     def test_class_function_exceptions(self):
-        class C(Class):
+        class C(Class, Final):
             def g(self, a, b):
                 assert False
 
@@ -271,7 +293,7 @@ class NativeClassTypesTests(unittest.TestCase):
         def g(a, b, c=10, *args, d=20, **kwargs):
             return (a, b, args, kwargs)
 
-        class C(Class):
+        class C(Class, Final):
             def g(self, a, b, c=10, *args, d=20, **kwargs):
                 return (a, b, args, kwargs)
 
@@ -294,7 +316,7 @@ class NativeClassTypesTests(unittest.TestCase):
         assertSame(lambda formOfG: formOfG(1, 2, 3, 4, 5, 6, d=10, q=20))
 
     def test_class_function_type_dispatch(self):
-        class C(Class):
+        class C(Class, Final):
             def f(self, a: float):
                 return float
 
@@ -320,7 +342,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(C().f(x=(1, 2)), "named tuple of ints")
 
     def test_class_members_accessible(self):
-        class C(Class):
+        class C(Class, Final):
             x = 10
             y = Member(int)
 
@@ -339,7 +361,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(C.y, Member(int))
 
     def test_static_methods(self):
-        class C(Class):
+        class C(Class, Final):
             @staticmethod
             def f(a: float):
                 return float
@@ -382,7 +404,7 @@ class NativeClassTypesTests(unittest.TestCase):
             def fun(self):
                 return self.x + self.y
 
-        class X(Class):
+        class X(Class, Final):
             anything = Member(object)
             pyclass = Member(OneOf(None, NormalPyClass))
             pysubclass = Member(OneOf(None, NormalPySubclass))
@@ -441,7 +463,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(x.f(10), "object")
 
     def test_class_with_getitem(self):
-        class WithGetitem(Class):
+        class WithGetitem(Class, Final):
             def __getitem__(self, x: int):
                 return "Int"
 
@@ -455,7 +477,7 @@ class NativeClassTypesTests(unittest.TestCase):
             WithGetitem()[None]
 
     def test_class_with_len(self):
-        class WithLen(Class):
+        class WithLen(Class, Final):
             x = Member(int)
 
             def __init__(self, x):
@@ -474,7 +496,7 @@ class NativeClassTypesTests(unittest.TestCase):
             len(WithLen(-2))
 
     def test_class_unary_operators(self):
-        class WithLotsOfOperators(Class):
+        class WithLotsOfOperators(Class, Final):
             def __neg__(self):
                 return "neg"
 
@@ -507,7 +529,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual([1, 2, 3][c], 3)
 
     def test_class_binary_operators(self):
-        class WithLotsOfOperators(Class):
+        class WithLotsOfOperators(Class, Final):
             def __add__(self, other):
                 return (self, "add", other)
 
@@ -560,7 +582,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c@0, (c, "matmul", 0))
 
     def test_class_binary_operators_reverse(self):
-        class WithLotsOfOperators(Class):
+        class WithLotsOfOperators(Class, Final):
             def __radd__(self, other):
                 return (self, "add", other)
 
@@ -613,7 +635,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(0@c, (c, "matmul", 0))
 
     def test_class_binary_inplace_operators(self):
-        class WithLotsOfOperators(Class):
+        class WithLotsOfOperators(Class, Final):
             def __iadd__(self, other):
                 return (self, "iadd", other)
 
@@ -666,7 +688,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(operator.imatmul(c, 0), (c, "imatmul", 0))
 
     def test_class_dispatch_on_tuple_vs_list(self):
-        class WithTwoFunctions(Class):
+        class WithTwoFunctions(Class, Final):
             def f(self, x: TupleOf(int)):
                 return "Tuple"
 
@@ -678,7 +700,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.f(ListOf(int)((1, 2, 3))), "List")
 
     def test_class_comparison_operators(self):
-        class ClassWithComparisons(Class):
+        class ClassWithComparisons(Class, Final):
             x = Member(int)
 
             def __init__(self, x):
@@ -730,7 +752,7 @@ class NativeClassTypesTests(unittest.TestCase):
                 )
 
     def test_class_repr_and_str_and_hash(self):
-        class ClassWithReprAndStr(Class):
+        class ClassWithReprAndStr(Class, Final):
             def __repr__(self):
                 return "repr"
 
@@ -745,7 +767,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(str(ClassWithReprAndStr()), "str")
 
     def test_missing_inplace_operators_fall_back(self):
-        class ClassWithoutInplaceOp(Class):
+        class ClassWithoutInplaceOp(Class, Final):
             def __add__(self, other):
                 return "worked"
 
@@ -755,7 +777,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c, "worked")
 
     def test_class_with_property(self):
-        class ClassWithProperty(Class):
+        class ClassWithProperty(Class, Final):
             _x = Member(int)
 
             def __init__(self, x):
@@ -775,7 +797,7 @@ class NativeClassTypesTests(unittest.TestCase):
             def __init__(self, x):
                 self.x = x
 
-        class ClassWithBoundMethod(Class):
+        class ClassWithBoundMethod(Class, Final):
             x = Member(OneOf(None, SomeClass))
 
             def __init__(self):
@@ -797,13 +819,13 @@ class NativeClassTypesTests(unittest.TestCase):
         class BaseClass(Class):
             x = Member(int)
 
-            def f(self, add):
+            def f(self, add) -> object:
                 return self.x + add
 
         class ChildClass(BaseClass):
             y = Member(int)
 
-            def f(self, add):
+            def f(self, add) -> object:
                 return self.x + self.y + add
 
         b = BaseClass(x=10)
@@ -836,17 +858,17 @@ class NativeClassTypesTests(unittest.TestCase):
 
     def test_class_multiple_inheritence(self):
         class BaseA(Class):
-            def f(self, x: int):
+            def f(self, x: int) -> str:
                 return "int"
 
-            def g(self):
+            def g(self) -> str:
                 return "BaseA"
 
         class BaseB(Class):
-            def f(self, x: float):
+            def f(self, x: float) -> str:
                 return "float"
 
-            def g(self):
+            def g(self) -> str:
                 return "BaseB"
 
         class BaseBoth(BaseA, BaseB):
@@ -865,19 +887,19 @@ class NativeClassTypesTests(unittest.TestCase):
         class BaseA(Class):
             x = Member(int)
 
-            def f(self, x: int):
+            def f(self, x: int) -> str:
                 return "int"
 
-            def g(self):
+            def g(self) -> str:
                 return "BaseA"
 
         class BaseB(Class):
             y = Member(int)
 
-            def f(self, x: float):
+            def f(self, x: float) -> str:
                 return "float"
 
-            def g(self):
+            def g(self) -> str:
                 return "BaseB"
 
         with self.assertRaisesRegex(TypeError, "Can't inherit from multiple base classes that both have members."):

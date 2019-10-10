@@ -17,7 +17,7 @@ from typed_python import (
     Alternative, OneOf, NoneType, Bool,
     Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
-    Float32, Float64,
+    Float32, Float64, Final
 )
 
 import unittest
@@ -38,7 +38,7 @@ class HoldsAnA:
         self.a = a
 
 
-class AClassWithBool(Class):
+class AClassWithBool(Class, Final):
     x = Member(int)
 
     def __init__(self, i):

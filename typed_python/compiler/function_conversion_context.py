@@ -569,6 +569,19 @@ class FunctionConversionContext(object):
             return True
 
     def convert_statement_ast(self, ast, variableStates: FunctionStackState):
+        try:
+            return self._convert_statement_ast(ast, variableStates)
+        except Exception as e:
+            types = {
+                varname: self._varname_to_type.get(varname)
+                for varname in set(computeReadVariables(ast)).union(computeAssignedVariables(ast))
+            }
+
+            newMessage = f"\n{ast.filename}:{ast.line_number}\n" + "\n".join(f"    {k}={v}" for k, v in types.items())
+            e.args = (str(e.args[0]) + newMessage,)
+            raise
+
+    def _convert_statement_ast(self, ast, variableStates: FunctionStackState):
         if ast.matches.Expr and ast.value.matches.Str:
             return native_ast.Expression(), True
 

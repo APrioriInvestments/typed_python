@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, Forward, ConstDict, Class, Member, ListOf
+from typed_python import Function, OneOf, TupleOf, Forward, ConstDict, Class, Final, Member, ListOf
 from typed_python import Value as ValueType
 import typed_python._types as _types
 from typed_python.compiler.runtime import Runtime
@@ -55,14 +55,14 @@ someValues = [
 ]
 
 
-class ClassA(Class):
+class ClassA(Class, Final):
     x = Member(int)
 
     def f(self, y):
         return self.x + y
 
 
-class ClassB(Class):
+class ClassB(Class, Final):
     x = Member(float)
 
     def f(self, y):

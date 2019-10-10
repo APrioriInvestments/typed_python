@@ -166,7 +166,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
                 )
             )
 
-        raise Exception(f"Unknown binary operator {op}")
+        raise Exception(f"Unknown binary operator {op} (inplace={inplace})")
 
     def convert_setitem(self, context, instance, index, value):
         indexAsObj = index.convert_to_type(object)

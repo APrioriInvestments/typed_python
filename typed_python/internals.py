@@ -74,8 +74,30 @@ class ClassMetaNamespace:
         self.ns[k] = v
         self.order.append((k, v))
 
+magicMethodTypes = {
+    '__init__': type(None),
+    '__repr__': str,
+    '__str__': str,
+    '__bool__': bool,
+    '__bytes__': bytes,
+    '__contains__': bool,
+    '__float__': float,
+    '__int__': int,
+    '__len__': int,
+    '__lt__': bool,
+    '__gt__': bool,
+    '__le__': bool,
+    '__ge__': bool,
+    '__eq__': bool,
+    '__ne__': bool,
+    '__hash__': int,
+    '__setattr__': type(None),
+    '__delattr__': type(None),
+    '__setitem__': type(None),
+    '__delitem__': type(None),
+}
 
-def makeFunction(name, f, firstArgType=None):
+def makeFunction(name, f, classType=None):
     spec = inspect.getfullargspec(f)
 
     def getAnn(argname):
@@ -106,8 +128,8 @@ def makeFunction(name, f, firstArgType=None):
         default = getDefault(i)
 
         ann = getAnn(argname)
-        if ann is None and i == 0 and firstArgType is not None:
-            ann = firstArgType
+        if ann is None and i == 0 and classType is not None:
+            ann = classType
 
         arg_types.append((argname, ann, default, False, False))
 
@@ -118,6 +140,14 @@ def makeFunction(name, f, firstArgType=None):
         if ann is None:
             ann = type(None)
         return_type = ann
+
+    if classType is not None and name in magicMethodTypes:
+        tgtType = magicMethodTypes[name]
+
+        if return_type is None:
+            return_type = tgtType
+        elif return_type != tgtType:
+            raise Exception(f"{name} must return {tgtType.__name__}")
 
     if spec.varargs is not None:
         arg_types.append((spec.varargs, getAnn(spec.varargs), None, True, False))

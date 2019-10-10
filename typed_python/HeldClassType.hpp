@@ -366,6 +366,20 @@ public:
             throw std::runtime_error("Can't inherit from multiple base classes that both have members.");
         }
 
+        if (!isFinal) {
+            for (auto nameAndMemberFunc: memberFunctions) {
+                for (auto overload: nameAndMemberFunc.second->getOverloads()) {
+                    if (!overload.getReturnType()) {
+                        throw std::runtime_error("Overload of " + inName + "." + nameAndMemberFunc.first
+                            + " has no return type, but the class is not marked final, so the compiler"
+                            + " won't have a return type defined for this method. Either add an '-> object' annotation"
+                            + " to the method, or mark the class Final (so that the compiler can apply type inference directly)"
+                        );
+                    }
+                }
+            }
+        }
+
         HeldClass* result = new HeldClass(
             inName,
             bases,

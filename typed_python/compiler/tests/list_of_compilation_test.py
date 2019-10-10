@@ -333,11 +333,12 @@ class TestListOfCompilation(unittest.TestCase):
             return out
 
         def timingComparison(addFun):
-            x = range(10000000)
-            y = range(10000000)
+            ct = 10000000
+            x = range(ct)
+            y = range(ct)
 
-            xnumpy = numpy.arange(10000000)
-            ynumpy = numpy.arange(10000000)
+            xnumpy = numpy.arange(ct)
+            ynumpy = numpy.arange(ct)
 
             t0 = time.time()
             for _ in range(10):

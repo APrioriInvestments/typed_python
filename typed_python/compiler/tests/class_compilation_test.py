@@ -33,10 +33,10 @@ class AClass(Class):
     y = Member(float)
     z = Member(TupleOf(int))
 
-    def f(self):
+    def f(self) -> float:
         return self.x + self.y
 
-    def f(self, arg):  # noqa
+    def f(self, arg) -> float:  # noqa
         return self.x + self.y + arg
 
     def g(self) -> float:
@@ -45,7 +45,7 @@ class AClass(Class):
     def add(self, x) -> float:
         return 100 + x
 
-    def loop(self, count: int):
+    def loop(self, count: int) -> float:
         i = 0
         res = self.y
         while i < count:
@@ -257,7 +257,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         print("speedup is ", speedup)  # I get about 75
 
     def test_dispatch_up_to_class_method(self):
-        class TestClass(Class):
+        class TestClass(Class, Final):
             def f(self, x: OneOf(int, float)):
                 return x + 1
 
@@ -552,7 +552,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def f(self) -> int:
                 return 3
 
-        class DispatchCls(Class):
+        class DispatchCls(Class, Final):
             def fOnBase(self, x: BaseClass):
                 return x.f()
 
@@ -629,14 +629,18 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
     def test_dispatch_with_no_specified_output_types(self):
         class BaseClass(Class):
+            def f(self, x: int) -> object:
+                return x + 1
+
+            def f(self, x: float) -> object:  # noqa
+                return x * 2
+
+        class BaseClassFinal(Class, Final):
             def f(self, x: int):
                 return x + 1
 
             def f(self, x: float):  # noqa
                 return x * 2
-
-        class BaseClassFinal(BaseClass, Final):
-            pass
 
         def f(x):
             return BaseClass().f(x)

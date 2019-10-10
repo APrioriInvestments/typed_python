@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Class, Member
+from typed_python import ListOf, Class, Member, Final
 from typed_python._types import touchCompiledSpecializations
 from typed_python import Entrypoint, NotCompiled
 from typed_python.compiler.runtime import Runtime
@@ -181,7 +181,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertEqual(ARandomPythonClass(23).f(10), 33)
 
     def test_can_use_entrypoints_on_typed_class_methods(self):
-        class AClass(Class):
+        class AClass(Class, Final):
             x = Member(int)
 
             @Entrypoint

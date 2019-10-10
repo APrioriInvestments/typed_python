@@ -19,7 +19,7 @@ from typed_python import (
     Float32, Float64,
     NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
     ConstDict, Alternative, serialize, deserialize, Class, Member,
-    TypeFilter, Function, Forward, Set
+    TypeFilter, Function, Forward, Set, Final
 )
 from typed_python.type_promotion import computeArithmeticBinaryResultType
 from typed_python.test_util import currentMemUsageMb
@@ -271,7 +271,7 @@ class NativeTypesTests(unittest.TestCase):
             two()
 
     def test_callable_class(self):
-        class CallableClass(Class):
+        class CallableClass(Class, Final):
             x = Member(int)
 
             def __call__(self, x):
@@ -280,7 +280,7 @@ class NativeTypesTests(unittest.TestCase):
             def __call__(self):  # noqa: F811
                 return -1
 
-        class RegularClass(Class):
+        class RegularClass(Class, Final):
             x = Member(int)
 
             def call(self, x):
@@ -2017,11 +2017,11 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(x[numpy.int64(0)][numpy.int64(0)], 1)
 
     def test_dispatch_tries_without_conversion_first(self):
-        class ClassWithForcedConversion(Class):
+        class ClassWithForcedConversion(Class, Final):
             def f(self, x: float):
                 return "float"
 
-        class ClassWithBoth(Class):
+        class ClassWithBoth(Class, Final):
             def f(self, x: float):
                 return "float"
 
@@ -2032,7 +2032,7 @@ class NativeTypesTests(unittest.TestCase):
                 return "bool"
 
         # swap the order
-        class ClassWithBoth2(Class):
+        class ClassWithBoth2(Class, Final):
             def f(self, x: bool):
                 return "bool"
 
