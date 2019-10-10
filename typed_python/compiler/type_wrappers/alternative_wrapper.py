@@ -17,7 +17,7 @@ from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWra
 from typed_python.compiler.type_wrappers.arithmetic_wrapper import FloatWrapper, IntWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, OneOf, Bool, Int32
+from typed_python import NoneType, _types, OneOf, Bool, Int32, String
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -88,13 +88,6 @@ class SimpleAlternativeWrapper(Wrapper):
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
-        # seem to need this conversion for floor() and ceil() to behave the same as interpreted code
-        if isinstance(target_type, FloatWrapper):
-            y = self.generate_method_call(context, "__float__", (e,))
-            if y is not None:
-                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
-                return context.constant(True)
-
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_cast(self, context, e, target_type):
@@ -108,7 +101,11 @@ class SimpleAlternativeWrapper(Wrapper):
             if y is not None:
                 return y.convert_to_type(target_type)
 
-        return super().convert_cast(context, e, target_type)
+        if target_type.typeRepresentation == Bool:
+            return super().convert_cast(context, e, target_type)
+        if target_type.typeRepresentation == String:
+            return super().convert_cast(context, e, target_type)
+        return None
 
     def convert_call(self, context, expr, args, kwargs):
         return self.generate_method_call(context, "__call__", [expr] + args)
@@ -160,11 +157,13 @@ class SimpleAlternativeWrapper(Wrapper):
             return self.generate_method_call(context, "__trunc__", (expr,)) \
                 or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
         if f is floor:
+            expr_float = expr.convert_cast(float)
             return self.generate_method_call(context, "__floor__", (expr,)) \
-                or context.pushPod(float, runtime_functions.floor_float64.call(expr.toFloat64().nonref_expr))
+                or (expr_float and context.pushPod(float, runtime_functions.floor_float64.call(expr_float.nonref_expr)))
         if f is ceil:
+            expr_float = expr.convert_cast(float)
             return self.generate_method_call(context, "__ceil__", (expr,)) \
-                or context.pushPod(float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr))
+                or (expr_float and context.pushPod(float, runtime_functions.ceil_float64.call(expr_float.nonref_expr)))
         if f is complex:
             return self.generate_method_call(context, "__complex__", (expr, ))
         if f is dir:
@@ -203,10 +202,10 @@ class SimpleAlternativeWrapper(Wrapper):
             "__ge__" if op.matches.GtE else \
             ""
 
-        if magic and inplace:
-            magic = '__i' + magic[2:]
+        magic_inplace = '__i' + magic[2:] if magic and inplace else None
 
-        return self.generate_method_call(context, magic, (l, r)) \
+        return (magic_inplace and self.generate_method_call(context, magic_inplace, (l, r))) \
+            or self.generate_method_call(context, magic, (l, r)) \
             or self.convert_comparison(context, l, op, r) \
             or super().convert_bin_op(context, l, op, r, inplace)
 
@@ -241,8 +240,26 @@ class SimpleAlternativeWrapper(Wrapper):
     def convert_bin_op_reverse(self, context, r, op, l, inplace):
         if op.matches.In:
             ret = self.generate_method_call(context, "__contains__", (r, l))
-            return ret and ret.toBool()
-        return super().convert_bin_op_reverse(context, r, op, l, inplace)
+            return (ret and ret.toBool()) \
+                or super().convert_bin_op_reverse(context, r, op, l, inplace)
+
+        magic = "__radd__" if op.matches.Add else \
+            "__rsub__" if op.matches.Sub else \
+            "__rmul__" if op.matches.Mult else \
+            "__rtruediv__" if op.matches.Div else \
+            "__rfloordiv__" if op.matches.FloorDiv else \
+            "__rmod__" if op.matches.Mod else \
+            "__rmatmul__" if op.matches.MatMult else \
+            "__rpow__" if op.matches.Pow else \
+            "__rlshift__" if op.matches.LShift else \
+            "__rrshift__" if op.matches.RShift else \
+            "__ror__" if op.matches.BitOr else \
+            "__rxor__" if op.matches.BitXor else \
+            "__rand__" if op.matches.BitAnd else \
+            ""
+
+        return self.generate_method_call(context, magic, (r, l)) \
+            or super().convert_bin_op_reverse(context, r, op, l, inplace)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:
@@ -299,13 +316,6 @@ class ConcreteSimpleAlternativeWrapper(Wrapper):
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
-        # seem to need this conversion for floor() and ceil() to behave the same as interpreted code
-        if isinstance(target_type, FloatWrapper):
-            y = self.generate_method_call(context, "__float__", (e,))
-            if y is not None:
-                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
-                return context.constant(True)
-
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_cast(self, context, e, target_type):
@@ -319,7 +329,11 @@ class ConcreteSimpleAlternativeWrapper(Wrapper):
             if y is not None:
                 return y.convert_to_type(target_type)
 
-        return super().convert_cast(context, e, target_type)
+        if target_type.typeRepresentation == Bool:
+            return super().convert_cast(context, e, target_type)
+        if target_type.typeRepresentation == String:
+            return super().convert_cast(context, e, target_type)
+        return None
 
     def convert_builtin(self, f, context, expr, a1=None):
         altWrapper = typeWrapper(self.alternativeType)
@@ -433,6 +447,14 @@ class AlternativeWrapper(RefcountedWrapper):
 
             return output
 
+    def convert_getitem(self, context, instance, item):
+        return self.generate_method_call(context, "__getitem__", (instance, item)) \
+            or super().convert_getitem(context, instance, item)
+
+    def convert_setitem(self, context, instance, item, value):
+        return self.generate_method_call(context, "__setitem__", (instance, item, value)) \
+            or super().convert_setitem(context, instance, item, value)
+
     def convert_set_attribute(self, context, instance, attribute, value):
         if value is None:
             return self.generate_method_call(context, "__delattr__", (instance, context.constant(attribute))) \
@@ -468,13 +490,6 @@ class AlternativeWrapper(RefcountedWrapper):
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
-        # seem to need this conversion for floor() and ceil() to behave the same as interpreted code
-        if isinstance(target_type, FloatWrapper):
-            y = self.generate_method_call(context, "__float__", (e,))
-            if y is not None:
-                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
-                return context.constant(True)
-
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_cast(self, context, e, target_type):
@@ -488,7 +503,11 @@ class AlternativeWrapper(RefcountedWrapper):
             if y is not None:
                 return y.convert_to_type(target_type)
 
-        return super().convert_cast(context, e, target_type)
+        if target_type.typeRepresentation == Bool:
+            return super().convert_cast(context, e, target_type)
+        if target_type.typeRepresentation == String:
+            return super().convert_cast(context, e, target_type)
+        return None
 
     def convert_call(self, context, expr, args, kwargs):
         return self.generate_method_call(context, "__call__", [expr] + args)
@@ -536,11 +555,13 @@ class AlternativeWrapper(RefcountedWrapper):
             return self.generate_method_call(context, "__trunc__", (expr,)) \
                 or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
         if f is floor:
+            expr_float = expr.convert_cast(float)
             return self.generate_method_call(context, "__floor__", (expr,)) \
-                or context.pushPod(float, runtime_functions.floor_float64.call(expr.toFloat64().nonref_expr))
+                or (expr_float and context.pushPod(float, runtime_functions.floor_float64.call(expr_float.nonref_expr)))
         if f is ceil:
+            expr_float = expr.convert_cast(float)
             return self.generate_method_call(context, "__ceil__", (expr,)) \
-                or context.pushPod(float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr))
+                or (expr_float and context.pushPod(float, runtime_functions.ceil_float64.call(expr_float.nonref_expr)))
         if f is complex:
             return self.generate_method_call(context, "__complex__", (expr, ))
         if f is dir:
@@ -579,10 +600,10 @@ class AlternativeWrapper(RefcountedWrapper):
             "__ge__" if op.matches.GtE else \
             ""
 
-        if magic and inplace:
-            magic = '__i' + magic[2:]
+        magic_inplace = '__i' + magic[2:] if magic and inplace else None
 
-        return self.generate_method_call(context, magic, (l, r)) \
+        return (magic_inplace and self.generate_method_call(context, magic_inplace, (l, r))) \
+            or self.generate_method_call(context, magic, (l, r)) \
             or self.convert_comparison(context, l, op, r) \
             or super().convert_bin_op(context, l, op, r, inplace)
 
@@ -613,8 +634,26 @@ class AlternativeWrapper(RefcountedWrapper):
     def convert_bin_op_reverse(self, context, r, op, l, inplace):
         if op.matches.In:
             ret = self.generate_method_call(context, "__contains__", (r, l))
-            return ret and ret.toBool()
-        return super().convert_bin_op_reverse(context, r, op, l, inplace)
+            return (ret and ret.toBool()) \
+                or super().convert_bin_op_reverse(context, r, op, l, inplace)
+
+        magic = "__radd__" if op.matches.Add else \
+            "__rsub__" if op.matches.Sub else \
+            "__rmul__" if op.matches.Mult else \
+            "__rtruediv__" if op.matches.Div else \
+            "__rfloordiv__" if op.matches.FloorDiv else \
+            "__rmod__" if op.matches.Mod else \
+            "__rmatmul__" if op.matches.MatMult else \
+            "__rpow__" if op.matches.Pow else \
+            "__rlshift__" if op.matches.LShift else \
+            "__rrshift__" if op.matches.RShift else \
+            "__ror__" if op.matches.BitOr else \
+            "__rxor__" if op.matches.BitXor else \
+            "__rand__" if op.matches.BitAnd else \
+            ""
+
+        return self.generate_method_call(context, magic, (r, l)) \
+            or super().convert_bin_op_reverse(context, r, op, l, inplace)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:
@@ -678,14 +717,24 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
-        # seem to need this conversion for floor() and ceil() to behave the same as interpreted code
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_cast(self, context, e, target_type):
+        if isinstance(target_type, IntWrapper):
+            y = self.generate_method_call(context, "__int__", (e,))
+            if y is not None:
+                return y.convert_to_type(target_type)
+
         if isinstance(target_type, FloatWrapper):
             y = self.generate_method_call(context, "__float__", (e,))
             if y is not None:
-                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
-                return context.constant(True)
+                return y.convert_to_type(target_type)
 
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+        if target_type.typeRepresentation == Bool:
+            return super().convert_cast(context, e, target_type)
+        if target_type.typeRepresentation == String:
+            return super().convert_cast(context, e, target_type)
+        return None
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         tupletype = self.typeRepresentation.ElementType

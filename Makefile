@@ -62,7 +62,7 @@ install-pre-commit:install-dependencies
 
 
 .PHONY: test
-test: testcert.cert testcert.key js-test
+test: testcert.cert testcert.key
 	. $(VIRTUAL_ENV)/bin/activate; pytest
 
 .PHONY: lint

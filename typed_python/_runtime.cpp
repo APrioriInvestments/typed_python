@@ -30,6 +30,11 @@ extern "C" {
         return Alternative::cmpStatic(tp, lhs, rhs, pyComparisonOp);
     }
 
+    bool np_runtime_class_cmp(Class* tp, instance_ptr lhs, instance_ptr rhs, int64_t pyComparisonOp) {
+        PyEnsureGilAcquired acquireTheGil;
+        return Class::cmpStatic(tp, lhs, rhs, pyComparisonOp);
+    }
+
     StringType::layout* nativepython_runtime_string_concat(StringType::layout* lhs, StringType::layout* rhs) {
         return StringType::concatenate(lhs, rhs);
     }
@@ -698,9 +703,16 @@ extern "C" {
     }
 
     int32_t nativepython_hash_alternative(Alternative::layout* s, Alternative* tp) {
-        if (tp->getTypeCategory() != Type::TypeCategory::catAlternative)
-            throw std::logic_error("Called hash_alternative with a non-Alternative type");
+        // TODO: assert tp is an Alternative
+        //if (tp->getTypeCategory() != Type::TypeCategory::catAlternative)
+        //    throw std::logic_error("Called hash_alternative with a non-Alternative type");
+        return tp->hash((instance_ptr)&s);
+    }
 
+    int32_t nativepython_hash_class(Class::layout* s, Class* tp) {
+        // TODO: assert tp is a Class
+        //if (tp->getTypeCategory() != Type::TypeCategory::catClass)
+        //    throw std::logic_error("Called hash_class with a non-Class type");
         return tp->hash((instance_ptr)&s);
     }
 
@@ -974,7 +986,4 @@ extern "C" {
 
         return res;
     }
-
-
-
 }

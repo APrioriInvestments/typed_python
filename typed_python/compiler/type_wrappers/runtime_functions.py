@@ -333,6 +333,12 @@ alternative_cmp = externalCallTarget(
     UInt64, Void.pointer(), Void.Pointer(), Int64
 )
 
+class_cmp = externalCallTarget(
+    "np_runtime_class_cmp",
+    Bool,
+    UInt64, Void.pointer(), Void.Pointer(), Int64
+)
+
 string_getitem_int64 = externalCallTarget(
     "nativepython_runtime_string_getitem_int64",
     Void.pointer(),
@@ -588,6 +594,13 @@ hash_bytes = externalCallTarget(
 
 hash_alternative = externalCallTarget(
     "nativepython_hash_alternative",
+    Int32,
+    Void.pointer(),
+    UInt64
+)
+
+hash_class = externalCallTarget(
+    "nativepython_hash_class",
     Int32,
     Void.pointer(),
     UInt64

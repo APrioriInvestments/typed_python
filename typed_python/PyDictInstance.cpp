@@ -184,7 +184,7 @@ int PyDictInstance::sq_contains_concrete(PyObject* item) {
 }
 
 PyObject* PyDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
-    return ((PyInstance*)this)->pyOperatorConcrete(rhs, op, opErr);
+    return PyInstance::pyOperatorConcrete(rhs, op, opErr);
 }
 
 PyObject* PyDictInstance::mp_subscript_concrete(PyObject* item) {

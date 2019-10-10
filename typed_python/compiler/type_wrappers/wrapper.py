@@ -444,10 +444,24 @@ class Wrapper(object):
         :return: intermediate compiled result, or None if method does not exist or can't be called with these args
         """
         t = self.typeRepresentation
-        if getattr(getattr(t, method, None), "__typed_python_category__", None) == 'Function':
-            assert len(getattr(t, method).overloads) == 1
-            return context.call_py_function(getattr(t, method).overloads[0].functionObj, args, {})
-        return None
+        f = getattr(t, method, None)
+        if f is None:
+            return None
+        f_cat = getattr(f, "__typed_python_category__", None)
+        if f_cat != "Function":
+            # For Alternatives, member attributes are Functions.
+            # For Classes, member attributes are method_descriptors instead of Functions,
+            # so need to access the Function itself via MemberFunctions
+            if getattr(t, "MemberFunctions", None):
+                f = t.MemberFunctions.get(method)
+                if f is None:
+                    return None
+                f_cat = getattr(f, "__typed_python_category__", None)
+        if f_cat is None or f_cat != "Function":
+            return None
+
+        assert len(f.overloads) == 1
+        return context.call_py_function(f.overloads[0].functionObj, args, {})
 
     def get_iteration_expressions(self, context, expr):
         """Return a fixed list of TypedExpressions iterating the object.

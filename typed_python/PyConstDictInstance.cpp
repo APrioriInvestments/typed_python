@@ -234,6 +234,8 @@ PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
                 type()->addDicts(dataPtr(), w_rhs->dataPtr(), data);
             });
         } else {
+            if (!PyDict_Check(rhs))
+                return incref(Py_NotImplemented);
             Instance other(type(), [&](instance_ptr data) {
                 copyConstructFromPythonInstance(type(), data, rhs, true);
             });
@@ -244,6 +246,8 @@ PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
         }
     }
     if (strcmp(op, "__sub__") == 0) {
+        if (!PySequence_Check(rhs))
+            return incref(Py_NotImplemented);
         Type* tupleOfKeysType = type()->tupleOfKeysType();
 
         //convert rhs to a relevant dict type.
@@ -256,7 +260,7 @@ PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
         });
     }
 
-    return ((PyInstance*)this)->pyOperatorConcrete(rhs, op, opErr);
+    return PyInstance::pyOperatorConcrete(rhs, op, opErr);
 }
 
 PyObject* PyConstDictInstance::mp_subscript_concrete(PyObject* item) {

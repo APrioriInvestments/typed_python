@@ -65,6 +65,16 @@ class PointerToWrapper(Wrapper):
         if not explicit:
             return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
+        if target_type.typeRepresentation == Bool:
+            targetVal.convert_copy_initialize(e != context.zero(self))
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_cast(self, context, e, target_type):
+        if target_type.typeRepresentation == Int64:  # not Int32
+            return e.nonref_expr.cast(native_ast.Int64)
+
         if target_type.typeRepresentation == String:
             asInt = e.convert_to_type(int)
             if asInt is None:
@@ -74,41 +84,30 @@ class PointerToWrapper(Wrapper):
             if asStr is None:
                 return None
 
-            resStr = context.constant("0x") + asStr
-            targetVal.convert_copy_initialize(resStr)
-            return context.constant(True)
+            return context.constant("0x") + asStr
 
-        if target_type.typeRepresentation == Int64:
-            context.pushEffect(targetVal.expr.store(e.nonref_expr.cast(native_ast.Int64)))
-            return context.constant(True)
-
-        if target_type.typeRepresentation == Bool:
-            targetVal.convert_copy_initialize(e != context.zero(self))
-            return context.constant(True)
-
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+        return super().convert_cast(context, e, target_type)
 
     def convert_bin_op(self, context, left, op, right, inplace):
         if op.matches.Add:
-            right = right.toInt64()
-            if right is None:
-                return None
+            right_int = right.convert_cast(int)
+            if right_int is None:
+                return super().convert_bin_op(context, left, op, right, inplace)
 
-            return context.pushPod(self, left.nonref_expr.elemPtr(right.nonref_expr))
+            return context.pushPod(self, left.nonref_expr.elemPtr(right_int.nonref_expr))
 
         if op.matches.Sub:
-            right = right.toInt64()
+            right_int = right.convert_cast(int)
+            if right_int is None:
+                return super().convert_bin_op(context, left, op, right, inplace)
 
-            if right is None:
-                return None
-
-            left = left.toInt64()
+            left_int = left.convert_cast(int)
+            if left_int is None:
+                return super().convert_bin_op(context, left, op, right, inplace)
 
             return context.pushPod(
                 int,
-                left.nonref_expr
-                .sub(right.nonref_expr)
-                .div(typeWrapper(self.typeRepresentation.ElementType).getBytecount())
+                left_int.sub(right_int).div(typeWrapper(self.typeRepresentation.ElementType).getBytecount())
             )
 
         if op.matches.Lt and right.expr_type == left.expr_type:
@@ -186,3 +185,12 @@ class PointerToWrapper(Wrapper):
                 return context.pushPod(tgtType, instance.nonref_expr.cast(tgtType.getNativeLayoutType()))
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
+
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 0 and not kwargs:
+            return context.push(self, lambda x: x.convert_default_initialize())
+
+        if len(args) == 1 and not kwargs:
+            return args[0].convert_cast(self)
+
+        return super().convert_type_call(context, typeInst, args, kwargs)

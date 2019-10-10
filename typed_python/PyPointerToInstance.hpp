@@ -42,5 +42,6 @@ public:
         return true;
     }
 
+    int pyInquiryConcrete(const char* op, const char* opErrRep);
     static PyMethodDef* typeMethodsConcrete(Type* t);
 };
