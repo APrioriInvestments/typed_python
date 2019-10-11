@@ -55,9 +55,12 @@ class ConcreteTypeFunction(object):
                 return x.__qualname__
             return str(x)
 
-        return self._concreteTypeFunction.__qualname__ + "(" + ",".join(
-            [toStr(x) for x in args] + ["%s=%s" % (k, v) for k, v in kwargs]
-        ) + ")"
+        return (
+            self._concreteTypeFunction.__qualname__
+            + "("
+            + ",".join([toStr(x) for x in args] + ["%s=%s" % (k, v) for k, v in kwargs])
+            + ")"
+        )
 
     def applyNameChangesToType(self, type, name):
         return type
@@ -81,7 +84,9 @@ class ConcreteTypeFunction(object):
         if isinstance(arg, FunctionType):
             return self.mapArg(arg())
 
-        raise TypeError("Instance of type '%s' is not a valid argument to a type function" % type(arg))
+        raise TypeError(
+            "Instance of type '%s' is not a valid argument to a type function" % type(arg)
+        )
 
     def __call__(self, *args, **kwargs):
         args = tuple(self.mapArg(a) for a in args)

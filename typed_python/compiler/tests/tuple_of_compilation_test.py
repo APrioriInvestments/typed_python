@@ -40,8 +40,8 @@ class TestTupleOfCompilation(unittest.TestCase):
             slowval = f(*a)
             t2 = time.time()
 
-            t_py += t2-t1
-            t_fast += t1-t0
+            t_py += t2 - t1
+            t_fast += t1 - t0
 
             self.assertEqual(fastval, slowval)
         return t_py, t_fast
@@ -156,7 +156,7 @@ class TestTupleOfCompilation(unittest.TestCase):
         self.assertEqual(_types.refcount(t1), 1)
         self.assertEqual(_types.refcount(t2), 1)
 
-        self.assertEqual(res, t1+t2)
+        self.assertEqual(res, t1 + t2)
 
     def test_tuple_of_tuple_refcounting(self):
         T = TupleOf(int)
@@ -173,7 +173,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         fRes = f(aTT)
 
-        self.assertEqual(fRes, aTT+aTT+aTT)
+        self.assertEqual(fRes, aTT + aTT + aTT)
         self.assertEqual(_types.refcount(aTT), 1)
         self.assertEqual(_types.refcount(fRes), 1)
 

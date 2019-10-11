@@ -17,7 +17,9 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler
 from typed_python import Bool
 
-typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
+typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    x
+)
 
 
 class BoundCompiledMethodWrapper(Wrapper):
@@ -30,29 +32,24 @@ class BoundCompiledMethodWrapper(Wrapper):
         return self.wrapped_type.convert_assign(
             context,
             target.changeType(self.wrapped_type),
-            toStore.changeType(self.wrapped_type)
+            toStore.changeType(self.wrapped_type),
         )
 
     def convert_copy_initialize(self, context, target, toStore):
         return self.wrapped_type.convert_copy_initialize(
             context,
             target.changeType(self.wrapped_type),
-            toStore.changeType(self.wrapped_type)
+            toStore.changeType(self.wrapped_type),
         )
 
     def convert_destroy(self, context, instance):
         return self.wrapped_type.convert_destroy(
-            context,
-            instance.changeType(self.wrapped_type)
+            context, instance.changeType(self.wrapped_type)
         )
 
     def convert_call(self, context, left, args, kwargs):
         return self.wrapped_type.convert_method_call(
-            context,
-            left.changeType(self.wrapped_type),
-            self.method_name,
-            args,
-            kwargs
+            context, left.changeType(self.wrapped_type), self.method_name, args, kwargs
         )
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
@@ -62,11 +59,7 @@ class BoundCompiledMethodWrapper(Wrapper):
         target_type = targetVal.expr_type
 
         if target_type.typeRepresentation == Bool:
-            context.pushEffect(
-                targetVal.expr.store(
-                    context.constant(True)
-                )
-            )
+            context.pushEffect(targetVal.expr.store(context.constant(True)))
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)

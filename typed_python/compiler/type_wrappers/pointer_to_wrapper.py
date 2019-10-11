@@ -13,15 +13,21 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.python_type_object_wrapper import (
+    PythonTypeObjectWrapper,
+)
+from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import (
+    BoundCompiledMethodWrapper,
+)
 
 from typed_python import Int64, PointerTo, Bool, String
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    t
+)
 
 
 class PointerToWrapper(Wrapper):
@@ -41,20 +47,18 @@ class PointerToWrapper(Wrapper):
         self.convert_copy_initialize(
             context,
             target,
-            typed_python.compiler.python_object_representation.pythonObjectRepresentation(context, self.typeRepresentation())
+            typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+                context, self.typeRepresentation()
+            ),
         )
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference
-        context.pushEffect(
-            target.expr.store(toStore.nonref_expr)
-        )
+        context.pushEffect(target.expr.store(toStore.nonref_expr))
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
-        context.pushEffect(
-            target.expr.store(toStore.nonref_expr)
-        )
+        context.pushEffect(target.expr.store(toStore.nonref_expr))
 
     def convert_destroy(self, context, instance):
         pass
@@ -106,28 +110,58 @@ class PointerToWrapper(Wrapper):
 
             return context.pushPod(
                 int,
-                left.nonref_expr
-                .sub(right.nonref_expr)
-                .div(typeWrapper(self.typeRepresentation.ElementType).getBytecount())
+                left.nonref_expr.sub(right.nonref_expr).div(
+                    typeWrapper(self.typeRepresentation.ElementType).getBytecount()
+                ),
             )
 
         if op.matches.Lt and right.expr_type == left.expr_type:
-            return context.pushPod(bool, left.nonref_expr.cast(native_ast.Int64).lt(right.nonref_expr.cast(native_ast.Int64)))
+            return context.pushPod(
+                bool,
+                left.nonref_expr.cast(native_ast.Int64).lt(
+                    right.nonref_expr.cast(native_ast.Int64)
+                ),
+            )
 
         if op.matches.Gt and right.expr_type == left.expr_type:
-            return context.pushPod(bool, left.nonref_expr.cast(native_ast.Int64).gt(right.nonref_expr.cast(native_ast.Int64)))
+            return context.pushPod(
+                bool,
+                left.nonref_expr.cast(native_ast.Int64).gt(
+                    right.nonref_expr.cast(native_ast.Int64)
+                ),
+            )
 
         if op.matches.LtE and right.expr_type == left.expr_type:
-            return context.pushPod(bool, left.nonref_expr.cast(native_ast.Int64).lte(right.nonref_expr.cast(native_ast.Int64)))
+            return context.pushPod(
+                bool,
+                left.nonref_expr.cast(native_ast.Int64).lte(
+                    right.nonref_expr.cast(native_ast.Int64)
+                ),
+            )
 
         if op.matches.GtE and right.expr_type == left.expr_type:
-            return context.pushPod(bool, left.nonref_expr.cast(native_ast.Int64).gte(right.nonref_expr.cast(native_ast.Int64)))
+            return context.pushPod(
+                bool,
+                left.nonref_expr.cast(native_ast.Int64).gte(
+                    right.nonref_expr.cast(native_ast.Int64)
+                ),
+            )
 
         if op.matches.Eq and right.expr_type == left.expr_type:
-            return context.pushPod(bool, left.nonref_expr.cast(native_ast.Int64).eq(right.nonref_expr.cast(native_ast.Int64)))
+            return context.pushPod(
+                bool,
+                left.nonref_expr.cast(native_ast.Int64).eq(
+                    right.nonref_expr.cast(native_ast.Int64)
+                ),
+            )
 
         if op.matches.NotEq and right.expr_type == left.expr_type:
-            return context.pushPod(bool, left.nonref_expr.cast(native_ast.Int64).neq(right.nonref_expr.cast(native_ast.Int64)))
+            return context.pushPod(
+                bool,
+                left.nonref_expr.cast(native_ast.Int64).neq(
+                    right.nonref_expr.cast(native_ast.Int64)
+                ),
+            )
 
         return super().convert_bin_op(context, left, op, right, inplace)
 
@@ -144,10 +178,10 @@ class PointerToWrapper(Wrapper):
         return super().convert_attribute(context, instance, attr)
 
     def convert_getitem(self, context, instance, key):
-        return (instance+key).convert_method_call("get", (), {})
+        return (instance + key).convert_method_call("get", (), {})
 
     def convert_setitem(self, context, instance, key, val):
-        return (instance+key).convert_method_call("set", (val,), {})
+        return (instance + key).convert_method_call("set", (val,), {})
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         if kwargs:
@@ -159,30 +193,42 @@ class PointerToWrapper(Wrapper):
                 if val is None:
                     return None
 
-                context.pushReference(self.typeRepresentation.ElementType, instance.nonref_expr).convert_assign(val)
+                context.pushReference(
+                    self.typeRepresentation.ElementType, instance.nonref_expr
+                ).convert_assign(val)
                 return context.pushVoid()
 
         if methodname == "destroy":
             if len(args) == 0:
-                context.pushReference(self.typeRepresentation.ElementType, instance.nonref_expr).convert_destroy()
+                context.pushReference(
+                    self.typeRepresentation.ElementType, instance.nonref_expr
+                ).convert_destroy()
                 return context.pushVoid()
 
         if methodname == "initialize":
             if len(args) == 0:
-                context.pushReference(self.typeRepresentation.ElementType, instance.nonref_expr).convert_default_initialize()
+                context.pushReference(
+                    self.typeRepresentation.ElementType, instance.nonref_expr
+                ).convert_default_initialize()
                 return context.pushVoid()
 
             if len(args) == 1:
-                context.pushReference(self.typeRepresentation.ElementType, instance.nonref_expr).convert_copy_initialize(args[0])
+                context.pushReference(
+                    self.typeRepresentation.ElementType, instance.nonref_expr
+                ).convert_copy_initialize(args[0])
                 return context.pushVoid()
 
         if methodname == "get":
             if len(args) == 0:
-                return context.pushReference(self.typeRepresentation.ElementType, instance.nonref_expr)
+                return context.pushReference(
+                    self.typeRepresentation.ElementType, instance.nonref_expr
+                )
 
         if methodname == "cast":
             if len(args) == 1 and isinstance(args[0].expr_type, PythonTypeObjectWrapper):
                 tgtType = typeWrapper(PointerTo(args[0].expr_type.typeRepresentation.Value))
-                return context.pushPod(tgtType, instance.nonref_expr.cast(tgtType.getNativeLayoutType()))
+                return context.pushPod(
+                    tgtType, instance.nonref_expr.cast(tgtType.getNativeLayoutType())
+                )
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)

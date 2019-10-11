@@ -41,19 +41,24 @@ class NativeFunctionTypesTests(unittest.TestCase):
 
     def test_create_function_with_kwargs_and_star_args_and_defaults(self):
         @Function
-        def f(x: int,
-              y=30,
-              z: None = None,
-              *args: TupleOf(float),
-              **kwargs: ConstDict(str, float)) -> int:
+        def f(
+            x: int,
+            y=30,
+            z: None = None,
+            *args: TupleOf(float),
+            **kwargs: ConstDict(str, float),
+        ) -> int:
             return x + 1
 
         self.assertEqual(len(f.overloads), 1)
         o = f.overloads[0]
 
         self.assertEqual(len(o.args), 5)
-        self.assertEqual([a.name for a in o.args], ['x', 'y', 'z', 'args', 'kwargs'])
-        self.assertEqual([a.typeFilter for a in o.args], [Int64, None, NoneType, TupleOf(float), ConstDict(str, float)])
+        self.assertEqual([a.name for a in o.args], ["x", "y", "z", "args", "kwargs"])
+        self.assertEqual(
+            [a.typeFilter for a in o.args],
+            [Int64, None, NoneType, TupleOf(float), ConstDict(str, float)],
+        )
         self.assertEqual([a.defaultValue for a in o.args], [None, (30,), (None,), None, None])
         self.assertEqual([a.isStarArg for a in o.args], [False, False, False, True, False])
         self.assertEqual([a.isKwarg for a in o.args], [False, False, False, False, True])

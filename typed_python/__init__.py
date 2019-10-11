@@ -14,16 +14,41 @@
 
 __version__ = "0.1.1"
 
-from typed_python.internals import Member, Final, Function, UndefinedBehaviorException, makeNamedTuple
+from typed_python.internals import (
+    Member,
+    Final,
+    Function,
+    UndefinedBehaviorException,
+    makeNamedTuple,
+)
 from typed_python.type_function import TypeFunction
 from typed_python.hash import sha_hash
 from typed_python.SerializationContext import SerializationContext
 from typed_python.type_filter import TypeFilter
 from typed_python._types import (
-    Forward, TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict,
-    Alternative, Value, serialize, deserialize, serializeStream, deserializeStream,
-    PointerTo, Dict, validateSerializedObject, validateSerializedObjectStream, decodeSerializedObject,
-    getOrSetTypeResolver, Set, Class, Type, PythonObjectOfType
+    Forward,
+    TupleOf,
+    ListOf,
+    Tuple,
+    NamedTuple,
+    OneOf,
+    ConstDict,
+    Alternative,
+    Value,
+    serialize,
+    deserialize,
+    serializeStream,
+    deserializeStream,
+    PointerTo,
+    Dict,
+    validateSerializedObject,
+    validateSerializedObjectStream,
+    decodeSerializedObject,
+    getOrSetTypeResolver,
+    Set,
+    Class,
+    Type,
+    PythonObjectOfType,
 )
 import typed_python._types as _types
 

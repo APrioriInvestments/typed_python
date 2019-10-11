@@ -19,11 +19,19 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
-from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
+from typed_python.compiler.type_wrappers.python_type_object_wrapper import (
+    PythonTypeObjectWrapper,
+)
 from typed_python.compiler.type_wrappers.module_wrapper import ModuleWrapper
-from typed_python.compiler.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
-from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
-from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
+from typed_python.compiler.type_wrappers.python_free_function_wrapper import (
+    PythonFreeFunctionWrapper,
+)
+from typed_python.compiler.type_wrappers.python_free_object_wrapper import (
+    PythonFreeObjectWrapper,
+)
+from typed_python.compiler.type_wrappers.python_typed_function_wrapper import (
+    PythonTypedFunctionWrapper,
+)
 from typed_python.compiler.type_wrappers.value_wrapper import ValueWrapper
 from typed_python.compiler.type_wrappers.tuple_of_wrapper import TupleOfWrapper
 from typed_python.compiler.type_wrappers.pointer_to_wrapper import PointerToWrapper
@@ -44,17 +52,35 @@ from typed_python.compiler.type_wrappers.print_wrapper import PrintWrapper
 from typed_python.compiler.type_wrappers.math_wrappers import MathFunctionWrapper
 from typed_python.compiler.type_wrappers.builtin_wrappers import BuiltinWrapper
 from typed_python.compiler.type_wrappers.bytecount_wrapper import BytecountWrapper
-from typed_python.compiler.type_wrappers.arithmetic_wrapper import IntWrapper, FloatWrapper, BoolWrapper
+from typed_python.compiler.type_wrappers.arithmetic_wrapper import (
+    IntWrapper,
+    FloatWrapper,
+    BoolWrapper,
+)
 from typed_python.compiler.type_wrappers.string_wrapper import StringWrapper
 from typed_python.compiler.type_wrappers.bytes_wrapper import BytesWrapper
-from typed_python.compiler.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
+from typed_python.compiler.type_wrappers.python_object_of_type_wrapper import (
+    PythonObjectOfTypeWrapper,
+)
 from typed_python.compiler.type_wrappers.abs_wrapper import AbsWrapper
 from typed_python.compiler.type_wrappers.repr_wrapper import ReprWrapper
 from types import ModuleType
 from typed_python._types import TypeFor, bytecount
 from typed_python import (
-    Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16,
-    UInt8, Float64, Float32, Bool, String, Bytes, NoneType
+    Int64,
+    Int32,
+    Int16,
+    Int8,
+    UInt64,
+    UInt32,
+    UInt16,
+    UInt8,
+    Float64,
+    Float32,
+    Bool,
+    String,
+    Bytes,
+    NoneType,
 )
 
 _type_to_type_wrapper_cache = {}
@@ -83,7 +109,7 @@ _concreteWrappers = {
     Bool: BoolWrapper(),
     NoneType: NoneWrapper(),
     String: StringWrapper(),
-    Bytes: BytesWrapper()
+    Bytes: BytesWrapper(),
 }
 
 
@@ -91,9 +117,9 @@ def _typedPythonTypeToTypeWrapper(t):
     if isinstance(t, Wrapper):
         return t
 
-    if not hasattr(t, '__typed_python_category__'):
+    if not hasattr(t, "__typed_python_category__"):
         t = TypeFor(t)
-        assert hasattr(t, '__typed_python_category__'), t
+        assert hasattr(t, "__typed_python_category__"), t
 
     if t in _concreteWrappers:
         return _concreteWrappers[t]
@@ -155,7 +181,7 @@ def pythonObjectRepresentation(context, f):
     if isinstance(f, type) and issubclass(f, CompilableBuiltin):
         return TypedExpression(context, native_ast.nullExpr, f(), False)
 
-    if isinstance(f, types.FunctionType) and hasattr(f, '__typed_python_function__'):
+    if isinstance(f, types.FunctionType) and hasattr(f, "__typed_python_function__"):
         f = f.__typed_python_function__
 
     if f is len:
@@ -191,11 +217,9 @@ def pythonObjectRepresentation(context, f):
     if f is None:
         return TypedExpression(
             context,
-            native_ast.Expression.Constant(
-                val=native_ast.Constant.Void()
-            ),
+            native_ast.Expression.Constant(val=native_ast.Constant.Void()),
             NoneWrapper(),
-            False
+            False,
         )
 
     if isinstance(f, bool):
@@ -205,7 +229,7 @@ def pythonObjectRepresentation(context, f):
                 val=native_ast.Constant.Int(val=f, bits=1, signed=False)
             ),
             BoolWrapper(),
-            False
+            False,
         )
 
     if isinstance(f, int):
@@ -215,17 +239,15 @@ def pythonObjectRepresentation(context, f):
                 val=native_ast.Constant.Int(val=f, bits=64, signed=True)
             ),
             IntWrapper(Int64),
-            False
+            False,
         )
 
     if isinstance(f, float):
         return TypedExpression(
             context,
-            native_ast.Expression.Constant(
-                val=native_ast.Constant.Float(val=f, bits=64)
-            ),
+            native_ast.Expression.Constant(val=native_ast.Constant.Float(val=f, bits=64)),
             FloatWrapper(Float64),
-            False
+            False,
         )
 
     if isinstance(f, str):
@@ -236,19 +258,13 @@ def pythonObjectRepresentation(context, f):
 
     if isinstance(f, type(pythonObjectRepresentation)):
         return TypedExpression(
-            context,
-            native_ast.nullExpr,
-            PythonFreeFunctionWrapper(f),
-            False
+            context, native_ast.nullExpr, PythonFreeFunctionWrapper(f), False
         )
 
-    if hasattr(f, '__typed_python_category__'):
+    if hasattr(f, "__typed_python_category__"):
         if f.__typed_python_category__ == "Function":
             return TypedExpression(
-                context,
-                native_ast.nullExpr,
-                PythonTypedFunctionWrapper(f),
-                False
+                context, native_ast.nullExpr, PythonTypedFunctionWrapper(f), False
             )
 
     if isinstance(f, type):

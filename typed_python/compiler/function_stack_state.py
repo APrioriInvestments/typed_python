@@ -12,7 +12,7 @@ def mergeTypes(t1, t2):
 
 
 def removeTypeFrom(type, toRemove):
-    if getattr(type, '__typed_python_category__', None) == "OneOf":
+    if getattr(type, "__typed_python_category__", None) == "OneOf":
         types = [x for x in type.Types if x is not toRemove]
         if len(types) == 0:
             return None
@@ -29,6 +29,7 @@ class FunctionStackState:
 
     Each variable may be one of a set of types, or 'Uninitialized'
     """
+
     def __init__(self, types=None, maybeUnintialized=None):
         self._types = types or dict()
         self._maybeUnintialized = maybeUnintialized or set()
@@ -36,7 +37,9 @@ class FunctionStackState:
     def __str__(self):
         res = []
         for name, t in self._types.items():
-            res.append(f"{name} -> {t} {'[or uninit]' if name in self._maybeUnintialized else ''}")
+            res.append(
+                f"{name} -> {t} {'[or uninit]' if name in self._maybeUnintialized else ''}"
+            )
         return "\n".join(res) + "\n"
 
     def isDefinitelyInitialized(self, name):
@@ -100,8 +103,11 @@ class FunctionStackState:
         for name in allNames:
             self._types[name] = mergeTypes(left._types.get(name), right._types.get(name))
 
-            if (name in left._maybeUnintialized or name in right._maybeUnintialized
-                    or not (name in left._types and name in right._types)):
+            if (
+                name in left._maybeUnintialized
+                or name in right._maybeUnintialized
+                or not (name in left._types and name in right._types)
+            ):
                 self._maybeUnintialized.add(name)
 
     def mergeWithSelf(self, other):
@@ -124,4 +130,6 @@ class FunctionStackState:
         if not isinstance(other, FunctionStackState):
             return False
 
-        return self._types == other._types and self._maybeUnintialized == other._maybeUnintialized
+        return (
+            self._types == other._types and self._maybeUnintialized == other._maybeUnintialized
+        )

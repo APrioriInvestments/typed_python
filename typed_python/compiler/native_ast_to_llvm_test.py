@@ -13,8 +13,16 @@
 #   limitations under the License.
 
 from typed_python.compiler.native_ast import (
-    Expression, Void, Int32, nullExpr, Function, FunctionBody,
-    Teardown, const_int32_expr, CallTarget, NamedCallTarget
+    Expression,
+    Void,
+    Int32,
+    nullExpr,
+    Function,
+    FunctionBody,
+    Teardown,
+    const_int32_expr,
+    CallTarget,
+    NamedCallTarget,
 )
 from typed_python.compiler.llvm_compiler import llvm
 import typed_python.compiler.native_ast_to_llvm as native_ast_to_llvm
@@ -30,7 +38,7 @@ def externalCallTarget(name, output, *inputs):
             external=True,
             varargs=False,
             intrinsic=False,
-            can_throw=True
+            can_throw=True,
         )
     )
 
@@ -42,26 +50,31 @@ class TestNativeAstToLlvm(unittest.TestCase):
         ct = externalCallTarget("thrower", Void)
 
         f = Function(
-            args=[('a', Int32)],
+            args=[("a", Int32)],
             output_type=Void,
             body=FunctionBody.Internal(
                 Expression.Finally(
                     expr=(
-                        ct.call() >>
-                        Expression.ActivatesTeardown('a1') >>
-                        ct.call() >>
-                        Expression.ActivatesTeardown('a2') >>
-                        nullExpr
+                        ct.call()
+                        >> Expression.ActivatesTeardown("a1")
+                        >> ct.call()
+                        >> Expression.ActivatesTeardown("a2")
+                        >> nullExpr
                     ),
                     teardowns=[
-                        Teardown.ByTag(tag='a1', expr=Expression.Branch(cond=const_int32_expr(10), true=ct.call(), false=nullExpr)),
-                        Teardown.ByTag(tag='a1', expr=nullExpr)
-                    ]
+                        Teardown.ByTag(
+                            tag="a1",
+                            expr=Expression.Branch(
+                                cond=const_int32_expr(10), true=ct.call(), false=nullExpr
+                            ),
+                        ),
+                        Teardown.ByTag(tag="a1", expr=nullExpr),
+                    ],
                 )
-            )
+            ),
         )
 
-        text = converter.add_functions({'f': f})
+        text = converter.add_functions({"f": f})
         print(text)
         mod = llvm.parse_assembly(text)
         mod.verify()

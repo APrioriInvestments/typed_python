@@ -21,7 +21,9 @@ import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    t
+)
 
 
 class SetWrapperBase(RefcountedWrapper):
@@ -30,7 +32,7 @@ class SetWrapperBase(RefcountedWrapper):
     is_pass_by_ref = True
 
     def __init__(self, t, behavior):
-        assert hasattr(t, '__typed_python_category__')
+        assert hasattr(t, "__typed_python_category__")
         super().__init__(t if behavior is None else (t, behavior))
 
         self.keyType = typeWrapper(t.KeyType)
@@ -38,32 +40,33 @@ class SetWrapperBase(RefcountedWrapper):
 
         self.keyBytecount = self.keyType.getBytecount()
 
-        self.layoutType = native_ast.Type.Struct(element_types=(
-            ('refcount', native_ast.Int64),
-            ('items', native_ast.UInt8Ptr),
-            ('items_populated', native_ast.UInt8Ptr),
-            ('items_reserved', native_ast.Int64),
-            ('top_item_slot', native_ast.Int64),
-            ('hash_table_slots', native_ast.Int32Ptr),
-            ('hash_table_hashes', native_ast.Int32Ptr),
-            ('hash_table_size', native_ast.Int64),
-            ('hash_table_count', native_ast.Int64),
-            ('hash_table_empty_slots', native_ast.Int64),
-            ('setdefault', native_ast.Int64)
-        ), name="DictWrapper").pointer()
+        self.layoutType = native_ast.Type.Struct(
+            element_types=(
+                ("refcount", native_ast.Int64),
+                ("items", native_ast.UInt8Ptr),
+                ("items_populated", native_ast.UInt8Ptr),
+                ("items_reserved", native_ast.Int64),
+                ("top_item_slot", native_ast.Int64),
+                ("hash_table_slots", native_ast.Int32Ptr),
+                ("hash_table_hashes", native_ast.Int32Ptr),
+                ("hash_table_size", native_ast.Int64),
+                ("hash_table_count", native_ast.Int64),
+                ("hash_table_empty_slots", native_ast.Int64),
+                ("setdefault", native_ast.Int64),
+            ),
+            name="DictWrapper",
+        ).pointer()
 
     def on_refcount_zero(self, context, instance):
         assert instance.isReference
 
-        return (
-            context.converter.defineNativeFunction(
-                "destructor_" + str(self.typeRepresentation),
-                ('destructor', self),
-                [self],
-                typeWrapper(NoneType),
-                self.generateNativeDestructorFunction
-            ).call(instance)
-        )
+        return context.converter.defineNativeFunction(
+            "destructor_" + str(self.typeRepresentation),
+            ("destructor", self),
+            [self],
+            typeWrapper(NoneType),
+            self.generateNativeDestructorFunction,
+        ).call(instance)
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -99,21 +102,32 @@ class SetWrapper(SetWrapperBase):
             self.keyType,
             expr.nonref_expr.ElementPtrIntegers(0, 1)
             .elemPtr(item.nonref_expr.mul(native_ast.const_int_expr(self.keyBytecount)))
-            .cast(self.keyType.getNativeLayoutType().pointer())
+            .cast(self.keyType.getNativeLayoutType().pointer()),
         )
 
     def generateNativeDestructorFunction(self, context, out, inst):
         with context.loop(self.convert_items_reserved(context, inst)) as i:
-            with context.ifelse(self.convert_slot_populated_native(inst, i)) as (then, otherwise):
+            with context.ifelse(self.convert_slot_populated_native(inst, i)) as (
+                then,
+                otherwise,
+            ):
                 with then:
                     self.convert_getkey_by_index_unsafe(context, inst, i).convert_destroy()
 
         context.pushEffect(
-            runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 1).load().cast(native_ast.UInt8Ptr)) >>
-            runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 2).load().cast(native_ast.UInt8Ptr)) >>
-            runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 5).load().cast(native_ast.UInt8Ptr)) >>
-            runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 6).load().cast(native_ast.UInt8Ptr)) >>
-            runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
+            runtime_functions.free.call(
+                inst.nonref_expr.ElementPtrIntegers(0, 1).load().cast(native_ast.UInt8Ptr)
+            )
+            >> runtime_functions.free.call(
+                inst.nonref_expr.ElementPtrIntegers(0, 2).load().cast(native_ast.UInt8Ptr)
+            )
+            >> runtime_functions.free.call(
+                inst.nonref_expr.ElementPtrIntegers(0, 5).load().cast(native_ast.UInt8Ptr)
+            )
+            >> runtime_functions.free.call(
+                inst.nonref_expr.ElementPtrIntegers(0, 6).load().cast(native_ast.UInt8Ptr)
+            )
+            >> runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
         )
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
@@ -124,9 +138,7 @@ class SetWrapper(SetWrapperBase):
 
         if target_type.typeRepresentation == Bool:
             context.pushEffect(
-                targetVal.expr.store(
-                    self.convert_len_native(e.nonref_expr).neq(0)
-                )
+                targetVal.expr.store(self.convert_len_native(e.nonref_expr).neq(0))
             )
             return context.constant(True)
 

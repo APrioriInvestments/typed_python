@@ -23,7 +23,10 @@ from typed_python.compiler.codebase_compiler import CodebaseCompiler
 
 class TestCodebaseCompiler(unittest.TestCase):
     def test_basic(self):
-        codebase = Codebase.Instantiate({"a.py": textwrap.dedent("""
+        codebase = Codebase.Instantiate(
+            {
+                "a.py": textwrap.dedent(
+                    """
             from typed_python import Function, ListOf, OneOf
 
             @Function
@@ -37,7 +40,10 @@ class TestCodebaseCompiler(unittest.TestCase):
                     x -= 1
                     y += g(x)
                 return y
-            """)})
+            """
+                )
+            }
+        )
 
         f = codebase.getClassByName("a.f")
 
@@ -57,5 +63,5 @@ class TestCodebaseCompiler(unittest.TestCase):
         f(100000)
         f_time_second = time.time() - t0
 
-        self.assertTrue(f_time_second < f_time_first * .1)
+        self.assertTrue(f_time_second < f_time_first * 0.1)
         self.assertTrue(install_time < compilation_time * 0.1)

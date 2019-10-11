@@ -29,6 +29,5 @@ class TypesCodebaseSerializationTest(unittest.TestCase):
         serializer = cb.serializationContext
 
         self.assertIs(
-            serializer.deserialize(serializer.serialize(thisIsAFunction)),
-            thisIsAFunction
+            serializer.deserialize(serializer.serialize(thisIsAFunction)), thisIsAFunction
         )

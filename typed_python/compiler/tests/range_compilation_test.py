@@ -28,11 +28,11 @@ class TestRangeCompilation(unittest.TestCase):
         def sumWithRange(x):
             res = 0
             for i in range(x):
-                res += (i+1)
+                res += i + 1
             return res
 
         for i in range(10):
-            self.assertEqual(sumWithRange(i), sum(range(i+1)))
+            self.assertEqual(sumWithRange(i), sum(range(i + 1)))
 
     def test_range_with_two_values(self):
         @Compiled

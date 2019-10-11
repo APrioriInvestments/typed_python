@@ -27,68 +27,56 @@ class NumpyBuildExtension(build_ext):
     """
 
     def run(self):
-        self.include_dirs.append(
-            pkg_resources.resource_filename('numpy', 'core/include'))
+        self.include_dirs.append(pkg_resources.resource_filename("numpy", "core/include"))
         build_ext.run(self)
 
 
 extra_compile_args = [
-    '-O2',
-    '-fstack-protector-strong',
-    '-Wformat',
-    '-Wdate-time',
-    '-Werror=format-security',
-    '-std=c++14',
-    '-Wno-sign-compare',
-    '-Wno-narrowing',
-    '-Wno-sign-compare',
-    '-Wno-terminate',
-    '-Wno-reorder',
-    '-Wno-bool-compare',
-    '-Wno-cpp'
+    "-O2",
+    "-fstack-protector-strong",
+    "-Wformat",
+    "-Wdate-time",
+    "-Werror=format-security",
+    "-std=c++14",
+    "-Wno-sign-compare",
+    "-Wno-narrowing",
+    "-Wno-sign-compare",
+    "-Wno-terminate",
+    "-Wno-reorder",
+    "-Wno-bool-compare",
+    "-Wno-cpp",
 ]
 
 ext_modules = [
     Extension(
-        'typed_python._types',
-        sources=[
-            'typed_python/all.cpp',
-        ],
-        define_macros=[
-            ("_FORTIFY_SOURCE", 2)
-        ],
-        extra_compile_args=extra_compile_args
+        "typed_python._types",
+        sources=["typed_python/all.cpp"],
+        define_macros=[("_FORTIFY_SOURCE", 2)],
+        extra_compile_args=extra_compile_args,
     )
 ]
 
-INSTALL_REQUIRES = [line.strip() for line in open('requirements.txt')]
+INSTALL_REQUIRES = [line.strip() for line in open("requirements.txt")]
 
 setuptools.setup(
-    name='typed_python',
-    version='0.1.1',
-    description='opt-in strong typing at runtime for python, plus a compiler.',
-    author='Braxton Mckee',
-    author_email='braxton.mckee@gmail.com',
-    url='https://github.com/aprioriinvestments/nativepython',
+    name="typed_python",
+    version="0.1.1",
+    description="opt-in strong typing at runtime for python, plus a compiler.",
+    author="Braxton Mckee",
+    author_email="braxton.mckee@gmail.com",
+    url="https://github.com/aprioriinvestments/nativepython",
     packages=setuptools.find_packages(),
-    cmdclass={'build_ext': NumpyBuildExtension},
+    cmdclass={"build_ext": NumpyBuildExtension},
     ext_modules=ext_modules,
-    setup_requires=[
-        'numpy'
-    ],
+    setup_requires=["numpy"],
     install_requires=INSTALL_REQUIRES,
-
     # https://pypi.org/classifiers/
     classifiers=[
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3 :: Only",
     ],
-
     license="Apache Software License v2.0",
-
     include_package_data=True,
-    data_files=[
-        ("", ["requirements.txt"]),
-    ],
-    zip_safe=False
+    data_files=[("", ["requirements.txt"])],
+    zip_safe=False,
 )

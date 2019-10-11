@@ -32,11 +32,31 @@ from typed_python.Codebase import Codebase
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
-    NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Int64, Float64, Class,
-    Member, String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
-    Dict, Set, SerializationContext, EmbeddedMessage,
-    serializeStream, deserializeStream, decodeSerializedObject,
-    Forward
+    NoneType,
+    TupleOf,
+    ListOf,
+    OneOf,
+    Tuple,
+    NamedTuple,
+    Int64,
+    Float64,
+    Class,
+    Member,
+    String,
+    Bool,
+    Bytes,
+    ConstDict,
+    Alternative,
+    serialize,
+    deserialize,
+    Dict,
+    Set,
+    SerializationContext,
+    EmbeddedMessage,
+    serializeStream,
+    deserializeStream,
+    decodeSerializedObject,
+    Forward,
 )
 
 from typed_python._types import refcount
@@ -62,6 +82,7 @@ class E(C):
 class H(object):
     pass
 
+
 # Hashable mutable key
 
 
@@ -75,6 +96,7 @@ class K(object):
 
 
 import __main__  # noqa: E402
+
 __main__.C = C
 C.__module__ = "__main__"
 __main__.D = D
@@ -93,7 +115,6 @@ class myint(int):
 
 
 class initarg(C):
-
     def __init__(self, a, b):
         self.a = a
         self.b = b
@@ -112,8 +133,7 @@ class use_metaclass(object, metaclass=metaclass):
 
 class pickling_metaclass(type):
     def __eq__(self, other):
-        return (type(self) == type(other) and
-                self.reduce_args == other.reduce_args)
+        return type(self) == type(other) and self.reduce_args == other.reduce_args
 
     def __reduce__(self):
         return (create_dynamic_class, self.reduce_args)
@@ -134,18 +154,30 @@ def create_data():
     x = [0, 1, 2.0]
     # Append some integer test cases at cPickle.c's internal size
     # cutoffs.
-    uint1max = 0xff
-    uint2max = 0xffff
-    int4max = 0x7fffffff
-    x.extend([1, -1,
-              uint1max, -uint1max, -uint1max-1,
-              uint2max, -uint2max, -uint2max-1,
-              int4max, -int4max, -int4max-1])
-    y = ('abc', 'abc', c, c)
+    uint1max = 0xFF
+    uint2max = 0xFFFF
+    int4max = 0x7FFFFFFF
+    x.extend(
+        [
+            1,
+            -1,
+            uint1max,
+            -uint1max,
+            -uint1max - 1,
+            uint2max,
+            -uint2max,
+            -uint2max - 1,
+            int4max,
+            -int4max,
+            -int4max - 1,
+        ]
+    )
+    y = ("abc", "abc", c, c)
     x.append(y)
     x.append(y)
     x.append(5)
     return x
+
 
 # Test classes for newobj
 
@@ -194,13 +226,21 @@ class MyFrozenSet(frozenset):
     sample = frozenset({"a", "b"})
 
 
-myclasses = [MyInt, MyFloat,
-             MyComplex,
-             MyStr, MyUnicode,
-             MyTuple, MyList, MyDict, MySet, MyFrozenSet]
+myclasses = [
+    MyInt,
+    MyFloat,
+    MyComplex,
+    MyStr,
+    MyUnicode,
+    MyTuple,
+    MyList,
+    MyDict,
+    MySet,
+    MyFrozenSet,
+]
 
 
-REDUCE_A = 'reduce_A'
+REDUCE_A = "reduce_A"
 
 
 class AAA(object):
@@ -208,29 +248,31 @@ class AAA(object):
         return str, (REDUCE_A,)
 
 
-sc = SerializationContext({
-    'initarg': initarg,
-    'C': C,
-    'D': D,
-    'E': E,
-    'H': H,
-    'K': K,
-    'MyInt': MyInt,
-    'MyFloat': MyFloat,
-    'MyComplex': MyComplex,
-    'MyStr': MyStr,
-    'MyUnicode': MyUnicode,
-    'MyBytes': MyBytes,
-    'MyTuple': MyTuple,
-    'MyList': MyList,
-    'MyDict': MyDict,
-    'MySet': MySet,
-    'MyFrozenSet': MyFrozenSet,
-    'use_metaclass': use_metaclass,
-    'metaclass': metaclass,
-    'pickling_metaclass': pickling_metaclass,
-    'AAA': AAA,
-})
+sc = SerializationContext(
+    {
+        "initarg": initarg,
+        "C": C,
+        "D": D,
+        "E": E,
+        "H": H,
+        "K": K,
+        "MyInt": MyInt,
+        "MyFloat": MyFloat,
+        "MyComplex": MyComplex,
+        "MyStr": MyStr,
+        "MyUnicode": MyUnicode,
+        "MyBytes": MyBytes,
+        "MyTuple": MyTuple,
+        "MyList": MyList,
+        "MyDict": MyDict,
+        "MySet": MySet,
+        "MyFrozenSet": MyFrozenSet,
+        "use_metaclass": use_metaclass,
+        "metaclass": metaclass,
+        "pickling_metaclass": pickling_metaclass,
+        "AAA": AAA,
+    }
+)
 
 
 def ping_pong(obj, serialization_context=None):
@@ -253,17 +295,17 @@ class TypesSerializationTest(unittest.TestCase):
             msg = "{!r} is not a copy of {!r}".format(obj, objcopy)
         self.assertEqual(obj, objcopy, msg=msg)
         self.assertIs(type(obj), type(objcopy), msg=msg)
-        if hasattr(obj, '__dict__'):
+        if hasattr(obj, "__dict__"):
             if isinstance(obj.__dict__, dict):
                 self.assertDictEqual(obj.__dict__, objcopy.__dict__, msg=msg)
             self.assertIsNot(obj.__dict__, objcopy.__dict__, msg=msg)
-        if hasattr(obj, '__slots__'):
+        if hasattr(obj, "__slots__"):
             self.assertListEqual(obj.__slots__, objcopy.__slots__, msg=msg)
             for slot in obj.__slots__:
+                self.assertEqual(hasattr(obj, slot), hasattr(objcopy, slot), msg=msg)
                 self.assertEqual(
-                    hasattr(obj, slot), hasattr(objcopy, slot), msg=msg)
-                self.assertEqual(getattr(obj, slot, None),
-                                 getattr(objcopy, slot, None), msg=msg)
+                    getattr(obj, slot, None), getattr(objcopy, slot, None), msg=msg
+                )
 
     def check_idempotence(self, obj, ser_ctx=None):
         ser_ctx = ser_ctx or SerializationContext()
@@ -307,7 +349,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.check_idempotence(TupleOf(int)([0x08]))
 
     def test_serialize_python_dict(self):
-        d = {1: 2, 3: '4', '5': 6, 7.0: b'8'}
+        d = {1: 2, 3: "4", "5": 6, 7.0: b"8"}
         self.check_idempotence(d)
 
     def test_serialize_recursive_list(self):
@@ -331,14 +373,14 @@ class TypesSerializationTest(unittest.TestCase):
         lst = (1, 2, 3)
         for i in range(100):
             lst = (lst, lst)
-            self.assertTrue(len(ts.serialize(lst)) < (i+1) * 100)
+            self.assertTrue(len(ts.serialize(lst)) < (i + 1) * 100)
 
     def test_serialize_objects(self):
         class AnObject:
             def __init__(self, o):
                 self.o = o
 
-        ts = SerializationContext({'O': AnObject})
+        ts = SerializationContext({"O": AnObject})
 
         o = AnObject(123)
 
@@ -350,30 +392,23 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_stream_integers(self):
         for someInts in [(1, 2), TupleOf(int)((1, 2)), [1, 2]]:
             self.assertEqual(
-                serializeStream(int, someInts),
-                b"".join([serialize(int, x) for x in someInts])
+                serializeStream(int, someInts), b"".join([serialize(int, x) for x in someInts])
             )
 
             self.assertEqual(
-                deserializeStream(int, serializeStream(int, someInts)),
-                TupleOf(int)(someInts)
+                deserializeStream(int, serializeStream(int, someInts)), TupleOf(int)(someInts)
             )
 
     def test_serialize_stream_complex(self):
         T = OneOf(None, float, str, int, ListOf(int))
 
-        for items in [
-                (1, 2),
-                ("hi", None, 10, [1, 2, 3, 4]),
-                ()]:
+        for items in [(1, 2), ("hi", None, 10, [1, 2, 3, 4]), ()]:
             self.assertEqual(
-                serializeStream(T, items),
-                b"".join([serialize(T, x) for x in items])
+                serializeStream(T, items), b"".join([serialize(T, x) for x in items])
             )
 
             self.assertEqual(
-                deserializeStream(T, serializeStream(T, items)),
-                TupleOf(T)(items)
+                deserializeStream(T, serializeStream(T, items)), TupleOf(T)(items)
             )
 
     def test_serialize_recursive_object(self):
@@ -381,7 +416,7 @@ class TypesSerializationTest(unittest.TestCase):
             def __init__(self, o):
                 self.o = o
 
-        ts = SerializationContext({'O': AnObject})
+        ts = SerializationContext({"O": AnObject})
 
         o = AnObject(None)
         o.o = o
@@ -397,35 +432,36 @@ class TypesSerializationTest(unittest.TestCase):
         class A:
             pass
 
-        B = Alternative("B", X={'a': A})
+        B = Alternative("B", X={"a": A})
 
-        ts = SerializationContext({'A': A, 'B': B})
+        ts = SerializationContext({"A": A, "B": B})
 
-        for t in [  ConstDict(int, float),
-                    NamedTuple(x=int, y=str),
-                    TupleOf(bool),
-                    Tuple(int, int, bool),
-                    OneOf(int, float),
-                    OneOf(1, 2, 3, "hi", b"goodbye"),
-                    TupleOf(NamedTuple(x=int)),
-                    TupleOf(object),
-                    TupleOf(A),
-                    TupleOf(B)
-                    ]:
+        for t in [
+            ConstDict(int, float),
+            NamedTuple(x=int, y=str),
+            TupleOf(bool),
+            Tuple(int, int, bool),
+            OneOf(int, float),
+            OneOf(1, 2, 3, "hi", b"goodbye"),
+            TupleOf(NamedTuple(x=int)),
+            TupleOf(object),
+            TupleOf(A),
+            TupleOf(B),
+        ]:
             self.assertIs(ping_pong(t, ts), t)
 
     def test_serialize_functions(self):
         def f():
             return 10
 
-        ts = SerializationContext({'f': f})
+        ts = SerializationContext({"f": f})
         self.assertIs(ping_pong(f, ts), f)
 
     def test_serialize_alternatives_as_types(self):
         A = Forward("A")
-        A = A.define(Alternative("A", X={'a': int}, Y={'a': A}))
+        A = A.define(Alternative("A", X={"a": int}, Y={"a": A}))
 
-        ts = SerializationContext({'A': A})
+        ts = SerializationContext({"A": A})
         self.assertIs(ping_pong(A, ts), A)
         self.assertIs(ping_pong(A.X, ts), A.X)
 
@@ -443,11 +479,11 @@ class TypesSerializationTest(unittest.TestCase):
 
         check(f, (10,))
         check(f2, (10,))
-        check(lambda x: x+1, (10,))
+        check(lambda x: x + 1, (10,))
         check(lambda x: (x, True, False), (10,))
         check(lambda x: (x, "hi"), (10,))
         check(lambda x: (x, None), (10,))
-        check(lambda x: x+y, (10,))
+        check(lambda x: x + y, (10,))
 
     def test_serialize_class_instance(self):
         class A:
@@ -457,10 +493,10 @@ class TypesSerializationTest(unittest.TestCase):
             def f(self):
                 return b"an embedded string"
 
-        ts = SerializationContext({'A': A})
+        ts = SerializationContext({"A": A})
         serialization = ts.serialize(A(10))
 
-        self.assertTrue(b'an embedded string' not in serialization)
+        self.assertTrue(b"an embedded string" not in serialization)
 
         anA = ts.deserialize(serialization)
 
@@ -483,19 +519,21 @@ class TypesSerializationTest(unittest.TestCase):
 
         sizeNotCompressed = len(ts.serialize(x))
 
-        self.assertTrue(sizeNotCompressed > sizeCompressed * 2, (sizeNotCompressed, sizeCompressed))
+        self.assertTrue(
+            sizeNotCompressed > sizeCompressed * 2, (sizeNotCompressed, sizeCompressed)
+        )
 
     def test_serialize_and_numpy_with_dicts(self):
         x = numpy.ones(10000)
 
-        self.assertTrue(numpy.all(ping_pong({'a': x, 'b': x})['a'] == x))
+        self.assertTrue(numpy.all(ping_pong({"a": x, "b": x})["a"] == x))
 
     def test_serialize_and_threads(self):
         class A:
             def __init__(self, x):
                 self.x = x
 
-        ts = SerializationContext({'A': A})
+        ts = SerializationContext({"A": A})
 
         OK = []
 
@@ -522,7 +560,7 @@ class TypesSerializationTest(unittest.TestCase):
             def f(self):
                 return self.x
 
-        ts = SerializationContext({'X': X})
+        ts = SerializationContext({"X": X})
 
         self.assertIs(ping_pong(X, ts), X)
 
@@ -532,20 +570,17 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_bad_serialization_context(self):
         with self.assertRaises(AssertionError):
-            SerializationContext({'': int})
+            SerializationContext({"": int})
 
         with self.assertRaises(AssertionError):
-            SerializationContext({b'': int})
+            SerializationContext({b"": int})
 
     def test_serialization_context_queries(self):
-        sc = SerializationContext({
-            'X': False,
-            'Y': True,
-        })
-        self.assertIs(sc.objectFromName('X'), False)
-        self.assertIs(sc.nameForObject(False), 'X')
-        self.assertIs(sc.objectFromName('Y'), True)
-        self.assertIs(sc.nameForObject(True), 'Y')
+        sc = SerializationContext({"X": False, "Y": True})
+        self.assertIs(sc.objectFromName("X"), False)
+        self.assertIs(sc.nameForObject(False), "X")
+        self.assertIs(sc.objectFromName("Y"), True)
+        self.assertIs(sc.nameForObject(True), "Y")
 
     def test_serializing_dicts_in_loop(self):
         self.serializeInLoop(lambda: 1)
@@ -556,7 +591,7 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serializing_tuples_in_loop(self):
         self.serializeInLoop(lambda: ())
         self.serializeInLoop(lambda: (1, 2, 3))
-        self.serializeInLoop(lambda: (1, 2, (3, 4,), ((5, 6), (((6,),),))))
+        self.serializeInLoop(lambda: (1, 2, (3, 4), ((5, 6), (((6,),),))))
 
     def test_serializing_lists_in_loop(self):
         self.serializeInLoop(lambda: [])
@@ -569,7 +604,8 @@ class TypesSerializationTest(unittest.TestCase):
                 self.a = a
                 self.b = b
                 self.c = c
-        c = SerializationContext({'X': X})
+
+        c = SerializationContext({"X": X})
 
         self.serializeInLoop(lambda: X(a=X(), b=[1, 2, 3], c=X(a=X())), context=c)
 
@@ -593,22 +629,22 @@ class TypesSerializationTest(unittest.TestCase):
         NT = Forward("NT")
         NT = NT.define(NamedTuple(x=OneOf(int, float), y=OneOf(int, TupleOf(NT))))
 
-        context = SerializationContext({'NT': NT})
+        context = SerializationContext({"NT": NT})
 
         self.serializeInLoop(lambda: NT(x=10, y=(NT(x=20, y=2),)), context=context)
 
     def test_serializing_tuple_of_in_loop(self):
         TO = TupleOf(int)
 
-        context = SerializationContext({'TO': TO})
+        context = SerializationContext({"TO": TO})
 
         self.serializeInLoop(lambda: TO((1, 2, 3, 4, 5)), context=context)
 
     def test_serializing_alternatives_in_loop(self):
         AT = Forward("AT")
-        AT = AT.define(Alternative("AT", X={'x': int, 'y': float}, Y={'x': int, 'y': AT}))
+        AT = AT.define(Alternative("AT", X={"x": int, "y": float}, Y={"x": int, "y": AT}))
 
-        context = SerializationContext({'AT': AT})
+        context = SerializationContext({"AT": AT})
 
         self.serializeInLoop(lambda: AT, context=context)
         self.serializeInLoop(lambda: AT.Y, context=context)
@@ -617,8 +653,8 @@ class TypesSerializationTest(unittest.TestCase):
     def test_inject_exception_into_context(self):
         NT = NamedTuple()
 
-        context = SerializationContext({'NT': NT})
-        context2 = SerializationContext({'NT': NT})
+        context = SerializationContext({"NT": NT})
+        context2 = SerializationContext({"NT": NT})
 
         def throws(*args):
             raise Exception("Test Exception")
@@ -639,7 +675,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         t0 = time.time()
 
-        while time.time() - t0 < .25:
+        while time.time() - t0 < 0.25:
             data = context.serialize(objectMaker())
             context.deserialize(data)
 
@@ -782,10 +818,16 @@ class TypesSerializationTest(unittest.TestCase):
     @pytest.mark.skip(reason="it fails with a coredump")
     @unittest.skip
     def test_serialize_unicode_1(self):
-        endcases = ['', '<\\u>', '<\\\u1234>', '<\n>',
-                    '<\\>', '<\\\U00012345>',
-                    # surrogates
-                    '<\udc80>']
+        endcases = [
+            "",
+            "<\\u>",
+            "<\\\u1234>",
+            "<\n>",
+            "<\\>",
+            "<\\\U00012345>",
+            # surrogates
+            "<\udc80>",
+        ]
 
         for u in endcases:
             print("u = {}".format(u))
@@ -793,13 +835,13 @@ class TypesSerializationTest(unittest.TestCase):
             self.assert_is_copy(u, u2)
 
     def test_serialize_unicode_high_plane(self):
-        t = '\U00012345'
+        t = "\U00012345"
 
         t2 = ping_pong(t)
         self.assert_is_copy(t, t2)
 
     def test_serialize_bytes(self):
-        for s in b'', b'xyz', b'xyz'*100:
+        for s in b"", b"xyz", b"xyz" * 100:
             s2 = ping_pong(s)
             self.assert_is_copy(s, s2)
 
@@ -823,9 +865,9 @@ class TypesSerializationTest(unittest.TestCase):
     @unittest.skip
     def test_serialize_long(self):
         # 256 bytes is where LONG4 begins.
-        for nbits in 1, 8, 8*254, 8*255, 8*256, 8*257:
+        for nbits in 1, 8, 8 * 254, 8 * 255, 8 * 256, 8 * 257:
             nbase = 1 << nbits
-            for npos in nbase-1, nbase, nbase+1:
+            for npos in nbase - 1, nbase, nbase + 1:
                 for n in npos, -npos:
                     got = ping_pong(n)
                     self.assert_is_copy(n, got)
@@ -841,8 +883,19 @@ class TypesSerializationTest(unittest.TestCase):
             self.assertEqual(n, got)
 
     def test_serialize_float(self):
-        test_values = [0.0, 4.94e-324, 1e-310, 7e-308, 6.626e-34, 0.1, 0.5,
-                       3.14, 263.44582062374053, 6.022e23, 1e30]
+        test_values = [
+            0.0,
+            4.94e-324,
+            1e-310,
+            7e-308,
+            6.626e-34,
+            0.1,
+            0.5,
+            3.14,
+            263.44582062374053,
+            6.022e23,
+            1e30,
+        ]
         test_values = test_values + [-x for x in test_values]
 
         for value in test_values:
@@ -878,6 +931,7 @@ class TypesSerializationTest(unittest.TestCase):
     @unittest.skip
     def test_serialize_dynamic_class(self):
         import copyreg
+
         a = create_dynamic_class("my_dynamic_class", (object,))
         copyreg.pickle(pickling_metaclass, pickling_metaclass.__reduce__)
 
@@ -885,7 +939,9 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(a, b)
         self.assertIs(type(a), type(b))
 
-    @pytest.mark.skip(reason="fails with: TypeError: Classes derived from `tuple` cannot be serialized")
+    @pytest.mark.skip(
+        reason="fails with: TypeError: Classes derived from `tuple` cannot be serialized"
+    )
     @unittest.skip
     def test_serialize_structseq(self):
         import time
@@ -952,7 +1008,7 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_large_pickles(self):
         # Test the correctness of internal buffering routines when handling
         # large data.
-        data = (1, min, b'xy' * (30 * 1024), len)
+        data = (1, min, b"xy" * (30 * 1024), len)
         loaded = ping_pong(data, sc)
         self.assertEqual(len(loaded), len(data))
         self.assertEqual(loaded, data)
@@ -966,12 +1022,14 @@ class TypesSerializationTest(unittest.TestCase):
                     class C:
                         pass
 
-        sc = SerializationContext({
-            'Nested': Nested,
-            'Nested.A': Nested.A,
-            'Nested.A.B': Nested.A.B,
-            'Nested.A.B.C': Nested.A.B.C
-        })
+        sc = SerializationContext(
+            {
+                "Nested": Nested,
+                "Nested.A": Nested.A,
+                "Nested.A.B": Nested.A.B,
+                "Nested.A.B.C": Nested.A.B.C,
+            }
+        )
 
         for obj in [Nested.A, Nested.A.B, Nested.A.B.C]:
             with self.subTest(obj=obj):
@@ -987,7 +1045,7 @@ class TypesSerializationTest(unittest.TestCase):
                 f.write("def f(x):\n    return x + 1\n")
             sys.path.append(tf)
 
-            m = importlib.import_module('weird_serialization_test')
+            m = importlib.import_module("weird_serialization_test")
 
             # verify we can serialize this
             deserialized_f = sc.deserialize(sc.serialize(m.f))
@@ -1025,7 +1083,7 @@ class TypesSerializationTest(unittest.TestCase):
         codebase = Codebase._FromModule(dummy_test_module)
         sc = codebase.serializationContext
 
-        self.assertIn('.modules.pytz', sc.nameToObject)
+        self.assertIn(".modules.pytz", sc.nameToObject)
 
         pytz = dummy_test_module.pytz
         self.assertIs(pytz, sc.deserialize(sc.serialize(pytz)))
@@ -1131,27 +1189,24 @@ class TypesSerializationTest(unittest.TestCase):
 
         d2 = x.deserialize(x.serialize(d))
 
-        self.assertEqual(d2['recurses']['recurses']['hi'], 'bye')
+        self.assertEqual(d2["recurses"]["recurses"]["hi"], "bye")
 
     def test_serialize_dict_doesnt_leak(self):
         T = Dict(int, int)
-        d = T({i: i+1 for i in range(100)})
+        d = T({i: i + 1 for i in range(100)})
         x = SerializationContext({})
 
         usage = currentMemUsageMb()
         for _ in range(20000):
             x.deserialize(x.serialize(d))
 
-        self.assertLess(currentMemUsageMb(), usage+1)
+        self.assertLess(currentMemUsageMb(), usage + 1)
 
     def test_serialize_named_tuples_with_extra_fields(self):
         T1 = NamedTuple(x=int)
         T2 = NamedTuple(x=int, y=float, z=str)
 
-        self.assertEqual(
-            deserialize(T2, serialize(T1, T1(x=10))),
-            T2(x=10, y=0.0, z="")
-        )
+        self.assertEqual(deserialize(T2, serialize(T1, T1(x=10))), T2(x=10, y=0.0, z=""))
 
     def test_serialize_listof(self):
         T = ListOf(int)

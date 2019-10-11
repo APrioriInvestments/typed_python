@@ -25,7 +25,7 @@ Uprops_PRINTABLE = 0x80
 Uprops_TITLE = 0x100
 
 first = 0
-last = 0x10ffff
+last = 0x10FFFF
 print("#pragma once")
 print("")
 print("// Generated from:")
@@ -40,7 +40,7 @@ print("#define Uprops_NUMERIC 0x{:04x}".format(Uprops_NUMERIC))
 print("#define Uprops_SPACE 0x{:04x}".format(Uprops_SPACE))
 print("#define Uprops_PRINTABLE 0x{:04x}".format(Uprops_PRINTABLE))
 print("#define Uprops_TITLE 0x{:04x}".format(Uprops_TITLE))
-print("static uint16_t uprops_runlength[] = {{".format(last+1))
+print("static uint16_t uprops_runlength[] = {{".format(last + 1))
 
 prev = None
 count = 0
@@ -79,9 +79,9 @@ print("0x{:x},{}\n}};\n".format(prev, count))
 sum += count
 entries += 1
 
-print("// check 0x{:x} == 0x{:x}\n".format(sum, last+1))
+print("// check 0x{:x} == 0x{:x}\n".format(sum, last + 1))
 
-print("static uint16_t uprops[0x{:x}];\n".format(last+1))
+print("static uint16_t uprops[0x{:x}];\n".format(last + 1))
 
 print("void initialize_uprops(void) {")
 print("    uint16_t *cur = uprops;")

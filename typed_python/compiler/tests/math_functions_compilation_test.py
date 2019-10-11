@@ -17,9 +17,7 @@ import math
 import time
 import numpy
 
-from typed_python import (
-    Float32, UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8
-)
+from typed_python import Float32, UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8
 
 from typed_python import Entrypoint
 
@@ -34,7 +32,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         for funToTest in [
             lambda x: math.isinf(x),
             lambda x: math.isfinite(x),
-            lambda x: math.isnan(x)
+            lambda x: math.isnan(x),
         ]:
             compiled = Entrypoint(funToTest)
 

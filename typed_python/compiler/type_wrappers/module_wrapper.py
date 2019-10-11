@@ -17,7 +17,9 @@ from typed_python import Value
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    t
+)
 
 
 class ModuleWrapper(Wrapper):
@@ -35,13 +37,10 @@ class ModuleWrapper(Wrapper):
         if not hasattr(self.typeRepresentation.Value, attribute):
             return context.pushException(
                 AttributeError,
-                "module '%s' has no attribute '%s'" % (
-                    self.typeRepresentation.Value.__name__,
-                    attribute
-                )
+                "module '%s' has no attribute '%s'"
+                % (self.typeRepresentation.Value.__name__, attribute),
             )
 
         return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
-            context,
-            getattr(self.typeRepresentation.Value, attribute)
+            context, getattr(self.typeRepresentation.Value, attribute)
         )

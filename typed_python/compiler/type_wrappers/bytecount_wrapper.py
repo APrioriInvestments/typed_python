@@ -13,7 +13,9 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
+from typed_python.compiler.type_wrappers.python_type_object_wrapper import (
+    PythonTypeObjectWrapper,
+)
 import typed_python.compiler.native_ast as native_ast
 from typed_python._types import bytecount
 
@@ -30,7 +32,11 @@ class BytecountWrapper(Wrapper):
         return native_ast.Type.Void()
 
     def convert_call(self, context, expr, args, kwargs):
-        if len(args) == 1 and isinstance(args[0].expr_type, PythonTypeObjectWrapper) and not kwargs:
+        if (
+            len(args) == 1
+            and isinstance(args[0].expr_type, PythonTypeObjectWrapper)
+            and not kwargs
+        ):
             return context.constant(bytecount(args[0].expr_type.typeRepresentation.Value))
 
         return super().convert_call(context, expr, args, kwargs)

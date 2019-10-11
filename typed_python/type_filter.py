@@ -33,6 +33,7 @@ def TypeFilter(base_type, filter_function):
     Produce a 'type object' that can be used in typed python to filter objects by
     arbitrary criteria.
     """
+
     class TypeFilter(metaclass=TypeFilterBase):
         pass
 

@@ -21,12 +21,16 @@ from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
 from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
 from typed_python.compiler.function_conversion_context import FunctionConversionContext
-from typed_python.compiler.native_function_conversion_context import NativeFunctionConversionContext
+from typed_python.compiler.native_function_conversion_context import (
+    NativeFunctionConversionContext,
+)
 
 NoneExprType = NoneWrapper()
 
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    t
+)
 
 
 class TypedCallTarget(object):
@@ -48,7 +52,7 @@ class TypedCallTarget(object):
         return "TypedCallTarget(name=%s,inputs=%s,outputs=%s)" % (
             self.name,
             [str(x) for x in self.input_types],
-            str(self.output_type)
+            str(self.output_type),
         )
 
 
@@ -95,7 +99,7 @@ class PythonToNativeConverter(object):
         suffix = None
         getname = lambda: prefix + name + ("" if suffix is None else ".%s" % suffix)
         while getname() in self._used_names:
-            suffix = 1 if not suffix else suffix+1
+            suffix = 1 if not suffix else suffix + 1
         res = getname()
         self._used_names.add(res)
         return res
@@ -106,14 +110,18 @@ class PythonToNativeConverter(object):
         if isinstance(pyast, python_ast.Statement.FunctionDef):
             body = pyast.body
         else:
-            body = [python_ast.Statement.Return(
-                value=pyast.body,
-                line_number=pyast.body.line_number,
-                col_offset=pyast.body.col_offset,
-                filename=pyast.body.filename
-            )]
+            body = [
+                python_ast.Statement.Return(
+                    value=pyast.body,
+                    line_number=pyast.body.line_number,
+                    col_offset=pyast.body.col_offset,
+                    filename=pyast.body.filename,
+                )
+            ]
 
-        return FunctionConversionContext(self, f.__name__, identity, pyast.args, body, input_types, output_type, freevars)
+        return FunctionConversionContext(
+            self, f.__name__, identity, pyast.args, body, input_types, output_type, freevars
+        )
 
     def installLinktimeHook(self, identity, callback):
         """Call 'callback' with the native function pointer for 'identity' after compilation has finished."""
@@ -125,7 +133,9 @@ class PythonToNativeConverter(object):
         else:
             return None
 
-    def defineNativeFunction(self, name, identity, input_types, output_type, generatingFunction, callback=None):
+    def defineNativeFunction(
+        self, name, identity, input_types, output_type, generatingFunction, callback=None
+    ):
         """Define a native function if we haven't defined it before already.
 
             name - the name to actually give the function.
@@ -182,10 +192,10 @@ class PythonToNativeConverter(object):
                 external=False,
                 varargs=False,
                 intrinsic=False,
-                can_throw=True
+                can_throw=True,
             ),
             input_types,
-            output_type
+            output_type,
         )
 
     def _callable_to_ast_and_vars(self, f):
@@ -234,7 +244,7 @@ class PythonToNativeConverter(object):
             if not callTarget.input_types[i].is_empty:
                 argtype = callTarget.input_types[i].getNativeLayoutType()
 
-                untypedPtr = native_ast.var('input').ElementPtrIntegers(i).load()
+                untypedPtr = native_ast.var("input").ElementPtrIntegers(i).load()
 
                 if callTarget.input_types[i].is_pass_by_ref:
                     # we've been handed a pointer, and it's already a pointer
@@ -244,24 +254,30 @@ class PythonToNativeConverter(object):
 
         if callTarget.output_type is not None and callTarget.output_type.is_pass_by_ref:
             body = callTarget.call(
-                native_ast.var('return').cast(callTarget.output_type.getNativeLayoutType().pointer()),
-                *args
+                native_ast.var("return").cast(
+                    callTarget.output_type.getNativeLayoutType().pointer()
+                ),
+                *args,
             )
         else:
             body = callTarget.call(*args)
 
             if not (callTarget.output_type is None or callTarget.output_type.is_empty):
-                body = native_ast.var('return').cast(callTarget.output_type.getNativeLayoutType().pointer()).store(body)
+                body = (
+                    native_ast.var("return")
+                    .cast(callTarget.output_type.getNativeLayoutType().pointer())
+                    .store(body)
+                )
 
         body = native_ast.FunctionBody.Internal(body=body)
 
         definition = native_ast.Function(
             args=(
-                ('return', native_ast.Type.Void().pointer()),
-                ('input', native_ast.Type.Void().pointer().pointer())
+                ("return", native_ast.Type.Void().pointer()),
+                ("input", native_ast.Type.Void().pointer().pointer()),
             ),
             body=body,
-            output_type=native_ast.Type.Void()
+            output_type=native_ast.Type.Void(),
         )
 
         new_name = self.new_name(callTarget.name + ".dispatch")
@@ -288,7 +304,9 @@ class PythonToNativeConverter(object):
 
                 name = self._names_for_identifier[identity]
 
-                self._targets[name] = self.getTypedCallTarget(name, functionConverter._input_types, actual_output_type)
+                self._targets[name] = self.getTypedCallTarget(
+                    name, functionConverter._input_types, actual_output_type
+                )
 
         # when we define an entrypoint to a class, we actually need to compile
         # a version of that function for every override of that function as well.
@@ -310,17 +328,23 @@ class PythonToNativeConverter(object):
 
         interfaceClass, implementingClass, slotIndex = dispatch
 
-        name, signature = _types.getClassMethodDispatchSignature(interfaceClass, implementingClass, slotIndex)
+        name, signature = _types.getClassMethodDispatchSignature(
+            interfaceClass, implementingClass, slotIndex
+        )
 
         # generate a callback that takes the linked function pointer and jams
         # it into the relevant slot in the vtable once it's produced
         def installOverload(fp):
-            _types.installClassMethodDispatch(interfaceClass, implementingClass, slotIndex, fp.fp)
+            _types.installClassMethodDispatch(
+                interfaceClass, implementingClass, slotIndex, fp.fp
+            )
 
         # we are compiling the function 'name' in 'implementingClass' to be installed when
         # viewing an instance of 'implementingClass' as 'interfaceClass' that's function
         # 'name' called with signature 'signature'
-        assert ClassWrapper.compileMethodInstantiation(self, interfaceClass, implementingClass, name, signature, callback=installOverload)
+        assert ClassWrapper.compileMethodInstantiation(
+            self, interfaceClass, implementingClass, name, signature, callback=installOverload
+        )
 
         return True
 
@@ -329,7 +353,9 @@ class PythonToNativeConverter(object):
         while self._resolveInflightOnePass():
             passCt += 1
             if passCt > 100:
-                print("We've done ", passCt, " with ", len(self._inflight_function_conversions))
+                print(
+                    "We've done ", passCt, " with ", len(self._inflight_function_conversions)
+                )
                 for c in self._inflight_function_conversions.values():
                     print("    ", c.identity[1].__name__, c.identity[2], "->", c._output_type)
                 raise Exception("Exceed max pass count")
@@ -362,7 +388,9 @@ class PythonToNativeConverter(object):
             assert isRoot
 
         if identifier not in self._inflight_function_conversions:
-            functionConverter = self.createConversionContext(identifier, f, input_types, output_type)
+            functionConverter = self.createConversionContext(
+                identifier, f, input_types, output_type
+            )
 
             self._inflight_function_conversions[identifier] = functionConverter
 

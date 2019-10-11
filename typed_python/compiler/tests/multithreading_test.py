@@ -12,7 +12,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, Class, Member, Alternative, TupleOf, ListOf, ConstDict, SerializationContext
+from typed_python import (
+    Function,
+    Class,
+    Member,
+    Alternative,
+    TupleOf,
+    ListOf,
+    ConstDict,
+    SerializationContext,
+)
 import typed_python._types as _types
 from typed_python.compiler.runtime import Runtime
 import unittest
@@ -68,7 +77,7 @@ class TestMultithreading(unittest.TestCase):
             first = t1 - t0
             second = t2 - t1
 
-            ratios.append(second/first)
+            ratios.append(second / first)
 
         ratios = sorted(ratios)
 
@@ -76,26 +85,27 @@ class TestMultithreading(unittest.TestCase):
 
         # expect the ratio to be close to 1, but have some error margin, especially on Travis
         # where we may be running in a multitenant environment
-        if os.environ.get('TRAVIS_CI', None):
-            self.assertTrue(ratio >= .8 and ratio < 1.75, ratio)
+        if os.environ.get("TRAVIS_CI", None):
+            self.assertTrue(ratio >= 0.8 and ratio < 1.75, ratio)
         else:
-            self.assertTrue(ratio >= .9 and ratio < 1.1, ratio)
+            self.assertTrue(ratio >= 0.9 and ratio < 1.1, ratio)
 
     def test_refcounts_of_objects_across_boundary(self):
         class Object:
             pass
+
         _ = Object()
 
-        A = Alternative("A", X={'x': int}, Y={'y': int})
+        A = Alternative("A", X={"x": int}, Y={"y": int})
 
         for instance in [
-                TupleOf(int)((1, 2, 3)),
-                ListOf(int)((1, 2, 3)),
-                # Dict(int,int)({1:2,3:4}),
-                ConstDict(int, int)({1: 2, 3: 4}),
-                AClass(),
-                # anObject,
-                A.X(x=10)
+            TupleOf(int)((1, 2, 3)),
+            ListOf(int)((1, 2, 3)),
+            # Dict(int,int)({1:2,3:4}),
+            ConstDict(int, int)({1: 2, 3: 4}),
+            AClass(),
+            # anObject,
+            A.X(x=10),
         ]:
             self.refcountsTest(instance)
 
@@ -114,7 +124,7 @@ class TestMultithreading(unittest.TestCase):
         self.assertEqual(_types.refcount(instance), 1)
 
     def test_serialize_is_parallel(self):
-        if os.environ.get('TRAVIS_CI', None):
+        if os.environ.get("TRAVIS_CI", None):
             return
 
         T = ListOf(int)
@@ -137,11 +147,11 @@ class TestMultithreading(unittest.TestCase):
             first = t1 - t0
             second = t2 - t1
 
-            ratios.append(second/first)
+            ratios.append(second / first)
 
         ratios = sorted(ratios)
 
         ratio = ratios[5]
 
         # expect the ratio to be close to 1, but have some error margin
-        self.assertTrue(ratio >= .8 and ratio < 1.2, ratios)
+        self.assertTrue(ratio >= 0.8 and ratio < 1.2, ratios)

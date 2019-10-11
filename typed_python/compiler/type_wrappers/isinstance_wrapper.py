@@ -15,7 +15,9 @@
 from typed_python import Int64, Float64, Bool, String
 from typed_python.compiler import native_ast
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
+from typed_python.compiler.type_wrappers.python_free_object_wrapper import (
+    PythonFreeObjectWrapper,
+)
 
 
 class IsinstanceWrapper(Wrapper):
@@ -49,7 +51,9 @@ class IsinstanceWrapper(Wrapper):
                     return context.constant(False)
 
                 if not isinstance(args[1].expr_type.typeRepresentation.Value, type):
-                    return context.pushException(TypeError, "second argument to isinstance must be a type.")
+                    return context.pushException(
+                        TypeError, "second argument to isinstance must be a type."
+                    )
 
                 return context.constant(
                     issubclass(argType, args[1].expr_type.typeRepresentation.Value)

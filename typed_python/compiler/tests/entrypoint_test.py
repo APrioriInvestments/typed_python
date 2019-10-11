@@ -83,7 +83,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
             compiledAdd(aList, 1)
             t2 = time.time()
 
-            speedup = (t1 - t0)/(t2 - t1)
+            speedup = (t1 - t0) / (t2 - t1)
             self.assertGreater(speedup, 10)
 
             print("speedup for ", T, " is ", speedup)  # I get about 70x
@@ -105,7 +105,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         def threadloop():
             try:
                 while not done[0]:
-                    sumFun(0.0, 10**4)
+                    sumFun(0.0, 10 ** 4)
             except Exception:
                 traceback.print_exc()
                 failed.append(True)
@@ -117,7 +117,9 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         t0 = time.time()
         while time.time() - t0 < 10.0:
-            touchCompiledSpecializations(sumFun.__typed_python_function__.overloads[0].functionTypeObject, 0)
+            touchCompiledSpecializations(
+                sumFun.__typed_python_function__.overloads[0].functionTypeObject, 0
+            )
 
         done[0] = True
 
@@ -127,14 +129,10 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         assert not failed
 
     def test_specialization_noniterable_after_iterable(self):
-
-        class AClass():
+        class AClass:
             pass
 
-        test_cases = [
-            ListOf(int)(),
-            AClass(),
-        ]
+        test_cases = [ListOf(int)(), AClass()]
 
         @Entrypoint
         def specialized_f(x):
@@ -149,13 +147,13 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         def f(x):
             if x <= 0:
                 return 0
-            return g(x-1) + 1
+            return g(x - 1) + 1
 
         @Entrypoint
         def g(x):
             if x <= 0:
                 return 0
-            return g(x-1) + 1
+            return g(x - 1) + 1
 
         self.assertEqual(f(100), 100)
 
@@ -229,7 +227,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         # make sure it's fast
         t0 = time.time()
         sumOver(100000000, addsOne)
-        self.assertLess(time.time() - t0, .4)
+        self.assertLess(time.time() - t0, 0.4)
 
     def test_nocompile_works(self):
         thisWouldNotBeVisible = set()
@@ -257,4 +255,4 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         sumOver(100000000, 3.0)
         time.time() - t0
 
-        self.assertLess(time.time() - t0, .4)
+        self.assertLess(time.time() - t0, 0.4)

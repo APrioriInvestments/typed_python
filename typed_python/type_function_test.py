@@ -12,7 +12,14 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Class, Alternative, Member, SerializationContext, Forward
+from typed_python import (
+    TypeFunction,
+    Class,
+    Alternative,
+    Member,
+    SerializationContext,
+    Forward,
+)
 import unittest
 
 
@@ -20,11 +27,7 @@ class TypeFunctionTest(unittest.TestCase):
     def test_basic(self):
         @TypeFunction
         def List(T):
-            return Alternative(
-                "List",
-                Node={"head": T, "tail": List(T)},
-                Empty={}
-            )
+            return Alternative("List", Node={"head": T, "tail": List(T)}, Empty={})
 
         self.assertIs(List(int), List(int))
         self.assertIsNot(List(float), List(int))
@@ -44,6 +47,7 @@ class TypeFunctionTest(unittest.TestCase):
             class X(Class):
                 i = Member(T)
                 y = Member(Y(T))
+
             return X
 
         @TypeFunction
@@ -51,6 +55,7 @@ class TypeFunctionTest(unittest.TestCase):
             class Y(Class):
                 i = Member(T)
                 x = Member(X(T))
+
             return Y
 
         self.assertIs(Y(int), Y(int))
@@ -68,21 +73,13 @@ class TypeFunctionTest(unittest.TestCase):
         @TypeFunction
         def List(T):
             ListT = Forward("ListT")
-            return ListT.define(Alternative(
-                "List",
-                Node={"head": T, "tail": ListT},
-                Empty={}
-            ))
+            return ListT.define(Alternative("List", Node={"head": T, "tail": ListT}, Empty={}))
 
-        context = SerializationContext({'List': List})
+        context = SerializationContext({"List": List})
 
-        self.assertIs(
-            context.deserialize(context.serialize(List(int))),
-            List(int)
-        )
+        self.assertIs(context.deserialize(context.serialize(List(int))), List(int))
         self.assertIsInstance(
-            context.deserialize(context.serialize(List(int).Empty())),
-            List(int)
+            context.deserialize(context.serialize(List(int).Empty())), List(int)
         )
 
         list_of_int = List(int)
@@ -91,7 +88,4 @@ class TypeFunctionTest(unittest.TestCase):
         l0 = list_of_int.Empty()
         l_l = list_of_list.Node(head=l0, tail=list_of_list.Empty())
 
-        self.assertEqual(
-            context.deserialize(context.serialize(l_l)),
-            l_l
-        )
+        self.assertEqual(context.deserialize(context.serialize(l_l)), l_l)

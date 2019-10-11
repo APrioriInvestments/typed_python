@@ -43,12 +43,14 @@ class TestAlternativeCompilation(unittest.TestCase):
 
     def test_complex_alternative_passing(self):
         Complex = Forward("Complex")
-        Complex = Complex.define(Alternative(
-            "Complex",
-            A={'a': str, 'b': int},
-            B={'a': str, 'c': int},
-            C={'a': str, 'd': Complex}
-        ))
+        Complex = Complex.define(
+            Alternative(
+                "Complex",
+                A={"a": str, "b": int},
+                B={"a": str, "c": int},
+                C={"a": str, "d": Complex},
+            )
+        )
 
         c = Complex.A(a="hi", b=20)
         c2 = Complex.C(a="hi", d=c)
@@ -65,7 +67,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(_types.refcount(c2), 1)
 
     def test_construct_alternative(self):
-        A = Alternative("A", X={'x': int})
+        A = Alternative("A", X={"x": int})
 
         @Compiled
         def f():
@@ -75,7 +77,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(f().x, 10)
 
     def test_alternative_matches(self):
-        A = Alternative("A", X={'x': int}, Y={'x': int})
+        A = Alternative("A", X={"x": int}, Y={"x": int})
 
         @Compiled
         def f(x: A):
@@ -85,7 +87,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertFalse(f(A.Y()))
 
     def test_alternative_member_homogenous(self):
-        A = Alternative("A", X={'x': int}, Y={'x': int})
+        A = Alternative("A", X={"x": int}, Y={"x": int})
 
         @Compiled
         def f(x: A):
@@ -95,7 +97,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(f(A.Y(x=10)), 10)
 
     def test_alternative_member_diverse(self):
-        A = Alternative("A", X={'x': int}, Y={'x': float})
+        A = Alternative("A", X={"x": int}, Y={"x": float})
 
         @Compiled
         def f(x: A):
@@ -105,7 +107,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(f(A.Y(x=10.5)), 10.5)
 
     def test_alternative_member_distinct(self):
-        A = Alternative("A", X={'x': int}, Y={'y': float})
+        A = Alternative("A", X={"x": int}, Y={"y": float})
 
         @Compiled
         def f(x: A):
@@ -121,11 +123,11 @@ class TestAlternativeCompilation(unittest.TestCase):
         @TypeFunction
         def Tree(T):
             TreeType = Forward("TreeType")
-            TreeType = TreeType.define(Alternative(
-                "Tree",
-                Leaf={'value': T},
-                Node={'left': TreeType, 'right': TreeType}
-            ))
+            TreeType = TreeType.define(
+                Alternative(
+                    "Tree", Leaf={"value": T}, Node={"left": TreeType, "right": TreeType}
+                )
+            )
             return TreeType
 
         def treeSum(x: Tree(int)):
@@ -139,8 +141,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         def buildTree(depth: int, offset: int) -> Tree(int):
             if depth > 0:
                 return Tree(int).Node(
-                    left=buildTree(depth-1, offset),
-                    right=buildTree(depth-1, offset+1),
+                    left=buildTree(depth - 1, offset), right=buildTree(depth - 1, offset + 1)
                 )
             return Tree(int).Leaf(value=offset)
 
@@ -154,60 +155,58 @@ class TestAlternativeCompilation(unittest.TestCase):
         t2 = time.time()
 
         self.assertEqual(sum, sumCompiled)
-        speedup = (t1-t0)/(t2-t1)
+        speedup = (t1 - t0) / (t2 - t1)
         self.assertGreater(speedup, 20)  # I get about 50
 
     def test_compile_alternative_magic_methods(self):
 
-        A = Alternative("A", a={'a': int}, b={'b': str},
-                        __bool__=lambda self: False,
-                        __str__=lambda self: "my str",
-                        __repr__=lambda self: "my repr",
-                        __call__=lambda self, i: "my call",
-                        __len__=lambda self: 42,
-                        __contains__=lambda self, item: item == 1,
-                        __bytes__=lambda self: b'my bytes',
-                        __format__=lambda self, spec: "my format",
-
-                        __int__=lambda self: 43,
-                        __float__=lambda self: 44.44,
-                        __complex__=lambda self: 3+4j,
-
-                        __add__=lambda self, other: A.b("add"),
-                        __sub__=lambda self, other: A.b("sub"),
-                        __mul__=lambda self, other: A.b("mul"),
-                        __matmul__=lambda self, other: A.b("matmul"),
-                        __truediv__=lambda self, other: A.b("truediv"),
-                        __floordiv__=lambda self, other: A.b("floordiv"),
-                        __divmod__=lambda self, other: A.b("divmod"),
-                        __mod__=lambda self, other: A.b("mod"),
-                        __pow__=lambda self, other: A.b("pow"),
-                        __lshift__=lambda self, other: A.b("lshift"),
-                        __rshift__=lambda self, other: A.b("rshift"),
-                        __and__=lambda self, other: A.b("and"),
-                        __or__=lambda self, other: A.b("or"),
-                        __xor__=lambda self, other: A.b("xor"),
-
-                        __iadd__=lambda self, other: A.b("iadd"),
-                        __isub__=lambda self, other: A.b("isub"),
-                        __imul__=lambda self, other: A.b("imul"),
-                        __imatmul__=lambda self, other: A.b("imatmul"),
-                        __itruediv__=lambda self, other: A.b("itruediv"),
-                        __ifloordiv__=lambda self, other: A.b("ifloordiv"),
-                        __imod__=lambda self, other: A.b("imod"),
-                        __ipow__=lambda self, other: A.b("ipow"),
-                        __ilshift__=lambda self, other: A.b("ilshift"),
-                        __irshift__=lambda self, other: A.b("irshift"),
-                        __iand__=lambda self, other: A.b("iand"),
-                        __ior__=lambda self, other: A.b("ior"),
-                        __ixor__=lambda self, other: A.b("ixor"),
-
-                        __neg__=lambda self: A.b("neg"),
-                        __pos__=lambda self: A.b("pos"),
-                        __invert__=lambda self: A.b("invert"),
-
-                        __abs__=lambda self: A.b("abs"),
-                        )
+        A = Alternative(
+            "A",
+            a={"a": int},
+            b={"b": str},
+            __bool__=lambda self: False,
+            __str__=lambda self: "my str",
+            __repr__=lambda self: "my repr",
+            __call__=lambda self, i: "my call",
+            __len__=lambda self: 42,
+            __contains__=lambda self, item: item == 1,
+            __bytes__=lambda self: b"my bytes",
+            __format__=lambda self, spec: "my format",
+            __int__=lambda self: 43,
+            __float__=lambda self: 44.44,
+            __complex__=lambda self: 3 + 4j,
+            __add__=lambda self, other: A.b("add"),
+            __sub__=lambda self, other: A.b("sub"),
+            __mul__=lambda self, other: A.b("mul"),
+            __matmul__=lambda self, other: A.b("matmul"),
+            __truediv__=lambda self, other: A.b("truediv"),
+            __floordiv__=lambda self, other: A.b("floordiv"),
+            __divmod__=lambda self, other: A.b("divmod"),
+            __mod__=lambda self, other: A.b("mod"),
+            __pow__=lambda self, other: A.b("pow"),
+            __lshift__=lambda self, other: A.b("lshift"),
+            __rshift__=lambda self, other: A.b("rshift"),
+            __and__=lambda self, other: A.b("and"),
+            __or__=lambda self, other: A.b("or"),
+            __xor__=lambda self, other: A.b("xor"),
+            __iadd__=lambda self, other: A.b("iadd"),
+            __isub__=lambda self, other: A.b("isub"),
+            __imul__=lambda self, other: A.b("imul"),
+            __imatmul__=lambda self, other: A.b("imatmul"),
+            __itruediv__=lambda self, other: A.b("itruediv"),
+            __ifloordiv__=lambda self, other: A.b("ifloordiv"),
+            __imod__=lambda self, other: A.b("imod"),
+            __ipow__=lambda self, other: A.b("ipow"),
+            __ilshift__=lambda self, other: A.b("ilshift"),
+            __irshift__=lambda self, other: A.b("irshift"),
+            __iand__=lambda self, other: A.b("iand"),
+            __ior__=lambda self, other: A.b("ior"),
+            __ixor__=lambda self, other: A.b("ixor"),
+            __neg__=lambda self: A.b("neg"),
+            __pos__=lambda self: A.b("pos"),
+            __invert__=lambda self: A.b("invert"),
+            __abs__=lambda self: A.b("abs"),
+        )
 
         def f_bool(x: A):
             return bool(x)
@@ -339,11 +338,47 @@ class TestAlternativeCompilation(unittest.TestCase):
             x **= A.a()
             return x
 
-        test_cases = [f_int, f_float, f_bool, f_str, f_repr, f_call, f_0in, f_1in, f_len,
-                      f_add, f_sub, f_mul, f_div, f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift, f_pow,
-                      f_neg, f_pos, f_invert, f_abs,
-                      f_iadd, f_isub, f_imul, f_idiv, f_ifloordiv, f_imatmul,
-                      f_imod, f_iand, f_ior, f_ixor, f_irshift, f_ilshift, f_ipow]
+        test_cases = [
+            f_int,
+            f_float,
+            f_bool,
+            f_str,
+            f_repr,
+            f_call,
+            f_0in,
+            f_1in,
+            f_len,
+            f_add,
+            f_sub,
+            f_mul,
+            f_div,
+            f_floordiv,
+            f_matmul,
+            f_mod,
+            f_and,
+            f_or,
+            f_xor,
+            f_rshift,
+            f_lshift,
+            f_pow,
+            f_neg,
+            f_pos,
+            f_invert,
+            f_abs,
+            f_iadd,
+            f_isub,
+            f_imul,
+            f_idiv,
+            f_ifloordiv,
+            f_imatmul,
+            f_imod,
+            f_iand,
+            f_ior,
+            f_ixor,
+            f_irshift,
+            f_ilshift,
+            f_ipow,
+        ]
 
         for f in test_cases:
             compiled_f = Compiled(f)
@@ -354,9 +389,9 @@ class TestAlternativeCompilation(unittest.TestCase):
     @pytest.mark.skip(reason="not supported yet")
     def test_compile_alternative_reverse_methods(self):
 
-        A = Alternative("A", a={'a': int}, b={'b': str},
-                        __radd__=lambda self, other: A.b("radd")
-                        )
+        A = Alternative(
+            "A", a={"a": int}, b={"b": str}, __radd__=lambda self, other: A.b("radd")
+        )
 
         def f_radd(x: A):
             return 1 + x
@@ -369,13 +404,11 @@ class TestAlternativeCompilation(unittest.TestCase):
             self.assertEqual(r1, r2)
 
     def test_compile_alternative_format(self):
-        A1 = Alternative("A1", a={'a': int}, b={'b': str})
-        A2 = Alternative("A2", a={'a': int}, b={'b': str},
-                         __str__=lambda self: "my str"
-                         )
-        A3 = Alternative("A3", a={'a': int}, b={'b': str},
-                         __format__=lambda self, spec: "my format " + spec
-                         )
+        A1 = Alternative("A1", a={"a": int}, b={"b": str})
+        A2 = Alternative("A2", a={"a": int}, b={"b": str}, __str__=lambda self: "my str")
+        A3 = Alternative(
+            "A3", a={"a": int}, b={"b": str}, __format__=lambda self, spec: "my format " + spec
+        )
 
         def a1_format(x: A1):
             return format(x)
@@ -421,9 +454,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             self.assertEqual(r1, r2)
 
     def test_compile_alternative_bytes(self):
-        A = Alternative("A", a={'a': int}, b={'b': str},
-                        __bytes__=lambda self: b'my bytes'
-                        )
+        A = Alternative("A", a={"a": int}, b={"b": str}, __bytes__=lambda self: b"my bytes")
 
         def f_bytes(x: A):
             return bytes(x)
@@ -435,7 +466,6 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(r1, r2)
 
     def test_compile_alternative_attr(self):
-
         def A_getattr(self, n):
             return self.d[n]
 
@@ -445,11 +475,13 @@ class TestAlternativeCompilation(unittest.TestCase):
         def A_delattr(self, n):
             del self.d[n]
 
-        A = Alternative("A", a={'d': Dict(str, str), 'i': int},
-                        __getattr__=A_getattr,
-                        __setattr__=A_setattr,
-                        __delattr__=A_delattr
-                        )
+        A = Alternative(
+            "A",
+            a={"d": Dict(str, str), "i": int},
+            __getattr__=A_getattr,
+            __setattr__=A_setattr,
+            __delattr__=A_delattr,
+        )
 
         def f_getattr1(x: A):
             return x.q
@@ -541,9 +573,7 @@ class TestAlternativeCompilation(unittest.TestCase):
     def test_compile_alternative_float_methods(self):
         # if __float__ is defined, then floor() and ceil() are based off this conversion,
         # when __floor__ and __ceil__ are not defined
-        A = Alternative("A", a={'a': int}, b={'b': str},
-                        __float__=lambda self: 1234.5
-                        )
+        A = Alternative("A", a={"a": int}, b={"b": str}, __float__=lambda self: 1234.5)
 
         def f_floor(x: A):
             return floor(x)
@@ -558,12 +588,15 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = compiled_f(A.a())
             self.assertEqual(r1, r2)
 
-        B = Alternative("B", a={'a': int}, b={'b': str},
-                        __round__=lambda self, n: 1234 + n,
-                        __trunc__=lambda self: 1,
-                        __floor__=lambda self: 2,
-                        __ceil__=lambda self: 3
-                        )
+        B = Alternative(
+            "B",
+            a={"a": int},
+            b={"b": str},
+            __round__=lambda self, n: 1234 + n,
+            __trunc__=lambda self: 1,
+            __floor__=lambda self: 2,
+            __ceil__=lambda self: 3,
+        )
 
         def f_round0(x: B):
             return round(x, 0)
@@ -589,7 +622,16 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_ceil(x: B):
             return ceil(x)
 
-        test_cases = [f_round0, f_round1, f_round2, f_round_1, f_round_2, f_trunc, f_floor, f_ceil]
+        test_cases = [
+            f_round0,
+            f_round1,
+            f_round2,
+            f_round_1,
+            f_round_2,
+            f_trunc,
+            f_floor,
+            f_ceil,
+        ]
         for f in test_cases:
             r1 = f(B.a())
             compiled_f = Compiled(f)
@@ -601,7 +643,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         # I expected the compiled dir() to do the same thing, but it doesn't sort.
         # So if you append these elements out of order, the test will fail.
 
-        A0 = Alternative("A", a={'a': int}, b={'b': str})
+        A0 = Alternative("A", a={"a": int}, b={"b": str})
 
         def A_dir(self):
             x = ListOf(str)()
@@ -610,9 +652,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             x.append("z")
             return x
 
-        A = Alternative("A", a={'a': int}, b={'b': str},
-                        __dir__=A_dir,
-                        )
+        A = Alternative("A", a={"a": int}, b={"b": str}, __dir__=A_dir)
 
         def f_dir0(x: A0):
             return dir(x)
@@ -646,7 +686,7 @@ class TestAlternativeCompilation(unittest.TestCase):
 
     def test_compile_alternative_comparison_defaults(self):
 
-        B = Alternative("B", a={'a': int}, b={'b': str})
+        B = Alternative("B", a={"a": int}, b={"b": str})
 
         def f_eq(x: B, y: B):
             return x == y
@@ -688,15 +728,18 @@ class TestAlternativeCompilation(unittest.TestCase):
 
     def test_compile_alternative_comparison_methods(self):
 
-        C = Alternative("C", a={'a': int}, b={'b': str},
-                        __eq__=lambda self, other: True,
-                        __ne__=lambda self, other: False,
-                        __lt__=lambda self, other: True,
-                        __gt__=lambda self, other: False,
-                        __le__=lambda self, other: True,
-                        __ge__=lambda self, other: False,
-                        __hash__=lambda self: 123,
-                        )
+        C = Alternative(
+            "C",
+            a={"a": int},
+            b={"b": str},
+            __eq__=lambda self, other: True,
+            __ne__=lambda self, other: False,
+            __lt__=lambda self, other: True,
+            __gt__=lambda self, other: False,
+            __le__=lambda self, other: True,
+            __ge__=lambda self, other: False,
+            __hash__=lambda self: 123,
+        )
 
         def f_eq(x: C):
             return x == C.a()
@@ -729,55 +772,53 @@ class TestAlternativeCompilation(unittest.TestCase):
 
     def test_compile_simple_alternative_magic_methods(self):
 
-        A = Alternative("A", a={}, b={},
-                        __bool__=lambda self: False,
-                        __str__=lambda self: "my str",
-                        __repr__=lambda self: "my repr",
-                        __call__=lambda self, i: "my call",
-                        __len__=lambda self: 42,
-                        __contains__=lambda self, item: item == 1,
-                        __bytes__=lambda self: b'my bytes',
-                        __format__=lambda self, spec: "my format",
-
-                        __int__=lambda self: 43,
-                        __float__=lambda self: 44.44,
-                        __complex__=lambda self: 3+4j,
-
-                        __add__=lambda self, other: "add",
-                        __sub__=lambda self, other: "sub",
-                        __mul__=lambda self, other: "mul",
-                        __matmul__=lambda self, other: "matmul",
-                        __truediv__=lambda self, other: "truediv",
-                        __floordiv__=lambda self, other: "floordiv",
-                        __divmod__=lambda self, other: "divmod",
-                        __mod__=lambda self, other: "mod",
-                        __pow__=lambda self, other: "pow",
-                        __lshift__=lambda self, other: "lshift",
-                        __rshift__=lambda self, other: "rshift",
-                        __and__=lambda self, other: "and",
-                        __or__=lambda self, other: "or",
-                        __xor__=lambda self, other: "xor",
-
-                        __iadd__=lambda self, other: "iadd",
-                        __isub__=lambda self, other: "isub",
-                        __imul__=lambda self, other: "imul",
-                        __imatmul__=lambda self, other: "imatmul",
-                        __itruediv__=lambda self, other: "itruediv",
-                        __ifloordiv__=lambda self, other: "ifloordiv",
-                        __imod__=lambda self, other: "imod",
-                        __ipow__=lambda self, other: "ipow",
-                        __ilshift__=lambda self, other: "ilshift",
-                        __irshift__=lambda self, other: "irshift",
-                        __iand__=lambda self, other: "iand",
-                        __ior__=lambda self, other: "ior",
-                        __ixor__=lambda self, other: "ixor",
-
-                        __neg__=lambda self: "neg",
-                        __pos__=lambda self: "pos",
-                        __invert__=lambda self: "invert",
-
-                        __abs__=lambda self: "abs",
-                        )
+        A = Alternative(
+            "A",
+            a={},
+            b={},
+            __bool__=lambda self: False,
+            __str__=lambda self: "my str",
+            __repr__=lambda self: "my repr",
+            __call__=lambda self, i: "my call",
+            __len__=lambda self: 42,
+            __contains__=lambda self, item: item == 1,
+            __bytes__=lambda self: b"my bytes",
+            __format__=lambda self, spec: "my format",
+            __int__=lambda self: 43,
+            __float__=lambda self: 44.44,
+            __complex__=lambda self: 3 + 4j,
+            __add__=lambda self, other: "add",
+            __sub__=lambda self, other: "sub",
+            __mul__=lambda self, other: "mul",
+            __matmul__=lambda self, other: "matmul",
+            __truediv__=lambda self, other: "truediv",
+            __floordiv__=lambda self, other: "floordiv",
+            __divmod__=lambda self, other: "divmod",
+            __mod__=lambda self, other: "mod",
+            __pow__=lambda self, other: "pow",
+            __lshift__=lambda self, other: "lshift",
+            __rshift__=lambda self, other: "rshift",
+            __and__=lambda self, other: "and",
+            __or__=lambda self, other: "or",
+            __xor__=lambda self, other: "xor",
+            __iadd__=lambda self, other: "iadd",
+            __isub__=lambda self, other: "isub",
+            __imul__=lambda self, other: "imul",
+            __imatmul__=lambda self, other: "imatmul",
+            __itruediv__=lambda self, other: "itruediv",
+            __ifloordiv__=lambda self, other: "ifloordiv",
+            __imod__=lambda self, other: "imod",
+            __ipow__=lambda self, other: "ipow",
+            __ilshift__=lambda self, other: "ilshift",
+            __irshift__=lambda self, other: "irshift",
+            __iand__=lambda self, other: "iand",
+            __ior__=lambda self, other: "ior",
+            __ixor__=lambda self, other: "ixor",
+            __neg__=lambda self: "neg",
+            __pos__=lambda self: "pos",
+            __invert__=lambda self: "invert",
+            __abs__=lambda self: "abs",
+        )
 
         def f_bool(x: A):
             return bool(x)
@@ -909,9 +950,34 @@ class TestAlternativeCompilation(unittest.TestCase):
             x **= A.a()
             return x
 
-        test_cases = [f_int, f_float, f_bool, f_str, f_repr, f_call, f_0in, f_1in, f_len,
-                      f_add, f_sub, f_mul, f_div, f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift, f_pow,
-                      f_neg, f_pos, f_invert, f_abs]
+        test_cases = [
+            f_int,
+            f_float,
+            f_bool,
+            f_str,
+            f_repr,
+            f_call,
+            f_0in,
+            f_1in,
+            f_len,
+            f_add,
+            f_sub,
+            f_mul,
+            f_div,
+            f_floordiv,
+            f_matmul,
+            f_mod,
+            f_and,
+            f_or,
+            f_xor,
+            f_rshift,
+            f_lshift,
+            f_pow,
+            f_neg,
+            f_pos,
+            f_invert,
+            f_abs,
+        ]
 
         # not supported:
         #               [f_iadd, f_isub, f_imul, f_idiv, f_ifloordiv, f_imatmul,
@@ -925,9 +991,7 @@ class TestAlternativeCompilation(unittest.TestCase):
 
     @pytest.mark.skip(reason="not supported yet")
     def test_compile_simple_alternative_reverse_methods(self):
-        A = Alternative("A", a={}, b={},
-                        __radd__=lambda self, other: A.b("radd")
-                        )
+        A = Alternative("A", a={}, b={}, __radd__=lambda self, other: A.b("radd"))
 
         def f_radd(x: A):
             return 1 + x
@@ -941,12 +1005,8 @@ class TestAlternativeCompilation(unittest.TestCase):
 
     def test_compile_simple_alternative_format(self):
         A1 = Alternative("A1", a={}, b={})
-        A2 = Alternative("A2", a={}, b={},
-                         __str__=lambda self: "my str"
-                         )
-        A3 = Alternative("A3", a={}, b={},
-                         __format__=lambda self, spec: "my format " + spec
-                         )
+        A2 = Alternative("A2", a={}, b={}, __str__=lambda self: "my str")
+        A3 = Alternative("A3", a={}, b={}, __format__=lambda self, spec: "my format " + spec)
 
         def a1_format(x: A1):
             return format(x)
@@ -992,9 +1052,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             self.assertEqual(r1, r2)
 
     def test_compile_simple_alternative_bytes(self):
-        A = Alternative("A", a={}, b={},
-                        __bytes__=lambda self: b'my bytes'
-                        )
+        A = Alternative("A", a={}, b={}, __bytes__=lambda self: b"my bytes")
 
         def f_bytes(x: A):
             return bytes(x)
@@ -1017,11 +1075,14 @@ class TestAlternativeCompilation(unittest.TestCase):
         def A_delattr(self, n):
             del self.d[n]
 
-        A = Alternative("A", a={}, b={},
-                        __getattr__=A_getattr,
-                        __setattr__=A_setattr,
-                        __delattr__=A_delattr
-                        )
+        A = Alternative(
+            "A",
+            a={},
+            b={},
+            __getattr__=A_getattr,
+            __setattr__=A_setattr,
+            __delattr__=A_delattr,
+        )
 
         def f_getattr1(x: A):
             return x.q
@@ -1113,9 +1174,7 @@ class TestAlternativeCompilation(unittest.TestCase):
     def test_compile_simple_alternative_float_methods(self):
         # if __float__ is defined, then floor() and ceil() are based off this conversion,
         # when __floor__ and __ceil__ are not defined
-        A = Alternative("A", a={}, b={},
-                        __float__=lambda self: 1234.5
-                        )
+        A = Alternative("A", a={}, b={}, __float__=lambda self: 1234.5)
 
         def f_floor(x: A):
             return floor(x)
@@ -1130,12 +1189,15 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = compiled_f(A.a())
             self.assertEqual(r1, r2)
 
-        B = Alternative("B", a={}, b={},
-                        __round__=lambda self, n: 1234 + n,
-                        __trunc__=lambda self: 1,
-                        __floor__=lambda self: 2,
-                        __ceil__=lambda self: 3
-                        )
+        B = Alternative(
+            "B",
+            a={},
+            b={},
+            __round__=lambda self, n: 1234 + n,
+            __trunc__=lambda self: 1,
+            __floor__=lambda self: 2,
+            __ceil__=lambda self: 3,
+        )
 
         def f_round0(x: B):
             return round(x, 0)
@@ -1161,7 +1223,16 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_ceil(x: B):
             return ceil(x)
 
-        test_cases = [f_round0, f_round1, f_round2, f_round_1, f_round_2, f_trunc, f_floor, f_ceil]
+        test_cases = [
+            f_round0,
+            f_round1,
+            f_round2,
+            f_round_1,
+            f_round_2,
+            f_trunc,
+            f_floor,
+            f_ceil,
+        ]
         for f in test_cases:
             r1 = f(B.a())
             compiled_f = Compiled(f)
@@ -1182,9 +1253,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             x.append("z")
             return x
 
-        A = Alternative("A", a={}, b={},
-                        __dir__=A_dir,
-                        )
+        A = Alternative("A", a={}, b={}, __dir__=A_dir)
 
         def f_dir0(x: A0):
             return dir(x)
@@ -1258,15 +1327,18 @@ class TestAlternativeCompilation(unittest.TestCase):
                 self.assertEqual(r1, r2)
 
     def test_compile_simple_alternative_comparison_methods(self):
-        C = Alternative("C", a={}, b={},
-                        __eq__=lambda self, other: True,
-                        __ne__=lambda self, other: False,
-                        __lt__=lambda self, other: True,
-                        __gt__=lambda self, other: False,
-                        __le__=lambda self, other: True,
-                        __ge__=lambda self, other: False,
-                        __hash__=lambda self: 123,
-                        )
+        C = Alternative(
+            "C",
+            a={},
+            b={},
+            __eq__=lambda self, other: True,
+            __ne__=lambda self, other: False,
+            __lt__=lambda self, other: True,
+            __gt__=lambda self, other: False,
+            __le__=lambda self, other: True,
+            __ge__=lambda self, other: False,
+            __hash__=lambda self: 123,
+        )
 
         def f_eq(x: C):
             return x == C.a()

@@ -30,7 +30,7 @@ llvm.initialize_native_asmprinter()  # yes, even this one
 target_triple = llvm.get_process_triple()
 target = llvm.Target.from_triple(target_triple)
 target_machine = target.create_target_machine()
-target_machine_shared_object = target.create_target_machine(reloc='pic', codemodel='default')
+target_machine_shared_object = target.create_target_machine(reloc="pic", codemodel="default")
 
 # we need to load the appropriate libstdc++ so that we can get __cxa_begin_catch and friends
 if sys.platform == "darwin":
@@ -41,9 +41,8 @@ else:
 ctypes.CDLL(_types.__file__, mode=ctypes.RTLD_GLOBAL)
 
 
-pointer_size = (
-    llvmlite.ir.PointerType(llvmlite.ir.DoubleType())
-    .get_abi_size(target_machine.target_data)
+pointer_size = llvmlite.ir.PointerType(llvmlite.ir.DoubleType()).get_abi_size(
+    target_machine.target_data
 )
 
 assert pointer_size == native_ast_to_llvm.pointer_size
@@ -53,9 +52,8 @@ def sizeof_native_type(native_type):
     if native_type.matches.Void:
         return 0
 
-    return (
-        native_ast_to_llvm.type_to_llvm_type(native_type)
-        .get_abi_size(target_machine.target_data)
+    return native_ast_to_llvm.type_to_llvm_type(native_type).get_abi_size(
+        target_machine.target_data
     )
 
 
@@ -92,8 +90,12 @@ class NativeFunctionPointer:
         self.output_type = output_type
 
     def __repr__(self):
-        return "NativeFunctionPointer(name=%s,addr=%x,in=%s,out=%s)" \
-            % (self.fname, self.fp, [str(x) for x in self.input_types], str(self.output_type))
+        return "NativeFunctionPointer(name=%s,addr=%x,in=%s,out=%s)" % (
+            self.fname,
+            self.fp,
+            [str(x) for x in self.input_types],
+            str(self.output_type),
+        )
 
 
 class BinarySharedObject:
@@ -116,7 +118,14 @@ class BinarySharedObject:
                 o_file.write(o_file_contents)
 
             subprocess.check_call(
-                ["ld", "-shared", "-fPIC", os.path.join(tf, "module.o"), "-o", os.path.join(tf, "module.so")]
+                [
+                    "ld",
+                    "-shared",
+                    "-fPIC",
+                    os.path.join(tf, "module.o"),
+                    "-o",
+                    os.path.join(tf, "module.so"),
+                ]
             )
 
             with open(os.path.join(tf, "module.so"), "rb") as so_file:

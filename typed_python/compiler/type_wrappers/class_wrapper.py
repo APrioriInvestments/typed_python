@@ -14,7 +14,9 @@
 
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
-from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
+from typed_python.compiler.type_wrappers.python_typed_function_wrapper import (
+    PythonTypedFunctionWrapper,
+)
 
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
@@ -24,41 +26,40 @@ import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
 
-typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
+typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    x
+)
 
 
 native_destructor_function_type = native_ast.Type.Function(
-    output=native_ast.Void,
-    args=(native_ast.VoidPtr,),
-    varargs=False,
-    can_throw=False
+    output=native_ast.Void, args=(native_ast.VoidPtr,), varargs=False, can_throw=False
 ).pointer()
 
 
 class_dispatch_table_type = native_ast.Type.Struct(
     element_types=[
-        ('implementingClass', native_ast.VoidPtr),
-        ('interfaceClass', native_ast.VoidPtr),
-        ('funcPtrs', native_ast.VoidPtr.pointer()),
-        ('upcastDispatches', native_ast.UInt16.pointer()),
-        ('funcPtrsAllocated', native_ast.UInt64),
-        ('funcPtrsUsed', native_ast.UInt64),
-        ('dispatchIndices', native_ast.VoidPtr),
-        ('dispatchDefinitions', native_ast.VoidPtr),
-        ('indicesNeedingDefinition', native_ast.VoidPtr),
+        ("implementingClass", native_ast.VoidPtr),
+        ("interfaceClass", native_ast.VoidPtr),
+        ("funcPtrs", native_ast.VoidPtr.pointer()),
+        ("upcastDispatches", native_ast.UInt16.pointer()),
+        ("funcPtrsAllocated", native_ast.UInt64),
+        ("funcPtrsUsed", native_ast.UInt64),
+        ("dispatchIndices", native_ast.VoidPtr),
+        ("dispatchDefinitions", native_ast.VoidPtr),
+        ("indicesNeedingDefinition", native_ast.VoidPtr),
     ],
-    name="ClassDispatchTable"
+    name="ClassDispatchTable",
 )
 
 
 vtable_type = native_ast.Type.Struct(
     element_types=[
-        ('heldTypePtr', native_ast.VoidPtr),
-        ('destructorFun', native_destructor_function_type),
-        ('classDispatchTable', class_dispatch_table_type.pointer()),
-        ('initializationBitsBytecount', native_ast.Int64)
+        ("heldTypePtr", native_ast.VoidPtr),
+        ("destructorFun", native_destructor_function_type),
+        ("classDispatchTable", class_dispatch_table_type.pointer()),
+        ("initializationBitsBytecount", native_ast.Int64),
     ],
-    name="VTable"
+    name="VTable",
 )
 
 
@@ -76,7 +77,11 @@ class ClassWrapper(RefcountedWrapper):
         self.indexToByteOffset = {}
         self.classType = t
 
-        element_types = [('refcount', native_ast.Int64), ('vtable', vtable_type.pointer()), ('data', native_ast.UInt8)]
+        element_types = [
+            ("refcount", native_ast.Int64),
+            ("vtable", vtable_type.pointer()),
+            ("data", native_ast.UInt8),
+        ]
 
         # this follows the general layout of 'held class' which is 1 bit per field for initialization and then
         # each field packed directly according to byte size
@@ -90,7 +95,9 @@ class ClassWrapper(RefcountedWrapper):
 
             byteOffset += _types.bytecount(self.classType.MemberTypes[i])
 
-        self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
+        self.layoutType = native_ast.Type.Struct(
+            element_types=element_types, name=t.__qualname__ + "Layout"
+        ).pointer()
 
         # we need this to actually be a global variable that we fill out, but we don't have the machinery
         # yet in the native_ast. So for now, we just hack it together.
@@ -120,13 +127,11 @@ class ClassWrapper(RefcountedWrapper):
         if isinstance(otherType, ClassWrapper):
             if otherType.typeRepresentation in self.typeRepresentation.MRO:
                 # this is an upcast
-                index = _types.getDispatchIndexForType(otherType.typeRepresentation, self.typeRepresentation)
-
-                context.pushEffect(
-                    targetVal.expr.store(
-                        self.withDispatchIndex(e, index)
-                    )
+                index = _types.getDispatchIndexForType(
+                    otherType.typeRepresentation, self.typeRepresentation
                 )
+
+                context.pushEffect(targetVal.expr.store(self.withDispatchIndex(e, index)))
                 targetVal.convert_incref()
 
                 return context.constant(True)
@@ -141,7 +146,9 @@ class ClassWrapper(RefcountedWrapper):
             else:
                 y = self.generate_method_call(context, "__len__", (e,))
                 if y is not None:
-                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                    context.pushEffect(
+                        targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0))
+                    )
                 else:
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
@@ -152,8 +159,7 @@ class ClassWrapper(RefcountedWrapper):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.
         # so whenever we interact with the pointer we need to chop off the top 16 bits
         return (
-            nonref_expr
-            .cast(native_ast.UInt64)
+            nonref_expr.cast(native_ast.UInt64)
             .bitand(native_ast.const_uint64_expr(0xFFFFFFFFFFFF))  # 48 bits of 1s
             .cast(self.layoutType)
         )
@@ -161,7 +167,10 @@ class ClassWrapper(RefcountedWrapper):
     def classDispatchTable(self, instance):
         classDispatchTables = (
             self.get_layout_pointer(instance.nonref_expr)
-            .ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 2).load()
+            .ElementPtrIntegers(0, 1)
+            .load()
+            .ElementPtrIntegers(0, 2)
+            .load()
         )
 
         # instances of a class can 'masquerade' as any one of their base classes. They have a vtable
@@ -171,9 +180,7 @@ class ClassWrapper(RefcountedWrapper):
         # be using for dispatch. We encode this in the top 16 bits of the pointer because on modern
         # x64 systems, the pointer address space is 48 bits. If somehow we need to compile on
         # itanium, we'll have to rethink this.
-        return classDispatchTables.elemPtr(
-            self.get_dispatch_index(instance)
-        )
+        return classDispatchTables.elemPtr(self.get_dispatch_index(instance))
 
     def withDispatchIndex(self, instance, index):
         """Return a native expression representing 'instance' as the 'index'th base class in the MRO.
@@ -185,13 +192,18 @@ class ClassWrapper(RefcountedWrapper):
         """
         classDispatchTable = self.classDispatchTable(instance)
 
-        actualIndexExpr = classDispatchTable.ElementPtrIntegers(0, 3).load().ElementPtrIntegers(index).load()
+        actualIndexExpr = (
+            classDispatchTable.ElementPtrIntegers(0, 3).load().ElementPtrIntegers(index).load()
+        )
 
         return (
-            instance.nonref_expr
-            .cast(native_ast.UInt64)
+            instance.nonref_expr.cast(native_ast.UInt64)
             .bitand(native_ast.const_uint64_expr(0xFFFFFFFFFFFF))
-            .add(actualIndexExpr.cast(native_ast.UInt64).lshift(native_ast.const_uint64_expr(48)))
+            .add(
+                actualIndexExpr.cast(native_ast.UInt64).lshift(
+                    native_ast.const_uint64_expr(48)
+                )
+            )
             .cast(self.layoutType)
         )
 
@@ -208,8 +220,7 @@ class ClassWrapper(RefcountedWrapper):
                 # load it
                 .load()
                 # get a pointer to the initializer flag area bytecount
-                .ElementPtrIntegers(0, 3)
-                .load()
+                .ElementPtrIntegers(0, 3).load()
             )
 
     def get_refcount_ptr_expr(self, nonref_expr):
@@ -223,14 +234,14 @@ class ClassWrapper(RefcountedWrapper):
 
     def get_dispatch_index(self, instance):
         """Return the integer index of the current class dispatch within this instances' vtable."""
-        return (
-            instance.nonref_expr
-            .cast(native_ast.UInt64)
-            .rshift(native_ast.const_uint64_expr(48))
+        return instance.nonref_expr.cast(native_ast.UInt64).rshift(
+            native_ast.const_uint64_expr(48)
         )
 
     def convert_default_initialize(self, context, instance):
-        return context.pushException(TypeError, f"Can't default initialize instances of {self}")
+        return context.pushException(
+            TypeError, f"Can't default initialize instances of {self}"
+        )
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -241,27 +252,37 @@ class ClassWrapper(RefcountedWrapper):
 
         context.converter.defineNativeFunction(
             "destructor_" + str(self.typeRepresentation),
-            ('destructor', self),
+            ("destructor", self),
             [self],
             typeWrapper(NoneType),
             self.generateNativeDestructorFunction,
-            callback=installDestructorFun
+            callback=installDestructorFun,
         )
 
         return native_ast.CallTarget.Pointer(
-            expr=self.get_layout_pointer(instance.nonref_expr).ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 1).load()
+            expr=self.get_layout_pointer(instance.nonref_expr)
+            .ElementPtrIntegers(0, 1)
+            .load()
+            .ElementPtrIntegers(0, 1)
+            .load()
         ).call(instance.expr.cast(native_ast.VoidPtr))
 
     def generateNativeDestructorFunction(self, context, out, instance):
         for i in range(len(self.typeRepresentation.MemberTypes)):
             if not typeWrapper(self.typeRepresentation.MemberTypes[i]).is_pod:
-                with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(instance, i))) as (true_block, false_block):
+                with context.ifelse(
+                    context.pushPod(bool, self.isInitializedNativeExpr(instance, i))
+                ) as (true_block, false_block):
                     with true_block:
                         context.pushEffect(
-                            self.convert_attribute(context, instance, i, nocheck=True).convert_destroy()
+                            self.convert_attribute(
+                                context, instance, i, nocheck=True
+                            ).convert_destroy()
                         )
 
-        context.pushEffect(runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr)))
+        context.pushEffect(
+            runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
+        )
 
     def memberPtr(self, instance, ix):
         return (
@@ -304,7 +325,9 @@ class ClassWrapper(RefcountedWrapper):
 
     def convert_attribute(self, context, instance, attribute, nocheck=False):
         if attribute in self.typeRepresentation.MemberFunctions:
-            methodType = BoundMethodWrapper(_types.BoundMethod(self.typeRepresentation, attribute))
+            methodType = BoundMethodWrapper(
+                _types.BoundMethod(self.typeRepresentation, attribute)
+            )
 
             return instance.changeType(methodType)
 
@@ -316,17 +339,21 @@ class ClassWrapper(RefcountedWrapper):
         if ix is None:
             return context.pushException(
                 AttributeError,
-                "Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation)
+                "Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation),
             )
 
         if not nocheck:
-            with context.ifelse(self.isInitializedNativeExpr(instance, ix)) as (ifTrue, ifFalse):
+            with context.ifelse(self.isInitializedNativeExpr(instance, ix)) as (
+                ifTrue,
+                ifFalse,
+            ):
                 with ifFalse:
-                    context.pushException(AttributeError, "Attribute %s is not initialized" % attribute)
+                    context.pushException(
+                        AttributeError, "Attribute %s is not initialized" % attribute
+                    )
 
         return context.pushReference(
-            self.typeRepresentation.MemberTypes[ix],
-            self.memberPtr(instance, ix)
+            self.typeRepresentation.MemberTypes[ix], self.memberPtr(instance, ix)
         )
 
     def resultTypesForCall(self, func, argTypes):
@@ -335,7 +362,9 @@ class ClassWrapper(RefcountedWrapper):
         for isExplicit in [False, True]:
             for o in func.overloads:
                 # check each overload that we might match.
-                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(o, argTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(
+                    o, argTypes, isExplicit
+                )
 
                 if mightMatch is False:
                     return resultTypes
@@ -359,7 +388,9 @@ class ClassWrapper(RefcountedWrapper):
 
         if self.typeRepresentation.IsFinal:
             # we can sidestep the vtable entirely
-            return typeWrapper(func).convert_call(context, None, [instance] + list(args), kwargs)
+            return typeWrapper(func).convert_call(
+                context, None, [instance] + list(args), kwargs
+            )
 
         argTypes = [instance.expr_type] + [a.expr_type for a in args]
 
@@ -385,7 +416,9 @@ class ClassWrapper(RefcountedWrapper):
         # of a base class implementation.
 
         # first, see if there is exacly one possible overload
-        overloadAndIsExplicit = PythonTypedFunctionWrapper.pickSingleOverloadForCall(func, argTypes)
+        overloadAndIsExplicit = PythonTypedFunctionWrapper.pickSingleOverloadForCall(
+            func, argTypes
+        )
 
         if overloadAndIsExplicit is not None:
             return self.dispatchToSingleOverload(
@@ -395,7 +428,7 @@ class ClassWrapper(RefcountedWrapper):
                 methodName,
                 argTypes,
                 instance,
-                args
+                args,
             )
 
         resultTypes = self.resultTypesForCall(func, argTypes)
@@ -405,7 +438,7 @@ class ClassWrapper(RefcountedWrapper):
             context.pushException(
                 Exception,
                 f"No overload could be found for compiled dispatch to "
-                f"{self}.{methodName} with args {argTypes}."
+                f"{self}.{methodName} with args {argTypes}.",
             )
             return None
 
@@ -417,11 +450,13 @@ class ClassWrapper(RefcountedWrapper):
             output_type = typeWrapper(OneOf(*resultTypes))
 
         dispatchToOverloads = context.converter.defineNativeFunction(
-            f'call_method.{self}.{methodName}.{argTypes[1:]}',
-            ('call_method', self, methodName, tuple(argTypes[1:])),
+            f"call_method.{self}.{methodName}.{argTypes[1:]}",
+            ("call_method", self, methodName, tuple(argTypes[1:])),
             list(argTypes),
             output_type,
-            lambda context, outputVar, *args: self.generateMethodDispatch(context, methodName, output_type, args)
+            lambda context, outputVar, *args: self.generateMethodDispatch(
+                context, methodName, output_type, args
+            ),
         )
 
         return context.call_typed_call_target(dispatchToOverloads, [instance] + args, {})
@@ -451,17 +486,27 @@ class ClassWrapper(RefcountedWrapper):
 
         for isExplicit in [False, True]:
             for overloadIndex, overload in enumerate(func.overloads):
-                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, argTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(
+                    overload, argTypes, isExplicit
+                )
 
                 if mightMatch is not False:
                     overloadRetType = overload.returnType or object
 
                     testSingleOverloadForm = context.converter.defineNativeFunction(
-                        f'call_overload.{self}.{methodName}.{overloadIndex}.{isExplicit}.{argTypes[1:]}->{overloadRetType}',
-                        ('call_overload', self, methodName, overloadIndex, isExplicit, overloadRetType, tuple(argTypes[1:])),
+                        f"call_overload.{self}.{methodName}.{overloadIndex}.{isExplicit}.{argTypes[1:]}->{overloadRetType}",
+                        (
+                            "call_overload",
+                            self,
+                            methodName,
+                            overloadIndex,
+                            isExplicit,
+                            overloadRetType,
+                            tuple(argTypes[1:]),
+                        ),
                         [PointerTo(overloadRetType)] + list(argTypes),
                         typeWrapper(bool),
-                        makeOverloadDispatcher(overload, isExplicit)
+                        makeOverloadDispatcher(overload, isExplicit),
                     )
 
                     outputSlot = context.allocateUninitializedSlot(overloadRetType)
@@ -469,7 +514,7 @@ class ClassWrapper(RefcountedWrapper):
                     successful = context.call_typed_call_target(
                         testSingleOverloadForm,
                         (outputSlot.changeType(PointerTo(overloadRetType), False),) + args,
-                        {}
+                        {},
                     )
 
                     with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
@@ -484,12 +529,17 @@ class ClassWrapper(RefcountedWrapper):
 
                     # if we definitely match, we can return early
                     if mightMatch is True:
-                        context.pushException(TypeError, f"Failed to find an overload for {self}.{methodName} matching {args}")
+                        context.pushException(
+                            TypeError,
+                            f"Failed to find an overload for {self}.{methodName} matching {args}",
+                        )
                         return
 
         # generate a cleanup handler for the cases where we don't match a method signature.
         # this should actually be hitting the interpreter instead.
-        context.pushException(TypeError, f"Failed to find an overload for {self}.{methodName} matching {args}")
+        context.pushException(
+            TypeError, f"Failed to find an overload for {self}.{methodName} matching {args}"
+        )
 
     def generateMethodImplementation(self, context, methodName, methodReturnType, args):
         """Generate native code that implements 'methodName' with a given return type and set of arguments.
@@ -516,17 +566,27 @@ class ClassWrapper(RefcountedWrapper):
 
         for isExplicit in [False, True]:
             for overloadIndex, overload in enumerate(func.overloads):
-                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, argTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(
+                    overload, argTypes, isExplicit
+                )
 
                 if mightMatch is not False:
                     overloadRetType = overload.returnType or object
 
                     testSingleOverloadForm = context.converter.defineNativeFunction(
-                        f'implement_overload.{self}.{methodName}.{overloadIndex}.{isExplicit}.{argTypes[1:]}->{overloadRetType}',
-                        ('implement_overload', self, methodName, overloadIndex, isExplicit, overloadRetType, tuple(argTypes[1:])),
+                        f"implement_overload.{self}.{methodName}.{overloadIndex}.{isExplicit}.{argTypes[1:]}->{overloadRetType}",
+                        (
+                            "implement_overload",
+                            self,
+                            methodName,
+                            overloadIndex,
+                            isExplicit,
+                            overloadRetType,
+                            tuple(argTypes[1:]),
+                        ),
                         [PointerTo(overloadRetType)] + list(argTypes),
                         typeWrapper(bool),
-                        makeOverloadImplementor(overload, isExplicit)
+                        makeOverloadImplementor(overload, isExplicit),
                     )
 
                     outputSlot = context.allocateUninitializedSlot(overloadRetType)
@@ -534,7 +594,7 @@ class ClassWrapper(RefcountedWrapper):
                     successful = context.call_typed_call_target(
                         testSingleOverloadForm,
                         (outputSlot.changeType(PointerTo(overloadRetType), False),) + args,
-                        {}
+                        {},
                     )
 
                     with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
@@ -549,14 +609,21 @@ class ClassWrapper(RefcountedWrapper):
 
                     # if we definitely match, we can return early
                     if mightMatch is True:
-                        context.pushException(TypeError, f"Failed to find an overload for {self}.{methodName} matching {args}")
+                        context.pushException(
+                            TypeError,
+                            f"Failed to find an overload for {self}.{methodName} matching {args}",
+                        )
                         return
 
         # generate a cleanup handler for the cases where we don't match a method signature.
         # this should actually be hitting the interpreter instead.
-        context.pushException(TypeError, f"Failed to find an overload for {self}.{methodName} matching {args}")
+        context.pushException(
+            TypeError, f"Failed to find an overload for {self}.{methodName} matching {args}"
+        )
 
-    def generateOverloadImplement(self, context, methodName, overload, isExplicit, outputVar, args):
+    def generateOverloadImplement(
+        self, context, methodName, overload, isExplicit, outputVar, args
+    ):
         """Produce the code that implements this specific overload.
 
         We return True if successful, False otherwise, and the output is a pointer to the result
@@ -570,7 +637,9 @@ class ClassWrapper(RefcountedWrapper):
             outputVar - a TypedExpression(PointerTo(returnType)) we're supposed to initialize.
             args - the arguments to pass to the method (including the instance)
         """
-        signature = PythonTypedFunctionWrapper.pickCallSignatureToImplement(overload, [a.expr_type for a in args])
+        signature = PythonTypedFunctionWrapper.pickCallSignatureToImplement(
+            overload, [a.expr_type for a in args]
+        )
 
         argTypes = [a.typeFilter for a in signature.overloads[0].args]
 
@@ -597,9 +666,13 @@ class ClassWrapper(RefcountedWrapper):
             convertedArgs.append(convertedArg)
 
         if outputVar.expr_type.typeRepresentation.ElementType != retType:
-            raise Exception(f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}")
+            raise Exception(
+                f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}"
+            )
 
-        res = context.call_py_function(overload.functionObj, convertedArgs, {}, typeWrapper(retType))
+        res = context.call_py_function(
+            overload.functionObj, convertedArgs, {}, typeWrapper(retType)
+        )
 
         if res is None:
             context.pushException(Exception, "unreachable")
@@ -609,7 +682,9 @@ class ClassWrapper(RefcountedWrapper):
 
         context.pushReturnValue(context.constant(True))
 
-    def generateOverloadDispatch(self, context, methodName, overload, isExplicit, outputVar, args):
+    def generateOverloadDispatch(
+        self, context, methodName, overload, isExplicit, outputVar, args
+    ):
         """Produce the code that calls this specific overload.
 
         We return True if successful, False otherwise, and the output is a pointer to the result
@@ -639,11 +714,15 @@ class ClassWrapper(RefcountedWrapper):
         assert len(signature.overloads[0].args) == len(argTypes)
 
         # each entrypoint generates a slot we could call.
-        dispatchSlot = _types.allocateClassMethodDispatch(self.typeRepresentation, methodName, signature)
+        dispatchSlot = _types.allocateClassMethodDispatch(
+            self.typeRepresentation, methodName, signature
+        )
 
         classDispatchTable = self.classDispatchTable(instance)
 
-        funcPtr = classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
+        funcPtr = (
+            classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
+        )
 
         retType = overload.returnType or typeWrapper(object).typeRepresentation
 
@@ -668,7 +747,9 @@ class ClassWrapper(RefcountedWrapper):
             convertedArgs.append(convertedArg)
 
         if outputVar.expr_type.typeRepresentation.ElementType != retType:
-            raise Exception(f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}")
+            raise Exception(
+                f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}"
+            )
 
         outputVar.changeType(typeWrapper(retType), True).convert_copy_initialize(
             context.call_function_pointer(funcPtr, convertedArgs, {}, typeWrapper(retType))
@@ -676,18 +757,24 @@ class ClassWrapper(RefcountedWrapper):
 
         context.pushReturnValue(context.constant(True))
 
-    def dispatchToSingleOverload(self, context, overload, explicitConversions, methodName, argTypes, instance, args):
+    def dispatchToSingleOverload(
+        self, context, overload, explicitConversions, methodName, argTypes, instance, args
+    ):
         # get the Function object representing this entrypoint as a signature.
         # we specialize on the types in 'argTypes' because we might be specializing
         # a generic method on a specific subtype.
         signature = PythonTypedFunctionWrapper.pickCallSignatureToImplement(overload, argTypes)
 
         # each entrypoint generates a slot we could call.
-        dispatchSlot = _types.allocateClassMethodDispatch(self.typeRepresentation, methodName, signature)
+        dispatchSlot = _types.allocateClassMethodDispatch(
+            self.typeRepresentation, methodName, signature
+        )
 
         classDispatchTable = self.classDispatchTable(instance)
 
-        funcPtr = classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
+        funcPtr = (
+            classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
+        )
 
         retType = overload.returnType or object
 
@@ -698,7 +785,7 @@ class ClassWrapper(RefcountedWrapper):
             convertedArgs.append(
                 argExpr.convert_to_type(
                     signature.overloads[0].args[argIx].typeFilter or object,
-                    explicit=explicitConversions
+                    explicit=explicitConversions,
                 )
             )
 
@@ -706,12 +793,16 @@ class ClassWrapper(RefcountedWrapper):
                 return None
 
         kwargs = {}
-        res = context.call_function_pointer(funcPtr, convertedArgs, kwargs, typeWrapper(retType))
+        res = context.call_function_pointer(
+            funcPtr, convertedArgs, kwargs, typeWrapper(retType)
+        )
 
         return res
 
     @staticmethod
-    def compileMethodInstantiation(converter, interfaceClass, implementingClass, methodName, signature, callback):
+    def compileMethodInstantiation(
+        converter, interfaceClass, implementingClass, methodName, signature, callback
+    ):
         """Compile a concrete method instantiation.
 
         In this case, we have a call signature dicatated by a definition in the interface class,
@@ -763,7 +854,7 @@ class ClassWrapper(RefcountedWrapper):
         if ix is None:
             return context.pushException(
                 AttributeError,
-                "Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation)
+                "Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation),
             )
 
         attr_type = typeWrapper(self.typeRepresentation.MemberTypes[ix])
@@ -776,14 +867,14 @@ class ClassWrapper(RefcountedWrapper):
         else:
             member = context.pushReference(attr_type, self.memberPtr(instance, ix))
 
-            with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(instance, ix))) as (true_block, false_block):
+            with context.ifelse(
+                context.pushPod(bool, self.isInitializedNativeExpr(instance, ix))
+            ) as (true_block, false_block):
                 with true_block:
                     member.convert_assign(value)
                 with false_block:
                     member.convert_copy_initialize(value)
-                    context.pushEffect(
-                        self.setIsInitializedExpr(instance, ix)
-                    )
+                    context.pushEffect(self.setIsInitializedExpr(instance, ix))
 
             return native_ast.nullExpr
 
@@ -793,15 +884,17 @@ class ClassWrapper(RefcountedWrapper):
 
         return context.push(
             self,
-            lambda new_class:
-                context.converter.defineNativeFunction(
-                    'construct(' + self.typeRepresentation.__name__ + ")("
-                    + ",".join([a.expr_type.typeRepresentation.__name__ for a in args]) + ")",
-                    ('util', self, 'construct', tuple([a.expr_type for a in args])),
-                    [a.expr_type for a in args],
-                    self,
-                    self.generateConstructor
-                ).call(new_class, *args)
+            lambda new_class: context.converter.defineNativeFunction(
+                "construct("
+                + self.typeRepresentation.__name__
+                + ")("
+                + ",".join([a.expr_type.typeRepresentation.__name__ for a in args])
+                + ")",
+                ("util", self, "construct", tuple([a.expr_type for a in args])),
+                [a.expr_type for a in args],
+                self,
+                self.generateConstructor,
+            ).call(new_class, *args),
         )
 
     def generateConstructor(self, context, out, *args):
@@ -809,7 +902,8 @@ class ClassWrapper(RefcountedWrapper):
             out.expr.store(
                 runtime_functions.malloc.call(
                     native_ast.const_int_expr(
-                        _types.bytecount(self.typeRepresentation.HeldClass) + self.BYTES_BEFORE_INIT_BITS
+                        _types.bytecount(self.typeRepresentation.HeldClass)
+                        + self.BYTES_BEFORE_INIT_BITS
                     )
                 ).cast(self.getNativeLayoutType())
             )
@@ -822,9 +916,9 @@ class ClassWrapper(RefcountedWrapper):
         # clear bits of init flags
         for byteOffset in range(self.bytesOfInitBits):
             context.pushEffect(
-                out.nonref_expr
-                .cast(native_ast.UInt8.pointer())
-                .ElementPtrIntegers(self.BYTES_BEFORE_INIT_BITS + byteOffset).store(native_ast.const_uint8_expr(0))
+                out.nonref_expr.cast(native_ast.UInt8.pointer())
+                .ElementPtrIntegers(self.BYTES_BEFORE_INIT_BITS + byteOffset)
+                .store(native_ast.const_uint8_expr(0))
             )
 
         for i in range(len(self.classType.MemberTypes)):
@@ -833,20 +927,29 @@ class ClassWrapper(RefcountedWrapper):
 
                 if name in self.classType.MemberDefaultValues:
                     defVal = self.classType.MemberDefaultValues.get(name)
-                    context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_copy_initialize(
-                        typed_python.compiler.python_object_representation.pythonObjectRepresentation(context, defVal)
+                    context.pushReference(
+                        self.classType.MemberTypes[i], self.memberPtr(out, i)
+                    ).convert_copy_initialize(
+                        typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+                            context, defVal
+                        )
                     )
                 else:
-                    context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_default_initialize()
+                    context.pushReference(
+                        self.classType.MemberTypes[i], self.memberPtr(out, i)
+                    ).convert_default_initialize()
                 context.pushEffect(self.setIsInitializedExpr(out, i))
 
-        if '__init__' in self.typeRepresentation.MemberFunctions:
-            initFuncType = typeWrapper(self.typeRepresentation.MemberFunctions['__init__'])
-            initFuncType.convert_call(context, context.pushVoid(initFuncType), (out,) + args, {})
+        if "__init__" in self.typeRepresentation.MemberFunctions:
+            initFuncType = typeWrapper(self.typeRepresentation.MemberFunctions["__init__"])
+            initFuncType.convert_call(
+                context, context.pushVoid(initFuncType), (out,) + args, {}
+            )
         else:
             if len(args):
                 context.pushException(
                     TypeError,
-                    "Can't construct a " + self.typeRepresentation.__qualname__ +
-                    " with positional arguments because it doesn't have an __init__"
+                    "Can't construct a "
+                    + self.typeRepresentation.__qualname__
+                    + " with positional arguments because it doesn't have an __init__",
                 )

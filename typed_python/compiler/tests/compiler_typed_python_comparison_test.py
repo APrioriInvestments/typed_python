@@ -13,10 +13,20 @@
 #   limitations under the License.
 
 from typed_python import (
-    TupleOf, ListOf, Dict,
-    UInt8, UInt16, UInt32, UInt64,
-    Int8, Int16, Int32, Int64,
-    Float32, Float64, Tuple
+    TupleOf,
+    ListOf,
+    Dict,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    Float32,
+    Float64,
+    Tuple,
 )
 from typed_python import Entrypoint
 
@@ -32,7 +42,7 @@ def pyTypeFor(T):
     if T in (UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64, Float32, Float64):
         return int
 
-    if hasattr(T, '__typed_python_category__'):
+    if hasattr(T, "__typed_python_category__"):
         if T.__typed_python_category__ == "ListOf":
             return list
         if T.__typed_python_category__ == "TupleOf":
@@ -53,8 +63,13 @@ types = [
     float,
     str,
     bytes,
-    UInt8, UInt16, UInt32, UInt64,
-    Int8, Int16, Int32,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+    Int8,
+    Int16,
+    Int32,
     Float32,
     ListOf(int),
     ListOf(str),
@@ -63,7 +78,7 @@ types = [
     Dict(int, int),
     Dict(str, str),
     Tuple(int, int, int),
-    Tuple(str, int, str)
+    Tuple(str, int, str),
 ]
 
 
@@ -82,30 +97,54 @@ def instancesOf(T):
         return [T(x) for x in [0, 1, 2]]
 
     if T is str:
-        return ['', 'a', 'b', 'ab', 'ba']
+        return ["", "a", "b", "ab", "ba"]
 
     if T is bytes:
-        return [b'', b'a', b'b', b'ab', b'ba']
+        return [b"", b"a", b"b", b"ab", b"ba"]
 
     if T is ListOf(int):
-        return [ListOf(int)(), ListOf(int)([1]), ListOf(int)([2]), ListOf(int)([1, 2]), ListOf(int)([2, 1])]
+        return [
+            ListOf(int)(),
+            ListOf(int)([1]),
+            ListOf(int)([2]),
+            ListOf(int)([1, 2]),
+            ListOf(int)([2, 1]),
+        ]
     if T is ListOf(str):
-        return [ListOf(str)(), ListOf(str)(['a']), ListOf(str)(['b']), ListOf(str)(['a', 'b']), ListOf(str)(['b', 'a'])]
+        return [
+            ListOf(str)(),
+            ListOf(str)(["a"]),
+            ListOf(str)(["b"]),
+            ListOf(str)(["a", "b"]),
+            ListOf(str)(["b", "a"]),
+        ]
 
     if T is TupleOf(int):
-        return [TupleOf(int)(), TupleOf(int)([1]), TupleOf(int)([2]), TupleOf(int)([1, 2]), TupleOf(int)([2, 1])]
+        return [
+            TupleOf(int)(),
+            TupleOf(int)([1]),
+            TupleOf(int)([2]),
+            TupleOf(int)([1, 2]),
+            TupleOf(int)([2, 1]),
+        ]
     if T is TupleOf(str):
-        return [TupleOf(str)(), TupleOf(str)(['a']), TupleOf(str)(['b']), TupleOf(str)(['a', 'b']), TupleOf(str)(['b', 'a'])]
+        return [
+            TupleOf(str)(),
+            TupleOf(str)(["a"]),
+            TupleOf(str)(["b"]),
+            TupleOf(str)(["a", "b"]),
+            TupleOf(str)(["b", "a"]),
+        ]
 
     if T is Tuple(int, int, int):
         return [T((1, 2, 3)), T((2, 2, 3)), T((3, 2, 1))]
     if T is Tuple(str, int, str):
-        return [T(('1', 2, '3')), T(('2', 2, '3')), T(('3', 2, '1'))]
+        return [T(("1", 2, "3")), T(("2", 2, "3")), T(("3", 2, "1"))]
 
     if T is Dict(int, int):
         return [T({1: 2}), T({3: 4}), T({1: 2, 3: 4})]
     if T is Dict(str, str):
-        return [T({'1': '2'}), T({'3': '4'}), T({'1': '2', '3': '4'})]
+        return [T({"1": "2"}), T({"3": "4"}), T({"1": "2", "3": "4"})]
 
     assert False, f"Can't make instances of {T}"
 
@@ -119,31 +158,27 @@ def toPyForm(x):
 
 
 binary_operations = {
-    'add': lambda a, b: a + b,
-    'sub': lambda a, b: a - b,
-    'floordiv': lambda a, b: a // b,
-    'truediv': lambda a, b: a / b,
-    'mul': lambda a, b: a * b,
-    'pow': lambda a, b: a ** b,
-    'bitxor': lambda a, b: a ^ b,
-    'bitor': lambda a, b: a | b,
-    'bitand': lambda a, b: a & b,
-    'lshift': lambda a, b: a << b,
-    'rshift': lambda a, b: a >> b,
-    'eq': lambda a, b: a == b,
-    'neq': lambda a, b: a != b,
-    'lt': lambda a, b: a < b,
-    'gt': lambda a, b: a > b,
-    'lte': lambda a, b: a <= b,
-    'gte': lambda a, b: a >= b,
+    "add": lambda a, b: a + b,
+    "sub": lambda a, b: a - b,
+    "floordiv": lambda a, b: a // b,
+    "truediv": lambda a, b: a / b,
+    "mul": lambda a, b: a * b,
+    "pow": lambda a, b: a ** b,
+    "bitxor": lambda a, b: a ^ b,
+    "bitor": lambda a, b: a | b,
+    "bitand": lambda a, b: a & b,
+    "lshift": lambda a, b: a << b,
+    "rshift": lambda a, b: a >> b,
+    "eq": lambda a, b: a == b,
+    "neq": lambda a, b: a != b,
+    "lt": lambda a, b: a < b,
+    "gt": lambda a, b: a > b,
+    "lte": lambda a, b: a <= b,
+    "gte": lambda a, b: a >= b,
 }
 
 
-unary_operations = {
-    'neg': lambda a: -a,
-    'pos': lambda a: +a,
-    'inv': lambda a: ~a
-}
+unary_operations = {"neg": lambda a: -a, "pos": lambda a: +a, "inv": lambda a: ~a}
 
 
 _specializedCache = {}
@@ -181,7 +216,7 @@ class TestTypedPythonAgainstCompiler(unittest.TestCase):
         try:
             return f(*args)
         except Exception:
-            return 'Exception'
+            return "Exception"
 
     def test_binary_operations(self):
         # systematically check that all binary operations work as expected
@@ -201,7 +236,9 @@ class TestTypedPythonAgainstCompiler(unittest.TestCase):
                             typed_res = self.callOrException(impl, i1, i2)
                             compiled_res = self.callOrException(compiled(impl), i1, i2)
 
-                            categories[self.categorizeResults(res, typed_res, compiled_res)] += 1
+                            categories[
+                                self.categorizeResults(res, typed_res, compiled_res)
+                            ] += 1
 
                     if list(categories) != ["OK"]:
                         print(binop, T1, T2, categories)
@@ -209,11 +246,11 @@ class TestTypedPythonAgainstCompiler(unittest.TestCase):
     def categorizeResults(self, interpreter, typed_python, compiler):
         # print(sanitize(interpreter), sanitize(typed_python), sanitize(compiler))
 
-        if interpreter == 'Exception' and typed_python != 'Exception':
-            return 'TypedPythonShouldThrow'
+        if interpreter == "Exception" and typed_python != "Exception":
+            return "TypedPythonShouldThrow"
 
-        if interpreter != 'Exception' and typed_python == 'Exception':
-            return 'TypedPythonThrows'
+        if interpreter != "Exception" and typed_python == "Exception":
+            return "TypedPythonThrows"
 
         if interpreter != "Exception" and typed_python != "Exception":
             if pyTypeFor(type(typed_python)) != type(interpreter):
@@ -222,11 +259,11 @@ class TestTypedPythonAgainstCompiler(unittest.TestCase):
             if pyTypeFor(type(typed_python))(typed_python) != interpreter:
                 return "TypedPythonWrongValue"
 
-        if typed_python == 'Exception' and compiler != 'Exception':
-            return 'CompilerShouldThrow'
+        if typed_python == "Exception" and compiler != "Exception":
+            return "CompilerShouldThrow"
 
-        if typed_python != 'Exception' and compiler == 'Exception':
-            return 'CompilerThrows'
+        if typed_python != "Exception" and compiler == "Exception":
+            return "CompilerThrows"
 
         if typed_python != "Exception" and compiler != "Exception":
             if type(typed_python) != type(compiler):

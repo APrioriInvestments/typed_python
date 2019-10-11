@@ -38,6 +38,7 @@ class Final:
     Final classes can't be subclassed, but generate faster code because
     we don't have to look up method dispatch in the vtable.
     """
+
     pass
 
 
@@ -52,7 +53,7 @@ class Member:
 
     @property
     def type(self):
-        if getattr(self._type, '__typed_python_category__', None) == "Forward":
+        if getattr(self._type, "__typed_python_category__", None) == "Forward":
             return self._type.get()
         return self._type
 
@@ -76,26 +77,26 @@ class ClassMetaNamespace:
 
 
 magicMethodTypes = {
-    '__init__': type(None),
-    '__repr__': str,
-    '__str__': str,
-    '__bool__': bool,
-    '__bytes__': bytes,
-    '__contains__': bool,
-    '__float__': float,
-    '__int__': int,
-    '__len__': int,
-    '__lt__': bool,
-    '__gt__': bool,
-    '__le__': bool,
-    '__ge__': bool,
-    '__eq__': bool,
-    '__ne__': bool,
-    '__hash__': int,
-    '__setattr__': type(None),
-    '__delattr__': type(None),
-    '__setitem__': type(None),
-    '__delitem__': type(None),
+    "__init__": type(None),
+    "__repr__": str,
+    "__str__": str,
+    "__bool__": bool,
+    "__bytes__": bytes,
+    "__contains__": bool,
+    "__float__": float,
+    "__int__": int,
+    "__len__": int,
+    "__lt__": bool,
+    "__gt__": bool,
+    "__le__": bool,
+    "__ge__": bool,
+    "__eq__": bool,
+    "__ne__": bool,
+    "__hash__": int,
+    "__setattr__": type(None),
+    "__delattr__": type(None),
+    "__setitem__": type(None),
+    "__delitem__": type(None),
 }
 
 
@@ -137,8 +138,8 @@ def makeFunction(name, f, classType=None):
 
     return_type = None
 
-    if 'return' in spec.annotations:
-        ann = spec.annotations.get('return')
+    if "return" in spec.annotations:
+        ann = spec.annotations.get("return")
         if ann is None:
             ann = type(None)
         return_type = ann
@@ -195,30 +196,30 @@ class ClassMetaclass(type):
                     staticFunctions[eltName] = makeFunction(eltName, elt.__func__)
                 else:
                     staticFunctions[eltName] = typed_python._types.Function(
-                        staticFunctions[eltName],
-                        makeFunction(eltName, elt.__func__)
+                        staticFunctions[eltName], makeFunction(eltName, elt.__func__)
                     )
             elif isinstance(elt, FunctionType):
                 if eltName not in memberFunctions:
                     memberFunctions[eltName] = makeFunction(eltName, elt, actualClass)
                 else:
                     memberFunctions[eltName] = typed_python._types.Function(
-                        memberFunctions[eltName],
-                        makeFunction(eltName, elt, actualClass)
+                        memberFunctions[eltName], makeFunction(eltName, elt, actualClass)
                     )
             else:
                 classMembers.append((eltName, elt))
 
-        actualClass = actualClass.define(typed_python._types.Class(
-            name,
-            tuple(bases),
-            isFinal,
-            tuple(members),
-            tuple(memberFunctions.items()),
-            tuple(staticFunctions.items()),
-            tuple(properties.items()),
-            tuple(classMembers)
-        ))
+        actualClass = actualClass.define(
+            typed_python._types.Class(
+                name,
+                tuple(bases),
+                isFinal,
+                tuple(members),
+                tuple(memberFunctions.items()),
+                tuple(staticFunctions.items()),
+                tuple(properties.items()),
+                tuple(classMembers),
+            )
+        )
 
         return actualClass
 
@@ -238,7 +239,7 @@ class FunctionOverloadArg:
 
     @property
     def typeFilter(self):
-        if getattr(self._typeFilter, '__typed_python_category__', None) == "Forward":
+        if getattr(self._typeFilter, "__typed_python_category__", None) == "Forward":
             return self._typeFilter.get()
         return self._typeFilter
 
@@ -268,14 +269,21 @@ class FunctionOverload:
         return self.functionObj.__name__
 
     def addArg(self, name, defaultVal, typeFilter, isStarArg, isKwarg):
-        self.args = self.args + (FunctionOverloadArg(name, defaultVal, typeFilter, isStarArg, isKwarg),)
+        self.args = self.args + (
+            FunctionOverloadArg(name, defaultVal, typeFilter, isStarArg, isKwarg),
+        )
 
     def matchesTypes(self, argTypes):
         """Do the types in 'argTypes' match our argument typeFilters at a binary level"""
-        if len(argTypes) == len(self.args) and not any(x.isStarArg or x.isKwarg for x in self.args):
+        if len(argTypes) == len(self.args) and not any(
+            x.isStarArg or x.isKwarg for x in self.args
+        ):
             for i in range(len(argTypes)):
-                if (self.args[i].typeFilter is not None and
-                        not typed_python._types.isBinaryCompatible(self.args[i].typeFilter, argTypes[i])):
+                if self.args[
+                    i
+                ].typeFilter is not None and not typed_python._types.isBinaryCompatible(
+                    self.args[i].typeFilter, argTypes[i]
+                ):
                     return False
 
             return True
@@ -286,11 +294,13 @@ class FunctionOverload:
         return "FunctionOverload(returns %s, %s, %s)" % (
             self.returnType,
             self.args,
-            "<signature>" if self.functionObj is None else "<impl>"
+            "<signature>" if self.functionObj is None else "<impl>",
         )
 
     def _installNativePointer(self, fp, returnType, argumentTypes):
-        typed_python._types.installNativeFunctionPointer(self.functionTypeObject, self.index, fp, returnType, tuple(argumentTypes))
+        typed_python._types.installNativeFunctionPointer(
+            self.functionTypeObject, self.index, fp, returnType, tuple(argumentTypes)
+        )
 
 
 class DisableCompiledCode:

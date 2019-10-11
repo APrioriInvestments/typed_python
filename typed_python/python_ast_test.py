@@ -41,7 +41,7 @@ class TestPythonAst(unittest.TestCase):
     def test_reverse_parse(self):
         self.reverseParseCheck(lambda: X)  # noqa: F821
         self.reverseParseCheck(lambda x: X)  # noqa: F821
-        self.reverseParseCheck(lambda x: X+1)  # noqa: F821
+        self.reverseParseCheck(lambda x: X + 1)  # noqa: F821
         self.reverseParseCheck(lambda x: 1.2)
         self.reverseParseCheck(lambda x: "hi")
         self.reverseParseCheck(lambda x: (x, True))
@@ -63,6 +63,7 @@ class TestPythonAst(unittest.TestCase):
         def f():
             class A:
                 z = 20
+
                 @staticmethod
                 def y(self, z: int):
                     pass
@@ -79,6 +80,7 @@ class TestPythonAst(unittest.TestCase):
         def f():
             def g(x=10, y=20, *args, q=30):
                 return (x, y, args, q)
+
             g(x=20, y=30)
 
         self.reverseParseCheck(f)
@@ -105,22 +107,25 @@ class TestPythonAst(unittest.TestCase):
 
     def test_reverse_parse_eval(self):
         def f(x):
-            return x+x
+            return x + x
+
         self.reverseParseAndEvalCheck(f, 10)
-        self.reverseParseAndEvalCheck(lambda x: x+x, 10)
+        self.reverseParseAndEvalCheck(lambda x: x + x, 10)
 
     def test_reverse_parse_eval_withblock(self):
         def f(x, filename):
-            with open(filename, 'r'):
+            with open(filename, "r"):
                 pass
-            return x+x
+            return x + x
 
         self.reverseParseAndEvalCheck(f, (10, ownName))
 
     def test_reverse_parse_eval_import(self):
         def f(x):
             from numpy import float64
+
             return float(float64(x))
+
         self.reverseParseAndEvalCheck(f, 10)
 
     def test_parsing_fstring(self):
@@ -133,14 +138,18 @@ class TestPythonAst(unittest.TestCase):
 
     def test_parsing_assert(self):
         """This code generates ast.Assert node."""
+
         def f(x):
             assert x == 1
+
         self.reverseParseCheck(f)
 
     def test_parsing_yield_from(self):
         """This code generates ast.YieldFrom."""
+
         def f(x):
             yield from x
+
         self.reverseParseCheck(f)
 
     def test_parsing_async(self):
@@ -164,6 +173,7 @@ class TestPythonAst(unittest.TestCase):
 
     def test_parsing_nonlocal(self):
         """This code generates: ast.Nonlocal."""
+
         def f():
             x = "local"
 
@@ -179,6 +189,7 @@ class TestPythonAst(unittest.TestCase):
 
     def test_parsing_matmul(self):
         """This code generates: ast.MatMult."""
+
         def f(a, b):
             a @ b
             a @= b
@@ -187,6 +198,7 @@ class TestPythonAst(unittest.TestCase):
 
     def test_parsing_annotated_assignment(self):
         """This code generates: ast.AddAssign."""
+
         def f():
             a: int = 2
             return a

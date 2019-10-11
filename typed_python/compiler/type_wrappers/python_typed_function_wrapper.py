@@ -19,7 +19,9 @@ from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
-typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
+typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    x
+)
 
 
 class PythonTypedFunctionWrapper(Wrapper):
@@ -35,7 +37,9 @@ class PythonTypedFunctionWrapper(Wrapper):
 
     def convert_call(self, context, left, args, kwargs):
         if kwargs:
-            raise NotImplementedError("can't dispatch to native code with kwargs yet as our matcher doesn't understand it")
+            raise NotImplementedError(
+                "can't dispatch to native code with kwargs yet as our matcher doesn't understand it"
+            )
 
         if len(self.typeRepresentation.overloads) == 1:
             overload = self.typeRepresentation.overloads[0]
@@ -44,9 +48,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             if hasattr(functionObj, "__typed_python_no_compile__"):
                 returnType = overload.returnType or object
 
-                callRes = context.constantPyObject(functionObj).convert_call(
-                    args, kwargs
-                )
+                callRes = context.constantPyObject(functionObj).convert_call(args, kwargs)
 
                 if callRes is None:
                     return None
@@ -54,10 +56,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                 return callRes.convert_to_type(returnType)
 
         callTarget = self.compileCall(
-            context.functionContext.converter,
-            None,
-            [a.expr_type for a in args],
-            None
+            context.functionContext.converter, None, [a.expr_type for a in args], None
         )
         if not callTarget:
             context.pushException(TypeError, f"Failed to dispatch to {self} with args {args}")
@@ -97,15 +96,10 @@ class PythonTypedFunctionWrapper(Wrapper):
             else:
                 argType = arg.typeFilter or object
 
-            argTuples.append(
-                (arg.name, argType, arg.defaultValue, arg.isStarArg, arg.isKwarg)
-            )
+            argTuples.append((arg.name, argType, arg.defaultValue, arg.isStarArg, arg.isKwarg))
 
         return _types.Function(
-            overload.name,
-            overload.returnType or object,
-            None,
-            tuple(argTuples)
+            overload.name, overload.returnType or object, None, tuple(argTuples)
         )
 
     def compileCall(self, converter, returnType, argTypes, callback):
@@ -122,7 +116,9 @@ class PythonTypedFunctionWrapper(Wrapper):
         Returns:
             a TypedCallTarget, or None
         """
-        overloadAndIsExplicit = PythonTypedFunctionWrapper.pickSingleOverloadForCall(self.typeRepresentation, argTypes)
+        overloadAndIsExplicit = PythonTypedFunctionWrapper.pickSingleOverloadForCall(
+            self.typeRepresentation, argTypes
+        )
 
         if overloadAndIsExplicit is not None:
             overload = overloadAndIsExplicit[0]
@@ -130,18 +126,13 @@ class PythonTypedFunctionWrapper(Wrapper):
             # just one overload will do. We can just instantiate this particular function
             # with a signature that comes from the method overload signature itself.
             return converter.convert(
-                overload.functionObj,
-                argTypes,
-                returnType,
-                callback=callback
+                overload.functionObj, argTypes, returnType, callback=callback
             )
 
         if returnType is None:
             # we have to take the union of the return types we might be dispatching to
             possibleTypes = PythonTypedFunctionWrapper.determinePossibleReturnTypes(
-                converter,
-                self.typeRepresentation,
-                argTypes
+                converter, self.typeRepresentation, argTypes
             )
 
             returnType = OneOfWrapper.mergeTypes(possibleTypes)
@@ -150,14 +141,14 @@ class PythonTypedFunctionWrapper(Wrapper):
                 return None
 
         return converter.defineNativeFunction(
-            f'implement_function.{self}{argTypes}->{returnType}',
-            ('implement_function.', self, returnType, tuple(argTypes)),
+            f"implement_function.{self}{argTypes}->{returnType}",
+            ("implement_function.", self, returnType, tuple(argTypes)),
             list(argTypes),
             returnType,
             lambda context, outputVar, *args: (
                 self.generateMethodImplementation(context, returnType, args)
             ),
-            callback=callback
+            callback=callback,
         )
 
     @staticmethod
@@ -169,12 +160,17 @@ class PythonTypedFunctionWrapper(Wrapper):
             "Maybe" if we might match
             False if we definitely don't match the arguments.
         """
-        if not (len(argTypes) == len(overload.args) and not any(x.isStarArg or x.isKwarg for x in overload.args)):
+        if not (
+            len(argTypes) == len(overload.args)
+            and not any(x.isStarArg or x.isKwarg for x in overload.args)
+        ):
             return False
 
         allTrue = True
         for i in range(len(argTypes)):
-            canConvert = argTypes[i].can_convert_to_type(typeWrapper(overload.args[i].typeFilter or object), isExplicit)
+            canConvert = argTypes[i].can_convert_to_type(
+                typeWrapper(overload.args[i].typeFilter or object), isExplicit
+            )
 
             if canConvert is False:
                 return False
@@ -193,7 +189,9 @@ class PythonTypedFunctionWrapper(Wrapper):
         for isExplicit in [False, True]:
             for o in func.overloads:
                 # check each overload that we might match.
-                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(o, argTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(
+                    o, argTypes, isExplicit
+                )
 
                 if mightMatch is False:
                     pass
@@ -225,7 +223,9 @@ class PythonTypedFunctionWrapper(Wrapper):
         for isExplicit in [False, True]:
             for o in func.overloads:
                 # check each overload that we might match.
-                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(o, argTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(
+                    o, argTypes, isExplicit
+                )
 
                 if mightMatch is False:
                     pass
@@ -277,11 +277,18 @@ class PythonTypedFunctionWrapper(Wrapper):
                     overloadRetType = overload.returnType or object
 
                     testSingleOverloadForm = context.converter.defineNativeFunction(
-                        f'implement_overload.{self}.{overloadIndex}.{isExplicit}.{argTypes}->{overloadRetType}',
-                        ('implement_overload', self, overloadIndex, isExplicit, overloadRetType, tuple(argTypes)),
+                        f"implement_overload.{self}.{overloadIndex}.{isExplicit}.{argTypes}->{overloadRetType}",
+                        (
+                            "implement_overload",
+                            self,
+                            overloadIndex,
+                            isExplicit,
+                            overloadRetType,
+                            tuple(argTypes),
+                        ),
                         [PointerTo(overloadRetType)] + list(argTypes),
                         typeWrapper(bool),
-                        makeOverloadImplementor(overload, isExplicit)
+                        makeOverloadImplementor(overload, isExplicit),
                     )
 
                     outputSlot = context.allocateUninitializedSlot(overloadRetType)
@@ -289,7 +296,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                     successful = context.call_typed_call_target(
                         testSingleOverloadForm,
                         (outputSlot.changeType(PointerTo(overloadRetType), False),) + args,
-                        {}
+                        {},
                     )
 
                     with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
@@ -304,12 +311,16 @@ class PythonTypedFunctionWrapper(Wrapper):
 
                     # if we definitely match, we can return early
                     if mightMatch is True:
-                        context.pushException(TypeError, f"Failed to find an overload for {self} matching {args}")
+                        context.pushException(
+                            TypeError, f"Failed to find an overload for {self} matching {args}"
+                        )
                         return
 
         # generate a cleanup handler for the cases where we don't match a method signature.
         # this should actually be hitting the interpreter instead.
-        context.pushException(TypeError, f"Failed to find an overload for {self} matching {args}")
+        context.pushException(
+            TypeError, f"Failed to find an overload for {self} matching {args}"
+        )
 
     def generateOverloadImplement(self, context, overload, isExplicit, outputVar, args):
         """Produce the code that implements this specific overload.
@@ -351,9 +362,13 @@ class PythonTypedFunctionWrapper(Wrapper):
             convertedArgs.append(convertedArg)
 
         if outputVar.expr_type.typeRepresentation.ElementType != retType:
-            raise Exception(f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}")
+            raise Exception(
+                f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}"
+            )
 
-        res = context.call_py_function(overload.functionObj, convertedArgs, {}, typeWrapper(retType))
+        res = context.call_py_function(
+            overload.functionObj, convertedArgs, {}, typeWrapper(retType)
+        )
 
         if res is None:
             context.pushException(Exception, "unreachable")

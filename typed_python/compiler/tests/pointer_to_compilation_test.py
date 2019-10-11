@@ -31,11 +31,11 @@ class TestPointerToCompilation(unittest.TestCase):
             pointer = x.pointerUnsafe(0)
 
             pointer.set(20)
-            (pointer+1).set(20)
-            (pointer+2).set((pointer+1).get()+1)
-            (pointer+3).initialize((pointer+2).get())
+            (pointer + 1).set(20)
+            (pointer + 2).set((pointer + 1).get() + 1)
+            (pointer + 3).initialize((pointer + 2).get())
 
-            (pointer+4).cast(float).set(1.0)
+            (pointer + 4).cast(float).set(1.0)
             return pointer[3]
 
         compiledFun = Compiled(testfun)
@@ -52,7 +52,7 @@ class TestPointerToCompilation(unittest.TestCase):
         self.assertEqual(l1[1], 20)
         self.assertEqual(l1[2], 21)
         self.assertEqual(l1[3], 21)
-        self.assertEqual(l1[4], 0x3ff0000000000000)  # hex representation of 64 bit float 1.0
+        self.assertEqual(l1[4], 0x3FF0000000000000)  # hex representation of 64 bit float 1.0
 
     def test_bytecount(self):
         def testfun(x):
@@ -62,8 +62,7 @@ class TestPointerToCompilation(unittest.TestCase):
 
         def check(x):
             self.assertEqual(
-                testfun(x),
-                Runtime.singleton().compile(testfun, {'x': type(x)})(x)
+                testfun(x), Runtime.singleton().compile(testfun, {"x": type(x)})(x)
             )
 
         check(0)

@@ -13,13 +13,31 @@
 #   limitations under the License.
 
 from typed_python import (
-    Bool, Float64, Float32, Int8, Int16, Int32, Int64, UInt8,
-    UInt16, UInt32, UInt64
+    Bool,
+    Float64,
+    Float32,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
 )
 
 arithmetic_types = (
-    Bool, Float64, Float32, Int8, Int16, Int32, Int64, UInt8,
-    UInt16, UInt32, UInt64
+    Bool,
+    Float64,
+    Float32,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
 )
 
 _intsBySignednessAndBitness = {
@@ -30,7 +48,7 @@ _intsBySignednessAndBitness = {
     (False, 8): UInt8,
     (False, 16): UInt16,
     (False, 32): UInt32,
-    (False, 64): UInt64
+    (False, 64): UInt64,
 }
 
 

@@ -19,7 +19,9 @@ import typed_python.compiler
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    t
+)
 
 
 class TypedExpression(object):
@@ -53,7 +55,7 @@ class TypedExpression(object):
             self.context,
             self.expr,
             typeWrapper(newType),
-            self.isReference if isReferenceOverride is None else isReferenceOverride
+            self.isReference if isReferenceOverride is None else isReferenceOverride,
         )
 
     def as_native_call_arg(self):
@@ -175,10 +177,14 @@ class TypedExpression(object):
         """
         target_type = typeWrapper(target_type)
 
-        return self.expr_type.convert_to_type(self.context, self, target_type, explicit=explicit)
+        return self.expr_type.convert_to_type(
+            self.context, self, target_type, explicit=explicit
+        )
 
     def convert_to_type_with_target(self, targetVal, explicit=True):
-        return self.expr_type.convert_to_type_with_target(self.context, self, targetVal, explicit=explicit)
+        return self.expr_type.convert_to_type_with_target(
+            self.context, self, targetVal, explicit=explicit
+        )
 
     def get_iteration_expressions(self):
         return self.expr_type.get_iteration_expressions(self.context, self)
@@ -212,7 +218,9 @@ class TypedExpression(object):
         return "TypedExpression(%s%s)" % (self.expr_type, ",[ref]" if self.isReference else "")
 
     def __rshift__(self, other):
-        return TypedExpression(self.context, self.expr >> other.expr, other.expr_type, other.isReference)
+        return TypedExpression(
+            self.context, self.expr >> other.expr, other.expr_type, other.isReference
+        )
 
     @staticmethod
     def sugar_operator(left, right, opname):

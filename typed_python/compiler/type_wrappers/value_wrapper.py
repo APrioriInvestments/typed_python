@@ -27,6 +27,7 @@ class ValueWrapper(Wrapper):
     This type wrapper is responsible for implementing these same semantics
     at the compiler level.
     """
+
     is_pod = True
     is_empty = True
     is_pass_by_ref = False
@@ -38,7 +39,7 @@ class ValueWrapper(Wrapper):
 
     def __init__(self, valueType):
         super().__init__(valueType)
-        assert getattr(valueType, '__typed_python_category__', '') == 'Value'
+        assert getattr(valueType, "__typed_python_category__", "") == "Value"
 
     def __str__(self):
         return f"Value({self.typeRepresentation})"

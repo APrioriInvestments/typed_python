@@ -19,11 +19,13 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.native_ast import VoidPtr
 
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    t
+)
 
 
 def replaceTupElt(tup, index, newValue):
-    return tuple(tup[:index]) + (newValue,) + tuple(tup[index+1:])
+    return tuple(tup[:index]) + (newValue,) + tuple(tup[index + 1 :])
 
 
 def replaceDictElt(dct, key, newValue):
@@ -119,57 +121,41 @@ class Wrapper(object):
 
         If continue_iteration is False, then next_value will be ignored. It should be a reference.
         """
-        return context.pushException(
-            AttributeError,
-            "%s object cannot be iterated" % self
-        )
+        return context.pushException(AttributeError, "%s object cannot be iterated" % self)
 
     def convert_attribute(self, context, instance, attribute):
         """Produce code to access 'attribute' on an object represented by TypedExpression 'instance'."""
         return context.pushException(
-            AttributeError,
-            "%s object has no attribute %s" % (self, attribute)
+            AttributeError, "%s object has no attribute %s" % (self, attribute)
         )
 
     def convert_set_attribute(self, context, instance, attribute, value):
         return context.pushException(
-            AttributeError,
-            "%s object has no attribute %s" % (self, attribute)
+            AttributeError, "%s object has no attribute %s" % (self, attribute)
         )
 
     def convert_delitem(self, context, instance, item):
-        return context.pushException(
-            AttributeError,
-            "%s is not subscriptable" % str(self)
-        )
+        return context.pushException(AttributeError, "%s is not subscriptable" % str(self))
 
     def convert_getitem(self, context, instance, item):
-        return context.pushException(
-            AttributeError,
-            "%s is not subscriptable" % str(self)
-        )
+        return context.pushException(AttributeError, "%s is not subscriptable" % str(self))
 
     def convert_setitem(self, context, instance, index, value):
         return context.pushException(
-            AttributeError,
-            "%s does not support item assignment" % str(self)
+            AttributeError, "%s does not support item assignment" % str(self)
         )
 
     def convert_assign(self, context, target, toStore):
         if self.is_pod:
             assert target.isReference
-            context.pushEffect(
-                target.expr.store(toStore.nonref_expr)
-            )
+            context.pushEffect(target.expr.store(toStore.nonref_expr))
         else:
             raise NotImplementedError()
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
         if self.is_pod:
-            context.pushEffect(
-                target.expr.store(toStore.nonref_expr)
-            )
+            context.pushEffect(target.expr.store(toStore.nonref_expr))
         else:
             raise NotImplementedError()
 
@@ -183,27 +169,31 @@ class Wrapper(object):
         raise NotImplementedError(self)
 
     def convert_call(self, context, left, args, kwargs):
-        return context.pushException(TypeError, "Can't call %s with args of type (%s)" % (
-            str(self) + "( of type " + str(self.typeRepresentation) + ")",
-            ",".join([str(a.expr_type) for a in args] + ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()])
-        ))
+        return context.pushException(
+            TypeError,
+            "Can't call %s with args of type (%s)"
+            % (
+                str(self) + "( of type " + str(self.typeRepresentation) + ")",
+                ",".join(
+                    [str(a.expr_type) for a in args]
+                    + ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()]
+                ),
+            ),
+        )
 
     def convert_len(self, context, expr):
         return context.pushException(
-            TypeError,
-            "Can't take 'len' of instance of type '%s'" % (str(self),)
+            TypeError, "Can't take 'len' of instance of type '%s'" % (str(self),)
         )
 
     def convert_hash(self, context, expr):
         return context.pushException(
-            TypeError,
-            "Can't hash instance of type '%s'" % (str(self),)
+            TypeError, "Can't hash instance of type '%s'" % (str(self),)
         )
 
     def convert_abs(self, context, expr):
         return context.pushException(
-            TypeError,
-            "Can't take 'abs' of instance of type '%s'" % (str(self),)
+            TypeError, "Can't take 'abs' of instance of type '%s'" % (str(self),)
         )
 
     def convert_builtin(self, f, context, expr, a1=None):
@@ -211,13 +201,17 @@ class Wrapper(object):
             tp = context.getTypePointer(expr.expr_type.typeRepresentation)
             if tp:
                 if not expr.isReference:
-                    expr = context.push(expr.expr_type, lambda x: x.convert_copy_initialize(expr))
+                    expr = context.push(
+                        expr.expr_type, lambda x: x.convert_copy_initialize(expr)
+                    )
                 retT = ListOf(str)
                 return context.push(
                     typeWrapper(retT),
                     lambda Ref: Ref.expr.store(
-                        runtime_functions.np_dir.call(expr.expr.cast(VoidPtr), tp).cast(typeWrapper(retT).layoutType)
-                    )
+                        runtime_functions.np_dir.call(expr.expr.cast(VoidPtr), tp).cast(
+                            typeWrapper(retT).layoutType
+                        )
+                    ),
                 )
         if f is format and a1 is None:
             return expr.convert_cast(str)
@@ -225,7 +219,7 @@ class Wrapper(object):
         return context.pushException(
             TypeError,
             "Can't compile '%s' on instance of type '%s'%s"
-            % (str(f), str(self), " with additional parameter" if a1 else "")
+            % (str(f), str(self), " with additional parameter" if a1 else ""),
         )
 
     def convert_repr(self, context, expr):
@@ -236,18 +230,16 @@ class Wrapper(object):
             return context.push(
                 str,
                 lambda r: r.expr.store(
-                    runtime_functions.np_repr.call(expr.expr.cast(VoidPtr), tp).cast(typeWrapper(str).layoutType)
-                )
+                    runtime_functions.np_repr.call(expr.expr.cast(VoidPtr), tp).cast(
+                        typeWrapper(str).layoutType
+                    )
+                ),
             )
-        return context.pushException(
-            TypeError,
-            "No type pointer for '%s'" % (str(self),)
-        )
+        return context.pushException(TypeError, "No type pointer for '%s'" % (str(self),))
 
     def convert_unary_op(self, context, expr, op):
         return context.pushException(
-            TypeError,
-            "Can't apply unary op %s to type '%s'" % (op, expr.expr_type)
+            TypeError, "Can't apply unary op %s to type '%s'" % (op, expr.expr_type)
         )
 
     def can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):
@@ -325,13 +317,18 @@ class Wrapper(object):
         canConvert = self.can_convert_to_type(target_type, explicit)
 
         if canConvert is False:
-            context.pushException(TypeError, "Definitely can't convert from type %s to type %s" % (self, target_type))
+            context.pushException(
+                TypeError,
+                "Definitely can't convert from type %s to type %s" % (self, target_type),
+            )
             return None
 
         # put conversion into its own function
         targetVal = context.allocateUninitializedSlot(target_type)
 
-        succeeded = expr.expr_type.convert_to_type_with_target(context, expr, targetVal, explicit)
+        succeeded = expr.expr_type.convert_to_type_with_target(
+            context, expr, targetVal, explicit
+        )
 
         if succeeded is None:
             return
@@ -351,7 +348,9 @@ class Wrapper(object):
                 context.markUninitializedSlotInitialized(targetVal)
 
             with ifFalse:
-                context.pushException(TypeError, "Can't convert from type %s to type %s" % (self, target_type))
+                context.pushException(
+                    TypeError, "Can't convert from type %s to type %s" % (self, target_type)
+                )
 
         return targetVal
 
@@ -362,7 +361,9 @@ class Wrapper(object):
         If no conversion to the target type is available, we're expected to call the super implementation
         which defers to 'convert_to_self_with_target'
         """
-        return targetVal.expr_type.convert_to_self_with_target(context, targetVal, expr, explicit)
+        return targetVal.expr_type.convert_to_self_with_target(
+            context, targetVal, expr, explicit
+        )
 
     def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
         if sourceVal.expr_type == self:
@@ -389,15 +390,17 @@ class Wrapper(object):
 
         return context.pushException(
             TypeError,
-            "Can't apply op %s to expressions of type %s and %s" %
-            (op, str(l.expr_type), str(r.expr_type))
+            "Can't apply op %s to expressions of type %s and %s"
+            % (op, str(l.expr_type), str(r.expr_type)),
         )
 
     def convert_format(self, context, instance, formatSpecOrNone=None):
         if formatSpecOrNone is None:
             return instance.convert_cast(str)
         else:
-            raise context.pushException(TypeError, "We don't support conversion in the base wrapper.")
+            raise context.pushException(
+                TypeError, "We don't support conversion in the base wrapper."
+            )
 
     def convert_cast(self, context, instance, target_type):
         """Convert an explicit cast of 'instance' to our type."""
@@ -414,19 +417,22 @@ class Wrapper(object):
         return instance.expr_type.convert_to_type(context, instance, self, explicit=True)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
-        raise Exception(f"We can't call type {self.typeRepresentation} with args {args} and kwargs {kwargs}")
+        raise Exception(
+            f"We can't call type {self.typeRepresentation} with args {args} and kwargs {kwargs}"
+        )
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         return context.pushException(
             TypeError,
-            "Can't call %s.%s with args of type (%s)" % (
+            "Can't call %s.%s with args of type (%s)"
+            % (
                 self,
                 methodname,
                 ",".join(
-                    [str(a.expr_type) for a in args] +
-                    ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()]
-                )
-            )
+                    [str(a.expr_type) for a in args]
+                    + ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()]
+                ),
+            ),
         )
 
     def generate_method_call(self, context, method, args):
@@ -438,9 +444,11 @@ class Wrapper(object):
         :return: intermediate compiled result, or None if method does not exist or can't be called with these args
         """
         t = self.typeRepresentation
-        if getattr(getattr(t, method, None), "__typed_python_category__", None) == 'Function':
+        if getattr(getattr(t, method, None), "__typed_python_category__", None) == "Function":
             assert len(getattr(t, method).overloads) == 1
-            return context.call_py_function(getattr(t, method).overloads[0].functionObj, args, {})
+            return context.call_py_function(
+                getattr(t, method).overloads[0].functionObj, args, {}
+            )
         return None
 
     def get_iteration_expressions(self, context, expr):
@@ -471,6 +479,7 @@ class Wrapper(object):
         We also loop over lists, tuples, and dicts (at the first level of the argument tree)
         and break those apart.
         """
+
         def inner(self, context, *args):
             TypedExpression = typed_python.compiler.typed_expression.TypedExpression
 
@@ -484,14 +493,26 @@ class Wrapper(object):
                     for j in range(len(args[i])):
                         if isinstance(args[i][j], TypedExpression) and args[i][j].canUnwrap():
                             return args[i][j].unwrap(
-                                lambda newArgIJ: inner(self, context, *replaceTupElt(args, i, replaceTupElt(args[i], j, newArgIJ)))
+                                lambda newArgIJ: inner(
+                                    self,
+                                    context,
+                                    *replaceTupElt(
+                                        args, i, replaceTupElt(args[i], j, newArgIJ)
+                                    ),
+                                )
                             )
 
                 if isinstance(args[i], dict):
                     for key, val in args[i].items():
                         if isinstance(val, TypedExpression) and val.canUnwrap():
                             return val.unwrap(
-                                lambda newVal: inner(self, context, *replaceTupElt(args, i, replaceDictElt(args[i], key, newVal)))
+                                lambda newVal: inner(
+                                    self,
+                                    context,
+                                    *replaceTupElt(
+                                        args, i, replaceDictElt(args[i], key, newVal)
+                                    ),
+                                )
                             )
 
             return f(self, context, *args)

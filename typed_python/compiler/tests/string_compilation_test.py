@@ -31,12 +31,12 @@ someStrings = [
     "\u00F1",
     "\u007F\u0080\u0081\u07FF",
     "\u0800\u0801\uFFFF",
-    "\U00010000\U00010001\U0010FFFF"
+    "\U00010000\U00010001\U0010FFFF",
 ]
 
 for s1 in list(someStrings):
     for s2 in list(someStrings):
-        someStrings.append(s1+s2)
+        someStrings.append(s1 + s2)
 someStrings = sorted(set(someStrings))
 
 
@@ -58,7 +58,7 @@ def callOrExceptNoType(f, *args):
     try:
         return ("Normal", f(*args))
     except Exception:
-        return ("Exception", )
+        return ("Exception",)
 
 
 class TestStringCompilation(unittest.TestCase):
@@ -95,8 +95,8 @@ class TestStringCompilation(unittest.TestCase):
 
         for s in someStrings:
             for s2 in someStrings:
-                self.assertEqual(s+s2, concat(s, s2))
-                self.assertEqual(len(s+s2), concatLen(s, s2))
+                self.assertEqual(s + s2, concat(s, s2))
+                self.assertEqual(len(s + s2), concatLen(s, s2))
 
     def test_string_comparison(self):
         @Compiled
@@ -136,6 +136,7 @@ class TestStringCompilation(unittest.TestCase):
         def makeConstantConcatenator(s):
             def returner():
                 return s
+
             return returner
 
         for s in someStrings:
@@ -151,10 +152,11 @@ class TestStringCompilation(unittest.TestCase):
 
         for s in someStrings:
             for i in range(-20, 20):
-                self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
+                self.assertEqual(
+                    callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i)
+                )
 
     def test_string_lower_upper(self):
-
         @Compiled
         def c_lower(s: str):
             return s.lower()
@@ -172,8 +174,7 @@ class TestStringCompilation(unittest.TestCase):
             return s.upper(t)
 
         some_lu_strings = [
-            "abc"
-            "Abc",
+            "abc" "Abc",
             "aBc",
             "abC",
             "ABC",
@@ -182,7 +183,7 @@ class TestStringCompilation(unittest.TestCase):
             "\u00CA\u00F1\u011A\u1E66\u3444\u1E67\u1EEA\1F04" * 10000,
             "XyZ\U0001D471",
             "XyZ\U0001D471" * 10000,
-            "\u007F\u0080\u0081\u07FF\u0800\u0801\uFFFF\U00010000\U00010001\U0010FFFF"
+            "\u007F\u0080\u0081\u07FF\u0800\u0801\uFFFF\U00010000\U00010001\U0010FFFF",
         ]
         for s in some_lu_strings:
             self.assertEqual(c_lower(s), s.lower())
@@ -193,7 +194,6 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(callOrExceptType(c_upper2, s, s), callOrExceptType(s.upper, s))
 
     def test_string_find(self):
-
         @Compiled
         def c_find(s: str, sub: str, start: int, end: int):
             return s.find(sub, start, end)
@@ -207,19 +207,33 @@ class TestStringCompilation(unittest.TestCase):
             return s.find(sub)
 
         def test_find(t):
-            substrings = ["", "x", "xyz", "a"*100, t[0:-2] + t[-1] if len(t) > 2 else ""]
+            substrings = ["", "x", "xyz", "a" * 100, t[0:-2] + t[-1] if len(t) > 2 else ""]
             for start in range(0, min(len(t), 8)):
-                for end in range(start+1, min(len(t), 8)+1):
+                for end in range(start + 1, min(len(t), 8) + 1):
                     substrings.append(t[start:end])
 
             indexrange = [
-                -(len(t)+1)*256,
-                -len(t)-1, -len(t), -len(t)+1,
-                -len(t)//2-1, -len(t)//2, -len(t)//2+1,
-                -2, -1, 0, 1, 2,
-                len(t)//2-1, len(t)//2, len(t)//2+1,
-                len(t)-3, len(t)-2, len(t)-1, len(t), len(t)+1,
-                (len(t)+1)*256
+                -(len(t) + 1) * 256,
+                -len(t) - 1,
+                -len(t),
+                -len(t) + 1,
+                -len(t) // 2 - 1,
+                -len(t) // 2,
+                -len(t) // 2 + 1,
+                -2,
+                -1,
+                0,
+                1,
+                2,
+                len(t) // 2 - 1,
+                len(t) // 2,
+                len(t) // 2 + 1,
+                len(t) - 3,
+                len(t) - 2,
+                len(t) - 1,
+                len(t),
+                len(t) + 1,
+                (len(t) + 1) * 256,
             ]
             indexrange = sorted(set(indexrange))
             for sub in substrings:
@@ -244,7 +258,7 @@ class TestStringCompilation(unittest.TestCase):
         test_find("a")
         test_find("abcdef")
         test_find("baaaab")
-        test_find(("a"*99 + "b")*100)
+        test_find(("a" * 99 + "b") * 100)
         test_find("\u00CA\u00D1\u011A\u1E66\u1EEA")
         test_find("\u00DD\U00012EEE\U0001D471\u00AA\U00011234")
 
@@ -257,7 +271,9 @@ class TestStringCompilation(unittest.TestCase):
             return s.find(str, start, end, extra)
 
         for s in ["a", ""]:
-            self.assertEqual(callOrExceptType(c_find_5, s, s, 0, 1, 2), callOrExceptType(s.find, s, 0, 1, 2))
+            self.assertEqual(
+                callOrExceptType(c_find_5, s, s, 0, 1, 2), callOrExceptType(s.find, s, 0, 1, 2)
+            )
             self.assertEqual(callOrExceptType(c_find_1, s), callOrExceptType(s.find))
 
     def test_string_from_float(self):
@@ -339,11 +355,22 @@ class TestStringCompilation(unittest.TestCase):
             perform_comparison(chr(i) + "\U00010428")
 
         titlestrings = [
-            "Title Case", "TitleCa)se", "2Title/Case", "2title/case",
-            "\u01C5a", "\u01C5A", "\u01C5\u1F88",
-            "\u01C5 \u1F88", "\u01C5 \u1F88a", "\u01C5 \u1F88A",
-            "\U00010401 \u1F88", "\U00010401 \u1F88a", "\U00010401 \u1F88A",
-            "\U00010428 \u1F88", "\U00010428 \u1F88a", "\U00010428 \u1F88A"
+            "Title Case",
+            "TitleCa)se",
+            "2Title/Case",
+            "2title/case",
+            "\u01C5a",
+            "\u01C5A",
+            "\u01C5\u1F88",
+            "\u01C5 \u1F88",
+            "\u01C5 \u1F88a",
+            "\u01C5 \u1F88A",
+            "\U00010401 \u1F88",
+            "\U00010401 \u1F88a",
+            "\U00010401 \u1F88A",
+            "\U00010428 \u1F88",
+            "\U00010428 \u1F88a",
+            "\U00010428 \u1F88A",
         ]
         for s in titlestrings:
             self.assertEqual(c_istitle(s), s.istitle(), s)
@@ -378,7 +405,7 @@ class TestStringCompilation(unittest.TestCase):
 
         compiledStripMany = Compiled(stripMany)
 
-        for s, expectedRatio, passCount in [(bigS, 1.5, 100), (littleS, .25, 10000)]:
+        for s, expectedRatio, passCount in [(bigS, 1.5, 100), (littleS, 0.25, 10000)]:
             t0 = time.time()
             stripMany(s, passCount)
             t1 = time.time()
@@ -433,7 +460,7 @@ class TestStringCompilation(unittest.TestCase):
             "",
             "a",
             " one two  three   \tfour    \n\nfive\r\rsix\n",
-            " one two  three   \tfour    \n\nfive\r\rsix\n" * 100
+            " one two  three   \tfour    \n\nfive\r\rsix\n" * 100,
         ]
         for s in split_strings:
             result = callOrExceptNoType(c_split_2, s)
@@ -506,33 +533,15 @@ class TestStringCompilation(unittest.TestCase):
     def validate_joining_strings(self, function, make_obj):
         # Test data, the fields are: description, separator, items, expected output
         test_data = [
-            ["simple data",
-             ",", ["1", "2", "3"], "1,2,3"],
-
-            ["longer separator",
-             "---", ["1", "2", "3"], "1---2---3"],
-
-            ["longer items",
-             "---", ["aaa", "bb", "c"], "aaa---bb---c"],
-
-            ["empty separator",
-             "", ["1", "2", "3"], "123"],
-
-            ["everything empty",
-             "", [], ""],
-
-            ["empty list",
-             "a", [], ""],
-
-            ["empty string in the items",
-             "--", ["", "1", "3"], "--1--3"],
-
-            ["blank string in the items",
-             "--", [" ", "1", "3"], " --1--3"],
-
-            ["separator with 3 codepoints",
-             "☺", ["a", "bb", "ccc"], "a☺bb☺ccc"],
-
+            ["simple data", ",", ["1", "2", "3"], "1,2,3"],
+            ["longer separator", "---", ["1", "2", "3"], "1---2---3"],
+            ["longer items", "---", ["aaa", "bb", "c"], "aaa---bb---c"],
+            ["empty separator", "", ["1", "2", "3"], "123"],
+            ["everything empty", "", [], ""],
+            ["empty list", "a", [], ""],
+            ["empty string in the items", "--", ["", "1", "3"], "--1--3"],
+            ["blank string in the items", "--", [" ", "1", "3"], " --1--3"],
+            ["separator with 3 codepoints", "☺", ["a", "bb", "ccc"], "a☺bb☺ccc"],
             #   ® - 2B
             #   ☺ - 3B
             #   𝍭 - 4B
@@ -542,11 +551,18 @@ class TestStringCompilation(unittest.TestCase):
             #   హ - 3B
             #   ీ - 3B
             #   c - 1B
-            ["items with 1, 2, and 3 bytes for code point",
-             "--", ["123", "®®", "హీaa"], "123--®®--హీaa"],
-
-            ["separator with 4 bytes for code point, items with less",
-             "𝍭", ["123", "®®", "హీ"], "123𝍭®®𝍭హీ"],
+            [
+                "items with 1, 2, and 3 bytes for code point",
+                "--",
+                ["123", "®®", "హీaa"],
+                "123--®®--హీaa",
+            ],
+            [
+                "separator with 4 bytes for code point, items with less",
+                "𝍭",
+                ["123", "®®", "హీ"],
+                "123𝍭®®𝍭హీ",
+            ],
         ]
 
         for description, separator, items, expected in test_data:
@@ -583,7 +599,9 @@ class TestStringCompilation(unittest.TestCase):
         def f(sep: str, items: ConstDict(str, str)) -> str:
             return sep.join(items)
 
-        self.validate_joining_strings(f, lambda items: ConstDict(str, str)({i: "a" for i in items}))
+        self.validate_joining_strings(
+            f, lambda items: ConstDict(str, str)({i: "a" for i in items})
+        )
 
     def test_string_join_for_bad_types(self):
         """str.join supports only joining ListOf(str) or TupleOf(str)."""

@@ -37,7 +37,9 @@ class MathFunctionWrapper(Wrapper):
     def convert_call(self, context, expr, args, kwargs):
         if len(args) == 1 and not kwargs:
             if not args[0].expr_type.is_arithmetic:
-                return context.pushException(TypeError, f"must be a real number, not {args[0].expr_type}")
+                return context.pushException(
+                    TypeError, f"must be a real number, not {args[0].expr_type}"
+                )
 
             argType = args[0].expr_type.typeRepresentation
 
@@ -48,11 +50,23 @@ class MathFunctionWrapper(Wrapper):
                     return context.constant(True)
 
             if self.typeRepresentation is isnan:
-                func = runtime_functions.isnan_float32 if argType is Float32 else runtime_functions.isnan_float64
+                func = (
+                    runtime_functions.isnan_float32
+                    if argType is Float32
+                    else runtime_functions.isnan_float64
+                )
             elif self.typeRepresentation is isfinite:
-                func = runtime_functions.isfinite_float32 if argType is Float32 else runtime_functions.isfinite_float64
+                func = (
+                    runtime_functions.isfinite_float32
+                    if argType is Float32
+                    else runtime_functions.isfinite_float64
+                )
             elif self.typeRepresentation is isinf:
-                func = runtime_functions.isinf_float32 if argType is Float32 else runtime_functions.isinf_float64
+                func = (
+                    runtime_functions.isinf_float32
+                    if argType is Float32
+                    else runtime_functions.isinf_float64
+                )
             else:
                 assert False, "Unreachable"
 

@@ -12,7 +12,18 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, Class, TupleOf, ListOf, Member, OneOf, Int64, Float64, String, Final
+from typed_python import (
+    Function,
+    Class,
+    TupleOf,
+    ListOf,
+    Member,
+    OneOf,
+    Int64,
+    Float64,
+    String,
+    Final,
+)
 import typed_python._types as _types
 from typed_python.compiler.runtime import Runtime, Entrypoint
 import unittest
@@ -234,7 +245,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         print("Times were ", elapsed1, elapsed2)
         # they should take the same amount of time. Takes about 1 second for me to
         # tun this test. Note that we generate two entrypoints (one for float, one for int)
-        self.assertTrue(.5 <= elapsed1 / elapsed2 <= 2.0, elapsed1 / elapsed2)
+        self.assertTrue(0.5 <= elapsed1 / elapsed2 <= 2.0, elapsed1 / elapsed2)
 
     def test_compile_class_method(self):
         c = AClass(x=20)
@@ -370,7 +381,10 @@ class TestClassCompilationCompilation(unittest.TestCase):
                 return 0
 
         # if you override a method you can't change its output type.
-        with self.assertRaisesRegex(Exception, "Overloads of 'f' don't have the same return type"):
+        with self.assertRaisesRegex(
+            Exception, "Overloads of 'f' don't have the same return type"
+        ):
+
             class BadChild(Base):
                 def f(self) -> float:
                     pass
@@ -393,8 +407,14 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(resultType(lambda c, a: c.f(a), c=TestClass, a=int), Int64)
         self.assertEqual(resultType(lambda c, a: c.f(a), c=TestClass, a=str), String)
-        self.assertEqual(set(resultType(lambda c, a: c.f(a), c=TestClass, a=OneOf(str, int)).Types), set(OneOf(str, int).Types))
-        self.assertEqual(set(resultType(lambda c, a: c.f(a), c=TestClass, a=object).Types), set(OneOf(str, int).Types))
+        self.assertEqual(
+            set(resultType(lambda c, a: c.f(a), c=TestClass, a=OneOf(str, int)).Types),
+            set(OneOf(str, int).Types),
+        )
+        self.assertEqual(
+            set(resultType(lambda c, a: c.f(a), c=TestClass, a=object).Types),
+            set(OneOf(str, int).Types),
+        )
 
         @Compiled
         def callWithStr(c: TestClass, x: str):
@@ -535,7 +555,9 @@ class TestClassCompilationCompilation(unittest.TestCase):
         elapsedUncompiled = t2 - t1
         speedup = elapsedUncompiled / elapsedCompiled
 
-        print(f"speedup is {speedup}. Compiled took {elapsedCompiled} to do {count * len(aList)}")
+        print(
+            f"speedup is {speedup}. Compiled took {elapsedCompiled} to do {count * len(aList)}"
+        )
 
         self.assertGreater(speedup, 20)
 
@@ -716,4 +738,4 @@ class TestClassCompilationCompilation(unittest.TestCase):
         elapsedNoDispatch = t2 - t1
         speedup = elapsedDispatch / elapsedNoDispatch
 
-        self.assertTrue(.8 < speedup < 1.2, speedup)
+        self.assertTrue(0.8 < speedup < 1.2, speedup)

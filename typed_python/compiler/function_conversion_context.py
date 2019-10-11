@@ -17,7 +17,7 @@ import typed_python.python_ast as python_ast
 from typed_python.compiler.python_ast_analysis import (
     computeAssignedVariables,
     computeReadVariables,
-    computeFunctionArgVariables
+    computeFunctionArgVariables,
 )
 
 import typed_python.compiler
@@ -31,7 +31,9 @@ from typed_python import OneOf
 
 NoneExprType = NoneWrapper()
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    t
+)
 
 
 class FunctionOutput:
@@ -41,7 +43,17 @@ class FunctionOutput:
 class FunctionConversionContext(object):
     """Helper function for converting a single python function given some input and output types"""
 
-    def __init__(self, converter, name, identity, ast_arg, statements, input_types, output_type, free_variable_lookup):
+    def __init__(
+        self,
+        converter,
+        name,
+        identity,
+        ast_arg,
+        statements,
+        input_types,
+        output_type,
+        free_variable_lookup,
+    ):
         """Initialize a FunctionConverter
 
         Args:
@@ -67,7 +79,9 @@ class FunctionConversionContext(object):
         self._statements = statements
         self._input_types = input_types
         self._output_type = output_type
-        self._argumentsWithoutStackslots = set()  # arguments that we don't bother to copy into the stack
+        self._argumentsWithoutStackslots = (
+            set()
+        )  # arguments that we don't bother to copy into the stack
         self._varname_to_type = {}
         self._free_variable_lookup = free_variable_lookup
         self._temp_let_var = 0
@@ -92,12 +106,9 @@ class FunctionConversionContext(object):
 
         return TypedExpression(
             context,
-            native_ast.Expression.StackSlot(
-                name=name,
-                type=slot_type.getNativeLayoutType()
-            ),
+            native_ast.Expression.StackSlot(name=name, type=slot_type.getNativeLayoutType()),
             slot_type,
-            isReference=True
+            isReference=True,
         )
 
     def variableIsAlwaysEmpty(self, name):
@@ -126,9 +137,13 @@ class FunctionConversionContext(object):
     def convertToNativeFunction(self):
         variableStates = FunctionStackState()
 
-        initializer_expr = self.initializeVariableStates(self._argnames, self._star_args_name, variableStates)
+        initializer_expr = self.initializeVariableStates(
+            self._argnames, self._star_args_name, variableStates
+        )
 
-        body_native_expr, controlFlowReturns = self.convert_function_body(self._statements, variableStates)
+        body_native_expr, controlFlowReturns = self.convert_function_body(
+            self._statements, variableStates
+        )
 
         # destroy our variables if they are in scope
         destructors = self.generateDestructors(variableStates)
@@ -139,8 +154,7 @@ class FunctionConversionContext(object):
 
         if destructors:
             body_native_expr = native_ast.Expression.Finally(
-                teardowns=destructors,
-                expr=body_native_expr
+                teardowns=destructors, expr=body_native_expr
             )
 
         return_type = self._varname_to_type.get(FunctionOutput, None)
@@ -150,31 +164,31 @@ class FunctionConversionContext(object):
                 native_ast.Function(
                     args=self._native_args,
                     body=native_ast.FunctionBody.Internal(body=body_native_expr),
-                    output_type=native_ast.Void
+                    output_type=native_ast.Void,
                 ),
-                return_type
+                return_type,
             )
 
         if return_type.is_pass_by_ref:
             return (
                 native_ast.Function(
                     args=(
-                        (('.return', return_type.getNativeLayoutType().pointer()),)
+                        ((".return", return_type.getNativeLayoutType().pointer()),)
                         + tuple(self._native_args)
                     ),
                     body=native_ast.FunctionBody.Internal(body=body_native_expr),
-                    output_type=native_ast.Void
+                    output_type=native_ast.Void,
                 ),
-                return_type
+                return_type,
             )
         else:
             return (
                 native_ast.Function(
                     args=self._native_args,
                     body=native_ast.FunctionBody.Internal(body=body_native_expr),
-                    output_type=return_type.getNativeLayoutType()
+                    output_type=return_type.getNativeLayoutType(),
                 ),
-                return_type
+                return_type,
             )
 
     def _constructInitialVarnameToType(self):
@@ -186,20 +200,23 @@ class FunctionConversionContext(object):
         if self._star_args_name is None:
             if len(input_types) != len(self._ast_arg.args):
                 raise ConversionException(
-                    "Expected %s arguments but got %s" % (len(self._ast_arg.args), len(input_types))
+                    "Expected %s arguments but got %s"
+                    % (len(self._ast_arg.args), len(input_types))
                 )
         else:
             if len(input_types) < len(self._ast_arg.args):
                 raise ConversionException(
-                    "Expected at least %s arguments but got %s" %
-                    (len(self._ast_arg.args), len(input_types))
+                    "Expected at least %s arguments but got %s"
+                    % (len(self._ast_arg.args), len(input_types))
                 )
 
         self._native_args = []
         for i in range(len(self._ast_arg.args)):
             self._varname_to_type[self._ast_arg.args[i].arg] = input_types[i]
             if not input_types[i].is_empty:
-                self._native_args.append((self._ast_arg.args[i].arg, input_types[i].getNativePassingType()))
+                self._native_args.append(
+                    (self._ast_arg.args[i].arg, input_types[i].getNativePassingType())
+                )
 
         self._argnames = [a.arg for a in self._ast_arg.args]
 
@@ -208,13 +225,17 @@ class FunctionConversionContext(object):
 
             for i in range(len(self._ast_arg.args), len(input_types)):
                 self._native_args.append(
-                    ('.star_args.%s' % (i - len(self._ast_arg.args)),
-                        input_types[i].getNativePassingType())
+                    (
+                        ".star_args.%s" % (i - len(self._ast_arg.args)),
+                        input_types[i].getNativePassingType(),
+                    )
                 )
 
             starargs_type = native_ast.Struct(
-                [('f_%s' % i, input_types[i+len(self._ast_arg.args)])
-                    for i in range(star_args_count)]
+                [
+                    ("f_%s" % i, input_types[i + len(self._ast_arg.args)])
+                    for i in range(star_args_count)
+                ]
             )
 
             self._varname_to_type[self._star_args_name] = starargs_type
@@ -235,11 +256,11 @@ class FunctionConversionContext(object):
 
     def let_varname(self):
         self._temp_let_var += 1
-        return "letvar.%s" % (self._temp_let_var-1)
+        return "letvar.%s" % (self._temp_let_var - 1)
 
     def stack_varname(self):
         self._temp_stack_var += 1
-        return "stackvar.%s" % (self._temp_stack_var-1)
+        return "stackvar.%s" % (self._temp_stack_var - 1)
 
     def externalScopeVarExpr(self, subcontext, varname):
         """If 'varname' refers to a known variable that doesn't use a stack slot, return an expression for it.
@@ -264,7 +285,7 @@ class FunctionConversionContext(object):
             subcontext,
             native_ast.Expression.Variable(name=varname),
             varType,
-            varType.is_pass_by_ref
+            varType.is_pass_by_ref,
         )
 
     def upsizeVariableType(self, varname, new_type):
@@ -281,8 +302,10 @@ class FunctionConversionContext(object):
         if existingType == new_type.typeRepresentation:
             return
 
-        if hasattr(existingType, '__typed_python_category__') and \
-                existingType.__typed_python_category__ == 'OneOf':
+        if (
+            hasattr(existingType, "__typed_python_category__")
+            and existingType.__typed_python_category__ == "OneOf"
+        ):
             if new_type.typeRepresentation in existingType.Types:
                 return
 
@@ -306,7 +329,9 @@ class FunctionConversionContext(object):
 
         for name in self.variablesBound:
             if name not in self.variablesAssigned:
-                variableStates.variableAssigned(name, self._varname_to_type[name].typeRepresentation)
+                variableStates.variableAssigned(
+                    name, self._varname_to_type[name].typeRepresentation
+                )
 
         for name in argnames:
             if name is not FunctionOutput and name != stararg_name:
@@ -332,13 +357,13 @@ class FunctionConversionContext(object):
                         context.pushEffect(
                             native_ast.Expression.Store(
                                 ptr=native_ast.Expression.StackSlot(
-                                    name=name,
-                                    type=slot_type.getNativeLayoutType()
+                                    name=name, type=slot_type.getNativeLayoutType()
                                 ),
                                 val=(
-                                    native_ast.Expression.Variable(name=name) if not slot_type.is_pass_by_ref else
-                                    native_ast.Expression.Variable(name=name).load()
-                                )
+                                    native_ast.Expression.Variable(name=name)
+                                    if not slot_type.is_pass_by_ref
+                                    else native_ast.Expression.Variable(name=name).load()
+                                ),
                             )
                         )
                         context.markVariableInitialized(name)
@@ -369,7 +394,9 @@ class FunctionConversionContext(object):
 
                 destructors.append(
                     native_ast.Teardown.Always(
-                        expr=context.finalize(None).with_comment("Cleanup for variable %s" % name)
+                        expr=context.finalize(None).with_comment(
+                            "Cleanup for variable %s" % name
+                        )
                     )
                 )
 
@@ -387,10 +414,12 @@ class FunctionConversionContext(object):
                 [
                     TypedExpression(
                         native_ast.Expression.Variable(".star_args.%s" % i),
-                        args_type.element_types[i][1]
+                        args_type.element_types[i][1],
                     )
-                    for i in range(len(args_type.element_types))]
-            ).with_comment("initialize *args slot") + res
+                    for i in range(len(args_type.element_types))
+                ],
+            ).with_comment("initialize *args slot")
+            + res
         )
 
     def assignToLocalVariable(self, varname, val_to_store, variableStates):
@@ -420,7 +449,10 @@ class FunctionConversionContext(object):
                 slot_ref.convert_copy_initialize(val_to_store)
                 subcontext.markVariableInitialized(varname)
             else:
-                with subcontext.ifelse(subcontext.isInitializedVarExpr(varname)) as (true_block, false_block):
+                with subcontext.ifelse(subcontext.isInitializedVarExpr(varname)) as (
+                    true_block,
+                    false_block,
+                ):
                     with true_block:
                         slot_ref.convert_assign(val_to_store)
                     with false_block:
@@ -509,13 +541,12 @@ class FunctionConversionContext(object):
             if len(iterated_expressions) < len(targets):
                 subcontext.pushException(
                     ValueError,
-                    f"not enough values to unpack (expected {len(targets)}, got {len(iterated_expressions)})"
+                    f"not enough values to unpack (expected {len(targets)}, got {len(iterated_expressions)})",
                 )
                 return False
             elif len(iterated_expressions) > len(targets):
                 subcontext.pushException(
-                    ValueError,
-                    f"too many values to unpack (expected {len(targets)})"
+                    ValueError, f"too many values to unpack (expected {len(targets)})"
                 )
                 return False
 
@@ -541,29 +572,38 @@ class FunctionConversionContext(object):
             tempVarnames = []
 
             for targetIndex in range(len(targets) + 1):
-                next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
+                next_ptr, is_populated = (
+                    iter_obj.convert_next()
+                )  # this conversion is special - it returns two values
                 if next_ptr is not None:
                     with subcontext.ifelse(is_populated.nonref_expr) as (if_true, if_false):
                         if targetIndex < len(targets):
                             with if_true:
-                                tempVarnames.append(f".anonyous_iter{targets[0].line_number}.{targetIndex}")
+                                tempVarnames.append(
+                                    f".anonyous_iter{targets[0].line_number}.{targetIndex}"
+                                )
                                 self.variablesAssigned.add(tempVarnames[-1])
-                                self.assignToLocalVariable(tempVarnames[-1], next_ptr, variableStates)
+                                self.assignToLocalVariable(
+                                    tempVarnames[-1], next_ptr, variableStates
+                                )
 
                             with if_false:
                                 subcontext.pushException(
                                     ValueError,
-                                    f"not enough values to unpack (expected {len(targets)}, got {targetIndex})"
+                                    f"not enough values to unpack (expected {len(targets)}, got {targetIndex})",
                                 )
                         else:
                             with if_true:
-                                subcontext.pushException(ValueError, f"too many values to unpack (expected {len(targets)})")
+                                subcontext.pushException(
+                                    ValueError,
+                                    f"too many values to unpack (expected {len(targets)})",
+                                )
 
             for targetIndex in range(len(targets)):
                 self.convert_assignment(
                     targets[targetIndex],
                     None,
-                    subcontext.namedVariableLookup(tempVarnames[targetIndex])
+                    subcontext.namedVariableLookup(tempVarnames[targetIndex]),
                 )
 
             return True
@@ -574,10 +614,14 @@ class FunctionConversionContext(object):
         except Exception as e:
             types = {
                 varname: self._varname_to_type.get(varname)
-                for varname in set(computeReadVariables(ast)).union(computeAssignedVariables(ast))
+                for varname in set(computeReadVariables(ast)).union(
+                    computeAssignedVariables(ast)
+                )
             }
 
-            newMessage = f"\n{ast.filename}:{ast.line_number}\n" + "\n".join(f"    {k}={v}" for k, v in types.items())
+            newMessage = f"\n{ast.filename}:{ast.line_number}\n" + "\n".join(
+                f"    {k}={v}" for k, v in types.items()
+            )
             e.args = (str(e.args[0]) + newMessage,)
             raise
 
@@ -646,7 +690,10 @@ class FunctionConversionContext(object):
 
             result_expr = subcontext.convert_expression_ast(ast.value)
 
-            return subcontext.finalize(result_expr, exceptionsTakeFrom=ast), result_expr is not None
+            return (
+                subcontext.finalize(result_expr, exceptionsTakeFrom=ast),
+                result_expr is not None,
+            )
 
         if ast.matches.If:
             cond_context = ExpressionConversionContext(self, variableStates)
@@ -660,7 +707,9 @@ class FunctionConversionContext(object):
             if cond.expr.matches.Constant:
                 truth_val = cond.expr.val.truth_value()
 
-                branch, flow_returns = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse, variableStates)
+                branch, flow_returns = self.convert_statement_list_ast(
+                    ast.body if truth_val else ast.orelse, variableStates
+                )
 
                 return cond.expr >> branch, flow_returns
 
@@ -671,18 +720,22 @@ class FunctionConversionContext(object):
             self.restrictByCondition(variableStatesFalse, ast.test, result=False)
 
             true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue)
-            false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse)
+            false, false_returns = self.convert_statement_list_ast(
+                ast.orelse, variableStatesFalse
+            )
 
             variableStates.becomeMerge(
                 variableStatesTrue if true_returns else None,
-                variableStatesFalse if false_returns else None
+                variableStatesFalse if false_returns else None,
             )
 
             return (
                 native_ast.Expression.Branch(
-                    cond=cond_context.finalize(cond.nonref_expr, exceptionsTakeFrom=ast), true=true, false=false
+                    cond=cond_context.finalize(cond.nonref_expr, exceptionsTakeFrom=ast),
+                    true=true,
+                    false=false,
                 ),
-                true_returns or false_returns
+                true_returns or false_returns,
             )
 
         if ast.matches.Pass:
@@ -707,8 +760,13 @@ class FunctionConversionContext(object):
                     truth_value = cond.expr.val.truth_value()
 
                     if not truth_value:
-                        branch, flow_returns = self.convert_statement_list_ast(ast.orelse, variableStates)
-                        return cond_context.finalize(None, exceptionsTakeFrom=ast) >> branch, flow_returns
+                        branch, flow_returns = self.convert_statement_list_ast(
+                            ast.orelse, variableStates
+                        )
+                        return (
+                            cond_context.finalize(None, exceptionsTakeFrom=ast) >> branch,
+                            flow_returns,
+                        )
                     else:
                         isWhileTrue = True
                 else:
@@ -720,13 +778,17 @@ class FunctionConversionContext(object):
                 self.restrictByCondition(variableStatesTrue, ast.test, result=True)
                 self.restrictByCondition(variableStatesFalse, ast.test, result=False)
 
-                true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue)
+                true, true_returns = self.convert_statement_list_ast(
+                    ast.body, variableStatesTrue
+                )
 
-                false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse)
+                false, false_returns = self.convert_statement_list_ast(
+                    ast.orelse, variableStatesFalse
+                )
 
                 variableStates.becomeMerge(
                     variableStatesTrue if true_returns else None,
-                    variableStatesFalse if false_returns else None
+                    variableStatesFalse if false_returns else None,
                 )
 
                 variableStates.mergeWithSelf(initVariableStates)
@@ -734,9 +796,13 @@ class FunctionConversionContext(object):
                 if variableStates == initVariableStates:
                     return (
                         native_ast.Expression.While(
-                            cond=cond_context.finalize(cond.nonref_expr, exceptionsTakeFrom=ast), while_true=true, orelse=false
+                            cond=cond_context.finalize(
+                                cond.nonref_expr, exceptionsTakeFrom=ast
+                            ),
+                            while_true=true,
+                            orelse=false,
                         ),
-                        (true_returns or false_returns) and not isWhileTrue
+                        (true_returns or false_returns) and not isWhileTrue,
                     )
 
         if ast.matches.Try:
@@ -752,7 +818,10 @@ class FunctionConversionContext(object):
 
             to_iterate = iterator_setup_context.convert_expression_ast(ast.iter)
             if to_iterate is None:
-                return iterator_setup_context.finalize(to_iterate, exceptionsTakeFrom=ast), False
+                return (
+                    iterator_setup_context.finalize(to_iterate, exceptionsTakeFrom=ast),
+                    False,
+                )
 
             iteration_expressions = to_iterate.get_iteration_expressions()
 
@@ -762,18 +831,28 @@ class FunctionConversionContext(object):
                 for subexpr in iteration_expressions:
                     self.assignToLocalVariable(target_var_name, subexpr, variableStates)
 
-                    thisOne, thisOneReturns = self.convert_statement_list_ast(ast.body, variableStates)
+                    thisOne, thisOneReturns = self.convert_statement_list_ast(
+                        ast.body, variableStates
+                    )
 
                     iterator_setup_context.pushEffect(thisOne)
 
                     if not thisOneReturns:
-                        return iterator_setup_context.finalize(None, exceptionsTakeFrom=ast), False
+                        return (
+                            iterator_setup_context.finalize(None, exceptionsTakeFrom=ast),
+                            False,
+                        )
 
-                thisOne, thisOneReturns = self.convert_statement_list_ast(ast.orelse, variableStates)
+                thisOne, thisOneReturns = self.convert_statement_list_ast(
+                    ast.orelse, variableStates
+                )
 
                 iterator_setup_context.pushEffect(thisOne)
 
-                return iterator_setup_context.finalize(None, exceptionsTakeFrom=ast), thisOneReturns
+                return (
+                    iterator_setup_context.finalize(None, exceptionsTakeFrom=ast),
+                    thisOneReturns,
+                )
             else:
                 # create a variable to hold the iterator, and instantiate it there
                 iter_varname = target_var_name + ".iter." + str(ast.line_number)
@@ -783,7 +862,12 @@ class FunctionConversionContext(object):
 
                 iterator_object = to_iterate.convert_method_call("__iter__", (), {})
                 if iterator_object is None:
-                    return iterator_setup_context.finalize(iterator_object, exceptionsTakeFrom=ast), False
+                    return (
+                        iterator_setup_context.finalize(
+                            iterator_object, exceptionsTakeFrom=ast
+                        ),
+                        False,
+                    )
 
                 self.assignToLocalVariable(iter_varname, iterator_object, variableStates)
 
@@ -798,30 +882,38 @@ class FunctionConversionContext(object):
                         return (
                             iterator_setup_context.finalize(None, exceptionsTakeFrom=ast)
                             >> cond_context.finalize(None, exceptionsTakeFrom=ast),
-                            False
+                            False,
                         )
 
-                    next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
+                    next_ptr, is_populated = (
+                        iter_obj.convert_next()
+                    )  # this conversion is special - it returns two values
                     if next_ptr is None:
                         return (
                             iterator_setup_context.finalize(None, exceptionsTakeFrom=ast)
                             >> cond_context.finalize(None, exceptionsTakeFrom=ast),
-                            False
+                            False,
                         )
 
                     with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
                         with if_true:
-                            self.assignToLocalVariable(target_var_name, next_ptr, variableStates)
+                            self.assignToLocalVariable(
+                                target_var_name, next_ptr, variableStates
+                            )
 
                     variableStatesTrue = variableStates.clone()
                     variableStatesFalse = variableStates.clone()
 
-                    true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue)
-                    false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse)
+                    true, true_returns = self.convert_statement_list_ast(
+                        ast.body, variableStatesTrue
+                    )
+                    false, false_returns = self.convert_statement_list_ast(
+                        ast.orelse, variableStatesFalse
+                    )
 
                     variableStates.becomeMerge(
                         variableStatesTrue if true_returns else None,
-                        variableStatesFalse if false_returns else None
+                        variableStatesFalse if false_returns else None,
                     )
 
                     variableStates.mergeWithSelf(initVariableStates)
@@ -829,11 +921,15 @@ class FunctionConversionContext(object):
                     if variableStates == initVariableStates:
                         # if nothing changed, the loop is stable.
                         return (
-                            iterator_setup_context.finalize(None, exceptionsTakeFrom=ast) >>
-                            native_ast.Expression.While(
-                                cond=cond_context.finalize(is_populated, exceptionsTakeFrom=ast), while_true=true, orelse=false
+                            iterator_setup_context.finalize(None, exceptionsTakeFrom=ast)
+                            >> native_ast.Expression.While(
+                                cond=cond_context.finalize(
+                                    is_populated, exceptionsTakeFrom=ast
+                                ),
+                                while_true=true,
+                                orelse=false,
                             ),
-                            true_returns or false_returns
+                            true_returns or false_returns,
                         )
 
         if ast.matches.Raise:
@@ -871,29 +967,49 @@ class FunctionConversionContext(object):
         return None
 
     def restrictByCondition(self, variableStates, condition, result):
-        if condition.matches.Call and condition.func.matches.Name and len(condition.args) == 2 and condition.args[0].matches.Name:
+        if (
+            condition.matches.Call
+            and condition.func.matches.Name
+            and len(condition.args) == 2
+            and condition.args[0].matches.Name
+        ):
             if self.freeVariableLookup(condition.func.id) is isinstance:
                 context = ExpressionConversionContext(self, variableStates)
                 typeExpr = context.convert_expression_ast(condition.args[1])
 
-                PythonTypeObjectWrapper = typed_python.compiler.type_wrappers.python_type_object_wrapper.PythonTypeObjectWrapper
-                if typeExpr is not None and isinstance(typeExpr.expr_type, PythonTypeObjectWrapper):
-                    variableStates.restrictTypeFor(condition.args[0].id, typeExpr.expr_type.typeRepresentation.Value, result)
+                PythonTypeObjectWrapper = (
+                    typed_python.compiler.type_wrappers.python_type_object_wrapper.PythonTypeObjectWrapper
+                )
+                if typeExpr is not None and isinstance(
+                    typeExpr.expr_type, PythonTypeObjectWrapper
+                ):
+                    variableStates.restrictTypeFor(
+                        condition.args[0].id,
+                        typeExpr.expr_type.typeRepresentation.Value,
+                        result,
+                    )
 
         # check if we are a 'var.matches.Y' expression
-        if (condition.matches.Attribute and
-                condition.value.matches.Attribute and
-                condition.value.attr == "matches" and
-                condition.value.value.matches.Name):
+        if (
+            condition.matches.Attribute
+            and condition.value.matches.Attribute
+            and condition.value.attr == "matches"
+            and condition.value.value.matches.Name
+        ):
             curType = variableStates.currentType(condition.value.value.id)
-            if curType is not None and getattr(curType, '__typed_python_category__', None) == "Alternative":
+            if (
+                curType is not None
+                and getattr(curType, "__typed_python_category__", None) == "Alternative"
+            ):
                 if result:
-                    subType = [x for x in curType.__typed_python_alternatives__ if x.Name == condition.attr]
+                    subType = [
+                        x
+                        for x in curType.__typed_python_alternatives__
+                        if x.Name == condition.attr
+                    ]
                     if subType:
                         variableStates.restrictTypeFor(
-                            condition.value.value.id,
-                            subType[0],
-                            result
+                            condition.value.value.id, subType[0], result
                         )
 
     def convert_delete(self, expression, variableStates):
@@ -938,7 +1054,9 @@ class FunctionConversionContext(object):
     def convert_function_body(self, statements, variableStates: FunctionStackState):
         return self.convert_statement_list_ast(statements, variableStates, toplevel=True)
 
-    def convert_statement_list_ast(self, statements, variableStates: FunctionStackState, toplevel=False):
+    def convert_statement_list_ast(
+        self, statements, variableStates: FunctionStackState, toplevel=False
+    ):
         """Convert a sequence of statements to a native expression.
 
         After executing this statement, variableStates will contain the known states of the
@@ -982,12 +1100,10 @@ class FunctionConversionContext(object):
                     python_ast.Statement.Return(
                         value=None, filename="", line_number=0, col_offset=0
                     ),
-                    variableStates
+                    variableStates,
                 )
             )
 
-        seq_expr = native_ast.makeSequence(
-            [expr for expr, _ in exprAndReturns]
-        )
+        seq_expr = native_ast.makeSequence([expr for expr, _ in exprAndReturns])
 
         return seq_expr, flows_off_end

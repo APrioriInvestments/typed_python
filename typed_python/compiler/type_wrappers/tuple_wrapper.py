@@ -16,11 +16,15 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
 from typed_python import _types, Int32, OneOf, Bool
 
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import (
+    BoundCompiledMethodWrapper,
+)
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    t
+)
 
 
 class TupleWrapper(Wrapper):
@@ -28,7 +32,7 @@ class TupleWrapper(Wrapper):
     is_pass_by_ref = True
 
     def __init__(self, t):
-        assert hasattr(t, '__typed_python_category__')
+        assert hasattr(t, "__typed_python_category__")
         super().__init__(t)
         bytecount = _types.bytecount(t)
 
@@ -36,12 +40,14 @@ class TupleWrapper(Wrapper):
         self.unionType = OneOf(*tuple(t.ElementTypes))
         self.byteOffsets = [0]
 
-        for i in range(len(self.subTypeWrappers)-1):
+        for i in range(len(self.subTypeWrappers) - 1):
             self.byteOffsets.append(self.byteOffsets[-1] + _types.bytecount(t.ElementTypes[i]))
 
         self.layoutType = native_ast.Type.Array(element_type=native_ast.UInt8, count=bytecount)
 
-        self._is_pod = all(typeWrapper(possibility).is_pod for possibility in self.subTypeWrappers)
+        self._is_pod = all(
+            typeWrapper(possibility).is_pod for possibility in self.subTypeWrappers
+        )
         self.is_default_constructible = _types.is_default_constructible(t)
 
     def convert_hash(self, context, expr):
@@ -67,7 +73,11 @@ class TupleWrapper(Wrapper):
 
     def convert_default_initialize(self, context, target):
         if not self.is_default_constructible:
-            context.pushException(TypeError, "Can't default-initialize any subtypes of %s" % self.typeRepresentation.__qualname__)
+            context.pushException(
+                TypeError,
+                "Can't default-initialize any subtypes of %s"
+                % self.typeRepresentation.__qualname__,
+            )
             return
 
         for i, t in enumerate(self.typeRepresentation.ElementTypes):
@@ -78,8 +88,8 @@ class TupleWrapper(Wrapper):
         return context.pushReference(
             self.subTypeWrappers[which],
             expr.expr.cast(native_ast.UInt8Ptr)
-                .ElementPtrIntegers(self.byteOffsets[which])
-                .cast(self.subTypeWrappers[which].getNativeLayoutType().pointer())
+            .ElementPtrIntegers(self.byteOffsets[which])
+            .cast(self.subTypeWrappers[which].getNativeLayoutType().pointer()),
         )
 
     def convert_len(self, context):
@@ -96,7 +106,9 @@ class TupleWrapper(Wrapper):
             if index.expr.val.matches.Int:
                 indexVal = index.expr.val.val
 
-                if indexVal >= - len(self.subTypeWrappers) and indexVal < len(self.subTypeWrappers):
+                if indexVal >= -len(self.subTypeWrappers) and indexVal < len(
+                    self.subTypeWrappers
+                ):
                     if indexVal < 0:
                         indexVal += len(self.subTypeWrappers)
 
@@ -108,19 +120,21 @@ class TupleWrapper(Wrapper):
 
         result = context.allocateUninitializedSlot(self.unionType)
         with context.switch(
-            index.nonref_expr,
-            range(len(self.subTypeWrappers)),
-            True
+            index.nonref_expr, range(len(self.subTypeWrappers)), True
         ) as indicesAndContexts:
             for i, subcontext in indicesAndContexts:
                 with subcontext:
                     if i is not None:
-                        converted = self.refAs(context, expr, i).convert_to_type(self.unionType)
+                        converted = self.refAs(context, expr, i).convert_to_type(
+                            self.unionType
+                        )
                         if converted is not None:
                             result.convert_copy_initialize(converted)
                             context.markUninitializedSlotInitialized(result)
                     else:
-                        context.pushException(IndexError, f"{i} not in [0, {len(self.subTypeWrappers)})")
+                        context.pushException(
+                            IndexError, f"{i} not in [0, {len(self.subTypeWrappers)})"
+                        )
 
         return result
 
@@ -150,9 +164,7 @@ class TupleWrapper(Wrapper):
 
         if target_type.typeRepresentation == Bool:
             context.pushEffect(
-                targetVal.expr.store(
-                    context.constant(len(self.subTypeWrappers) != 0)
-                )
+                targetVal.expr.store(context.constant(len(self.subTypeWrappers) != 0))
             )
             return context.constant(True)
 
@@ -172,7 +184,11 @@ class NamedTupleWrapper(TupleWrapper):
 
         ix = self.namesToIndices.get(attribute)
         if ix is None:
-            context.pushException(AttributeError, "'%s' object has no attribute '%s'" % (str(self.typeRepresentation), attribute))
+            context.pushException(
+                AttributeError,
+                "'%s' object has no attribute '%s'"
+                % (str(self.typeRepresentation), attribute),
+            )
             return
 
         return self.refAs(context, instance, ix)
@@ -181,7 +197,10 @@ class NamedTupleWrapper(TupleWrapper):
         if len(args) == 0:
             for name in kwargs:
                 if name not in self.namesToTypes:
-                    context.pushException(TypeError, f"Couldn't initialize type of {self} with an argument named {name}")
+                    context.pushException(
+                        TypeError,
+                        f"Couldn't initialize type of {self} with an argument named {name}",
+                    )
                     return
 
             needsDefaultInitializer = set()
@@ -191,7 +210,9 @@ class NamedTupleWrapper(TupleWrapper):
                     if _types.is_default_constructible(name):
                         needsDefaultInitializer.add(name)
                     else:
-                        context.pushException(TypeError, f"Can't default initialize member {name} of {self}")
+                        context.pushException(
+                            TypeError, f"Can't default initialize member {name} of {self}"
+                        )
                         return
 
             uninitializedNamedTuple = context.allocateUninitializedSlot(self)
@@ -201,11 +222,15 @@ class NamedTupleWrapper(TupleWrapper):
                 if actualExpr is None:
                     return None
 
-                uninitializedChildElement = self.refAs(context, uninitializedNamedTuple, self.namesToIndices[name])
+                uninitializedChildElement = self.refAs(
+                    context, uninitializedNamedTuple, self.namesToIndices[name]
+                )
                 uninitializedChildElement.convert_copy_initialize(actualExpr)
 
             for name in needsDefaultInitializer:
-                self.refAs(context, uninitializedNamedTuple, self.namesToIndices[name]).convert_default_initialize()
+                self.refAs(
+                    context, uninitializedNamedTuple, self.namesToIndices[name]
+                ).convert_default_initialize()
 
             context.markUninitializedSlotInitialized(uninitializedNamedTuple)
 
@@ -218,19 +243,27 @@ class NamedTupleWrapper(TupleWrapper):
         return super().convert_type_call(context, typeInst, args, kwargs)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        if methodname == 'replacing' and not args:
-            return context.push(self, lambda newInstance: self.initializeReplacing(context, newInstance, instance, kwargs))
+        if methodname == "replacing" and not args:
+            return context.push(
+                self,
+                lambda newInstance: self.initializeReplacing(
+                    context, newInstance, instance, kwargs
+                ),
+            )
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
     def initializeReplacing(self, context, toInitialize, existingInstance, kwargs):
         # check if all the passed arguments are in the list of the names
-        additional_arguments = sorted(list(set(kwargs.keys()) - set(self.typeRepresentation.ElementNames)))
+        additional_arguments = sorted(
+            list(set(kwargs.keys()) - set(self.typeRepresentation.ElementNames))
+        )
         if additional_arguments:
             context.pushException(
                 ValueError,
-                "The arguments list contain names '{}' which are not in the tuple definition."
-                .format(", ".join(additional_arguments))
+                "The arguments list contain names '{}' which are not in the tuple definition.".format(
+                    ", ".join(additional_arguments)
+                ),
             )
             return None
 
@@ -239,7 +272,9 @@ class NamedTupleWrapper(TupleWrapper):
             field_type = self.typeRepresentation.ElementTypes[i]
 
             if field_name not in kwargs:
-                self.refAs(context, toInitialize, i).convert_copy_initialize(self.refAs(context, existingInstance, i))
+                self.refAs(context, toInitialize, i).convert_copy_initialize(
+                    self.refAs(context, existingInstance, i)
+                )
             else:
                 converted = kwargs[field_name].convert_to_type(field_type)
                 if converted is None:

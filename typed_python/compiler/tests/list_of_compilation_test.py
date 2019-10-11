@@ -41,8 +41,8 @@ class TestListOfCompilation(unittest.TestCase):
             slowval = f(*a)
             t2 = time.time()
 
-            t_py += t2-t1
-            t_fast += t1-t0
+            t_py += t2 - t1
+            t_fast += t1 - t0
 
             self.assertEqual(fastval, slowval)
         return t_py, t_fast
@@ -167,7 +167,7 @@ class TestListOfCompilation(unittest.TestCase):
         self.assertEqual(_types.refcount(t1), 1)
         self.assertEqual(_types.refcount(t2), 1)
 
-        self.assertEqual(res, t1+t2)
+        self.assertEqual(res, t1 + t2)
 
     def test_list_of_list_refcounting(self):
         T = ListOf(int)
@@ -184,7 +184,7 @@ class TestListOfCompilation(unittest.TestCase):
 
         fRes = f(aTT)
 
-        self.assertEqual(fRes, aTT+aTT+aTT)
+        self.assertEqual(fRes, aTT + aTT + aTT)
         self.assertEqual(_types.refcount(aTT), 1)
         self.assertEqual(_types.refcount(fRes), 1)
 
@@ -222,12 +222,13 @@ class TestListOfCompilation(unittest.TestCase):
 
         oldReserved = aList.reserved()
         f(aList)
-        self.assertEqual(oldReserved+10, aList.reserved())
+        self.assertEqual(oldReserved + 10, aList.reserved())
 
     def test_list_resize(self):
         T = ListOf(TupleOf(int))
 
         aTup = TupleOf(int)((1, 2, 3))
+
         @Compiled
         def f(x: T, y: TupleOf(int)):
             x.resize(len(x) + 10, y)
@@ -274,6 +275,7 @@ class TestListOfCompilation(unittest.TestCase):
 
     def test_list_of_oneOf(self):
         T = ListOf(OneOf(None, float))
+
         @Compiled
         def f():
             x = T()
@@ -345,21 +347,27 @@ class TestListOfCompilation(unittest.TestCase):
                 y = addFun(x, y)
             t1 = time.time()
             for _ in range(10):
-                ynumpy = xnumpy+ynumpy
+                ynumpy = xnumpy + ynumpy
             t2 = time.time()
 
             slowerThanNumpyRatio = (t1 - t0) / (t2 - t1)
 
             self.assertEqual(y[10], x[10] * 11)
 
-            print("Performance of ", addFun, "vs numpy is", slowerThanNumpyRatio, "times slower")
+            print(
+                "Performance of ", addFun, "vs numpy is", slowerThanNumpyRatio, "times slower"
+            )
 
             return slowerThanNumpyRatio
 
         # numpy sped up between 1.16 and 1.17 somehow. I suspect it's using a more native set of
         # SIMD instructions that we're not persuading LLVM to emit.
-        self.assertLess(timingComparison(addSafe), 10)  # 2.0 for me with numpy 1.16, but 4.0 with numpy 1.17?
-        self.assertLess(timingComparison(addUnsafe), 4.0)  # 1.07 for me against numpy 1.16 but 4.0 against numpy 1.17
+        self.assertLess(
+            timingComparison(addSafe), 10
+        )  # 2.0 for me with numpy 1.16, but 4.0 with numpy 1.17?
+        self.assertLess(
+            timingComparison(addUnsafe), 4.0
+        )  # 1.07 for me against numpy 1.16 but 4.0 against numpy 1.17
 
     def test_list_duplicate_operation(self):
         @Compiled

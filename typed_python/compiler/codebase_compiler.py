@@ -34,7 +34,9 @@ class CompiledCodebase:
         function_pointers = compiler.link_binary_shared_object(
             self.sharedObject,
             self.nativeTargets,
-            os.path.join(self.codebase.rootDirectory, "__pycache__", "typed_python", "compiler")
+            os.path.join(
+                self.codebase.rootDirectory, "__pycache__", "typed_python", "compiler"
+            ),
         )
 
         for wrappingCallTargetName, (f, callTarget) in self.typedTargets.items():
@@ -42,8 +44,10 @@ class CompiledCodebase:
 
             f._installNativePointer(
                 fp.fp,
-                callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
-                [i.typeRepresentation for i in callTarget.input_types]
+                callTarget.output_type.typeRepresentation
+                if callTarget.output_type is not None
+                else NoneType,
+                [i.typeRepresentation for i in callTarget.input_types],
             )
 
 
@@ -70,7 +74,7 @@ class CodebaseCompiler:
         functions = []
 
         for name, object in self.codebase.allModuleLevelValues():
-            if hasattr(object, '__typed_python_category__'):
+            if hasattr(object, "__typed_python_category__"):
                 if object.__typed_python_category__ == "Class":
                     for f in object.MemberFunctions.values():
                         functions.append(f)
@@ -84,7 +88,9 @@ class CodebaseCompiler:
 
     def compileModule(self):
         native_targets = self.converter.extract_new_function_definitions()
-        sharedObject = self.llvm_compiler.compile_functions_and_return_shared_object(native_targets)
+        sharedObject = self.llvm_compiler.compile_functions_and_return_shared_object(
+            native_targets
+        )
 
         return CompiledCodebase(self.codebase, sharedObject, native_targets, self.targets)
 
@@ -93,8 +99,8 @@ class CodebaseCompiler:
 
         if isinstance(f, FunctionOverload):
             for a in f.args:
-                assert not a.isStarArg, 'dont support star args yet'
-                assert not a.isKwarg, 'dont support keyword yet'
+                assert not a.isStarArg, "dont support star args yet"
+                assert not a.isKwarg, "dont support keyword yet"
 
             def chooseTypeFilter(a):
                 return argument_types.pop(a.name, a.typeFilter or object)
@@ -104,7 +110,9 @@ class CodebaseCompiler:
             if len(argument_types):
                 raise Exception("No argument exists for type overrides %s" % argument_types)
 
-            callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType, assertIsRoot=True)
+            callTarget = self.converter.convert(
+                f.functionObj, input_wrappers, f.returnType, assertIsRoot=True
+            )
 
             assert callTarget is not None
 
@@ -112,12 +120,18 @@ class CodebaseCompiler:
 
             self.targets[wrappingCallTargetName] = (f, callTarget)
 
-        if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
+        if (
+            hasattr(f, "__typed_python_category__")
+            and f.__typed_python_category__ == "Function"
+        ):
             for o in f.overloads:
                 self._convert(o, argument_types)
             return f
 
-        if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'BoundMethod':
+        if (
+            hasattr(f, "__typed_python_category__")
+            and f.__typed_python_category__ == "BoundMethod"
+        ):
             for o in f.Function.overloads:
                 arg_types = dict(argument_types)
                 arg_types[o.args[0].name] = typeWrapper(f.Class)

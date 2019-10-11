@@ -22,7 +22,18 @@ import typed_python.compiler
 from math import trunc, floor, ceil
 
 from typed_python import (
-    Float32, Float64, Int64, Bool, String, Int8, UInt8, Int16, UInt16, Int32, UInt32, UInt64
+    Float32,
+    Float64,
+    Int64,
+    Bool,
+    String,
+    Int8,
+    UInt8,
+    Int16,
+    UInt16,
+    Int32,
+    UInt32,
+    UInt64,
 )
 
 pyOpToNative = {
@@ -36,7 +47,7 @@ pyOpToNative = {
     python_ast.BinaryOp.RShift(): native_ast.BinaryOp.RShift(),
     python_ast.BinaryOp.BitOr(): native_ast.BinaryOp.BitOr(),
     python_ast.BinaryOp.BitXor(): native_ast.BinaryOp.BitXor(),
-    python_ast.BinaryOp.BitAnd(): native_ast.BinaryOp.BitAnd()
+    python_ast.BinaryOp.BitAnd(): native_ast.BinaryOp.BitAnd(),
 }
 
 pyOpNotForFloat = {
@@ -44,7 +55,7 @@ pyOpNotForFloat = {
     python_ast.BinaryOp.RShift(),
     python_ast.BinaryOp.BitOr(),
     python_ast.BinaryOp.BitXor(),
-    python_ast.BinaryOp.BitAnd()
+    python_ast.BinaryOp.BitAnd(),
 }
 
 pyCompOp = {
@@ -53,7 +64,7 @@ pyCompOp = {
     python_ast.ComparisonOp.Lt(): native_ast.BinaryOp.Lt(),
     python_ast.ComparisonOp.LtE(): native_ast.BinaryOp.LtE(),
     python_ast.ComparisonOp.Gt(): native_ast.BinaryOp.Gt(),
-    python_ast.ComparisonOp.GtE(): native_ast.BinaryOp.GtE()
+    python_ast.ComparisonOp.GtE(): native_ast.BinaryOp.GtE(),
 }
 
 
@@ -67,22 +78,17 @@ class ArithmeticTypeWrapper(Wrapper):
             context,
             target,
             typed_python.compiler.python_object_representation.pythonObjectRepresentation(
-                context,
-                self.typeRepresentation()
-            )
+                context, self.typeRepresentation()
+            ),
         )
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference
-        context.pushEffect(
-            target.expr.store(toStore.nonref_expr)
-        )
+        context.pushEffect(target.expr.store(toStore.nonref_expr))
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
-        context.pushEffect(
-            target.expr.store(toStore.nonref_expr)
-        )
+        context.pushEffect(target.expr.store(toStore.nonref_expr))
 
     def convert_destroy(self, context, instance):
         pass
@@ -92,7 +98,9 @@ class ArithmeticTypeWrapper(Wrapper):
             return context.pushPod(self, instance.nonref_expr.negate())
 
         if op.matches.Not:
-            return context.pushPod(bool, instance.nonref_expr.cast(native_ast.Bool).logical_not())
+            return context.pushPod(
+                bool, instance.nonref_expr.cast(native_ast.Bool).logical_not()
+            )
 
         return super().convert_unary_op(context, instance, op)
 
@@ -164,7 +172,9 @@ class IntWrapper(ArithmeticTypeWrapper):
                 targetVal.expr.store(
                     native_ast.Expression.Cast(
                         left=e.nonref_expr,
-                        to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
+                        to_type=native_ast.Type.Float(
+                            bits=target_type.typeRepresentation.Bits
+                        ),
                     )
                 )
             )
@@ -181,8 +191,8 @@ class IntWrapper(ArithmeticTypeWrapper):
                         left=e.nonref_expr,
                         to_type=native_ast.Type.Int(
                             bits=target_type.typeRepresentation.Bits,
-                            signed=target_type.typeRepresentation.IsSignedInt
-                        )
+                            signed=target_type.typeRepresentation.IsSignedInt,
+                        ),
                     )
                 )
             )
@@ -196,27 +206,33 @@ class IntWrapper(ArithmeticTypeWrapper):
                 return context.push(
                     str,
                     lambda strRef: strRef.expr.store(
-                        runtime_functions.int64_to_string.call(instance.nonref_expr).cast(strRef.expr_type.layoutType)
-                    )
+                        runtime_functions.int64_to_string.call(instance.nonref_expr).cast(
+                            strRef.expr_type.layoutType
+                        )
+                    ),
                 )
             elif self.typeRepresentation == UInt64:
                 return context.push(
                     str,
                     lambda strRef: strRef.expr.store(
-                        runtime_functions.uint64_to_string.call(instance.nonref_expr).cast(strRef.expr_type.layoutType)
-                    )
+                        runtime_functions.uint64_to_string.call(instance.nonref_expr).cast(
+                            strRef.expr_type.layoutType
+                        )
+                    ),
                 )
             else:
                 suffix = {
-                    Int32: 'i32',
-                    UInt32: 'u32',
-                    Int16: 'i16',
-                    UInt16: 'u16',
-                    Int8: 'i8',
-                    UInt8: 'u8'
+                    Int32: "i32",
+                    UInt32: "u32",
+                    Int16: "i16",
+                    UInt16: "u16",
+                    Int8: "i8",
+                    UInt8: "u8",
                 }[self.typeRepresentation]
 
-                return instance.convert_to_type(int).convert_cast(str) + context.constant(suffix)
+                return instance.convert_to_type(int).convert_cast(str) + context.constant(
+                    suffix
+                )
 
         return super().convert_cast(context, instance, target_type)
 
@@ -227,8 +243,8 @@ class IntWrapper(ArithmeticTypeWrapper):
                 native_ast.Expression.Branch(
                     cond=(expr > 0).nonref_expr,
                     true=expr.nonref_expr,
-                    false=expr.nonref_expr.negate()
-                )
+                    false=expr.nonref_expr.negate(),
+                ),
             )
         else:
             return context.pushPod(self, expr.nonref_expr)
@@ -238,12 +254,16 @@ class IntWrapper(ArithmeticTypeWrapper):
             if a1 is None:
                 return context.pushPod(
                     float,
-                    runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, context.constant(0))
+                    runtime_functions.round_float64.call(
+                        expr.toFloat64().nonref_expr, context.constant(0)
+                    ),
                 ).convert_to_type(self)
             else:
                 return context.pushPod(
                     float,
-                    runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
+                    runtime_functions.round_float64.call(
+                        expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr
+                    ),
                 ).convert_to_type(self)
 
         if f in [trunc, floor, ceil]:
@@ -268,10 +288,9 @@ class IntWrapper(ArithmeticTypeWrapper):
             T = toWrapper(
                 computeArithmeticBinaryResultType(
                     computeArithmeticBinaryResultType(
-                        left.expr_type.typeRepresentation,
-                        right.expr_type.typeRepresentation
+                        left.expr_type.typeRepresentation, right.expr_type.typeRepresentation
                     ),
-                    Float32
+                    Float32,
                 )
             )
             return left.convert_to_type(T).convert_bin_op(op, right.convert_to_type(T))
@@ -283,20 +302,21 @@ class IntWrapper(ArithmeticTypeWrapper):
                         computeArithmeticBinaryResultType(
                             computeArithmeticBinaryResultType(
                                 left.expr_type.typeRepresentation,
-                                right.expr_type.typeRepresentation
+                                right.expr_type.typeRepresentation,
                             ),
-                            UInt64
+                            UInt64,
                         )
                     )
                 else:
                     promoteType = toWrapper(
                         computeArithmeticBinaryResultType(
-                            self.typeRepresentation,
-                            right.expr_type.typeRepresentation
+                            self.typeRepresentation, right.expr_type.typeRepresentation
                         )
                     )
 
-                return left.convert_to_type(promoteType).convert_bin_op(op, right.convert_to_type(promoteType))
+                return left.convert_to_type(promoteType).convert_bin_op(
+                    op, right.convert_to_type(promoteType)
+                )
 
             return super().convert_bin_op(context, left, op, right, inplace)
 
@@ -309,57 +329,69 @@ class IntWrapper(ArithmeticTypeWrapper):
                 return context.pushPod(
                     int,
                     runtime_functions.mod_int64_int64.call(
-                        left.toInt64().nonref_expr,
-                        right.toInt64().nonref_expr
-                    )
+                        left.toInt64().nonref_expr, right.toInt64().nonref_expr
+                    ),
                 ).convert_to_type(self)
 
             # unsigned int
             return context.pushPod(
                 int,
                 runtime_functions.mod_uint64_uint64.call(
-                    left.toUInt64().nonref_expr,
-                    right.toUInt64().nonref_expr
-                )
+                    left.toUInt64().nonref_expr, right.toUInt64().nonref_expr
+                ),
             ).convert_to_type(self)
         if op.matches.Pow:
             if left.expr_type.typeRepresentation.IsSignedInt:
                 return context.pushPod(
                     float,
-                    runtime_functions.pow_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
+                    runtime_functions.pow_int64_int64.call(
+                        left.toInt64().nonref_expr, right.toInt64().nonref_expr
+                    ),
                 ).toFloat64()
             # unsigned int
             return context.pushPod(
                 float,
-                runtime_functions.pow_uint64_uint64.call(left.toUInt64().nonref_expr, right.toUInt64().nonref_expr)
+                runtime_functions.pow_uint64_uint64.call(
+                    left.toUInt64().nonref_expr, right.toUInt64().nonref_expr
+                ),
             ).toFloat64()
         if op.matches.LShift:
             if left.expr_type.typeRepresentation.IsSignedInt:
                 return context.pushPod(
                     int,
-                    runtime_functions.lshift_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
+                    runtime_functions.lshift_int64_int64.call(
+                        left.toInt64().nonref_expr, right.toInt64().nonref_expr
+                    ),
                 ).convert_to_type(self)
             # unsigned int
             return context.pushPod(
                 int,
-                runtime_functions.lshift_uint64_uint64.call(left.toUInt64().nonref_expr, right.toUInt64().nonref_expr)
+                runtime_functions.lshift_uint64_uint64.call(
+                    left.toUInt64().nonref_expr, right.toUInt64().nonref_expr
+                ),
             ).convert_to_type(self)
         if op.matches.RShift:
             if left.expr_type.typeRepresentation.IsSignedInt:
                 return context.pushPod(
                     int,
-                    runtime_functions.rshift_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
+                    runtime_functions.rshift_int64_int64.call(
+                        left.toInt64().nonref_expr, right.toInt64().nonref_expr
+                    ),
                 ).convert_to_type(self)
             # unsigned int
             return context.pushPod(
                 int,
-                runtime_functions.rshift_uint64_uint64.call(left.toUInt64().nonref_expr, right.toUInt64().nonref_expr)
+                runtime_functions.rshift_uint64_uint64.call(
+                    left.toUInt64().nonref_expr, right.toUInt64().nonref_expr
+                ),
             ).convert_to_type(self)
         if op.matches.FloorDiv:
             if right.expr_type.typeRepresentation.IsSignedInt:
                 return context.pushPod(
                     int,
-                    runtime_functions.floordiv_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
+                    runtime_functions.floordiv_int64_int64.call(
+                        left.toInt64().nonref_expr, right.toInt64().nonref_expr
+                    ),
                 ).convert_to_type(self)
             # unsigned int
             with context.ifelse(right.nonref_expr) as (ifTrue, ifFalse):
@@ -371,26 +403,22 @@ class IntWrapper(ArithmeticTypeWrapper):
                 native_ast.Expression.Binop(
                     left=left.nonref_expr,
                     right=right.nonref_expr,
-                    op=native_ast.BinaryOp.Div()
-                )
+                    op=native_ast.BinaryOp.Div(),
+                ),
             )
         if op in pyOpToNative:
             return context.pushPod(
                 self,
                 native_ast.Expression.Binop(
-                    left=left.nonref_expr,
-                    right=right.nonref_expr,
-                    op=pyOpToNative[op]
-                )
+                    left=left.nonref_expr, right=right.nonref_expr, op=pyOpToNative[op]
+                ),
             )
         if op in pyCompOp:
             return context.pushPod(
                 bool,
                 native_ast.Expression.Binop(
-                    left=left.nonref_expr,
-                    right=right.nonref_expr,
-                    op=pyCompOp[op]
-                )
+                    left=left.nonref_expr, right=right.nonref_expr, op=pyCompOp[op]
+                ),
             )
 
         # we must have a bad binary operator
@@ -418,7 +446,9 @@ class BoolWrapper(ArithmeticTypeWrapper):
                 targetVal.expr.store(
                     native_ast.Expression.Cast(
                         left=e.nonref_expr,
-                        to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
+                        to_type=native_ast.Type.Float(
+                            bits=target_type.typeRepresentation.Bits
+                        ),
                     )
                 )
             )
@@ -431,8 +461,8 @@ class BoolWrapper(ArithmeticTypeWrapper):
                         left=e.nonref_expr,
                         to_type=native_ast.Type.Int(
                             bits=target_type.typeRepresentation.Bits,
-                            signed=target_type.typeRepresentation.IsSignedInt
-                        )
+                            signed=target_type.typeRepresentation.IsSignedInt,
+                        ),
                     )
                 )
             )
@@ -445,8 +475,10 @@ class BoolWrapper(ArithmeticTypeWrapper):
             return context.push(
                 str,
                 lambda strRef: strRef.expr.store(
-                    runtime_functions.bool_to_string.call(instance.nonref_expr).cast(strRef.expr_type.layoutType)
-                )
+                    runtime_functions.bool_to_string.call(instance.nonref_expr).cast(
+                        strRef.expr_type.layoutType
+                    )
+                ),
             )
 
         return super().convert_cast(context, instance, target_type)
@@ -458,8 +490,8 @@ class BoolWrapper(ArithmeticTypeWrapper):
                 native_ast.Expression.Binop(
                     left=expr.nonref_expr,
                     right=a1.nonref_expr.gte(0),
-                    op=native_ast.BinaryOp.BitAnd()
-                )
+                    op=native_ast.BinaryOp.BitAnd(),
+                ),
             )
         if f in [round, trunc, floor, ceil]:
             return context.pushPod(self, expr.nonref_expr)
@@ -483,10 +515,9 @@ class BoolWrapper(ArithmeticTypeWrapper):
             T = toWrapper(
                 computeArithmeticBinaryResultType(
                     computeArithmeticBinaryResultType(
-                        left.expr_type.typeRepresentation,
-                        right.expr_type.typeRepresentation
+                        left.expr_type.typeRepresentation, right.expr_type.typeRepresentation
                     ),
-                    Float32
+                    Float32,
                 )
             )
             return left.convert_to_type(T).convert_bin_op(op, right.convert_to_type(T))
@@ -495,12 +526,13 @@ class BoolWrapper(ArithmeticTypeWrapper):
             if isinstance(right.expr_type, ArithmeticTypeWrapper):
                 promoteType = toWrapper(
                     computeArithmeticBinaryResultType(
-                        self.typeRepresentation,
-                        right.expr_type.typeRepresentation
+                        self.typeRepresentation, right.expr_type.typeRepresentation
                     )
                 )
 
-                return left.convert_to_type(promoteType).convert_bin_op(op, right.convert_to_type(promoteType))
+                return left.convert_to_type(promoteType).convert_bin_op(
+                    op, right.convert_to_type(promoteType)
+                )
 
             return super().convert_bin_op(context, left, op, right, inplace)
 
@@ -509,20 +541,16 @@ class BoolWrapper(ArithmeticTypeWrapper):
                 return context.pushPod(
                     self,
                     native_ast.Expression.Binop(
-                        left=left.nonref_expr,
-                        right=right.nonref_expr,
-                        op=pyOpToNative[op]
-                    )
+                        left=left.nonref_expr, right=right.nonref_expr, op=pyOpToNative[op]
+                    ),
                 )
 
         if op in pyCompOp:
             return context.pushPod(
                 bool,
                 native_ast.Expression.Binop(
-                    left=left.nonref_expr,
-                    right=right.nonref_expr,
-                    op=pyCompOp[op]
-                )
+                    left=left.nonref_expr, right=right.nonref_expr, op=pyCompOp[op]
+                ),
             )
 
         return super().convert_bin_op(context, left, op, right, inplace)
@@ -537,9 +565,13 @@ class FloatWrapper(ArithmeticTypeWrapper):
 
     def convert_hash(self, context, expr):
         if self.typeRepresentation == Float32:
-            return context.pushPod(Int32, runtime_functions.hash_float32.call(expr.nonref_expr))
+            return context.pushPod(
+                Int32, runtime_functions.hash_float32.call(expr.nonref_expr)
+            )
         if self.typeRepresentation == Float64:
-            return context.pushPod(Int32, runtime_functions.hash_float64.call(expr.nonref_expr))
+            return context.pushPod(
+                Int32, runtime_functions.hash_float64.call(expr.nonref_expr)
+            )
 
         assert False
 
@@ -554,7 +586,9 @@ class FloatWrapper(ArithmeticTypeWrapper):
                 targetVal.expr.store(
                     native_ast.Expression.Cast(
                         left=e.nonref_expr,
-                        to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
+                        to_type=native_ast.Type.Float(
+                            bits=target_type.typeRepresentation.Bits
+                        ),
                     )
                 )
             )
@@ -571,8 +605,8 @@ class FloatWrapper(ArithmeticTypeWrapper):
                         left=e.nonref_expr,
                         to_type=native_ast.Type.Int(
                             bits=target_type.typeRepresentation.Bits,
-                            signed=target_type.typeRepresentation.IsSignedInt
-                        )
+                            signed=target_type.typeRepresentation.IsSignedInt,
+                        ),
                     )
                 )
             )
@@ -589,8 +623,9 @@ class FloatWrapper(ArithmeticTypeWrapper):
 
             return context.push(
                 str,
-                lambda targetVal:
-                    targetVal.expr.store(func.call(instance.nonref_expr).cast(target_type.layoutType))
+                lambda targetVal: targetVal.expr.store(
+                    func.call(instance.nonref_expr).cast(target_type.layoutType)
+                ),
             )
 
         return super().convert_cast(context, instance, target_type)
@@ -601,8 +636,8 @@ class FloatWrapper(ArithmeticTypeWrapper):
             native_ast.Expression.Branch(
                 cond=(expr > 0).nonref_expr,
                 true=expr.nonref_expr,
-                false=expr.nonref_expr.negate()
-            )
+                false=expr.nonref_expr.negate(),
+            ),
         )
 
     def convert_builtin(self, f, context, expr, a1=None):
@@ -610,19 +645,29 @@ class FloatWrapper(ArithmeticTypeWrapper):
             if a1:
                 return context.pushPod(
                     float,
-                    runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
+                    runtime_functions.round_float64.call(
+                        expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr
+                    ),
                 ).convert_to_type(self)
             else:
                 return context.pushPod(
                     float,
-                    runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, context.constant(0))
+                    runtime_functions.round_float64.call(
+                        expr.toFloat64().nonref_expr, context.constant(0)
+                    ),
                 ).convert_to_type(self)
         if f is trunc:
-            return context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr)).convert_to_type(self)
+            return context.pushPod(
+                float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr)
+            ).convert_to_type(self)
         if f is floor:
-            return context.pushPod(float, runtime_functions.floor_float64.call(expr.toFloat64().nonref_expr)).convert_to_type(self)
+            return context.pushPod(
+                float, runtime_functions.floor_float64.call(expr.toFloat64().nonref_expr)
+            ).convert_to_type(self)
         if f is ceil:
-            return context.pushPod(float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr)).convert_to_type(self)
+            return context.pushPod(
+                float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr)
+            ).convert_to_type(self)
 
         return super().convert_builtin(f, context, expr, a1)
 
@@ -644,18 +689,22 @@ class FloatWrapper(ArithmeticTypeWrapper):
                 else:
                     promoteType = toWrapper(
                         computeArithmeticBinaryResultType(
-                            self.typeRepresentation,
-                            right.expr_type.typeRepresentation
+                            self.typeRepresentation, right.expr_type.typeRepresentation
                         )
                     )
-                return left.convert_to_type(promoteType).convert_bin_op(op, right.convert_to_type(promoteType))
+                return left.convert_to_type(promoteType).convert_bin_op(
+                    op, right.convert_to_type(promoteType)
+                )
             return super().convert_bin_op(context, left, op, right, inplace)
 
         if op.matches.Mod:
             # TODO: might define mod_float32_float32 instead of doing these conversions
             if left.expr_type.typeRepresentation == Float32:
-                return left.toFloat64().convert_bin_op(
-                    op, right.toFloat64()).convert_to_type(toWrapper(Float32))
+                return (
+                    left.toFloat64()
+                    .convert_bin_op(op, right.toFloat64())
+                    .convert_to_type(toWrapper(Float32))
+                )
 
             with context.ifelse(right.nonref_expr) as (ifTrue, ifFalse):
                 with ifFalse:
@@ -663,7 +712,9 @@ class FloatWrapper(ArithmeticTypeWrapper):
 
             return context.pushPod(
                 self,
-                runtime_functions.mod_float64_float64.call(left.nonref_expr, right.nonref_expr)
+                runtime_functions.mod_float64_float64.call(
+                    left.nonref_expr, right.nonref_expr
+                ),
             )
 
         if op.matches.Div:
@@ -674,41 +725,39 @@ class FloatWrapper(ArithmeticTypeWrapper):
             return context.pushPod(
                 self,
                 native_ast.Expression.Binop(
-                    left=left.nonref_expr,
-                    right=right.nonref_expr,
-                    op=pyOpToNative[op]
-                )
+                    left=left.nonref_expr, right=right.nonref_expr, op=pyOpToNative[op]
+                ),
             )
 
         if op.matches.Pow:
             return context.pushPod(
                 float,
-                runtime_functions.pow_float64_float64.call(left.toFloat64().nonref_expr, right.toFloat64().nonref_expr)
+                runtime_functions.pow_float64_float64.call(
+                    left.toFloat64().nonref_expr, right.toFloat64().nonref_expr
+                ),
             ).toFloat64()
         if op.matches.FloorDiv:
             return context.pushPod(
                 float,
-                runtime_functions.floordiv_float64_float64.call(left.toFloat64().nonref_expr, right.toFloat64().nonref_expr)
+                runtime_functions.floordiv_float64_float64.call(
+                    left.toFloat64().nonref_expr, right.toFloat64().nonref_expr
+                ),
             ).convert_to_type(self)
 
         if op in pyOpToNative and op not in pyOpNotForFloat:
             return context.pushPod(
                 self,
                 native_ast.Expression.Binop(
-                    left=left.nonref_expr,
-                    right=right.nonref_expr,
-                    op=pyOpToNative[op]
-                )
+                    left=left.nonref_expr, right=right.nonref_expr, op=pyOpToNative[op]
+                ),
             )
 
         if op in pyCompOp:
             return context.pushPod(
                 bool,
                 native_ast.Expression.Binop(
-                    left=left.nonref_expr,
-                    right=right.nonref_expr,
-                    op=pyCompOp[op]
-                )
+                    left=left.nonref_expr, right=right.nonref_expr, op=pyCompOp[op]
+                ),
             )
 
         return super().convert_bin_op(context, left, op, right, inplace)

@@ -18,7 +18,7 @@ import ast
 import os
 import textwrap
 
-LINENO_ATTRIBUTE_NAME = 'lineno'
+LINENO_ATTRIBUTE_NAME = "lineno"
 
 
 class CantGetSourceTextError(Exception):
@@ -28,6 +28,7 @@ class CantGetSourceTextError(Exception):
 class VisitDone(Exception):
     """Raise this exception to short-circuit the visitor once we're done
     searching."""
+
     pass
 
 
@@ -80,16 +81,12 @@ def getSourceFilenameAndText(pyObject):
         raise CantGetSourceTextError(e.message)
 
     if sourceFile is None:
-        raise CantGetSourceTextError(
-            "can't get source lines for file %s" % sourceFile
-        )
+        raise CantGetSourceTextError("can't get source lines for file %s" % sourceFile)
 
     linesOrNone = inspect.getlines(sourceFile)
 
     if linesOrNone is None:
-        raise CantGetSourceTextError(
-            "can't get source lines for file %s" % sourceFile
-        )
+        raise CantGetSourceTextError("can't get source lines for file %s" % sourceFile)
 
     if sourceFile not in sourceFileCache_:
         sourceFileCache_[sourceFile] = "".join(linesOrNone)
@@ -190,8 +187,7 @@ def functionDefOrLambdaAtLineNumber(sourceAst, lineNumber):
     visitor.visit(sourceAst)
 
     subnodesAtLineNumber = (
-        visitor.funcDefSubnodesAtLineNumber +
-        visitor.lambdaSubnodesAtLineNumber
+        visitor.funcDefSubnodesAtLineNumber + visitor.lambdaSubnodesAtLineNumber
     )
 
     if len(subnodesAtLineNumber) == 0:
@@ -200,8 +196,8 @@ def functionDefOrLambdaAtLineNumber(sourceAst, lineNumber):
         )
     if len(subnodesAtLineNumber) > 1:
         raise CantGetSourceTextError(
-            "can't find a unique function definition at line %s. Do you " +
-            "have two lambdas on the same line?" % lineNumber
+            "can't find a unique function definition at line %s. Do you "
+            + "have two lambdas on the same line?" % lineNumber
         )
 
     return subnodesAtLineNumber[0]

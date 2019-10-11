@@ -12,10 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import (
-    Tuple, Float32,
-    UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8
-)
+from typed_python import Tuple, Float32, UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8
 
 from typed_python import Entrypoint
 import unittest
@@ -32,18 +29,22 @@ class TestHashCompilation(unittest.TestCase):
         someIntegers = []
 
         for bits in range(64):
-            someIntegers.append(2**bits - 1)
-            someIntegers.append(2**bits)
+            someIntegers.append(2 ** bits - 1)
+            someIntegers.append(2 ** bits)
 
         for intType in [bool, UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32]:
             for intVal in someIntegers:
-                self.assertEqual(hash(intType(intVal)), int(compiledHash(intType(intVal))), (intType, intVal, intType(intVal)))
+                self.assertEqual(
+                    hash(intType(intVal)),
+                    int(compiledHash(intType(intVal))),
+                    (intType, intVal, intType(intVal)),
+                )
 
     def test_hashes_equivalent_floats(self):
         # we have to do this through tuples because if we 'hash' a normal python str,
         # we use python's hash function which is not the same as the typed_python one.
         # we are not trying to replicate python's hash function exactly
-        someFloats = [-1.0, -.5, 0.0, .5, 1.0, 1.5, 100.0, 1e10, 1e100, numpy.nan, numpy.inf]
+        someFloats = [-1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 100.0, 1e10, 1e100, numpy.nan, numpy.inf]
 
         for fType in [Float32, float]:
             for fVal in someFloats:
@@ -69,6 +70,6 @@ class TestHashCompilation(unittest.TestCase):
             lambda: Tuple(str)(("abcdef this is a long string",)),
             lambda: Tuple(bytes)((b"",)),
             lambda: Tuple(bytes)((b"asdf",)),
-            lambda: Tuple(bytes)((b"asdf2",))
+            lambda: Tuple(bytes)((b"asdf2",)),
         ]:
             self.assertEqual(hash(valueMaker()), compiledHash(valueMaker()))

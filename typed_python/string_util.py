@@ -13,9 +13,9 @@
 #   limitations under the License.
 
 
-def indent(text, amount=4, ch=' '):
+def indent(text, amount=4, ch=" "):
     padding = amount * ch
-    return ''.join(padding+line for line in text.splitlines(True))
+    return "".join(padding + line for line in text.splitlines(True))
 
 
 def distance(s1, s2):
@@ -31,7 +31,7 @@ def distance(s1, s2):
     for i, c1 in enumerate(s1):
         cur = [i + 1]
         for j, c2 in enumerate(s2):
-            cur.append(min(prev[j+1]+1, cur[j]+1, prev[j] + (1 if c1 != c2 else 0)))
+            cur.append(min(prev[j + 1] + 1, cur[j] + 1, prev[j] + (1 if c1 != c2 else 0)))
         prev = cur
 
     return prev[-1]

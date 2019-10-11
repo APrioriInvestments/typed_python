@@ -25,11 +25,7 @@ def Compiled(f):
     return Runtime.singleton().compile(f)
 
 
-dictTypes = [
-    ConstDict(str, str),
-    ConstDict(int, str),
-    ConstDict(int, int)
-]
+dictTypes = [ConstDict(str, str), ConstDict(int, str), ConstDict(int, int)]
 
 
 def makeSomeValues(dtype, count=10):
@@ -53,6 +49,7 @@ def makeSomeValues(dtype, count=10):
 class TestConstDictCompilation(unittest.TestCase):
     def test_const_dict_copying(self):
         for dtype in dictTypes:
+
             @Compiled
             def copyInOut(x: dtype):
                 _ = x
@@ -64,6 +61,7 @@ class TestConstDictCompilation(unittest.TestCase):
 
     def test_const_dict_len(self):
         for dtype in dictTypes:
+
             @Compiled
             def compiledLen(x: dtype):
                 return len(x)
@@ -74,6 +72,7 @@ class TestConstDictCompilation(unittest.TestCase):
 
     def test_const_dict_getitem(self):
         for dtype in dictTypes:
+
             @Compiled
             def compiledGetItem(x: dtype, y: dtype.KeyType):
                 return x[y]
@@ -82,16 +81,19 @@ class TestConstDictCompilation(unittest.TestCase):
                 try:
                     return ("Value", f())
                 except Exception:
-                    return ("Exception", )
+                    return ("Exception",)
 
             d = makeSomeValues(dtype, 10)
             bigger_d = makeSomeValues(dtype, 20)
 
             for key in bigger_d:
-                self.assertEqual(callOrExpr(lambda: d[key]), callOrExpr(lambda: compiledGetItem(d, key)))
+                self.assertEqual(
+                    callOrExpr(lambda: d[key]), callOrExpr(lambda: compiledGetItem(d, key))
+                )
 
     def test_const_dict_contains(self):
         for dtype in dictTypes:
+
             @Compiled
             def compiledIn(x: dtype, y: dtype.KeyType):
                 return y in x
@@ -111,10 +113,10 @@ class TestConstDictCompilation(unittest.TestCase):
         def compiledContains(x: ConstDict(int, int), y: int):
             return y in x
 
-        self.assertTrue(compiledContains({k*2: k*2 for k in range(10)}, 2))
-        self.assertFalse(compiledContains({k*2: k*2 for k in range(10)}, 3))
-        self.assertTrue(compiledContains({k*2: k*2 for k in range(10)}, 4))
-        self.assertFalse(compiledContains({k*2: k*2 for k in range(10)}, 5))
+        self.assertTrue(compiledContains({k * 2: k * 2 for k in range(10)}, 2))
+        self.assertFalse(compiledContains({k * 2: k * 2 for k in range(10)}, 3))
+        self.assertTrue(compiledContains({k * 2: k * 2 for k in range(10)}, 4))
+        self.assertFalse(compiledContains({k * 2: k * 2 for k in range(10)}, 5))
 
     def test_const_dict_loops(self):
         def loop(x: ConstDict(int, int)):
@@ -139,7 +141,7 @@ class TestConstDictCompilation(unittest.TestCase):
         compiledResult = compiledLoop(aBigDict)
         t2 = time.time()
 
-        speedup = (t1-t0)/(t2-t1)
+        speedup = (t1 - t0) / (t2 - t1)
 
         self.assertEqual(interpreterResult, compiledResult)
 
@@ -191,7 +193,7 @@ class TestConstDictCompilation(unittest.TestCase):
         toi_copy_2 = getvalue(t2, 0)
         self.assertEqual(_types.refcount(toi), 5)
 
-        toi_copy = toi_copy_2 = None # noqa
+        toi_copy = toi_copy_2 = None  # noqa
         t2 = None
 
         self.assertEqual(_types.refcount(toi), 1)
@@ -210,8 +212,8 @@ class TestConstDictCompilation(unittest.TestCase):
             return x < y
 
         T = ConstDict(str, str)
-        t1 = T({'1': '2'})
-        t2 = T({'1': '3'})
+        t1 = T({"1": "2"})
+        t2 = T({"1": "3"})
 
         self.assertTrue(eq(t1, t1))
         self.assertFalse(neq(t1, t1))
@@ -258,7 +260,12 @@ class TestConstDictCompilation(unittest.TestCase):
         t2 = T({k * 2: k * 2 for k in range(10)})
         t3 = T({k * 2: k * 5 for k in range(10)})
 
-        for kf in [iterateConstDict, iterateKeysObject, iterateValuesObject, iterateItemsObject]:
+        for kf in [
+            iterateConstDict,
+            iterateKeysObject,
+            iterateValuesObject,
+            iterateItemsObject,
+        ]:
             for toCheck in [t0, t1, t2, t3]:
                 if len(toCheck):
                     self.assertEqual(_types.refcount(toCheck), 1)
@@ -270,14 +277,19 @@ class TestConstDictCompilation(unittest.TestCase):
 
         T2 = ConstDict(TupleOf(int), TupleOf(str))
         atup = TupleOf(int)((1, 2, 3))
-        atup2 = TupleOf(str)(('1', '2', '3', '4'))
+        atup2 = TupleOf(str)(("1", "2", "3", "4"))
 
         t0 = T2({atup: atup2})
 
         self.assertEqual(_types.refcount(atup), 2)
         self.assertEqual(_types.refcount(atup2), 2)
 
-        for kf in [iterateConstDict, iterateKeysObject, iterateValuesObject, iterateItemsObject]:
+        for kf in [
+            iterateConstDict,
+            iterateKeysObject,
+            iterateValuesObject,
+            iterateItemsObject,
+        ]:
             Entrypoint(kf)(t0)
 
             self.assertEqual(_types.refcount(atup), 2)
@@ -302,7 +314,7 @@ class TestConstDictCompilation(unittest.TestCase):
         compiledResult = compiledLoop(aBigDict)
         t2 = time.time()
 
-        speedup = (t1-t0)/(t2-t1)
+        speedup = (t1 - t0) / (t2 - t1)
 
         self.assertEqual(interpreterResult, compiledResult)
 

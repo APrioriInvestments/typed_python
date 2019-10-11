@@ -29,12 +29,7 @@ class TestCompilationStructures(unittest.TestCase):
         class AClass(Class):
             pass
 
-        someValues = [
-            TupleOf(int)(),
-            (1, 2, 3),
-            [1, 2, 3],
-            AClass()
-        ]
+        someValues = [TupleOf(int)(), (1, 2, 3), [1, 2, 3], AClass()]
 
         for testCases in [someValues, reversed(someValues)]:
             # ensure that we are not order-dependent trying to dispatch
@@ -72,7 +67,7 @@ class TestCompilationStructures(unittest.TestCase):
 
     def test_basic_arithmetic(self):
         def f(x: int) -> int:
-            y = x+1
+            y = x + 1
             return y
 
         self.checkFunctionOfIntegers(f)
@@ -135,10 +130,10 @@ class TestCompilationStructures(unittest.TestCase):
 
     def test_call_other_typed_function(self):
         def g(x: int) -> int:
-            return x+1
+            return x + 1
 
         def f(x: int) -> int:
-            return g(x+2)
+            return g(x + 2)
 
         self.checkFunctionOfIntegers(f)
 
@@ -171,7 +166,7 @@ class TestCompilationStructures(unittest.TestCase):
         y = 2
 
         def f(x: int) -> int:
-            return x+y
+            return x + y
 
         self.checkFunctionOfIntegers(f)
 
@@ -197,7 +192,9 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f(1, (1, 2, 3)), (1, 2, 3))
 
-        with self.assertRaisesRegex(Exception, "local variable 'x' referenced before assignment"):
+        with self.assertRaisesRegex(
+            Exception, "local variable 'x' referenced before assignment"
+        ):
             self.assertEqual(f(0, (1, 2, 3)), (1, 2, 3))
 
     def test_return_from_function_without_return_value_specified(self):
@@ -217,23 +214,23 @@ class TestCompilationStructures(unittest.TestCase):
 
     def test_mutually_recursive_untyped_functions(self):
         def q(x):
-            return x-1
+            return x - 1
 
         def z(x):
-            return q(x)+1
+            return q(x) + 1
 
         def f(x):
             return z(g(x - 1)) + z(g(x - 2)) + z(x)
 
         def g(x):
             if x > 0:
-                return z(f(x-1)) * z(2) + f(x-2)
+                return z(f(x - 1)) * z(2) + f(x - 2)
             return 1
 
         g_typed = Function(g)
 
-        Runtime.singleton().compile(g_typed, {'x': int})
-        Runtime.singleton().compile(g_typed, {'x': float})
+        Runtime.singleton().compile(g_typed, {"x": int})
+        Runtime.singleton().compile(g_typed, {"x": float})
 
         self.assertEqual(g(10), g_typed(10))
 
@@ -259,7 +256,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         @Function
         def g(x: int):
-            return f(x+1)
+            return f(x + 1)
 
         Runtime.singleton().compile(g)
         Runtime.singleton().compile(f)
@@ -273,18 +270,22 @@ class TestCompilationStructures(unittest.TestCase):
 
         Runtime.singleton().compile(g)
 
-        with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
+        with self.assertRaisesRegex(
+            Exception, "Can't apply op Add.. to expressions of type NoneType"
+        ):
             g()
 
     def test_exception_before_return_propagated(self):
         @Function
         def g():
-            None+None
+            None + None
             return None
 
         Runtime.singleton().compile(g)
 
-        with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
+        with self.assertRaisesRegex(
+            Exception, "Can't apply op Add.. to expressions of type NoneType"
+        ):
             g()
 
     def test_call_function_with_none(self):
@@ -310,7 +311,7 @@ class TestCompilationStructures(unittest.TestCase):
 
     def test_interleaving_nones(self):
         def f(x, y, z):
-            x+z
+            x + z
             return y
 
         @Function
@@ -325,7 +326,9 @@ class TestCompilationStructures(unittest.TestCase):
         Runtime.singleton().compile(throws)
 
         self.assertEqual(works(1), None)
-        with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
+        with self.assertRaisesRegex(
+            Exception, "Can't apply op Add.. to expressions of type NoneType"
+        ):
             throws(1)
 
     def test_assign_with_none(self):
@@ -347,7 +350,9 @@ class TestCompilationStructures(unittest.TestCase):
         def f():
             return this_variable_name_is_undefined  # noqa: F821
 
-        with self.assertRaisesRegex(Exception, "name 'this_variable_name_is_undefined' is not defined"):
+        with self.assertRaisesRegex(
+            Exception, "name 'this_variable_name_is_undefined' is not defined"
+        ):
             f()
 
     def test_iterating(self):
@@ -376,8 +381,8 @@ class TestCompilationStructures(unittest.TestCase):
         sumUsingRange(1000000)
         t2 = time.time()
 
-        print("Range is %.2f slower than nonrange." % ((t2-t1)/(t1-t0)))  # I get 1.00
-        self.assertTrue((t1-t0) < (t2 - t1) * 1.1)
+        print("Range is %.2f slower than nonrange." % ((t2 - t1) / (t1 - t0)))  # I get 1.00
+        self.assertTrue((t1 - t0) < (t2 - t1) * 1.1)
 
     def test_read_invalid_variables(self):
         @Compiled
@@ -452,8 +457,8 @@ class TestCompilationStructures(unittest.TestCase):
         except Exception:
             trace = traceback.format_exc()
             # the traceback should know where we are
-            self.assertIn('conversion_test', trace)
-            self.assertIn('aFunctionThatRaises', trace)
+            self.assertIn("conversion_test", trace)
+            self.assertIn("aFunctionThatRaises", trace)
 
     def test_stacktraces_show_up(self):
         @Entrypoint

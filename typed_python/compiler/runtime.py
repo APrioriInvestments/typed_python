@@ -62,8 +62,8 @@ class Runtime:
 
             if isinstance(f, FunctionOverload):
                 for a in f.args:
-                    assert not a.isStarArg, 'dont support star args yet'
-                    assert not a.isKwarg, 'dont support keyword yet'
+                    assert not a.isStarArg, "dont support star args yet"
+                    assert not a.isKwarg, "dont support keyword yet"
 
                 def chooseTypeFilter(a):
                     return argument_types.pop(a.name, a.typeFilter or object)
@@ -71,11 +71,15 @@ class Runtime:
                 input_wrappers = [typeWrapper(chooseTypeFilter(a)) for a in f.args]
 
                 if len(argument_types):
-                    raise Exception("No argument exists for type overrides %s" % argument_types)
+                    raise Exception(
+                        "No argument exists for type overrides %s" % argument_types
+                    )
 
                 self.timesCompiled += 1
 
-                callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType, assertIsRoot=True)
+                callTarget = self.converter.convert(
+                    f.functionObj, input_wrappers, f.returnType, assertIsRoot=True
+                )
 
                 assert callTarget is not None
 
@@ -90,15 +94,26 @@ class Runtime:
 
                 f._installNativePointer(
                     fp.fp,
-                    callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
-                    [i.typeRepresentation for i in input_wrappers]
+                    callTarget.output_type.typeRepresentation
+                    if callTarget.output_type is not None
+                    else NoneType,
+                    [i.typeRepresentation for i in input_wrappers],
                 )
 
                 self._collectLinktimeHooks()
 
-                return toSingleType(set([callTarget.output_type.typeRepresentation] if callTarget.output_type is not None else []))
+                return toSingleType(
+                    set(
+                        [callTarget.output_type.typeRepresentation]
+                        if callTarget.output_type is not None
+                        else []
+                    )
+                )
 
-            if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
+            if (
+                hasattr(f, "__typed_python_category__")
+                and f.__typed_python_category__ == "Function"
+            ):
                 results = set()
 
                 for o in f.overloads:
@@ -106,7 +121,10 @@ class Runtime:
 
                 return toSingleType(results)
 
-            if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'BoundMethod':
+            if (
+                hasattr(f, "__typed_python_category__")
+                and f.__typed_python_category__ == "BoundMethod"
+            ):
                 results = set()
 
                 for o in f.Function.overloads:
@@ -150,8 +168,8 @@ class Runtime:
 
             if isinstance(f, FunctionOverload):
                 for a in f.args:
-                    assert not a.isStarArg, 'dont support star args yet'
-                    assert not a.isKwarg, 'dont support keyword yet'
+                    assert not a.isStarArg, "dont support star args yet"
+                    assert not a.isKwarg, "dont support keyword yet"
 
                 def chooseTypeFilter(a):
                     return argument_types.pop(a.name, a.typeFilter or object)
@@ -159,11 +177,15 @@ class Runtime:
                 input_wrappers = [typeWrapper(chooseTypeFilter(a)) for a in f.args]
 
                 if len(argument_types):
-                    raise Exception("No argument exists for type overrides %s" % argument_types)
+                    raise Exception(
+                        "No argument exists for type overrides %s" % argument_types
+                    )
 
                 self.timesCompiled += 1
 
-                callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType, assertIsRoot=True)
+                callTarget = self.converter.convert(
+                    f.functionObj, input_wrappers, f.returnType, assertIsRoot=True
+                )
 
                 assert callTarget is not None
 
@@ -178,20 +200,28 @@ class Runtime:
 
                 f._installNativePointer(
                     fp.fp,
-                    callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
-                    [i.typeRepresentation for i in input_wrappers]
+                    callTarget.output_type.typeRepresentation
+                    if callTarget.output_type is not None
+                    else NoneType,
+                    [i.typeRepresentation for i in input_wrappers],
                 )
 
                 self._collectLinktimeHooks()
 
                 return targets
 
-            if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
+            if (
+                hasattr(f, "__typed_python_category__")
+                and f.__typed_python_category__ == "Function"
+            ):
                 for o in f.overloads:
                     self.compile(o, argument_types)
                 return f
 
-            if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'BoundMethod':
+            if (
+                hasattr(f, "__typed_python_category__")
+                and f.__typed_python_category__ == "BoundMethod"
+            ):
                 for o in f.Function.overloads:
                     arg_types = dict(argument_types)
                     arg_types[o.args[0].name] = typeWrapper(f.Class)
@@ -231,7 +261,9 @@ def NotCompiled(pyFunc):
     The actual python object for the function gets used, so it can have references
     to global state in the program.
     """
-    assert isinstance(pyFunc, types.FunctionType), "Can't apply NotCompiled to anything but functions."
+    assert isinstance(
+        pyFunc, types.FunctionType
+    ), "Can't apply NotCompiled to anything but functions."
 
     pyFunc.__typed_python_no_compile__ = True
     return Function(pyFunc)

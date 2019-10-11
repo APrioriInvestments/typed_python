@@ -32,9 +32,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
         return native_ast.Type.Void().pointer()
 
     def convert_incref(self, context, expr):
-        context.pushEffect(
-            runtime_functions.incref_pyobj.call(expr.nonref_expr)
-        )
+        context.pushEffect(runtime_functions.incref_pyobj.call(expr.nonref_expr))
 
     def convert_default_initialize(self, context, target):
         if isinstance(None, self.typeRepresentation):
@@ -43,7 +41,9 @@ class PythonObjectOfTypeWrapper(Wrapper):
             )
             return
 
-        context.pushException(TypeError, "Can't default-initialize %s" % self.typeRepresentation.__qualname__)
+        context.pushException(
+            TypeError, "Can't default-initialize %s" % self.typeRepresentation.__qualname__
+        )
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference
@@ -51,35 +51,27 @@ class PythonObjectOfTypeWrapper(Wrapper):
         toStore.convert_incref()
         target.convert_destroy()
 
-        context.pushEffect(
-            target.expr.store(toStore.nonref_expr)
-        )
+        context.pushEffect(target.expr.store(toStore.nonref_expr))
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
 
         toStore.convert_incref()
 
-        context.pushEffect(
-            target.expr.store(toStore.nonref_expr)
-        )
+        context.pushEffect(target.expr.store(toStore.nonref_expr))
 
     def convert_destroy(self, context, instance):
-        context.pushEffect(
-            runtime_functions.decref_pyobj.call(instance.nonref_expr)
-        )
+        context.pushEffect(runtime_functions.decref_pyobj.call(instance.nonref_expr))
 
     def convert_attribute(self, context, instance, attr):
         assert isinstance(attr, str)
         return context.push(
             self,
-            lambda targetSlot:
-                targetSlot.expr.store(
-                    runtime_functions.getattr_pyobj.call(
-                        instance.nonref_expr,
-                        native_ast.const_utf8_cstr(attr)
-                    )
+            lambda targetSlot: targetSlot.expr.store(
+                runtime_functions.getattr_pyobj.call(
+                    instance.nonref_expr, native_ast.const_utf8_cstr(attr)
                 )
+            ),
         )
 
     def convert_set_attribute(self, context, instance, attr, val):
@@ -91,9 +83,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         context.pushEffect(
             runtime_functions.setattr_pyobj.call(
-                instance.nonref_expr,
-                native_ast.const_utf8_cstr(attr),
-                valAsObj.nonref_expr
+                instance.nonref_expr, native_ast.const_utf8_cstr(attr), valAsObj.nonref_expr
             )
         )
 
@@ -106,13 +96,11 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         return context.push(
             self,
-            lambda targetSlot:
-                targetSlot.expr.store(
-                    runtime_functions.getitem_pyobj.call(
-                        instance.nonref_expr,
-                        itemAsObj.nonref_expr
-                    )
+            lambda targetSlot: targetSlot.expr.store(
+                runtime_functions.getitem_pyobj.call(
+                    instance.nonref_expr, itemAsObj.nonref_expr
                 )
+            ),
         )
 
     def convert_delitem(self, context, instance, item):
@@ -121,10 +109,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
             return None
 
         return context.pushEffect(
-            runtime_functions.delitem_pyobj.call(
-                instance.nonref_expr,
-                itemAsObj.nonref_expr
-            )
+            runtime_functions.delitem_pyobj.call(instance.nonref_expr, itemAsObj.nonref_expr)
         )
 
     def convert_unary_op(self, context, l, op):
@@ -132,17 +117,10 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         if tgt is not None:
             if op.matches.Not:
-                return context.pushPod(
-                    bool,
-                    tgt.call(l.nonref_expr)
-                )
+                return context.pushPod(bool, tgt.call(l.nonref_expr))
 
             return context.push(
-                object,
-                lambda objPtr:
-                objPtr.expr.store(
-                    tgt.call(l.nonref_expr)
-                )
+                object, lambda objPtr: objPtr.expr.store(tgt.call(l.nonref_expr))
             )
 
         raise Exception(f"Unknown unary operator {op}")
@@ -160,10 +138,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
         if tgt is not None:
             return context.push(
                 object,
-                lambda objPtr:
-                objPtr.expr.store(
-                    tgt.call(l.nonref_expr, rAsObj.nonref_expr)
-                )
+                lambda objPtr: objPtr.expr.store(tgt.call(l.nonref_expr, rAsObj.nonref_expr)),
             )
 
         raise Exception(f"Unknown binary operator {op} (inplace={inplace})")
@@ -179,9 +154,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         context.pushEffect(
             runtime_functions.setitem_pyobj.call(
-                instance.nonref_expr,
-                indexAsObj.nonref_expr,
-                valueAsObj.nonref_expr
+                instance.nonref_expr, indexAsObj.nonref_expr, valueAsObj.nonref_expr
             )
         )
 
@@ -217,27 +190,23 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         return context.push(
             object,
-            lambda oPtr:
-                oPtr.expr.store(
-                    runtime_functions.call_pyobj.call(
-                        instance.nonref_expr,
-                        native_ast.const_int_expr(len(arguments)),
-                        native_ast.const_int_expr(len(kwargsAsObjects)),
-                        *arguments,
-                        *kwarguments,
-                    )
+            lambda oPtr: oPtr.expr.store(
+                runtime_functions.call_pyobj.call(
+                    instance.nonref_expr,
+                    native_ast.const_int_expr(len(arguments)),
+                    native_ast.const_int_expr(len(kwargsAsObjects)),
+                    *arguments,
+                    *kwarguments,
                 )
+            ),
         )
 
     def convert_len(self, context, instance):
         return context.push(
             int,
-            lambda outLen:
-            outLen.expr.store(
-                runtime_functions.pyobj_len.call(
-                    instance.nonref_expr
-                )
-            )
+            lambda outLen: outLen.expr.store(
+                runtime_functions.pyobj_len.call(instance.nonref_expr)
+            ),
         )
 
     def _can_convert_to_type(self, otherType, explicit):
@@ -263,8 +232,8 @@ class PythonObjectOfTypeWrapper(Wrapper):
                     e.nonref_expr.cast(VoidPtr),
                     targetVal.expr.cast(VoidPtr),
                     tp,
-                    context.constant(explicit)
-                )
+                    context.constant(explicit),
+                ),
             )
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
@@ -279,7 +248,9 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         if tp:
             if not sourceVal.isReference:
-                sourceVal = context.push(sourceVal.expr_type, lambda x: x.convert_copy_initialize(sourceVal))
+                sourceVal = context.push(
+                    sourceVal.expr_type, lambda x: x.convert_copy_initialize(sourceVal)
+                )
 
             context.pushEffect(
                 targetVal.expr.store(

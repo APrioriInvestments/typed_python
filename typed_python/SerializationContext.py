@@ -13,9 +13,18 @@
 #   limitations under the License.
 
 from typed_python._types import serialize, deserialize
-from typed_python.python_ast import convertFunctionToAlgebraicPyAst, evaluateFunctionPyAst, Expr, Statement
+from typed_python.python_ast import (
+    convertFunctionToAlgebraicPyAst,
+    evaluateFunctionPyAst,
+    Expr,
+    Statement,
+)
 from typed_python.hash import sha_hash
-from typed_python.type_function import ConcreteTypeFunction, isTypeFunctionType, reconstructTypeFunctionType
+from typed_python.type_function import (
+    ConcreteTypeFunction,
+    isTypeFunctionType,
+    reconstructTypeFunctionType,
+)
 from types import FunctionType, ModuleType
 import numpy
 import datetime
@@ -37,13 +46,16 @@ def createEmptyFunction(ast):
 
 
 _builtin_name_to_value = {
-    ".builtin." + k: v for k, v in __builtins__.items()
-    if isinstance(v, type) or 'builtin_function_or_method' in str(type(v))
+    ".builtin." + k: v
+    for k, v in __builtins__.items()
+    if isinstance(v, type) or "builtin_function_or_method" in str(type(v))
 }
 _builtin_name_to_value[".builtin.createEmptyFunction"] = createEmptyFunction
 _builtin_name_to_value[".builtin._reconstruct"] = _reconstruct
 _builtin_name_to_value[".builtin._ndarray"] = _ndarray
-_builtin_name_to_value[".builtin.numpy.scalar"] = numpy.int64(10).__reduce__()[0]  # the 'scalar' function
+_builtin_name_to_value[".builtin.numpy.scalar"] = numpy.int64(10).__reduce__()[
+    0
+]  # the 'scalar' function
 _builtin_name_to_value[".builtin.dtype"] = numpy.dtype
 _builtin_name_to_value[".builtin.numpy"] = numpy
 _builtin_name_to_value[".builtin.datetime.datetime"] = datetime.datetime
@@ -59,21 +71,26 @@ _builtin_value_to_name = {id(v): k for k, v in _builtin_name_to_value.items()}
 
 class SerializationContext(object):
     """Represents a collection of types with well-specified names that we can use to serialize objects."""
-    def __init__(self, nameToObject=None, objToName=None, compressionEnabled=True, encodeLineInformationForCode=True):
+
+    def __init__(
+        self,
+        nameToObject=None,
+        objToName=None,
+        compressionEnabled=True,
+        encodeLineInformationForCode=True,
+    ):
         super().__init__()
 
         self.nameToObject = nameToObject or {}
         self.objToName = objToName
 
         for k in self.nameToObject:
-            assert isinstance(k, str), (
-                "nameToObject keys must be strings (This one was not: {})"
-                .format(k)
-            )
+            assert isinstance(
+                k, str
+            ), "nameToObject keys must be strings (This one was not: {})".format(k)
 
-        assert '' not in self.nameToObject, (
-            "Empty object/type name not allowed: {}"
-            .format(self.nameToObject[''])
+        assert "" not in self.nameToObject, "Empty object/type name not allowed: {}".format(
+            self.nameToObject[""]
         )
 
         if self.objToName is None:
@@ -120,11 +137,13 @@ class SerializationContext(object):
             modulename = module.__name__
 
             for membername, member in module.__dict__.items():
-                if isinstance(member, type) and hasattr(member, '__dict__'):
+                if isinstance(member, type) and hasattr(member, "__dict__"):
                     for sub_name, sub_obj in member.__dict__.items():
                         if not (sub_name[:2] == "__" and sub_name[-2:] == "__"):
                             if isinstance(sub_obj, (type, FunctionType, ConcreteTypeFunction)):
-                                nameToObject[modulename + "." + membername + "." + sub_name] = sub_obj
+                                nameToObject[
+                                    modulename + "." + membername + "." + sub_name
+                                ] = sub_obj
                             elif isinstance(sub_obj, ModuleType):
                                 nameToObject[".modules." + sub_obj.__name__] = sub_obj
 
@@ -139,20 +158,26 @@ class SerializationContext(object):
         return SerializationContext(
             {prefix + "." + k: v for k, v in self.nameToObject.items()},
             self.compressionEnabled,
-            self.encodeLineInformationForCode
+            self.encodeLineInformationForCode,
         )
 
     def withoutLineInfoEncoded(self):
-        return SerializationContext(self.nameToObject, self.objToName, self.compressionEnabled, False)
+        return SerializationContext(
+            self.nameToObject, self.objToName, self.compressionEnabled, False
+        )
 
     def withoutCompression(self):
-        return SerializationContext(self.nameToObject, self.objToName, False, self.encodeLineInformationForCode)
+        return SerializationContext(
+            self.nameToObject, self.objToName, False, self.encodeLineInformationForCode
+        )
 
     def withCompression(self):
-        return SerializationContext(self.nameToObject, self.objToName, True, self.encodeLineInformationForCode)
+        return SerializationContext(
+            self.nameToObject, self.objToName, True, self.encodeLineInformationForCode
+        )
 
     def nameForObject(self, t):
-        ''' Return a name(string) for an input object t, or None if not found. '''
+        """ Return a name(string) for an input object t, or None if not found. """
         tid = id(t)
         res = self.objToName.get(tid)
 
@@ -162,7 +187,7 @@ class SerializationContext(object):
         return _builtin_value_to_name.get(tid)
 
     def objectFromName(self, name):
-        ''' Return an object for an input name(string), or None if not found. '''
+        """ Return an object for an input name(string), or None if not found. """
         res = self.nameToObject.get(name)
 
         if res is None:
@@ -172,7 +197,7 @@ class SerializationContext(object):
             logging.warn(
                 "Failed to find a value for object named %s. unique prefixes are %s",
                 name,
-                set([x.split(".")[0] for x in self.nameToObject])
+                set([x.split(".")[0] for x in self.nameToObject]),
             )
 
         return res
@@ -187,7 +212,7 @@ class SerializationContext(object):
         return deserialize(serializeType, bytes, self)
 
     def representationFor(self, inst):
-        ''' Return the representation of a given instance or None.
+        """ Return the representation of a given instance or None.
 
             For certain types, we want to special-case how they are serialized.
             For those types, we return a representation object and for other
@@ -205,7 +230,7 @@ class SerializationContext(object):
 
             @param inst: an instance to be serialized
             @return a representation object or None
-        '''
+        """
         if GoogleProtobufMessage is not None and isinstance(inst, GoogleProtobufMessage):
             return (type(inst), (), inst.SerializeToString())
 
@@ -255,12 +280,18 @@ class SerializationContext(object):
 
             walkCodeObject(inst.__code__)
 
-            representation["freevars"] = {k: v for k, v in inst.__globals__.items() if k in all_names}
+            representation["freevars"] = {
+                k: v for k, v in inst.__globals__.items() if k in all_names
+            }
 
             for ix, x in enumerate(inst.__code__.co_freevars):
                 representation["freevars"][x] = inst.__closure__[ix].cell_contents
 
-            args = (convertFunctionToAlgebraicPyAst(inst, keepLineInformation=self.encodeLineInformationForCode),)
+            args = (
+                convertFunctionToAlgebraicPyAst(
+                    inst, keepLineInformation=self.encodeLineInformationForCode
+                ),
+            )
 
             return (createEmptyFunction, args, representation)
 
@@ -300,9 +331,9 @@ class SerializationContext(object):
             return True
 
         if isinstance(instance, FunctionType):
-            instance.__globals__.update(representation['freevars'])
-            instance.__name__ = representation['name']
-            instance.__qualname__ = representation['qualname']
+            instance.__globals__.update(representation["freevars"])
+            instance.__name__ = representation["name"]
+            instance.__qualname__ = representation["qualname"]
 
             return True
 

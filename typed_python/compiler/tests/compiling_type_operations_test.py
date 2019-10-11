@@ -25,10 +25,7 @@ class TestCompilingTypeOperations(unittest.TestCase):
             result.append(x)
             return result
 
-        self.assertEqual(
-            type(f(10)).ElementType,
-            OneOf(None, int)
-        )
+        self.assertEqual(type(f(10)).ElementType, OneOf(None, int))
 
     def test_stringification_of_type(self):
         @Entrypoint
@@ -38,5 +35,14 @@ class TestCompilingTypeOperations(unittest.TestCase):
         def check(T):
             self.assertEqual(f(T()), str(T))
 
-        for typ in [str, int, Int32, bool, float, type(None), ListOf(int), ListOf(OneOf(int, float))]:
+        for typ in [
+            str,
+            int,
+            Int32,
+            bool,
+            float,
+            type(None),
+            ListOf(int),
+            ListOf(OneOf(int, float)),
+        ]:
             check(typ)

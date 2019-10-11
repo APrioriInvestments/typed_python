@@ -15,7 +15,9 @@
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import (
+    BoundCompiledMethodWrapper,
+)
 from typed_python.compiler.type_wrappers.util import min
 from typed_python.compiler.typed_expression import TypedExpression
 
@@ -24,7 +26,9 @@ from typed_python import NoneType, Tuple, Bool
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    t
+)
 
 
 def const_dict_eq(l, r):
@@ -139,12 +143,13 @@ class ConstDictWrapperBase(RefcountedWrapper):
     We subclass this for things like 'keys', 'values', and 'items' since
     they all basically look like a const-dict with different methods
     """
+
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
 
     def __init__(self, constDictType, behavior):
-        assert hasattr(constDictType, '__typed_python_category__')
+        assert hasattr(constDictType, "__typed_python_category__")
         super().__init__(constDictType if behavior is None else (constDictType, behavior))
 
         self.constDictType = constDictType
@@ -155,13 +160,16 @@ class ConstDictWrapperBase(RefcountedWrapper):
         self.kvBytecount = self.keyType.getBytecount() + self.valueType.getBytecount()
         self.keyBytecount = self.keyType.getBytecount()
 
-        self.layoutType = native_ast.Type.Struct(element_types=(
-            ('refcount', native_ast.Int64),
-            ('hash_cache', native_ast.Int32),
-            ('count', native_ast.Int32),
-            ('subpointers', native_ast.Int32),
-            ('data', native_ast.UInt8)
-        ), name='ConstDictLayout').pointer()
+        self.layoutType = native_ast.Type.Struct(
+            element_types=(
+                ("refcount", native_ast.Int64),
+                ("hash_cache", native_ast.Int32),
+                ("count", native_ast.Int32),
+                ("subpointers", native_ast.Int32),
+                ("data", native_ast.UInt8),
+            ),
+            name="ConstDictLayout",
+        ).pointer()
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -172,16 +180,13 @@ class ConstDictWrapperBase(RefcountedWrapper):
         if self.keyType.is_pod and self.valueType.is_pod:
             return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
         else:
-            return (
-                context.converter.defineNativeFunction(
-                    "destructor_" + str(self.constDictType),
-                    ('destructor', self),
-                    [self],
-                    typeWrapper(NoneType),
-                    self.generateNativeDestructorFunction
-                )
-                .call(instance)
-            )
+            return context.converter.defineNativeFunction(
+                "destructor_" + str(self.constDictType),
+                ("destructor", self),
+                [self],
+                typeWrapper(NoneType),
+                self.generateNativeDestructorFunction,
+            ).call(instance)
 
     def generateNativeDestructorFunction(self, context, out, inst):
         with context.loop(inst.convert_len()) as i:
@@ -198,7 +203,13 @@ class ConstDictWrapper(ConstDictWrapperBase):
         super().__init__(constDictType, None)
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("get_key_by_index_unsafe", "get_value_by_index_unsafe", "keys", "values", "items"):
+        if attr in (
+            "get_key_by_index_unsafe",
+            "get_value_by_index_unsafe",
+            "keys",
+            "values",
+            "items",
+        ):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -207,15 +218,13 @@ class ConstDictWrapper(ConstDictWrapperBase):
         if methodname == "__iter__" and not args and not kwargs:
             res = context.push(
                 ConstDictKeysIteratorWrapper(self.constDictType),
-                lambda instance:
-                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
-                    # we initialize the dict pointer below, so technically
-                    # if that were to throw, this would leak a bad value.
+                lambda instance: instance.expr.ElementPtrIntegers(0, 0).store(-1)
+                # we initialize the dict pointer below, so technically
+                # if that were to throw, this would leak a bad value.
             )
 
             context.pushReference(
-                self,
-                res.expr.ElementPtrIntegers(0, 1)
+                self, res.expr.ElementPtrIntegers(0, 1)
             ).convert_copy_initialize(instance)
 
             return res
@@ -253,26 +262,29 @@ class ConstDictWrapper(ConstDictWrapperBase):
     def convert_getkey_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
             self.keyType,
-            expr.nonref_expr.ElementPtrIntegers(0, 4).elemPtr(
-                item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
-            ).cast(self.keyType.getNativeLayoutType().pointer())
+            expr.nonref_expr.ElementPtrIntegers(0, 4)
+            .elemPtr(item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount)))
+            .cast(self.keyType.getNativeLayoutType().pointer()),
         )
 
     def convert_getitem_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
             self.itemType,
-            expr.nonref_expr.ElementPtrIntegers(0, 4).elemPtr(
-                item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
-            ).cast(self.itemType.getNativeLayoutType().pointer())
+            expr.nonref_expr.ElementPtrIntegers(0, 4)
+            .elemPtr(item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount)))
+            .cast(self.itemType.getNativeLayoutType().pointer()),
         )
 
     def convert_getvalue_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
             self.valueType,
-            expr.nonref_expr.ElementPtrIntegers(0, 4).elemPtr(
-                item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
-                .add(native_ast.const_int_expr(self.keyBytecount))
-            ).cast(self.valueType.getNativeLayoutType().pointer())
+            expr.nonref_expr.ElementPtrIntegers(0, 4)
+            .elemPtr(
+                item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount)).add(
+                    native_ast.const_int_expr(self.keyBytecount)
+                )
+            )
+            .cast(self.valueType.getNativeLayoutType().pointer()),
         )
 
     def convert_bin_op(self, context, left, op, right, inplace):
@@ -301,7 +313,7 @@ class ConstDictWrapper(ConstDictWrapperBase):
             return context.call_py_function(
                 const_dict_contains if op.matches.In else const_dict_contains_not,
                 (left, right),
-                {}
+                {},
             )
 
         return super().convert_bin_op(context, left, op, right, inplace)
@@ -319,7 +331,7 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return native_ast.Expression.Branch(
             cond=expr,
             false=native_ast.const_int_expr(0),
-            true=expr.ElementPtrIntegers(0, 2).load().cast(native_ast.Int64)
+            true=expr.ElementPtrIntegers(0, 2).load().cast(native_ast.Int64),
         )
 
     def convert_len(self, context, expr):
@@ -332,11 +344,7 @@ class ConstDictWrapper(ConstDictWrapperBase):
         target_type = targetVal.expr_type
 
         if target_type.typeRepresentation == Bool:
-            context.pushEffect(
-                targetVal.expr.store(
-                    self.convert_len_native(e).neq(0)
-                )
-            )
+            context.pushEffect(targetVal.expr.store(self.convert_len_native(e).neq(0)))
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
@@ -349,13 +357,11 @@ class ConstDictMakeIteratorWrapper(ConstDictWrapperBase):
                 # self.iteratorType is inherited from our specialized children
                 # who pick whether we're an interator over keys, values, items, etc.
                 self.iteratorType,
-                lambda instance:
-                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
+                lambda instance: instance.expr.ElementPtrIntegers(0, 0).store(-1),
             )
 
             context.pushReference(
-                self,
-                res.expr.ElementPtrIntegers(0, 1)
+                self, res.expr.ElementPtrIntegers(0, 1)
             ).convert_copy_initialize(expr)
 
             return res
@@ -393,8 +399,11 @@ class ConstDictIteratorWrapper(Wrapper):
 
     def getNativeLayoutType(self):
         return native_ast.Type.Struct(
-            element_types=(("pos", native_ast.Int64), ("dict", ConstDictWrapper(self.constDictType).getNativeLayoutType())),
-            name="const_dict_iterator"
+            element_types=(
+                ("pos", native_ast.Int64),
+                ("dict", ConstDictWrapper(self.constDictType).getNativeLayoutType()),
+            ),
+            name="const_dict_iterator",
         )
 
     def convert_next(self, context, expr):
@@ -405,8 +414,7 @@ class ConstDictIteratorWrapper(Wrapper):
         )
         self_len = self.refAs(context, expr, 1).convert_len()
         canContinue = context.pushPod(
-            bool,
-            expr.expr.ElementPtrIntegers(0, 0).load().lt(self_len.nonref_expr)
+            bool, expr.expr.ElementPtrIntegers(0, 0).load().lt(self_len.nonref_expr)
         )
 
         nextIx = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
@@ -422,9 +430,9 @@ class ConstDictIteratorWrapper(Wrapper):
         if which == 1:
             return context.pushReference(
                 self.constDictType,
-                expr.expr
-                    .ElementPtrIntegers(0, 1)
-                    .cast(ConstDictWrapper(self.constDictType).getNativeLayoutType().pointer())
+                expr.expr.ElementPtrIntegers(0, 1).cast(
+                    ConstDictWrapper(self.constDictType).getNativeLayoutType().pointer()
+                ),
             )
 
     def convert_assign(self, context, expr, other):
@@ -447,9 +455,7 @@ class ConstDictKeysIteratorWrapper(ConstDictIteratorWrapper):
 
     def iteratedItemForReference(self, context, expr, ixExpr):
         return ConstDictWrapper(self.constDictType).convert_getkey_by_index_unsafe(
-            context,
-            self.refAs(context, expr, 1),
-            ixExpr
+            context, self.refAs(context, expr, 1), ixExpr
         )
 
 
@@ -459,9 +465,7 @@ class ConstDictItemsIteratorWrapper(ConstDictIteratorWrapper):
 
     def iteratedItemForReference(self, context, expr, ixExpr):
         return ConstDictWrapper(self.constDictType).convert_getitem_by_index_unsafe(
-            context,
-            self.refAs(context, expr, 1),
-            ixExpr
+            context, self.refAs(context, expr, 1), ixExpr
         )
 
 
@@ -471,7 +475,5 @@ class ConstDictValuesIteratorWrapper(ConstDictIteratorWrapper):
 
     def iteratedItemForReference(self, context, expr, ixExpr):
         return ConstDictWrapper(self.constDictType).convert_getvalue_by_index_unsafe(
-            context,
-            self.refAs(context, expr, 1),
-            ixExpr
+            context, self.refAs(context, expr, 1), ixExpr
         )

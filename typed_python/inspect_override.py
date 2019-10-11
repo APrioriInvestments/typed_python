@@ -19,8 +19,16 @@ import os
 import re
 
 from inspect import (  # import what we use to avoid F405 warnings
-    isclass, ismethod, isfunction, ismodule, isframe, iscode, istraceback,
-    getmembers, getmodule, getblock
+    isclass,
+    ismethod,
+    isfunction,
+    ismodule,
+    isframe,
+    iscode,
+    istraceback,
+    getmembers,
+    getmodule,
+    getblock,
 )
 from inspect import *  # noqa: F401,F403
 
@@ -65,15 +73,10 @@ def getfile(pyObject):
 
 
 def _try_getfile_class(pyObject):
-    members = getmembers(
-        pyObject,
-        lambda _: ismethod(_) or isfunction(_)
-    )
+    members = getmembers(pyObject, lambda _: ismethod(_) or isfunction(_))
 
     if len(members) == 0:
-        raise InspectError(
-            "can't get source code for class %s" % pyObject
-        )
+        raise InspectError("can't get source code for class %s" % pyObject)
 
     # members is a list of tuples: (name, func)
     elt0 = members[0][1]
@@ -96,11 +99,11 @@ def getsourcefile(pyObject):
     if filename == "<stdin>":
         return filename
 
-    if filename[-4:].lower() in ('.pyc', '.pyo'):
-        filename = filename[:-4] + '.py'
+    if filename[-4:].lower() in (".pyc", ".pyo"):
+        filename = filename[:-4] + ".py"
 
     for suffix in importlib.machinery.EXTENSION_SUFFIXES:
-        if filename[-len(suffix):].lower() == suffix:
+        if filename[-len(suffix) :].lower() == suffix:
             # Looks like a binary file.  We want to only return a text file.
             return None
 
@@ -111,7 +114,7 @@ def getsourcefile(pyObject):
         return filename
 
     # only return a non-existent filename if the module has a PEP 302 loader
-    if hasattr(getmodule(pyObject, filename), '__loader__'):
+    if hasattr(getmodule(pyObject, filename), "__loader__"):
         return filename
     # or it is in the linecache
     if filename in linecache.cache:
@@ -129,22 +132,22 @@ def findsource(pyObject):
     pyFile = getfile(pyObject)
     sourcefile = getsourcefile(pyObject)
 
-    if not sourcefile and pyFile[:1] + pyFile[-1:] != '<>':
-        raise IOError('source code not available')
+    if not sourcefile and pyFile[:1] + pyFile[-1:] != "<>":
+        raise IOError("source code not available")
 
     pyFile = sourcefile if sourcefile else pyFile
 
     lines = getlines(pyFile)
 
     if not lines:
-        raise IOError('could not get source code')
+        raise IOError("could not get source code")
 
     if ismodule(pyObject):
         return lines, 0
 
     if isclass(pyObject):
         name = pyObject.__name__
-        pat = re.compile(r'^(\s*)class\s*' + name + r'\b')
+        pat = re.compile(r"^(\s*)class\s*" + name + r"\b")
         # find all matching class definitions and if more than one
         # is found, raise a InspectError
         candidates = []
@@ -154,16 +157,15 @@ def findsource(pyObject):
                 # add to candidate list
                 candidates.append(i)
         if not candidates:
-            raise IOError('could not find class definition for %s' % pyObject)
+            raise IOError("could not find class definition for %s" % pyObject)
         elif len(candidates) > 1:
-            raise InspectError('could not find class unequivocally: class '
-                               + name)
+            raise InspectError("could not find class unequivocally: class " + name)
         else:
             # classes may have decorators and the decorator is considered part
             # of the class definition
             lnum = candidates[0]
-            pat = re.compile(r'^(\s*)@\w+')
-            while lnum > 0 and pat.match(lines[lnum-1]):
+            pat = re.compile(r"^(\s*)@\w+")
+            while lnum > 0 and pat.match(lines[lnum - 1]):
                 lnum -= 1
             return lines, lnum
 
@@ -181,16 +183,16 @@ def findsource(pyObject):
     if isframe(pyObject):
         pyObject = pyObject.f_code
     if iscode(pyObject):
-        if not hasattr(pyObject, 'co_firstlineno'):
-            raise IOError('could not find function definition')
+        if not hasattr(pyObject, "co_firstlineno"):
+            raise IOError("could not find function definition")
         lnum = pyObject.co_firstlineno - 1
-        pat = re.compile(r'^(\s*def\s)|(.*(?<!\w)lambda(:|\s))|^(\s*@)')
+        pat = re.compile(r"^(\s*def\s)|(.*(?<!\w)lambda(:|\s))|^(\s*@)")
         while lnum > 0:
             if pat.match(lines[lnum]):
                 break
             lnum = lnum - 1
         return lines, lnum
-    raise IOError('could not find code object')
+    raise IOError("could not find code object")
 
 
 def getsourcelines(pyObject):
@@ -216,4 +218,4 @@ def getsource(pyObject):
     or code object.  The source code is returned as a single string.  An
     IOError is raised if the source code cannot be retrieved."""
     lines, _ = getsourcelines(pyObject)
-    return ''.join(lines)
+    return "".join(lines)

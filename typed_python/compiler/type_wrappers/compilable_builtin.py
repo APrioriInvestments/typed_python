@@ -34,6 +34,7 @@ class CompilableBuiltin(Wrapper):
         # this will dispatch to the 'convert_call' above.
         return SomeCodeGenerator(x)
     """
+
     is_pod = True
     is_empty = True
     is_pass_by_ref = False

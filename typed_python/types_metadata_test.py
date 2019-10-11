@@ -13,8 +13,22 @@
 #   limitations under the License.
 import unittest
 from typed_python import (
-    ListOf, Set, Dict, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String,
-    ConstDict, Alternative, Forward, Class, PointerTo, Type
+    ListOf,
+    Set,
+    Dict,
+    TupleOf,
+    OneOf,
+    Tuple,
+    NamedTuple,
+    Int64,
+    Float64,
+    String,
+    ConstDict,
+    Alternative,
+    Forward,
+    Class,
+    PointerTo,
+    Type,
 )
 
 
@@ -45,15 +59,24 @@ class TypesMetadataTest(unittest.TestCase):
         self.assertEqual(TupleOf(float).ElementType, Float64)
         self.assertEqual(TupleOf(OneOf(10, 20)).ElementType, OneOf(10, 20))
 
-        self.assertEqual(TupleOf(object).ElementType.__typed_python_category__, "PythonObjectOfType")
+        self.assertEqual(
+            TupleOf(object).ElementType.__typed_python_category__, "PythonObjectOfType"
+        )
         self.assertEqual(TupleOf(10).ElementType.__typed_python_category__, "Value")
 
     def test_tuple(self):
-        self.assertEqual(Tuple(int, int, OneOf(10, 20)).ElementTypes, (Int64, Int64, OneOf(10, 20)))
+        self.assertEqual(
+            Tuple(int, int, OneOf(10, 20)).ElementTypes, (Int64, Int64, OneOf(10, 20))
+        )
 
     def test_named_tuple(self):
-        self.assertEqual(NamedTuple(x=int, y=int, z=OneOf(10, 20)).ElementTypes, (Int64, Int64, OneOf(10, 20)))
-        self.assertEqual(NamedTuple(x=int, y=int, z=OneOf(10, 20)).ElementNames, ('x', 'y', 'z'))
+        self.assertEqual(
+            NamedTuple(x=int, y=int, z=OneOf(10, 20)).ElementTypes,
+            (Int64, Int64, OneOf(10, 20)),
+        )
+        self.assertEqual(
+            NamedTuple(x=int, y=int, z=OneOf(10, 20)).ElementNames, ("x", "y", "z")
+        )
 
     def test_const_dict(self):
         self.assertEqual(ConstDict(str, int).KeyType, String)
@@ -61,11 +84,7 @@ class TypesMetadataTest(unittest.TestCase):
 
     def test_alternatives(self):
         X = Forward("X")
-        X = X.define(Alternative(
-            "X",
-            Left={'x': int, 'y': str},
-            Right={'x': X, 'val': int}
-        ))
+        X = X.define(Alternative("X", Left={"x": int, "y": str}, Right={"x": X, "val": int}))
 
         self.assertEqual(len(X.__typed_python_alternatives__), 2)
 
@@ -76,7 +95,7 @@ class TypesMetadataTest(unittest.TestCase):
 
         self.assertEqual(Left.ElementType.ElementNames, ("x", "y"))
         self.assertEqual(Left.ElementType.ElementTypes, (Int64, String))
-        self.assertEqual(Right.ElementType.ElementNames, ('x', 'val'))
+        self.assertEqual(Right.ElementType.ElementNames, ("x", "val"))
         self.assertEqual(Right.ElementType.ElementTypes, (X, Int64))
 
     def test_oneof(self):

@@ -13,11 +13,33 @@
 #   limitations under the License.
 
 from typed_python import (
-    Class, Member, Function, Tuple, TupleOf, ListOf, String, Bytes, ConstDict, Dict, NamedTuple, Set,
-    Alternative, OneOf, NoneType, Bool,
-    Int8, Int16, Int32, Int64,
-    UInt8, UInt16, UInt32, UInt64,
-    Float32, Float64, Final
+    Class,
+    Member,
+    Function,
+    Tuple,
+    TupleOf,
+    ListOf,
+    String,
+    Bytes,
+    ConstDict,
+    Dict,
+    NamedTuple,
+    Set,
+    Alternative,
+    OneOf,
+    NoneType,
+    Bool,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+    Float32,
+    Float64,
+    Final,
 )
 
 import unittest
@@ -75,7 +97,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         def f(x):
             return x.a
 
-        x = '1'
+        x = "1"
         self.assertIs(f(HoldsAnA(x)), x)
         with self.assertRaises(Exception):
             f(10)
@@ -134,7 +156,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             lambda x, y: x | y,
             lambda x, y: x ^ y,
             lambda x, y: x ** y,
-            lambda x, y: x % y
+            lambda x, y: x % y,
         ]
 
         for f in fcn:
@@ -146,12 +168,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
                 compiled(2.5, "hi")
 
     def test_unary_ops(self):
-        fcn = [
-            lambda x: +x,
-            lambda x: -x,
-            lambda x: ~x,
-            lambda x: not x,
-        ]
+        fcn = [lambda x: +x, lambda x: -x, lambda x: ~x, lambda x: not x]
 
         for f in fcn:
             compiled = Compiled(f)
@@ -180,7 +197,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         def aFunc(*args, **kwargs):
             return (args, kwargs)
 
-        self.assertEqual(f(aFunc, 'arg', 'the kwarg'), (('arg',), ({'keyword': 'the kwarg'})))
+        self.assertEqual(f(aFunc, "arg", "the kwarg"), (("arg",), ({"keyword": "the kwarg"})))
 
     def test_len(self):
         @Compiled
@@ -196,12 +213,12 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (Bool, True),
             (Int8, -128),
             (Int16, -32768),
-            (Int32, -2**31),
-            (Int64, -2**63),
+            (Int32, -2 ** 31),
+            (Int64, -2 ** 63),
             (UInt8, 127),
             (UInt16, 65535),
-            (UInt32, 2**32-1),
-            (UInt64, 2**64-1),
+            (UInt32, 2 ** 32 - 1),
+            (UInt64, 2 ** 64 - 1),
             (Float64, 1.2345),
             (String, "abcd"),
             (TupleOf(Int64), (7, 6, 5, 4, 3, 2, -1)),
@@ -215,15 +232,16 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (TupleOf(str), ("a", "b", "c")),
             (ListOf(str), ["a", "b", "d"]),
             (Float32, 1.2345),
-            (Dict(str, int), {'y': 7, 'n': 6}),
+            (Dict(str, int), {"y": 7, "n": 6}),
             (TupleOf(int), tuple(range(10000))),
             (OneOf(String, Int64), "ab"),
             (OneOf(String, Int64), 34),
             (NT1, NT1(a=1, b=2.3, c="c", d="d")),
-            (NT2, NT2(s="xyz", t=tuple(range(10000))))
+            (NT2, NT2(s="xyz", t=tuple(range(10000)))),
         ]
 
         for T, v in cases:
+
             @Function
             def toObject(x: object):
                 return x
@@ -246,8 +264,16 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
                 self.assertEqual(fro_and_to(v), v)
 
             x = T(v)
-            if T.__typed_python_category__ in ["ListOf", "TupleOf", "Alternative", "ConcreteAlternative",
-                                               "Class", "Dict", "ConstDict", "Set"]:
+            if T.__typed_python_category__ in [
+                "ListOf",
+                "TupleOf",
+                "Alternative",
+                "ConcreteAlternative",
+                "Class",
+                "Dict",
+                "ConstDict",
+                "Set",
+            ]:
                 self.assertEqual(refcount(x), 1)
                 self.assertEqual(to_and_fro(x), x)
                 self.assertEqual(refcount(x), 1)
@@ -283,38 +309,68 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         A3 = Alternative("A3", a={}, b={}, __bool__=lambda self: True)
         A4 = Alternative("A4", a={}, b={}, __len__=lambda self: 0)
         A5 = Alternative("A5", a={}, b={}, __len__=lambda self: 42)
-        B1 = Alternative("B1", a={'s': str}, b={'i': int})
-        B2 = Alternative("B2", a={'s': str}, b={'i': int}, __bool__=lambda self: False)
-        B3 = Alternative("B3", a={'s': str}, b={'i': int}, __bool__=lambda self: True)
-        B4 = Alternative("B4", a={'s': str}, b={'i': int}, __len__=lambda self: 0)
-        B5 = Alternative("B5", a={'s': str}, b={'i': int}, __len__=lambda self: 42)
+        B1 = Alternative("B1", a={"s": str}, b={"i": int})
+        B2 = Alternative("B2", a={"s": str}, b={"i": int}, __bool__=lambda self: False)
+        B3 = Alternative("B3", a={"s": str}, b={"i": int}, __bool__=lambda self: True)
+        B4 = Alternative("B4", a={"s": str}, b={"i": int}, __len__=lambda self: 0)
+        B5 = Alternative("B5", a={"s": str}, b={"i": int}, __len__=lambda self: 42)
         # want to test something like A6 below, but .matches. is not compilable at the moment
         # A6 = Alternative("A6", a={}, b={}, __len__=lambda self: 0 if self.matches.a else 42)
 
         test_cases = [
             (int, 0),
             (int, 1),
-            (Int8, Int8(0)), (Int8, Int8(1)), (UInt8, UInt8(0)), (UInt8, UInt8(-1)),
-            (Int16, Int16(0)), (Int16, Int16(1)), (UInt16, UInt16(0)), (UInt16, UInt16(-1)),
-            (Int32, Int32(0)), (Int32, Int32(1)), (UInt32, UInt32(0)), (UInt32, UInt32(-1)),
-            (Int64, Int64(0)), (Int64, Int64(1)), (UInt64, UInt64(0)), (UInt64, UInt64(-1)),
-            (Float64, 0.0), (Float64, 0.1),
-            (Float32, 0.0), (Float32, 0.1),
+            (Int8, Int8(0)),
+            (Int8, Int8(1)),
+            (UInt8, UInt8(0)),
+            (UInt8, UInt8(-1)),
+            (Int16, Int16(0)),
+            (Int16, Int16(1)),
+            (UInt16, UInt16(0)),
+            (UInt16, UInt16(-1)),
+            (Int32, Int32(0)),
+            (Int32, Int32(1)),
+            (UInt32, UInt32(0)),
+            (UInt32, UInt32(-1)),
+            (Int64, Int64(0)),
+            (Int64, Int64(1)),
+            (UInt64, UInt64(0)),
+            (UInt64, UInt64(-1)),
+            (Float64, 0.0),
+            (Float64, 0.1),
+            (Float32, 0.0),
+            (Float32, 0.1),
             (NoneType, NoneType()),
-            (String, ""), (String, "0"), (String, "1"),
-            (Bytes, b""), (Bytes, b"0"), (Bytes, b"\x00"), (Bytes, b"\x01"),
-            (IDict, IDict()), (IDict, IDict({0: 0})), (IDict, IDict({1: 1, 2: 4})),
-            (IConstDict, IConstDict()), (IConstDict, IConstDict({0: 0})), (IConstDict, IConstDict({1: 1, 2: 4})),
+            (String, ""),
+            (String, "0"),
+            (String, "1"),
+            (Bytes, b""),
+            (Bytes, b"0"),
+            (Bytes, b"\x00"),
+            (Bytes, b"\x01"),
+            (IDict, IDict()),
+            (IDict, IDict({0: 0})),
+            (IDict, IDict({1: 1, 2: 4})),
+            (IConstDict, IConstDict()),
+            (IConstDict, IConstDict({0: 0})),
+            (IConstDict, IConstDict({1: 1, 2: 4})),
             (NamedTuple0, NamedTuple0()),
-            (NamedTuple1, NamedTuple1(a=0)), (NamedTuple1, NamedTuple1(a=1)),
-            (OneOf2, OneOf2(0)), (OneOf2, OneOf2("")),
-            (OneOf2, OneOf2(1)), (OneOf2, OneOf2("a")),
+            (NamedTuple1, NamedTuple1(a=0)),
+            (NamedTuple1, NamedTuple1(a=1)),
+            (OneOf2, OneOf2(0)),
+            (OneOf2, OneOf2("")),
+            (OneOf2, OneOf2(1)),
+            (OneOf2, OneOf2("a")),
             (IntTuple2, IntTuple2((0, 0))),
             (IntTuple2, IntTuple2((1, 1))),
             (ISet, ISet([1, 2, 3])),
             (ISet, ISet([])),
-            (IList, IList()), (IList, IList([0])), (IList, IList(range(1000))),
-            (ITuple, ITuple()), (ITuple, ITuple((0,))), (ITuple, ITuple(range(1000))),
+            (IList, IList()),
+            (IList, IList([0])),
+            (IList, IList(range(1000))),
+            (ITuple, ITuple()),
+            (ITuple, ITuple((0,))),
+            (ITuple, ITuple(range(1000))),
             (AClassWithBool, AClassWithBool(1)),
             (AClassWithBool, AClassWithBool(0)),
             (A1.a, A1.a()),
@@ -330,16 +386,16 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (A5.b, A5.b()),
             # (A6.a, A6.a()),
             # (A6.b, A6.b()),
-            (B1.a, B1.a(s='')),
-            (B1.a, B1.a(s='a')),
-            (B2.a, B2.a(s='')),
-            (B2.a, B2.a(s='a')),
-            (B3.a, B3.a(s='')),
-            (B3.a, B3.a(s='a')),
-            (B4.a, B4.a(s='')),
-            (B4.a, B4.a(s='a')),
-            (B5.a, B5.a(s='')),
-            (B5.a, B5.a(s='a')),
+            (B1.a, B1.a(s="")),
+            (B1.a, B1.a(s="a")),
+            (B2.a, B2.a(s="")),
+            (B2.a, B2.a(s="a")),
+            (B3.a, B3.a(s="")),
+            (B3.a, B3.a(s="a")),
+            (B4.a, B4.a(s="")),
+            (B4.a, B4.a(s="a")),
+            (B5.a, B5.a(s="")),
+            (B5.a, B5.a(s="a")),
             (A1, A1.a()),
             (A1, A1.a()),
             (A1, A1.b()),
@@ -353,15 +409,15 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (A5, A5.b()),
             # (A6, A6.a()),
             # (A6, A6.b()),
-            (B1, B1.a(s='')),
-            (B1, B1.a(s='a')),
-            (B2, B2.a(s='')),
-            (B2, B2.a(s='a')),
-            (B3, B3.a(s='')),
-            (B3, B3.a(s='a')),
-            (B4, B4.a(s='')),
-            (B4, B4.a(s='a')),
-            (B5, B5.a(s='')),
+            (B1, B1.a(s="")),
+            (B1, B1.a(s="a")),
+            (B2, B2.a(s="")),
+            (B2, B2.a(s="a")),
+            (B3, B3.a(s="")),
+            (B3, B3.a(s="a")),
+            (B4, B4.a(s="")),
+            (B4, B4.a(s="a")),
+            (B5, B5.a(s="")),
         ]
 
         @Entrypoint
@@ -393,7 +449,6 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             self.assertEqual(r1, r5)
 
     def test_obj_to_bool(self):
-
         def bool_f(x: object):
             return bool(x)
 

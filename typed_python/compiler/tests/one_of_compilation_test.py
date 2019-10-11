@@ -12,7 +12,17 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, Forward, ConstDict, Class, Final, Member, ListOf
+from typed_python import (
+    Function,
+    OneOf,
+    TupleOf,
+    Forward,
+    ConstDict,
+    Class,
+    Final,
+    Member,
+    ListOf,
+)
 from typed_python import Value as ValueType
 import typed_python._types as _types
 from typed_python.compiler.runtime import Runtime
@@ -29,29 +39,21 @@ Value = Forward("Value")
 
 
 Value = Value.define(
-    OneOf(
-        None,
-        False,
-        True,
-        float,
-        int,
-        str,
-        bytes,
-        ConstDict(Value, Value),
-        TupleOf(Value)
-    )
+    OneOf(None, False, True, float, int, str, bytes, ConstDict(Value, Value), TupleOf(Value))
 )
 
 someValues = [
     None,
     False,
     True,
-    0.0, 1.0,
-    0, 1,
+    0.0,
+    1.0,
+    0,
+    1,
     "hi",
     b"bye",
-    Value({'hi': 'bye'}),
-    Value((1, 2, 3))
+    Value({"hi": "bye"}),
+    Value((1, 2, 3)),
 ]
 
 
@@ -97,8 +99,8 @@ class TestOneOfOfCompilation(unittest.TestCase):
             return x + y
 
         def check(x, y):
-            self.assertIs(type(f(x, y)), type(x+y))
-            self.assertEqual(f(x, y), x+y)
+            self.assertIs(type(f(x, y)), type(x + y))
+            self.assertEqual(f(x, y), x + y)
 
         things = [0, 1, 2, 0.0, 1.0, 2.0]
         for a in things:
@@ -111,8 +113,8 @@ class TestOneOfOfCompilation(unittest.TestCase):
             return x + y
 
         def check(x, y):
-            self.assertIs(type(f(x, y)), type(x+y))
-            self.assertEqual(f(x, y), x+y)
+            self.assertIs(type(f(x, y)), type(x + y))
+            self.assertEqual(f(x, y), x + y)
 
         things = [0, 1, 2, 0.0, 1.0, 2.0]
         for a in things:
@@ -140,8 +142,8 @@ class TestOneOfOfCompilation(unittest.TestCase):
             return x + y
 
         def check(x, y):
-            self.assertIs(type(f(x, y)), type(x+y))
-            self.assertEqual(f(x, y), x+y)
+            self.assertIs(type(f(x, y)), type(x + y))
+            self.assertEqual(f(x, y), x + y)
 
         things = [0, 1, 2, 0.0, 1.0, 2.0]
         for a in things:
@@ -154,8 +156,8 @@ class TestOneOfOfCompilation(unittest.TestCase):
             return x ** y
 
         def check(x, y):
-            self.assertIs(type(f(x, y)), type(x**y))
-            self.assertEqual(f(x, y), x**y)
+            self.assertIs(type(f(x, y)), type(x ** y))
+            self.assertEqual(f(x, y), x ** y)
 
         things = [0, 1, 2, 0.0, 1.0, 2.0]
         for a in things:

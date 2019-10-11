@@ -17,11 +17,7 @@ from typed_python.compiler.runtime import Runtime, Entrypoint
 import unittest
 
 
-A = Alternative(
-    "A",
-    X={'x': int},
-    Y={'x': str}
-)
+A = Alternative("A", X={"x": int}, Y={"x": str})
 
 
 def resultType(f, **kwargs):
@@ -113,4 +109,6 @@ class TestTypeInference(unittest.TestCase):
             return type(x)
 
         self.assertEqual(resultType(f, x=str), Value(str))
-        self.assertEqual(set(resultType(f, x=OneOf(int, str)).Types), set([Value(int), Value(str)]))
+        self.assertEqual(
+            set(resultType(f, x=OneOf(int, str)).Types), set([Value(int), Value(str)])
+        )

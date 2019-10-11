@@ -16,11 +16,19 @@ import operator
 import sys
 from math import isfinite, trunc, floor, ceil
 from typed_python import (
-    Function, OneOf,
+    Function,
+    OneOf,
     Bool,
-    Int8, Int16, Int32, Int64,
-    UInt8, UInt16, UInt32, UInt64,
-    Float32, Float64
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+    Float32,
+    Float64,
 )
 from typed_python.type_promotion import computeArithmeticBinaryResultType
 from typed_python import Entrypoint
@@ -38,23 +46,23 @@ Out = OneOf(int, float, bool)
 
 
 def add(x: In, y: In) -> Out:
-    return x+y
+    return x + y
 
 
 def sub(x: In, y: In) -> Out:
-    return x-y
+    return x - y
 
 
 def mul(x: In, y: In) -> Out:
-    return x*y
+    return x * y
 
 
 def div(x: In, y: In) -> Out:
-    return x/y
+    return x / y
 
 
 def mod(x: In, y: In) -> Out:
-    return x%y
+    return x % y
 
 
 def lshift(x: In, y: In) -> Out:
@@ -74,11 +82,11 @@ def bitxor(x: In, y: In) -> Out:
 
 
 def bitand(x: In, y: In) -> Out:
-    return x&y
+    return x & y
 
 
 def bitor(x: In, y: In) -> Out:
-    return x|y
+    return x | y
 
 
 def less(x: In, y: In) -> Out:
@@ -106,9 +114,23 @@ def neq(x: In, y: In) -> Out:
 
 
 ALL_OPERATIONS = [
-    add, sub, mul, div, mod, lshift, rshift,
-    pow, bitxor, bitand, bitor, less,
-    greater, lessEq, greaterEq, eq, neq
+    add,
+    sub,
+    mul,
+    div,
+    mod,
+    lshift,
+    rshift,
+    pow,
+    bitxor,
+    bitand,
+    bitor,
+    less,
+    greater,
+    lessEq,
+    greaterEq,
+    eq,
+    neq,
 ]
 
 
@@ -119,7 +141,7 @@ class TestArithmeticCompilation(unittest.TestCase):
     def test_compile_simple(self):
         @Function
         def f(x: int) -> int:
-            return x+x+x
+            return x + x + x
 
         r = Runtime.singleton()
         r.compile(f.overloads[0])
@@ -206,10 +228,10 @@ class TestArithmeticCompilation(unittest.TestCase):
 
     def test_call_other_typed_function(self):
         def g(x: int) -> int:
-            return x+1
+            return x + 1
 
         def f(x: int) -> int:
-            return g(x+2)
+            return g(x + 2)
 
         self.checkFunctionOfIntegers(f)
 
@@ -224,7 +246,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         y = 2
 
         def f(x: int) -> int:
-            return x+y
+            return x + y
 
         self.checkFunctionOfIntegers(f)
 
@@ -251,7 +273,19 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(toString(UInt8(10)), "10u8")
 
     def test_can_compile_register_builtins(self):
-        registerTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
+        registerTypes = [
+            Bool,
+            Int8,
+            Int16,
+            Int32,
+            Int64,
+            UInt8,
+            UInt16,
+            UInt32,
+            UInt64,
+            Float32,
+            Float64,
+        ]
 
         def suitable_range(t):
             if t in [Bool]:
@@ -264,6 +298,7 @@ class TestArithmeticCompilation(unittest.TestCase):
                 return [x / 2.0 for x in range(-100, 100)]
 
         for T in registerTypes:
+
             def f_round0(x: T):
                 return round(x)
 
@@ -301,7 +336,19 @@ class TestArithmeticCompilation(unittest.TestCase):
                 return format(x)
 
             # not_tested_yet = [f_complex]
-            ops = [f_int, f_float, f_format, f_round0, f_round1, f_round2, f_round_1, f_round_2, f_trunc, f_floor, f_ceil]
+            ops = [
+                f_int,
+                f_float,
+                f_format,
+                f_round0,
+                f_round1,
+                f_round2,
+                f_round_1,
+                f_round_2,
+                f_trunc,
+                f_floor,
+                f_ceil,
+            ]
             for op in ops:
                 c_op = Compiled(op)
                 for v in suitable_range(T):
@@ -313,7 +360,19 @@ class TestArithmeticCompilation(unittest.TestCase):
                     # but Float64 when compiled
 
     def test_can_compile_register_operations(self):
-        registerTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
+        registerTypes = [
+            Bool,
+            Int8,
+            Int16,
+            Int32,
+            Int64,
+            UInt8,
+            UInt16,
+            UInt32,
+            UInt64,
+            Float32,
+            Float64,
+        ]
 
         def result_or_exception(f, *p):
             try:
@@ -322,9 +381,11 @@ class TestArithmeticCompilation(unittest.TestCase):
                 return "exception"
 
         def equal_result(a, b):
-            if (type(a) is float or (hasattr(a, "IsFloat") and a.IsFloat)):
+            if type(a) is float or (hasattr(a, "IsFloat") and a.IsFloat):
                 epsilon = float(1e-6)
-                if a < 1e-32:  # these results happen to be from calculations that magnify errors
+                if (
+                    a < 1e-32
+                ):  # these results happen to be from calculations that magnify errors
                     epsilon = float(1e-5)
                 if a != 0.0:
                     return abs(float(b - a) / a) < epsilon
@@ -333,24 +394,79 @@ class TestArithmeticCompilation(unittest.TestCase):
             return a == b
 
         def signed_overflow(T, v):
-            return T.IsUnsignedInt and (v >= 2**(T.Bits - 1) or v < -2**(T.Bits - 1))
+            return T.IsUnsignedInt and (v >= 2 ** (T.Bits - 1) or v < -2 ** (T.Bits - 1))
 
         def suitable_range(t):
             if t in [Bool]:
                 return [0, 1]
             elif t.IsUnsignedInt:
-                return [0, 1, 2, (1 << (t.Bits // 4)) - 1, (1 << (t.Bits // 2)) - 1, (1 << t.Bits) - 1]
+                return [
+                    0,
+                    1,
+                    2,
+                    (1 << (t.Bits // 4)) - 1,
+                    (1 << (t.Bits // 2)) - 1,
+                    (1 << t.Bits) - 1,
+                ]
             elif t.IsSignedInt:
-                return [0, 1, 2, (1 << (t.Bits // 2 - 1)) - 1, (1 << (t.Bits - 1)) - 1,
-                        -1, -2, -(1 << (t.Bits // 2 - 1)), -(1 << (t.Bits - 1))]
+                return [
+                    0,
+                    1,
+                    2,
+                    (1 << (t.Bits // 2 - 1)) - 1,
+                    (1 << (t.Bits - 1)) - 1,
+                    -1,
+                    -2,
+                    -(1 << (t.Bits // 2 - 1)),
+                    -(1 << (t.Bits - 1)),
+                ]
             elif t in [Float32]:
-                return [0.0, 1.0/3.0, 0.5, 1.0, 1.5, 2.0, (2 - 1 / (2**23)) * 2**127,
-                        -1.0/3.0, -0.5, -1.0, -1.5, -2.0, -(2 - 1 / (2**23)) * 2**127]
+                return [
+                    0.0,
+                    1.0 / 3.0,
+                    0.5,
+                    1.0,
+                    1.5,
+                    2.0,
+                    (2 - 1 / (2 ** 23)) * 2 ** 127,
+                    -1.0 / 3.0,
+                    -0.5,
+                    -1.0,
+                    -1.5,
+                    -2.0,
+                    -(2 - 1 / (2 ** 23)) * 2 ** 127,
+                ]
             elif t in [Float64]:
-                return [0.0, 1e-16, 9.876e-16, 1.0/3.0, 0.5, 1.0, 1.5, 10.0/7.0, 2.0, 3.0, 10.0/3.0, 100.0/3.0, sys.float_info.max,
-                        -1e-16, -9.876e-16, -1.0/3.0, -0.5, -1.0, -10.0/7.0, -1.5, -2.0, -3.0, -10.0/3.0, -100.0/3.0, -sys.float_info.max]
+                return [
+                    0.0,
+                    1e-16,
+                    9.876e-16,
+                    1.0 / 3.0,
+                    0.5,
+                    1.0,
+                    1.5,
+                    10.0 / 7.0,
+                    2.0,
+                    3.0,
+                    10.0 / 3.0,
+                    100.0 / 3.0,
+                    sys.float_info.max,
+                    -1e-16,
+                    -9.876e-16,
+                    -1.0 / 3.0,
+                    -0.5,
+                    -1.0,
+                    -10.0 / 7.0,
+                    -1.5,
+                    -2.0,
+                    -3.0,
+                    -10.0 / 3.0,
+                    -100.0 / 3.0,
+                    -sys.float_info.max,
+                ]
 
         for T in registerTypes:
+
             def not_(x: T):
                 return not x
 
@@ -388,10 +504,12 @@ class TestArithmeticCompilation(unittest.TestCase):
                     comparable = True
                     native_result = result_or_exception(native_op, v)
                     if T.IsSignedInt:
-                        if native_result >= 2**(T.Bits - 1) or native_result < -2**(T.Bits - 1):
+                        if native_result >= 2 ** (T.Bits - 1) or native_result < -2 ** (
+                            T.Bits - 1
+                        ):
                             comparable = False
                     elif T.IsUnsignedInt:
-                        if native_result >= 2**T.Bits or native_result < 0:
+                        if native_result >= 2 ** T.Bits or native_result < 0:
                             comparable = False
                     typed_result = result_or_exception(op, T(v))
                     if typed_result == NotImplemented:
@@ -399,17 +517,25 @@ class TestArithmeticCompilation(unittest.TestCase):
                     compiled_result = result_or_exception(compiled_op, T(v))
 
                     self.assertEqual(
-                        type(typed_result), type(compiled_result),
-                        (T, type(typed_result), type(compiled_result), op.__name__)
+                        type(typed_result),
+                        type(compiled_result),
+                        (T, type(typed_result), type(compiled_result), op.__name__),
                     )
                     if comparable:
-                        self.assertTrue(equal_result(type(compiled_result)(typed_result), compiled_result),
-                                        (T, op.__name__, typed_result, compiled_result))
-                        self.assertTrue(equal_result(type(compiled_result)(native_result), compiled_result),
-                                        (T, op.__name__, native_result, compiled_result))
+                        self.assertTrue(
+                            equal_result(type(compiled_result)(typed_result), compiled_result),
+                            (T, op.__name__, typed_result, compiled_result),
+                        )
+                        self.assertTrue(
+                            equal_result(
+                                type(compiled_result)(native_result), compiled_result
+                            ),
+                            (T, op.__name__, native_result, compiled_result),
+                        )
 
         for T1 in registerTypes:
             for T2 in registerTypes:
+
                 def add(x: T1, y: T2):
                     return x + y
 
@@ -465,9 +591,23 @@ class TestArithmeticCompilation(unittest.TestCase):
                     suitable_ops = [bitand, bitor, bitxor]
                 else:
                     suitable_ops = [
-                        add, sub, mul, div, mod, floordiv,
-                        less, greater, lessEq, greaterEq, neq,
-                        bitand, bitor, bitxor, lshift, rshift, pow
+                        add,
+                        sub,
+                        mul,
+                        div,
+                        mod,
+                        floordiv,
+                        less,
+                        greater,
+                        lessEq,
+                        greaterEq,
+                        neq,
+                        bitand,
+                        bitor,
+                        bitxor,
+                        lshift,
+                        rshift,
+                        pow,
                     ]
 
                 typed_to_native_op = {
@@ -487,7 +627,7 @@ class TestArithmeticCompilation(unittest.TestCase):
                     bitxor: operator.xor,
                     rshift: operator.rshift,
                     lshift: operator.lshift,
-                    pow: operator.pow
+                    pow: operator.pow,
                 }
 
                 for op in suitable_ops:
@@ -501,8 +641,9 @@ class TestArithmeticCompilation(unittest.TestCase):
                             if T_result.IsSignedInt:
                                 if signed_overflow(T1, v1) or signed_overflow(T2, v2):
                                     comparable = False
-                            if (op is lshift and v1 != 0 and v2 > 1024) \
-                                    or (op is pow and (v1 > 1 or v1 < -1) and v2 > 1024):
+                            if (op is lshift and v1 != 0 and v2 > 1024) or (
+                                op is pow and (v1 > 1 or v1 < -1) and v2 > 1024
+                            ):
                                 native_result = "exception"
                             else:
                                 native_result = result_or_exception(native_op, v1, v2)
@@ -512,13 +653,18 @@ class TestArithmeticCompilation(unittest.TestCase):
                                 elif type(native_result) is complex:
                                     native_result = "exception"
                                 elif T_result.IsSignedInt:
-                                    if native_result >= 2**(T_result.Bits - 1) or native_result < -2**(T_result.Bits - 1):
+                                    if native_result >= 2 ** (
+                                        T_result.Bits - 1
+                                    ) or native_result < -2 ** (T_result.Bits - 1):
                                         comparable = False
                                 elif T_result.IsUnsignedInt:
-                                    if native_result >= 2**T_result.Bits or native_result < 0:
+                                    if (
+                                        native_result >= 2 ** T_result.Bits
+                                        or native_result < 0
+                                    ):
                                         comparable = False
                                 elif T_result.IsFloat:
-                                    if native_result >= 2**128 or native_result <= -2**128:
+                                    if native_result >= 2 ** 128 or native_result <= -2 ** 128:
                                         comparable = False
 
                             native_comparable = comparable
@@ -526,17 +672,28 @@ class TestArithmeticCompilation(unittest.TestCase):
                                 # can't expect Float32 mod and floordiv to match native calculations
                                 # typed should still match compiled
                                 native_comparable = False
-                            if ((T1 is Float32 and T2 is Float64) or (T1 is Float64 and T2 is Float32)) \
-                                    and op in [less, greater, lessEq, greaterEq, neq]:
+                            if (
+                                (T1 is Float32 and T2 is Float64)
+                                or (T1 is Float64 and T2 is Float32)
+                            ) and op in [less, greater, lessEq, greaterEq, neq]:
                                 native_comparable = False
 
-                            if T1 is Int64 and T2 is Int64 and \
-                                    ((op is lshift and v1 != 0 and v2 > 1024) or
-                                     (op is pow and (v1 > 1 or v1 < -1) and v2 > 1024)):
+                            if (
+                                T1 is Int64
+                                and T2 is Int64
+                                and (
+                                    (op is lshift and v1 != 0 and v2 > 1024)
+                                    or (op is pow and (v1 > 1 or v1 < -1) and v2 > 1024)
+                                )
+                            ):
                                 typed_result = "exception"
                             else:
                                 typed_result = result_or_exception(op, T1(v1), T2(v2))
-                                if type(typed_result) in [float, Float32, Float64] and not isfinite(typed_result):
+                                if type(typed_result) in [
+                                    float,
+                                    Float32,
+                                    Float64,
+                                ] and not isfinite(typed_result):
                                     typed_result = "exception"
                                 if type(typed_result) is complex:
                                     typed_result = "exception"
@@ -544,7 +701,11 @@ class TestArithmeticCompilation(unittest.TestCase):
                                     typed_result = float(typed_result)
 
                             compiled_result = result_or_exception(compiled_op, T1(v1), T2(v2))
-                            if type(compiled_result) in [float, Float32, Float64] and not isfinite(compiled_result):
+                            if type(compiled_result) in [
+                                float,
+                                Float32,
+                                Float64,
+                            ] and not isfinite(compiled_result):
                                 compiled_result = "exception"
 
                             # for debugging
@@ -560,13 +721,28 @@ class TestArithmeticCompilation(unittest.TestCase):
                             #     print("mismatch exception")
 
                             self.assertEqual(
-                                type(typed_result), type(compiled_result),
-                                (T1, T2, type(typed_result), type(compiled_result), op.__name__)
+                                type(typed_result),
+                                type(compiled_result),
+                                (
+                                    T1,
+                                    T2,
+                                    type(typed_result),
+                                    type(compiled_result),
+                                    op.__name__,
+                                ),
                             )
 
                             if comparable:
-                                self.assertTrue(equal_result(type(compiled_result)(typed_result), compiled_result),
-                                                (T1, T2, op.__name__, typed_result, compiled_result))
+                                self.assertTrue(
+                                    equal_result(
+                                        type(compiled_result)(typed_result), compiled_result
+                                    ),
+                                    (T1, T2, op.__name__, typed_result, compiled_result),
+                                )
                             if native_comparable:
-                                self.assertTrue(equal_result(type(compiled_result)(native_result), compiled_result),
-                                                (T1, T2, op.__name__, native_result, compiled_result))
+                                self.assertTrue(
+                                    equal_result(
+                                        type(compiled_result)(native_result), compiled_result
+                                    ),
+                                    (T1, T2, op.__name__, native_result, compiled_result),
+                                )

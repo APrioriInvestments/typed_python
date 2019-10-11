@@ -17,7 +17,9 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler
 from typed_python import Bool
 
-typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
+typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    x
+)
 
 
 class BoundMethodWrapper(Wrapper):
@@ -33,20 +35,19 @@ class BoundMethodWrapper(Wrapper):
         return self.firstArgType.convert_assign(
             context,
             target.changeType(self.firstArgType),
-            toStore.changeType(self.firstArgType)
+            toStore.changeType(self.firstArgType),
         )
 
     def convert_copy_initialize(self, context, target, toStore):
         return self.firstArgType.convert_copy_initialize(
             context,
             target.changeType(self.firstArgType),
-            toStore.changeType(self.firstArgType)
+            toStore.changeType(self.firstArgType),
         )
 
     def convert_destroy(self, context, instance):
         return self.firstArgType.convert_destroy(
-            context,
-            instance.changeType(self.firstArgType)
+            context, instance.changeType(self.firstArgType)
         )
 
     def convert_call(self, context, left, args, kwargs):
@@ -55,7 +56,7 @@ class BoundMethodWrapper(Wrapper):
             left.changeType(self.firstArgType),
             self.typeRepresentation.FuncName,
             args,
-            kwargs
+            kwargs,
         )
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
@@ -65,11 +66,7 @@ class BoundMethodWrapper(Wrapper):
         target_type = targetVal.expr_type
 
         if target_type.typeRepresentation == Bool:
-            context.pushEffect(
-                targetVal.expr.store(
-                    context.constant(True)
-                )
-            )
+            context.pushEffect(targetVal.expr.store(context.constant(True)))
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)

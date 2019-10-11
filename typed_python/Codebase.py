@@ -86,12 +86,12 @@ class Codebase:
 
     @staticmethod
     def FromRootlevelModule(module, **kwargs):
-        assert '.' not in module.__name__
+        assert "." not in module.__name__
         return Codebase._FromModule(module, **kwargs)
 
     @staticmethod
     def _FromModule(module, ignoreCache=False, **kwargs):
-        if '.' in module.__name__:
+        if "." in module.__name__:
             prefix = module.__name__.rsplit(".", 1)[0]
         else:
             prefix = None
@@ -100,9 +100,13 @@ class Codebase:
             if module in _root_level_module_codebase_cache and not ignoreCache:
                 return _root_level_module_codebase_cache[module]
 
-            assert module.__file__.endswith("__init__.py") or module.__file__.endswith("__init__.pyc")
+            assert module.__file__.endswith("__init__.py") or module.__file__.endswith(
+                "__init__.pyc"
+            )
 
-            root, files, modules = Codebase._walkModuleDiskRepresentation(module, prefix=prefix, **kwargs)
+            root, files, modules = Codebase._walkModuleDiskRepresentation(
+                module, prefix=prefix, **kwargs
+            )
 
             codebase = Codebase(root, files, modules)
 
@@ -118,7 +122,9 @@ class Codebase:
         return codebase
 
     @staticmethod
-    def _walkDiskRepresentation(rootPath, prefix=None, extensions=('.py',), maxTotalBytes=100 * 1024 * 1024):
+    def _walkDiskRepresentation(
+        rootPath, prefix=None, extensions=(".py",), maxTotalBytes=100 * 1024 * 1024
+    ):
         """ Utility method that collects the code for a given root module.
 
             Parameters:
@@ -150,17 +156,20 @@ class Codebase:
                     walkDisk(fullpath, so_far_with_name)
                 else:
                     if os.path.splitext(name)[1] in extensions:
-                        with open(fullpath, "r", encoding='utf-8') as f:
+                        with open(fullpath, "r", encoding="utf-8") as f:
                             try:
                                 contents = f.read()
                             except UnicodeDecodeError:
-                                raise Exception(f"Failed to parse code in {fullpath} because of a unicode error.")
+                                raise Exception(
+                                    f"Failed to parse code in {fullpath} because of a unicode error."
+                                )
 
                         total_bytes[0] += len(contents)
 
                         if total_bytes[0] > maxTotalBytes:
                             raise Exception(
-                                "exceeded bytecount with %s of size %s" % (fullpath, len(contents))
+                                "exceeded bytecount with %s of size %s"
+                                % (fullpath, len(contents))
                             )
 
                         files[so_far_with_name] = contents
@@ -247,7 +256,8 @@ class Codebase:
                 modules[mname] = importlib.import_module(mname)
             except Exception as e:
                 logging.getLogger(__name__).warn(
-                    "Error importing module '%s' from codebase: %s", mname, e)
+                    "Error importing module '%s' from codebase: %s", mname, e
+                )
         return modules
 
     @staticmethod
@@ -259,22 +269,27 @@ class Codebase:
                 del sys.path_importer_cache[f]
 
         for m, sysmodule in list(sys.modules.items()):
-            if hasattr(sysmodule, '__file__') and any(sysmodule.__file__.startswith(p) for p in paths):
+            if hasattr(sysmodule, "__file__") and any(
+                sysmodule.__file__.startswith(p) for p in paths
+            ):
                 del sys.modules[m]
-            elif hasattr(sysmodule, '__path__') and hasattr(sysmodule.__path__, '_path'):
-                if any(any(pathElt.startswith(p) for p in paths) for pathElt in sysmodule.__path__._path):
+            elif hasattr(sysmodule, "__path__") and hasattr(sysmodule.__path__, "_path"):
+                if any(
+                    any(pathElt.startswith(p) for p in paths)
+                    for pathElt in sysmodule.__path__._path
+                ):
                     del sys.modules[m]
 
     @staticmethod
     def rootlevelPathFromModule(module):
         module_path = os.path.abspath(module.__file__)
 
-        if os.path.basename(module_path) == '__init__.py':
+        if os.path.basename(module_path) == "__init__.py":
             module_path = os.path.dirname(module_path)
 
         # drop as many parts of the module_path as there dots to the
         # module name
-        for _ in range(len(module.__name__.split("."))-1):
+        for _ in range(len(module.__name__.split(".")) - 1):
             module_path = os.path.dirname(module_path)
 
         return module_path

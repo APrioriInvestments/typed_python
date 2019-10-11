@@ -33,16 +33,19 @@ class PrintWrapper(Wrapper):
         end = context.constant("\n")
 
         for kwargName, value in kwargs.items():
-            if kwargName == 'sep':
+            if kwargName == "sep":
                 sep = value.convert_to_type(str)
                 if sep is None:
                     return
-            elif kwargName == 'end':
+            elif kwargName == "end":
                 end = value.convert_to_type(str)
                 if end is None:
                     return
             else:
-                context.pushException(TypeError, f"'{kwargName}' is an invalid keyword argument for this function")
+                context.pushException(
+                    TypeError,
+                    f"'{kwargName}' is an invalid keyword argument for this function",
+                )
                 return
 
         res = None

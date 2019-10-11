@@ -22,7 +22,9 @@ import typed_python.compiler
 
 from typed_python.compiler.native_ast import VoidPtr
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    t
+)
 
 
 class BytesWrapper(RefcountedWrapper):
@@ -33,16 +35,18 @@ class BytesWrapper(RefcountedWrapper):
     def __init__(self):
         super().__init__(Bytes)
 
-        self.layoutType = native_ast.Type.Struct(element_types=(
-            ('refcount', native_ast.Int64),
-            ('data', native_ast.UInt8)
-        ), name='BytesLayout').pointer()
+        self.layoutType = native_ast.Type.Struct(
+            element_types=(("refcount", native_ast.Int64), ("data", native_ast.UInt8)),
+            name="BytesLayout",
+        ).pointer()
 
     def getNativeLayoutType(self):
         return self.layoutType
 
     def convert_hash(self, context, expr):
-        return context.pushPod(Int32, runtime_functions.hash_bytes.call(expr.nonref_expr.cast(VoidPtr)))
+        return context.pushPod(
+            Int32, runtime_functions.hash_bytes.call(expr.nonref_expr.cast(VoidPtr))
+        )
 
     def on_refcount_zero(self, context, instance):
         assert instance.isReference
@@ -55,54 +59,41 @@ class BytesWrapper(RefcountedWrapper):
 
     def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type == left.expr_type:
-            if op.matches.Eq or op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.GtE or op.matches.Gt:
+            if (
+                op.matches.Eq
+                or op.matches.NotEq
+                or op.matches.Lt
+                or op.matches.LtE
+                or op.matches.GtE
+                or op.matches.Gt
+            ):
                 cmp_res = context.pushPod(
                     int,
                     runtime_functions.bytes_cmp.call(
-                        left.nonref_expr.cast(VoidPtr),
-                        right.nonref_expr.cast(VoidPtr)
-                    )
+                        left.nonref_expr.cast(VoidPtr), right.nonref_expr.cast(VoidPtr)
+                    ),
                 )
                 if op.matches.Eq:
-                    return context.pushPod(
-                        bool,
-                        cmp_res.nonref_expr.eq(0)
-                    )
+                    return context.pushPod(bool, cmp_res.nonref_expr.eq(0))
                 if op.matches.NotEq:
-                    return context.pushPod(
-                        bool,
-                        cmp_res.nonref_expr.neq(0)
-                    )
+                    return context.pushPod(bool, cmp_res.nonref_expr.neq(0))
                 if op.matches.Lt:
-                    return context.pushPod(
-                        bool,
-                        cmp_res.nonref_expr.lt(0)
-                    )
+                    return context.pushPod(bool, cmp_res.nonref_expr.lt(0))
                 if op.matches.LtE:
-                    return context.pushPod(
-                        bool,
-                        cmp_res.nonref_expr.lte(0)
-                    )
+                    return context.pushPod(bool, cmp_res.nonref_expr.lte(0))
                 if op.matches.Gt:
-                    return context.pushPod(
-                        bool,
-                        cmp_res.nonref_expr.gt(0)
-                    )
+                    return context.pushPod(bool, cmp_res.nonref_expr.gt(0))
                 if op.matches.GtE:
-                    return context.pushPod(
-                        bool,
-                        cmp_res.nonref_expr.gte(0)
-                    )
+                    return context.pushPod(bool, cmp_res.nonref_expr.gte(0))
 
             if op.matches.Add:
                 return context.push(
                     bytes,
                     lambda bytesRef: bytesRef.expr.store(
                         runtime_functions.bytes_concat.call(
-                            left.nonref_expr.cast(VoidPtr),
-                            right.nonref_expr.cast(VoidPtr)
+                            left.nonref_expr.cast(VoidPtr), right.nonref_expr.cast(VoidPtr)
                         ).cast(self.layoutType)
-                    )
+                    ),
                 )
 
         return super().convert_bin_op(context, left, op, right, inplace)
@@ -112,20 +103,26 @@ class BytesWrapper(RefcountedWrapper):
 
         len_expr = self.convert_len(context, expr)
 
-        with context.ifelse((item.nonref_expr.lt(len_expr.nonref_expr.negate()))
-                            .bitor(item.nonref_expr.gte(len_expr.nonref_expr))) as (true, false):
+        with context.ifelse(
+            (item.nonref_expr.lt(len_expr.nonref_expr.negate())).bitor(
+                item.nonref_expr.gte(len_expr.nonref_expr)
+            )
+        ) as (true, false):
             with true:
                 context.pushException(IndexError, "index out of range")
 
         return context.pushPod(
             int,
-            expr.nonref_expr.ElementPtrIntegers(0, 1).elemPtr(
+            expr.nonref_expr.ElementPtrIntegers(0, 1)
+            .elemPtr(
                 native_ast.Expression.Branch(
                     cond=item.nonref_expr.lt(native_ast.const_int_expr(0)),
                     false=item.nonref_expr,
-                    true=item.nonref_expr.add(len_expr.nonref_expr)
+                    true=item.nonref_expr.add(len_expr.nonref_expr),
                 ).add(native_ast.const_int_expr(8))
-            ).load().cast(native_ast.Int64)
+            )
+            .load()
+            .cast(native_ast.Int64),
         )
 
     def convert_len_native(self, expr):
@@ -133,9 +130,12 @@ class BytesWrapper(RefcountedWrapper):
             cond=expr,
             false=native_ast.const_int_expr(0),
             true=(
-                expr.ElementPtrIntegers(0, 1).ElementPtrIntegers(4)
-                .cast(native_ast.Int32.pointer()).load().cast(native_ast.Int64)
-            )
+                expr.ElementPtrIntegers(0, 1)
+                .ElementPtrIntegers(4)
+                .cast(native_ast.Int32.pointer())
+                .load()
+                .cast(native_ast.Int64)
+            ),
         )
 
     def convert_len(self, context, expr):
@@ -146,10 +146,9 @@ class BytesWrapper(RefcountedWrapper):
             bytes,
             lambda bytesRef: bytesRef.expr.store(
                 runtime_functions.bytes_from_ptr_and_len.call(
-                    native_ast.const_bytes_cstr(s),
-                    native_ast.const_int_expr(len(s))
+                    native_ast.const_bytes_cstr(s), native_ast.const_int_expr(len(s))
                 ).cast(self.layoutType)
-            )
+            ),
         )
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
@@ -160,9 +159,7 @@ class BytesWrapper(RefcountedWrapper):
 
         if target_type.typeRepresentation == Bool:
             context.pushEffect(
-                targetVal.expr.store(
-                    self.convert_len_native(e.nonref_expr).neq(0)
-                )
+                targetVal.expr.store(self.convert_len_native(e.nonref_expr).neq(0))
             )
             return context.constant(True)
 

@@ -15,7 +15,9 @@
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import (
+    BoundCompiledMethodWrapper,
+)
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python import NoneType, Tuple, PointerTo, Int32, Int64, UInt8, Bool
@@ -24,7 +26,9 @@ import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    t
+)
 
 EMPTY = -1
 DELETED = -2
@@ -32,24 +36,30 @@ DELETED = -2
 
 class CPlusPlusStyleMod(CompilableBuiltin):
     def convert_call(self, context, instance, args, kwargs):
-        if len(args) == 2 and args[0].expr_type.typeRepresentation == Int32 and args[1].expr_type.typeRepresentation == Int64:
+        if (
+            len(args) == 2
+            and args[0].expr_type.typeRepresentation == Int32
+            and args[1].expr_type.typeRepresentation == Int64
+        ):
             return context.pushPod(
-                int,
-                args[0].nonref_expr.cast(native_ast.Int64).mod(args[1].nonref_expr)
+                int, args[0].nonref_expr.cast(native_ast.Int64).mod(args[1].nonref_expr)
             )
 
-        if len(args) == 2 and args[0].expr_type.typeRepresentation == Int64 and args[1].expr_type.typeRepresentation == Int64:
-            return context.pushPod(
-                int,
-                args[0].nonref_expr.mod(args[1].nonref_expr)
-            )
+        if (
+            len(args) == 2
+            and args[0].expr_type.typeRepresentation == Int64
+            and args[1].expr_type.typeRepresentation == Int64
+        ):
+            return context.pushPod(int, args[0].nonref_expr.mod(args[1].nonref_expr))
 
         return super().convert_call(context, instance, args, kwargs)
 
 
 def dict_add_slot(instance, itemHash, slot):
-    if (instance._hash_table_count * 2 + 1 > instance._hash_table_size or
-            instance._hash_table_empty_slots < instance._hash_table_size >> 2 + 1):
+    if (
+        instance._hash_table_count * 2 + 1 > instance._hash_table_size
+        or instance._hash_table_empty_slots < instance._hash_table_size >> 2 + 1
+    ):
         instance._resizeTableUnsafe()
 
     if itemHash < 0:
@@ -58,7 +68,10 @@ def dict_add_slot(instance, itemHash, slot):
     offset = CPlusPlusStyleMod(itemHash, instance._hash_table_size)
 
     while True:
-        if instance._hash_table_slots[offset] == EMPTY or instance._hash_table_slots[offset] == DELETED:
+        if (
+            instance._hash_table_slots[offset] == EMPTY
+            or instance._hash_table_slots[offset] == DELETED
+        ):
             if instance._hash_table_slots[offset] == EMPTY:
                 instance._hash_table_empty_slots -= 1
 
@@ -220,7 +233,7 @@ class DictWrapperBase(RefcountedWrapper):
     CAN_BE_NULL = False
 
     def __init__(self, t, behavior):
-        assert hasattr(t, '__typed_python_category__')
+        assert hasattr(t, "__typed_python_category__")
         super().__init__(t if behavior is None else (t, behavior))
 
         self.keyType = typeWrapper(t.KeyType)
@@ -231,32 +244,33 @@ class DictWrapperBase(RefcountedWrapper):
         self.kvBytecount = self.keyType.getBytecount() + self.valueType.getBytecount()
         self.keyBytecount = self.keyType.getBytecount()
 
-        self.layoutType = native_ast.Type.Struct(element_types=(
-            ('refcount', native_ast.Int64),
-            ('items', native_ast.UInt8Ptr),
-            ('items_populated', native_ast.UInt8Ptr),
-            ('items_reserved', native_ast.Int64),
-            ('top_item_slot', native_ast.Int64),
-            ('hash_table_slots', native_ast.Int32Ptr),
-            ('hash_table_hashes', native_ast.Int32Ptr),
-            ('hash_table_size', native_ast.Int64),
-            ('hash_table_count', native_ast.Int64),
-            ('hash_table_empty_slots', native_ast.Int64),
-            ('setdefault', native_ast.Int64)
-        ), name="DictWrapper").pointer()
+        self.layoutType = native_ast.Type.Struct(
+            element_types=(
+                ("refcount", native_ast.Int64),
+                ("items", native_ast.UInt8Ptr),
+                ("items_populated", native_ast.UInt8Ptr),
+                ("items_reserved", native_ast.Int64),
+                ("top_item_slot", native_ast.Int64),
+                ("hash_table_slots", native_ast.Int32Ptr),
+                ("hash_table_hashes", native_ast.Int32Ptr),
+                ("hash_table_size", native_ast.Int64),
+                ("hash_table_count", native_ast.Int64),
+                ("hash_table_empty_slots", native_ast.Int64),
+                ("setdefault", native_ast.Int64),
+            ),
+            name="DictWrapper",
+        ).pointer()
 
     def on_refcount_zero(self, context, instance):
         assert instance.isReference
 
-        return (
-            context.converter.defineNativeFunction(
-                "destructor_" + str(self.typeRepresentation),
-                ('destructor', self),
-                [self],
-                typeWrapper(NoneType),
-                self.generateNativeDestructorFunction
-            ).call(instance)
-        )
+        return context.converter.defineNativeFunction(
+            "destructor_" + str(self.typeRepresentation),
+            ("destructor", self),
+            [self],
+            typeWrapper(NoneType),
+            self.generateNativeDestructorFunction,
+        ).call(instance)
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -268,65 +282,60 @@ class DictWrapper(DictWrapperBase):
 
     def convert_default_initialize(self, context, instance):
         context.pushEffect(
-            instance.expr.store(
-                runtime_functions.dict_create.call().cast(self.layoutType)
-            )
+            instance.expr.store(runtime_functions.dict_create.call().cast(self.layoutType))
         )
 
     def convert_attribute(self, context, expr, attr):
         if attr in (
-                "getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe",
-                "initializeValueByIndexUnsafe", "assignValueByIndexUnsafe",
-                "initializeKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
-                "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault"):
+            "getItemByIndexUnsafe",
+            "getKeyByIndexUnsafe",
+            "getValueByIndexUnsafe",
+            "deleteItemByIndexUnsafe",
+            "initializeValueByIndexUnsafe",
+            "assignValueByIndexUnsafe",
+            "initializeKeyByIndexUnsafe",
+            "_allocateNewSlotUnsafe",
+            "_resizeTableUnsafe",
+            "_compressItemTableUnsafe",
+            "get",
+            "items",
+            "keys",
+            "values",
+            "setdefault",
+        ):
             return expr.changeType(BoundCompiledMethodWrapper(self, attr))
 
-        if attr == '_items_populated':
+        if attr == "_items_populated":
             return context.pushPod(
-                PointerTo(UInt8),
-                expr.nonref_expr.ElementPtrIntegers(0, 2).load()
+                PointerTo(UInt8), expr.nonref_expr.ElementPtrIntegers(0, 2).load()
             )
 
-        if attr == '_items_reserved':
+        if attr == "_items_reserved":
+            return context.pushPod(Int64, expr.nonref_expr.ElementPtrIntegers(0, 3).load())
+
+        if attr == "_hash_table_slots":
             return context.pushPod(
-                Int64,
-                expr.nonref_expr.ElementPtrIntegers(0, 3).load()
+                PointerTo(Int32), expr.nonref_expr.ElementPtrIntegers(0, 5).load()
             )
 
-        if attr == '_hash_table_slots':
+        if attr == "_hash_table_hashes":
             return context.pushPod(
-                PointerTo(Int32),
-                expr.nonref_expr.ElementPtrIntegers(0, 5).load()
+                PointerTo(Int32), expr.nonref_expr.ElementPtrIntegers(0, 6).load()
             )
 
-        if attr == '_hash_table_hashes':
-            return context.pushPod(
-                PointerTo(Int32),
-                expr.nonref_expr.ElementPtrIntegers(0, 6).load()
-            )
+        if attr == "_hash_table_size":
+            return context.pushPod(int, expr.nonref_expr.ElementPtrIntegers(0, 7).load())
 
-        if attr == '_hash_table_size':
-            return context.pushPod(
-                int,
-                expr.nonref_expr.ElementPtrIntegers(0, 7).load()
-            )
+        if attr == "_hash_table_count":
+            return context.pushPod(int, expr.nonref_expr.ElementPtrIntegers(0, 8).load())
 
-        if attr == '_hash_table_count':
-            return context.pushPod(
-                int,
-                expr.nonref_expr.ElementPtrIntegers(0, 8).load()
-            )
-
-        if attr == '_hash_table_empty_slots':
-            return context.pushPod(
-                int,
-                expr.nonref_expr.ElementPtrIntegers(0, 9).load()
-            )
+        if attr == "_hash_table_empty_slots":
+            return context.pushPod(int, expr.nonref_expr.ElementPtrIntegers(0, 9).load())
 
         return super().convert_attribute(context, expr, attr)
 
     def convert_set_attribute(self, context, instance, attr, expr):
-        if attr == '_hash_table_count':
+        if attr == "_hash_table_count":
             val = expr.convert_to_type(int)
             if val is None:
                 return None
@@ -336,7 +345,7 @@ class DictWrapper(DictWrapperBase):
 
             return context.pushVoid()
 
-        if attr == '_hash_table_empty_slots':
+        if attr == "_hash_table_empty_slots":
             val = expr.convert_to_type(int)
             if val is None:
                 return None
@@ -355,15 +364,13 @@ class DictWrapper(DictWrapperBase):
         if methodname == "__iter__" and not args and not kwargs:
             res = context.push(
                 DictKeysIteratorWrapper(self.dictType),
-                lambda instance:
-                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
-                    # we initialize the dict pointer below, so technically
-                    # if that were to throw, this would leak a bad value.
+                lambda instance: instance.expr.ElementPtrIntegers(0, 0).store(-1)
+                # we initialize the dict pointer below, so technically
+                # if that were to throw, this would leak a bad value.
             )
 
             context.pushReference(
-                self,
-                res.expr.ElementPtrIntegers(0, 1)
+                self, res.expr.ElementPtrIntegers(0, 1)
             ).convert_copy_initialize(instance)
 
             return res
@@ -382,7 +389,7 @@ class DictWrapper(DictWrapperBase):
                 context.pushEffect(
                     runtime_functions.dict_compressItemTable.call(
                         instance.nonref_expr.cast(native_ast.VoidPtr),
-                        context.constant(self.kvBytecount)
+                        context.constant(self.kvBytecount),
                     )
                 )
                 return context.pushVoid()
@@ -400,30 +407,38 @@ class DictWrapper(DictWrapperBase):
                     Int32,
                     runtime_functions.dict_allocateNewSlot.call(
                         instance.nonref_expr.cast(native_ast.VoidPtr),
-                        context.constant(self.kvBytecount)
-                    )
+                        context.constant(self.kvBytecount),
+                    ),
                 )
 
         if methodname == "setdefault":
             if len(args) == 1:
                 return context.call_py_function(dict_setdefault, (instance, args[0]), {})
             else:
-                return context.call_py_function(dict_setdefault, (instance, args[0], args[1]), {})
+                return context.call_py_function(
+                    dict_setdefault, (instance, args[0], args[1]), {}
+                )
 
         if len(args) == 1:
             if methodname == "get":
                 return self.convert_getitem(context, instance, args[0])
 
-            if methodname in ("getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe"):
+            if methodname in (
+                "getItemByIndexUnsafe",
+                "getKeyByIndexUnsafe",
+                "getValueByIndexUnsafe",
+                "deleteItemByIndexUnsafe",
+            ):
                 index = args[0].convert_to_type(int)
                 if index is None:
                     return None
 
                 item = context.pushReference(
                     self.itemType,
-                    instance.nonref_expr.ElementPtrIntegers(0, 1).load().cast(
-                        self.itemType.getNativeLayoutType().pointer()
-                    ).elemPtr(index.toInt64().nonref_expr)
+                    instance.nonref_expr.ElementPtrIntegers(0, 1)
+                    .load()
+                    .cast(self.itemType.getNativeLayoutType().pointer())
+                    .elemPtr(index.toInt64().nonref_expr),
                 )
 
                 if methodname == "getItemByIndexUnsafe":
@@ -439,7 +454,7 @@ class DictWrapper(DictWrapperBase):
                     return item.expr_type.refAs(context, item, 1)
 
         if len(args) == 2:
-            if methodname in ("initializeValueByIndexUnsafe", 'assignValueByIndexUnsafe'):
+            if methodname in ("initializeValueByIndexUnsafe", "assignValueByIndexUnsafe"):
                 index = args[0].convert_to_type(int)
                 if index is None:
                     return None
@@ -450,12 +465,13 @@ class DictWrapper(DictWrapperBase):
 
                 item = context.pushReference(
                     self.itemType,
-                    instance.nonref_expr.ElementPtrIntegers(0, 1).load().cast(
-                        self.itemType.getNativeLayoutType().pointer()
-                    ).elemPtr(index.toInt64().nonref_expr)
+                    instance.nonref_expr.ElementPtrIntegers(0, 1)
+                    .load()
+                    .cast(self.itemType.getNativeLayoutType().pointer())
+                    .elemPtr(index.toInt64().nonref_expr),
                 )
 
-                if methodname == 'assignValueByIndexUnsafe':
+                if methodname == "assignValueByIndexUnsafe":
                     item.expr_type.refAs(context, item, 1).convert_assign(value)
                 else:
                     item.expr_type.refAs(context, item, 1).convert_copy_initialize(value)
@@ -473,9 +489,10 @@ class DictWrapper(DictWrapperBase):
 
                 item = context.pushReference(
                     self.itemType,
-                    instance.nonref_expr.ElementPtrIntegers(0, 1).load().cast(
-                        self.itemType.getNativeLayoutType().pointer()
-                    ).elemPtr(index.toInt64().nonref_expr)
+                    instance.nonref_expr.ElementPtrIntegers(0, 1)
+                    .load()
+                    .cast(self.itemType.getNativeLayoutType().pointer())
+                    .elemPtr(index.toInt64().nonref_expr),
                 )
 
                 item.expr_type.refAs(context, item, 0).convert_copy_initialize(key)
@@ -546,9 +563,7 @@ class DictWrapper(DictWrapperBase):
                 return None
 
             return context.call_py_function(
-                dict_contains if op.matches.In else dict_contains_not,
-                (left, right),
-                {}
+                dict_contains if op.matches.In else dict_contains_not, (left, right), {}
             )
 
         return super().convert_bin_op(context, left, op, right, inplace)
@@ -556,34 +571,49 @@ class DictWrapper(DictWrapperBase):
     def convert_getkey_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
             self.keyType,
-            expr.nonref_expr.ElementPtrIntegers(0, 1).load()
-                .elemPtr(item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount)))
-                .cast(self.keyType.getNativeLayoutType().pointer())
+            expr.nonref_expr.ElementPtrIntegers(0, 1)
+            .load()
+            .elemPtr(item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount)))
+            .cast(self.keyType.getNativeLayoutType().pointer()),
         )
 
     def convert_getvalue_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
             self.valueType,
-            expr.nonref_expr.ElementPtrIntegers(0, 1).load()
+            expr.nonref_expr.ElementPtrIntegers(0, 1)
+            .load()
             .elemPtr(
-                item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
-                .add(native_ast.const_int_expr(self.keyBytecount))
-            ).cast(self.valueType.getNativeLayoutType().pointer())
+                item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount)).add(
+                    native_ast.const_int_expr(self.keyBytecount)
+                )
+            )
+            .cast(self.valueType.getNativeLayoutType().pointer()),
         )
 
     def generateNativeDestructorFunction(self, context, out, inst):
         with context.loop(self.convert_items_reserved(context, inst)) as i:
-            with context.ifelse(self.convert_slot_populated_native(inst, i).neq(0)) as (then, otherwise):
+            with context.ifelse(self.convert_slot_populated_native(inst, i).neq(0)) as (
+                then,
+                otherwise,
+            ):
                 with then:
                     self.convert_getkey_by_index_unsafe(context, inst, i).convert_destroy()
                     self.convert_getvalue_by_index_unsafe(context, inst, i).convert_destroy()
 
         context.pushEffect(
-            runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 1).load().cast(native_ast.UInt8Ptr)) >>
-            runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 2).load().cast(native_ast.UInt8Ptr)) >>
-            runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 5).load().cast(native_ast.UInt8Ptr)) >>
-            runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 6).load().cast(native_ast.UInt8Ptr)) >>
-            runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
+            runtime_functions.free.call(
+                inst.nonref_expr.ElementPtrIntegers(0, 1).load().cast(native_ast.UInt8Ptr)
+            )
+            >> runtime_functions.free.call(
+                inst.nonref_expr.ElementPtrIntegers(0, 2).load().cast(native_ast.UInt8Ptr)
+            )
+            >> runtime_functions.free.call(
+                inst.nonref_expr.ElementPtrIntegers(0, 5).load().cast(native_ast.UInt8Ptr)
+            )
+            >> runtime_functions.free.call(
+                inst.nonref_expr.ElementPtrIntegers(0, 6).load().cast(native_ast.UInt8Ptr)
+            )
+            >> runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
         )
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
@@ -594,9 +624,7 @@ class DictWrapper(DictWrapperBase):
 
         if target_type.typeRepresentation == Bool:
             context.pushEffect(
-                targetVal.expr.store(
-                    self.convert_len_native(e.nonref_expr).neq(0)
-                )
+                targetVal.expr.store(self.convert_len_native(e.nonref_expr).neq(0))
             )
             return context.constant(True)
 
@@ -619,13 +647,11 @@ class DictMakeIteratorWrapper(DictWrapperBase):
                 # self.iteratorType is inherited from our specialized children
                 # who pick whether we're an interator over keys, values, items, etc.
                 self.iteratorType,
-                lambda instance:
-                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
+                lambda instance: instance.expr.ElementPtrIntegers(0, 0).store(-1),
             )
 
             context.pushReference(
-                self,
-                res.expr.ElementPtrIntegers(0, 1)
+                self, res.expr.ElementPtrIntegers(0, 1)
             ).convert_copy_initialize(expr)
 
             return res
@@ -663,25 +689,23 @@ class DictIteratorWrapper(Wrapper):
 
     def getNativeLayoutType(self):
         return native_ast.Type.Struct(
-            element_types=(("pos", native_ast.Int64), ("dict", DictWrapper(self.dictType).getNativeLayoutType())),
-            name="const_dict_iterator"
+            element_types=(
+                ("pos", native_ast.Int64),
+                ("dict", DictWrapper(self.dictType).getNativeLayoutType()),
+            ),
+            name="const_dict_iterator",
         )
 
     def convert_next(self, context, expr):
-        nextSlotIx = context.call_py_function(dict_next_slot, (self.refAs(context, expr, 1), self.refAs(context, expr, 0)), {})
+        nextSlotIx = context.call_py_function(
+            dict_next_slot, (self.refAs(context, expr, 1), self.refAs(context, expr, 0)), {}
+        )
 
         if nextSlotIx is None:
             return None, None
 
-        context.pushEffect(
-            expr.expr.ElementPtrIntegers(0, 0).store(
-                nextSlotIx.nonref_expr
-            )
-        )
-        canContinue = context.pushPod(
-            bool,
-            nextSlotIx.nonref_expr.gte(0)
-        )
+        context.pushEffect(expr.expr.ElementPtrIntegers(0, 0).store(nextSlotIx.nonref_expr))
+        canContinue = context.pushPod(bool, nextSlotIx.nonref_expr.gte(0))
 
         nextIx = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
 
@@ -696,9 +720,9 @@ class DictIteratorWrapper(Wrapper):
         if which == 1:
             return context.pushReference(
                 self.dictType,
-                expr.expr
-                    .ElementPtrIntegers(0, 1)
-                    .cast(DictWrapper(self.dictType).getNativeLayoutType().pointer())
+                expr.expr.ElementPtrIntegers(0, 1).cast(
+                    DictWrapper(self.dictType).getNativeLayoutType().pointer()
+                ),
             )
 
     def convert_assign(self, context, expr, other):
@@ -721,11 +745,7 @@ class DictKeysIteratorWrapper(DictIteratorWrapper):
 
     def iteratedItemForReference(self, context, expr, ixExpr):
         return DictWrapper(self.dictType).convert_method_call(
-            context,
-            self.refAs(context, expr, 1),
-            "getKeyByIndexUnsafe",
-            (ixExpr,),
-            {}
+            context, self.refAs(context, expr, 1), "getKeyByIndexUnsafe", (ixExpr,), {}
         )
 
 
@@ -735,11 +755,7 @@ class DictItemsIteratorWrapper(DictIteratorWrapper):
 
     def iteratedItemForReference(self, context, expr, ixExpr):
         return DictWrapper(self.dictType).convert_method_call(
-            context,
-            self.refAs(context, expr, 1),
-            "getItemByIndexUnsafe",
-            (ixExpr,),
-            {}
+            context, self.refAs(context, expr, 1), "getItemByIndexUnsafe", (ixExpr,), {}
         )
 
 
@@ -749,9 +765,5 @@ class DictValuesIteratorWrapper(DictIteratorWrapper):
 
     def iteratedItemForReference(self, context, expr, ixExpr):
         return DictWrapper(self.dictType).convert_method_call(
-            context,
-            self.refAs(context, expr, 1),
-            "getValueByIndexUnsafe",
-            (ixExpr,),
-            {}
+            context, self.refAs(context, expr, 1), "getValueByIndexUnsafe", (ixExpr,), {}
         )

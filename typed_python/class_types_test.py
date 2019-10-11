@@ -18,7 +18,15 @@ import gc
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
-    ListOf, TupleOf, OneOf, NamedTuple, Class, Member, _types, Forward, Final
+    ListOf,
+    TupleOf,
+    OneOf,
+    NamedTuple,
+    Class,
+    Member,
+    _types,
+    Forward,
+    Final,
 )
 
 
@@ -79,10 +87,10 @@ class ClassWithComplexDispatch(Class):
     x = Member(int)
 
     def f(self, x) -> str:
-        return 'x'
+        return "x"
 
     def f(self, y) -> str:  # noqa: F811
-        return 'y'
+        return "y"
 
 
 class NativeClassTypesTests(unittest.TestCase):
@@ -107,9 +115,9 @@ class NativeClassTypesTests(unittest.TestCase):
     def test_class_dispatch_by_name(self):
         c = ClassWithComplexDispatch(x=200)
 
-        self.assertEqual(c.f(10), 'x')
-        self.assertEqual(c.f(x=10), 'x')
-        self.assertEqual(c.f(y=10), 'y')
+        self.assertEqual(c.f(10), "x")
+        self.assertEqual(c.f(x=10), "x")
+        self.assertEqual(c.f(y=10), "y")
 
     def test_nonfinal_classes_require_type_annotations(self):
         # nonfinal classes _MUST_ declare their types, because otherwise
@@ -122,6 +130,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         # not putting 'object' will cause an exception at define time.
         with self.assertRaisesRegex(TypeError, "BadNonfinalClass.f has no return type"):
+
             class BadNonfinalClass(Class):
                 def f(self):
                     return 0
@@ -159,7 +168,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(Interior(x=20, y=10).x, 20)
         self.assertEqual(Interior(x=20, y=10).y, 10)
 
-    def executeInLoop(self, f, duration=.25):
+    def executeInLoop(self, f, duration=0.25):
         memUsage = currentMemUsageMb()
 
         t0 = time.time()
@@ -179,6 +188,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
     def test_class(self):
         with self.assertRaises(TypeError):
+
             class A0(Class):
                 x = Member((1, 2, 3))
 
@@ -300,10 +310,7 @@ class NativeClassTypesTests(unittest.TestCase):
         c = C()
 
         def assertSame(takesCallable):
-            self.assertEqual(
-                takesCallable(c.g),
-                takesCallable(g)
-            )
+            self.assertEqual(takesCallable(c.g), takesCallable(g))
 
         assertSame(lambda formOfG: formOfG(1, 2))
         assertSame(lambda formOfG: formOfG(1, 2, 3))
@@ -354,7 +361,9 @@ class NativeClassTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(AttributeError, "Cannot modify read-only class member"):
             c.x = 20
 
-        with self.assertRaisesRegex(AttributeError, "cannot add attributes to instances of this type"):
+        with self.assertRaisesRegex(
+            AttributeError, "cannot add attributes to instances of this type"
+        ):
             c.z = 20
 
         self.assertEqual(C.x, 10)
@@ -568,18 +577,18 @@ class NativeClassTypesTests(unittest.TestCase):
 
         c = WithLotsOfOperators()
 
-        self.assertEqual(c+0, (c, "add", 0))
-        self.assertEqual(c-0, (c, "sub", 0))
-        self.assertEqual(c*0, (c, "mul", 0))
-        self.assertEqual(c/0, (c, "div", 0))
-        self.assertEqual(c%0, (c, "mod", 0))
-        self.assertEqual(c//0, (c, "floordiv", 0))
-        self.assertEqual(c<<0, (c, "lshift", 0))
-        self.assertEqual(c>>0, (c, "rshift", 0))
-        self.assertEqual(c|0, (c, "or", 0))
-        self.assertEqual(c&0, (c, "and", 0))
-        self.assertEqual(c^0, (c, "xor", 0))
-        self.assertEqual(c@0, (c, "matmul", 0))
+        self.assertEqual(c + 0, (c, "add", 0))
+        self.assertEqual(c - 0, (c, "sub", 0))
+        self.assertEqual(c * 0, (c, "mul", 0))
+        self.assertEqual(c / 0, (c, "div", 0))
+        self.assertEqual(c % 0, (c, "mod", 0))
+        self.assertEqual(c // 0, (c, "floordiv", 0))
+        self.assertEqual(c << 0, (c, "lshift", 0))
+        self.assertEqual(c >> 0, (c, "rshift", 0))
+        self.assertEqual(c | 0, (c, "or", 0))
+        self.assertEqual(c & 0, (c, "and", 0))
+        self.assertEqual(c ^ 0, (c, "xor", 0))
+        self.assertEqual(c @ 0, (c, "matmul", 0))
 
     def test_class_binary_operators_reverse(self):
         class WithLotsOfOperators(Class, Final):
@@ -621,18 +630,18 @@ class NativeClassTypesTests(unittest.TestCase):
 
         c = WithLotsOfOperators()
 
-        self.assertEqual(0+c, (c, "add", 0))
-        self.assertEqual(0-c, (c, "sub", 0))
-        self.assertEqual(0*c, (c, "mul", 0))
-        self.assertEqual(0/c, (c, "div", 0))
-        self.assertEqual(0%c, (c, "mod", 0))
-        self.assertEqual(0//c, (c, "floordiv", 0))
-        self.assertEqual(0<<c, (c, "lshift", 0))
-        self.assertEqual(0>>c, (c, "rshift", 0))
-        self.assertEqual(0|c, (c, "or", 0))
-        self.assertEqual(0&c, (c, "and", 0))
-        self.assertEqual(0^c, (c, "xor", 0))
-        self.assertEqual(0@c, (c, "matmul", 0))
+        self.assertEqual(0 + c, (c, "add", 0))
+        self.assertEqual(0 - c, (c, "sub", 0))
+        self.assertEqual(0 * c, (c, "mul", 0))
+        self.assertEqual(0 / c, (c, "div", 0))
+        self.assertEqual(0 % c, (c, "mod", 0))
+        self.assertEqual(0 // c, (c, "floordiv", 0))
+        self.assertEqual(0 << c, (c, "lshift", 0))
+        self.assertEqual(0 >> c, (c, "rshift", 0))
+        self.assertEqual(0 | c, (c, "or", 0))
+        self.assertEqual(0 & c, (c, "and", 0))
+        self.assertEqual(0 ^ c, (c, "xor", 0))
+        self.assertEqual(0 @ c, (c, "matmul", 0))
 
     def test_class_binary_inplace_operators(self):
         class WithLotsOfOperators(Class, Final):
@@ -726,30 +735,12 @@ class NativeClassTypesTests(unittest.TestCase):
 
         for i in [0, 1, 2, 3]:
             for j in [0, 1, 2, 3]:
-                self.assertEqual(
-                    ClassWithComparisons(i) < ClassWithComparisons(j),
-                    i < j
-                )
-                self.assertEqual(
-                    ClassWithComparisons(i) > ClassWithComparisons(j),
-                    i > j
-                )
-                self.assertEqual(
-                    ClassWithComparisons(i) <= ClassWithComparisons(j),
-                    i <= j
-                )
-                self.assertEqual(
-                    ClassWithComparisons(i) >= ClassWithComparisons(j),
-                    i >= j
-                )
-                self.assertEqual(
-                    ClassWithComparisons(i) == ClassWithComparisons(j),
-                    i == j
-                )
-                self.assertEqual(
-                    ClassWithComparisons(i) != ClassWithComparisons(j),
-                    i != j
-                )
+                self.assertEqual(ClassWithComparisons(i) < ClassWithComparisons(j), i < j)
+                self.assertEqual(ClassWithComparisons(i) > ClassWithComparisons(j), i > j)
+                self.assertEqual(ClassWithComparisons(i) <= ClassWithComparisons(j), i <= j)
+                self.assertEqual(ClassWithComparisons(i) >= ClassWithComparisons(j), i >= j)
+                self.assertEqual(ClassWithComparisons(i) == ClassWithComparisons(j), i == j)
+                self.assertEqual(ClassWithComparisons(i) != ClassWithComparisons(j), i != j)
 
     def test_class_repr_and_str_and_hash(self):
         class ClassWithReprAndStr(Class, Final):
@@ -902,7 +893,10 @@ class NativeClassTypesTests(unittest.TestCase):
             def g(self) -> str:
                 return "BaseB"
 
-        with self.assertRaisesRegex(TypeError, "Can't inherit from multiple base classes that both have members."):
+        with self.assertRaisesRegex(
+            TypeError, "Can't inherit from multiple base classes that both have members."
+        ):
+
             class BaseBoth(BaseA, BaseB):
                 pass
 
@@ -914,7 +908,7 @@ class NativeClassTypesTests(unittest.TestCase):
         class ChildClass(BaseClass):
             z = Member(int)
 
-        self.assertEqual(ChildClass.MemberNames, ('x', 'y', 'z'))
+        self.assertEqual(ChildClass.MemberNames, ("x", "y", "z"))
 
     def test_final_classes(self):
         class BaseClass(Class):
@@ -926,6 +920,9 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertFalse(BaseClass.IsFinal)
         self.assertTrue(ChildClass.IsFinal)
 
-        with self.assertRaisesRegex(Exception, "Can't subclass ChildClass because it's marked 'final'."):
+        with self.assertRaisesRegex(
+            Exception, "Can't subclass ChildClass because it's marked 'final'."
+        ):
+
             class BadClass(ChildClass):
                 pass

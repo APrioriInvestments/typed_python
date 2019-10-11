@@ -72,14 +72,14 @@ class TestOperatorIsCompilation(unittest.TestCase):
             lambda: type is type,
             lambda: type is not int,
             lambda: int is int,
-            lambda: int is not float
+            lambda: int is not float,
         ]
 
         falseLambda = [
             lambda: type is not type,
             lambda: type is int,
             lambda: int is float,
-            lambda: int is not int
+            lambda: int is not int,
         ]
 
         for tl in trueLambdas:

@@ -91,15 +91,15 @@ class TestDictCompilation(unittest.TestCase):
 
         x = Dict(int, str)()
 
-        x[1] = '2'
+        x[1] = "2"
 
-        dict_setitem(x, 1, '3')
+        dict_setitem(x, 1, "3")
 
-        self.assertEqual(x, {1: '3'})
+        self.assertEqual(x, {1: "3"})
 
-        dict_setitem(x, 2, '300')
+        dict_setitem(x, 2, "300")
 
-        self.assertEqual(x, {1: '3', 2: '300'})
+        self.assertEqual(x, {1: "3", 2: "300"})
 
         @Entrypoint
         def dict_setmany(d, count):
@@ -108,7 +108,7 @@ class TestDictCompilation(unittest.TestCase):
 
         dict_setmany(x, 1000)
 
-        self.assertEqual(x, {i: str(i*i) for i in range(1000)})
+        self.assertEqual(x, {i: str(i * i) for i in range(1000)})
 
     def test_adding_to_dicts(self):
         @Entrypoint
@@ -137,13 +137,13 @@ class TestDictCompilation(unittest.TestCase):
             d["hi"] = Dict(str, float)()
             d["hi"]["good"] = 100.0
             d["bye"] = Dict(str, float)()
-            d2 = Dict(str, Dict(str, float))() # noqa
+            d2 = Dict(str, Dict(str, float))()  # noqa
             return d
 
         for _ in range(1000):
             d = f()
 
-        self.assertEqual(d['hi']['good'], 100.0)
+        self.assertEqual(d["hi"]["good"], 100.0)
 
     def test_dict_destructors(self):
         @Entrypoint
@@ -176,6 +176,7 @@ class TestDictCompilation(unittest.TestCase):
         """Check if the dictionary with different types
         supports proper key and type conversion.
         """
+
         @Entrypoint
         def dict_setvalue(d, k, v):
             d[k] = v
@@ -256,7 +257,10 @@ class TestDictCompilation(unittest.TestCase):
         t1 = time.time()
 
         # test it with 2 cores
-        threads = [threading.Thread(target=compiled_setmany, args=(Dict(int, int)(), 10000, 100)) for _ in range(2)]
+        threads = [
+            threading.Thread(target=compiled_setmany, args=(Dict(int, int)(), 10000, 100))
+            for _ in range(2)
+        ]
         t2 = time.time()
         for t in threads:
             t.start()
@@ -266,7 +270,7 @@ class TestDictCompilation(unittest.TestCase):
 
         slowdownRatio = (t3 - t2) / (t1 - t0)
 
-        self.assertGreater(slowdownRatio, .9)
+        self.assertGreater(slowdownRatio, 0.9)
         self.assertLess(slowdownRatio, 1.75)
 
         print("Multicore slowdown factor was ", slowdownRatio)

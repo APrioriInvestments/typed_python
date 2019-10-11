@@ -23,13 +23,7 @@ def Compiled(f):
     return Runtime.singleton().compile(f)
 
 
-someBytes = [
-    b"",
-    b"a",
-    b"as\x00df",
-    b"\x00\x01",
-    b"\x00\x01\x02\x00\x01",
-]
+someBytes = [b"", b"a", b"as\x00df", b"\x00\x01", b"\x00\x01\x02\x00\x01"]
 
 
 class TestBytesCompilation(unittest.TestCase):
@@ -66,13 +60,14 @@ class TestBytesCompilation(unittest.TestCase):
 
         for s in someBytes:
             for s2 in someBytes:
-                self.assertEqual(s+s2, concat(s, s2))
-                self.assertEqual(len(s+s2), concatLen(s, s2))
+                self.assertEqual(s + s2, concat(s, s2))
+                self.assertEqual(len(s + s2), concatLen(s, s2))
 
     def test_bytes_constants(self):
         def makeConstantConcatenator(s):
             def returner():
                 return s
+
             return returner
 
         for s in someBytes:
@@ -94,7 +89,9 @@ class TestBytesCompilation(unittest.TestCase):
 
         for s in someBytes:
             for i in range(-20, 20):
-                self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
+                self.assertEqual(
+                    callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i)
+                )
 
     def test_bytes_perf(self):
         def bytesAdd(x: bytes):
@@ -123,13 +120,12 @@ class TestBytesCompilation(unittest.TestCase):
         self.assertGreater(speedup, 100)
 
     def test_bytes_literals(self):
-
         def f(i: int):
             x = b"abcdefghijklmnopqrstuvwxyz"
             return x[i]
 
         def g(i: int):
-            y = bytes(b'01234567890123456789012345')
+            y = bytes(b"01234567890123456789012345")
             return y[i]
 
         cf = Compiled(f)
@@ -140,13 +136,12 @@ class TestBytesCompilation(unittest.TestCase):
             self.assertEqual(g(i), cg(i))
 
     def test_bytes_conversions(self):
-
         def f(x: Bytes):
             return bytes(x)
 
         cf = Compiled(f)
 
-        for v in [b'123', b'abcdefgh', b'\x00\x01\x02\x00']:
+        for v in [b"123", b"abcdefgh", b"\x00\x01\x02\x00"]:
             self.assertEqual(f(v), cf(v))
 
         # TODO: support this

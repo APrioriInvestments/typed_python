@@ -24,6 +24,7 @@ class PythonFreeObjectWrapper(Wrapper):
     Practically speaking, this object can't do anything except interact
     in the type layer. But if we access its attributes or call it with other
     type-like objects, we can resolve them."""
+
     is_pod = True
     is_empty = True
     is_pass_by_ref = False
@@ -48,14 +49,16 @@ class PythonFreeObjectWrapper(Wrapper):
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_call(self, context, left, args, kwargs):
-        if all([x.expr_type.is_compile_time_constant for x in list(args) + list(kwargs.values())]):
+        if all(
+            [x.expr_type.is_compile_time_constant for x in list(args) + list(kwargs.values())]
+        ):
             try:
                 return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
                     context,
                     self.typeRepresentation.Value(
                         *[a.expr_type.getCompileTimeConstant() for a in args],
-                        **{k: v.expr_type.getCompileTimeConstant() for k, v in kwargs.items()}
-                    )
+                        **{k: v.expr_type.getCompileTimeConstant() for k, v in kwargs.items()},
+                    ),
                 )
             except Exception as e:
                 context.pushException(type(e), str(e))
@@ -66,8 +69,7 @@ class PythonFreeObjectWrapper(Wrapper):
     def convert_attribute(self, context, instance, attribute):
         try:
             return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
-                context,
-                getattr(self.typeRepresentation.Value, attribute)
+                context, getattr(self.typeRepresentation.Value, attribute)
             )
         except Exception as e:
             context.pushException(type(e), str(e))
@@ -80,7 +82,9 @@ class PythonFreeObjectWrapper(Wrapper):
             return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
         if target_type.typeRepresentation == String:
-            targetVal.convert_copy_initialize(context.constant(str(self.typeRepresentation.Value)))
+            targetVal.convert_copy_initialize(
+                context.constant(str(self.typeRepresentation.Value))
+            )
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)

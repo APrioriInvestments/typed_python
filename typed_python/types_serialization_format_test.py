@@ -16,9 +16,17 @@ import unittest
 import struct
 import numpy
 from typed_python import (
-    TupleOf, ListOf, OneOf, Dict,
-    ConstDict, Alternative, Forward,
-    serialize, deserialize, validateSerializedObject, decodeSerializedObject
+    TupleOf,
+    ListOf,
+    OneOf,
+    Dict,
+    ConstDict,
+    Alternative,
+    Forward,
+    serialize,
+    deserialize,
+    validateSerializedObject,
+    decodeSerializedObject,
 )
 
 
@@ -39,9 +47,9 @@ def unsignedVarint(u):
 def signedVarint(s):
     """Encode a signed integer in 'varint' zig-zag encoding (see google protobufs)"""
     if s >= 0:
-        return unsignedVarint(s*2)
+        return unsignedVarint(s * 2)
     else:
-        return unsignedVarint((-s)*2 - 1)
+        return unsignedVarint((-s) * 2 - 1)
 
 
 def EMPTY(fieldNumber):
@@ -166,6 +174,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
 
     The root-level serialization always has an initial fieldNumber of 0.
     """
+
     def test_single_values(self):
         # each value we produce should consist of a single field number (0)
         # encoding a value
@@ -206,7 +215,9 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
         # SINGLE must have a value after it
         self.assertNotEqual(validateSerializedObject(SINGLE(0)), None)
         self.assertNotEqual(validateSerializedObject(SINGLE(0) + VARINT(0)), None)
-        self.assertEqual(validateSerializedObject(SINGLE(0) + VARINT(0) + signedVarint(0)), None)
+        self.assertEqual(
+            validateSerializedObject(SINGLE(0) + VARINT(0) + signedVarint(0)), None
+        )
 
         # BITS must have the right number of bits after it
         self.assertNotEqual(validateSerializedObject(BITS_32(0) + b"aaa"), None)
@@ -221,7 +232,9 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
 
         self.assertEqual(validateSerializedObject(BYTES(0) + unsignedVarint(0)), None)
         self.assertEqual(validateSerializedObject(BYTES(0) + unsignedVarint(2) + b"  "), None)
-        self.assertEqual(validateSerializedObject(BYTES(0) + unsignedVarint(10) + b" " * 10), None)
+        self.assertEqual(
+            validateSerializedObject(BYTES(0) + unsignedVarint(10) + b" " * 10), None
+        )
 
     def test_roundtrip_strings(self):
         # strings are encoded as utf8.
@@ -230,85 +243,89 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
             utfForm = s.encode("utf8")
 
             self.assertEqual(
-                serialize(str, s),
-                BYTES(0) + unsignedVarint(len(utfForm)) + utfForm
+                serialize(str, s), BYTES(0) + unsignedVarint(len(utfForm)) + utfForm
             )
 
             self.assertEqual(
-                deserialize(str, serialize(str, s)).encode('raw_unicode_escape'),
-                s.encode('raw_unicode_escape')
+                deserialize(str, serialize(str, s)).encode("raw_unicode_escape"),
+                s.encode("raw_unicode_escape"),
             )
 
         somePieces = [
-            '',
-            'hi',
-            '\x00',
-            '\xFF',
-            '\u0001',
-            '\u0010',
-            '\u0100',
-            '\uFFFF',
-            '\U00010000',
-            '\U0001FFFF',
-            '\U00020000',
-            '\U0002FFFF',
-            '\U00030000',
-            '\U0003FFFF',
-            '\U00030000',
-            '\U0003FFFF',
-            '\U00040000',
-            '\U000DFFFF',
-            '\U000E0000',
-            '\U000EFFFF',
-            '\U000F0000',
-            '\U0010FFFF',
+            "",
+            "hi",
+            "\x00",
+            "\xFF",
+            "\u0001",
+            "\u0010",
+            "\u0100",
+            "\uFFFF",
+            "\U00010000",
+            "\U0001FFFF",
+            "\U00020000",
+            "\U0002FFFF",
+            "\U00030000",
+            "\U0003FFFF",
+            "\U00030000",
+            "\U0003FFFF",
+            "\U00040000",
+            "\U000DFFFF",
+            "\U000E0000",
+            "\U000EFFFF",
+            "\U000F0000",
+            "\U0010FFFF",
         ]
 
         for s in somePieces:
             test(s)
 
             for s2 in somePieces:
-                test(s+s2)
-                test(s+s2+s)
+                test(s + s2)
+                test(s + s2 + s)
 
     def test_message_decoding(self):
         self.assertEqual(decodeSerializedObject(VARINT(0) + signedVarint(100)), 100)
         self.assertEqual(decodeSerializedObject(EMPTY(0)), [])
-        self.assertEqual(decodeSerializedObject(BYTES(0) + unsignedVarint(4) + b"asdf"), b"asdf")
+        self.assertEqual(
+            decodeSerializedObject(BYTES(0) + unsignedVarint(4) + b"asdf"), b"asdf"
+        )
         self.assertEqual(decodeSerializedObject(BITS_64(0) + floatToBits(1.5)), 1.5)
-        self.assertEqual(decodeSerializedObject(SINGLE(0) + VARINT(100) + signedVarint(-200)), [(100, -200)])
+        self.assertEqual(
+            decodeSerializedObject(SINGLE(0) + VARINT(100) + signedVarint(-200)), [(100, -200)]
+        )
         self.assertEqual(
             decodeSerializedObject(
-                BEGIN_COMPOUND(0) + (
-                    VARINT(100) + signedVarint(-200) +
-                    VARINT(200) + signedVarint(-400)
-                ) + END_COMPOUND()
+                BEGIN_COMPOUND(0)
+                + (VARINT(100) + signedVarint(-200) + VARINT(200) + signedVarint(-400))
+                + END_COMPOUND()
             ),
-            [(100, -200), (200, -400)]
+            [(100, -200), (200, -400)],
         )
 
     def test_message_validation_fuzzer(self):
         def randomMessage(depth=0, maxDepth=8):
             x = numpy.random.uniform()
             k = int((numpy.random.uniform()) * 100)
-            if x < .2 or depth >= maxDepth:
-                return VARINT(k) + signedVarint(int((numpy.random.uniform() - .5) * 1000))
-            if x < .4:
+            if x < 0.2 or depth >= maxDepth:
+                return VARINT(k) + signedVarint(int((numpy.random.uniform() - 0.5) * 1000))
+            if x < 0.4:
                 return BITS_32(k) + b"aaaa"
-            if x < .5:
+            if x < 0.5:
                 return BITS_64(k) + b"aaaabbbb"
-            if x < .6:
+            if x < 0.6:
                 length = int(numpy.random.uniform() * 200)
                 return BYTES(k) + unsignedVarint(length) + b" " * length
-            if x < .7:
+            if x < 0.7:
                 return EMPTY(k)
-            if x < .8:
-                return SINGLE(k) + randomMessage(depth+1, maxDepth)
+            if x < 0.8:
+                return SINGLE(k) + randomMessage(depth + 1, maxDepth)
 
             return (
-                BEGIN_COMPOUND(k) +
-                b"".join([randomMessage(depth+1, maxDepth) for _ in range(numpy.random.choice(5))]) +
-                END_COMPOUND()
+                BEGIN_COMPOUND(k)
+                + b"".join(
+                    [randomMessage(depth + 1, maxDepth) for _ in range(numpy.random.choice(5))]
+                )
+                + END_COMPOUND()
             )
 
         goodSubmessageCount = 0
@@ -342,26 +359,42 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
         # A single element tuple is SINGLE + 0=VARINT + count + 0=VARINT + value
         self.assertEqual(
             serialize(T, T((1,))),
-            BEGIN_COMPOUND(0) + VARINT(0) + unsignedVarint(1) + VARINT(0) + signedVarint(1) + END_COMPOUND()
+            BEGIN_COMPOUND(0)
+            + VARINT(0)
+            + unsignedVarint(1)
+            + VARINT(0)
+            + signedVarint(1)
+            + END_COMPOUND(),
         )
 
         self.assertEqual(
             serialize(T, T((123, 124))),
-            BEGIN_COMPOUND(0) + (
-                VARINT(0) + unsignedVarint(2) +
-                VARINT(0) + signedVarint(123) +
-                VARINT(0) + signedVarint(124)
-            ) + END_COMPOUND()
+            BEGIN_COMPOUND(0)
+            + (
+                VARINT(0)
+                + unsignedVarint(2)
+                + VARINT(0)
+                + signedVarint(123)
+                + VARINT(0)
+                + signedVarint(124)
+            )
+            + END_COMPOUND(),
         )
 
         self.assertEqual(
             serialize(T, T((123, 124, 125))),
-            BEGIN_COMPOUND(0) + (
-                VARINT(0) + unsignedVarint(3) +
-                VARINT(0) + signedVarint(123) +
-                VARINT(0) + signedVarint(124) +
-                VARINT(0) + signedVarint(125)
-            ) + END_COMPOUND()
+            BEGIN_COMPOUND(0)
+            + (
+                VARINT(0)
+                + unsignedVarint(3)
+                + VARINT(0)
+                + signedVarint(123)
+                + VARINT(0)
+                + signedVarint(124)
+                + VARINT(0)
+                + signedVarint(125)
+            )
+            + END_COMPOUND(),
         )
 
     def test_oneof(self):
@@ -374,29 +407,37 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
         self.assertEqual(serialize(T, "HI"), SINGLE(0) + EMPTY(3))
         self.assertEqual(
             serialize(T, (1, 2, 123)),
-            SINGLE(0) + BEGIN_COMPOUND(4) + (
-                VARINT(0) + unsignedVarint(3) +
-                VARINT(0) + signedVarint(1) +
-                VARINT(0) + signedVarint(2) +
-                VARINT(0) + signedVarint(123)
-            ) + END_COMPOUND()
+            SINGLE(0)
+            + BEGIN_COMPOUND(4)
+            + (
+                VARINT(0)
+                + unsignedVarint(3)
+                + VARINT(0)
+                + signedVarint(1)
+                + VARINT(0)
+                + signedVarint(2)
+                + VARINT(0)
+                + signedVarint(123)
+            )
+            + END_COMPOUND(),
         )
 
     def test_alternative(self):
-        A = Alternative(
-            "A",
-            X=dict(a=int),
-            Y=dict(b=float, c=float)
-        )
+        A = Alternative("A", X=dict(a=int), Y=dict(b=float, c=float))
 
         self.assertEqual(
-            serialize(A, A.X(a=10)),
-            SINGLE(0) + SINGLE(0) + VARINT(0) + signedVarint(10)
+            serialize(A, A.X(a=10)), SINGLE(0) + SINGLE(0) + VARINT(0) + signedVarint(10)
         )
 
         self.assertEqual(
             serialize(A, A.Y(b=10, c=20.2)),
-            SINGLE(0) + BEGIN_COMPOUND(1) + BITS_64(0) + floatToBits(10) + BITS_64(1) + floatToBits(20.2) + END_COMPOUND()
+            SINGLE(0)
+            + BEGIN_COMPOUND(1)
+            + BITS_64(0)
+            + floatToBits(10)
+            + BITS_64(1)
+            + floatToBits(20.2)
+            + END_COMPOUND(),
         )
 
     def test_recursive_list(self):
@@ -409,14 +450,22 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
 
         self.assertEqual(
             serialize(L, listInst),
-            BEGIN_COMPOUND(0) + (
-                VARINT(0) + unsignedVarint(0) +  # the ID
-                VARINT(0) + unsignedVarint(2) +  # the size
-                SINGLE(0) + VARINT(0) + signedVarint(10) +
-                SINGLE(0) + SINGLE(1) + (  # a compound object encoding the second element of the one-of
+            BEGIN_COMPOUND(0)
+            + (
+                VARINT(0)
+                + unsignedVarint(0)
+                + VARINT(0)  # the ID
+                + unsignedVarint(2)
+                + SINGLE(0)  # the size
+                + VARINT(0)
+                + signedVarint(10)
+                + SINGLE(0)
+                + SINGLE(1)
+                + (  # a compound object encoding the second element of the one-of
                     VARINT(0) + unsignedVarint(0)  # the ID and nothing else
                 )
-            ) + END_COMPOUND()
+            )
+            + END_COMPOUND(),
         )
 
     def test_const_dict(self):
@@ -424,13 +473,18 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
 
         self.assertEqual(
             serialize(T, T({1: 2, 33: 44})),
-            BEGIN_COMPOUND(0) +
-            VARINT(0) + unsignedVarint(2) +  # for the size
-            VARINT(0) + signedVarint(1) +
-            VARINT(0) + signedVarint(2) +
-            VARINT(0) + signedVarint(33) +
-            VARINT(0) + signedVarint(44) +
-            END_COMPOUND()
+            BEGIN_COMPOUND(0)
+            + VARINT(0)
+            + unsignedVarint(2)
+            + VARINT(0)  # for the size
+            + signedVarint(1)
+            + VARINT(0)
+            + signedVarint(2)
+            + VARINT(0)
+            + signedVarint(33)
+            + VARINT(0)
+            + signedVarint(44)
+            + END_COMPOUND(),
         )
 
     def test_dict(self):
@@ -438,12 +492,18 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
 
         self.assertEqual(
             serialize(T, T({1: 2, 33: 44})),
-            BEGIN_COMPOUND(0) +
-            VARINT(0) + unsignedVarint(0) +  # for the id
-            VARINT(0) + unsignedVarint(2) +  # for the size
-            VARINT(0) + signedVarint(1) +
-            VARINT(0) + signedVarint(2) +
-            VARINT(0) + signedVarint(33) +
-            VARINT(0) + signedVarint(44) +
-            END_COMPOUND()
+            BEGIN_COMPOUND(0)
+            + VARINT(0)
+            + unsignedVarint(0)
+            + VARINT(0)  # for the id
+            + unsignedVarint(2)
+            + VARINT(0)  # for the size
+            + signedVarint(1)
+            + VARINT(0)
+            + signedVarint(2)
+            + VARINT(0)
+            + signedVarint(33)
+            + VARINT(0)
+            + signedVarint(44)
+            + END_COMPOUND(),
         )

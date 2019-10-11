@@ -14,8 +14,18 @@
 import unittest
 
 from typed_python import (
-    TupleOf, OneOf, Alternative, Class, Member,
-    Forward, Int64, NamedTuple, Tuple, Dict, ListOf, ConstDict
+    TupleOf,
+    OneOf,
+    Alternative,
+    Class,
+    Member,
+    Forward,
+    Int64,
+    NamedTuple,
+    Tuple,
+    Dict,
+    ListOf,
+    ConstDict,
 )
 
 
@@ -41,10 +51,7 @@ class NativeForwardTypesTests(unittest.TestCase):
 
     def test_recursive_forwards(self):
         Value = Forward("Value")
-        Value.define(OneOf(
-            None,
-            ConstDict(str, Value)
-        ))
+        Value.define(OneOf(None, ConstDict(str, Value)))
 
     def test_cannot_create_cyclic_forwards(self):
         F0 = Forward("F0")
@@ -71,12 +78,16 @@ class NativeForwardTypesTests(unittest.TestCase):
 
     def test_recursive_alternative(self):
         List = Forward("List")
-        List = List.define(Alternative(
-            "List",
-            Node={'head': int, 'tail': List },
-            Leaf={},
-            unpack=lambda self: () if self.matches.Leaf else (self.head,) + self.tail.unpack()
-        ))
+        List = List.define(
+            Alternative(
+                "List",
+                Node={"head": int, "tail": List},
+                Leaf={},
+                unpack=lambda self: ()
+                if self.matches.Leaf
+                else (self.head,) + self.tail.unpack(),
+            )
+        )
 
         # ensure recursive implementation actually works
         lst = List.Leaf()
@@ -124,11 +135,11 @@ class NativeForwardTypesTests(unittest.TestCase):
 
         str(X)
 
-        anX = X( (None,) )
+        anX = X((None,))
 
         self.assertTrue("Unresolved" not in str(X))
 
-        anotherX = X( (anX, anX) )
+        anotherX = X((anX, anX))
 
         self.assertEqual(anotherX[0], anX)
 
@@ -138,9 +149,9 @@ class NativeForwardTypesTests(unittest.TestCase):
 
         str(X)
 
-        anX = X( ((((None,),),),) )
+        anX = X(((((None,),),),))
 
-        anotherX = X( ((((anX,),),),) )
+        anotherX = X(((((anX,),),),))
 
         self.assertEqual(anotherX[0][0][0][0], anX)
 
@@ -168,13 +179,7 @@ class NativeForwardTypesTests(unittest.TestCase):
 
     def test_recursive_alternatives(self):
         X = Forward("X")
-        X = X.define(
-            Alternative(
-                "X",
-                A=dict(x=X, y=int),
-                B=dict()
-            )
-        )
+        X = X.define(Alternative("X", A=dict(x=X, y=int), B=dict()))
 
         anX = X.A(x=X.B(), y=21)
 
@@ -186,7 +191,10 @@ class NativeForwardTypesTests(unittest.TestCase):
         OneOfTupleOfSelf = OneOfTupleOfSelf.define(OneOf(None, TupleOf(OneOfTupleOfSelf)))
 
         self.assertEqual(OneOfTupleOfSelf.__qualname__, "OneOfTupleOfSelf")
-        self.assertEqual(OneOf(None, TupleOf(OneOfTupleOfSelf)).__qualname__, "OneOf(NoneType, TupleOf(OneOfTupleOfSelf))")
+        self.assertEqual(
+            OneOf(None, TupleOf(OneOfTupleOfSelf)).__qualname__,
+            "OneOf(NoneType, TupleOf(OneOfTupleOfSelf))",
+        )
 
         TO = Forward("TO")
         TO = TO.define(TupleOf(OneOf(None, TO)))

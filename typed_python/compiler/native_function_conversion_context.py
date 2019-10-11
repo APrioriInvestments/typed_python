@@ -22,6 +22,7 @@ class NativeFunctionConversionContext:
     In this case, we know all the types up-front, so we don't need as much infrastructure for tracking
     return types etc.
     """
+
     def __init__(self, converter, input_types, output_type, generatingFunction, identity):
         self.varnames = 0
         self.converter = converter
@@ -61,32 +62,36 @@ class NativeFunctionConversionContext:
             generatingFunction = self._generatingFunction
 
             if output_type.is_pass_by_ref:
-                outputArg = subcontext.inputArg(output_type, '.return')
+                outputArg = subcontext.inputArg(output_type, ".return")
             else:
                 outputArg = None
 
-            inputArgs = [subcontext.inputArg(input_types[i], 'a_%s' % i) if not input_types[i].is_empty
-                         else subcontext.pushPod(input_types[i], native_ast.nullExpr)
-                         for i in range(len(input_types))]
+            inputArgs = [
+                subcontext.inputArg(input_types[i], "a_%s" % i)
+                if not input_types[i].is_empty
+                else subcontext.pushPod(input_types[i], native_ast.nullExpr)
+                for i in range(len(input_types))
+            ]
 
             generatingFunction(subcontext, outputArg, *inputArgs)
 
             native_args = [
-                ('a_%s' % i, input_types[i].getNativePassingType())
-                for i in range(len(input_types)) if not input_types[i].is_empty
+                ("a_%s" % i, input_types[i].getNativePassingType())
+                for i in range(len(input_types))
+                if not input_types[i].is_empty
             ]
 
             if output_type.is_pass_by_ref:
                 # the first argument is actually the output
                 native_output_type = native_ast.Void
-                native_args = [('.return', output_type.getNativePassingType())] + native_args
+                native_args = [(".return", output_type.getNativePassingType())] + native_args
             else:
                 native_output_type = output_type.getNativeLayoutType()
 
             return native_ast.Function(
                 args=native_args,
                 output_type=native_output_type,
-                body=native_ast.FunctionBody.Internal(subcontext.finalize(None))
+                body=native_ast.FunctionBody.Internal(subcontext.finalize(None)),
             )
         except Exception:
             print("Failing function is ", self.identity)

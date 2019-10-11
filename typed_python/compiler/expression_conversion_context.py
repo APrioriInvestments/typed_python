@@ -27,14 +27,16 @@ builtinValueIdToNameAndValue = {id(v): (k, v) for k, v in __builtins__.items()}
 
 NoneExprType = NoneWrapper()
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(
+    t
+)
 
 ExpressionIntermediate = Alternative(
     "ExpressionIntermediate",
     Effect={"expr": native_ast.Expression},
     Terminal={"expr": native_ast.Expression},
     Simple={"name": str, "expr": native_ast.Expression},
-    StackSlot={"name": str, "expr": native_ast.Expression}
+    StackSlot={"name": str, "expr": native_ast.Expression},
 )
 
 _memoizedThingsById = {}
@@ -62,7 +64,9 @@ class ExpressionConversionContext(object):
         return not self.intermediates
 
     def inputArg(self, type, name):
-        return TypedExpression(self, native_ast.Expression.Variable(name), type, type.is_pass_by_ref)
+        return TypedExpression(
+            self, native_ast.Expression.Variable(name), type, type.is_pass_by_ref
+        )
 
     def zero(self, T):
         """Return a TypedExpression matching the Zero form of the native layout of type T.
@@ -88,17 +92,18 @@ class ExpressionConversionContext(object):
 
         return self.push(
             object,
-            lambda oExpr:
-            oExpr.expr.store(
+            lambda oExpr: oExpr.expr.store(
                 runtime_functions.incref_pyobj.call(
                     native_ast.const_uint64_expr(id(x)).cast(native_ast.Void.pointer())
                 )
-            )
+            ),
         )
 
     def constant(self, x):
         if isinstance(x, str):
-            return typed_python.compiler.type_wrappers.string_wrapper.StringWrapper().constant(self, x)
+            return typed_python.compiler.type_wrappers.string_wrapper.StringWrapper().constant(
+                self, x
+            )
         if isinstance(x, bool):
             return TypedExpression(self, native_ast.const_bool_expr(x), bool, False)
         if isinstance(x, int):
@@ -110,15 +115,17 @@ class ExpressionConversionContext(object):
         if x is None:
             return TypedExpression(self, native_ast.nullExpr, type(None), False)
 
-        if id(x) in builtinValueIdToNameAndValue and builtinValueIdToNameAndValue[id(x)][1] is x:
+        if (
+            id(x) in builtinValueIdToNameAndValue
+            and builtinValueIdToNameAndValue[id(x)][1] is x
+        ):
             return self.push(
                 object,
-                lambda oPtr:
-                oPtr.expr.store(
+                lambda oPtr: oPtr.expr.store(
                     runtime_functions.builtin_pyobj_by_name.call(
                         native_ast.const_utf8_cstr(builtinValueIdToNameAndValue[id(x)][0])
                     )
-                )
+                ),
             )
 
         raise Exception(f"Couldn't convert {x} to a constant expression.")
@@ -139,9 +146,7 @@ class ExpressionConversionContext(object):
 
         varname = self.functionContext.let_varname()
 
-        self.intermediates.append(
-            ExpressionIntermediate.Simple(name=varname, expr=expression)
-        )
+        self.intermediates.append(ExpressionIntermediate.Simple(name=varname, expr=expression))
 
         return TypedExpression(self, native_ast.Expression.Variable(varname), type, False)
 
@@ -149,11 +154,11 @@ class ExpressionConversionContext(object):
         """Push an arbitrary expression onto the stack."""
         varname = self.functionContext.let_varname()
 
-        self.intermediates.append(
-            ExpressionIntermediate.Simple(name=varname, expr=expression)
-        )
+        self.intermediates.append(ExpressionIntermediate.Simple(name=varname, expr=expression))
 
-        return TypedExpression(self, native_ast.Expression.Variable(varname), type, isReference)
+        return TypedExpression(
+            self, native_ast.Expression.Variable(varname), type, isReference
+        )
 
     def pushEffect(self, expression):
         """Push a native expression that has a side effect but no value, and that returns control flow."""
@@ -163,9 +168,7 @@ class ExpressionConversionContext(object):
         if expression == native_ast.nullExpr:
             return
 
-        self.intermediates.append(
-            ExpressionIntermediate.Effect(expression)
-        )
+        self.intermediates.append(ExpressionIntermediate.Effect(expression))
 
     def pushReturnValue(self, expression, isMove=False):
         """Push an expression returning 'expression' in the current function context.
@@ -178,10 +181,7 @@ class ExpressionConversionContext(object):
 
         if returnType.is_pass_by_ref:
             returnTarget = TypedExpression(
-                self,
-                native_ast.Expression.Variable(name=".return"),
-                returnType,
-                True
+                self, native_ast.Expression.Variable(name=".return"), returnType, True
             )
 
             if isMove:
@@ -189,19 +189,13 @@ class ExpressionConversionContext(object):
             else:
                 returnTarget.convert_copy_initialize(expression)
 
-            self.pushTerminal(
-                native_ast.Expression.Return(arg=None)
-            )
+            self.pushTerminal(native_ast.Expression.Return(arg=None))
         else:
-            self.pushTerminal(
-                native_ast.Expression.Return(arg=expression.nonref_expr)
-            )
+            self.pushTerminal(native_ast.Expression.Return(arg=expression.nonref_expr))
 
     def pushTerminal(self, expression):
         """Push a native expression that does not return control flow."""
-        self.intermediates.append(
-            ExpressionIntermediate.Terminal(expression)
-        )
+        self.intermediates.append(ExpressionIntermediate.Terminal(expression))
 
     def pushMove(self, typed_expression):
         """Given a typed expression, allocate space for it on the stack and 'move' it
@@ -210,16 +204,14 @@ class ExpressionConversionContext(object):
         return self.push(
             typed_expression.expr_type,
             lambda other: other.expr.store(typed_expression.nonref_expr),
-            wantsTeardown=False
+            wantsTeardown=False,
         )
 
     def let(self, e1, e2):
         v = self.functionContext.let_varname()
 
         return native_ast.Expression.Let(
-            var=v,
-            val=e1,
-            within=e2(native_ast.Expression.Variable(name=v))
+            var=v, val=e1, within=e2(native_ast.Expression.Variable(name=v))
         )
 
     def pushReferenceCopy(self, type, expression):
@@ -237,9 +229,7 @@ class ExpressionConversionContext(object):
 
         varname = self.functionContext.let_varname()
 
-        self.intermediates.append(
-            ExpressionIntermediate.Simple(name=varname, expr=expression)
-        )
+        self.intermediates.append(ExpressionIntermediate.Simple(name=varname, expr=expression))
 
         return TypedExpression(self, native_ast.Expression.Variable(varname), type, True)
 
@@ -252,19 +242,14 @@ class ExpressionConversionContext(object):
             self,
             native_ast.Expression.StackSlot(name=varname, type=type.getNativeLayoutType()),
             type,
-            True
+            True,
         )
 
         if not type.is_pod:
             with self.subcontext() as sc:
                 type.convert_destroy(self, resExpr)
 
-            self.teardowns.append(
-                native_ast.Teardown.ByTag(
-                    tag=varname,
-                    expr=sc.result
-                )
-            )
+            self.teardowns.append(native_ast.Teardown.ByTag(tag=varname, expr=sc.result))
 
         return resExpr
 
@@ -291,7 +276,7 @@ class ExpressionConversionContext(object):
             self,
             native_ast.Expression.StackSlot(name=varname, type=type.getNativeLayoutType()),
             type,
-            True
+            True,
         )
 
         expr = callback(resExpr)
@@ -308,7 +293,9 @@ class ExpressionConversionContext(object):
         self.intermediates.append(
             ExpressionIntermediate.StackSlot(
                 name=varname,
-                expr=expr if not wantsTeardown else expr >> native_ast.Expression.ActivatesTeardown(varname)
+                expr=expr
+                if not wantsTeardown
+                else expr >> native_ast.Expression.ActivatesTeardown(varname),
             )
         )
 
@@ -316,12 +303,7 @@ class ExpressionConversionContext(object):
             with self.subcontext() as sc:
                 type.convert_destroy(self, resExpr)
 
-            self.teardowns.append(
-                native_ast.Teardown.ByTag(
-                    tag=varname,
-                    expr=sc.result
-                )
-            )
+            self.teardowns.append(native_ast.Teardown.ByTag(tag=varname, expr=sc.result))
 
         return resExpr
 
@@ -371,11 +353,10 @@ class ExpressionConversionContext(object):
 
                 self.pushEffect(
                     native_ast.Expression.While(
-                        cond=conditionExpr,
-                        while_true=result,
-                        orelse=native_ast.nullExpr
+                        cond=conditionExpr, while_true=result, orelse=native_ast.nullExpr
                     )
                 )
+
         return Scope()
 
     def loop(self, countExpr):
@@ -385,7 +366,9 @@ class ExpressionConversionContext(object):
                 scope.teardowns = None
 
             def __enter__(scope):
-                scope.counter = self.push(int, lambda counter: counter.expr.store(native_ast.const_int_expr(0)))
+                scope.counter = self.push(
+                    int, lambda counter: counter.expr.store(native_ast.const_int_expr(0))
+                )
 
                 scope.intermediates = self.intermediates
                 scope.teardowns = self.teardowns
@@ -402,12 +385,14 @@ class ExpressionConversionContext(object):
                 self.pushEffect(
                     native_ast.Expression.While(
                         cond=scope.counter.nonref_expr.lt(countExpr.nonref_expr),
-                        while_true=result >> scope.counter.expr.store(
+                        while_true=result
+                        >> scope.counter.expr.store(
                             scope.counter.nonref_expr.add(native_ast.const_int_expr(1))
                         ),
-                        orelse=native_ast.nullExpr
+                        orelse=native_ast.nullExpr,
                     )
                 )
+
         return Scope()
 
     def switch(self, expression, targets, wantsBailout):
@@ -425,13 +410,19 @@ class ExpressionConversionContext(object):
                 scope.target = target
 
             def __enter__(scope):
-                scope.intermediates, self.intermediates = self.intermediates, scope.intermediates
+                scope.intermediates, self.intermediates = (
+                    self.intermediates,
+                    scope.intermediates,
+                )
                 scope.teardowns, self.teardowns = self.teardowns, scope.teardowns
 
             def __exit__(scope, *args):
                 results[scope.target] = self.finalize(None)
 
-                scope.intermediates, self.intermediates = self.intermediates, scope.intermediates
+                scope.intermediates, self.intermediates = (
+                    self.intermediates,
+                    scope.intermediates,
+                )
                 scope.teardowns, self.teardowns = self.teardowns, scope.teardowns
 
         class MainScope:
@@ -447,9 +438,11 @@ class ExpressionConversionContext(object):
 
                     for t in reversed(targets[:-1]):
                         expr = native_ast.Expression.Branch(
-                            cond=expression.cast(native_ast.Int64).eq(native_ast.const_int_expr(t)),
+                            cond=expression.cast(native_ast.Int64).eq(
+                                native_ast.const_int_expr(t)
+                            ),
                             true=results.get(t, native_ast.nullExpr),
-                            false=expr
+                            false=expr,
                         )
 
                     self.pushEffect(expr)
@@ -469,13 +462,19 @@ class ExpressionConversionContext(object):
                 scope.isTrue = isTrue
 
             def __enter__(scope):
-                scope.intermediates, self.intermediates = self.intermediates, scope.intermediates
+                scope.intermediates, self.intermediates = (
+                    self.intermediates,
+                    scope.intermediates,
+                )
                 scope.teardowns, self.teardowns = self.teardowns, scope.teardowns
 
             def __exit__(scope, *args):
                 results[scope.isTrue] = self.finalize(None)
 
-                scope.intermediates, self.intermediates = self.intermediates, scope.intermediates
+                scope.intermediates, self.intermediates = (
+                    self.intermediates,
+                    scope.intermediates,
+                )
                 scope.teardowns, self.teardowns = self.teardowns, scope.teardowns
 
         class MainScope:
@@ -498,9 +497,7 @@ class ExpressionConversionContext(object):
                     else:
                         self.pushEffect(
                             native_ast.Expression.Branch(
-                                cond=condition,
-                                true=true,
-                                false=false
+                                cond=condition, true=true, false=false
                             )
                         )
 
@@ -533,12 +530,15 @@ class ExpressionConversionContext(object):
                 handler=runtime_functions.add_traceback.call(
                     native_ast.const_utf8_cstr(self.functionContext.name),
                     native_ast.const_utf8_cstr(exceptionsTakeFrom.filename),
-                    native_ast.const_int_expr(exceptionsTakeFrom.line_number)
-                ) >> native_ast.Expression.Throw(
-                    expr=native_ast.Expression.Constant(
-                        val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())
-                    )
+                    native_ast.const_int_expr(exceptionsTakeFrom.line_number),
                 )
+                >> native_ast.Expression.Throw(
+                    expr=native_ast.Expression.Constant(
+                        val=native_ast.Constant.NullPointer(
+                            value_type=native_ast.UInt8.pointer()
+                        )
+                    )
+                ),
             )
 
         return expr
@@ -553,35 +553,40 @@ class ExpressionConversionContext(object):
         if returnType.is_pass_by_ref:
             nativeFunType = native_ast.Type.Function(
                 output=native_ast.Void,
-                args=[returnType.getNativePassingType()] + [a.expr_type.getNativePassingType() for a in args],
+                args=[returnType.getNativePassingType()]
+                + [a.expr_type.getNativePassingType() for a in args],
                 varargs=False,
-                can_throw=True
+                can_throw=True,
             )
 
             return self.push(
                 returnType,
-                lambda output_slot:
-                    native_ast.CallTarget.Pointer(expr=funcPtr.cast(nativeFunType.pointer()))
-                    .call(output_slot.expr, *native_args)
+                lambda output_slot: native_ast.CallTarget.Pointer(
+                    expr=funcPtr.cast(nativeFunType.pointer())
+                ).call(output_slot.expr, *native_args),
             )
         else:
             nativeFunType = native_ast.Type.Function(
                 output=returnType.getNativePassingType(),
                 args=[a.expr_type.getNativePassingType() for a in args],
                 varargs=False,
-                can_throw=True
+                can_throw=True,
             )
 
             return self.pushPod(
                 returnType,
-                native_ast.CallTarget.Pointer(expr=funcPtr.cast(nativeFunType.pointer())).call(*native_args)
+                native_ast.CallTarget.Pointer(expr=funcPtr.cast(nativeFunType.pointer())).call(
+                    *native_args
+                ),
             )
 
     def call_py_function(self, f, args, kwargs, returnTypeOverload=None):
         if kwargs:
             raise NotImplementedError("Kwargs not implemented for py-function dispatch yet")
 
-        call_target = self.functionContext.converter.convert(f, [a.expr_type for a in args], returnTypeOverload)
+        call_target = self.functionContext.converter.convert(
+            f, [a.expr_type for a in args], returnTypeOverload
+        )
 
         if call_target is None:
             self.pushException(TypeError, "Function %s was not convertible." % f.__qualname__)
@@ -607,7 +612,7 @@ class ExpressionConversionContext(object):
         if call_target.output_type.is_pass_by_ref:
             return self.push(
                 call_target.output_type,
-                lambda output_slot: call_target.call(output_slot.expr, *native_args)
+                lambda output_slot: call_target.call(output_slot.expr, *native_args),
             )
         else:
             assert call_target.output_type.is_pod
@@ -617,10 +622,7 @@ class ExpressionConversionContext(object):
                     f"{len(call_target.named_call_target.arg_types)} and we got {len(native_args)}"
                 )
 
-            return self.pushPod(
-                call_target.output_type,
-                call_target.call(*native_args)
-            )
+            return self.pushPod(call_target.output_type, call_target.call(*native_args))
 
     def pushComment(self, c):
         self.pushEffect(native_ast.nullExpr.with_comment(c))
@@ -660,9 +662,7 @@ class ExpressionConversionContext(object):
         return self.pushExceptionObject(exceptionVal)
 
     def pushExceptionObject(self, exceptionObject):
-        nativeExpr = (
-            runtime_functions.initialize_exception.call(exceptionObject.nonref_expr)
-        )
+        nativeExpr = runtime_functions.initialize_exception.call(exceptionObject.nonref_expr)
 
         nativeExpr = nativeExpr >> native_ast.Expression.Throw(
             expr=native_ast.Expression.Constant(
@@ -679,11 +679,10 @@ class ExpressionConversionContext(object):
         return TypedExpression(
             self,
             native_ast.Expression.StackSlot(
-                name=name + ".isInitialized",
-                type=native_ast.Bool
+                name=name + ".isInitialized", type=native_ast.Bool
             ),
             bool,
-            isReference=True
+            isReference=True,
         )
 
     def markVariableInitialized(self, varname):
@@ -704,11 +703,18 @@ class ExpressionConversionContext(object):
 
     def recastVariableAsRestrictedType(self, expr, varType):
         if varType is not None and varType != expr.expr_type.typeRepresentation:
-            if getattr(expr.expr_type.typeRepresentation, "__typed_python_category__", None) == "OneOf":
+            if (
+                getattr(expr.expr_type.typeRepresentation, "__typed_python_category__", None)
+                == "OneOf"
+            ):
                 return expr.convert_to_type(varType)
 
-            if getattr(expr.expr_type.typeRepresentation, "__typed_python_category__", None) == "Alternative" and \
-                    getattr(varType, "__typed_python_category__", None) == "ConcreteAlternative":
+            if (
+                getattr(expr.expr_type.typeRepresentation, "__typed_python_category__", None)
+                == "Alternative"
+                and getattr(varType, "__typed_python_category__", None)
+                == "ConcreteAlternative"
+            ):
                 return expr.changeType(varType)
         return expr
 
@@ -725,7 +731,10 @@ class ExpressionConversionContext(object):
 
                 with self.ifelse(isInitExpr) as (true, false):
                     with false:
-                        self.pushException(UnboundLocalError, "local variable '%s' referenced before assignment" % name)
+                        self.pushException(
+                            UnboundLocalError,
+                            "local variable '%s' referenced before assignment" % name,
+                        )
 
             res = self.functionContext.localVariableExpression(self, name)
             if res is None:
@@ -735,7 +744,9 @@ class ExpressionConversionContext(object):
             return self.recastVariableAsRestrictedType(res, varType)
 
         if name in self.functionContext._free_variable_lookup:
-            return pythonObjectRepresentation(self, self.functionContext._free_variable_lookup[name])
+            return pythonObjectRepresentation(
+                self, self.functionContext._free_variable_lookup[name]
+            )
 
         if name in __builtins__:
             return pythonObjectRepresentation(self, __builtins__[name])
@@ -775,6 +786,7 @@ class ExpressionConversionContext(object):
             return pythonObjectRepresentation(self, ast.s)
 
         if ast.matches.BoolOp:
+
             def convertBoolOp(depth=0):
                 with self.subcontext() as sc:
                     value = self.convert_expression_ast(ast.values[depth])
@@ -787,12 +799,20 @@ class ExpressionConversionContext(object):
 
                             if ast.op.matches.And:
                                 sc.expr = native_ast.Expression.Branch(
-                                    cond=value.nonref_expr, true=tail_expr, false=native_ast.falseExpr)
+                                    cond=value.nonref_expr,
+                                    true=tail_expr,
+                                    false=native_ast.falseExpr,
+                                )
                             elif ast.op.matches.Or:
                                 sc.expr = native_ast.Expression.Branch(
-                                    cond=value.nonref_expr, true=native_ast.trueExpr, false=tail_expr)
+                                    cond=value.nonref_expr,
+                                    true=native_ast.trueExpr,
+                                    false=tail_expr,
+                                )
                             else:
-                                raise Exception(f"Unknown kind of Boolean operator: {ast.op.Name}")
+                                raise Exception(
+                                    f"Unknown kind of Boolean operator: {ast.op.Name}"
+                                )
 
                 return sc.result
 
@@ -888,7 +908,12 @@ class ExpressionConversionContext(object):
                     false_res = self.convert_expression_ast(ast.orelse)
 
                 if true_res.expr_type != false_res.expr_type:
-                    out_type = typeWrapper(OneOf(true_res.expr_type.typeRepresentation, false_res.expr_type.typeRepresentation))
+                    out_type = typeWrapper(
+                        OneOf(
+                            true_res.expr_type.typeRepresentation,
+                            false_res.expr_type.typeRepresentation,
+                        )
+                    )
                 else:
                     out_type = true_res.expr_type
 
@@ -918,7 +943,10 @@ class ExpressionConversionContext(object):
                 return
 
             if result.expr_type.typeRepresentation is not String:
-                self.pushException(TypeError, "Expected string, but got %s" % result.expr_type.typeRepresentation)
+                self.pushException(
+                    TypeError,
+                    "Expected string, but got %s" % result.expr_type.typeRepresentation,
+                )
                 return None
 
             return result
@@ -934,7 +962,9 @@ class ExpressionConversionContext(object):
                 if items_to_join.convert_method_call("append", (value,), {}) is None:
                     return None
 
-            return pythonObjectRepresentation(self, "").convert_method_call("join", (items_to_join,), {})
+            return pythonObjectRepresentation(self, "").convert_method_call(
+                "join", (items_to_join,), {}
+            )
 
         raise ConversionException("can't handle python expression type %s" % ast.Name)
 

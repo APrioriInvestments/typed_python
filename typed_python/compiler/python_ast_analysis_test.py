@@ -26,38 +26,36 @@ class TestPythonAstAnalysis(unittest.TestCase):
         assert pyast.matches.FunctionDef or pyast.matches.Lambda, type(pyast)
 
         self.assertEqual(
-            set(python_ast_analysis.computeAssignedVariables(pyast.body)),
-            set(assignedVars)
+            set(python_ast_analysis.computeAssignedVariables(pyast.body)), set(assignedVars)
         )
         self.assertEqual(
-            set(python_ast_analysis.computeReadVariables(pyast.body)),
-            set(readVars)
+            set(python_ast_analysis.computeReadVariables(pyast.body)), set(readVars)
         )
 
     def test_free_vars_basic(self):
-        self.freeVarCheck(lambda: x, ['x'], [])  # noqa
-        self.freeVarCheck(lambda: x + y, ['x', 'y'], [])  # noqa
-        self.freeVarCheck(lambda: f(*args), ['f', 'args'], [])  # noqa
+        self.freeVarCheck(lambda: x, ["x"], [])  # noqa
+        self.freeVarCheck(lambda: x + y, ["x", "y"], [])  # noqa
+        self.freeVarCheck(lambda: f(*args), ["f", "args"], [])  # noqa
 
     def test_assignment_shows_up(self):
         def f():
             x = 10
             return x
 
-        self.freeVarCheck(f, ['x'], ['x'])
+        self.freeVarCheck(f, ["x"], ["x"])
 
     def test_multi_assignment_shows_up(self):
         def f():
             x, y = (1, 2)  # noqa
 
-        self.freeVarCheck(f, [], ['x', 'y'])
+        self.freeVarCheck(f, [], ["x", "y"])
 
     def test_for_loops(self):
         def f():
             for i in 10:
                 pass
 
-        self.freeVarCheck(f, [], ['i'])
+        self.freeVarCheck(f, [], ["i"])
 
     def test_function_defs(self):
         def f():
@@ -67,7 +65,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
             def aFun2(*args, **kwargs):
                 return args + kwargs
 
-        self.freeVarCheck(f, ['y'], ['aFun', 'aFun2'])
+        self.freeVarCheck(f, ["y"], ["aFun", "aFun2"])
 
     def test_class_defs(self):
         def f():
@@ -78,4 +76,4 @@ class TestPythonAstAnalysis(unittest.TestCase):
                 def f(x):
                     return z  # noqa
 
-        self.freeVarCheck(f, ['z'], ['AClass'])
+        self.freeVarCheck(f, ["z"], ["AClass"])

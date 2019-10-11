@@ -31,7 +31,7 @@ from typed_python.python_ast import (
     Arguments,
     Keyword,
     Alias,
-    WithItem
+    WithItem,
 )
 
 nodeTypes = (
@@ -51,7 +51,7 @@ nodeTypes = (
     Arguments,
     Keyword,
     Alias,
-    WithItem
+    WithItem,
 )
 
 
@@ -94,7 +94,9 @@ def computeAssignedVariables(astNode):
         if isinstance(x, Alias):
             variables.add(x)
         if isinstance(x, Expr):
-            if x.matches.Name and (x.ctx.matches.Store or x.ctx.matches.Del or x.ctx.matches.AugStore):
+            if x.matches.Name and (
+                x.ctx.matches.Store or x.ctx.matches.Del or x.ctx.matches.AugStore
+            ):
                 variables.add(x.id)
 
             if x.matches.Lambda:
@@ -175,8 +177,7 @@ def computeReadVariables(astNode):
             if x.matches.FunctionDef:
                 variables.update(
                     # get the variables read by the body
-                    computeReadVariables(x.body)
-                    .union(computeReadVariables(x.returns))
+                    computeReadVariables(x.body).union(computeReadVariables(x.returns))
                     # but remove anything bound by the function scope
                     .difference(
                         computeAssignedVariables(x.body)

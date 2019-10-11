@@ -51,7 +51,13 @@ class NoneWrapper(Wrapper):
         if right.expr_type == self:
             if op.matches.Eq:
                 return context.constant(True)
-            if op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.Gt or op.matches.GtE:
+            if (
+                op.matches.NotEq
+                or op.matches.Lt
+                or op.matches.LtE
+                or op.matches.Gt
+                or op.matches.GtE
+            ):
                 return context.constant(False)
             if op.matches.Is:
                 return context.constant(True)
@@ -67,11 +73,7 @@ class NoneWrapper(Wrapper):
         target_type = targetVal.expr_type
 
         if target_type.typeRepresentation == Bool:
-            context.pushEffect(
-                targetVal.expr.store(
-                    context.constant(False)
-                )
-            )
+            context.pushEffect(targetVal.expr.store(context.constant(False)))
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
