@@ -780,7 +780,6 @@ class TypesSerializationTest(unittest.TestCase):
             sc.serialize(MyFrozenSet())
 
     @pytest.mark.skip(reason="it fails with a coredump")
-    @unittest.skip
     def test_serialize_unicode_1(self):
         endcases = ['', '<\\u>', '<\\\u1234>', '<\n>',
                     '<\\>', '<\\\U00012345>',
@@ -820,7 +819,6 @@ class TypesSerializationTest(unittest.TestCase):
             n = n >> 1
 
     @pytest.mark.skip(reason="it fails")
-    @unittest.skip
     def test_serialize_long(self):
         # 256 bytes is where LONG4 begins.
         for nbits in 1, 8, 8*254, 8*255, 8*256, 8*257:
@@ -856,14 +854,12 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIsInstance(deserializedVal, numpy.float64)
 
     @pytest.mark.skip(reason="it fails")
-    @unittest.skip
     def test_serialize_reduce(self):
         inst = AAA()
         loaded = ping_pong(inst, sc)
         self.assertEqual(loaded, REDUCE_A)
 
     @pytest.mark.skip(reason="fails with: tp_new threw an exception")
-    @unittest.skip
     def test_serialize_getinitargs(self):
         inst = initarg(1, 2)
         loaded = ping_pong(inst)
@@ -875,7 +871,6 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(a.__class__, b.__class__)
 
     @pytest.mark.skip(reason="Didn't even bother")
-    @unittest.skip
     def test_serialize_dynamic_class(self):
         import copyreg
         a = create_dynamic_class("my_dynamic_class", (object,))
@@ -886,7 +881,6 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(type(a), type(b))
 
     @pytest.mark.skip(reason="fails with: TypeError: Classes derived from `tuple` cannot be serialized")
-    @unittest.skip
     def test_serialize_structseq(self):
         import time
         import os
@@ -904,19 +898,16 @@ class TypesSerializationTest(unittest.TestCase):
             self.assert_is_copy(t, u)
 
     @pytest.mark.skip(reason="fails")
-    @unittest.skip
     def test_serialize_ellipsis(self):
         u = ping_pong(...)
         self.assertIs(..., u)
 
     @pytest.mark.skip(reason="fails")
-    @unittest.skip
     def test_serialize_notimplemented(self):
         u = ping_pong(NotImplemented)
         self.assertIs(NotImplemented, u)
 
     @pytest.mark.skip(reason="fails")
-    @unittest.skip
     def test_serialize_singleton_types(self):
         # Issue #6477: Test that types of built-in singletons can be pickled.
         singletons = [None, ..., NotImplemented]
@@ -935,7 +926,6 @@ class TypesSerializationTest(unittest.TestCase):
         self.assert_is_copy(obj, loaded)
 
     @pytest.mark.skip(reason="fails with: AssertionError: 'bar' is not 'bar'")
-    @unittest.skip
     def test_serialize_attribute_name_interning(self):
         # Test that attribute names of pickled objects are interned when
         # unpickling.
