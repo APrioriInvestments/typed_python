@@ -36,6 +36,7 @@ jobs:
 
     - name: "black check"
       script:
+        - pip install black
         - black --check .
 
     - name: "Unit Tests"
