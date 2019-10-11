@@ -34,6 +34,10 @@ jobs:
       script:
         - pipenv check || (sleep 60; pipenv check) || (sleep 60; pipenv check)
 
+    - name: "black check"
+      script:
+        - black --check .
+
     - name: "Unit Tests"
       before_script:
         - ulimit -c unlimited -S       # enable core dumps

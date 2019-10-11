@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.com/APrioriInvestments/typed_python.svg?branch=dev)](https://travis-ci.com/APrioriInvestments/typed_python.svg?branch=dev)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Code Style]("https://img.shields.io/badge/code%20style-black-000000.svg")]("https://img.shields.io/badge/code%20style-black-000000.svg")
 
 # `typed_python`
 
