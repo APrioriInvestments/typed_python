@@ -373,9 +373,9 @@ class TestAlternativeCompilation(unittest.TestCase):
         A2 = Alternative("A2", a={'a': int}, b={'b': str},
                          __str__=lambda self: "my str"
                          )
-        A3 = Alternative("A3", a={'a': int}, b={'b': str},
-                         __format__=lambda self, spec: "my format " + spec
-                         )
+        A3 = Alternative(
+            "A3", a={'a': int}, b={'b': str}, __format__=lambda self, spec: "my format " + spec
+        )
 
         def a1_format(x: A1):
             return format(x)
