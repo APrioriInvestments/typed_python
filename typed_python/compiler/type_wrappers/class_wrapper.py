@@ -812,11 +812,11 @@ class ClassWrapper(RefcountedWrapper):
                         _types.bytecount(self.typeRepresentation.HeldClass) + self.BYTES_BEFORE_INIT_BITS
                     )
                 ).cast(self.getNativeLayoutType())
-            ) >>
+            )
             # store a refcount
-            out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>
+            >> out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1))
             # store the vtable
-            out.expr.load().ElementPtrIntegers(0, 1).store(self.vtableExpr)
+            >> out.expr.load().ElementPtrIntegers(0, 1).store(self.vtableExpr)
         )
 
         # clear bits of init flags
