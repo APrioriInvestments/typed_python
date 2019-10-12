@@ -1,6 +1,7 @@
 [![Build Status](https://travis-ci.com/APrioriInvestments/typed_python.svg?branch=dev)](https://travis-ci.com/APrioriInvestments/typed_python.svg?branch=dev)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
+
 # `typed_python`
 
 The `typed_python` module provides strong runtime types to Python and a compiler

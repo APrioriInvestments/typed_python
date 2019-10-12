@@ -34,7 +34,30 @@ jobs:
       script:
         - pipenv check || (sleep 60; pipenv check) || (sleep 60; pipenv check)
 
-    - name: "Unit Tests"
+    - name: "Unit Tests (3.6)"
+      python: 3.6
+      before_script:
+        - ulimit -c unlimited -S       # enable core dumps
+      script:
+        - pipenv lock --requirements > reqs.txt
+        - pip install -r reqs.txt
+        - sudo apt-get install -y gdb  # install gdb
+        - make testcert.cert
+        - coverage erase
+        - pytest
+        - ls -la
+        - coverage combine
+      after_success:
+        - codecov
+      after_failure:
+        - PYTHON_EXECUTABLE=$(python3 -c "import sys; print(sys.executable)")
+        - COREFILE=$(find . -maxdepth 1 -name "core*" | head -n 1) # find core file
+        - if [[ -f "$COREFILE" ]]; then
+              gdb -c "$COREFILE" $PYTHON_EXECUTABLE -ex "thread apply all bt" -ex "set pagination 0" -batch;
+          fi
+
+    - name: "Unit Tests (3.7.4)"
+      python: 3.7.4
       before_script:
         - ulimit -c unlimited -S       # enable core dumps
       script:

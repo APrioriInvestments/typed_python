@@ -83,7 +83,7 @@ setuptools.setup(
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3 :: Only",
     ],
-
+    python_requires='>=3.6',
     license="Apache Software License v2.0",
 
     include_package_data=True,
