@@ -313,6 +313,8 @@ class TestArithmeticCompilation(unittest.TestCase):
                     # but Float64 when compiled
 
     def test_can_compile_register_operations(self):
+        failed = False
+
         registerTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
 
         def result_or_exception(f, *p):
@@ -386,27 +388,27 @@ class TestArithmeticCompilation(unittest.TestCase):
 
                 for v in suitable_range(T):
                     comparable = True
-                    native_result = result_or_exception(native_op, v)
+                    interpreterResult = result_or_exception(native_op, v)
                     if T.IsSignedInt:
-                        if native_result >= 2**(T.Bits - 1) or native_result < -2**(T.Bits - 1):
+                        if interpreterResult >= 2**(T.Bits - 1) or interpreterResult < -2**(T.Bits - 1):
                             comparable = False
                     elif T.IsUnsignedInt:
-                        if native_result >= 2**T.Bits or native_result < 0:
+                        if interpreterResult >= 2**T.Bits or interpreterResult < 0:
                             comparable = False
-                    typed_result = result_or_exception(op, T(v))
-                    if typed_result == NotImplemented:
-                        typed_result = "exception"
-                    compiled_result = result_or_exception(compiled_op, T(v))
+                    typedPythonResult = result_or_exception(op, T(v))
+                    if typedPythonResult == NotImplemented:
+                        typedPythonResult = "exception"
+                    compilerResult = result_or_exception(compiled_op, T(v))
 
                     self.assertEqual(
-                        type(typed_result), type(compiled_result),
-                        (T, type(typed_result), type(compiled_result), op.__name__)
+                        type(typedPythonResult), type(compilerResult),
+                        (T, type(typedPythonResult), type(compilerResult), op.__name__)
                     )
                     if comparable:
-                        self.assertTrue(equal_result(type(compiled_result)(typed_result), compiled_result),
-                                        (T, op.__name__, typed_result, compiled_result))
-                        self.assertTrue(equal_result(type(compiled_result)(native_result), compiled_result),
-                                        (T, op.__name__, native_result, compiled_result))
+                        self.assertTrue(equal_result(type(compilerResult)(typedPythonResult), compilerResult),
+                                        (T, op.__name__, typedPythonResult, compilerResult))
+                        self.assertTrue(equal_result(type(compilerResult)(interpreterResult), compilerResult),
+                                        (T, op.__name__, interpreterResult, compilerResult))
 
         for T1 in registerTypes:
             for T2 in registerTypes:
@@ -467,7 +469,9 @@ class TestArithmeticCompilation(unittest.TestCase):
                     suitable_ops = [
                         add, sub, mul, div, mod, floordiv,
                         less, greater, lessEq, greaterEq, neq,
-                        bitand, bitor, bitxor, lshift, rshift, pow
+                        bitand, bitor, bitxor,
+                        lshift,
+                        rshift, pow
                     ]
 
                 typed_to_native_op = {
@@ -501,24 +505,27 @@ class TestArithmeticCompilation(unittest.TestCase):
                             if T_result.IsSignedInt:
                                 if signed_overflow(T1, v1) or signed_overflow(T2, v2):
                                     comparable = False
-                            if (op is lshift and v1 != 0 and v2 > 1024) \
+
+                            if (op in (lshift, rshift) and v2 > 1024) \
                                     or (op is pow and (v1 > 1 or v1 < -1) and v2 > 1024):
-                                native_result = "exception"
+                                interpreterResult = "expected to disagree"
                             else:
-                                native_result = result_or_exception(native_op, v1, v2)
+                                interpreterResult = result_or_exception(native_op, v1, v2)
+
                                 T_result = computeArithmeticBinaryResultType(T1, T2)
-                                if native_result == "exception":
+
+                                if interpreterResult == "exception":
                                     pass
-                                elif type(native_result) is complex:
-                                    native_result = "exception"
+                                elif type(interpreterResult) is complex:
+                                    interpreterResult = "expected to disagree"
                                 elif T_result.IsSignedInt:
-                                    if native_result >= 2**(T_result.Bits - 1) or native_result < -2**(T_result.Bits - 1):
+                                    if interpreterResult >= 2**(T_result.Bits - 1) or interpreterResult < -2**(T_result.Bits - 1):
                                         comparable = False
                                 elif T_result.IsUnsignedInt:
-                                    if native_result >= 2**T_result.Bits or native_result < 0:
+                                    if interpreterResult >= 2**T_result.Bits or interpreterResult < 0:
                                         comparable = False
                                 elif T_result.IsFloat:
-                                    if native_result >= 2**128 or native_result <= -2**128:
+                                    if interpreterResult >= 2**128 or interpreterResult <= -2**128:
                                         comparable = False
 
                             native_comparable = comparable
@@ -533,40 +540,53 @@ class TestArithmeticCompilation(unittest.TestCase):
                             if T1 is Int64 and T2 is Int64 and \
                                     ((op is lshift and v1 != 0 and v2 > 1024) or
                                      (op is pow and (v1 > 1 or v1 < -1) and v2 > 1024)):
-                                typed_result = "exception"
+                                typedPythonResult = "expected to disagree"
                             else:
-                                typed_result = result_or_exception(op, T1(v1), T2(v2))
-                                if type(typed_result) in [float, Float32, Float64] and not isfinite(typed_result):
-                                    typed_result = "exception"
-                                if type(typed_result) is complex:
-                                    typed_result = "exception"
-                                if op is pow and type(typed_result) is int:
-                                    typed_result = float(typed_result)
+                                typedPythonResult = result_or_exception(op, T1(v1), T2(v2))
+                                if type(typedPythonResult) in [float, Float32, Float64] and not isfinite(typedPythonResult):
+                                    typedPythonResult = "expected to disagree"
+                                if type(typedPythonResult) is complex:
+                                    typedPythonResult = "expected to disagree"
+                                if op is pow and type(typedPythonResult) is int:
+                                    typedPythonResult = float(typedPythonResult)
 
-                            compiled_result = result_or_exception(compiled_op, T1(v1), T2(v2))
-                            if type(compiled_result) in [float, Float32, Float64] and not isfinite(compiled_result):
-                                compiled_result = "exception"
+                            compilerResult = result_or_exception(compiled_op, T1(v1), T2(v2))
+
+                            if type(compilerResult) in [float, Float32, Float64] and not isfinite(compilerResult):
+                                compilerResult = "expected to disagree"
 
                             # for debugging
-                            # if type(typed_result) != type(compiled_result):
-                            #     print("type mismatch", type(typed_result).__name__, type(compiled_result).__name__)
-                            # if type(typed_result) == type(compiled_result):
-                            #     if comparable and not equal_result(typed_result, compiled_result):
+                            # if type(typedPythonResult) != type(compilerResult):
+                            #     print("type mismatch", type(typedPythonResult).__name__, type(compilerResult).__name__)
+                            # if type(typedPythonResult) == type(compilerResult):
+                            #     if comparable and not equal_result(typedPythonResult, compilerResult):
                             #         print("result mismatch")
                             # try:
-                            #     if native_comparable and not equal_result(type(compiled_result)(native_result), compiled_result):
+                            #     if native_comparable and not equal_result(type(compilerResult)(interpreterResult), compilerResult):
                             #         print("mismatch")
                             # except Exception:
                             #     print("mismatch exception")
 
-                            self.assertEqual(
-                                type(typed_result), type(compiled_result),
-                                (T1, T2, type(typed_result), type(compiled_result), op.__name__)
-                            )
+                            if type(typedPythonResult) != type(compilerResult):
+                                print(
+                                    f"interpreter and compiler types for {op.__name__} on arguments of type "
+                                    f"{T1} and {T2} were not the same. the interpreter gave {type(typedPythonResult)} but"
+                                    f"compiler gave {type(compilerResult)}"
+                                )
 
-                            if comparable:
-                                self.assertTrue(equal_result(type(compiled_result)(typed_result), compiled_result),
-                                                (T1, T2, op.__name__, typed_result, compiled_result))
-                            if native_comparable:
-                                self.assertTrue(equal_result(type(compiled_result)(native_result), compiled_result),
-                                                (T1, T2, op.__name__, native_result, compiled_result))
+                                failed = True
+
+                            if "expected to disagree" not in (typedPythonResult, compilerResult, interpreterResult):
+                                if (comparable and not equal_result(type(compilerResult)(typedPythonResult), compilerResult) or
+                                        native_comparable and not equal_result(type(compilerResult)(interpreterResult), compilerResult)):
+                                    print(
+                                        f"results for {op.__name__} on arguments "
+                                        f"{v1} of type {T1} and {v2} of type {T2} do not agree: "
+                                        f"interpreter gives {interpreterResult}, "
+                                        f"typed_python gave {typedPythonResult}, and "
+                                        f"the compiler gave {compilerResult}"
+                                    )
+
+                                    failed = True
+
+        self.assertFalse(failed)

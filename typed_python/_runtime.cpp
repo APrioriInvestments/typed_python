@@ -433,9 +433,15 @@ extern "C" {
         if (r < 0) {
             throw std::runtime_error("negative shift count");
         }
+
+        if (PY_MINOR_VERSION > 6 && l == 0) {
+            return 0;
+        }
+
         if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
             throw std::runtime_error("shift count too large");
         }
+
         return (l >= 0) ? l << r : -((-l) << r);
     }
 
@@ -968,4 +974,3 @@ extern "C" {
 
 
 }
-
