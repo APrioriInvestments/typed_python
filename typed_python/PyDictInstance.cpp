@@ -436,7 +436,24 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
 
         // there is no value, we need to insert this to the dictionary
         if (!i) {
-            if (extractTypeFrom(ifNotFound->ob_type) == self->type()->valueType()) {
+            if (argsNumber == 1) {
+                if (!valueType->is_default_constructible()) {
+                    throw std::runtime_error("Can't default construct " + valueType->name());
+                }
+
+                // we don't try to convert 'None' directly to a value because in most cases
+                // that wouldn't work, and it's not that useful. Instead, we'll construct
+                // the default item for the set.
+                Instance i(valueType, [&](instance_ptr data) {
+                    valueType->constructor(data);
+                });
+
+                instance_ptr valueTgt = self->type()->insertKey(self->dataPtr(), lookupKey);
+                self->type()->valueType()->copy_constructor(valueTgt, i.data());
+
+                return extractPythonObject(valueTgt, self->type()->valueType());
+            }
+            else if (extractTypeFrom(ifNotFound->ob_type) == self->type()->valueType()) {
                 instance_ptr ifNotFoundValue = ((PyInstance *) (PyObject *) ifNotFound)->dataPtr();
                 instance_ptr valueTgt = self->type()->insertKey(self->dataPtr(), lookupKey);
                 self->type()->valueType()->copy_constructor(valueTgt, ifNotFoundValue);
