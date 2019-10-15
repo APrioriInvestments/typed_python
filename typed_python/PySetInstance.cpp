@@ -35,16 +35,13 @@ void PySetInstance::getDataFromNative(PyTupleOrListOfInstance* src,
 
 PyMethodDef* PySetInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef[9]{{"add", (PyCFunction)PySetInstance::setAdd, METH_VARARGS, NULL},
-                              {"discard", (PyCFunction)PySetInstance::setDiscard, METH_VARARGS,
-                               NULL},
+                              {"discard", (PyCFunction)PySetInstance::setDiscard, METH_VARARGS, NULL},
                               {"remove", (PyCFunction)PySetInstance::setRemove, METH_VARARGS, NULL},
                               {"clear", (PyCFunction)PySetInstance::setClear, METH_VARARGS, NULL},
                               {"copy", (PyCFunction)PySetInstance::setCopy, METH_VARARGS, NULL},
                               {"union", (PyCFunction)PySetInstance::setUnion, METH_VARARGS, NULL},
-                              {"intersection", (PyCFunction)PySetInstance::setIntersection,
-                               METH_VARARGS, NULL},
-                              {"difference", (PyCFunction)PySetInstance::setDifference,
-                               METH_VARARGS, NULL},
+                              {"intersection", (PyCFunction)PySetInstance::setIntersection, METH_VARARGS, NULL},
+                              {"difference", (PyCFunction)PySetInstance::setDifference, METH_VARARGS, NULL},
                               {NULL, NULL}};
 }
 

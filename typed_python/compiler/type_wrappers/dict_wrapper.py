@@ -205,11 +205,36 @@ def dict_setitem(instance, key, value):
         instance.assignValueByIndexUnsafe(slot, value)
 
 
-def dict_setdefault(dict, item, defaultValue=None):
+def dict_setdefault_nodefault(dict, item):
     if item not in dict:
-        # TypeError: Can't convert from type String to type Int64
+        dict[item] = type(dict).ValueType()
+    return dict[item]
+
+
+def dict_setdefault(dict, item, defaultValue):
+    if item not in dict:
         dict[item] = defaultValue
     return dict[item]
+
+
+def dict_pop_nodefault(dict, item):
+    if item not in dict:
+        raise KeyError(item)
+
+    res = dict[item]
+
+    del dict[item]
+
+    return res
+
+
+def dict_pop(dict, item, defaultValue):
+    if item not in dict:
+        return defaultValue
+
+    res = dict[item]
+    del dict[item]
+    return res
 
 
 class DictWrapperBase(RefcountedWrapper):
@@ -278,7 +303,7 @@ class DictWrapper(DictWrapperBase):
                 "getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe",
                 "initializeValueByIndexUnsafe", "assignValueByIndexUnsafe",
                 "initializeKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
-                "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault"):
+                "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault", "pop"):
             return expr.changeType(BoundCompiledMethodWrapper(self, attr))
 
         if attr == '_items_populated':
@@ -406,9 +431,15 @@ class DictWrapper(DictWrapperBase):
 
         if methodname == "setdefault":
             if len(args) == 1:
-                return context.call_py_function(dict_setdefault, (instance, args[0]), {})
+                return context.call_py_function(dict_setdefault_nodefault, (instance, args[0]), {})
             else:
                 return context.call_py_function(dict_setdefault, (instance, args[0], args[1]), {})
+
+        if methodname == "pop":
+            if len(args) == 1:
+                return context.call_py_function(dict_pop_nodefault, (instance, args[0]), {})
+            else:
+                return context.call_py_function(dict_pop, (instance, args[0], args[1]), {})
 
         if len(args) == 1:
             if methodname == "get":

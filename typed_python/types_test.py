@@ -2232,6 +2232,19 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(d.setdefault(3), "")
 
+    def test_mutable_dict_pop(self):
+        d = Dict(int, str)()
+        d[1] = 'a'
+
+        self.assertEqual(d.pop(1), 'a')
+        self.assertNotIn(1, d)
+
+        with self.assertRaisesRegex(KeyError, "10"):
+            d.pop(10)
+
+        with self.assertRaisesRegex(TypeError, "Couldn't initialize type Int64 from str"):
+            d.pop("hihi")
+
     def test_mutable_dict_setdefault_refcount(self):
         d = Dict(int, ListOf(int))()
         aList = ListOf(int)([1, 2, 3])

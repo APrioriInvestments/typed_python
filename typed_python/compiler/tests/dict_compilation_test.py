@@ -172,6 +172,44 @@ class TestDictCompilation(unittest.TestCase):
         self.assertEqual(v2, "b")
         self.assertEqual(x, {1: "a", 2: "b"})
 
+    def test_dict_setdefault_noarg(self):
+        @Entrypoint
+        def dict_setdefault(d, k):
+            return d.setdefault(k)
+
+        x = Dict(int, str)()
+        x[1] = "a"
+
+        # This should not change the dictionary, and return "a"
+        v1 = dict_setdefault(x, 1)
+        self.assertEqual(v1, "a")
+        self.assertEqual(x, {1: "a"})
+
+        # This should set x[2]="" and return ""
+        v2 = dict_setdefault(x, 2)
+        self.assertEqual(v2, "")
+        self.assertEqual(x, {1: "a", 2: ""})
+
+    def test_dict_pop(self):
+        @Entrypoint
+        def dict_pop(d, k):
+            return d.pop(k)
+
+        @Entrypoint
+        def dict_pop_2(d, k, v):
+            return d.pop(k, v)
+
+        d = Dict(int, str)()
+        d[1] = "a"
+        d[2] = "b"
+
+        self.assertEqual(dict_pop(d, 1), 'a')
+        self.assertEqual(dict_pop_2(d, 2, 'asdf'), 'b')
+        self.assertEqual(dict_pop_2(d, 2, 'asdf'), 'asdf')
+
+        with self.assertRaisesRegex(KeyError, "10"):
+            dict_pop(d, 10)
+
     def test_dict_with_different_types(self):
         """Check if the dictionary with different types
         supports proper key and type conversion.

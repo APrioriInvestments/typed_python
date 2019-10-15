@@ -273,12 +273,13 @@ int PyDictInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
 }
 
 PyMethodDef* PyDictInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [6] {
+    return new PyMethodDef [7] {
         {"get", (PyCFunction)PyDictInstance::dictGet, METH_VARARGS, NULL},
         {"items", (PyCFunction)PyDictInstance::dictItems, METH_NOARGS, NULL},
         {"keys", (PyCFunction)PyDictInstance::dictKeys, METH_NOARGS, NULL},
         {"values", (PyCFunction)PyDictInstance::dictValues, METH_NOARGS, NULL},
         {"setdefault", (PyCFunction)PyDictInstance::setDefault, METH_VARARGS, NULL},
+        {"pop", (PyCFunction)PyDictInstance::pop, METH_VARARGS, NULL},
         {NULL, NULL}
     };
 }
@@ -415,7 +416,7 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
         Type *valueType = self->type()->valueType();
 
         if (selfType->getTypeCategory() != Type::TypeCategory::catDict) {
-            throw std::runtime_error("Wrong type!");
+            throw std::runtime_error("Somehow 'self' was not a Dictionary.");
         }
 
         instance_ptr i;
@@ -423,7 +424,7 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
         Instance key;
 
         if (itemType == keyType) {
-            PyInstance *item_w = (PyInstance *) (PyObject *) item;
+            PyInstance *item_w = (PyInstance*)(PyObject*)item;
             lookupKey = item_w->dataPtr();
             i = self->type()->lookupValueByKey(self->dataPtr(), item_w->dataPtr());
         } else {
@@ -472,6 +473,63 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
         // there is this value, we should return the one which is stored
         return extractPythonObject(i, self->type()->valueType());
 
+    });
+}
+
+//static
+PyObject* PyDictInstance::pop(PyObject* o, PyObject* args) {
+    return translateExceptionToPyObject([&]() {
+        const int argsNumber = PyTuple_Size(args);
+
+        if (argsNumber < 1 || argsNumber > 2) {
+            throw std::runtime_error("Dict.pop takes one or two arguments.");
+        }
+
+        PyDictInstance *self = (PyDictInstance *) o;
+
+        /*
+         * The function is called with pop(key, ifNotFound=None)
+         */
+        PyObjectHolder item(PyTuple_GetItem(args, 0));
+        PyObjectHolder ifNotFound(argsNumber == 2 ? PyTuple_GetItem(args, 1) : Py_None);
+
+        Type *selfType = extractTypeFrom(o->ob_type);
+        Type *itemType = extractTypeFrom(item->ob_type);
+
+        Type *keyType = self->type()->keyType();
+        Type *valueType = self->type()->valueType();
+
+        if (selfType->getTypeCategory() != Type::TypeCategory::catDict) {
+            throw std::runtime_error("Somehow 'self' was not a Dictionary.");
+        }
+
+        instance_ptr i;
+        Instance key;
+
+        if (itemType == keyType) {
+            PyInstance *item_w = (PyInstance*)(PyObject*)item;
+            i = self->type()->lookupValueByKey(self->dataPtr(), item_w->dataPtr());
+        } else {
+            key = Instance(keyType, [&](instance_ptr data) {
+                copyConstructFromPythonInstance(keyType, data, item);
+            });
+            i = self->type()->lookupValueByKey(self->dataPtr(), key.data());
+        }
+
+        if (i) {
+            PyObject* result = extractPythonObject(i, valueType);
+
+            self->type()->deleteKey(self->dataPtr(), key.data());
+
+            return result;
+        }
+
+        if (argsNumber == 1) {
+            PyErr_SetObject(PyExc_KeyError, item);
+            throw PythonExceptionSet();
+        }
+
+        return incref((PyObject*)ifNotFound);
     });
 }
 
