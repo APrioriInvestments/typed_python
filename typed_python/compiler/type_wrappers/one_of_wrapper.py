@@ -248,6 +248,9 @@ class OneOfWrapper(Wrapper):
             )
         )
 
+        if self._can_convert_from_type(otherExpr.expr_type, explicit) is True:
+            return context.constant(True)
+
         return didConvert
 
     def generateConvertToSelf(self, context, _, convertIntoPtr, convertFrom, explicit):

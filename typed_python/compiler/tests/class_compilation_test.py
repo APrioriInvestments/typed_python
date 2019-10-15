@@ -717,3 +717,15 @@ class TestClassCompilationCompilation(unittest.TestCase):
         speedup = elapsedDispatch / elapsedNoDispatch
 
         self.assertTrue(.8 < speedup < 1.2, speedup)
+
+    def test_class_return_self(self):
+        class C(Class):
+            def e(self) -> object:
+                return self
+
+        def f(a: C) -> object:
+            return a
+
+        # verify that we don't segfault
+        c_f = Compiled(f)
+        self.assertIsInstance(c_f(C()), C)

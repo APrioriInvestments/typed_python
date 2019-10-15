@@ -146,7 +146,7 @@ class ClassWrapper(RefcountedWrapper):
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
-        return context.constant(False)
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def get_layout_pointer(self, nonref_expr):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.

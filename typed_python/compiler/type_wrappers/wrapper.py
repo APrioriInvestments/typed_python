@@ -339,6 +339,12 @@ class Wrapper(object):
         # if we know with certainty that we can convert, then don't produce the exception
         # code.
         if canConvert is True:
+            if not (succeeded.expr.matches.Constant and succeeded.expr.val.truth_value()):
+                raise Exception(
+                    f"Trying to convert {self} to {target_type}, we "
+                    f"were promised conversion would succeed, but it didn't. Expr was {succeeded.expr}"
+                )
+
             context.markUninitializedSlotInitialized(targetVal)
             return targetVal
 
