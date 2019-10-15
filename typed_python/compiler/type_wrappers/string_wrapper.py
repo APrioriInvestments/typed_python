@@ -60,13 +60,6 @@ class StringWrapper(RefcountedWrapper):
             ('data', native_ast.UInt8)
         ), name='StringLayout').pointer()
 
-    def convert_default_initialize(self, context, target):
-        context.pushEffect(
-            target.expr.store(
-                self.layoutType.zero()
-            )
-        )
-
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:
             return context.push(self, lambda x: x.convert_default_initialize())
@@ -81,6 +74,13 @@ class StringWrapper(RefcountedWrapper):
 
     def getNativeLayoutType(self):
         return self.layoutType
+
+    def convert_default_initialize(self, context, target):
+        context.pushEffect(
+            target.expr.store(
+                self.layoutType.zero()
+            )
+        )
 
     def on_refcount_zero(self, context, instance):
         assert instance.isReference
