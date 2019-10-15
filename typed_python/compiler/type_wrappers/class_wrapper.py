@@ -778,6 +778,14 @@ class ClassWrapper(RefcountedWrapper):
 
         return True
 
+    def convert_getitem(self, context, instance, item):
+        return self.generate_method_call(context, "__getitem__", (instance, item)) \
+            or super().convert_getitem(context, instance, item)
+
+    def convert_setitem(self, context, instance, item, value):
+        return self.generate_method_call(context, "__setitem__", (instance, item, value)) \
+            or super().convert_setitem(context, instance, item, value)
+
     def convert_set_attribute(self, context, instance, attribute, value):
         if not isinstance(attribute, int):
             ix = self.nameToIndex.get(attribute)

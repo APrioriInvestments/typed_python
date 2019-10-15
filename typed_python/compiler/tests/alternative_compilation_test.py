@@ -779,6 +779,43 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = compiled_f(C.a())
             self.assertEqual(r1, r2)
 
+    def test_compile_alternative_getsetitem(self):
+
+        def A2_getitem(self, i):
+            if i not in self.d:
+                return i
+            return self.d[i]
+
+        def A2_setitem(self, i, v):
+            self.d[i] = v
+
+        A2 = Alternative("A2", d={'d': Dict(int, int)},
+                         __getitem__=A2_getitem,
+                         __setitem__=A2_setitem
+                         )
+
+        def f_getitem(a: A2, i: int) -> int:
+            return a[i]
+
+        def f_setitem(a: A2, i: int, v: int):
+            a[i] = v
+
+        c_getitem = Compiled(f_getitem)
+        c_setitem = Compiled(f_setitem)
+
+        a = A2.d()
+        a[123] = 7
+        self.assertEqual(a[123], 7)
+        for i in range(10, 20):
+            self.assertEqual(f_getitem(a, i), i)
+            self.assertEqual(c_getitem(a, i), i)
+            f_setitem(a, i, i + 100)
+            self.assertEqual(f_getitem(a, i), i + 100)
+            self.assertEqual(c_getitem(a, i), i + 100)
+            c_setitem(a, i, i + 200)
+            self.assertEqual(f_getitem(a, i), i + 200)
+            self.assertEqual(c_getitem(a, i), i + 200)
+
     def test_compile_simple_alternative_magic_methods(self):
 
         A = Alternative("A", a={}, b={},

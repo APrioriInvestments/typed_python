@@ -1392,6 +1392,41 @@ class TestClassCompilationCompilation(unittest.TestCase):
                 r2 = compiled_f(v)
                 self.assertEqual(r1, r2)
 
+    def test_compile_class_getsetitem(self):
+
+        class C(Class, Final):
+            d = Member(Dict(int, int))
+
+            def __getitem__(self, i):
+                if i not in self.d:
+                    return i
+                return self.d[i]
+
+            def __setitem__(self, i, v):
+                self.d[i] = v
+
+        def f_getitem(c: C, i: int) -> int:
+            return c[i]
+
+        def f_setitem(c: C, i: int, v: int):
+            c[i] = v
+
+        c_getitem = Compiled(f_getitem)
+        c_setitem = Compiled(f_setitem)
+
+        c = C()
+        c[123] = 7
+        self.assertEqual(c[123], 7)
+        for i in range(10, 20):
+            self.assertEqual(f_getitem(c, i), i)
+            self.assertEqual(c_getitem(c, i), i)
+            f_setitem(c, i, i + 100)
+            self.assertEqual(f_getitem(c, i), i + 100)
+            self.assertEqual(c_getitem(c, i), i + 100)
+            c_setitem(c, i, i + 200)
+            self.assertEqual(f_getitem(c, i), i + 200)
+            self.assertEqual(c_getitem(c, i), i + 200)
+
     def test_compile_class_float_conv(self):
 
         class C0(Class, Final):
