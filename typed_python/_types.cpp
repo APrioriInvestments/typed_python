@@ -525,7 +525,7 @@ PyObject *MakeTypeFor(PyObject* nullValue, PyObject* args) {
         return incref((PyObject*)PyInstance::typeObj(type));
     }
 
-    PyErr_Format(PyExc_TypeError, "Couldn't convert %S to a Type", arg);
+    PyErr_Format(PyExc_TypeError, "Couldn't convert %S to a Type", (PyObject*)arg);
     return NULL;
 }
 
@@ -643,7 +643,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
             PyObjectHolder k4(PyTuple_GetItem(kTup, 4));
 
             if (!PyUnicode_Check(k0)) {
-                PyErr_Format(PyExc_TypeError, "Argument %S has a name which is not a string.", k0);
+                PyErr_Format(PyExc_TypeError, "Argument %S has a name which is not a string.", (PyObject*)k0);
                 return NULL;
             }
 
@@ -657,14 +657,14 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
             }
 
             if ((k3 != Py_True && k3 != Py_False) || (k4 != Py_True && k4 != Py_False)) {
-                PyErr_Format(PyExc_TypeError, "Argument %S has a malformed type tuple", k0);
+                PyErr_Format(PyExc_TypeError, "Argument %S has a malformed type tuple", (PyObject*)k0);
                 return NULL;
             }
 
             PyObject* val = nullptr;
             if (k2 != Py_None) {
                 if (!PyTuple_Check(k2) || PyTuple_Size(k2) != 1) {
-                    PyErr_Format(PyExc_TypeError, "Argument %S has a malformed type tuple", k0);
+                    PyErr_Format(PyExc_TypeError, "Argument %S has a malformed type tuple", (PyObject*)k0);
                     return NULL;
                 }
 

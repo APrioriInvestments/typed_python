@@ -259,11 +259,12 @@ class Codebase:
                 del sys.path_importer_cache[f]
 
         for m, sysmodule in list(sys.modules.items()):
-            if hasattr(sysmodule, '__file__') and any(sysmodule.__file__.startswith(p) for p in paths):
-                del sys.modules[m]
-            elif hasattr(sysmodule, '__path__') and hasattr(sysmodule.__path__, '_path'):
-                if any(any(pathElt.startswith(p) for p in paths) for pathElt in sysmodule.__path__._path):
+            if sysmodule is not None:
+                if getattr(sysmodule, '__file__', None) is not None and any(sysmodule.__file__.startswith(p) for p in paths):
                     del sys.modules[m]
+                elif getattr(sysmodule, '__path__', None) is not None and hasattr(sysmodule.__path__, '_path'):
+                    if any(any(pathElt.startswith(p) for p in paths) for pathElt in sysmodule.__path__._path):
+                        del sys.modules[m]
 
     @staticmethod
     def rootlevelPathFromModule(module):

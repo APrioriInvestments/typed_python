@@ -40,9 +40,9 @@ private:
 public:
     static Instance create(bool val);
 
-    static Instance create(long val);
+    static Instance create(int64_t val);
 
-    static Instance create(unsigned long val);
+    static Instance create(uint64_t val);
 
     static Instance create(double val);
 

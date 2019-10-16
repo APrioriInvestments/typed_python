@@ -36,11 +36,11 @@ Instance Instance::create(bool val) {
     return create(Bool::Make(), (instance_ptr)&val);
 }
 
-Instance Instance::create(long val) {
+Instance Instance::create(int64_t val) {
     return create(Int64::Make(), (instance_ptr)&val);
 }
 
-Instance Instance::create(unsigned long val) {
+Instance Instance::create(uint64_t val) {
     return create(UInt64::Make(), (instance_ptr)&val);
 }
 

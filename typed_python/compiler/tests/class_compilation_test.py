@@ -716,7 +716,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         elapsedNoDispatch = t2 - t1
         speedup = elapsedDispatch / elapsedNoDispatch
 
-        self.assertTrue(.8 < speedup < 1.2, speedup)
+        self.assertTrue(.7 < speedup < 1.3, speedup)
 
     def test_class_return_self(self):
         class C(Class):
