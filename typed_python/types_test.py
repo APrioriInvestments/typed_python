@@ -2453,8 +2453,8 @@ class NativeTypesTests(unittest.TestCase):
         s = Set(str)
         self.assertEqual(s.__qualname__, "Set(String)")
 
-        s1 = Set(int)(1)
-        s2 = Set(int)(1)
+        s1 = Set(int)([1])
+        s2 = Set(int)([1])
         self.assertNotEqual(id(s2), id(s1))
 
     def test_set_len(self):
@@ -2543,19 +2543,21 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(_types.refcount(i), 2)
         s.discard(i)
         self.assertEqual(_types.refcount(i), 1)
-        d['a'] = d['b'] = i
-        self.assertEqual(_types.refcount(i), 3)
+        d['a'] = d['b'] = Set(TupleOf(int))((i,))
+        self.assertEqual(_types.refcount(i), 2)
         d = None
         self.assertEqual(_types.refcount(i), 1)
         s.add(i)
         self.assertEqual(_types.refcount(i), 2)
         d = Dict(str, Set(TupleOf(int)))()
-        d['a'] = d['b'] = i
-        self.assertEqual(_types.refcount(i), 4)
-        s.clear()
+        d['a'] = d['b'] = Set(TupleOf(int))((i,))
         self.assertEqual(_types.refcount(i), 3)
+        s.clear()
+        self.assertEqual(_types.refcount(i), 2)
         del d['a']
         self.assertEqual(_types.refcount(i), 2)
+        del d['b']
+        self.assertEqual(_types.refcount(i), 1)
         d = None
 
         # test several tuple adds into same set
@@ -2663,7 +2665,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(ss, ds)
 
     def test_set_copy(self):
-        s = Set(int)(1)
+        s = Set(int)([1])
         dup = s.copy()
         self.assertEqual(s, dup)
         self.assertNotEqual(id(s), id(dup))
@@ -2692,7 +2694,7 @@ class NativeTypesTests(unittest.TestCase):
             self.assertIn(c, s)
 
     def test_set_ops_throws_diff_type(self):
-        s = Set(int)(1)
+        s = Set(int)([1])
         self.assertRaises(TypeError, s.union, 1.0)
         self.assertRaises(TypeError, s.union, 'hello')
         self.assertRaises(TypeError, s.union, ListOf(str)(['hello']))
@@ -2705,8 +2707,8 @@ class NativeTypesTests(unittest.TestCase):
         self.assertRaises(TypeError, s.difference, [[]])
 
     def test_set_union_refcounts(self):
-        s = Set(int)(1)
-        s2 = Set(int)(2)
+        s = Set(int)([1])
+        s2 = Set(int)([2])
         k = s.union(s2)
         self.assertEqual(_types.refcount(s), 1)
         self.assertEqual(_types.refcount(k), 1)

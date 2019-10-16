@@ -512,39 +512,65 @@ SetType* PySetInstance::type() {
 void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, instance_ptr tgt,
                                                             PyObject* pyRepresentation,
                                                             bool isExplicit) {
-    setType->constructor(tgt);
-    try {
-        if ((PyList_Check(pyRepresentation) || PySet_Check(pyRepresentation)
-             || PyUnicode_Check(pyRepresentation) || PyBytes_Check(pyRepresentation)
-             || PyTuple_Check(pyRepresentation))) {
-            iterate(pyRepresentation, [&](PyObject* item) {
-                Instance key(setType->keyType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(setType->keyType(), data, item);
-                });
+    bool setIsInitialized = false;
 
-                instance_ptr found = setType->lookupKey(tgt, key.data());
-                if (!found) {
-                    setType->insertKey(tgt, key.data());
+    try {
+        Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+
+        if (argType && argType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+            TupleOfType* tupType = (TupleOfType*)argType;
+            instance_ptr tupSelf = ((PyInstance*)pyRepresentation)->dataPtr();
+
+            if (tupType->getEltType() == setType->keyType()) {
+                setType->constructor(tgt);
+                setIsInitialized = true;
+
+                for (long k = 0; k < tupType->count(tupSelf); k++) {
+                    setType->insertKey(tgt, tupType->eltPtr(tupSelf, k));
                 }
-            });
-            return;
-        } else if (PyNumber_Check(pyRepresentation)) {
+
+                return;
+            }
+        }
+
+        if (argType && argType->getTypeCategory() == Type::TypeCategory::catListOf) {
+            ListOfType* listType = (ListOfType*)argType;
+            instance_ptr listSelf = ((PyInstance*)pyRepresentation)->dataPtr();
+
+            if (listType->getEltType() == setType->keyType()) {
+                setType->constructor(tgt);
+                setIsInitialized = true;
+
+                for (long k = 0; k < listType->count(listSelf); k++) {
+                    setType->insertKey(tgt, listType->eltPtr(listSelf, k));
+                }
+
+                return;
+            }
+        }
+
+        setType->constructor(tgt);
+        setIsInitialized = true;
+
+        iterate(pyRepresentation, [&](PyObject* item) {
             Instance key(setType->keyType(), [&](instance_ptr data) {
-                copyConstructFromPythonInstance(setType->keyType(), data, pyRepresentation);
+                copyConstructFromPythonInstance(setType->keyType(), data, item);
             });
 
             instance_ptr found = setType->lookupKey(tgt, key.data());
             if (!found) {
                 setType->insertKey(tgt, key.data());
             }
-            return;
-        }
+        });
+
+        return;
     } catch (...) {
-        setType->destroy(tgt);
+        if (setIsInitialized) {
+            setType->destroy(tgt);
+        }
+
         throw;
     }
-
-    PyInstance::copyConstructFromPythonInstanceConcrete(setType, tgt, pyRepresentation, isExplicit);
 }
 
 int PySetInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
