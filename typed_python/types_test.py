@@ -2521,6 +2521,14 @@ class NativeTypesTests(unittest.TestCase):
             s = Set(int)(i)
             self.assertEqual(len(s), 3)
 
+    def test_set_pop(self):
+        s = Set(int)([1, 2, 3])
+
+        self.assertEqual(sorted([s.pop() for i in range(len(s))]), [1, 2, 3])
+
+        with self.assertRaises(KeyError):
+            s.pop()
+
     def test_set_refcounts(self):
         native_d = Dict(str, Set(int))()
         i = Set(int)()

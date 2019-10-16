@@ -34,7 +34,8 @@ void PySetInstance::getDataFromNative(PyTupleOrListOfInstance* src,
 
 
 PyMethodDef* PySetInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef[9]{{"add", (PyCFunction)PySetInstance::setAdd, METH_VARARGS, NULL},
+    return new PyMethodDef[10]{{"add", (PyCFunction)PySetInstance::setAdd, METH_VARARGS, NULL},
+                              {"pop", (PyCFunction)PySetInstance::setPop, METH_VARARGS, NULL},
                               {"discard", (PyCFunction)PySetInstance::setDiscard, METH_VARARGS, NULL},
                               {"remove", (PyCFunction)PySetInstance::setRemove, METH_VARARGS, NULL},
                               {"clear", (PyCFunction)PySetInstance::setClear, METH_VARARGS, NULL},
@@ -419,6 +420,37 @@ int PySetInstance::sq_contains_concrete(PyObject* item) {
         instance_ptr i = type()->lookupKey(dataPtr(), key.data());
         return i ? 1 : 0;
     }
+}
+
+PyObject* PySetInstance::setPop(PyObject* o, PyObject* args) {
+    PySetInstance* self_w = (PySetInstance*)o;
+    if (PyTuple_Size(args) != 0) {
+        PyErr_SetString(PyExc_TypeError, "Set.pop takes no arguments");
+        return NULL;
+    }
+
+    SetType* self_type = (SetType*)extractTypeFrom(o->ob_type);
+    instance_ptr self_ptr = self_w->dataPtr();
+
+    int iteratorOffset = 0;
+
+    while (iteratorOffset < self_type->slotCount(self_ptr) &&
+                !self_type->slotPopulated(self_ptr, iteratorOffset)) {
+        iteratorOffset++;
+    }
+
+    if (iteratorOffset == self_type->slotCount(self_ptr)) {
+        PyErr_SetString(PyExc_KeyError, "pop from an empty set");
+        return NULL;
+    }
+
+    instance_ptr keyPtr = self_type->keyAtSlot(self_ptr, iteratorOffset);
+
+    PyObject* result = extractPythonObject(keyPtr, self_type->keyType());
+
+    self_type->discard(self_ptr, keyPtr);
+
+    return result;
 }
 
 PyObject* PySetInstance::setAdd(PyObject* o, PyObject* args) {

@@ -24,6 +24,7 @@ class PySetInstance : public PyInstance {
 
     // module definitions
     static PyMethodDef* typeMethodsConcrete(Type* t);
+    static PyObject* setPop(PyObject* o, PyObject* args);
     static PyObject* setAdd(PyObject* o, PyObject* args);
     static PyObject* setContains(PyObject* o, PyObject* args);
     static PyObject* setDiscard(PyObject* o, PyObject* args);
@@ -60,4 +61,3 @@ class PySetInstance : public PyInstance {
     static void getDataFromNative(PyTupleOrListOfInstance* src,
                                   std::function<void(instance_ptr)> func);
 };
-
