@@ -74,6 +74,9 @@ class ClassMetaNamespace:
         self.ns[k] = v
         self.order.append((k, v))
 
+    def get(self, k, default):
+        return self.ns.get(k, default)
+
 
 magicMethodTypes = {
     '__init__': type(None),
