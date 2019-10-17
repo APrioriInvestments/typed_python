@@ -208,11 +208,9 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
 void PythonSerializationContext::serializePyDict(PyObject* o, SerializationBuffer& b) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
-
     uint32_t id;
     bool isNew;
-    std::tie(id, isNew) = b.cachePointer(o, anyPyObjType);
+    std::tie(id, isNew) = b.cachePointer(o);
 
     b.writeUnsignedVarintObject(FieldNumbers::MEMO, id);
 
@@ -239,9 +237,7 @@ PyObject* PythonSerializationContext::deserializePyDict(DeserializationBuffer& b
     PyObjectStealer res(PyDict_New());
 
     if (memo != -1) {
-        static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
-
-        b.addCachedPointer(memo, incref(res), anyPyObjType);
+        b.addCachedPyObj(memo, incref(res));
     }
 
     PyObjectHolder key;
@@ -297,9 +293,7 @@ PyObject* PythonSerializationContext::deserializePyFrozenSet(DeserializationBuff
     }
 
     if (memo != -1) {
-        static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
-
-        b.addCachedPointer(memo, incref(res), anyPyObjType);
+        b.addCachedPyObj(memo, incref(res));
     }
 
     try {
@@ -341,11 +335,9 @@ PyObject* PythonSerializationContext::deserializePyFrozenSet(DeserializationBuff
 void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, SerializationBuffer& b) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
-
     uint32_t id;
     bool isNew;
-    std::tie(id, isNew) = b.cachePointer(o, anyPyObjType);
+    std::tie(id, isNew) = b.cachePointer(o);
 
     b.writeUnsignedVarintObject(FieldNumbers::MEMO, id);
 
@@ -441,9 +433,7 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromName(Deserializ
     }
 
     if (memo != -1) {
-        static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
-
-        b.addCachedPointer(memo, incref(result), anyPyObjType);
+        b.addCachedPyObj(memo, incref(result));
     }
 
     return result;
@@ -455,8 +445,6 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromRepresentation(
     PyObjectHolder factory, factoryArgs;
     PyObjectHolder value;
     PyObjectHolder state;
-
-    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
 
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
         if (fieldNumber == 0) {
@@ -480,7 +468,7 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromRepresentation(
             }
 
             if (memo != -1) {
-                b.addCachedPointer(memo, incref(value), anyPyObjType);
+                b.addCachedPyObj(memo, incref(value));
             }
         }
         else if (fieldNumber == 2) {
@@ -523,8 +511,6 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromTypeAndDict(Des
     PyObjectHolder value;
     PyObjectHolder dict;
 
-    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
-
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
         if (fieldNumber == 0) {
             type.steal(deserializePythonObject(b, wireType));
@@ -545,7 +531,7 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromTypeAndDict(Des
             }
 
             if (memo != -1) {
-                b.addCachedPointer(memo, incref(value), anyPyObjType);
+                b.addCachedPyObj(memo, incref(value));
             }
         }
         if (fieldNumber == 1) {
@@ -756,8 +742,6 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
 
     int category = -1;
 
-    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
-
     std::vector<Type*> types;
     std::vector<std::string> names;
     int64_t whichIndex = -1;
@@ -930,7 +914,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
     }
 
     if (memo != -1) {
-        b.addCachedPointer(memo, incref((PyObject*)PyInstance::typeObj(resultType)), anyPyObjType);
+        b.addCachedPyObj(memo, incref((PyObject*)PyInstance::typeObj(resultType)));
     }
 
     return resultType;
@@ -946,8 +930,6 @@ inline PyObject* PythonSerializationContext::deserializeIndexable(
             ) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
-
     PyObjectHolder res;
     int64_t count = -1;
 
@@ -959,7 +941,7 @@ inline PyObject* PythonSerializationContext::deserializeIndexable(
             res.steal(factory_fn(count));
 
             if (memo != -1) {
-                b.addCachedPointer(memo, incref(res), anyPyObjType);
+                b.addCachedPyObj(memo, incref(res));
             }
         } else {
             if (!res) {
@@ -981,11 +963,9 @@ inline PyObject* PythonSerializationContext::deserializeIndexable(
 void PythonSerializationContext::serializeIterable(PyObject* o, SerializationBuffer& b, size_t fieldNumber) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
-
     uint32_t id;
     bool isNew;
-    std::tie(id, isNew) = b.cachePointer(o, anyPyObjType);
+    std::tie(id, isNew) = b.cachePointer(o);
 
     b.writeUnsignedVarintObject(FieldNumbers::MEMO, id);
 
@@ -1023,8 +1003,6 @@ inline PyObject* PythonSerializationContext::deserializeIterable(
             ) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
-
     PyObjectHolder res;
 
     b.consumeCompoundMessageWithImpliedFieldNumbers(inWireType, [&](size_t fieldNumber, size_t wireType) {
@@ -1036,7 +1014,7 @@ inline PyObject* PythonSerializationContext::deserializeIterable(
             res.steal(factory_fn(NULL));
 
             if (memo != -1) {
-                b.addCachedPointer(memo, incref(res), anyPyObjType);
+                b.addCachedPyObj(memo, incref(res));
             }
         } else {
             PyObjectHolder elt;
@@ -1121,4 +1099,3 @@ std::shared_ptr<ByteBuffer> PythonSerializationContext::compress(uint8_t* begin,
 std::shared_ptr<ByteBuffer> PythonSerializationContext::decompress(uint8_t* begin, uint8_t* end) const {
     return compressOrDecompress(begin, end, false);
 }
-

@@ -19,7 +19,7 @@
 void PythonObjectOfType::repr(instance_ptr self, ReprAccumulator& stream) {
     PyEnsureGilAcquired acquireTheGil;
 
-    PyObject* p = *(PyObject**)self;
+    PyObject* p = getPyObj(self);
 
     PyObjectStealer o(PyObject_Repr(p));
 
@@ -40,8 +40,8 @@ void PythonObjectOfType::repr(instance_ptr self, ReprAccumulator& stream) {
 bool PythonObjectOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     PyEnsureGilAcquired acquireTheGil;
 
-    PyObject* l = *(PyObject**)left;
-    PyObject* r = *(PyObject**)right;
+    PyObject* l = getPyObj(left);
+    PyObject* r = getPyObj(right);
 
     int res = PyObject_RichCompareBool(l, r, pyComparisonOp);
 
@@ -76,7 +76,7 @@ PythonObjectOfType* PythonObjectOfType::Make(PyTypeObject* pyType) {
     if (it == m.end()) {
         it = m.insert(
             std::make_pair(pyType, new PythonObjectOfType(pyType))
-            ).first;
+        ).first;
     }
 
     return it->second;

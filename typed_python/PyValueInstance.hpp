@@ -25,7 +25,8 @@ public:
     static void copyConstructFromPythonInstanceConcrete(Value* v, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         const Instance& elt = v->value();
 
-        if (elt.type()->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType && *(PyObject**)elt.data() == pyRepresentation) {
+        if (elt.type()->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType &&
+            ((PythonObjectOfType*)elt.type())->getPyObj(elt.data()) == pyRepresentation) {
             return;
         }
         else if (compare_to_python(elt.type(), elt.data(), pyRepresentation, isExplicit ? false : true, Py_EQ)) {
@@ -39,7 +40,7 @@ public:
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* valType, PyObject* pyRepresentation, bool isExplicit) {
         if (valType->value().type()->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
-            return *(PyObject**)valType->value().data() == pyRepresentation;
+            return ((PythonObjectOfType*)valType->value().type())->getPyObj(valType->value().data()) == pyRepresentation;
         }
 
         return compare_to_python(valType->value().type(), valType->value().data(), pyRepresentation, true, Py_EQ);

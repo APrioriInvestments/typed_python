@@ -180,6 +180,12 @@ floordiv_float64_float64 = externalCallTarget(
     Float64, Float64
 )
 
+create_pyobj = externalCallTarget(
+    "nativepython_runtime_create_pyobj",
+    Void.pointer(),
+    Void.pointer()
+)
+
 call_pyobj = externalCallTarget(
     "nativepython_runtime_call_pyobj",
     Void.pointer(),
@@ -193,14 +199,8 @@ get_pyobj_None = externalCallTarget(
     Void.pointer()
 )
 
-incref_pyobj = externalCallTarget(
-    "nativepython_runtime_incref_pyobj",
-    Void.pointer(),
-    Void.pointer()
-)
-
-decref_pyobj = externalCallTarget(
-    "nativepython_runtime_decref_pyobj",
+destroy_pyobj_handle = externalCallTarget(
+    "np_destroy_pyobj_handle",
     Void,
     Void.pointer()
 )
@@ -215,22 +215,6 @@ np_repr = externalCallTarget(
 np_str = externalCallTarget(
     "nativepython_runtime_str",
     Void.pointer(),
-    Void.pointer(),
-    UInt64
-)
-
-np_len = externalCallTarget(
-    "nativepython_runtime_len",
-    UInt64,
-    Void.pointer(),
-    UInt64
-)
-
-np_contains = externalCallTarget(
-    "nativepython_runtime_contains",
-    UInt64,
-    Void.pointer(),
-    UInt64,
     Void.pointer(),
     UInt64
 )
@@ -626,13 +610,6 @@ floor_float64 = externalCallTarget(
 
 ceil_float64 = externalCallTarget(
     "nativepython_runtime_ceil_float64",
-    Float64,
-    Float64
-)
-
-np_complex = externalCallTarget(
-    "nativepython_runtime_complex",
-    Void.pointer(),
     Float64,
     Float64
 )

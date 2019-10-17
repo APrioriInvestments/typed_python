@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.typed_expression import TypedExpression
 
 import typed_python.compiler.native_ast as native_ast
@@ -20,7 +20,7 @@ from typed_python.compiler.native_ast import VoidPtr
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
 
-class PythonObjectOfTypeWrapper(Wrapper):
+class PythonObjectOfTypeWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -28,46 +28,36 @@ class PythonObjectOfTypeWrapper(Wrapper):
     def __init__(self, pytype):
         super().__init__(pytype)
 
-    def getNativeLayoutType(self):
-        return native_ast.Type.Void().pointer()
+        self.layoutType = native_ast.Type.Struct(element_types=(
+            ('refcount', native_ast.Int64),
+            ('pyObj', VoidPtr)
+        ), name='PythonObjectOfTypeWrapper').pointer()
 
-    def convert_incref(self, context, expr):
+    def getNativeLayoutType(self):
+        return self.layoutType
+
+    def on_refcount_zero(self, context, instance):
+        assert instance.isReference
+
         context.pushEffect(
-            runtime_functions.incref_pyobj.call(expr.nonref_expr)
+            runtime_functions.destroy_pyobj_handle.call(
+                instance.nonref_expr.cast(VoidPtr)
+            )
         )
 
     def convert_default_initialize(self, context, target):
         if isinstance(None, self.typeRepresentation):
             target.convert_copy_initialize(
-                TypedExpression(context, self, runtime_functions.get_pyobj_None.call(), False)
+                TypedExpression(
+                    context,
+                    self,
+                    runtime_functions.get_pyobj_None.call(),
+                    False
+                ).cast(self.getNativeLayoutType())
             )
             return
 
         context.pushException(TypeError, "Can't default-initialize %s" % self.typeRepresentation.__qualname__)
-
-    def convert_assign(self, context, target, toStore):
-        assert target.isReference
-
-        toStore.convert_incref()
-        target.convert_destroy()
-
-        context.pushEffect(
-            target.expr.store(toStore.nonref_expr)
-        )
-
-    def convert_copy_initialize(self, context, target, toStore):
-        assert target.isReference
-
-        toStore.convert_incref()
-
-        context.pushEffect(
-            target.expr.store(toStore.nonref_expr)
-        )
-
-    def convert_destroy(self, context, instance):
-        context.pushEffect(
-            runtime_functions.decref_pyobj.call(instance.nonref_expr)
-        )
 
     def convert_attribute(self, context, instance, attr):
         assert isinstance(attr, str)
@@ -76,9 +66,9 @@ class PythonObjectOfTypeWrapper(Wrapper):
             lambda targetSlot:
                 targetSlot.expr.store(
                     runtime_functions.getattr_pyobj.call(
-                        instance.nonref_expr,
+                        instance.nonref_expr.cast(VoidPtr),
                         native_ast.const_utf8_cstr(attr)
-                    )
+                    ).cast(self.getNativeLayoutType())
                 )
         )
 
@@ -91,9 +81,9 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         context.pushEffect(
             runtime_functions.setattr_pyobj.call(
-                instance.nonref_expr,
+                instance.nonref_expr.cast(VoidPtr),
                 native_ast.const_utf8_cstr(attr),
-                valAsObj.nonref_expr
+                valAsObj.nonref_expr.cast(VoidPtr)
             )
         )
 
@@ -109,9 +99,9 @@ class PythonObjectOfTypeWrapper(Wrapper):
             lambda targetSlot:
                 targetSlot.expr.store(
                     runtime_functions.getitem_pyobj.call(
-                        instance.nonref_expr,
-                        itemAsObj.nonref_expr
-                    )
+                        instance.nonref_expr.cast(VoidPtr),
+                        itemAsObj.nonref_expr.cast(VoidPtr)
+                    ).cast(self.getNativeLayoutType())
                 )
         )
 
@@ -122,8 +112,8 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         return context.pushEffect(
             runtime_functions.delitem_pyobj.call(
-                instance.nonref_expr,
-                itemAsObj.nonref_expr
+                instance.nonref_expr.cast(VoidPtr),
+                itemAsObj.nonref_expr.cast(VoidPtr)
             )
         )
 
@@ -134,14 +124,15 @@ class PythonObjectOfTypeWrapper(Wrapper):
             if op.matches.Not:
                 return context.pushPod(
                     bool,
-                    tgt.call(l.nonref_expr)
+                    tgt.call(l.nonref_expr.cast(VoidPtr))
                 )
 
             return context.push(
                 object,
                 lambda objPtr:
                 objPtr.expr.store(
-                    tgt.call(l.nonref_expr)
+                    tgt.call(l.nonref_expr.cast(VoidPtr))
+                    .cast(self.getNativeLayoutType())
                 )
             )
 
@@ -162,7 +153,10 @@ class PythonObjectOfTypeWrapper(Wrapper):
                 object,
                 lambda objPtr:
                 objPtr.expr.store(
-                    tgt.call(l.nonref_expr, rAsObj.nonref_expr)
+                    tgt.call(
+                        l.nonref_expr.cast(VoidPtr),
+                        rAsObj.nonref_expr.cast(VoidPtr)
+                    ).cast(self.getNativeLayoutType())
                 )
             )
 
@@ -186,9 +180,9 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         context.pushEffect(
             runtime_functions.setitem_pyobj.call(
-                instance.nonref_expr,
-                indexAsObj.nonref_expr,
-                valueAsObj.nonref_expr
+                instance.nonref_expr.cast(VoidPtr),
+                indexAsObj.nonref_expr.cast(VoidPtr),
+                valueAsObj.nonref_expr.cast(VoidPtr)
             )
         )
 
@@ -216,10 +210,10 @@ class PythonObjectOfTypeWrapper(Wrapper):
         kwarguments = []
 
         for a in argsAsObjects:
-            arguments.append(a.nonref_expr)
+            arguments.append(a.nonref_expr.cast(VoidPtr))
 
         for kwargName, kwargVal in kwargsAsObjects.items():
-            kwarguments.append(kwargVal.nonref_expr)
+            kwarguments.append(kwargVal.nonref_expr.cast(VoidPtr))
             kwarguments.append(native_ast.const_utf8_cstr(kwargName))
 
         return context.push(
@@ -227,12 +221,12 @@ class PythonObjectOfTypeWrapper(Wrapper):
             lambda oPtr:
                 oPtr.expr.store(
                     runtime_functions.call_pyobj.call(
-                        instance.nonref_expr,
+                        instance.nonref_expr.cast(VoidPtr),
                         native_ast.const_int_expr(len(arguments)),
                         native_ast.const_int_expr(len(kwargsAsObjects)),
                         *arguments,
                         *kwarguments,
-                    )
+                    ).cast(self.getNativeLayoutType())
                 )
         )
 
@@ -242,7 +236,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
             lambda outLen:
             outLen.expr.store(
                 runtime_functions.pyobj_len.call(
-                    instance.nonref_expr
+                    instance.nonref_expr.cast(VoidPtr)
                 )
             )
         )
@@ -291,6 +285,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
             context.pushEffect(
                 targetVal.expr.store(
                     runtime_functions.to_pyobj.call(sourceVal.expr.cast(VoidPtr), tp)
+                    .cast(self.getNativeLayoutType())
                 )
             )
             return context.constant(True)

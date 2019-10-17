@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class
+from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, _types
 from typed_python.compiler.runtime import Runtime, Entrypoint
 import unittest
 import traceback
@@ -524,3 +524,24 @@ class TestCompilationStructures(unittest.TestCase):
         # which would get rid of some of the extra code we're generating.
         self.assertTrue(1.0 <= ratio <= 2.0, ratio)
         print(f"Deeper call tree code was {ratio} times slow.")
+
+    def test_exception_handling_preserves_refcount(self):
+        @Entrypoint
+        def f(x, shouldThrow):
+            # this will increment the 'x' refcount
+            y = x  # noqa
+            if shouldThrow:
+                raise Exception("exception")
+
+        aList = ListOf(int)()
+
+        self.assertEqual(_types.refcount(aList), 1)
+
+        f(aList, False)
+
+        self.assertEqual(_types.refcount(aList), 1)
+
+        with self.assertRaises(Exception):
+            f(aList, True)
+
+        self.assertEqual(_types.refcount(aList), 1)

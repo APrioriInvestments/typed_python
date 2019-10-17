@@ -373,7 +373,6 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             return True if x else False
 
         for T, x in test_cases:
-
             @Compiled
             def compiled_cast(x: T) -> bool:
                 return bool(x)

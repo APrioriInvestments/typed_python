@@ -48,6 +48,10 @@ public:
                 }
             });
         }
+
+        for (auto p: m_pyobj_needs_decref) {
+            decref(p);
+        }
     }
 
     DeserializationBuffer(const DeserializationBuffer&) = delete;
@@ -372,6 +376,23 @@ public:
         return ptr;
     }
 
+    PyObject* addCachedPyObj(int32_t which, PyObject* ptr) {
+        if (!ptr) {
+            throw std::runtime_error("Corrupt data: can't write a null cache pointer.");
+        }
+        while (which >= m_cachedPointers.size()) {
+            m_cachedPointers.push_back(nullptr);
+        }
+        if (m_cachedPointers[which]) {
+            throw std::runtime_error("Corrupt data: tried to write a recursive object multiple times");
+        }
+        m_cachedPointers[which] = (void*)ptr;
+
+        m_pyobj_needs_decref.push_back(ptr);
+
+        return ptr;
+    }
+
     void skipNextEncodedValue() {
         throw std::runtime_error("not implemented yet");
     }
@@ -544,4 +565,6 @@ private:
     //object (e.g. PyObject, Dict, etc). We pass a pointer to this
     //as the actual instance to the 'destroy' operation
     std::map<Type*, std::vector<void*> > m_needs_decref;
+
+    std::vector<PyObject*> m_pyobj_needs_decref;
 };

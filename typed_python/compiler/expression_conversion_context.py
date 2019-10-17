@@ -90,9 +90,9 @@ class ExpressionConversionContext(object):
             object,
             lambda oExpr:
             oExpr.expr.store(
-                runtime_functions.incref_pyobj.call(
+                runtime_functions.create_pyobj.call(
                     native_ast.const_uint64_expr(id(x)).cast(native_ast.Void.pointer())
-                )
+                ).cast(oExpr.expr_type.getNativeLayoutType())
             )
         )
 
@@ -117,7 +117,7 @@ class ExpressionConversionContext(object):
                 oPtr.expr.store(
                     runtime_functions.builtin_pyobj_by_name.call(
                         native_ast.const_utf8_cstr(builtinValueIdToNameAndValue[id(x)][0])
-                    )
+                    ).cast(oPtr.expr_type.getNativeLayoutType())
                 )
             )
 
@@ -661,7 +661,9 @@ class ExpressionConversionContext(object):
 
     def pushExceptionObject(self, exceptionObject):
         nativeExpr = (
-            runtime_functions.initialize_exception.call(exceptionObject.nonref_expr)
+            runtime_functions.initialize_exception.call(
+                exceptionObject.nonref_expr.cast(native_ast.VoidPtr)
+            )
         )
 
         nativeExpr = nativeExpr >> native_ast.Expression.Throw(

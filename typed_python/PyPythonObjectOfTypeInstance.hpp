@@ -34,7 +34,7 @@ public:
                     " is not an instance of " + ((PythonObjectOfType*)eltType)->pyType()->tp_name);
         }
 
-        ((PyObject**)tgt)[0] = incref(pyRepresentation);
+        eltType->initializeFromPyObject(tgt, pyRepresentation);
         return;
     }
 
@@ -50,7 +50,7 @@ public:
     }
 
     static PyObject* extractPythonObjectConcrete(PythonObjectOfType* valueType, instance_ptr data) {
-        return incref(*(PyObject**)data);
+        return incref(valueType->getPyObj(data));
     }
 
     static void mirrorTypeInformationIntoPyTypeConcrete(PythonObjectOfType* inType, PyTypeObject* pyType) {
@@ -62,4 +62,3 @@ public:
         );
     }
 };
-

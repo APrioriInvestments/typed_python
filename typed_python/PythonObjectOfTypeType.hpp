@@ -21,13 +21,22 @@
 
 //wraps an actual python instance. Note that we assume we're holding the GIL whenever
 //we interact with actual python objects. Compiled code needs to treat these objects
-//with extreme care...
+//with extreme care. We hold the pointer in our own refcounted datastructure so that
+//compiled code can move python objects around without hitting the GIL (we only
+//refcount when we completely release a handle to a python object).
 class PythonObjectOfType : public Type {
 public:
+    class layout_type {
+    public:
+        std::atomic<int64_t> refcount;
+        PyObject* pyObj;
+    };
+
     PythonObjectOfType(PyTypeObject* typePtr) :
             Type(TypeCategory::catPythonObjectOfType)
     {
         mPyTypePtr = (PyTypeObject*)incref((PyObject*)typePtr);
+
         m_name = std::string("PythonObjectOfType(") + typePtr->tp_name + ")";
         m_is_simple = false;
 
@@ -62,21 +71,60 @@ public:
         return false;
     }
 
-    typed_python_hash_type hash(instance_ptr left) {
-        PyObject* p = *(PyObject**)left;
+    // return a new layout with a refcount of 1, but steal the reference
+    // to the python object.
+    static layout_type* stealToCreateLayout(PyObject* p) {
+        return createLayout(p, false);
+    }
 
-        return PyObject_Hash(p);
+    // return a new layout with a refcount of 1, increffing the argument
+    // before placing it in the layout.
+    static layout_type* createLayout(PyObject* p, bool alsoIncref = true) {
+        layout_type* res = (layout_type*)malloc(sizeof(layout_type));
+
+        if (alsoIncref) {
+            incref(p);
+        }
+
+        res->pyObj = p;
+        res->refcount = 1;
+
+        return res;
+    }
+
+    void initializeHandleAt(instance_ptr ptr, int refcount=1) {
+        ((layout_type**)ptr)[0] = (layout_type*)malloc(sizeof(layout_type));
+        ((layout_type**)ptr)[0]->pyObj = NULL;
+        ((layout_type**)ptr)[0]->refcount = 1;
+    }
+
+    void initializeFromPyObject(instance_ptr ptr, PyObject* o) {
+        initializeHandleAt(ptr);
+        getPyObj(ptr) = incref(o);
+    }
+
+    PyObject*& getPyObj(instance_ptr ptr) {
+        return ((layout_type**)ptr)[0]->pyObj;
+    }
+
+    layout_type*& getHandlePtr(instance_ptr ptr) {
+        return *(layout_type**)ptr;
+    }
+
+    typed_python_hash_type hash(instance_ptr left) {
+        return PyObject_Hash(getPyObj(left));
     }
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
-        PyObject* p = *(PyObject**)self;
+        PyObject* p = getPyObj(self);
         buffer.getContext().serializePythonObject(p, buffer, fieldNumber);
     }
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
-         *(PyObject**)self = buffer.getContext().deserializePythonObject(buffer, wireType);
+         initializeHandleAt(self);
+         getPyObj(self) = buffer.getContext().deserializePythonObject(buffer, wireType);
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream);
@@ -84,21 +132,41 @@ public:
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
     void constructor(instance_ptr self) {
-        *(PyObject**)self = incref(Py_None);
+        initializeHandleAt(self);
+        getPyObj(self) = incref(Py_None);
+    }
+
+    static void decrefLayoutWithoutHoldingTheGil(layout_type* p) {
+        p->refcount--;
+
+        if (p->refcount == 0) {
+            PyEnsureGilAcquired getTheGil;
+            decref(p->pyObj);
+            free(p);
+        }
     }
 
     void destroy(instance_ptr self) {
-        decref(*(PyObject**)self);
+        getHandlePtr(self)->refcount--;
+
+        if (getHandlePtr(self)->refcount == 0) {
+            decref(getPyObj(self));
+            free(*(layout_type**)self);
+        }
     }
 
     void copy_constructor(instance_ptr self, instance_ptr other) {
-        *(PyObject**)self = incref(*(PyObject**)other);
+        getHandlePtr(self) = getHandlePtr(other);
+        getHandlePtr(self)->refcount++;
     }
 
     void assign(instance_ptr self, instance_ptr other) {
-        incref(*(PyObject**)other);
-        decref(*(PyObject**)self);
-        *(PyObject**)self = *(PyObject**)other;
+        if (getHandlePtr(self) == getHandlePtr(other)) {
+            return;
+        }
+        getHandlePtr(other)->refcount++;
+        destroy(self);
+        getHandlePtr(self) = getHandlePtr(other);
     }
 
     static PythonObjectOfType* Make(PyTypeObject* pyType);

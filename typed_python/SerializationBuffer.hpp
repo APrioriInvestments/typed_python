@@ -53,6 +53,10 @@ public:
                 }
             });
         }
+
+        for (auto p: m_pyObjectsNeedingDecref) {
+            decref(p);
+        }
     }
 
     SerializationBuffer(const SerializationBuffer&) = delete;
@@ -266,6 +270,20 @@ public:
         return std::pair<uint32_t, bool>(it->second, false);
     }
 
+    std::pair<uint32_t, bool> cachePointer(PyObject* t) {
+        auto it = m_idToPointerCache.find((void*)t);
+        if (it == m_idToPointerCache.end()) {
+            m_pyObjectsNeedingDecref.push_back(incref(t));
+
+            uint32_t id = m_idToPointerCache.size();
+            m_idToPointerCache[(void*)t] = id;
+
+            return std::pair<uint32_t, bool>(id, true);
+        }
+
+        return std::pair<uint32_t, bool>(it->second, false);
+    }
+
     void finalize() {
         if (m_wants_compress) {
             compress();
@@ -342,6 +360,8 @@ private:
 
     std::map<Type*, std::vector<void*>> m_pointersNeedingDecref;
 
+    std::vector<PyObject*> m_pyObjectsNeedingDecref;
+
     std::set<Type*> m_types_being_serialized;
 };
 
@@ -362,4 +382,3 @@ private:
     Type* m_type;
     SerializationBuffer& m_buffer;
 };
-

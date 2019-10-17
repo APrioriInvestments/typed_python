@@ -1444,7 +1444,7 @@ Instance PyInstance::unwrapPyObjectToInstance(PyObject* inst, bool allowArbitrar
         return Instance::createAndInitialize(
             PythonObjectOfType::AnyPyType(),
             [&](instance_ptr i) {
-                *((PyObject**)i) = incref(inst);
+                PythonObjectOfType::AnyPyType()->initializeFromPyObject(i, inst);
             }
         );
     }
@@ -1453,7 +1453,7 @@ Instance PyInstance::unwrapPyObjectToInstance(PyObject* inst, bool allowArbitrar
         return Instance::createAndInitialize(
             PythonObjectOfType::AnyPyObject(),
             [&](instance_ptr i) {
-                *((PyObject**)i) = incref(inst);
+                PythonObjectOfType::AnyPyObject()->initializeFromPyObject(i, inst);
             }
         );
     }

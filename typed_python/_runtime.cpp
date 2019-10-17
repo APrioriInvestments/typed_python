@@ -138,10 +138,15 @@ extern "C" {
         return BytesType::createFromPtr(utf8_str, len);
     }
 
-    void np_initialize_exception(PyObject* o) {
+    PythonObjectOfType::layout_type* nativepython_runtime_create_pyobj(PyObject* p) {
+        PyEnsureGilAcquired getTheGil;
+        return PythonObjectOfType::createLayout(p);
+    }
+
+    void np_initialize_exception(PythonObjectOfType::layout_type* layout) {
         PyEnsureGilAcquired getTheGil;
 
-        PyTypeObject* tp = o->ob_type;
+        PyTypeObject* tp = layout->pyObj->ob_type;
         bool hasBaseE = false;
 
         while (tp) {
@@ -152,11 +157,16 @@ extern "C" {
         }
 
         if (!hasBaseE) {
-            PyErr_Format(PyExc_TypeError, "exceptions must derive from BaseException, not %S", (PyObject*)o->ob_type);
+            PyErr_Format(
+                PyExc_TypeError,
+                "exceptions must derive from BaseException, not %S",
+                (PyObject*)layout->pyObj->ob_type
+            );
+
             return;
         }
 
-        PyErr_Restore((PyObject*)incref(o->ob_type), incref(o), nullptr);
+        PyErr_Restore((PyObject*)incref(layout->pyObj->ob_type), incref(layout->pyObj), nullptr);
     }
 
     void np_add_traceback(const char* funcname, const char* filename, int lineno) {
@@ -165,26 +175,18 @@ extern "C" {
         _PyTraceback_Add(funcname, filename, lineno);
     }
 
-    PyObject* np_builtin_pyobj_by_name(const char* utf8_name) {
+    PythonObjectOfType::layout_type* np_builtin_pyobj_by_name(const char* utf8_name) {
         PyEnsureGilAcquired getTheGil;
 
         static PyObject* module = PyImport_ImportModule("builtins");
 
-        return PyObject_GetAttrString(module, utf8_name);
+        return PythonObjectOfType::createLayout(PyObject_GetAttrString(module, utf8_name));
     }
 
-    PyObject* nativepython_runtime_incref_pyobj(PyObject* p) {
-        PyEnsureGilAcquired getTheGil;
-
-        incref(p);
-
-        return p;
-    }
-
-    PyObject* nativepython_runtime_get_pyobj_None() {
+    PythonObjectOfType::layout_type* nativepython_runtime_get_pyobj_None() {
         PyEnsureGilAcquired acquireTheGil;
 
-        return incref(Py_None);
+        return PythonObjectOfType::createLayout(Py_None);
     }
 
     StringType::layout* nativepython_runtime_repr(instance_ptr inst, Type* tp) {
@@ -227,51 +229,13 @@ extern "C" {
         return ret;
     }
 
-    uint64_t nativepython_runtime_len(instance_ptr inst, Type* tp) {
+    uint64_t nativepython_pyobj_len(PythonObjectOfType::layout_type* layout) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObjectStealer o(PyInstance::extractPythonObject(inst, tp));
-        if (!o) {
-            PyErr_PrintEx(0);
-            throw std::runtime_error("nativepython_runtime_len: failed to extract python object");
-        }
-        Py_ssize_t len = PyObject_Length(o);
-        if (len == -1) {
-            PyErr_PrintEx(0);
-            throw std::runtime_error("nativepython_runtime_str: PyObject_Length returned -1");
-        }
-        return len;
+        return PyObject_Length(layout->pyObj);
     }
 
-    uint64_t nativepython_pyobj_len(PyObject* pyobj) {
-        PyEnsureGilAcquired getTheGil;
-
-        return PyObject_Length(pyobj);
-    }
-
-    bool nativepython_runtime_contains(instance_ptr self, Type* self_tp, instance_ptr item, Type* item_tp) {
-        PyEnsureGilAcquired getTheGil;
-
-        PyObjectStealer o(PyInstance::extractPythonObject(self, self_tp));
-        if (!o) {
-            PyErr_PrintEx(0);
-            throw std::runtime_error("nativepython_runtime_contains: failed to extract python object");
-        }
-        PyObjectStealer i(PyInstance::extractPythonObject(item, item_tp));
-        if (!i) {
-            PyErr_PrintEx(0);
-            throw std::runtime_error("nativepython_runtime_contains: failed to extract item python object");
-        }
-        PyObject* contains = PyObject_GetAttrString(o, "__contains__");
-        if (!contains) {
-            return 0;
-        }
-        int ret = PyObject_IsTrue(contains);
-        decref(contains);
-        return ret;
-    }
-
-    PyObject* nativepython_runtime_call_pyobj(PyObject* toCall, int argCount, int kwargCount, ...) {
+    PythonObjectOfType::layout_type* nativepython_runtime_call_pyobj(PythonObjectOfType::layout_type* toCall, int argCount, int kwargCount, ...) {
         PyEnsureGilAcquired getTheGil;
 
         // each of 'argCount' arguments is a PyObject* followed by a const char*
@@ -282,11 +246,11 @@ extern "C" {
         PyObjectStealer kwargs(PyDict_New());
 
         for (int i = 0; i < argCount; ++i) {
-            PyTuple_SetItem((PyObject*)args, i, incref(va_arg(va_args, PyObject*)));
+            PyTuple_SetItem((PyObject*)args, i, incref(va_arg(va_args, PythonObjectOfType::layout_type*)->pyObj));
         }
 
         for (int i = 0; i < kwargCount; ++i) {
-            PyObject* kwargVal = va_arg(va_args, PyObject*);
+            PyObject* kwargVal = va_arg(va_args, PythonObjectOfType::layout_type*)->pyObj;
             const char* kwargName = va_arg(va_args, const char*);
 
             PyDict_SetItemString((PyObject*)kwargs, kwargName, kwargVal);
@@ -294,73 +258,75 @@ extern "C" {
 
         va_end(va_args);
 
-        PyObject* res = PyObject_Call(toCall, args, kwargs);
+        PyObject* res = PyObject_Call(toCall->pyObj, args, kwargs);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* nativepython_runtime_getattr_pyobj(PyObject* p, const char* a) {
+    PythonObjectOfType::layout_type* nativepython_runtime_getattr_pyobj(PythonObjectOfType::layout_type* p, const char* a) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* res = PyObject_GetAttrString(p, a);
+        PyObject* res = PyObject_GetAttrString(p->pyObj, a);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* nativepython_runtime_getitem_pyobj(PyObject* p, PyObject* a) {
+    PythonObjectOfType::layout_type* nativepython_runtime_getitem_pyobj(PythonObjectOfType::layout_type* p, PythonObjectOfType::layout_type* a) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* res = PyObject_GetItem(p, a);
+        PyObject* res = PyObject_GetItem(p->pyObj, a->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    void nativepython_runtime_delitem_pyobj(PyObject* p, PyObject* a) {
+    void nativepython_runtime_delitem_pyobj(PythonObjectOfType::layout_type* p, PythonObjectOfType::layout_type* a) {
         PyEnsureGilAcquired getTheGil;
 
-        int success = PyObject_DelItem(p, a);
+        int success = PyObject_DelItem(p->pyObj, a->pyObj);
 
         if (success != 0) {
             throw PythonExceptionSet();
         }
     }
 
-    void nativepython_runtime_setitem_pyobj(PyObject* p, PyObject* index, PyObject* value) {
+    void nativepython_runtime_setitem_pyobj(
+            PythonObjectOfType::layout_type* p,
+            PythonObjectOfType::layout_type* index,
+            PythonObjectOfType::layout_type* value
+    ) {
         PyEnsureGilAcquired getTheGil;
 
-        int res = PyObject_SetItem(p, index, value);
+        int res = PyObject_SetItem(p->pyObj, index->pyObj, value->pyObj);
 
         if (res) {
             throw PythonExceptionSet();
         }
     }
 
-    void nativepython_runtime_setattr_pyobj(PyObject* p, const char* a, PyObject* val) {
+    void nativepython_runtime_setattr_pyobj(PythonObjectOfType::layout_type* p, const char* a, PythonObjectOfType::layout_type* val) {
         PyEnsureGilAcquired getTheGil;
 
-        int res = PyObject_SetAttrString(p, a, val);
+        int res = PyObject_SetAttrString(p->pyObj, a, val->pyObj);
 
         if (res) {
             throw PythonExceptionSet();
         }
     }
 
-    void nativepython_runtime_decref_pyobj(PyObject* p) {
-        PyEnsureGilAcquired getTheGil;
-
-        decref(p);
+    void np_destroy_pyobj_handle(PythonObjectOfType::layout_type* p) {
+        PythonObjectOfType::decrefLayoutWithoutHoldingTheGil(p);
     }
 
     int64_t nativepython_runtime_mod_int64_int64(int64_t l, int64_t r) {
@@ -520,15 +486,15 @@ extern "C" {
 
     // attempt to initialize 'tgt' of type 'tp' with data from 'obj'. Returns true if we
     // are able to do so.
-    bool np_runtime_pyobj_to_typed(PyObject *obj, instance_ptr tgt, Type* tp, bool isExplicit) {
+    bool np_runtime_pyobj_to_typed(PythonObjectOfType::layout_type *layout, instance_ptr tgt, Type* tp, bool isExplicit) {
         PyEnsureGilAcquired acquireTheGil;
 
         try {
-            if (!PyInstance::pyValCouldBeOfType(tp, obj,  isExplicit)) {
+            if (!PyInstance::pyValCouldBeOfType(tp, layout->pyObj,  isExplicit)) {
                 return false;
             }
 
-            PyInstance::copyConstructFromPythonInstance(tp, tgt, obj, isExplicit);
+            PyInstance::copyConstructFromPythonInstance(tp, tgt, layout->pyObj, isExplicit);
 
             return true;
         } catch(PythonExceptionSet&) {
@@ -553,7 +519,7 @@ extern "C" {
         return r;
     }
 
-    PyObject* np_runtime_to_pyobj(instance_ptr obj, Type* tp) {
+    PythonObjectOfType::layout_type* np_runtime_to_pyobj(instance_ptr obj, Type* tp) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyInstance::extractPythonObject(obj, tp);
@@ -562,7 +528,7 @@ extern "C" {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
     void nativepython_print_string(StringType::layout* layout) {
@@ -753,12 +719,6 @@ extern "C" {
         return ceil(l);
     }
 
-    PyObject* nativepython_runtime_complex(double r, double i) {
-        PyEnsureGilAcquired acquireTheGil;
-
-        return PyComplex_FromDoubles(r, i);
-    }
-
     ListOfType::layout* nativepython_runtime_dir(instance_ptr i, Type* tp) {
         PyEnsureGilAcquired acquireTheGil;
 
@@ -772,202 +732,202 @@ extern "C" {
         return ret;
     }
 
-    PyObject* np_pyobj_Add(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_Add(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_Add(lhs, rhs);
+        PyObject* res = PyNumber_Add(lhs->pyObj, rhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_Subtract(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_Subtract(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_Subtract(lhs, rhs);
+        PyObject* res = PyNumber_Subtract(lhs->pyObj, rhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_Multiply(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_Multiply(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_Multiply(lhs, rhs);
+        PyObject* res = PyNumber_Multiply(lhs->pyObj, rhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_Pow(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_Pow(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_Power(lhs, rhs, Py_None);
+        PyObject* res = PyNumber_Power(lhs->pyObj, rhs->pyObj, Py_None);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_MatrixMultiply(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_MatrixMultiply(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_MatrixMultiply(lhs, rhs);
+        PyObject* res = PyNumber_MatrixMultiply(lhs->pyObj, rhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_TrueDivide(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_TrueDivide(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_TrueDivide(lhs, rhs);
+        PyObject* res = PyNumber_TrueDivide(lhs->pyObj, rhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_FloorDivide(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_FloorDivide(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_FloorDivide(lhs, rhs);
+        PyObject* res = PyNumber_FloorDivide(lhs->pyObj, rhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_Remainder(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_Remainder(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_Remainder(lhs, rhs);
+        PyObject* res = PyNumber_Remainder(lhs->pyObj, rhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_Lshift(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_Lshift(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_Lshift(lhs, rhs);
+        PyObject* res = PyNumber_Lshift(lhs->pyObj, rhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_Rshift(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_Rshift(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_Rshift(lhs, rhs);
+        PyObject* res = PyNumber_Rshift(lhs->pyObj, rhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_Or(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_Or(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_Or(lhs, rhs);
+        PyObject* res = PyNumber_Or(lhs->pyObj, rhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_Xor(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_Xor(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_Xor(lhs, rhs);
+        PyObject* res = PyNumber_Xor(lhs->pyObj, rhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_And(PyObject* lhs, PyObject* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_And(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_And(lhs, rhs);
+        PyObject* res = PyNumber_And(lhs->pyObj, rhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_Invert(PyObject* lhs) {
+    PythonObjectOfType::layout_type* np_pyobj_Invert(PythonObjectOfType::layout_type* lhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_Invert(lhs);
+        PyObject* res = PyNumber_Invert(lhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_Positive(PyObject* lhs) {
+    PythonObjectOfType::layout_type* np_pyobj_Positive(PythonObjectOfType::layout_type* lhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_Positive(lhs);
+        PyObject* res = PyNumber_Positive(lhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PyObject* np_pyobj_Negative(PyObject* lhs) {
+    PythonObjectOfType::layout_type* np_pyobj_Negative(PythonObjectOfType::layout_type* lhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        PyObject* res = PyNumber_Negative(lhs);
+        PyObject* res = PyNumber_Negative(lhs->pyObj);
 
         if (!res) {
             throw PythonExceptionSet();
         }
 
-        return res;
+        return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    bool np_pyobj_Not(PyObject* lhs) {
+    bool np_pyobj_Not(PythonObjectOfType::layout_type* lhs) {
         PyEnsureGilAcquired acquireTheGil;
 
-        int64_t res = PyObject_Not(lhs);
+        int64_t res = PyObject_Not(lhs->pyObj);
         if (res == -1) {
             throw PythonExceptionSet();
         }
