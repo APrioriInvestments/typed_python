@@ -391,6 +391,10 @@ extern "C" {
     }
 
     double nativepython_runtime_mod_float64_float64(double l, double r) {
+        if (std::isnan(r) or std::isnan(l)) {
+            return NAN;
+        }
+
         if (l == 0.0) {
             return 0.0;
         }

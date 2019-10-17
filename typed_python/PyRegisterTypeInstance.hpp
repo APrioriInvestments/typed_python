@@ -78,6 +78,10 @@ inline int64_t pyMod(int64_t l, int64_t r) {
 //implement mod the same way python does for floats and doubles
 template<class T>
 T pyModFloat(T l, T r) {
+    if (std::isnan(r) || std::isnan(l)) {
+        return NAN;
+    }
+
     if (l == 0.0) {
         return 0.0;
     }
@@ -974,4 +978,3 @@ public:
         }
 
 };
-

@@ -168,6 +168,13 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         raise Exception(f"Unknown binary operator {op} (inplace={inplace})")
 
+    def convert_bin_op_reverse(self, context, r, op, l, inplace):
+        lAsObj = l.convert_to_type(object)
+        if lAsObj is None:
+            return None
+
+        return lAsObj.convert_bin_op(op, r, inplace)
+
     def convert_setitem(self, context, instance, index, value):
         indexAsObj = index.convert_to_type(object)
         if indexAsObj is None:

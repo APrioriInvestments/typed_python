@@ -264,7 +264,7 @@ class IntWrapper(ArithmeticTypeWrapper):
         return super().convert_unary_op(context, left, op)
 
     def convert_bin_op(self, context, left, op, right, inplace):
-        if op.matches.Div:
+        if op.matches.Div and isinstance(right.expr_type, ArithmeticTypeWrapper):
             T = toWrapper(
                 computeArithmeticBinaryResultType(
                     computeArithmeticBinaryResultType(
@@ -479,7 +479,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
         if op.matches.IsNot and right.expr_type == self:
             op = python_ast.ComparisonOp.NotEq()
 
-        if op.matches.Div:
+        if op.matches.Div and isinstance(right, ArithmeticTypeWrapper):
             T = toWrapper(
                 computeArithmeticBinaryResultType(
                     computeArithmeticBinaryResultType(
@@ -514,6 +514,9 @@ class BoolWrapper(ArithmeticTypeWrapper):
                         op=pyOpToNative[op]
                     )
                 )
+
+        if op in pyOpToNative or op.matches.Pow:
+            return left.convert_to_type(int).convert_bin_op(op, right, inplace)
 
         if op in pyCompOp:
             return context.pushPod(
