@@ -372,6 +372,7 @@ bool PyDictInstance::compare_to_python_concrete(DictType* dictType, instance_ptr
             });
         } catch(PythonExceptionSet&) {
             PyErr_Clear();
+            return false;
         } catch(...) {
             //if we can't convert to KeyType, we're not equal
             return false;
