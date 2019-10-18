@@ -60,6 +60,13 @@ PyObject* PyInstance::undefinedBehaviorException() {
     return t;
 }
 
+//static
+PyObject* PyInstance::nonTypesAcceptedAsTypes() {
+    static PyObject* module = PyImport_ImportModule("typed_python.internals");
+    static PyObject* t = PyObject_GetAttrString(module, "_nonTypesAcceptedAsTypes");
+    return t;
+}
+
 // static
 PyMethodDef* PyInstance::typeMethods(Type* t) {
     return specializeStatic(t->getTypeCategory(), [&](auto* concrete_null_ptr) {
@@ -1569,8 +1576,15 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
                 return PythonObjectOfType::Make(pyType);
             }
         }
-
     }
+
+    if (PyDict_Contains(nonTypesAcceptedAsTypes(), typearg)) {
+        return PythonObjectOfType::Make(
+            (PyTypeObject*)PyDict_GetItem(nonTypesAcceptedAsTypes(), typearg),
+            typearg
+        );
+    }
+
     // else: typearg is not a type -> it is a value
     Type* valueType = PyInstance::tryUnwrapPyInstanceToValueType(typearg, false);
 

@@ -62,20 +62,22 @@ bool PythonObjectOfType::cmp(instance_ptr left, instance_ptr right, int pyCompar
 }
 
 // static
-PythonObjectOfType* PythonObjectOfType::Make(PyTypeObject* pyType) {
+PythonObjectOfType* PythonObjectOfType::Make(PyTypeObject* pyType, PyObject* givenType) {
     static std::mutex guard;
 
     std::lock_guard<std::mutex> lock(guard);
 
-    typedef PyTypeObject* keytype;
+    typedef std::pair<PyTypeObject*, PyObject*> keytype;
 
     static std::map<keytype, PythonObjectOfType*> m;
 
-    auto it = m.find(pyType);
+    keytype key(pyType, givenType);
+
+    auto it = m.find(key);
 
     if (it == m.end()) {
         it = m.insert(
-            std::make_pair(pyType, new PythonObjectOfType(pyType))
+            std::make_pair(key, new PythonObjectOfType(pyType, givenType))
         ).first;
     }
 

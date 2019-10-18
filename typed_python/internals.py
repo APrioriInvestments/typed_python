@@ -14,8 +14,20 @@
 
 from types import FunctionType
 
+import _thread
+import threading
+
 import typed_python
 import typed_python.inspect_override as inspect
+
+
+# some 'types' (threading.Lock, threading.RLock) aren't really types, they're
+# functions that produce some internal type. This contains the map from the
+# factory to the type that we actually expect instances to hold.
+_nonTypesAcceptedAsTypes = {
+    threading.Lock: _thread.LockType,
+    threading.RLock: _thread.RLock,
+}
 
 
 class UndefinedBehaviorException(BaseException):
@@ -163,6 +175,7 @@ def makeFunction(name, f, classType=None):
     if spec.varkw is not None:
         arg_types.append((spec.varkw, getAnn(spec.varkw), None, False, True))
 
+    print(name, type(name))
     return typed_python._types.Function(name, return_type, f, tuple(arg_types))
 
 

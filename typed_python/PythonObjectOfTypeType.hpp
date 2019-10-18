@@ -32,12 +32,19 @@ public:
         PyObject* pyObj;
     };
 
-    PythonObjectOfType(PyTypeObject* typePtr) :
+    PythonObjectOfType(PyTypeObject* typePtr, PyObject* givenType) :
             Type(TypeCategory::catPythonObjectOfType)
     {
         mPyTypePtr = (PyTypeObject*)incref((PyObject*)typePtr);
 
-        m_name = std::string("PythonObjectOfType(") + typePtr->tp_name + ")";
+        if (givenType) {
+            mGivenType = incref(givenType);
+        } else {
+            mGivenType = nullptr;
+        }
+
+        m_name = std::string("PythonObjectOfType(") + mPyTypePtr->tp_name + ")";
+
         m_is_simple = false;
 
         endOfConstructorInitialization(); // finish initializing the type object.
@@ -169,7 +176,9 @@ public:
         getHandlePtr(self) = getHandlePtr(other);
     }
 
-    static PythonObjectOfType* Make(PyTypeObject* pyType);
+    // construct a new Type. If 'givenType' is not NULL, then it's the type the user
+    // gave us (and we inferred a real type from it based on the lookup table in internals.py)
+    static PythonObjectOfType* Make(PyTypeObject* pyType, PyObject* givenType=NULL);
 
     static PythonObjectOfType* AnyPyObject();
 
@@ -181,4 +190,5 @@ public:
 
 private:
     PyTypeObject* mPyTypePtr;
+    PyObject* mGivenType;
 };

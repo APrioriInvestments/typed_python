@@ -13,6 +13,8 @@
 #   limitations under the License.
 
 import types
+import threading
+import _thread
 
 from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.native_ast as native_ast
@@ -138,6 +140,11 @@ def _typedPythonTypeToTypeWrapper(t):
         return OneOfWrapper(t)
 
     if t.__typed_python_category__ == "PythonObjectOfType":
+        if t is threading.RLock:
+            t = _thread.RLock
+        elif t is threading.Lock:
+            t = _thread.LockType
+
         return PythonObjectOfTypeWrapper(t)
 
     if t.__typed_python_category__ == "Value":

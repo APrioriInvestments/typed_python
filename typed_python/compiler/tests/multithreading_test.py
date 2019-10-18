@@ -18,6 +18,7 @@ from typed_python.compiler.runtime import Runtime
 import unittest
 import time
 import threading
+import _thread
 import os
 
 
@@ -145,3 +146,22 @@ class TestMultithreading(unittest.TestCase):
 
         # expect the ratio to be close to 1, but have some error margin
         self.assertTrue(ratio >= .8 and ratio < 1.2, ratios)
+
+    def test_can_access_locks_in_compiler(self):
+        lock = threading.Lock()
+        recursiveLock = threading.RLock()
+
+        @Compiled
+        def lockFun(l: threading.Lock):
+            l.acquire()
+            l.release()
+            return 10
+
+        @Compiled
+        def recursiveLockFun(l: threading.RLock):
+            l.acquire()
+            l.release()
+            return 10
+
+        lockFun(lock)
+        recursiveLockFun(recursiveLock)

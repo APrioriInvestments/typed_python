@@ -462,6 +462,8 @@ public:
 
     static PyObject* undefinedBehaviorException();
 
+    static PyObject* nonTypesAcceptedAsTypes();
+
     static PySequenceMethods* sequenceMethodsFor(Type* t);
 
     static PyNumberMethods* numberMethods(Type* t);
