@@ -856,6 +856,39 @@ class FunctionConversionContext(object):
                     return exprs, flowReturns
             return exprs, True
 
+        if ast.matches.With:
+            assert len(ast.items) == 1 and ast.items[0].optional_vars is None
+
+            expr_context = ExpressionConversionContext(self, variableStates)
+
+            arg = expr_context.convert_expression_ast(ast.items[0].context_expr)
+
+            if arg is None:
+                return expr_context.finalize(None, exceptionsTakeFrom=ast), False
+
+            withResponse = arg.convert_context_manager_enter()
+
+            if withResponse is None:
+                return expr_context.finalize(None, exceptionsTakeFrom=ast), False
+
+            true, true_returns = self.convert_statement_list_ast(ast.body, variableStates)
+
+            exit_context = ExpressionConversionContext(self, variableStates)
+
+            arg.changeContext(exit_context).convert_context_manager_exit(
+                [exit_context.constant(None) for _ in range(3)]
+            )
+
+            return (
+                native_ast.Expression.Finally(
+                    expr=expr_context.finalize(true, exceptionsTakeFrom=ast),
+                    teardowns=[native_ast.Teardown.Always(
+                        expr=exit_context.finalize(None, exceptionsTakeFrom=ast)
+                    )]
+                ),
+                true_returns
+            )
+
         raise ConversionException("Can't handle python ast Statement.%s" % ast.Name)
 
     def freeVariableLookup(self, name):

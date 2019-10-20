@@ -18,7 +18,6 @@ from typed_python.compiler.runtime import Runtime
 import unittest
 import time
 import threading
-import _thread
 import os
 
 
@@ -153,15 +152,13 @@ class TestMultithreading(unittest.TestCase):
 
         @Compiled
         def lockFun(l: threading.Lock):
-            l.acquire()
-            l.release()
-            return 10
+            with l:
+                return 10
 
         @Compiled
         def recursiveLockFun(l: threading.RLock):
-            l.acquire()
-            l.release()
-            return 10
+            with l:
+                return 10
 
         lockFun(lock)
         recursiveLockFun(recursiveLock)

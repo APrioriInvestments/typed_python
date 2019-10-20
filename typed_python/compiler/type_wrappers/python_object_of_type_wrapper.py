@@ -294,3 +294,10 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         return context.constant(self.typeRepresentation.PyType).convert_call(args, kwargs)
+
+    def convert_method_call(self, context, instance, methodname, args, kwargs):
+        method = self.convert_attribute(context, instance, methodname)
+        if method is None:
+            return None
+
+        return method.convert_call(args, kwargs)

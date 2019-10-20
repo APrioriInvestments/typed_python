@@ -466,6 +466,12 @@ class Wrapper(object):
         """
         return None
 
+    def convert_context_manager_enter(self, context, instance):
+        return instance.convert_method_call("__enter__", (), {})
+
+    def convert_context_manager_exit(self, context, instance, args):
+        return instance.convert_method_call("__exit__", args, {})
+
     @staticmethod
     def unwrapOneOfAndValue(f):
         """Decorator for 'f' to unwrap value and oneof arguments to their composite forms.

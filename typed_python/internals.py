@@ -175,7 +175,6 @@ def makeFunction(name, f, classType=None):
     if spec.varkw is not None:
         arg_types.append((spec.varkw, getAnn(spec.varkw), None, False, True))
 
-    print(name, type(name))
     return typed_python._types.Function(name, return_type, f, tuple(arg_types))
 
 

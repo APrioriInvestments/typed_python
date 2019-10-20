@@ -47,6 +47,9 @@ class TypedExpression(object):
         self.expr_type = t
         self.isReference = isReference
 
+    def changeContext(self, newContext):
+        return TypedExpression(newContext, self.expr, self.expr_type, self.isReference)
+
     def changeType(self, newType, isReferenceOverride=None):
         """Return a TypedExpression with the same native_ast content but a different type-wrapper."""
         return TypedExpression(
@@ -176,6 +179,12 @@ class TypedExpression(object):
         target_type = typeWrapper(target_type)
 
         return self.expr_type.convert_to_type(self.context, self, target_type, explicit=explicit)
+
+    def convert_context_manager_enter(self):
+        return self.expr_type.convert_context_manager_enter(self.context, self)
+
+    def convert_context_manager_exit(self, args):
+        return self.expr_type.convert_context_manager_exit(self.context, self, args)
 
     def convert_to_type_with_target(self, targetVal, explicit=True):
         return self.expr_type.convert_to_type_with_target(self.context, self, targetVal, explicit=explicit)

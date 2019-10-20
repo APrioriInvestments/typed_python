@@ -990,8 +990,8 @@ class FunctionConverter:
 
             try:
                 if func.native_type.value_type.can_throw:
-                    normal_target = self.builder.append_basic_block()
-                    exception_target = self.builder.append_basic_block()
+                    normal_target = self.builder.append_basic_block('asdf')
+                    exception_target = self.builder.append_basic_block('bsdf')
 
                     llvm_call_result = self.builder.invoke(
                         func.llvm_value,
@@ -1055,6 +1055,7 @@ class FunctionConverter:
             return
 
         if expr.matches.TryCatch:
+
             self.teardown_handler = TeardownOnScopeExit(
                 self,
                 self.teardown_handler
@@ -1086,7 +1087,7 @@ class FunctionConverter:
                     if handler_res is not None:
                         self.builder.branch(resume_normal_block)
 
-            target_resume_block = self.builder.append_basic_block()
+            target_resume_block = self.builder.append_basic_block('csdf')
 
             if result is not None:
                 self.builder.branch(target_resume_block)
@@ -1094,6 +1095,9 @@ class FunctionConverter:
             new_handler.generate_trycatch_unwind(target_resume_block, generator)
 
             self.builder.position_at_start(target_resume_block)
+
+            if result is None:
+                self.builder.unreachable()
 
             return result
 
