@@ -12,6 +12,17 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import math
+import numpy
+import os
+import psutil
+import sys
+import time
+import unittest
+
+import typed_python._types as _types
+
+from flaky import flaky
 from typed_python import (
     Bool, Value,
     Int8, Int16, Int32, Int64,
@@ -23,14 +34,6 @@ from typed_python import (
 )
 from typed_python.type_promotion import computeArithmeticBinaryResultType
 from typed_python.test_util import currentMemUsageMb
-import typed_python._types as _types
-import psutil
-import unittest
-import time
-import numpy
-import os
-import math
-import sys
 
 
 def typeFor(t):
@@ -688,6 +691,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(t().a, '')
         self.assertEqual(t().b, '')
 
+    @flaky(max_runs=3, min_passes=1)
     def test_tuple_of_string_perf(self):
         t = NamedTuple(a=str, b=str)
 
@@ -911,6 +915,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(d2 not in big)
         self.assertTrue(big[d] == d2)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_dict_hash_perf(self):
         str_dict = ConstDict(str, str)
 
@@ -928,6 +933,7 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "not hashable"):
             hash(Dict(int, int)())
 
+    @flaky(max_runs=3, min_passes=1)
     def test_const_dict_str_perf(self):
         t = ConstDict(str, str)
 
@@ -939,6 +945,7 @@ class NativeTypesTests(unittest.TestCase):
         print("Took ", elapsed, " to do 1mm")
         self.check_expected_performance(elapsed)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_const_dict_int_perf(self):
         t = ConstDict(int, int)
 
@@ -1346,6 +1353,7 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(a+a, (a, a))
 
+    @flaky(max_runs=3, min_passes=1)
     def test_alternatives_perf(self):
         alt = Alternative(
             "Alt",

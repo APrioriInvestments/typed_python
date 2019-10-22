@@ -12,11 +12,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import time
+import traceback
+import unittest
+
+from flaky import flaky
 from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, _types
 from typed_python.compiler.runtime import Runtime, Entrypoint
-import unittest
-import traceback
-import time
 
 
 def Compiled(f):
@@ -350,6 +352,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "name 'this_variable_name_is_undefined' is not defined"):
             f()
 
+    @flaky(max_runs=3, min_passes=1)
     def test_iterating(self):
         @Compiled
         def sumDirectly(x: int):
@@ -377,7 +380,7 @@ class TestCompilationStructures(unittest.TestCase):
         t2 = time.time()
 
         print("Range is %.2f slower than nonrange." % ((t2-t1)/(t1-t0)))  # I get 1.00
-        self.assertTrue((t1-t0) < (t2 - t1) * 1.1)
+        self.assertLess((t1-t0), (t2 - t1) * 1.1)
 
     def test_read_invalid_variables(self):
         @Compiled
@@ -478,6 +481,7 @@ class TestCompilationStructures(unittest.TestCase):
             self.assertIn("f3", trace)
             self.assertIn("f4", trace)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_inlining_is_fast(self):
         def f1(x):
             return f2(x)
@@ -522,7 +526,8 @@ class TestCompilationStructures(unittest.TestCase):
         # we expect calling f1 to be slower, but not much.
         # eventually we should be able to note that 'f4' can't throw
         # which would get rid of some of the extra code we're generating.
-        self.assertTrue(1.0 <= ratio <= 2.0, ratio)
+        self.assertLessEqual(1.0, ratio)
+        self.assertLessEqual(ratio, 2.0)
         print(f"Deeper call tree code was {ratio} times slow.")
 
     def test_exception_handling_preserves_refcount(self):

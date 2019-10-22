@@ -10,6 +10,7 @@ flake8 = "*"
 coverage = "*"
 pytest = "*"
 pre-commit = "*"
+flaky = "*"
 
 [packages]
 llvmlite = "*"
