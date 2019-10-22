@@ -12,7 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, Class, Member, Alternative, TupleOf, ListOf, ConstDict, SerializationContext
+from typed_python import (
+    Function, Class, Member, Alternative, TupleOf, ListOf, ConstDict, SerializationContext, Entrypoint
+)
+
 import typed_python._types as _types
 from typed_python.compiler.runtime import Runtime
 import unittest
@@ -146,7 +149,22 @@ class TestMultithreading(unittest.TestCase):
         # expect the ratio to be close to 1, but have some error margin
         self.assertTrue(ratio >= .8 and ratio < 1.2, ratios)
 
-    def test_can_access_locks_in_compiler(self):
+    def test_can_access_locks_in_compiler_with_locks_as_obj(self):
+        lock = threading.Lock()
+        recursiveLock = threading.RLock()
+
+        @Compiled
+        def lockFun(l: object):
+            with l:
+                return 10
+
+        # these methods will hit 'l' using the interpreter
+        lockFun(lock)
+        lockFun(recursiveLock)
+
+        self.assertFalse(lock.locked())
+
+    def test_can_access_locks_in_compiler_with_typed_locks(self):
         lock = threading.Lock()
         recursiveLock = threading.RLock()
 
@@ -160,5 +178,95 @@ class TestMultithreading(unittest.TestCase):
             with l:
                 return 10
 
+        # these methods will hit the lock objects directly, bypassing
+        # the interpreter and using C code.
         lockFun(lock)
         recursiveLockFun(recursiveLock)
+
+        self.assertFalse(lock.locked())
+
+    def test_lock_perf(self):
+        lock = threading.Lock()
+        recursiveLock = threading.RLock()
+
+        aList = ListOf(int)([0])
+
+        @Compiled
+        def lockFun(l: threading.Lock, aList: ListOf(int), count: int):
+            for _ in range(count):
+                with l:
+                    aList[0] += 1
+
+        @Compiled
+        def recursiveLockFun(l: threading.RLock, aList: ListOf(int), count: int):
+            for _ in range(count):
+                with l:
+                    aList[0] += 1
+
+        t0 = time.time()
+        lockFun(lock, aList, 1000000)
+        t1 = time.time()
+        recursiveLockFun(recursiveLock, aList, 1000000)
+        t2 = time.time()
+
+        # I get around 0.02 for this, which is 50mm locks / second when there is no
+        # contention.
+        self.assertLess(t1 - t0, .1)
+        self.assertLess(t2 - t1, .1)
+
+    def test_lock_works(self):
+        lock = threading.Lock()
+
+        aList = ListOf(int)([0])
+
+        @Entrypoint
+        def loopWithLock(l, aList, count):
+            for _ in range(count):
+                with l:
+                    aList[0] += 1
+
+        ct = 1000000
+        threads = [threading.Thread(target=loopWithLock, args=(lock, aList, ct)) for _ in range(4)]
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        # this test will fail (badly) if you remove the lock because we won't add up
+        # to the right amount.
+        self.assertEqual(ct * 4, aList[0])
+
+    def test_lock_with_separate_locks_perf(self):
+        @Entrypoint
+        def loopWithLock(l, aList, count):
+            for _ in range(count):
+                with l:
+                    aList[0] += 1
+
+        def timeFor(threadCount, ct):
+            t0 = time.time()
+
+            threads = [threading.Thread(target=loopWithLock, args=(threading.Lock(), ListOf(int)([0]), ct)) for _ in range(threadCount)]
+
+            for t in threads:
+                t.start()
+
+            for t in threads:
+                t.join()
+
+            return time.time() - t0
+
+        # prime the compiler
+        timeFor(1, 10)
+
+        oneThread = timeFor(1, 1000000)
+        twoThreads = timeFor(2, 1000000)
+
+        # we should see that we don't really change performance, because our test is using separate
+        # locks for each of the two threads in the second case. I get almost exactly 1.0 for this,
+        # but on Travis, because we don't get a dedicated box, we can get more than 1. If the lock
+        # is held as 'object', you'd see 2.0 or higher, so this still verifies that we are
+        # getting c-level parallelism at this threshold.
+        self.assertLess(twoThreads / oneThread, 1.6, (oneThread, twoThreads))

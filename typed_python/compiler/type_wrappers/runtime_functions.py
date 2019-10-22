@@ -620,3 +620,27 @@ np_dir = externalCallTarget(
     Void.pointer(),
     UInt64
 )
+
+pyobj_rlocktype_unlock = externalCallTarget(
+    "np_pyobj_rlocktype_unlock",
+    Void,
+    Void.pointer()
+)
+
+pyobj_rlocktype_lock = externalCallTarget(
+    "np_pyobj_rlocktype_lock",
+    Bool,
+    Void.pointer()
+)
+
+pyobj_locktype_unlock = externalCallTarget(
+    "np_pyobj_locktype_unlock",
+    Void,
+    Void.pointer()
+)
+
+pyobj_locktype_lock = externalCallTarget(
+    "np_pyobj_locktype_lock",
+    Bool,
+    Void.pointer()
+)

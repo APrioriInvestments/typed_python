@@ -10,6 +10,8 @@
 #include "hash_table_layout.hpp"
 #include "PyInstance.hpp"
 
+#include <pythread.h>
+
 // Note: extern C identifiers are distinguished only up to 32 characters
 // nativepython_runtime_12345678901
 extern "C" {
@@ -935,6 +937,93 @@ extern "C" {
         return res;
     }
 
+    // this struct is defined in threadmodule.c - so it's internal to python itself,
+    // but because we want to bypass the GIL, we'll just read from the corresponding
+    // PyObject* knowing its structure.
+    typedef struct {
+        PyObject_HEAD
+        PyThread_type_lock lock_lock;
+        PyObject *in_weakreflist;
+        char locked; /* for sanity checking */
+    } np_lockobject_equivalent;
 
+    bool np_pyobj_locktype_lock(PythonObjectOfType::layout_type* lockPtr) {
+        PyThread_acquire_lock_timed(
+            ((np_lockobject_equivalent*)(lockPtr->pyObj))->lock_lock,
+            -1,
+            0
+        );
+
+        return true;
+    }
+
+    void np_pyobj_locktype_unlock(PythonObjectOfType::layout_type* lockPtr) {
+        PyThread_release_lock(
+            ((np_lockobject_equivalent*)(lockPtr->pyObj))->lock_lock
+        );
+    }
+
+    typedef struct {
+        PyObject_HEAD
+        PyThread_type_lock rlock_lock;
+        unsigned long rlock_owner;
+        unsigned long rlock_count;
+        PyObject *in_weakreflist;
+    } np_lockobject_rlockobject;
+
+    bool np_pyobj_rlocktype_lock(PythonObjectOfType::layout_type* lockPtr) {
+        np_lockobject_rlockobject* lockObj = (np_lockobject_rlockobject*)(lockPtr->pyObj);
+
+        unsigned long tid = PyThread_get_thread_ident();
+
+        if (lockObj->rlock_count > 0 && tid == lockObj->rlock_owner) {
+            unsigned long count = lockObj->rlock_count + 1;
+            if (count <= lockObj->rlock_count) {
+                PyEnsureGilAcquired getTheGil;
+
+                PyErr_SetString(PyExc_OverflowError,
+                                "Internal lock count overflowed");
+                throw PythonExceptionSet();
+            }
+
+            lockObj->rlock_count = count;
+
+            return true;
+        }
+
+        int r = PyThread_acquire_lock_timed(lockObj->rlock_lock, -1, 0);
+
+        if (r == PY_LOCK_ACQUIRED) {
+            assert(lockObj->rlock_count == 0);
+            lockObj->rlock_owner = tid;
+            lockObj->rlock_count = 1;
+        }
+        else if (r == PY_LOCK_INTR) {
+            PyEnsureGilAcquired getTheGil;
+
+            PyErr_SetString(PyExc_RuntimeError,
+                            "Expected we'd get the lock but we didn't.");
+            throw PythonExceptionSet();
+        }
+
+        return true;
+    }
+
+    void np_pyobj_rlocktype_unlock(PythonObjectOfType::layout_type* lockPtr) {
+        np_lockobject_rlockobject* lockObj = (np_lockobject_rlockobject*)(lockPtr->pyObj);
+
+        unsigned long tid = PyThread_get_thread_ident();
+
+        if (lockObj->rlock_count == 0 || lockObj->rlock_owner != tid) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_SetString(PyExc_RuntimeError,
+                            "cannot release un-acquired lock");
+            throw PythonExceptionSet();
+        }
+        if (--lockObj->rlock_count == 0) {
+            lockObj->rlock_owner = 0;
+            PyThread_release_lock(lockObj->rlock_lock);
+        }
+    }
 
 }

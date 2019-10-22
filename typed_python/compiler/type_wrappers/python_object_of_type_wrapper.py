@@ -12,6 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import _thread
+
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.typed_expression import TypedExpression
 
@@ -296,8 +298,36 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         return context.constant(self.typeRepresentation.PyType).convert_call(args, kwargs)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if self.typeRepresentation.PyType in (_thread.LockType, _thread.RLock) and methodname == "acquire" and len(args) == 0:
+            if self.typeRepresentation.PyType is _thread.LockType:
+                nativeFun = runtime_functions.pyobj_locktype_lock
+            else:
+                nativeFun = runtime_functions.pyobj_rlocktype_lock
+
+            return context.pushPod(bool, nativeFun.call(instance.nonref_expr.cast(VoidPtr)))
+
+        if self.typeRepresentation.PyType in (_thread.LockType, _thread.RLock) and methodname == "release" and len(args) == 0:
+            if self.typeRepresentation.PyType is _thread.LockType:
+                nativeFun = runtime_functions.pyobj_locktype_unlock
+            else:
+                nativeFun = runtime_functions.pyobj_rlocktype_unlock
+
+            return context.pushPod(bool, nativeFun.call(instance.nonref_expr.cast(VoidPtr)))
+
         method = self.convert_attribute(context, instance, methodname)
         if method is None:
             return None
 
         return method.convert_call(args, kwargs)
+
+    def convert_context_manager_enter(self, context, instance):
+        if self.typeRepresentation.PyType in (_thread.LockType, _thread.RLock):
+            return self.convert_method_call(context, instance, "acquire", (), {})
+
+        return super().convert_context_manager_enter(context, instance)
+
+    def convert_context_manager_exit(self, context, instance, args):
+        if self.typeRepresentation.PyType in (_thread.LockType, _thread.RLock):
+            return self.convert_method_call(context, instance, "release", (), {})
+
+        return super().convert_context_manager_exit(context, instance, args)
