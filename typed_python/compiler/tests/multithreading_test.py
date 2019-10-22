@@ -11,17 +11,18 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
+import os
+import threading
+import time
+import unittest
 
+from flaky import flaky
 from typed_python import (
     Function, Class, Member, Alternative, TupleOf, ListOf, ConstDict, SerializationContext, Entrypoint
 )
 
 import typed_python._types as _types
 from typed_python.compiler.runtime import Runtime
-import unittest
-import time
-import threading
-import os
 
 
 def thread_apply(f, argtuples):
@@ -52,6 +53,7 @@ class AClass(Class):
 
 
 class TestMultithreading(unittest.TestCase):
+    @flaky(max_runs=3, min_passes=1)
     def test_gil_is_released(self):
         @Compiled
         def f(x: int):
@@ -80,7 +82,7 @@ class TestMultithreading(unittest.TestCase):
         # expect the ratio to be close to 1, but have some error margin, especially on Travis
         # where we may be running in a multitenant environment
         if os.environ.get('TRAVIS_CI', None):
-            self.assertTrue(ratio >= .8 and ratio < 1.75, ratio)
+            self.assertTrue(ratio >= .7 and ratio < 1.75, ratio)
         else:
             self.assertTrue(ratio >= .9 and ratio < 1.1, ratio)
 
