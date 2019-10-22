@@ -49,7 +49,7 @@ install: install-dependencies install-pre-commit
 
 
 .PHONY: install-dependencies
-install-dependencies: $(VIRTUAL_ENV) testcert.cert testcert.key
+install-dependencies: $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate; \
 		pip install pipenv==2018.11.26; \
 		pipenv install --dev --deploy;
@@ -62,7 +62,7 @@ install-pre-commit:install-dependencies
 
 
 .PHONY: test
-test: testcert.cert testcert.key js-test
+test: js-test
 	. $(VIRTUAL_ENV)/bin/activate; pytest
 
 .PHONY: lint
@@ -94,7 +94,6 @@ clean:
 	rm -rf typed_python.egg-info/
 	rm -f nose.*.log
 	rm -f typed_python/_types.cpython-*.so
-	rm -f testcert.cert testcert.key
 	rm -rf $(VIRTUAL_ENV) .env
 	rm -f .coverage*
 	rm -f dist/
@@ -127,11 +126,6 @@ $(TP_BUILD_PATH):
 
 $(TP_LIB_PATH):
 	mkdir -p $(TP_LIB_PATH)
-
-testcert.cert testcert.key:
-	openssl req -x509 -newkey rsa:2048 -keyout testcert.key -nodes \
-		-out testcert.cert -sha256 -days 1000 \
-		-subj '/C=US/ST=New York/L=New York/CN=localhost'
 
 .PHONY: testpypi-upload
 testpypi-upload: $(VIRTUAL_ENV)
