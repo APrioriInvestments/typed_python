@@ -174,13 +174,15 @@ PyObject* PyAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const
 }
 
 PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
-    auto p = callMethod("__getattribute__", pyAttrName);
-    if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_AttributeError)) {
-        PyErr_Clear();
-    }
-    else {
-        if (p.first) {
-            return p.second;
+    if (type()->getAlternative()->hasGetAttributeMagicMethod()) {
+        auto p = callMethod("__getattribute__", pyAttrName);
+        if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_AttributeError)) {
+            PyErr_Clear();
+        }
+        else {
+            if (p.first) {
+                return p.second;
+            }
         }
     }
 
@@ -191,7 +193,7 @@ PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrNam
         return incref(Py_False);
     }
 
-    if (strcmp(attrName,"matches") == 0) {
+    if (strcmp(attrName, "matches") == 0) {
         PyInstance* self = duplicate();
 
         self->mIteratorOffset = -1;

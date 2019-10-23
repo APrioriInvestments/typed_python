@@ -347,13 +347,15 @@ void PyClassInstance::constructFromPythonArgumentsConcrete(Class* classT, uint8_
 }
 
 PyObject* PyClassInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
-    auto p = callMemberFunction("__getattribute__", pyAttrName);
-    if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_AttributeError)) {
-        PyErr_Clear();
-    }
-    else {
-        if (p.first) {
-            return p.second;
+    if (type()->getHeldClass()->hasGetAttributeMagicMethod()) {
+        auto p = callMemberFunction("__getattribute__", pyAttrName);
+        if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_AttributeError)) {
+            PyErr_Clear();
+        }
+        else {
+            if (p.first) {
+                return p.second;
+            }
         }
     }
 

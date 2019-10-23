@@ -1217,10 +1217,9 @@ class TestAlternativeCompilation(unittest.TestCase):
             self.assertEqual(f_getattr2(v), "4")
             self.assertEqual(f_getattr2(v), c_getattr2(v))
             f_delattr1(v)
-            # TODO: exception types are different.  Should this be made consistent?
             with self.assertRaises(KeyError):
                 f_getattr1(v)
-            with self.assertRaises(TypeError):
+            with self.assertRaises(KeyError):
                 c_getattr1(v)
             self.assertEqual(f_getattr2(v), "4")
             self.assertEqual(f_getattr2(v), c_getattr2(v))

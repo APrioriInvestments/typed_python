@@ -458,6 +458,7 @@ Expression = Expression.define(Alternative(
     rshift=lambda self, other: Expression.Binop(op=BinaryOp.RShift(), left=self, right=ensureExpr(other)),
     bitand=lambda self, other: Expression.Binop(op=BinaryOp.BitAnd(), left=self, right=ensureExpr(other)),
     bitor=lambda self, other: Expression.Binop(op=BinaryOp.BitOr(), left=self, right=ensureExpr(other)),
+    bitxor=lambda self, other: Expression.Binop(op=BinaryOp.BitXor(), left=self, right=ensureExpr(other)),
     load=lambda self: Expression.Load(ptr=self),
     store=lambda self, val: Expression.Store(ptr=self, val=ensureExpr(val)),
     atomic_add=lambda self, val: Expression.AtomicAdd(ptr=self, val=ensureExpr(val)),
