@@ -3,13 +3,19 @@
 
 #include <map>
 
-SetType* SetType::Make(Type* eltype) {
+SetType* SetType::Make(Type* eltype, SetType* knownType) {
     static std::mutex guard;
+
     std::lock_guard<std::mutex> lg(guard);
+
     static std::map<Type*, SetType*> m;
+
     auto it = m.find(eltype);
-    if (it == m.end())
-        it = m.insert(std::make_pair(eltype, new SetType(eltype))).first;
+
+    if (it == m.end()) {
+        it = m.insert(std::make_pair(eltype, knownType ? knownType : new SetType(eltype))).first;
+    }
+
     return it->second;
 }
 

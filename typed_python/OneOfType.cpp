@@ -158,7 +158,7 @@ void OneOfType::assign(instance_ptr self, instance_ptr other) {
 }
 
 // static
-OneOfType* OneOfType::Make(const std::vector<Type*>& types) {
+OneOfType* OneOfType::Make(const std::vector<Type*>& types, OneOfType* knownType) {
     std::vector<Type*> flat_typelist;
     std::set<Type*> seen;
 
@@ -186,9 +186,8 @@ OneOfType* OneOfType::Make(const std::vector<Type*>& types) {
 
     auto it = m.find(flat_typelist);
     if (it == m.end()) {
-        it = m.insert(std::make_pair(flat_typelist, new OneOfType(flat_typelist))).first;
+        it = m.insert(std::make_pair(flat_typelist, knownType ? knownType : new OneOfType(flat_typelist))).first;
     }
 
     return it->second;
 }
-

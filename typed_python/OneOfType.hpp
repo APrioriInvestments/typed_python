@@ -100,7 +100,11 @@ public:
         return m_types;
     }
 
-    static OneOfType* Make(const std::vector<Type*>& types);
+    void _updateTypeMemosAfterForwardResolution() {
+        OneOfType::Make(m_types, this);
+    }
+
+    static OneOfType* Make(const std::vector<Type*>& types, OneOfType* knownType = nullptr);
 
 private:
     std::vector<Type*> m_types;

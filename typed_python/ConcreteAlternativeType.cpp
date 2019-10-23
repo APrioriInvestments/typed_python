@@ -48,9 +48,9 @@ bool ConcreteAlternative::_updateAfterForwardTypesChanged() {
     bool is_default_constructible = m_alternative->subtypes()[m_which].second->is_default_constructible();
 
     bool anyChanged = (
-      m_name != name ||
-      m_size != size ||
-      m_is_default_constructible != is_default_constructible
+        m_name != name ||
+        m_size != size ||
+        m_is_default_constructible != is_default_constructible
     );
 
     m_name = name;
@@ -72,7 +72,7 @@ void ConcreteAlternative::constructor(instance_ptr self) {
 }
 
 // static
-ConcreteAlternative* ConcreteAlternative::Make(Alternative* alt, int64_t which) {
+ConcreteAlternative* ConcreteAlternative::Make(Alternative* alt, int64_t which, ConcreteAlternative* knownType) {
     static std::mutex guard;
 
     std::lock_guard<std::mutex> lock(guard);
@@ -85,18 +85,20 @@ ConcreteAlternative* ConcreteAlternative::Make(Alternative* alt, int64_t which) 
 
     if (it == m.end()) {
         if (which < 0 || which >= alt->subtypes().size()) {
-          throw std::runtime_error(
-            "invalid alternative index: " +
-            format(which) + " not in [0," +
-            format(alt->subtypes().size()) + ")"
-          );
+            throw std::runtime_error(
+                "invalid alternative index: " +
+                format(which) + " not in [0," +
+                format(alt->subtypes().size()) + ")"
+            );
         }
 
         it = m.insert(
-            std::make_pair(keytype(alt,which), new ConcreteAlternative(alt,which))
-            ).first;
+            std::make_pair(
+                keytype(alt,which),
+                knownType ? knownType : new ConcreteAlternative(alt,which)
+            )
+        ).first;
     }
 
     return it->second;
 }
-

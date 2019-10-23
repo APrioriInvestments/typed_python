@@ -26,6 +26,20 @@ bool TupleOrListOfType::isBinaryCompatibleWithConcrete(Type* other) {
     return m_element_type->isBinaryCompatibleWith(otherO->m_element_type);
 }
 
+bool TupleOrListOfType::_updateAfterForwardTypesChanged() {
+    std::string name = (m_is_tuple ? "TupleOf(" : "ListOf(") + m_element_type->name() + ")";
+
+    if (m_is_recursive) {
+        name = m_recursive_name;
+    }
+
+    bool anyChanged = name != m_name;
+
+    m_name = name;
+
+    return anyChanged;
+}
+
 void TupleOrListOfType::repr(instance_ptr self, ReprAccumulator& stream) {
     PushReprState isNew(stream, self);
 
@@ -139,7 +153,7 @@ bool TupleOrListOfType::cmp(instance_ptr left, instance_ptr right, int pyCompari
 }
 
 // static
-TupleOfType* TupleOfType::Make(Type* elt) {
+TupleOfType* TupleOfType::Make(Type* elt, TupleOfType* knownType) {
     static std::mutex guard;
 
     std::lock_guard<std::mutex> lock(guard);
@@ -147,15 +161,20 @@ TupleOfType* TupleOfType::Make(Type* elt) {
     static std::map<Type*, TupleOfType*> m;
 
     auto it = m.find(elt);
+
     if (it == m.end()) {
-        it = m.insert(std::make_pair(elt, new TupleOfType(elt))).first;
+        if (knownType == nullptr) {
+            knownType = new TupleOfType(elt);
+        }
+
+        it = m.insert(std::make_pair(elt, knownType)).first;
     }
 
     return it->second;
 }
 
 // static
-ListOfType* ListOfType::Make(Type* elt) {
+ListOfType* ListOfType::Make(Type* elt, ListOfType* knownType) {
     static std::mutex guard;
 
     std::lock_guard<std::mutex> lock(guard);
@@ -163,8 +182,13 @@ ListOfType* ListOfType::Make(Type* elt) {
     static std::map<Type*, ListOfType*> m;
 
     auto it = m.find(elt);
+
     if (it == m.end()) {
-        it = m.insert(std::make_pair(elt, new ListOfType(elt))).first;
+        if (knownType == nullptr) {
+            knownType = new ListOfType(elt);
+        }
+
+        it = m.insert(std::make_pair(elt, knownType)).first;
     }
 
     return it->second;
@@ -332,5 +356,3 @@ void ListOfType::resize(instance_ptr self, size_t count, instance_ptr value) {
         self_layout->count = count;
     }
 }
-
-

@@ -31,6 +31,11 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
+
+    void _updateTypeMemosAfterForwardResolution() {
+        ConcreteAlternative::Make(m_alternative, m_which, this);
+    }
+
     bool isBinaryCompatibleWithConcrete(Type* other);
 
     template<class visitor_type>
@@ -117,7 +122,7 @@ public:
         return m_alternative->eltPtr(self);
     }
 
-    static ConcreteAlternative* Make(Alternative* alt, int64_t which);
+    static ConcreteAlternative* Make(Alternative* alt, int64_t which, ConcreteAlternative* knownType=nullptr);
 
     Type* elementType() const {
         return m_alternative->subtypes()[m_which].second;

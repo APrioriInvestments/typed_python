@@ -291,6 +291,10 @@ void Type::forwardResolvedTo(Forward* forward, Type* resolvedTo) {
     if (m_referenced_forwards.size() == 0) {
         forwardTypesAreResolved();
     }
+
+    this->check([&](auto& subtype) {
+        subtype._updateTypeMemosAfterForwardResolution();
+    });
 }
 
 

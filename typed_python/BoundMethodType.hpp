@@ -63,7 +63,11 @@ public:
         return anyChanged;
     }
 
-    static BoundMethod* Make(Type* c, std::string funcName) {
+    void _updateTypeMemosAfterForwardResolution() {
+        BoundMethod::Make(m_first_arg, m_funcName, this);
+    }
+
+    static BoundMethod* Make(Type* c, std::string funcName, BoundMethod* knownType=nullptr) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
@@ -76,7 +80,7 @@ public:
 
         if (it == m.end()) {
             it = m.insert(
-                std::make_pair(keytype(c, funcName), new BoundMethod(c, funcName))
+                std::make_pair(keytype(c, funcName), knownType ? knownType : new BoundMethod(c, funcName))
             ).first;
         }
 
@@ -172,6 +176,3 @@ public:
 
     Function* m_function;
 };
-
-
-

@@ -33,7 +33,12 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
-    static PointerTo* Make(Type* elt) {
+    void _updateTypeMemosAfterForwardResolution() {
+        PointerTo::Make(m_element_type, this);
+    }
+
+
+    static PointerTo* Make(Type* elt, PointerTo* knownType = nullptr) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
@@ -42,7 +47,7 @@ public:
 
         auto it = m.find(elt);
         if (it == m.end()) {
-            it = m.insert(std::make_pair(elt, new PointerTo(elt))).first;
+            it = m.insert(std::make_pair(elt, knownType ? knownType : new PointerTo(elt))).first;
         }
 
         return it->second;
@@ -134,4 +139,3 @@ public:
 private:
     Type* m_element_type;
 };
-

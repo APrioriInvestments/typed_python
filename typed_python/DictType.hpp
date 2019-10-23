@@ -32,6 +32,10 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
+    void _updateTypeMemosAfterForwardResolution() {
+        DictType::Make(m_key, m_value, this);
+    }
+
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
     }
@@ -46,7 +50,7 @@ public:
 
     bool isBinaryCompatibleWithConcrete(Type* other);
 
-    static DictType* Make(Type* key, Type* value);
+    static DictType* Make(Type* key, Type* value, DictType* knownType=nullptr);
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
@@ -183,4 +187,3 @@ private:
     size_t m_bytes_per_key;
     size_t m_bytes_per_key_value_pair;
 };
-

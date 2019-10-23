@@ -166,7 +166,7 @@ public:
 
 protected:
     template<class subtype>
-    static subtype* MakeSubtype(const std::vector<Type*>& types, const std::vector<std::string>& names) {
+    static subtype* MakeSubtype(const std::vector<Type*>& types, const std::vector<std::string>& names, subtype* knownType = nullptr) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
@@ -177,7 +177,12 @@ protected:
 
         auto it = m.find(keytype(types, names));
         if (it == m.end()) {
-            it = m.insert(std::make_pair(keytype(types, names), new subtype(types, names))).first;
+            it = m.insert(
+                std::make_pair(
+                    keytype(types, names),
+                    knownType ? knownType : new subtype(types, names)
+                )
+            ).first;
         }
 
         return it->second;
@@ -202,8 +207,12 @@ public:
 
     bool _updateAfterForwardTypesChanged();
 
-    static NamedTuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names) {
-        return MakeSubtype<NamedTuple>(types, names);
+    void _updateTypeMemosAfterForwardResolution() {
+        NamedTuple::Make(m_types, m_names, this);
+    }
+
+    static NamedTuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names, NamedTuple* knownType = nullptr) {
+        return MakeSubtype<NamedTuple>(types, names, knownType);
     }
 };
 
@@ -217,8 +226,11 @@ public:
 
     bool _updateAfterForwardTypesChanged();
 
-    static Tuple* Make(const std::vector<Type*>& types) {
-        return MakeSubtype<Tuple>(types, std::vector<std::string>());
+    void _updateTypeMemosAfterForwardResolution() {
+        Tuple::Make(m_types, this);
+    }
+
+    static Tuple* Make(const std::vector<Type*>& types, Tuple* knownType=nullptr) {
+        return MakeSubtype<Tuple>(types, std::vector<std::string>(), knownType);
     }
 };
-

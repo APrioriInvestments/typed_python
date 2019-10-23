@@ -53,7 +53,11 @@ public:
 
     bool isBinaryCompatibleWithConcrete(Type* other);
 
-    static ConstDictType* Make(Type* key, Type* value);
+    void _updateTypeMemosAfterForwardResolution() {
+        ConstDictType::Make(m_key, m_value, this);
+    }
+
+    static ConstDictType* Make(Type* key, Type* value, ConstDictType* knownType = nullptr);
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
@@ -156,4 +160,3 @@ private:
     size_t m_bytes_per_key_value_pair;
     size_t m_bytes_per_key_subtree_pair;
 };
-

@@ -47,7 +47,7 @@ bool DictType::isBinaryCompatibleWithConcrete(Type* other) {
 }
 
 // static
-DictType* DictType::Make(Type* key, Type* value) {
+DictType* DictType::Make(Type* key, Type* value, DictType* knownType) {
     static std::mutex guard;
 
     std::lock_guard<std::mutex> lock(guard);
@@ -58,7 +58,12 @@ DictType* DictType::Make(Type* key, Type* value) {
 
     auto it = m.find(lookup_key);
     if (it == m.end()) {
-        it = m.insert(std::make_pair(lookup_key, new DictType(key, value))).first;
+        it = m.insert(
+            std::make_pair(
+                lookup_key,
+                knownType ? knownType: new DictType(key, value)
+            )
+        ).first;
     }
 
     return it->second;
@@ -278,4 +283,3 @@ void DictType::assign(instance_ptr self, instance_ptr other) {
 
     destroy((instance_ptr)&old);
 }
-

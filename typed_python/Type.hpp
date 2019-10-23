@@ -395,6 +395,16 @@ public:
     // subtype-specific calculation
     bool _updateAfterForwardTypesChanged() { return false; }
 
+    // update our T::Make memos to reflect the fact that our
+    // types may have referred to forward that are now replaced.
+    // the type memos will have us listed with the Forward as one
+    // of the arguments to the 'Make' function, but now we'll have
+    // the resolved circular type dependency, and we need that memo
+    // to resolve to 'this' as well.
+    //
+    // subtypes are expected to specialize this function
+    void _updateTypeMemosAfterForwardResolution() {}
+
     // called when a downstream type has changed in some way.
     // this may recalculate our on-disk size, our name, or some other
     // feature of the type that depends on the forward delcarations
@@ -520,4 +530,3 @@ protected:
     // a subset of m_referenced_forwards that we directly contain
     std::set<Forward*> m_contained_forwards;
 };
-

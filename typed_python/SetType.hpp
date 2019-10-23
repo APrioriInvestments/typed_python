@@ -15,6 +15,10 @@ class SetType : public Type {
         visitor(m_key_type);
     }
 
+    void _updateTypeMemosAfterForwardResolution() {
+        SetType::Make(m_key_type, this);
+    }
+
     instance_ptr insertKey(instance_ptr self, instance_ptr key);
     instance_ptr lookupKey(instance_ptr self, instance_ptr key) const;
     bool discard(instance_ptr self, instance_ptr key);
@@ -69,6 +73,10 @@ class SetType : public Type {
         }
     }
 
+    typed_python_hash_type hash(instance_ptr left) {
+        throw std::runtime_error("Can't hash Set instances");
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         size_t count;
@@ -121,7 +129,7 @@ class SetType : public Type {
     }
 
   public:
-    static SetType* Make(Type* eltype);
+    static SetType* Make(Type* eltype, SetType* knownType=nullptr);
 
   private:
     Type* m_key_type;

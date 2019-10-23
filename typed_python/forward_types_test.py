@@ -15,11 +15,11 @@ import unittest
 
 from typed_python import (
     TupleOf, OneOf, Alternative, Class, Member,
-    Forward, Int64, NamedTuple, Tuple, Dict, ListOf, ConstDict
+    Forward, Int64, NamedTuple, Tuple, Dict, ListOf, ConstDict, Module
 )
 
 
-class NativeForwardTypesTests(unittest.TestCase):
+class ForwardTypesTests(unittest.TestCase):
     def test_basic_forward_type_resolution(self):
         f = Forward("f")
         T = TupleOf(f)
@@ -186,10 +186,46 @@ class NativeForwardTypesTests(unittest.TestCase):
         OneOfTupleOfSelf = OneOfTupleOfSelf.define(OneOf(None, TupleOf(OneOfTupleOfSelf)))
 
         self.assertEqual(OneOfTupleOfSelf.__qualname__, "OneOfTupleOfSelf")
-        self.assertEqual(OneOf(None, TupleOf(OneOfTupleOfSelf)).__qualname__, "OneOf(NoneType, TupleOf(OneOfTupleOfSelf))")
+        self.assertEqual(OneOf(None, TupleOf(OneOfTupleOfSelf)).__qualname__, "OneOfTupleOfSelf")
 
         TO = Forward("TO")
         TO = TO.define(TupleOf(OneOf(None, TO)))
         self.assertEqual(TO.__qualname__, "TO")
         self.assertIs(TO.ElementType.Types[1], TO)
         self.assertEqual(TO.ElementType.__qualname__, "OneOf(NoneType, TO)")
+
+    def test_forward_types_identity_container(self):
+        for ContainerKind in [TupleOf, ListOf]:
+            module = Module("M")
+            module.RecursiveThing = OneOf(None, ContainerKind(module.RecursiveThing))
+
+            aRecursiveThing = module.RecursiveThing((None, (None,)))
+
+            self.assertEqual(type(aRecursiveThing), module.RecursiveThing.Types[1])
+            self.assertEqual(type(aRecursiveThing), ContainerKind(module.RecursiveThing))
+
+    def test_forward_types_identity_dict(self):
+        for DictKind in [Dict, ConstDict]:
+            module = Module("M")
+            module.RecursiveThing = OneOf(None, DictKind(int, module.RecursiveThing), DictKind(module.RecursiveThing, int))
+
+            aRecursiveThing = module.RecursiveThing({1: None})
+            self.assertEqual(type(aRecursiveThing), DictKind(int, module.RecursiveThing))
+
+            aRecursiveThing = module.RecursiveThing({None: 1})
+            self.assertEqual(type(aRecursiveThing), DictKind(module.RecursiveThing, int))
+
+    def test_forward_types_twice(self):
+        module = Module("M")
+        module.RecursiveThing = OneOf(
+            None,
+            Dict(int, TupleOf(module.RecursiveThing)),
+            Dict(str, TupleOf(module.RecursiveThing))
+        )
+
+        self.assertEqual(
+            module.RecursiveThing.Types[1].ValueType, TupleOf(module.RecursiveThing)
+        )
+        self.assertEqual(
+            module.RecursiveThing.Types[2].ValueType, TupleOf(module.RecursiveThing)
+        )

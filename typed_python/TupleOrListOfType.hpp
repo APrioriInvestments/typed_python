@@ -55,19 +55,7 @@ public:
         visitor(m_element_type);
     }
 
-    bool _updateAfterForwardTypesChanged() {
-        std::string name = (m_is_tuple ? "TupleOf(" : "ListOf(") + m_element_type->name() + ")";
-
-        if (m_is_recursive) {
-            name = m_recursive_name;
-        }
-
-        bool anyChanged = name != m_name;
-
-        m_name = name;
-
-        return anyChanged;
-    }
+    bool _updateAfterForwardTypesChanged();
 
     //serialize, but don't write a count
     template<class buf_t>
@@ -202,7 +190,11 @@ public:
     {
     }
 
-    static ListOfType* Make(Type* elt);
+    static ListOfType* Make(Type* elt, ListOfType* knownType=nullptr);
+
+    void _updateTypeMemosAfterForwardResolution() {
+        ListOfType::Make(m_element_type, this);
+    }
 
     void setSizeUnsafe(instance_ptr self, size_t count);
 
@@ -320,6 +312,9 @@ public:
     {
     }
 
+    void _updateTypeMemosAfterForwardResolution() {
+        TupleOfType::Make(m_element_type, this);
+    }
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
@@ -370,7 +365,7 @@ public:
         buffer.finishCompoundMessage(wireType);
     }
 
-
-    static TupleOfType* Make(Type* elt);
+    // get a memoized TupleOfType. If 'knownType', then install this type
+    // if not already known.
+    static TupleOfType* Make(Type* elt, TupleOfType* knownType = nullptr);
 };
-
