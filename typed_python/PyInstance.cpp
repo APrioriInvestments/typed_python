@@ -325,7 +325,7 @@ PyObject* PyInstance::pyOperator(PyObject* lhs, PyObject* rhs, const char* op, c
 
         if (ret && ret != Py_NotImplemented) {
             return ret;
-            }
+        }
 
         if (extractTypeFrom(rhs->ob_type)) {
             return specializeForType(rhs, [&](auto& subtype) {
@@ -604,8 +604,6 @@ PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
             new PySequenceMethods {0,0,0,0,0,0,0,0};
             res->sq_contains = (objobjproc)PyInstance::sq_contains;
             res->sq_length = (lenfunc)PyInstance::mp_and_sq_length;
-            //res->sq_item = (ssizeargfunc)PyInstance::sq_item;
-            //res->sq_ass_item = (ssizeobjargproc)PyInstance::sq_ass_item;
         return res;
     }
 

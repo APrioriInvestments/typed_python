@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
@@ -19,11 +20,10 @@ from typed_python.compiler.type_wrappers.arithmetic_wrapper import FloatWrapper,
 
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, OneOf, PointerTo, Bool, Int32, String
+from typed_python import NoneType, _types, OneOf, PointerTo, Bool, String, Int32
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
-from typed_python.compiler.native_ast import VoidPtr
 from math import trunc, floor, ceil
 
 
@@ -977,32 +977,15 @@ class ClassWrapper(RefcountedWrapper):
             or super().convert_bin_op(context, l, op, r, inplace)
 
     def convert_comparison(self, context, left, op, right):
-        # TODO: provide nicer translation from op to Py_ comparison codes
-        py_code = 2 if op.matches.Eq else \
-            3 if op.matches.NotEq else \
-            0 if op.matches.Lt else \
-            4 if op.matches.Gt else \
-            1 if op.matches.LtE else \
-            5 if op.matches.GtE else -1
-        if py_code < 0:
-            return None
-        tp_left = context.getTypePointer(left.expr_type.typeRepresentation)
-        tp_right = context.getTypePointer(right.expr_type.typeRepresentation)
-        if tp_left and tp_left == tp_right:
-            if not left.isReference:
-                left = context.push(left.expr_type, lambda x: x.convert_copy_initialize(left))
-            if not right.isReference:
-                right = context.push(right.expr_type, lambda x: x.convert_copy_initialize(right))
-            return context.pushPod(
-                Bool,
-                runtime_functions.class_cmp.call(
-                    tp_left,
-                    left.expr.cast(VoidPtr),
-                    right.expr.cast(VoidPtr),
-                    py_code
-                )
-            )
-        return None
+        if op.matches.Eq:
+            native_expr = left.nonref_expr.cast(native_ast.UInt64).eq(right.nonref_expr.cast(native_ast.UInt64))
+            return TypedExpression(context, native_expr, Bool, False)
+        if op.matches.NotEq:
+            native_expr = left.nonref_expr.cast(native_ast.UInt64).neq(right.nonref_expr.cast(native_ast.UInt64))
+            return TypedExpression(context, native_expr, Bool, False)
+
+        return context.pushException(TypeError, f"Can't compare instances of {left.expr_type.typeRepresentation}"
+                                                f" and {right.expr_type.typeRepresentation} with {op}")
 
     def convert_bin_op_reverse(self, context, r, op, l, inplace):
         if op.matches.In:
@@ -1032,7 +1015,10 @@ class ClassWrapper(RefcountedWrapper):
         y = self.generate_method_call(context, "__hash__", (expr,))
         if y is not None:
             return y
-        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
-        if tp:
-            return context.pushPod(Int32, runtime_functions.hash_class.call(expr.nonref_expr.cast(VoidPtr), tp))
-        return None
+
+        # default hash for Class types:
+        HELD_CLASS_CAT_NO = 29
+        PRIME_NO = 1000003
+
+        vtp = _types._vtablePointer(self.typeRepresentation)
+        return context.constant(Int32(((((HELD_CLASS_CAT_NO * PRIME_NO) ^ (vtp >> 32)) * PRIME_NO) ^ vtp) & 0xFFFFFFFF))

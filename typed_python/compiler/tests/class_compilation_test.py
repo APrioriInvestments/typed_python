@@ -1284,8 +1284,8 @@ class TestClassCompilationCompilation(unittest.TestCase):
         def result_or_exception(f, *p):
             try:
                 return f(*p)
-            except Exception:
-                return "exception"
+            except Exception as e:
+                return type(e)
 
         class C(Class, Final):
             i = Member(int)
@@ -1313,7 +1313,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             return hash(x)
 
         values = [C(i=0), C(i=1), C(s="a"), C(s="b")]
-        for f in [f_lt, f_eq, f_ne, f_lt, f_gt, f_le, f_ge]:
+        for f in [f_eq, f_ne, f_lt, f_gt, f_le, f_ge]:
             for v1 in values:
                 for v2 in values:
                     compiled_f = Compiled(f)
@@ -1325,8 +1325,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
                 compiled_f = Compiled(f)
                 r1 = result_or_exception(f, v)
                 r2 = result_or_exception(compiled_f, v)
-                if r1 != r2:
-                    print("mismatch")
                 self.assertEqual(r1, r2)
 
     def test_compile_class_comparison_methods(self):
@@ -1391,6 +1389,23 @@ class TestClassCompilationCompilation(unittest.TestCase):
                 r1 = f(v)
                 r2 = compiled_f(v)
                 self.assertEqual(r1, r2)
+
+    def test_compile_class_hash_special_value(self):
+
+        class C(Class, Final):
+            i = Member(int)
+
+            def __hash__(self):
+                return self.i
+
+        def f_hash(x: C):
+            return hash(x)
+
+        c_hash = Compiled(f_hash)
+        self.assertEqual(f_hash(C(i=123)), 123)
+        self.assertEqual(c_hash(C(i=123)), 123)
+        self.assertEqual(f_hash(C(i=-1)), -2)
+        self.assertEqual(c_hash(C(i=-1)), -2)
 
     def test_compile_class_getsetitem(self):
 
