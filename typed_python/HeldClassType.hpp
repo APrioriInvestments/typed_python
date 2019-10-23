@@ -297,7 +297,8 @@ public:
             m_own_staticFunctions(staticFunctions),
             m_own_propertyFunctions(propertyFunctions),
             m_own_classMembers(classMembers),
-            m_hasComparisonOperators(false)
+            m_hasComparisonOperators(false),
+            m_hasGetAttributeMagicMethod(false)
     {
         m_name = inName;
 
@@ -307,6 +308,8 @@ public:
         if (m_memberFunctions.find("__gt__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
         if (m_memberFunctions.find("__le__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
         if (m_memberFunctions.find("__ge__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+
+        if (m_own_memberFunctions.find("__getattribute__") != m_own_memberFunctions.end()) { m_hasGetAttributeMagicMethod = true; }
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -582,6 +585,10 @@ public:
         return m_hasComparisonOperators;
     }
 
+    bool hasGetAttributeMagicMethod() const {
+        return m_hasGetAttributeMagicMethod;
+    }
+
     void initializeMRO() {
         // this is not how the MRO actually works, but we have yet to actually
         // code it correctly.
@@ -808,6 +815,5 @@ private:
     std::unordered_map<const char*, BoundMethod*, HashConstCharPtr, ConstCharPtrsAreEqual> m_memberFunctionMethodTypes;
 
     bool m_hasComparisonOperators;
-
+    bool m_hasGetAttributeMagicMethod;
 };
-

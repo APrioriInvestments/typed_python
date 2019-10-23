@@ -37,10 +37,12 @@ public:
             m_default_construction_ix(0),
             m_default_construction_type(nullptr),
             m_subtypes(subtypes),
-            m_methods(methods)
+            m_methods(methods),
+            m_hasGetAttributeMagicMethod(false)
     {
         m_name = name;
         m_is_simple = false;
+        m_hasGetAttributeMagicMethod = m_methods.find("__getattribute__") != m_methods.end();
 
         if (m_subtypes.size() > 255) {
             throw std::runtime_error("Can't have an alternative with more than 255 subelements");
@@ -51,6 +53,10 @@ public:
         _updateAfterForwardTypesChanged();
 
         endOfConstructorInitialization(); // finish initializing the type object.
+    }
+
+    bool hasGetAttributeMagicMethod() const {
+        return m_hasGetAttributeMagicMethod;
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -179,5 +185,6 @@ private:
     std::map<std::string, Function*> m_methods;
 
     std::map<std::string, int> m_arg_positions;
-};
 
+    bool m_hasGetAttributeMagicMethod;
+};
