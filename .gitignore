@@ -25,3 +25,5 @@ object_database/web/content/dist
 /.env
 /dist/
 /pip-wheel-metadata/
+/testcert.cert
+/testcert.key
