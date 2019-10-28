@@ -1017,3 +1017,60 @@ void StringType::join(StringType::layout **outString, StringType::layout *separa
     StringType::Make()->destroy((instance_ptr)&newSeparator);
 
 }
+
+// static
+int64_t StringType::to_int64(layout *l) {
+    int64_t value = 0;
+    int64_t value_sign = 1;
+    enum State {left_space, sign, digit, underscore, right_space, failed} state = left_space;
+
+    if (l) {
+        for (int64_t i = 0; i < l->pointcount; i++) {
+            uint64_t c = getpoint(l, i);
+            if (uprops[c] & Uprops_SPACE) {
+                if (state == underscore || state == sign) {
+                    state = failed;
+                    break;
+                }
+                else if (state == digit)
+                    state = right_space;
+            }
+            else if (c == '+' || c == '-') {
+                if (state != left_space) {
+                    state = failed;
+                    break;
+                }
+                if (c == '-')
+                    value_sign = -1;
+                state = sign;
+            }
+            else if (c < 128 && std::isdigit(c)) {
+                if (state == right_space) {
+                    state = failed;
+                    break;
+                }
+                value *= 10;
+                value += c - '0';
+                state = digit;
+            }
+            else if (c == '_') {
+                if (state != digit) {
+                    state = failed;
+                    break;
+                }
+                state = underscore;
+            }
+            else {
+                state = failed;
+                break;
+            }
+        }
+    }
+    if (state == digit || state == right_space) {
+        return value_sign * value;
+    }
+    else {
+        PyErr_SetString(PyExc_ValueError, "'invalid literal for int() with base 10");
+        throw PythonExceptionSet();
+    }
+}

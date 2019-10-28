@@ -350,6 +350,8 @@ class TestAlternativeCompilation(unittest.TestCase):
             compiled_f = Compiled(f)
             r1 = f(A.a())
             r2 = compiled_f(A.a())
+            if r1 != r2:
+                print("mismatch")
             self.assertEqual(r1, r2)
 
     def test_compile_alternative_reverse_methods(self):

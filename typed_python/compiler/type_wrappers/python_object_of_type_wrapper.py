@@ -252,6 +252,9 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
         return super()._can_convert_from_type(otherType, explicit)
 
+    def convert_bool_cast(self, context, e):
+        return e.convert_to_type(bool)
+
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
         target_type = targetVal.expr_type
 
@@ -282,7 +285,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
         if tp:
             if not sourceVal.isReference:
-                sourceVal = context.push(sourceVal.expr_type, lambda x: x.convert_copy_initialize(sourceVal))
+                sourceVal = context.pushMove(sourceVal)
 
             context.pushEffect(
                 targetVal.expr.store(

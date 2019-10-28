@@ -13,6 +13,11 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python.compiler.type_wrappers.bool_cast_wrapper import BoolCastWrapper
+from typed_python.compiler.type_wrappers.int_cast_wrapper import IntCastWrapper
+from typed_python.compiler.type_wrappers.float_cast_wrapper import FloatCastWrapper
+from typed_python.compiler.type_wrappers.str_cast_wrapper import StrCastWrapper
+from typed_python.compiler.type_wrappers.bytes_cast_wrapper import BytesCastWrapper
 from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 import typed_python.compiler.native_ast as native_ast
 from typed_python._types import bytecount
@@ -32,5 +37,15 @@ class BytecountWrapper(Wrapper):
     def convert_call(self, context, expr, args, kwargs):
         if len(args) == 1 and isinstance(args[0].expr_type, PythonTypeObjectWrapper) and not kwargs:
             return context.constant(bytecount(args[0].expr_type.typeRepresentation.Value))
+        if len(args) == 1 and isinstance(args[0].expr_type, BoolCastWrapper) and not kwargs:
+            return context.constant(bytecount(bool))
+        if len(args) == 1 and isinstance(args[0].expr_type, IntCastWrapper) and not kwargs:
+            return context.constant(bytecount(int))
+        if len(args) == 1 and isinstance(args[0].expr_type, FloatCastWrapper) and not kwargs:
+            return context.constant(bytecount(float))
+        if len(args) == 1 and isinstance(args[0].expr_type, StrCastWrapper) and not kwargs:
+            return context.constant(bytecount(str))
+        if len(args) == 1 and isinstance(args[0].expr_type, BytesCastWrapper) and not kwargs:
+            return context.constant(bytecount(bytes))
 
         return super().convert_call(context, expr, args, kwargs)

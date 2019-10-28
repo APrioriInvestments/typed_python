@@ -1074,4 +1074,60 @@ extern "C" {
         }
     }
 
+    int64_t np_str_to_int64(StringType::layout* s) {
+        PyEnsureGilAcquired getTheGil; // since to_int64 can raise ValueErr
+
+        return StringType::to_int64(s);
+    }
+
+    double np_str_to_float64(StringType::layout* s) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* str_obj = PyInstance::extractPythonObject((instance_ptr)&s, StringType::Make());
+        if (!str_obj) {
+            throw PythonExceptionSet();
+        }
+        PyObject *float_obj = PyFloat_FromString(str_obj);
+        decref(str_obj);
+        if (!float_obj) {
+            throw PythonExceptionSet();
+        }
+        double ret = PyFloat_AsDouble(float_obj);
+        decref(float_obj);
+        return ret;
+    }
+
+    int64_t np_bytes_to_int64(BytesType::layout* l) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* str_obj = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, l->data, l->bytecount);
+        if (!str_obj) {
+            throw PythonExceptionSet();
+        }
+        PyObject *long_obj = PyLong_FromUnicodeObject(str_obj, 10);
+        decref(str_obj);
+        if (!long_obj) {
+            throw PythonExceptionSet();
+        }
+        long ret = PyLong_AsLong(long_obj);
+        decref(long_obj);
+        return ret;
+    }
+
+    double np_bytes_to_float64(BytesType::layout* l) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* str_obj = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, l->data, l->bytecount);
+        if (!str_obj) {
+            throw PythonExceptionSet();
+        }
+        PyObject *float_obj = PyFloat_FromString(str_obj);
+        decref(str_obj);
+        if (!float_obj) {
+            throw PythonExceptionSet();
+        }
+        double ret = PyFloat_AsDouble(float_obj);
+        decref(float_obj);
+        return ret;
+    }
 }

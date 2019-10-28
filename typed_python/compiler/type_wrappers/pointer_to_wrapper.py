@@ -13,10 +13,10 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
+from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 
-from typed_python import Int64, PointerTo, Bool, String
+from typed_python import PointerTo, Bool
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -71,37 +71,34 @@ class PointerToWrapper(Wrapper):
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-    def convert_cast(self, context, e, target_type):
-        if target_type.typeRepresentation == Int64:  # not Int32
-            return e.nonref_expr.cast(native_ast.Int64)
+    def convert_int_cast(self, context, e, raiseException=True):
+        return e.nonref_expr.cast(native_ast.Int64)
 
-        if target_type.typeRepresentation == String:
-            asInt = e.convert_to_type(int)
-            if asInt is None:
-                return None
+    def convert_str_cast(self, context, e):
+        asInt = e.convert_to_type(int)
+        if asInt is None:
+            return None
 
-            asStr = asInt.convert_to_type(str)
-            if asStr is None:
-                return None
+        asStr = asInt.convert_to_type(str)
+        if asStr is None:
+            return None
 
-            return context.constant("0x") + asStr
-
-        return super().convert_cast(context, e, target_type)
+        return context.constant("0x") + asStr
 
     def convert_bin_op(self, context, left, op, right, inplace):
         if op.matches.Add:
-            right_int = right.convert_cast(int)
+            right_int = right.expr_type.convert_int_cast(context, right, False)
             if right_int is None:
                 return super().convert_bin_op(context, left, op, right, inplace)
 
             return context.pushPod(self, left.nonref_expr.elemPtr(right_int.nonref_expr))
 
         if op.matches.Sub:
-            right_int = right.convert_cast(int)
+            right_int = right.expr_type.convert_int_cast(context, right, False)
             if right_int is None:
                 return super().convert_bin_op(context, left, op, right, inplace)
 
-            left_int = left.convert_cast(int)
+            left_int = left.expr_type.convert_int_cast(context, left, False)
             if left_int is None:
                 return super().convert_bin_op(context, left, op, right, inplace)
 
@@ -180,7 +177,8 @@ class PointerToWrapper(Wrapper):
                 return context.pushReference(self.typeRepresentation.ElementType, instance.nonref_expr)
 
         if methodname == "cast":
-            if len(args) == 1 and isinstance(args[0].expr_type, PythonTypeObjectWrapper):
+            if len(args) == 1 and isinstance(args[0].expr_type, PythonFreeObjectWrapper):
+                # (PythonTypeObjectWrapper, BoolCastWrapper, IntCastWrapper, FloatCastWrapper, StrCastWrapper, BytesCastWrapper)):
                 tgtType = typeWrapper(PointerTo(args[0].expr_type.typeRepresentation.Value))
                 return context.pushPod(tgtType, instance.nonref_expr.cast(tgtType.getNativeLayoutType()))
 
@@ -191,6 +189,9 @@ class PointerToWrapper(Wrapper):
             return context.push(self, lambda x: x.convert_default_initialize())
 
         if len(args) == 1 and not kwargs:
-            return args[0].convert_cast(self)
+            return args[0].convert_to_type(self, True)
 
         return super().convert_type_call(context, typeInst, args, kwargs)
+
+    def convert_bool_cast(self, context, e):
+        return e.convert_to_type(bool)

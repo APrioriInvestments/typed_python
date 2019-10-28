@@ -52,6 +52,11 @@ from typed_python.compiler.type_wrappers.string_wrapper import StringWrapper
 from typed_python.compiler.type_wrappers.bytes_wrapper import BytesWrapper
 from typed_python.compiler.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
 from typed_python.compiler.type_wrappers.abs_wrapper import AbsWrapper
+from typed_python.compiler.type_wrappers.bool_cast_wrapper import BoolCastWrapper
+from typed_python.compiler.type_wrappers.int_cast_wrapper import IntCastWrapper
+from typed_python.compiler.type_wrappers.float_cast_wrapper import FloatCastWrapper
+from typed_python.compiler.type_wrappers.str_cast_wrapper import StrCastWrapper
+from typed_python.compiler.type_wrappers.bytes_cast_wrapper import BytesCastWrapper
 from typed_python.compiler.type_wrappers.repr_wrapper import ReprWrapper
 from types import ModuleType
 from typed_python._types import TypeFor, bytecount
@@ -174,6 +179,21 @@ def pythonObjectRepresentation(context, f):
 
     if f is abs:
         return TypedExpression(context, native_ast.nullExpr, AbsWrapper(), False)
+
+    if f is bool:
+        return TypedExpression(context, native_ast.nullExpr, BoolCastWrapper(), False)
+
+    if f is int:
+        return TypedExpression(context, native_ast.nullExpr, IntCastWrapper(), False)
+
+    if f is float:
+        return TypedExpression(context, native_ast.nullExpr, FloatCastWrapper(), False)
+
+    if f is str:
+        return TypedExpression(context, native_ast.nullExpr, StrCastWrapper(), False)
+
+    if f is bytes:
+        return TypedExpression(context, native_ast.nullExpr, BytesCastWrapper(), False)
 
     if f is repr:
         return TypedExpression(context, native_ast.nullExpr, ReprWrapper(), False)

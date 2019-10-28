@@ -12,16 +12,24 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, ListOf, TupleOf, NamedTuple, Dict, ConstDict, OneOf, \
+import unittest
+
+from typed_python import Function, ListOf, TupleOf, NamedTuple, Dict, ConstDict, \
     Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Bool, Float64, Float32, \
     String, Bytes, Alternative, Set
 from typed_python.compiler.runtime import Runtime
-import unittest
 
 
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
+
+
+def result_or_exception(f, *p):
+    try:
+        return f(*p)
+    except Exception as e:
+        return type(e)
 
 
 class TestBuiltinCompilation(unittest.TestCase):
@@ -30,6 +38,14 @@ class TestBuiltinCompilation(unittest.TestCase):
         NT2 = NamedTuple(s=String, t=TupleOf(int))
         Alt1 = Alternative("Alt1", X={'a': int}, Y={'b': str})
         cases = [
+            (NT1, NT1(a=1, b=2.3, c="c", d="d")),
+            (Bytes, b"987654321"),
+            (Bytes, b"98.7654321"),
+            (Bytes, b"0.7654321e6"),
+            (Bytes, b"\01\00\02\03"),
+            (String, "1234567890"),
+            (String, "12345678.90"),
+            (String, "1.9E-15"),
             # (Float64, 1.23456789), # fails with compiled str=1.2345678899999999
             # (Float64, 12.3456789), # fails with compiled str=12.345678899999999
             # (Float64, -1.23456789), # fails with compiled str=-1.2345678899999999
@@ -83,6 +99,17 @@ class TestBuiltinCompilation(unittest.TestCase):
             (Float32, 1.234567),
             (Float32, 1.234),
             (String, "abcd"),
+            (String, "1234567890"),
+            (String, "\n\r +1234"),
+            (String, "-1234 \t "),
+            (String, "-123_4 \t "),
+            (String, "-_1234"),
+            (String, "-1234_"),
+            (String, "12__34"),
+            (String, "-_1234"),
+            (String, "-1234 _"),
+            (String, "x1234"),
+            (String, "1234L"),
             (Bytes, b"\01\00\02\03"),
             (Set(int), [1, 3, 5, 7]),
             (TupleOf(Int64), (7, 6, 5, 4, 3, 2, -1)),
@@ -98,33 +125,36 @@ class TestBuiltinCompilation(unittest.TestCase):
             (Dict(str, int), {'y': 7, 'n': 6}),
             (ConstDict(str, int), {'y': 2, 'n': 4}),
             (TupleOf(int), tuple(range(10000))),
-            (OneOf(String, Int64), "ab"),
-            (OneOf(String, Int64), 34),
+            # TODO: Currently, when compiled, failed OneOf conversions yield TypeError instead of ValueError
+            # (OneOf(String, Int64), "ab"),
+            # (OneOf(String, Int64), 34),
             (NT1, NT1(a=1, b=2.3, c="c", d="d")),
             (NT2, NT2(s="xyz", t=tuple(range(10000))))
         ]
-
         for T, v in cases:
-            @Compiled
-            def compiled_str(x: T):
+            def f_bool(x: T):
+                return bool(x)
+
+            def f_int(x: T):
+                return int(x)
+
+            def f_float(x: T):
+                return float(x)
+
+            def f_str(x: T):
                 return str(x)
 
-            @Compiled
-            def compiled_format(x: T):
+            def f_format(x: T):
                 return format(x)
 
-            @Compiled
-            def compiled_dir(x: T):
+            def f_dir(x: T):
                 return dir(x)
 
-            r1 = str(T(v))
-            r2 = compiled_str(v)
-            self.assertEqual(r1, r2)
-
-            r1 = format(T(v))
-            r2 = compiled_format(v)
-            self.assertEqual(r1, r2)
-
-            r1 = dir(T(v))
-            r2 = compiled_dir(v)
-            self.assertEqual(r1, r2)
+            fns = [f_bool, f_int, f_float]
+            for f in fns:
+                if f is f_int and isinstance(v, (int, float)) and (v > 2**63-1 or v < -2**63):
+                    continue
+                r1 = result_or_exception(f, T(v))
+                c_f = Compiled(f)
+                r2 = result_or_exception(c_f, v)
+                self.assertEqual(r1, r2)

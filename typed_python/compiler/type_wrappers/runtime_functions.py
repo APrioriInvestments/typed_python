@@ -658,3 +658,27 @@ pyobj_locktype_lock = externalCallTarget(
     Bool,
     Void.pointer()
 )
+
+str_to_int64 = externalCallTarget(
+    "np_str_to_int64",
+    Int64,
+    Void.pointer()
+)
+
+str_to_float64 = externalCallTarget(
+    "np_str_to_float64",
+    Float64,
+    Void.pointer()
+)
+
+bytes_to_int64 = externalCallTarget(
+    "np_bytes_to_int64",
+    Int64,
+    Void.pointer()
+)
+
+bytes_to_float64 = externalCallTarget(
+    "np_bytes_to_float64",
+    Float64,
+    Void.pointer()
+)
