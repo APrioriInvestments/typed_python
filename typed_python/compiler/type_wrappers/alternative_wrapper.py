@@ -12,17 +12,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from math import trunc, floor, ceil
+
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python.compiler.type_wrappers.arithmetic_wrapper import FloatWrapper, IntWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-
-from typed_python import NoneType, _types, OneOf, Bool, Int32, String
-
+from typed_python import NoneType, _types, OneOf, Bool, Int32
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 from typed_python.compiler.native_ast import VoidPtr
-from math import trunc, floor, ceil
 
 
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
@@ -90,23 +88,6 @@ class SimpleAlternativeWrapper(Wrapper):
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-    def convert_cast(self, context, e, target_type):
-        if isinstance(target_type, IntWrapper):
-            y = self.generate_method_call(context, "__int__", (e,))
-            if y is not None:
-                return y.convert_to_type(target_type)
-
-        if isinstance(target_type, FloatWrapper):
-            y = self.generate_method_call(context, "__float__", (e,))
-            if y is not None:
-                return y.convert_to_type(target_type)
-
-        if target_type.typeRepresentation == Bool:
-            return super().convert_cast(context, e, target_type)
-        if target_type.typeRepresentation == String:
-            return super().convert_cast(context, e, target_type)
-        return None
-
     def convert_call(self, context, expr, args, kwargs):
         return self.generate_method_call(context, "__call__", [expr] + args)
 
@@ -126,6 +107,37 @@ class SimpleAlternativeWrapper(Wrapper):
     def convert_abs(self, context, expr):
         return self.generate_method_call(context, "__abs__", (expr,))
 
+    def convert_bool_cast(self, context, e):
+        y = self.generate_method_call(context, "__bool__", (e,))
+        if y is not None:
+            return y
+        y = self.generate_method_call(context, "__len__", (e,))
+        if y is not None:
+            return context.pushPod(bool, y.nonref_expr.neq(0))
+        return context.constant(True)
+
+    def convert_int_cast(self, context, e, raiseException=True):
+        if raiseException:
+            return self.generate_method_call(context, "__int__", (e,)) \
+                or context.pushException(TypeError, f"__int__ not implemented for {self.typeRepresentation}")
+        else:
+            return self.generate_method_call(context, "__int__", (e,))
+
+    def convert_float_cast(self, context, e, raiseException=True):
+        if raiseException:
+            return self.generate_method_call(context, "__float__", (e,)) \
+                or context.pushException(TypeError, f"__float__ not implemented for {self.typeRepresentation}")
+        else:
+            return self.generate_method_call(context, "__float__", (e,))
+
+    def convert_str_cast(self, context, e):
+        return self.generate_method_call(context, "__str__", (e,)) \
+            or e.convert_repr()
+
+    def convert_bytes_cast(self, context, e):
+        return self.generate_method_call(context, "__bytes__", (e,)) \
+            or super().convert_bytes_cast(context, e)
+
     def convert_builtin(self, f, context, expr, a1=None):
         # handle builtins with additional arguments here:
         if f is format:
@@ -133,8 +145,7 @@ class SimpleAlternativeWrapper(Wrapper):
                 return self.generate_method_call(context, "__format__", (expr, a1))
             else:
                 return self.generate_method_call(context, "__format__", (expr, context.constant(''))) \
-                    or self.generate_method_call(context, "__str__", (expr,)) \
-                    or expr.convert_cast(str)
+                    or expr.convert_str_cast()
         if f is round:
             if a1 is not None:
                 return self.generate_method_call(context, "__round__", (expr, a1)) \
@@ -151,17 +162,15 @@ class SimpleAlternativeWrapper(Wrapper):
         if a1 is not None:
             return None
         # handle builtins with no additional arguments here:
-        if f is bytes:
-            return self.generate_method_call(context, "__bytes__", (expr, ))
         if f is trunc:
             return self.generate_method_call(context, "__trunc__", (expr,)) \
                 or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
         if f is floor:
-            expr_float = expr.convert_cast(float)
+            expr_float = self.convert_float_cast(context, expr, False)
             return self.generate_method_call(context, "__floor__", (expr,)) \
                 or (expr_float and context.pushPod(float, runtime_functions.floor_float64.call(expr_float.nonref_expr)))
         if f is ceil:
-            expr_float = expr.convert_cast(float)
+            expr_float = self.convert_float_cast(context, expr, False)
             return self.generate_method_call(context, "__ceil__", (expr,)) \
                 or (expr_float and context.pushPod(float, runtime_functions.ceil_float64.call(expr_float.nonref_expr)))
         if f is complex:
@@ -223,9 +232,9 @@ class SimpleAlternativeWrapper(Wrapper):
         tp_right = context.getTypePointer(right.expr_type.typeRepresentation)
         if tp_left and tp_left == tp_right:
             if not left.isReference:
-                left = context.push(left.expr_type, lambda x: x.convert_copy_initialize(left))
+                left = context.pushMove(left)
             if not right.isReference:
-                right = context.push(right.expr_type, lambda x: x.convert_copy_initialize(right))
+                right = context.pushMove(right)
             return context.pushPod(
                 Bool,
                 runtime_functions.alternative_cmp.call(
@@ -318,23 +327,6 @@ class ConcreteSimpleAlternativeWrapper(Wrapper):
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-    def convert_cast(self, context, e, target_type):
-        if isinstance(target_type, IntWrapper):
-            y = self.generate_method_call(context, "__int__", (e,))
-            if y is not None:
-                return y.convert_to_type(target_type)
-
-        if isinstance(target_type, FloatWrapper):
-            y = self.generate_method_call(context, "__float__", (e,))
-            if y is not None:
-                return y.convert_to_type(target_type)
-
-        if target_type.typeRepresentation == Bool:
-            return super().convert_cast(context, e, target_type)
-        if target_type.typeRepresentation == String:
-            return super().convert_cast(context, e, target_type)
-        return None
-
     def convert_builtin(self, f, context, expr, a1=None):
         altWrapper = typeWrapper(self.alternativeType)
         return altWrapper.convert_builtin(f, context, expr, a1)
@@ -344,6 +336,23 @@ class ConcreteSimpleAlternativeWrapper(Wrapper):
             return context.push(self, lambda x: x.convert_default_initialize())
 
         return super().convert_type_call(context, typeInst, args, kwargs)
+
+    def convert_bool_cast(self, context, e):
+        y = self.generate_method_call(context, "__bool__", (e,))
+        if y is not None:
+            return y
+        y = self.generate_method_call(context, "__len__", (e,))
+        if y is not None:
+            return context.pushPod(bool, y.nonref_expr.neq(0))
+        return context.constant(True)
+
+    def convert_str_cast(self, context, e):
+        return self.generate_method_call(context, "__str__", (e,)) \
+            or e.convert_repr()
+
+    def convert_bytes_cast(self, context, e):
+        return self.generate_method_call(context, "__bytes__", (e,)) \
+            or super().convert_bytes_cast(context, e)
 
 
 class AlternativeWrapper(RefcountedWrapper):
@@ -492,23 +501,6 @@ class AlternativeWrapper(RefcountedWrapper):
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-    def convert_cast(self, context, e, target_type):
-        if isinstance(target_type, IntWrapper):
-            y = self.generate_method_call(context, "__int__", (e,))
-            if y is not None:
-                return y.convert_to_type(target_type)
-
-        if isinstance(target_type, FloatWrapper):
-            y = self.generate_method_call(context, "__float__", (e,))
-            if y is not None:
-                return y.convert_to_type(target_type)
-
-        if target_type.typeRepresentation == Bool:
-            return super().convert_cast(context, e, target_type)
-        if target_type.typeRepresentation == String:
-            return super().convert_cast(context, e, target_type)
-        return None
-
     def convert_call(self, context, expr, args, kwargs):
         return self.generate_method_call(context, "__call__", [expr] + args)
 
@@ -524,6 +516,37 @@ class AlternativeWrapper(RefcountedWrapper):
     def convert_abs(self, context, expr):
         return self.generate_method_call(context, "__abs__", (expr,))
 
+    def convert_bool_cast(self, context, e):
+        y = self.generate_method_call(context, "__bool__", (e,))
+        if y is not None:
+            return y
+        y = self.generate_method_call(context, "__len__", (e,))
+        if y is not None:
+            return context.pushPod(bool, y.nonref_expr.neq(0))
+        return context.constant(True)
+
+    def convert_int_cast(self, context, e, raiseException=True):
+        if raiseException:
+            return self.generate_method_call(context, "__int__", (e,)) \
+                or context.pushException(TypeError, f"__int__ not implemented for {self.typeRepresentation}")
+        else:
+            return self.generate_method_call(context, "__int__", (e,))
+
+    def convert_float_cast(self, context, e, raiseException=True):
+        if raiseException:
+            return self.generate_method_call(context, "__float__", (e,)) \
+                or context.pushException(TypeError, f"__float__ not implemented for {self.typeRepresentation}")
+        else:
+            return self.generate_method_call(context, "__float__", (e,))
+
+    def convert_str_cast(self, context, e):
+        return self.generate_method_call(context, "__str__", (e,)) \
+            or e.convert_repr()
+
+    def convert_bytes_cast(self, context, e):
+        return self.generate_method_call(context, "__bytes__", (e,)) \
+            or super().convert_bytes_cast(context, e)
+
     def convert_builtin(self, f, context, expr, a1=None):
         # handle builtins with additional arguments here:
         if f is format:
@@ -531,8 +554,7 @@ class AlternativeWrapper(RefcountedWrapper):
                 return self.generate_method_call(context, "__format__", (expr, a1))
             else:
                 return self.generate_method_call(context, "__format__", (expr, context.constant(''))) \
-                    or self.generate_method_call(context, "__str__", (expr,)) \
-                    or expr.convert_cast(str)
+                    or expr.convert_str_cast()
         if f is round:
             if a1 is not None:
                 return self.generate_method_call(context, "__round__", (expr, a1)) \
@@ -549,17 +571,15 @@ class AlternativeWrapper(RefcountedWrapper):
         if a1 is not None:
             return None
         # handle builtins with no additional arguments here:
-        if f is bytes:
-            return self.generate_method_call(context, "__bytes__", (expr, ))
         if f is trunc:
             return self.generate_method_call(context, "__trunc__", (expr,)) \
                 or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
         if f is floor:
-            expr_float = expr.convert_cast(float)
+            expr_float = self.convert_float_cast(context, expr, False)
             return self.generate_method_call(context, "__floor__", (expr,)) \
                 or (expr_float and context.pushPod(float, runtime_functions.floor_float64.call(expr_float.nonref_expr)))
         if f is ceil:
-            expr_float = expr.convert_cast(float)
+            expr_float = self.convert_float_cast(context, expr, False)
             return self.generate_method_call(context, "__ceil__", (expr,)) \
                 or (expr_float and context.pushPod(float, runtime_functions.ceil_float64.call(expr_float.nonref_expr)))
         if f is complex:
@@ -719,23 +739,6 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-    def convert_cast(self, context, e, target_type):
-        if isinstance(target_type, IntWrapper):
-            y = self.generate_method_call(context, "__int__", (e,))
-            if y is not None:
-                return y.convert_to_type(target_type)
-
-        if isinstance(target_type, FloatWrapper):
-            y = self.generate_method_call(context, "__float__", (e,))
-            if y is not None:
-                return y.convert_to_type(target_type)
-
-        if target_type.typeRepresentation == Bool:
-            return super().convert_cast(context, e, target_type)
-        if target_type.typeRepresentation == String:
-            return super().convert_cast(context, e, target_type)
-        return None
-
     def convert_type_call(self, context, typeInst, args, kwargs):
         tupletype = self.typeRepresentation.ElementType
 
@@ -810,6 +813,23 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
     def convert_builtin(self, f, context, expr, a1=None):
         altWrapper = typeWrapper(self.alternativeType)
         return altWrapper.convert_builtin(f, context, expr, a1)
+
+    def convert_bool_cast(self, context, e):
+        y = self.generate_method_call(context, "__bool__", (e,))
+        if y is not None:
+            return y
+        y = self.generate_method_call(context, "__len__", (e,))
+        if y is not None:
+            return context.pushPod(bool, y.nonref_expr.neq(0))
+        return context.constant(True)
+
+    def convert_str_cast(self, context, e):
+        return self.generate_method_call(context, "__str__", (e,)) \
+            or e.convert_repr()
+
+    def convert_bytes_cast(self, context, e):
+        return self.generate_method_call(context, "__bytes__", (e,)) \
+            or super().convert_bytes_cast(context, e)
 
 
 class AlternativeMatchingWrapper(Wrapper):

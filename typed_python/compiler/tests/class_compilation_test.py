@@ -931,6 +931,8 @@ class TestClassCompilationCompilation(unittest.TestCase):
             compiled_f = Compiled(f)
             r1 = f(C(""))
             r2 = compiled_f(C(""))
+            if r1 != r2:
+                print("mismatch")
             self.assertEqual(r1, r2)
 
     def test_compile_class_reverse_methods(self):

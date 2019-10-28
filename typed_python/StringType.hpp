@@ -234,5 +234,8 @@ public:
     void copy_constructor(instance_ptr self, instance_ptr other);
 
     void assign(instance_ptr self, instance_ptr other);
-};
 
+    static bool to_int64(layout* s, int64_t* value);
+
+    static bool to_float64(layout* s, double* value);
+};

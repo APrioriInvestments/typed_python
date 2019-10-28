@@ -319,6 +319,9 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
+    def convert_bool_cast(self, context, expr):
+        return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
+
 
 class TupleOrListOfIteratorWrapper(Wrapper):
     is_pod = False

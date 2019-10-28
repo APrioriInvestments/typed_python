@@ -4,6 +4,7 @@
 #include <Python.h>
 #include <iostream>
 #include <iomanip>
+#include <sstream>
 #include "AllTypes.hpp"
 #include "StringType.hpp"
 #include "BytesType.hpp"
@@ -902,7 +903,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    bool np_pyobj_compare(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs, int comparisonOp) {
+    PythonObjectOfType::layout_type* np_pyobj_compare(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs, int comparisonOp) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyObject_RichCompare(lhs->pyObj, rhs->pyObj, comparisonOp);
@@ -914,27 +915,27 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    bool np_pyobj_EQ(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_EQ(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_EQ);
     }
 
-    bool np_pyobj_NE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_NE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_NE);
     }
 
-    bool np_pyobj_LT(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_LT(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_LT);
     }
 
-    bool np_pyobj_GT(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_GT(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_GT);
     }
 
-    bool np_pyobj_LE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_LE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_LE);
     }
 
-    bool np_pyobj_GE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_GE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_GE);
     }
 
@@ -1074,4 +1075,62 @@ extern "C" {
         }
     }
 
+    int64_t np_str_to_int64(StringType::layout* s) {
+        int64_t ret = 0;
+        if (StringType::to_int64(s, &ret)) {
+            return ret;
+        }
+        else {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_SetString(PyExc_ValueError, "'invalid literal for int() with base 10");
+            throw PythonExceptionSet();
+        }
+    }
+
+    double np_str_to_float64(StringType::layout* s) {
+        double ret = 0;
+        if (StringType::to_float64(s, &ret)) {
+            return ret;
+        }
+        else {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_ValueError, "could not convert string to float: '%s'",
+                StringType::Make()->toUtf8String((instance_ptr)&s).c_str());
+            throw PythonExceptionSet();
+        }
+    }
+
+    int64_t np_bytes_to_int64(BytesType::layout* l) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* str_obj = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, l->data, l->bytecount);
+        if (!str_obj) {
+            throw PythonExceptionSet();
+        }
+        PyObject *long_obj = PyLong_FromUnicodeObject(str_obj, 10);
+        decref(str_obj);
+        if (!long_obj) {
+            throw PythonExceptionSet();
+        }
+        long ret = PyLong_AsLong(long_obj);
+        decref(long_obj);
+        return ret;
+    }
+
+    double np_bytes_to_float64(BytesType::layout* l) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* str_obj = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, l->data, l->bytecount);
+        if (!str_obj) {
+            throw PythonExceptionSet();
+        }
+        PyObject *float_obj = PyFloat_FromString(str_obj);
+        decref(str_obj);
+        if (!float_obj) {
+            throw PythonExceptionSet();
+        }
+        double ret = PyFloat_AsDouble(float_obj);
+        decref(float_obj);
+        return ret;
+    }
 }

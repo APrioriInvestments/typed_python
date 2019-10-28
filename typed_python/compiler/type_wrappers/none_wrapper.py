@@ -75,3 +75,6 @@ class NoneWrapper(Wrapper):
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_bool_cast(self, context, expr):
+        return context.constant(False)

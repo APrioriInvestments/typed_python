@@ -65,7 +65,7 @@ class StringWrapper(RefcountedWrapper):
             return context.push(self, lambda x: x.convert_default_initialize())
 
         if len(args) == 1 and not kwargs:
-            return args[0].convert_cast(self)
+            return args[0].convert_str_cast()
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
@@ -359,24 +359,6 @@ class StringWrapper(RefcountedWrapper):
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
-    def convert_cast_to_self(self, context, instance):
-        t = instance.expr_type.typeRepresentation
-        tp = context.getTypePointer(t)
-        if tp:
-            if not instance.isReference:
-                instance = context.pushMove(instance)
-
-            return context.push(
-                str,
-                lambda newStr:
-                newStr.expr.store(
-                    runtime_functions.np_str.call(instance.expr.cast(VoidPtr), tp).cast(self.getNativeLayoutType())
-                )
-            )
-            return context.constant(True)
-
-        return super().convert_cast_to_self(context, instance)
-
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
         if not explicit:
             return super().convert_to_type_with_target(context, e, targetVal, explicit)
@@ -392,3 +374,12 @@ class StringWrapper(RefcountedWrapper):
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_bool_cast(self, context, expr):
+        return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
+
+    def convert_int_cast(self, context, expr):
+        return context.pushPod(int, runtime_functions.str_to_int64.call(expr.nonref_expr.cast(VoidPtr)))
+
+    def convert_float_cast(self, context, expr):
+        return context.pushPod(float, runtime_functions.str_to_float64.call(expr.nonref_expr.cast(VoidPtr)))

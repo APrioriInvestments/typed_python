@@ -12,16 +12,25 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, ListOf, TupleOf, NamedTuple, Dict, ConstDict, OneOf, \
-    Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Bool, Float64, Float32, \
-    String, Bytes, Alternative, Set
-from typed_python.compiler.runtime import Runtime
 import unittest
+from math import isnan
+
+from typed_python import Function, ListOf, TupleOf, NamedTuple, Dict, ConstDict, \
+    Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Bool, Float64, Float32, \
+    String, Bytes, Alternative, Set, OneOf
+from typed_python.compiler.runtime import Runtime
 
 
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
+
+
+def result_or_exception(f, *p):
+    try:
+        return f(*p)
+    except Exception as e:
+        return type(e)
 
 
 class TestBuiltinCompilation(unittest.TestCase):
@@ -83,6 +92,28 @@ class TestBuiltinCompilation(unittest.TestCase):
             (Float32, 1.234567),
             (Float32, 1.234),
             (String, "abcd"),
+            (String, "1234567890"),
+            (String, "\n\r +1234"),
+            (String, "-1234 \t "),
+            (String, "-123_4 \t "),
+            (String, "-_1234"),
+            (String, "-1234_"),
+            (String, "12__34"),
+            (String, "-_1234"),
+            (String, "-1234 _"),
+            (String, "x1234"),
+            (String, "1234L"),
+            (String, " -1.23e-5"),
+            (String, "-1.23e+5 "),
+            (String, "+1.23e+5_0 "),
+            (String, " +1.2_3e5_00 "),
+            (String, "+1.23e-500 "),
+            (String, "-0.0"),
+            (String, "1."),
+            (String, ".1"),
+            (String, "Nan"),
+            (String, " -inf"),
+            (String, " +InFiNiTy "),
             (Bytes, b"\01\00\02\03"),
             (Set(int), [1, 3, 5, 7]),
             (TupleOf(Int64), (7, 6, 5, 4, 3, 2, -1)),
@@ -103,28 +134,36 @@ class TestBuiltinCompilation(unittest.TestCase):
             (NT1, NT1(a=1, b=2.3, c="c", d="d")),
             (NT2, NT2(s="xyz", t=tuple(range(10000))))
         ]
-
         for T, v in cases:
-            @Compiled
-            def compiled_str(x: T):
+            def f_bool(x: T):
+                return bool(x)
+
+            def f_int(x: T):
+                return int(x)
+
+            def f_float(x: T):
+                return float(x)
+
+            def f_bytes(x: T):
                 return str(x)
 
-            @Compiled
-            def compiled_format(x: T):
+            def f_str(x: T):
+                return str(x)
+
+            def f_format(x: T):
                 return format(x)
 
-            @Compiled
-            def compiled_dir(x: T):
+            def f_dir(x: T):
                 return dir(x)
 
-            r1 = str(T(v))
-            r2 = compiled_str(v)
-            self.assertEqual(r1, r2)
-
-            r1 = format(T(v))
-            r2 = compiled_format(v)
-            self.assertEqual(r1, r2)
-
-            r1 = dir(T(v))
-            r2 = compiled_dir(v)
-            self.assertEqual(r1, r2)
+            fns = [f_bool, f_int, f_float, f_str, f_bytes, f_format, f_dir]
+            for f in fns:
+                if f is f_int and isinstance(v, (int, float)) and (v > 2**63-1 or v < -2**63):
+                    continue
+                r1 = result_or_exception(f, T(v))
+                c_f = Compiled(f)
+                r2 = result_or_exception(c_f, v)
+                if type(r1) is float and isnan(r1):
+                    self.assertEqual(isnan(r1), isnan(r2))
+                else:
+                    self.assertEqual(r1, r2)

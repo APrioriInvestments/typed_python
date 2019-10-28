@@ -22,7 +22,7 @@ class BuiltinWrapper(Wrapper):
     is_pod = True
     is_empty = False
     is_pass_by_ref = False
-    SUPPORTED_FUNCTIONS = (round, trunc, floor, ceil, format, bytes, dir)
+    SUPPORTED_FUNCTIONS = (round, trunc, floor, ceil, format, dir)
 
     def __init__(self, builtin):
         assert builtin in self.SUPPORTED_FUNCTIONS

@@ -20,7 +20,7 @@ from typed_python.compiler.type_wrappers.arithmetic_wrapper import FloatWrapper,
 
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, OneOf, PointerTo, Bool, String, Int32
+from typed_python import NoneType, _types, OneOf, PointerTo, Bool, Int32
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -155,24 +155,36 @@ class ClassWrapper(RefcountedWrapper):
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-    def convert_cast(self, context, e, target_type):
-        if isinstance(target_type, IntWrapper):
-            y = self.generate_method_call(context, "__int__", (e,))
-            if y is not None:
-                return y.convert_to_type(target_type)
+    def convert_bool_cast(self, context, e):
+        y = self.generate_method_call(context, "__bool__", (e,))
+        if y is not None:
+            return y
+        y = self.generate_method_call(context, "__len__", (e,))
+        if y is not None:
+            return context.pushPod(bool, y.nonref_expr.neq(0))
+        return context.constant(True)
 
-        if isinstance(target_type, FloatWrapper):
-            y = self.generate_method_call(context, "__float__", (e,))
-            if y is not None:
-                return y.convert_to_type(target_type)
+    def convert_int_cast(self, context, e, raiseException=True):
+        if raiseException:
+            return self.generate_method_call(context, "__int__", (e,)) \
+                or context.pushException(TypeError, f"__int__ not implemented for {self.typeRepresentation}")
+        else:
+            return self.generate_method_call(context, "__int__", (e,))
 
-        if target_type.typeRepresentation == String:
-            return super().convert_cast(context, e, target_type)
-        if target_type.typeRepresentation == Bool:
-            return super().convert_cast(context, e, target_type)
-        if isinstance(target_type, ClassWrapper):
-            return super().convert_cast(context, e, target_type)
-        return None
+    def convert_float_cast(self, context, e, raiseException=True):
+        if raiseException:
+            return self.generate_method_call(context, "__float__", (e,)) \
+                or context.pushException(TypeError, f"__float__ not implemented for {self.typeRepresentation}")
+        else:
+            return self.generate_method_call(context, "__float__", (e,))
+
+    def convert_str_cast(self, context, e):
+        return self.generate_method_call(context, "__str__", (e,)) \
+            or e.convert_repr()
+
+    def convert_bytes_cast(self, context, e):
+        return self.generate_method_call(context, "__bytes__", (e,)) \
+            or context.pushException(TypeError, f"__bytes__ not implemented for {self.typeRepresentation}")
 
     def get_layout_pointer(self, nonref_expr):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.
@@ -901,7 +913,7 @@ class ClassWrapper(RefcountedWrapper):
             else:
                 return self.generate_method_call(context, "__format__", (expr, context.constant(''))) \
                     or self.generate_method_call(context, "__str__", (expr,)) \
-                    or expr.convert_cast(str)
+                    or expr.convert_str_cast()
         if f is round:
             if a1 is not None:
                 return self.generate_method_call(context, "__round__", (expr, a1)) \
@@ -918,17 +930,15 @@ class ClassWrapper(RefcountedWrapper):
         if a1 is not None:
             return None
         # handle builtins with no additional arguments here:
-        if f is bytes:
-            return self.generate_method_call(context, "__bytes__", (expr,))
         if f is trunc:
             return self.generate_method_call(context, "__trunc__", (expr,)) \
                 or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
         if f is floor:
-            expr_float = expr.convert_cast(float)
+            expr_float = self.convert_float_cast(context, expr, False)
             return self.generate_method_call(context, "__floor__", (expr,)) \
                 or (expr_float and context.pushPod(float, runtime_functions.floor_float64.call(expr_float.nonref_expr)))
         if f is ceil:
-            expr_float = expr.convert_cast(float)
+            expr_float = self.convert_float_cast(context, expr, False)
             return self.generate_method_call(context, "__ceil__", (expr,)) \
                 or (expr_float and context.pushPod(float, runtime_functions.ceil_float64.call(expr_float.nonref_expr)))
         if f is complex:

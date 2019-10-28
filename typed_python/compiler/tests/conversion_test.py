@@ -15,8 +15,9 @@
 import time
 import traceback
 import unittest
-
+import pytest
 from flaky import flaky
+
 from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, _types
 from typed_python.compiler.runtime import Runtime, Entrypoint
 
@@ -579,3 +580,33 @@ class TestCompilationStructures(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             check(10)
+
+    @pytest.mark.skip(reason="to be fixed")
+    def test_conditional_eval_or(self):
+        @Compiled
+        def f(x: int, y: float, z: str):
+            return x or y or z
+
+        self.assertEqual(f(0, 0.0, ""), "")
+        self.assertEqual(f(0, 0.0, "one"), "one")
+        self.assertEqual(f(0, 1.5, ""), 1.5)
+        self.assertEqual(f(0, 1.5, "one"), 1.5)
+        self.assertEqual(f(3, 0.0, ""), 3)
+        self.assertEqual(f(3, 0.0, "one"), 3)
+        self.assertEqual(f(3, 1.5, ""), 3)
+        self.assertEqual(f(3, 1.5, "one"), 3)
+
+    @pytest.mark.skip(reason="to be fixed")
+    def test_conditional_eval_and(self):
+        @Compiled
+        def f(x: int, y: str, z: float):
+            return x and y and z
+
+        self.assertEqual(f(0, "", 0.0), 0)
+        self.assertEqual(f(0, "", 1.5), 0)
+        self.assertEqual(f(0, "one", 0.0), 0)
+        self.assertEqual(f(0, "one", 1.5), 0)
+        self.assertEqual(f(3, "", 0.0), "")
+        self.assertEqual(f(3, "", 1.5), "")
+        self.assertEqual(f(3, "one", 0.0), 0.0)
+        self.assertEqual(f(3, "one", 1.5), 1.5)

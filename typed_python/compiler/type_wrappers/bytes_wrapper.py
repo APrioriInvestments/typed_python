@@ -167,3 +167,15 @@ class BytesWrapper(RefcountedWrapper):
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_bool_cast(self, context, expr):
+        return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
+
+    def convert_int_cast(self, context, expr):
+        return context.pushPod(int, runtime_functions.bytes_to_int64.call(expr.nonref_expr.cast(VoidPtr)))
+
+    def convert_float_cast(self, context, expr):
+        return context.pushPod(float, runtime_functions.bytes_to_float64.call(expr.nonref_expr.cast(VoidPtr)))
+
+    def convert_bytes_cast(self, context, expr):
+        return expr

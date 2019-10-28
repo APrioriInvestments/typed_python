@@ -321,3 +321,19 @@ class OneOfWrapper(Wrapper):
             return args[0].convert_to_type(self, True)
 
         return super().convert_type_call(context, typeInst, args, kwargs)
+
+    def convert_bool_cast(self, context, expr):
+        return expr.convert_to_type(bool)
+
+    def convert_int_cast(self, context, expr):
+        return expr.convert_to_type(int)
+
+    def convert_float_cast(self, context, expr):
+        return expr.convert_to_type(float)
+
+    # TODO:
+    # We're using the default convert_str_cast() for now, which goes to the interpreter.
+    # But would be good to have a direct convert_str_cast for OneOf.
+
+    def convert_bytes_cast(self, context, expr):
+        return expr.convert_to_type(bytes)

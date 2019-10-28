@@ -23,7 +23,7 @@ class PrintWrapper(Wrapper):
     is_pass_by_ref = False
 
     def __init__(self):
-        super().__init__(len)
+        super().__init__(print)
 
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
@@ -49,7 +49,7 @@ class PrintWrapper(Wrapper):
 
         # it would be better to use join
         for a in args:
-            converted = a.convert_cast(str)
+            converted = a.convert_str_cast()
             if converted is None:
                 return None
 
