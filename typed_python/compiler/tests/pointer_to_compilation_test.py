@@ -66,6 +66,7 @@ class TestPointerToCompilation(unittest.TestCase):
                 Runtime.singleton().compile(testfun, {'x': type(x)})(x)
             )
 
+        check(False)
         check(0)
         check(0.0)
         check(ListOf(int)([10]))

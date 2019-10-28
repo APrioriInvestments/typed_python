@@ -131,3 +131,6 @@ class SetWrapper(SetWrapperBase):
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_bool_cast(self, context, expr):
+        return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))

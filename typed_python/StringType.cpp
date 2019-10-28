@@ -1015,5 +1015,197 @@ void StringType::join(StringType::layout **outString, StringType::layout *separa
         StringType::Make()->destroy((instance_ptr)&item);
     }
     StringType::Make()->destroy((instance_ptr)&newSeparator);
+}
 
+// static
+bool StringType::to_int64(StringType::layout* s, int64_t *value) {
+    enum State {left_space, sign, digit, underscore, right_space, failed} state = left_space;
+    int64_t value_sign = 1;
+    *value = 0;
+
+    if (s) {
+        for (int64_t i = 0; i < s->pointcount; i++) {
+            uint64_t c = StringType::getpoint(s, i);
+            if (uprops[c] & Uprops_SPACE) {
+                if (state == underscore || state == sign) {
+                    state = failed;
+                    break;
+                }
+                else if (state == digit) {
+                    state = right_space;
+                }
+            }
+            else if (c == '+' || c == '-') {
+                if (state != left_space) {
+                    state = failed;
+                    break;
+                }
+                if (c == '-') {
+                    value_sign = -1;
+                }
+                state = sign;
+            }
+            else if (c < 128 && c >= '0' && c <= '9') {
+                if (state == right_space) {
+                    state = failed;
+                    break;
+                }
+                *value *= 10;
+                *value += c - '0';
+                state = digit;
+            }
+            else if (c == '_') {
+                if (state != digit) {
+                    state = failed;
+                    break;
+                }
+                state = underscore;
+            }
+            else {
+                state = failed;
+                break;
+            }
+        }
+    }
+    if (state == digit || state == right_space) {
+        *value *= value_sign;
+        return true;
+    }
+    else {
+        *value = 0;
+        return false;
+    }
+}
+
+// static
+bool StringType::to_float64(StringType::layout* s, double* value) {
+    enum State {left_space, sign, whole, underscore, decimal, mantissa, underscore_mantissa,
+                exp, expsign, exponent, underscore_exponent,
+                right_space, identifier, identifier_right_space, failed} state = left_space;
+    const int MAX_FLOAT_STR = 48;
+    char buf[MAX_FLOAT_STR + 1];
+    int cur = 0;
+    *value = 0.0;
+
+    if (s) {
+        for (int64_t i = 0; i < s->pointcount; i++) {
+            bool accumulate = true;
+            uint64_t c = StringType::getpoint(s, i);
+            if (uprops[c] & Uprops_SPACE) {
+                accumulate = false;
+                if (state == underscore || state == underscore_exponent || state == underscore_mantissa
+                        || state == sign || state == exp || state == expsign) {
+                    state = failed;
+                }
+                else if (state == identifier || state == identifier_right_space) {
+                    state = identifier_right_space;
+                }
+                else if (state == right_space || state == whole || state == decimal || state == mantissa || state == exponent) {
+                    state = right_space;
+                }
+            }
+            else if (c == '+' || c == '-') {
+                if (state == left_space) {
+                    state = sign;
+                }
+                else if (state == exp) {
+                    state = expsign;
+                }
+                else {
+                    state = failed;
+                }
+            }
+            else if (c < 128 && c >= '0' && c <= '9') {
+                if (state == decimal) {
+                    state = mantissa;
+                }
+                else if (state == exp) {
+                    state = exponent;
+                }
+                else if (state == right_space || state == identifier || state == identifier_right_space) {
+                    state = failed;
+                }
+                else if (state == underscore_mantissa) {
+                    state = mantissa;
+                }
+                else if (state == underscore_exponent) {
+                    state = exponent;
+                }
+                else {
+                    state = whole;
+                }
+            }
+            else if (c == '.') {
+                if (state == left_space || state == sign || state == whole) {
+                    state = decimal;
+                }
+                else {
+                    state = failed;
+                }
+            }
+            else if (c == 'e' || c == 'E') {
+                if (state == whole || state == decimal || state == mantissa) {
+                    state = exp;
+                }
+                else {
+                    state = failed;
+                }
+            }
+            else if (c == '_') {
+                accumulate = false;
+                if (state == whole) {
+                    state = underscore;
+                }
+                else if (state == mantissa) {
+                    state = underscore_mantissa;
+                }
+                else if (state == exponent) {
+                    state = underscore_exponent;
+                }
+                else {
+                    state = failed;
+                }
+            }
+            else if (c < 128) {
+                if (state == left_space || state == sign || state == identifier) {
+                    state = identifier;
+                }
+                else {
+                    state = failed;
+                }
+            }
+            else {
+                state = failed;
+            }
+            if (state == failed) {
+                break;
+            }
+            if (accumulate && cur < MAX_FLOAT_STR) {
+                buf[cur++] = c;
+            }
+        }
+    }
+    buf[cur] = 0;
+    if (state == identifier || state == identifier_right_space) {
+        char* start = buf;
+        if (*start == '+' || *start == '-') {
+            start++;
+        }
+        for (char* p = start; *p; p++) {
+            *p = tolower(*p);
+        }
+        if (strcmp(start, "inf") && strcmp(start, "infinity") && strcmp(start, "nan")) {
+            state = failed;
+        }
+    }
+    if (state == whole || state == decimal || state == mantissa || state == exponent || state == right_space
+            || state == identifier || state == identifier_right_space) {
+        char* endptr;
+        *value = strtod(buf, &endptr);
+        return true;
+    }
+    else {
+        *value = 0.0;
+        return false;
+    }
 }

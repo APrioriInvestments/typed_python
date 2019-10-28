@@ -85,6 +85,9 @@ class TupleWrapper(Wrapper):
     def convert_len(self, context):
         return context.constant(len(self.subTypeWrappers))
 
+    def convert_bool_cast(self, context, e):
+        return context.constant(len(self.subTypeWrappers) != 0)
+
     def convert_getitem(self, context, expr, index):
         index = index.convert_to_type(int)
         if index is None:

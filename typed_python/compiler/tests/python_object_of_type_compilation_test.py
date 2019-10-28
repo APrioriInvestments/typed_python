@@ -321,7 +321,6 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (AClassWithBool, AClassWithBool(1)),
             (AClassWithBool, AClassWithBool(0)),
             (A1.a, A1.a()),
-            (A1.a, A1.a()),
             (A1.b, A1.b()),
             (A2.a, A2.a()),
             (A2.b, A2.b()),
@@ -331,8 +330,6 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (A4.b, A4.b()),
             (A5.a, A5.a()),
             (A5.b, A5.b()),
-            # (A6.a, A6.a()),
-            # (A6.b, A6.b()),
             (B1.a, B1.a(s='')),
             (B1.a, B1.a(s='a')),
             (B2.a, B2.a(s='')),
@@ -354,8 +351,6 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (A4, A4.b()),
             (A5, A5.a()),
             (A5, A5.b()),
-            # (A6, A6.a()),
-            # (A6, A6.b()),
             (B1, B1.a(s='')),
             (B1, B1.a(s='a')),
             (B2, B2.a(s='')),
@@ -487,3 +482,18 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             self.assertEqual(r1, r2)
             self.assertEqual(r1, r3)
             self.assertEqual(r1, r4)
+
+    def test_some_object_operations(self):
+        @Compiled
+        def f(x: object, y: object):
+            x += y
+            y += x
+            x += y
+            return x
+
+        @Compiled
+        def g(x: object, y: object):
+            return x >= y
+
+        self.assertEqual(f(1, 2), 8)
+        self.assertEqual(g("a", "b"), False)

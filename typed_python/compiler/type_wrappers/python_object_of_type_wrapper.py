@@ -145,10 +145,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         if rAsObj is None:
             return None
 
-        if not inplace:
-            tgt = runtime_functions.pyOpToBinaryCallTarget.get(op)
-        else:
-            tgt = runtime_functions.pyInplaceOpToBinaryCallTarget.get(op)
+        tgt = runtime_functions.pyOpToBinaryCallTarget.get(op)
 
         if tgt is not None:
             return context.push(
@@ -252,6 +249,9 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
         return super()._can_convert_from_type(otherType, explicit)
 
+    def convert_bool_cast(self, context, e):
+        return e.convert_to_type(bool)
+
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
         target_type = targetVal.expr_type
 
@@ -282,7 +282,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
         if tp:
             if not sourceVal.isReference:
-                sourceVal = context.push(sourceVal.expr_type, lambda x: x.convert_copy_initialize(sourceVal))
+                sourceVal = context.pushMove(sourceVal)
 
             context.pushEffect(
                 targetVal.expr.store(

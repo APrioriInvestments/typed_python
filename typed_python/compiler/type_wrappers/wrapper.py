@@ -206,12 +206,52 @@ class Wrapper(object):
             "Can't take 'abs' of instance of type '%s'" % (str(self),)
         )
 
+    def convert_bool_cast(self, context, expr):
+        return context.pushException(
+            TypeError,
+            "Can't take 'bool' of instance of type '%s'" % (str(self),)
+        )
+
+    def convert_int_cast(self, context, expr):
+        return context.pushException(
+            TypeError,
+            "Can't take 'int' of instance of type '%s'" % (str(self),)
+        )
+
+    def convert_float_cast(self, context, expr):
+        return context.pushException(
+            TypeError,
+            "Can't take 'float' of instance of type '%s'" % (str(self),)
+        )
+
+    def convert_str_cast(self, context, instance):
+        t = instance.expr_type.typeRepresentation
+        tp = context.getTypePointer(t)
+        if tp:
+            if not instance.isReference:
+                instance = context.pushMove(instance)
+
+            return context.push(
+                str,
+                lambda newStr:
+                    newStr.expr.store(
+                        runtime_functions.np_str.call(instance.expr.cast(VoidPtr), tp).cast(typeWrapper(str).getNativeLayoutType())
+                    )
+            )
+        return instance.convert_to_type(str)
+
+    def convert_bytes_cast(self, context, expr):
+        return context.pushException(
+            TypeError,
+            "Can't take 'bytes' of instance of type '%s'" % (str(self),)
+        )
+
     def convert_builtin(self, f, context, expr, a1=None):
         if f is dir and a1 is None:
             tp = context.getTypePointer(expr.expr_type.typeRepresentation)
             if tp:
                 if not expr.isReference:
-                    expr = context.push(expr.expr_type, lambda x: x.convert_copy_initialize(expr))
+                    expr = context.pushMove(expr)
                 retT = ListOf(str)
                 return context.push(
                     typeWrapper(retT),
@@ -220,7 +260,7 @@ class Wrapper(object):
                     )
                 )
         if f is format and a1 is None:
-            return expr.convert_cast(str)
+            return expr.convert_str_cast()
 
         return context.pushException(
             TypeError,
@@ -232,7 +272,7 @@ class Wrapper(object):
         tp = context.getTypePointer(expr.expr_type.typeRepresentation)
         if tp:
             if not expr.isReference:
-                expr = context.push(expr.expr_type, lambda x: x.convert_copy_initialize(expr))
+                expr = context.pushMove(expr)
             return context.push(
                 str,
                 lambda r: r.expr.store(
@@ -401,23 +441,9 @@ class Wrapper(object):
 
     def convert_format(self, context, instance, formatSpecOrNone=None):
         if formatSpecOrNone is None:
-            return instance.convert_cast(str)
+            return instance.convert_str_cast()
         else:
             raise context.pushException(TypeError, "We don't support conversion in the base wrapper.")
-
-    def convert_cast(self, context, instance, target_type):
-        """Convert an explicit cast of 'instance' to our type."""
-        return target_type.convert_cast_to_self(context, instance)
-
-    def convert_cast_to_self(self, context, instance):
-        """Convert 'instance' to type 'self'
-
-        Someone called T(x) where T is self and 'x' is instance, and instance didn't know
-        how to handle it. Now we get a chance to process it.
-        """
-
-        # by default, allow standard argument propagation to take over as an explicit conversion
-        return instance.expr_type.convert_to_type(context, instance, self, explicit=True)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         raise Exception(f"We can't call type {self.typeRepresentation} with args {args} and kwargs {kwargs}")
