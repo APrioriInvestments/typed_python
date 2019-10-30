@@ -816,6 +816,9 @@ class ExpressionConversionContext(object):
         if ast.matches.UnaryOp:
             operand = self.convert_expression_ast(ast.operand)
 
+            if operand is None:
+                return None
+
             return operand.convert_unary_op(ast.op)
 
         if ast.matches.Subscript:
