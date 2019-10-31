@@ -16,7 +16,7 @@ import unittest
 
 from typed_python import Function, ListOf, TupleOf, NamedTuple, Dict, ConstDict, \
     Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Bool, Float64, Float32, \
-    String, Bytes, Alternative, Set
+    String, Bytes, Alternative, Set, OneOf
 from typed_python.compiler.runtime import Runtime
 
 
@@ -125,9 +125,8 @@ class TestBuiltinCompilation(unittest.TestCase):
             (Dict(str, int), {'y': 7, 'n': 6}),
             (ConstDict(str, int), {'y': 2, 'n': 4}),
             (TupleOf(int), tuple(range(10000))),
-            # TODO: Currently, when compiled, failed OneOf conversions yield TypeError instead of ValueError
-            # (OneOf(String, Int64), "ab"),
-            # (OneOf(String, Int64), 34),
+            (OneOf(String, Int64), "ab"),
+            (OneOf(String, Int64), 34),
             (NT1, NT1(a=1, b=2.3, c="c", d="d")),
             (NT2, NT2(s="xyz", t=tuple(range(10000))))
         ]
@@ -141,6 +140,9 @@ class TestBuiltinCompilation(unittest.TestCase):
             def f_float(x: T):
                 return float(x)
 
+            def f_bytes(x: T):
+                return str(x)
+
             def f_str(x: T):
                 return str(x)
 
@@ -150,7 +152,7 @@ class TestBuiltinCompilation(unittest.TestCase):
             def f_dir(x: T):
                 return dir(x)
 
-            fns = [f_bool, f_int, f_float]
+            fns = [f_bool, f_int, f_float, f_str, f_bytes, f_format, f_dir]
             for f in fns:
                 if f is f_int and isinstance(v, (int, float)) and (v > 2**63-1 or v < -2**63):
                     continue
