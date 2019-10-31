@@ -301,15 +301,6 @@ public:
             m_hasGetAttributeMagicMethod(false)
     {
         m_name = inName;
-
-        if (m_memberFunctions.find("__eq__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-        if (m_memberFunctions.find("__ne__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-        if (m_memberFunctions.find("__lt__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-        if (m_memberFunctions.find("__gt__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-        if (m_memberFunctions.find("__le__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-        if (m_memberFunctions.find("__ge__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-
-        if (m_own_memberFunctions.find("__getattribute__") != m_own_memberFunctions.end()) { m_hasGetAttributeMagicMethod = true; }
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -674,6 +665,19 @@ public:
         for (HeldClass* ancestor: m_mro) {
             dispatchTableAs(ancestor)->initialize(ancestor->dispatchTableAs(ancestor));
         }
+
+        setMagicMethodExistConstants();
+    }
+
+    void setMagicMethodExistConstants() {
+        if (m_memberFunctions.find("__eq__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+        if (m_memberFunctions.find("__ne__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+        if (m_memberFunctions.find("__lt__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+        if (m_memberFunctions.find("__gt__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+        if (m_memberFunctions.find("__le__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+        if (m_memberFunctions.find("__ge__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+
+        if (m_memberFunctions.find("__getattribute__") != m_memberFunctions.end()) { m_hasGetAttributeMagicMethod = true; }
     }
 
     size_t allocateMethodDispatch(std::string funcName, function_signature_type signature) {

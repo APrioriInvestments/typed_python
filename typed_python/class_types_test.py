@@ -753,6 +753,26 @@ class NativeClassTypesTests(unittest.TestCase):
                     i != j
                 )
 
+    def test_class_comparison_subclassing(self):
+        class ClassWithComparisons(Class):
+            x = Member(int)
+
+        class SubclassWithComparisons(ClassWithComparisons, Final):
+            def __lt__(self, other):
+                return self.x < other.x
+
+        with self.assertRaises(Exception):
+            ClassWithComparisons(x=10) < ClassWithComparisons(x=20)
+
+        self.assertLess(
+            SubclassWithComparisons(x=9),
+            ClassWithComparisons(x=10)
+        )
+        self.assertLess(
+            SubclassWithComparisons(x=9),
+            SubclassWithComparisons(x=10)
+        )
+
     def test_class_repr_and_str_and_hash(self):
         class ClassWithReprAndStr(Class, Final):
             def __repr__(self):

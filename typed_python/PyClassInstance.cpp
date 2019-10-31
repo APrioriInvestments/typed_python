@@ -532,6 +532,39 @@ int PyClassInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) 
     return PyClassInstance::classInstanceSetAttributeFromPyObject(type(), dataPtr(), attrName, attrVal);
 }
 
+/* static */
+bool PyClassInstance::compare_to_python_concrete(Class* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+    if (t->getHeldClass()->hasAnyComparisonOperators()) {
+        auto it = t->getHeldClass()->getMemberFunctions().find(Class::pyComparisonOpToMethodName(pyComparisonOp));
+
+        if (it != t->getHeldClass()->getMemberFunctions().end()) {
+            //we found a user-defined method for this comparison function.
+            PyObjectStealer selfAsPyObj(PyInstance::extractPythonObject(self, t));
+
+            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
+                it->second,
+                selfAsPyObj,
+                other
+            );
+
+            if (res.first && !res.second) {
+                throw PythonExceptionSet();
+            }
+
+            int result = PyObject_IsTrue(res.second);
+            decref(res.second);
+
+            if (result == -1) {
+                throw PythonExceptionSet();
+            }
+
+            return result != 0;
+        }
+    }
+
+    return PyInstance::compare_to_python_concrete(t, self, other, exact, pyComparisonOp);
+}
+
 
 PyObject* PyClassInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
     auto it = type()->getMemberFunctions().find("__call__");

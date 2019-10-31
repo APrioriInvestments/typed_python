@@ -125,6 +125,19 @@ public:
         );
     }
 
+    static const char* pyComparisonOpToMethodName(int pyComparisonOp) {
+        switch (pyComparisonOp) {
+            case Py_EQ: return "__eq__";
+            case Py_NE: return "__ne__";
+            case Py_LT: return "__lt__";
+            case Py_GT: return "__gt__";
+            case Py_LE: return "__le__";
+            case Py_GE: return "__ge__";
+        }
+
+        return nullptr;
+    }
+
     bool isFinal() {
         return m_heldClass->isFinal();
     }

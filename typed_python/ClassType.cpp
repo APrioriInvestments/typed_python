@@ -60,48 +60,33 @@ bool Class::cmpStatic(Class* t, instance_ptr left, instance_ptr right, int64_t p
 }
 
 bool Class::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
-    const char* method = nullptr;
-    switch (pyComparisonOp) {
-        case Py_EQ:
-            method = "__eq__";
-            break;
-        case Py_NE:
-            method = "__ne__";
-            break;
-        case Py_LT:
-            method = "__lt__";
-            break;
-        case Py_GT:
-            method = "__gt__";
-            break;
-        case Py_LE:
-            method = "__le__";
-            break;
-        case Py_GE:
-            method = "__ge__";
-            break;
-    }
+    if (m_heldClass->hasAnyComparisonOperators()) {
+        auto it = m_heldClass->getMemberFunctions().find(pyComparisonOpToMethodName(pyComparisonOp));
 
-    auto it = m_heldClass->getMemberFunctions().find(method);
+        if (it != m_heldClass->getMemberFunctions().end()) {
+            //we found a user-defined method for this comparison function.
+            PyObjectStealer leftAsPyObj(PyInstance::extractPythonObject(left, this));
+            PyObjectStealer rightAsPyObj(PyInstance::extractPythonObject(right, this));
 
-    if (it != m_heldClass->getMemberFunctions().end()) {
-        //we found a user-defined method for this comparison function.
-        PyObjectStealer leftAsPyObj(PyInstance::extractPythonObject(left, this));
-        PyObjectStealer rightAsPyObj(PyInstance::extractPythonObject(right, this));
+            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
+                it->second,
+                leftAsPyObj,
+                rightAsPyObj
+                );
 
-        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
-            it->second,
-            leftAsPyObj,
-            rightAsPyObj
-            );
+            if (res.first && !res.second) {
+                throw PythonExceptionSet();
+            }
 
-        if (res.first && !res.second) {
-            throw PythonExceptionSet();
+            int result = PyObject_IsTrue(res.second);
+            decref(res.second);
+
+            if (result == -1) {
+                throw PythonExceptionSet();
+            }
+
+            return result != 0;
         }
-
-        bool result = res.second == Py_True;
-        decref(res.second);
-        return result;
     }
 
     if (pyComparisonOp == Py_NE) {

@@ -76,6 +76,7 @@ pyOpToBinaryCallTarget = {
     python_ast.BinaryOp.BitOr(): binaryPyobjCallTarget("np_pyobj_Or"),
     python_ast.BinaryOp.BitXor(): binaryPyobjCallTarget("np_pyobj_Xor"),
     python_ast.BinaryOp.BitAnd(): binaryPyobjCallTarget("np_pyobj_And"),
+    python_ast.ComparisonOp.Eq(): binaryPyobjCallTarget("np_pyobj_Eq"),
 }
 
 

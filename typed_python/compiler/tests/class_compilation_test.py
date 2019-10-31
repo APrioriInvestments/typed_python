@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import Function, Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, Int64, UInt64, Int16, \
-    Float32, Float64, String, Final, PointerTo
+    Float32, Float64, String, Final, PointerTo, makeNamedTuple
 import typed_python._types as _types
 from typed_python.compiler.runtime import Runtime, Entrypoint
 import unittest
@@ -1319,13 +1319,28 @@ class TestClassCompilationCompilation(unittest.TestCase):
                     compiled_f = Compiled(f)
                     r1 = result_or_exception(f, v1, v2)
                     r2 = result_or_exception(compiled_f, v1, v2)
-                    self.assertEqual(r1, r2)
+                    self.assertEqual(r1, r2, (f, v1, v2))
+
         for f in [f_hash]:
             for v in values:
                 compiled_f = Compiled(f)
                 r1 = result_or_exception(f, v)
                 r2 = result_or_exception(compiled_f, v)
                 self.assertEqual(r1, r2)
+
+    def test_compile_class_comparison_to_other_types(self):
+        class C(Class, Final):
+            x = Member(int)
+
+            def __eq__(self, other):
+                return self.x == other.x
+
+        @Entrypoint
+        def isEqObj(c: C, o: object):
+            return c == o
+
+        self.assertTrue(isEqObj(C(x=10), C(x=10)))
+        self.assertTrue(isEqObj(C(x=10), makeNamedTuple(x=10)))
 
     def test_compile_class_comparison_methods(self):
 

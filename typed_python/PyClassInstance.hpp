@@ -40,6 +40,8 @@ public:
 
     int64_t tryCallHashMemberFunction();
 
+    static bool compare_to_python_concrete(Class* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
+
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
 
     PyObject* tp_call_concrete(PyObject* args, PyObject* kwargs);
