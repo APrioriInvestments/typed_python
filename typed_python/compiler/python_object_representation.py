@@ -43,6 +43,7 @@ from typed_python.compiler.type_wrappers.len_wrapper import LenWrapper
 from typed_python.compiler.type_wrappers.hash_wrapper import HashWrapper
 from typed_python.compiler.type_wrappers.range_wrapper import _RangeWrapper
 from typed_python.compiler.type_wrappers.print_wrapper import PrintWrapper
+from typed_python.compiler.type_wrappers.make_named_tuple_wrapper import MakeNamedTupleWrapper
 from typed_python.compiler.type_wrappers.math_wrappers import MathFunctionWrapper
 from typed_python.compiler.type_wrappers.builtin_wrappers import BuiltinWrapper
 from typed_python.compiler.type_wrappers.bytecount_wrapper import BytecountWrapper
@@ -56,7 +57,7 @@ from types import ModuleType
 from typed_python._types import TypeFor, bytecount
 from typed_python import (
     Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16,
-    UInt8, Float64, Float32, Bool, String, Bytes, NoneType
+    UInt8, Float64, Float32, Bool, String, Bytes, NoneType, makeNamedTuple
 )
 
 _type_to_type_wrapper_cache = {}
@@ -188,6 +189,9 @@ def pythonObjectRepresentation(context, f):
 
     if f is print:
         return TypedExpression(context, native_ast.nullExpr, PrintWrapper(), False)
+
+    if f is makeNamedTuple:
+        return TypedExpression(context, native_ast.nullExpr, MakeNamedTupleWrapper(), False)
 
     if f in MathFunctionWrapper.SUPPORTED_FUNCTIONS:
         return TypedExpression(context, native_ast.nullExpr, MathFunctionWrapper(f), False)

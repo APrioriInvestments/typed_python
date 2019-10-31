@@ -16,7 +16,7 @@ from typed_python import Function, Tuple, NamedTuple, Class, Member, ListOf
 import typed_python._types as _types
 from typed_python.compiler.runtime import Runtime
 import unittest
-from typed_python import Entrypoint
+from typed_python import Entrypoint, makeNamedTuple
 
 
 def Compiled(f):
@@ -190,3 +190,11 @@ class TestTupleCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "convert from type Float64 to type List"):
             makeNtX(1.2)
+
+    def test_compiled_named_tuple(self):
+        @Entrypoint
+        def makeNt(x, y):
+            return makeNamedTuple(x=x, y=y)
+
+        self.assertEqual(makeNt(1, 2), makeNamedTuple(x=1, y=2))
+        self.assertEqual(makeNt(1, "2"), makeNamedTuple(x=1, y="2"))
