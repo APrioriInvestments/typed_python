@@ -265,10 +265,12 @@ def Entrypoint(pyFunc):
 
         with lock:
             if signature not in signatures:
-                for o in pyFunc.overloads:
-                    if o.matchesTypes(signature):
-                        argTypes = {o.args[i].name: signature[i] for i in range(len(args))}
-                        Runtime.singleton().compile(o, argTypes)
+                i = pyFunc.indexOfOverloadMatching(*args)
+
+                if i is not None:
+                    o = pyFunc.overloads[i]
+                    argTypes = {o.args[i].name: signature[i] for i in range(len(args))}
+                    Runtime.singleton().compile(o, argTypes)
                 signatures.add(signature)
 
         return pyFunc(*args)

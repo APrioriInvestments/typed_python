@@ -285,18 +285,6 @@ class FunctionOverload:
     def addArg(self, name, defaultVal, typeFilter, isStarArg, isKwarg):
         self.args = self.args + (FunctionOverloadArg(name, defaultVal, typeFilter, isStarArg, isKwarg),)
 
-    def matchesTypes(self, argTypes):
-        """Do the types in 'argTypes' match our argument typeFilters at a binary level"""
-        if len(argTypes) == len(self.args) and not any(x.isStarArg or x.isKwarg for x in self.args):
-            for i in range(len(argTypes)):
-                if (self.args[i].typeFilter is not None and
-                        not typed_python._types.isBinaryCompatible(self.args[i].typeFilter, argTypes[i])):
-                    return False
-
-            return True
-
-        return False
-
     def __str__(self):
         return "FunctionOverload(returns %s, %s, %s)" % (
             self.returnType,

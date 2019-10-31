@@ -240,6 +240,7 @@ class TestMultithreading(unittest.TestCase):
         # to the right amount.
         self.assertEqual(ct * 4, aList[0])
 
+    @flaky(max_runs=3, min_passes=1)
     def test_lock_with_separate_locks_perf(self):
         @Entrypoint
         def loopWithLock(l, aList, count):

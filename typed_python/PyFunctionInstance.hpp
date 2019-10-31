@@ -32,7 +32,7 @@ public:
 
     static std::pair<bool, PyObject*> tryToCallAnyOverload(const Function* f, PyObject* self, PyObject* args, PyObject* kwargs);
 
-    static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs, bool convertExplicitly);
+    static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs, bool convertExplicitly, bool dontActuallyCall=false);
 
     //perform a linear scan of all specializations contained in overload and attempt to dispatch to each one.
     //returns <true, result or none> if we dispatched.
@@ -57,4 +57,8 @@ public:
     static void mirrorTypeInformationIntoPyTypeConcrete(Function* inType, PyTypeObject* pyType);
 
     int pyInquiryConcrete(const char* op, const char* opErrRep);
+
+    static PyMethodDef* typeMethodsConcrete(Type* t);
+
+    static PyObject* indexOfOverloadMatching(PyObject* self, PyObject* args, PyObject* kwargs);
 };

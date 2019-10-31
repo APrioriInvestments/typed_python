@@ -48,7 +48,7 @@ PyFunctionInstance::tryToCallAnyOverload(const Function* f, PyObject* self,
 }
 
 // static
-std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs, bool convertExplicitly) {
+std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs, bool convertExplicitly, bool dontActuallyCall) {
     PyObjectStealer targetArgTuple(PyTuple_New(PyTuple_Size(args)+(self?1:0)));
     Function::Matcher matcher(f);
 
@@ -105,7 +105,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
         while (PyDict_Next(kwargs, &pos, &key, &value)) {
             if (!PyUnicode_Check(key)) {
                 PyErr_SetString(PyExc_TypeError, "Keywords arguments must be strings.");
-                return std::make_pair(false, nullptr);
+                return std::make_pair(true, nullptr);
             }
 
             //what type would we need for this unnamed arg?
@@ -142,6 +142,11 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
 
     if (!matcher.definitelyMatches()) {
         return std::make_pair(false, nullptr);
+    }
+
+    // pathway to let us test which form we'd call without actually dispatching.
+    if (dontActuallyCall) {
+        return std::make_pair(true, nullptr);
     }
 
     PyObjectHolder result;
@@ -420,4 +425,39 @@ void PyFunctionInstance::mirrorTypeInformationIntoPyTypeConcrete(Function* inTyp
 int PyFunctionInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
     // op == '__bool__'
     return 1;
+}
+
+/* static */
+PyObject* PyFunctionInstance::indexOfOverloadMatching(PyObject* self, PyObject* args, PyObject* kwargs) {
+    //first try to match arguments with no explicit conversion.
+    //if that fails, try explicit conversion
+    Function* f = ((PyFunctionInstance*)self)->type();
+
+    for (long tryToConvertExplicitly = 0; tryToConvertExplicitly <= 1; tryToConvertExplicitly++) {
+        long overloadIx = 0;
+
+        for (const auto& overload: f->getOverloads()) {
+            std::pair<bool, PyObject*> res =
+                PyFunctionInstance::tryToCallOverload(
+                    overload, nullptr, args, kwargs, tryToConvertExplicitly, true /* dontActuallyCall */
+                );
+
+            if (res.first) {
+                return PyLong_FromLong(overloadIx);
+            }
+
+            overloadIx++;
+        }
+    }
+
+    return incref(Py_None);
+}
+
+
+/* static */
+PyMethodDef* PyFunctionInstance::typeMethodsConcrete(Type* t) {
+    return new PyMethodDef [2] {
+        {"indexOfOverloadMatching", (PyCFunction)PyFunctionInstance::indexOfOverloadMatching, METH_VARARGS | METH_KEYWORDS, NULL},
+        {NULL, NULL}
+    };
 }

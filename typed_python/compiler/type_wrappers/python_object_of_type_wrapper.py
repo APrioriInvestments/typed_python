@@ -16,7 +16,7 @@ import _thread
 
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.typed_expression import TypedExpression
-
+from typed_python import OneOf
 import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.native_ast import VoidPtr
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -257,18 +257,19 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
         t = target_type.typeRepresentation
 
-        tp = context.getTypePointer(t)
+        if not issubclass(t, OneOf):
+            tp = context.getTypePointer(t)
 
-        if tp:
-            return context.pushPod(
-                bool,
-                runtime_functions.pyobj_to_typed.call(
-                    e.nonref_expr.cast(VoidPtr),
-                    targetVal.expr.cast(VoidPtr),
-                    tp,
-                    context.constant(explicit)
+            if tp:
+                return context.pushPod(
+                    bool,
+                    runtime_functions.pyobj_to_typed.call(
+                        e.nonref_expr.cast(VoidPtr),
+                        targetVal.expr.cast(VoidPtr),
+                        tp,
+                        context.constant(explicit)
+                    )
                 )
-            )
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
