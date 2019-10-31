@@ -482,3 +482,18 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             self.assertEqual(r1, r2)
             self.assertEqual(r1, r3)
             self.assertEqual(r1, r4)
+
+    def test_some_object_operations(self):
+        @Compiled
+        def f(x: object, y: object):
+            x += y
+            y += x
+            x += y
+            return x
+
+        @Compiled
+        def g(x: object, y: object):
+            return x >= y
+
+        self.assertEqual(f(1, 2), 8)
+        self.assertEqual(g("a", "b"), False)

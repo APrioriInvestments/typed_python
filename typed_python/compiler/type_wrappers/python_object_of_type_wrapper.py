@@ -145,10 +145,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         if rAsObj is None:
             return None
 
-        if not inplace:
-            tgt = runtime_functions.pyOpToBinaryCallTarget.get(op)
-        else:
-            tgt = runtime_functions.pyInplaceOpToBinaryCallTarget.get(op)
+        tgt = runtime_functions.pyOpToBinaryCallTarget.get(op)
 
         if tgt is not None:
             return context.push(

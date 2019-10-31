@@ -902,7 +902,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    bool np_pyobj_compare(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs, int comparisonOp) {
+    PythonObjectOfType::layout_type* np_pyobj_compare(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs, int comparisonOp) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyObject_RichCompare(lhs->pyObj, rhs->pyObj, comparisonOp);
@@ -914,27 +914,27 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    bool np_pyobj_EQ(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_EQ(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_EQ);
     }
 
-    bool np_pyobj_NE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_NE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_NE);
     }
 
-    bool np_pyobj_LT(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_LT(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_LT);
     }
 
-    bool np_pyobj_GT(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_GT(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_GT);
     }
 
-    bool np_pyobj_LE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_LE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_LE);
     }
 
-    bool np_pyobj_GE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    PythonObjectOfType::layout_type* np_pyobj_GE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_GE);
     }
 

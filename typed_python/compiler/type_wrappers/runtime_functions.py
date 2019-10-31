@@ -76,12 +76,13 @@ pyOpToBinaryCallTarget = {
     python_ast.BinaryOp.BitOr(): binaryPyobjCallTarget("np_pyobj_Or"),
     python_ast.BinaryOp.BitXor(): binaryPyobjCallTarget("np_pyobj_Xor"),
     python_ast.BinaryOp.BitAnd(): binaryPyobjCallTarget("np_pyobj_And"),
-    python_ast.ComparisonOp.Eq(): binaryPyobjCallTarget("np_pyobj_Eq"),
+    python_ast.ComparisonOp.Eq(): binaryPyobjCallTarget("np_pyobj_EQ"),
+    python_ast.ComparisonOp.NotEq(): binaryPyobjCallTarget("np_pyobj_NE"),
+    python_ast.ComparisonOp.Lt(): binaryPyobjCallTarget("np_pyobj_LT"),
+    python_ast.ComparisonOp.Gt(): binaryPyobjCallTarget("np_pyobj_GT"),
+    python_ast.ComparisonOp.LtE(): binaryPyobjCallTarget("np_pyobj_LE"),
+    python_ast.ComparisonOp.GtE(): binaryPyobjCallTarget("np_pyobj_GE"),
 }
-
-
-pyInplaceOpToBinaryCallTarget = {}
-
 
 pyOpToUnaryCallTarget = {
     python_ast.UnaryOp.Not(): externalCallTarget("np_pyobj_Not", Bool, Void.pointer()),
