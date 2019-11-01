@@ -371,7 +371,7 @@ class TestListOfCompilation(unittest.TestCase):
         x[0] = 100
         self.assertEqual(y[0], 1)
 
-    def test_list_short_circut_if(self):
+    def test_list_short_circuit_if(self):
         @Compiled
         def chkList(x: ListOf(int)):
             return len(x) > 0 and x[0]
