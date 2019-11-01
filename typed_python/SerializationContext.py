@@ -143,12 +143,21 @@ class SerializationContext(object):
         )
 
     def withoutLineInfoEncoded(self):
+        if not self.encodeLineInformationForCode:
+            return self
+
         return SerializationContext(self.nameToObject, self.objToName, self.compressionEnabled, False)
 
     def withoutCompression(self):
+        if not self.compressionEnabled:
+            return self
+
         return SerializationContext(self.nameToObject, self.objToName, False, self.encodeLineInformationForCode)
 
     def withCompression(self):
+        if self.compressionEnabled:
+            return self
+
         return SerializationContext(self.nameToObject, self.objToName, True, self.encodeLineInformationForCode)
 
     def nameForObject(self, t):
