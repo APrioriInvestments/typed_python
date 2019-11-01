@@ -25,10 +25,10 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.expression_conversion_context import ExpressionConversionContext
 from typed_python.compiler.function_stack_state import FunctionStackState
 from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
+from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
 from typed_python import OneOf
-from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 
 NoneExprType = NoneWrapper()
 
@@ -910,8 +910,7 @@ class FunctionConversionContext(object):
                 context = ExpressionConversionContext(self, variableStates)
                 typeExpr = context.convert_expression_ast(condition.args[1])
 
-                if typeExpr is not None and isinstance(typeExpr.expr_type, PythonFreeObjectWrapper):
-                    # (PythonTypeObjectWrapper, BoolCastWrapper, IntCastWrapper, FloatCastWrapper, StrCastWrapper, BytesCastWrapper)):
+                if typeExpr is not None and isinstance(typeExpr.expr_type, PythonTypeObjectWrapper):
                     variableStates.restrictTypeFor(condition.args[0].id, typeExpr.expr_type.typeRepresentation.Value, result)
 
         # check if we are a 'var.matches.Y' expression

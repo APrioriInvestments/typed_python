@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
+from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 
 from typed_python import PointerTo, Bool
@@ -177,8 +177,7 @@ class PointerToWrapper(Wrapper):
                 return context.pushReference(self.typeRepresentation.ElementType, instance.nonref_expr)
 
         if methodname == "cast":
-            if len(args) == 1 and isinstance(args[0].expr_type, PythonFreeObjectWrapper):
-                # (PythonTypeObjectWrapper, BoolCastWrapper, IntCastWrapper, FloatCastWrapper, StrCastWrapper, BytesCastWrapper)):
+            if len(args) == 1 and isinstance(args[0].expr_type, PythonTypeObjectWrapper):
                 tgtType = typeWrapper(PointerTo(args[0].expr_type.typeRepresentation.Value))
                 return context.pushPod(tgtType, instance.nonref_expr.cast(tgtType.getNativeLayoutType()))
 

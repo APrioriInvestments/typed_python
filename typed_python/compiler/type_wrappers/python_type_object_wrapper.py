@@ -55,6 +55,17 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
 
     @Wrapper.unwrapOneOfAndValue
     def convert_call(self, context, left, args, kwargs):
+        if self.typeRepresentation.Value is bool:
+            return args[0].convert_bool_cast()
+        if self.typeRepresentation.Value is int:
+            return args[0].convert_int_cast()
+        if self.typeRepresentation.Value is float:
+            return args[0].convert_float_cast()
+        if self.typeRepresentation.Value is str:
+            return args[0].convert_str_cast()
+        if self.typeRepresentation.Value is bytes:
+            return args[0].convert_bytes_cast()
+
         if self.typeRepresentation.Value is type:
             if len(args) != 1 or kwargs:
                 return super().convert_call(context, left, args, kwargs)
