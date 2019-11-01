@@ -17,6 +17,7 @@ import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.function_stack_state import FunctionStackState
 from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
+from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.python_object_representation import pythonObjectRepresentation
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
@@ -187,6 +188,9 @@ class ExpressionConversionContext(object):
             if isMove:
                 returnTarget.expr.store(expression.nonref_expr)
             else:
+                # TODO: Is this really what I want to do?
+                if not expression.isReference:
+                    expression = self.pushMove(expression)
                 returnTarget.convert_copy_initialize(expression)
 
             self.pushTerminal(
@@ -777,28 +781,32 @@ class ExpressionConversionContext(object):
             return pythonObjectRepresentation(self, ast.s)
 
         if ast.matches.BoolOp:
-            def convertBoolOp(depth=0):
+            with self.subcontext():
+                return_type = OneOfWrapper.mergeTypes((self.convert_expression_ast(v).expr_type.typeRepresentation for v in ast.values))
+
+            def convertBoolOp(return_type, depth=0):
                 with self.subcontext() as sc:
                     value = self.convert_expression_ast(ast.values[depth])
-                    value = TypedExpression.asBool(value)
-                    if value is not None:
+                    bool_value = TypedExpression.asBool(value)
+                    value_expr = value.convert_to_type(return_type).nonref_expr
+                    if bool_value is not None:
                         if depth == len(ast.values) - 1:
-                            sc.expr = value.nonref_expr
+                            sc.expr = value_expr
                         else:
-                            tail_expr = convertBoolOp(depth + 1)
+                            tail_expr = convertBoolOp(return_type, depth + 1)
 
                             if ast.op.matches.And:
                                 sc.expr = native_ast.Expression.Branch(
-                                    cond=value.nonref_expr, true=tail_expr, false=native_ast.falseExpr)
+                                    cond=bool_value.nonref_expr, true=tail_expr, false=value_expr)
                             elif ast.op.matches.Or:
                                 sc.expr = native_ast.Expression.Branch(
-                                    cond=value.nonref_expr, true=native_ast.trueExpr, false=tail_expr)
+                                    cond=bool_value.nonref_expr, true=value_expr, false=tail_expr)
                             else:
                                 raise Exception(f"Unknown kind of Boolean operator: {ast.op.Name}")
 
                 return sc.result
 
-            return TypedExpression(self, convertBoolOp(), typeWrapper(bool), False)
+            return TypedExpression(self, convertBoolOp(return_type), typeWrapper(return_type), False)
 
         if ast.matches.BinOp:
             lhs = self.convert_expression_ast(ast.left)

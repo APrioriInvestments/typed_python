@@ -15,7 +15,6 @@
 import time
 import traceback
 import unittest
-import pytest
 from flaky import flaky
 
 from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, _types
@@ -581,23 +580,61 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaises(AssertionError):
             check(10)
 
-    @pytest.mark.skip(reason="to be fixed")
     def test_conditional_eval_or(self):
         @Compiled
-        def f(x: int, y: float, z: str):
+        def f1(x: float, y: int):
+            return x or 1 / y
+
+        @Compiled
+        def f2(x: str, y: int):
+            return x or 1 / y
+
+        @Compiled
+        def f3(x: int, y: float, z: str):
             return x or y or z
 
-        self.assertEqual(f(0, 0.0, ""), "")
-        self.assertEqual(f(0, 0.0, "one"), "one")
-        self.assertEqual(f(0, 1.5, ""), 1.5)
-        self.assertEqual(f(0, 1.5, "one"), 1.5)
-        self.assertEqual(f(3, 0.0, ""), 3)
-        self.assertEqual(f(3, 0.0, "one"), 3)
-        self.assertEqual(f(3, 1.5, ""), 3)
-        self.assertEqual(f(3, 1.5, "one"), 3)
+        with self.assertRaises(ZeroDivisionError):
+            f1(0.0, 0)
+        self.assertEqual(f1(0.0, 2), 0.5)
+        self.assertEqual(f1(1.23, 0), 1.23)
+        self.assertEqual(f1(1.23, 2), 1.23)
 
-    @pytest.mark.skip(reason="to be fixed")
+        with self.assertRaises(ZeroDivisionError):
+            f2("", 0)
+        self.assertEqual(f2("", 2), 0.5)
+        self.assertEqual(f2("y", 0), "y")
+        self.assertEqual(f2("y", 2), "y")
+
+        self.assertEqual(f3(0, 0.0, ""), "")
+        self.assertEqual(f3(0, 0.0, "one"), "one")
+        self.assertEqual(f3(0, 1.5, ""), 1.5)
+        self.assertEqual(f3(0, 1.5, "one"), 1.5)
+        self.assertEqual(f3(3, 0.0, ""), 3)
+        self.assertEqual(f3(3, 0.0, "one"), 3)
+        self.assertEqual(f3(3, 1.5, ""), 3)
+        self.assertEqual(f3(3, 1.5, "one"), 3)
+
     def test_conditional_eval_and(self):
+        @Compiled
+        def f1(x: float, y: int):
+            return x and 1 / y
+
+        self.assertEqual(f1(0.0, 0), 0.0)
+        self.assertEqual(f1(0.0, 2), 0.0)
+        with self.assertRaises(ZeroDivisionError):
+            f1(2.5, 0)
+        self.assertEqual(f1(2.5, 2), 0.5)
+
+        @Compiled
+        def f2(x: str, y: int):
+            return x and 1 / y
+
+        self.assertEqual(f2("", 0), "")
+        self.assertEqual(f2("", 2), "")
+        with self.assertRaises(ZeroDivisionError):
+            f2("y", 0)
+        self.assertEqual(f2("y", 2), 0.5)
+
         @Compiled
         def f(x: int, y: str, z: float):
             return x and y and z
