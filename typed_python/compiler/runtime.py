@@ -276,6 +276,19 @@ def Entrypoint(pyFunc):
     inner.__qualname__ = str(pyFunc)
     inner.__typed_python_function__ = pyFunc
 
+    def resultTypeFor(*args):
+        signature = tuple(pickSpecializationTypeFor(x) for x in args)
+        args = tuple(pickSpecializationValueFor(x) for x in args)
+
+        for o in pyFunc.overloads:
+            if o.matchesTypes(signature):
+                argTypes = {o.args[i].name: signature[i] for i in range(len(args))}
+                return Runtime.singleton().resultTypes(o, argTypes)
+
+        raise Exception("No compilable dispatch found for these arguments.")
+
+    inner.resultTypeFor = resultTypeFor
+
     if wrapInStatic:
         inner = staticmethod(inner)
 

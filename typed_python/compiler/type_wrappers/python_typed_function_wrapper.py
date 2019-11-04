@@ -144,6 +144,8 @@ class PythonTypedFunctionWrapper(Wrapper):
                 argTypes
             )
 
+            print("Possible return types are ", possibleTypes)
+
             returnType = OneOfWrapper.mergeTypes(possibleTypes)
 
             if returnType is None:

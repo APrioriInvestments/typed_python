@@ -889,6 +889,31 @@ class FunctionConversionContext(object):
                 true_returns
             )
 
+        if ast.matches.Assert:
+            expr_context = ExpressionConversionContext(self, variableStates)
+
+            testExpr = expr_context.convert_expression_ast(ast.test)
+
+            if testExpr is not None:
+                testExpr = testExpr.toBool()
+
+            if testExpr is None:
+                return expr_context.finalize(None, exceptionsTakeFrom=ast), False
+
+            definitelyFails = testExpr.expr.matches.Constant and testExpr.expr.val.truth_value() is False
+
+            with expr_context.ifelse(testExpr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    if ast.msg is None:
+                        expr_context.pushException(AssertionError)
+                    else:
+                        msgExpr = expr_context.convert_expression_ast(ast.msg)
+
+                        if msgExpr is not None:
+                            expr_context.pushException(AssertionError, msgExpr)
+
+            return expr_context.finalize(None, exceptionsTakeFrom=ast), not definitelyFails
+
         raise ConversionException("Can't handle python ast Statement.%s" % ast.Name)
 
     def freeVariableLookup(self, name):

@@ -550,3 +550,32 @@ class TestCompilationStructures(unittest.TestCase):
             f(aList, True)
 
         self.assertEqual(_types.refcount(aList), 1)
+
+    def test_assert(self):
+        @Entrypoint
+        def assertNoMessage(x):
+            assert x
+
+        @Entrypoint
+        def assertWithMessage(x, y):
+            assert x, y
+
+        with self.assertRaises(AssertionError):
+            assertNoMessage(0)
+
+        with self.assertRaisesRegex(AssertionError, "boo"):
+            assertWithMessage(0, "boo")
+
+        assertNoMessage(1)
+        assertWithMessage(1, "message")
+
+    def test_assert_false(self):
+        @Entrypoint
+        def check(x):
+            assert False, x
+            return x
+
+        self.assertEqual(check.resultTypeFor(10), None)
+
+        with self.assertRaises(AssertionError):
+            check(10)
