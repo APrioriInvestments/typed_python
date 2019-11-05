@@ -504,23 +504,25 @@ PyObject* PyDictInstance::pop(PyObject* o, PyObject* args) {
             throw std::runtime_error("Somehow 'self' was not a Dictionary.");
         }
 
-        instance_ptr i;
         Instance key;
+        instance_ptr keyPtr;
 
         if (itemType == keyType) {
             PyInstance *item_w = (PyInstance*)(PyObject*)item;
-            i = self->type()->lookupValueByKey(self->dataPtr(), item_w->dataPtr());
+            keyPtr = item_w->dataPtr();
         } else {
             key = Instance(keyType, [&](instance_ptr data) {
                 copyConstructFromPythonInstance(keyType, data, item);
             });
-            i = self->type()->lookupValueByKey(self->dataPtr(), key.data());
+            keyPtr = key.data();
         }
 
-        if (i) {
-            PyObject* result = extractPythonObject(i, valueType);
+        instance_ptr valuePtr = self->type()->lookupValueByKey(self->dataPtr(), keyPtr);
 
-            self->type()->deleteKey(self->dataPtr(), key.data());
+        if (valuePtr) {
+            PyObject* result = extractPythonObject(valuePtr, valueType);
+
+            self->type()->deleteKey(self->dataPtr(), keyPtr);
 
             return result;
         }
