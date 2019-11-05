@@ -190,6 +190,17 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         self.assertEqual(f([1, 2, 3]), 3)
 
+    def test_convert_pyobj_to_oneof_with_string(self):
+        @Function
+        def toObject(x: object):
+            return x
+
+        @Compiled
+        def fro_and_to(x):
+            return OneOf(String, Int64)(x)
+
+        self.assertEqual(fro_and_to("ab"), "ab")
+
     def test_object_conversions(self):
         NT1 = NamedTuple(a=int, b=float, c=str, d=str)
         NT2 = NamedTuple(s=String, t=TupleOf(int))
@@ -242,10 +253,11 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
                 self.assertEqual(to_and_fro(v), T(v))
             else:
                 self.assertEqual(to_and_fro(v), v)
+
             if T in [Float32]:
                 self.assertEqual(fro_and_to(v), T(v))
             else:
-                self.assertEqual(fro_and_to(v), v)
+                self.assertEqual(fro_and_to(v), v, (type(v), T))
 
             x = T(v)
             if T.__typed_python_category__ in ["ListOf", "TupleOf", "Alternative", "ConcreteAlternative",

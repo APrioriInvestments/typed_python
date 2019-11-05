@@ -232,8 +232,8 @@ class OneOfWrapper(Wrapper):
         assert targetVal.isReference
 
         native = context.converter.defineNativeFunction(
-            f'convert({otherExpr.expr_type} to {targetVal.expr_type}, explicit={explicit})',
-            ('convert', otherExpr.expr_type, targetVal.expr_type, explicit),
+            f'type_convert({otherExpr.expr_type} -> {targetVal.expr_type}, explicit={explicit})',
+            ('type_convert', otherExpr.expr_type, targetVal.expr_type, explicit),
             [PointerTo(self.typeRepresentation), otherExpr.expr_type],
             bool,
             lambda *args: self.generateConvertToSelf(*args, explicit=explicit)
@@ -304,6 +304,9 @@ class OneOfWrapper(Wrapper):
                     # maybe we matched.
                     with context.ifelse(converted.nonref_expr) as (ifTrue, ifFalse):
                         with ifTrue:
+                            context.pushEffect(
+                                targetVal.expr.ElementPtrIntegers(0, 0).store(native_ast.const_uint8_expr(ix))
+                            )
                             context.pushEffect(
                                 native_ast.Expression.Return(arg=native_ast.const_bool_expr(True))
                             )
