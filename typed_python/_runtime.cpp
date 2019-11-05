@@ -4,6 +4,7 @@
 #include <Python.h>
 #include <iostream>
 #include <iomanip>
+#include <sstream>
 #include "AllTypes.hpp"
 #include "StringType.hpp"
 #include "BytesType.hpp"
@@ -1075,26 +1076,175 @@ extern "C" {
     }
 
     int64_t np_str_to_int64(StringType::layout* s) {
-        PyEnsureGilAcquired getTheGil; // since to_int64 can raise ValueErr
+        int64_t value = 0;
+        int64_t value_sign = 1;
+        enum State {left_space, sign, digit, underscore, right_space, failed} state = left_space;
 
-        return StringType::to_int64(s);
+        if (s) {
+            for (int64_t i = 0; i < s->pointcount; i++) {
+                uint64_t c = StringType::getpoint(s, i);
+                if (uprops[c] & Uprops_SPACE) {
+                    if (state == underscore || state == sign) {
+                        state = failed;
+                        break;
+                    }
+                    else if (state == digit)
+                        state = right_space;
+                }
+                else if (c == '+' || c == '-') {
+                    if (state != left_space) {
+                        state = failed;
+                        break;
+                    }
+                    if (c == '-')
+                        value_sign = -1;
+                    state = sign;
+                }
+                else if (c < 128 && c >= '0' && c <= '9') {
+                    if (state == right_space) {
+                        state = failed;
+                        break;
+                    }
+                    value *= 10;
+                    value += c - '0';
+                    state = digit;
+                }
+                else if (c == '_') {
+                    if (state != digit) {
+                        state = failed;
+                        break;
+                    }
+                    state = underscore;
+                }
+                else {
+                    state = failed;
+                    break;
+                }
+            }
+        }
+        if (state == digit || state == right_space) {
+            return value_sign * value;
+        }
+        else {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_SetString(PyExc_ValueError, "'invalid literal for int() with base 10");
+            throw PythonExceptionSet();
+        }
     }
 
     double np_str_to_float64(StringType::layout* s) {
-        PyEnsureGilAcquired getTheGil;
+        enum State {left_space, sign, whole, decimal, mantissa, exp, expsign, exponent, underscore,
+                    right_space, identifier, identifier_right_space, failed} state = left_space;
+        const int MAX_FLOAT_STR = 48;
+        char buf[MAX_FLOAT_STR + 1];
+        int cur = 0;
 
-        PyObject* str_obj = PyInstance::extractPythonObject((instance_ptr)&s, StringType::Make());
-        if (!str_obj) {
+        if (s) {
+            for (int64_t i = 0; i < s->pointcount; i++) {
+                bool accumulate = true;
+                uint64_t c = StringType::getpoint(s, i);
+                if (uprops[c] & Uprops_SPACE) {
+                    if (state == underscore || state == sign || state == exp || state == expsign) {
+                        state = failed;
+                    }
+                    else if (state == identifier || state == identifier_right_space) {
+                        state = identifier_right_space;
+                        accumulate = false;
+                    }
+                    else if (state == right_space || state == whole || state == decimal || state == mantissa || state == exponent) {
+                        state = right_space;
+                        accumulate = false;
+                    }
+                    else
+                        accumulate = false;
+                }
+                else if (c == '+' || c == '-') {
+                    if (state == left_space) {
+                        state = sign;
+                    }
+                    else if (state == exp) {
+                        state = expsign;
+                    }
+                    else {
+                        state = failed;
+                    }
+                }
+                else if (c < 128 && c >= '0' && c <= '9') {
+                    if (state == exp) {
+                        state = exponent;
+                    }
+                    else if (state == right_space || state == identifier || state == identifier_right_space) {
+                        state = failed;
+                    }
+                    else {
+                        state = whole;
+                    }
+                }
+                else if (c == '.') {
+                    if (state == left_space || state == sign || state == whole) {
+                        state = decimal;
+                    }
+                    else {
+                        state = failed;
+                    }
+                }
+                else if (c == 'e' || c == 'E') {
+                    if (state == whole || state == decimal || state == mantissa) {
+                        state = exp;
+                    }
+                    else {
+                        state = failed;
+                    }
+                }
+                else if (c == '_') {
+                    if (state == whole || state == mantissa || state == exponent) {
+                        state = underscore;
+                        accumulate = false;
+                    }
+                    else {
+                        state = failed;
+                    }
+                }
+                else if (c < 128) {
+                    if (state == left_space || state == sign || state == identifier) {
+                        state = identifier;
+                    }
+                    else {
+                        state = failed;
+                    }
+                }
+                else {
+                    state = failed;
+                }
+                if (state == failed)
+                    break;
+                if (accumulate && cur < MAX_FLOAT_STR) {
+                    buf[cur++] = c;
+                }
+            }
+        }
+        buf[cur] = 0;
+        if (state == identifier || state == identifier_right_space) {
+            char* start = buf;
+            if (*start == '+' || *start == '-')
+                start++;
+            for (char* p = start; *p; p++) {
+                *p = tolower(*p);
+            }
+            if (strcmp(start, "inf") && strcmp(start, "infinity") && strcmp(start, "nan"))
+                state = failed;
+        }
+        if (state == whole || state == decimal || state == mantissa || state == exponent || state == right_space
+                || state == identifier || state == identifier_right_space) {
+            char* endptr;
+            return strtod(buf, &endptr);
+        }
+        else {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_ValueError, "could not convert string to float: '%s'",
+                StringType::Make()->toUtf8String((instance_ptr)&s).c_str());
             throw PythonExceptionSet();
         }
-        PyObject *float_obj = PyFloat_FromString(str_obj);
-        decref(str_obj);
-        if (!float_obj) {
-            throw PythonExceptionSet();
-        }
-        double ret = PyFloat_AsDouble(float_obj);
-        decref(float_obj);
-        return ret;
     }
 
     int64_t np_bytes_to_int64(BytesType::layout* l) {

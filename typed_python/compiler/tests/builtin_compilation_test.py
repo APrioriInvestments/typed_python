@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import unittest
+from math import isnan
 
 from typed_python import Function, ListOf, TupleOf, NamedTuple, Dict, ConstDict, \
     Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Bool, Float64, Float32, \
@@ -38,14 +39,6 @@ class TestBuiltinCompilation(unittest.TestCase):
         NT2 = NamedTuple(s=String, t=TupleOf(int))
         Alt1 = Alternative("Alt1", X={'a': int}, Y={'b': str})
         cases = [
-            (NT1, NT1(a=1, b=2.3, c="c", d="d")),
-            (Bytes, b"987654321"),
-            (Bytes, b"98.7654321"),
-            (Bytes, b"0.7654321e6"),
-            (Bytes, b"\01\00\02\03"),
-            (String, "1234567890"),
-            (String, "12345678.90"),
-            (String, "1.9E-15"),
             # (Float64, 1.23456789), # fails with compiled str=1.2345678899999999
             # (Float64, 12.3456789), # fails with compiled str=12.345678899999999
             # (Float64, -1.23456789), # fails with compiled str=-1.2345678899999999
@@ -110,6 +103,14 @@ class TestBuiltinCompilation(unittest.TestCase):
             (String, "-1234 _"),
             (String, "x1234"),
             (String, "1234L"),
+            (String, " -1.23e-5"),
+            (String, "-1.23e+5 "),
+            (String, "+1.23e+5_0 "),
+            (String, " +1.2_3e5_00 "),
+            (String, "+1.23e-500 "),
+            (String, "Nan"),
+            (String, " -inf"),
+            (String, " +InFiNiTy "),
             (Bytes, b"\01\00\02\03"),
             (Set(int), [1, 3, 5, 7]),
             (TupleOf(Int64), (7, 6, 5, 4, 3, 2, -1)),
@@ -159,4 +160,9 @@ class TestBuiltinCompilation(unittest.TestCase):
                 r1 = result_or_exception(f, T(v))
                 c_f = Compiled(f)
                 r2 = result_or_exception(c_f, v)
-                self.assertEqual(r1, r2)
+                if r1 != r2:
+                    print("mismatch")
+                if type(r1) is float and isnan(r1):
+                    self.assertEqual(isnan(r1), isnan(r2))
+                else:
+                    self.assertEqual(r1, r2)
