@@ -97,6 +97,79 @@ void ConstDictType::repr(instance_ptr self, ReprAccumulator& stream) {
     stream << "}";
 }
 
+void ConstDictType::repr_keys(instance_ptr self, ReprAccumulator& stream) {
+    PushReprState isNew(stream, self);
+
+    if (!isNew) {
+        stream << m_name << "(" << (void*)self << ")";
+        return;
+    }
+
+    stream << "const_dict_keys([";
+
+    int32_t ct = count(self);
+
+    for (long k = 0; k < ct;k++) {
+        if (k > 0) {
+            stream << ", ";
+        }
+
+        m_key->repr(kvPairPtrKey(self,k),stream);
+    }
+
+    stream << "])";
+}
+
+void ConstDictType::repr_items(instance_ptr self, ReprAccumulator& stream) {
+    PushReprState isNew(stream, self);
+
+    if (!isNew) {
+        stream << m_name << "(" << (void*)self << ")";
+        return;
+    }
+
+    stream << "const_dict_items([";
+
+    int32_t ct = count(self);
+
+    for (long k = 0; k < ct;k++) {
+        if (k > 0) {
+            stream << ", ";
+        }
+
+        stream << "(";
+        m_key->repr(kvPairPtrKey(self,k), stream);
+        stream << ", ";
+        m_value->repr(kvPairPtrValue(self,k), stream);
+        stream << ")";
+    }
+
+    stream << "])";
+}
+
+void ConstDictType::repr_values(instance_ptr self, ReprAccumulator& stream) {
+    PushReprState isNew(stream, self);
+
+    if (!isNew) {
+        stream << m_name << "(" << (void*)self << ")";
+        return;
+    }
+
+    stream << "const_dict_values([";
+
+    int32_t ct = count(self);
+
+    for (long k = 0; k < ct;k++) {
+        if (k > 0) {
+            stream << ", ";
+        }
+
+        m_value->repr(kvPairPtrValue(self,k),stream);
+    }
+
+    stream << "])";
+}
+
 typed_python_hash_type ConstDictType::hash(instance_ptr left) {
     if (size(left) == 0) {
         return 0x123456;
@@ -122,11 +195,10 @@ typed_python_hash_type ConstDictType::hash(instance_ptr left) {
 }
 
 //to make this fast(er), we do dict size comparison first, then keys, then values
-bool ConstDictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
+bool ConstDictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions, bool compareValues) {
     if (pyComparisonOp == Py_NE) {
         return !cmp(left, right, Py_EQ, suppressExceptions);
     }
-
 
     if (size(left) < size(right)) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
@@ -144,7 +216,7 @@ bool ConstDictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonO
     if (pyComparisonOp == Py_EQ) {
         for (long k = 0; k < ct; k++) {
             if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_NE, true) ||
-                    m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE, true)) {
+                    (compareValues && m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE, true))) {
                 return false;
             }
         }
@@ -160,12 +232,14 @@ bool ConstDictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonO
             }
         }
 
-        for (long k = 0; k < ct; k++) {
-            if (m_value->cmp(kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE, true)) {
-                if (m_value->cmp(kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_LT, true)) {
-                    return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+        if (compareValues) {
+            for (long k = 0; k < ct; k++) {
+                if (m_value->cmp(kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE, true)) {
+                    if (m_value->cmp(kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_LT, true)) {
+                        return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+                    }
+                    return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
                 }
-                return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
             }
         }
 

@@ -22,6 +22,11 @@ DictType* PyDictInstance::type() {
 
 // static
 PyObject* PyDictInstance::dictItems(PyObject *o) {
+    if (((PyInstance*)o)->mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "dict iterators don't support 'items'");
+        return NULL;
+    }
+
     PyInstance* result = ((PyInstance*)o)->duplicate();
 
     result->mIteratorOffset = 0;
@@ -33,6 +38,11 @@ PyObject* PyDictInstance::dictItems(PyObject *o) {
 
 // static
 PyObject* PyDictInstance::dictKeys(PyObject *o) {
+    if (((PyInstance*)o)->mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "dict iterators don't support 'keys'");
+        return NULL;
+    }
+
     PyInstance* result = ((PyInstance*)o)->duplicate();
 
     result->mIteratorOffset = 0;
@@ -44,6 +54,11 @@ PyObject* PyDictInstance::dictKeys(PyObject *o) {
 
 // static
 PyObject* PyDictInstance::dictValues(PyObject *o) {
+    if (((PyInstance*)o)->mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "dict iterators don't support 'values'");
+        return NULL;
+    }
+
     PyInstance* result = ((PyInstance*)o)->duplicate();
 
     result->mIteratorOffset = 0;
@@ -56,6 +71,11 @@ PyObject* PyDictInstance::dictValues(PyObject *o) {
 // static
 PyObject* PyDictInstance::dictGet(PyObject* o, PyObject* args) {
     PyDictInstance* self_w = (PyDictInstance*)o;
+
+    if (self_w->mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "dict iterators are not subscriptable");
+        return NULL;
+    }
 
     if (PyTuple_Size(args) < 1 || PyTuple_Size(args) > 2) {
         PyErr_SetString(PyExc_TypeError, "Dict.get takes one or two arguments");
@@ -112,6 +132,29 @@ PyObject* PyDictInstance::tp_iter_concrete() {
     return createIteratorToSelf(mIteratorFlag);
 }
 
+bool PyDictInstance::compare_as_iterator_to_python_concrete(PyObject* other, int pyComparisonOp) {
+    if (extractTypeFrom(other->ob_type) != type()) {
+        return ((PyInstance*)this)->compare_as_iterator_to_python_concrete(other, pyComparisonOp);
+    }
+
+    if (((PyInstance*)other)->mIteratorFlag != mIteratorFlag) {
+        return ((PyInstance*)this)->compare_as_iterator_to_python_concrete(other, pyComparisonOp);
+    }
+
+    if (mIteratorFlag == 1) {
+        //.values() are never comparable.
+        return ((PyInstance*)this)->compare_as_iterator_to_python_concrete(other, pyComparisonOp);
+    }
+
+    if (mIteratorFlag == 2) {
+        // just compare the dicts
+        return type()->cmp(dataPtr(), ((PyInstance*)other)->dataPtr(), pyComparisonOp, false);
+    }
+
+    // just compare the dict keys
+    return type()->cmp(dataPtr(), ((PyInstance*)other)->dataPtr(), pyComparisonOp, false, false /* don't compare values */);
+}
+
 PyObject* PyDictInstance::tp_iternext_concrete() {
     if (mIteratorOffset == 0) {
         //search forward to find the first slot
@@ -162,6 +205,47 @@ Py_ssize_t PyDictInstance::mp_and_sq_length_concrete() {
 int PyDictInstance::sq_contains_concrete(PyObject* item) {
     Type* item_type = extractTypeFrom(item->ob_type);
 
+    if (mIteratorFlag == 1) {
+        // we're a values iterator
+        Instance value(type()->valueType(), [&](instance_ptr data) {
+            copyConstructFromPythonInstance(type()->valueType(), data, item);
+        });
+
+        bool found = false;
+        type()->visitValues(dataPtr(), [&](instance_ptr valueInst) {
+            if (type()->valueType()->cmp(value.data(), valueInst, Py_EQ)) {
+                found = true;
+                return false;
+            }
+
+            return true;
+        });
+
+        return found;
+    }
+
+    if (mIteratorFlag == 2) {
+        // we're an items iterator
+        bool found = false;
+
+        Type* tupType = Tuple::Make({type()->keyType(), type()->valueType()});
+
+        Instance value(tupType, [&](instance_ptr data) {
+            copyConstructFromPythonInstance(tupType, data, item);
+        });
+
+        type()->visitKeyValuePairs(dataPtr(), [&](instance_ptr keyValuePairInst) {
+            if (tupType->cmp(value.data(), keyValuePairInst, Py_EQ)) {
+                found = true;
+                return false;
+            }
+
+            return true;
+        });
+
+        return found;
+    }
+
     if (item_type == type()->keyType()) {
         PyInstance* item_w = (PyInstance*)item;
 
@@ -184,10 +268,19 @@ int PyDictInstance::sq_contains_concrete(PyObject* item) {
 }
 
 PyObject* PyDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
+    if (mIteratorOffset != -1) {
+        return incref(Py_NotImplemented);
+    }
+
     return PyInstance::pyOperatorConcrete(rhs, op, opErr);
 }
 
 PyObject* PyDictInstance::mp_subscript_concrete(PyObject* item) {
+    if (mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "dict iterators are not subscriptable");
+        return NULL;
+    }
+
     Type* item_type = extractTypeFrom(item->ob_type);
 
     if (item_type == type()->keyType()) {
@@ -221,6 +314,11 @@ PyObject* PyDictInstance::mp_subscript_concrete(PyObject* item) {
 }
 
 int PyDictInstance::mp_ass_subscript_concrete_typed(instance_ptr key, instance_ptr value) {
+    if (mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "dict iterators are not subscriptable");
+        return -1;
+    }
+
     instance_ptr existingLoc = type()->lookupValueByKey(dataPtr(), key);
     if (existingLoc) {
         type()->valueType()->assign(existingLoc, value);
@@ -404,6 +502,11 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
 
         PyDictInstance *self = (PyDictInstance *) o;
 
+        if (self->mIteratorOffset != -1) {
+            PyErr_SetString(PyExc_TypeError, "dict iterators don't support setdefault");
+            throw PythonExceptionSet();
+        }
+
         /*
          * The function is called with setdefault(tem, ifNotFound=None)
          */
@@ -488,6 +591,11 @@ PyObject* PyDictInstance::pop(PyObject* o, PyObject* args) {
 
         PyDictInstance *self = (PyDictInstance *) o;
 
+        if (self->mIteratorOffset != -1) {
+            PyErr_SetString(PyExc_TypeError, "dict iterators don't support 'pop'");
+            throw PythonExceptionSet();
+        }
+
         /*
          * The function is called with pop(key, ifNotFound=None)
          */
@@ -539,4 +647,29 @@ PyObject* PyDictInstance::pop(PyObject* o, PyObject* args) {
 int PyDictInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
     // op == '__bool__'
     return type()->size(dataPtr()) != 0;
+}
+
+PyObject* PyDictInstance::tp_str_concrete() {
+    return tp_repr_concrete();
+}
+
+PyObject* PyDictInstance::tp_repr_concrete() {
+    if (mIteratorOffset == -1) {
+        return ((PyInstance*)this)->tp_repr_concrete();
+    }
+
+    std::ostringstream str;
+    ReprAccumulator accumulator(str);
+
+    if (mIteratorFlag == 0) {
+        type()->repr_keys(dataPtr(), accumulator);
+    }
+    if (mIteratorFlag == 1) {
+        type()->repr_values(dataPtr(), accumulator);
+    }
+    if (mIteratorFlag == 2) {
+        type()->repr_items(dataPtr(), accumulator);
+    }
+
+    return PyUnicode_FromString(str.str().c_str());
 }

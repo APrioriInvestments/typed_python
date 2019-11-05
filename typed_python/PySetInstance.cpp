@@ -159,7 +159,7 @@ PyObject* PySetInstance::setCopy(PyObject* o, PyObject* args) {
     if (!new_inst) {
         return NULL;
     }
-    new_inst->mIteratorOffset = 0;
+    new_inst->mIteratorOffset = -1;
     new_inst->mIteratorFlag = 0;
     new_inst->mIsMatcher = false;
 
@@ -181,7 +181,7 @@ PyObject* PySetInstance::set_intersection(PyObject* o, PyObject* other) {
     if (!new_inst) {
         return NULL;
     }
-    new_inst->mIteratorOffset = 0;
+    new_inst->mIteratorOffset = -1;
     new_inst->mIteratorFlag = 0;
     new_inst->mIsMatcher = false;
 
@@ -236,12 +236,12 @@ PyObject* PySetInstance::set_difference(PyObject* o, PyObject* other) {
     Type* src_type = extractTypeFrom(Py_TYPE(other));
 
     if (src_type && (src_type->getTypeCategory() == Type::TypeCategory::catSet)
-        && ((SetType*)src_type)->keyType() == self_w->type()->keyType()) {
+            && ((SetType*)src_type)->keyType() == self_w->type()->keyType()) {
         new_inst = (PySetInstance*)PyInstance::tp_new(Py_TYPE(o), NULL, NULL);
         if (!new_inst) {
             return NULL;
         }
-        new_inst->mIteratorOffset = 0;
+        new_inst->mIteratorOffset = -1;
         new_inst->mIteratorFlag = 0;
         new_inst->mIsMatcher = false;
 
@@ -377,7 +377,7 @@ PyObject* PySetInstance::setUnion(PyObject* o, PyObject* args) {
     if (!new_inst) {
         return NULL;
     }
-    new_inst->mIteratorOffset = 0;
+    new_inst->mIteratorOffset = -1;
     new_inst->mIteratorFlag = 0;
     new_inst->mIsMatcher = false;
 

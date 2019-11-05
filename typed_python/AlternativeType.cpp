@@ -160,7 +160,37 @@ void Alternative::repr(instance_ptr self, ReprAccumulator& stream) {
         return;
     }
 
+    auto it = m_methods.find(stream.isStrCall() ? "__str__" : "__repr__");
+    if (it != m_methods.end()) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObjectStealer selfAsPyObj(PyInstance::extractPythonObject(self, this));
+
+        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
+            it->second,
+            selfAsPyObj
+        );
+
+        if (res.first) {
+            if (!res.second) {
+                throw PythonExceptionSet();
+            }
+            if (!PyUnicode_Check(res.second)) {
+                decref(res.second);
+                throw std::runtime_error(
+                    stream.isStrCall() ? "__str__ returned a non-string" : "__repr__ returned a non-string"
+                    );
+            }
+
+            stream << PyUnicode_AsUTF8(res.second);
+            decref(res.second);
+
+            return;
+        }
+    }
+
     stream << m_subtypes[which(self)].first;
+
     m_subtypes[which(self)].second->repr(eltPtr(self), stream);
 }
 
@@ -267,10 +297,10 @@ Type* Alternative::pickConcreteSubclassConcrete(instance_ptr data) {
 
 void Alternative::constructor(instance_ptr self) {
     assertForwardsResolved();
+
     if (!m_default_construction_type) {
         m_default_construction_type = ConcreteAlternative::Make(this, m_default_construction_ix);
     }
 
     m_default_construction_type->constructor(self);
 }
-

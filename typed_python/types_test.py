@@ -804,6 +804,117 @@ class NativeTypesTests(unittest.TestCase):
                     for k in v:
                         self.assertTrue(k in v)
 
+    def test_dict_keys_values_and_items(self):
+        # check that 'Dict().keys' behaves correctly.
+        T = Dict(str, int)
+        aDict = T({"hi": 10, "bye": 20})
+
+        self.assertEqual(str(aDict.keys()), 'dict_keys(["hi", "bye"])')
+        self.assertEqual(str(aDict.values()), 'dict_values([10, 20])')
+        self.assertEqual(str(aDict.items()), 'dict_items([("hi", 10), ("bye", 20)])')
+
+        self.assertEqual(aDict.keys(), T({"hi": 10, "bye": 30}).keys())
+        self.assertNotEqual(aDict.keys(), aDict.values())
+        self.assertEqual(aDict.items(), aDict.items())
+
+        # you can't use dict methods on iterators, even though
+        # they have the same underlying representation
+        with self.assertRaises(TypeError):
+            aDict.keys().keys()
+        with self.assertRaises(TypeError):
+            aDict.keys().values()
+        with self.assertRaises(TypeError):
+            aDict.keys().items()
+        with self.assertRaises(TypeError):
+            aDict.keys().setdefault("hi", 10)
+        with self.assertRaises(TypeError):
+            aDict.keys()['hi']
+
+        self.assertIn('hi', aDict.keys())
+        self.assertNotIn('boo', aDict.keys())
+
+        with self.assertRaises(TypeError):
+            'hi' in aDict.items()
+        with self.assertRaises(TypeError):
+            'hi' in aDict.values()
+
+        self.assertIn(10, aDict.values())
+        self.assertNotIn(11, aDict.values())
+
+        with self.assertRaises(TypeError):
+            10 in aDict.keys()
+        with self.assertRaises(TypeError):
+            10 in aDict.items()
+
+        self.assertIn(('hi', 10), aDict.items())
+        self.assertNotIn(('asdf', 10), aDict.items())
+
+        with self.assertRaises(TypeError):
+            ('hi', 10) in aDict.keys()
+
+        with self.assertRaises(TypeError):
+            ('hi', 10) in aDict.values()
+
+        with self.assertRaises(Exception):
+            aDict.keys().keys()
+
+    def test_const_dict_keys_values_and_items(self):
+        # check that 'ConstDict().keys' behaves correctly.
+        T = ConstDict(str, int)
+        aDict = T({"hi": 10, "bye": 20})
+
+        self.assertEqual(str(aDict.keys()), 'const_dict_keys(["bye", "hi"])')
+        self.assertEqual(str(aDict.values()), 'const_dict_values([20, 10])')
+        self.assertEqual(str(aDict.items()), 'const_dict_items([("bye", 20), ("hi", 10)])')
+
+        self.assertEqual(aDict.keys(), T({"hi": 10, "bye": 30}).keys())
+        self.assertNotEqual(aDict.keys(), aDict.values())
+
+        # this is odd, but follows python's builtin behavior
+        self.assertNotEqual(aDict.values(), aDict.values())
+        self.assertNotEqual({1: 2}.values(), {1: 2}.values())
+
+        self.assertEqual(aDict.items(), aDict.items())
+
+        # you can't use dict methods on iterators, even though
+        # they have the same underlying representation
+        with self.assertRaises(TypeError):
+            aDict.keys().keys()
+        with self.assertRaises(TypeError):
+            aDict.keys().values()
+        with self.assertRaises(TypeError):
+            aDict.keys().items()
+        with self.assertRaises(TypeError):
+            aDict.keys()['hi']
+
+        self.assertIn('hi', aDict.keys())
+        self.assertNotIn('boo', aDict.keys())
+
+        with self.assertRaises(TypeError):
+            'hi' in aDict.items()
+        with self.assertRaises(TypeError):
+            'hi' in aDict.values()
+
+        self.assertIn(10, aDict.values())
+        self.assertNotIn(11, aDict.values())
+
+        with self.assertRaises(TypeError):
+            10 in aDict.keys()
+        with self.assertRaises(TypeError):
+            10 in aDict.items()
+
+        self.assertIn(('hi', 10), aDict.items())
+        self.assertNotIn(('asdf', 10), aDict.items())
+
+        with self.assertRaises(TypeError):
+            ('hi', 10) in aDict.keys()
+
+        with self.assertRaises(TypeError):
+            ('hi', 10) in aDict.values()
+
+        with self.assertRaises(Exception):
+            aDict.keys().keys()
+
     def test_named_tuple_from_dict(self):
         N = NamedTuple(x=int, y=str, z=OneOf(None, "hihi"))
         self.assertEqual(N().x, 0)

@@ -277,6 +277,9 @@ public:
         PyInstance* self =
             (PyInstance*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
 
+        self->mIteratorOffset = -1;
+        self->mIsMatcher = false;
+
         try {
             self->initialize(f, eltType);
 
@@ -516,6 +519,8 @@ public:
 
     static bool compare_to_python_concrete(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
+    bool compare_as_iterator_to_python_concrete(PyObject* other, int pyComparisonOp);
+
     static PyObject *tp_richcompare(PyObject *a, PyObject *b, int op);
 
     static PyObject* tp_iter(PyObject *o);
@@ -528,7 +533,11 @@ public:
 
     static PyObject* tp_repr(PyObject *o);
 
+    PyObject* tp_repr_concrete();
+
     static PyObject* tp_str(PyObject *o);
+
+    PyObject* tp_str_concrete();
 
     static bool typeCanBeSubclassed(Type* t);
 

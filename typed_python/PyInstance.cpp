@@ -1213,6 +1213,19 @@ bool PyInstance::compare_to_python_concrete(Type* t, instance_ptr self, PyObject
     return false;
 }
 
+bool PyInstance::compare_as_iterator_to_python_concrete(PyObject* other, int pyComparisonOp) {
+    if (pyComparisonOp == Py_NE) {
+        return true;
+    }
+    if (pyComparisonOp == Py_EQ) {
+        return false;
+    }
+
+    throw std::runtime_error("Cannot compare instances of type " + type()->name() + " and " + other->ob_type->tp_name);
+
+    return false;
+}
+
 int PyInstance::reversePyOpOrdering(int op) {
     if (op == Py_LT) {
         return Py_GT;
@@ -1241,16 +1254,27 @@ PyObject* PyInstance::tp_richcompare(PyObject *a, PyObject *b, int op) {
             return (PyObject*)NULL;
         }
 
-        if (own && other && own == other) {
+        if (own && other && own == other && ((PyInstance*)a)->mIteratorOffset == -1 && ((PyInstance*)b)->mIteratorOffset == -1) {
             return incref(compare_to_python(own, ((PyInstance*)a)->dataPtr(), b, false, op) ? Py_True : Py_False);
         }
 
+        if (!own) {
+            op = reversePyOpOrdering(op);
+            std::swap(a, b);
+        }
+
+        PyInstance* instance = (PyInstance*)a;
+
         bool cmp;
 
-        if (own) {
-            cmp = compare_to_python(own, ((PyInstance*)a)->dataPtr(), b, false, op);
+        if (instance->mIteratorOffset != -1) {
+            cmp = instance->specializeStatic(instance->type()->getTypeCategory(), [&](auto* concrete_null_ptr) {
+                typedef typename std::remove_reference<decltype(*concrete_null_ptr)>::type py_instance_type;
+
+                return ((py_instance_type*)instance)->compare_as_iterator_to_python_concrete(b, op);
+            });
         } else {
-            cmp = compare_to_python(other, ((PyInstance*)b)->dataPtr(), a, false, reversePyOpOrdering(op));
+            cmp = compare_to_python(instance->type(), instance->dataPtr(), b, false, op);
         }
 
         return incref(cmp ? Py_True : Py_False);
@@ -1284,58 +1308,35 @@ PyObject* PyInstance::tp_iternext_concrete() {
 }
 
 // static
-PyObject* PyInstance::tp_repr(PyObject *o) {
-    Type* self_type = extractTypeFrom(o->ob_type);
-    PyInstance* w = (PyInstance*)o;
-
-    if (self_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
-        self_type = self_type->getBaseType();
-    }
-
-    if (self_type->getTypeCategory() == Type::TypeCategory::catAlternative) {
-        Alternative* a = (Alternative*)self_type;
-        auto it = a->getMethods().find("__repr__");
-        if (it != a->getMethods().end()) {
-            return PyObject_CallFunctionObjArgs(
-                (PyObject*)it->second->getOverloads()[0].getFunctionObj(),
-                o,
-                NULL
-                );
+PyObject* PyInstance::tp_repr(PyObject *self) {
+    return specializeForType(self, [&](auto& subtype) {
+        return subtype.tp_repr_concrete();
         }
-    }
+    );
+}
+
+PyObject* PyInstance::tp_repr_concrete() {
     std::ostringstream str;
     ReprAccumulator accumulator(str);
 
-    self_type->repr(w->dataPtr(), accumulator);
+    type()->repr(dataPtr(), accumulator);
 
     return PyUnicode_FromString(str.str().c_str());
 }
 
 // static
-PyObject* PyInstance::tp_str(PyObject *o) {
-    Type* self_type = extractTypeFrom(o->ob_type);
-    PyInstance* self_w = (PyInstance*)o;
-
-    if (self_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
-        self_type = self_type->getBaseType();
-    }
-
-    if (self_type->getTypeCategory() == Type::TypeCategory::catAlternative) {
-        Alternative* a = (Alternative*)self_type;
-        auto it = a->getMethods().find("__str__");
-        if (it != a->getMethods().end()) {
-            return PyObject_CallFunctionObjArgs(
-                (PyObject*)it->second->getOverloads()[0].getFunctionObj(),
-                o,
-                NULL
-                );
+PyObject* PyInstance::tp_str(PyObject *self) {
+    return specializeForType(self, [&](auto& subtype) {
+        return subtype.tp_str_concrete();
         }
-    }
+    );
+}
 
+PyObject* PyInstance::tp_str_concrete() {
     std::ostringstream str;
     ReprAccumulator accumulator(str, true);
 
-    self_type->repr(self_w->dataPtr(), accumulator);
+    type()->repr(dataPtr(), accumulator);
 
     return PyUnicode_FromString(str.str().c_str());
 }

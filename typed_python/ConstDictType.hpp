@@ -59,6 +59,33 @@ public:
 
     static ConstDictType* Make(Type* key, Type* value, ConstDictType* knownType = nullptr);
 
+
+    // hand 'visitor' each an instance_ptr for
+    // each value. if it returns 'false', exit early.
+    template<class visitor_type>
+    void visitValues(instance_ptr self, visitor_type visitor) {
+        size_t ct = count(self);
+
+        for (long k = 0; k < ct; k++) {
+            if (!visitor(kvPairPtrValue(self, k))) {
+                return;
+            }
+        }
+    }
+
+    // hand 'visitor' each key and value instance_ptr as a single tuple.
+    // if it returns 'false', exit early.
+    template<class visitor_type>
+    void visitKeyValuePairs(instance_ptr self, visitor_type visitor) {
+        size_t ct = count(self);
+
+        for (long k = 0; k < ct; k++) {
+            if (!visitor(kvPairPtrKey(self, k))) {
+                return;
+            }
+        }
+    }
+
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         size_t ct = count(self);
@@ -105,9 +132,15 @@ public:
 
     void repr(instance_ptr self, ReprAccumulator& stream);
 
+    void repr_keys(instance_ptr self, ReprAccumulator& stream);
+
+    void repr_values(instance_ptr self, ReprAccumulator& stream);
+
+    void repr_items(instance_ptr self, ReprAccumulator& stream);
+
     typed_python_hash_type hash(instance_ptr left);
 
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions, bool compareValues=true);
 
     void addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const;
 

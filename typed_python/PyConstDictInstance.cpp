@@ -22,6 +22,11 @@ ConstDictType* PyConstDictInstance::type() {
 
 // static
 PyObject* PyConstDictInstance::constDictItems(PyObject *o) {
+    if (((PyInstance*)o)->mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "ConstDict iterators don't support 'items'");
+        return NULL;
+    }
+
     Type* self_type = extractTypeFrom(o->ob_type);
 
     PyInstance* w = (PyInstance*)o;
@@ -47,6 +52,11 @@ PyObject* PyConstDictInstance::constDictItems(PyObject *o) {
 
 // static
 PyObject* PyConstDictInstance::constDictKeys(PyObject *o) {
+    if (((PyInstance*)o)->mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "ConstDict iterators don't support 'keys'");
+        return NULL;
+    }
+
     Type* self_type = extractTypeFrom(o->ob_type);
     PyInstance* w = (PyInstance*)o;
 
@@ -70,6 +80,11 @@ PyObject* PyConstDictInstance::constDictKeys(PyObject *o) {
 
 // static
 PyObject* PyConstDictInstance::constDictValues(PyObject *o) {
+    if (((PyInstance*)o)->mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "ConstDict iterators don't support 'values'");
+        return NULL;
+    }
+
     Type* self_type = extractTypeFrom(o->ob_type);
     PyInstance* w = (PyInstance*)o;
 
@@ -94,6 +109,11 @@ PyObject* PyConstDictInstance::constDictValues(PyObject *o) {
 
 // static
 PyObject* PyConstDictInstance::constDictGet(PyObject* o, PyObject* args) {
+    if (((PyInstance*)o)->mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "ConstDict iterators don't support 'get'");
+        return NULL;
+    }
+
     PyConstDictInstance* self_w = (PyConstDictInstance*)o;
 
     if (PyTuple_Size(args) < 1 || PyTuple_Size(args) > 2) {
@@ -202,6 +222,47 @@ Py_ssize_t PyConstDictInstance::mp_and_sq_length_concrete() {
 int PyConstDictInstance::sq_contains_concrete(PyObject* item) {
     Type* item_type = extractTypeFrom(item->ob_type);
 
+    if (mIteratorFlag == 1) {
+        // we're a values iterator
+        Instance value(type()->valueType(), [&](instance_ptr data) {
+            copyConstructFromPythonInstance(type()->valueType(), data, item);
+        });
+
+        bool found = false;
+        type()->visitValues(dataPtr(), [&](instance_ptr valueInst) {
+            if (type()->valueType()->cmp(value.data(), valueInst, Py_EQ)) {
+                found = true;
+                return false;
+            }
+
+            return true;
+        });
+
+        return found;
+    }
+
+    if (mIteratorFlag == 2) {
+        // we're an items iterator
+        bool found = false;
+
+        Type* tupType = Tuple::Make({type()->keyType(), type()->valueType()});
+
+        Instance value(tupType, [&](instance_ptr data) {
+            copyConstructFromPythonInstance(tupType, data, item);
+        });
+
+        type()->visitKeyValuePairs(dataPtr(), [&](instance_ptr keyValuePairInst) {
+            if (tupType->cmp(value.data(), keyValuePairInst, Py_EQ)) {
+                found = true;
+                return false;
+            }
+
+            return true;
+        });
+
+        return found;
+    }
+
     if (item_type == type()->keyType()) {
         PyInstance* item_w = (PyInstance*)item;
 
@@ -224,6 +285,10 @@ int PyConstDictInstance::sq_contains_concrete(PyObject* item) {
 }
 
 PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
+    if (mIteratorOffset != -1) {
+        return incref(Py_NotImplemented);
+    }
+
     if (strcmp(op, "__add__") == 0) {
         Type* rhs_type = extractTypeFrom(rhs->ob_type);
 
@@ -263,7 +328,35 @@ PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
     return PyInstance::pyOperatorConcrete(rhs, op, opErr);
 }
 
+bool PyConstDictInstance::compare_as_iterator_to_python_concrete(PyObject* other, int pyComparisonOp) {
+    if (extractTypeFrom(other->ob_type) != type()) {
+        return ((PyInstance*)this)->compare_as_iterator_to_python_concrete(other, pyComparisonOp);
+    }
+
+    if (((PyInstance*)other)->mIteratorFlag != mIteratorFlag) {
+        return ((PyInstance*)this)->compare_as_iterator_to_python_concrete(other, pyComparisonOp);
+    }
+
+    if (mIteratorFlag == 1) {
+        //.values() are never comparable.
+        return ((PyInstance*)this)->compare_as_iterator_to_python_concrete(other, pyComparisonOp);
+    }
+
+    if (mIteratorFlag == 2) {
+        // just compare the dicts
+        return type()->cmp(dataPtr(), ((PyInstance*)other)->dataPtr(), pyComparisonOp, false);
+    }
+
+    // just compare the dict keys
+    return type()->cmp(dataPtr(), ((PyInstance*)other)->dataPtr(), pyComparisonOp, false, false /* don't compare values */);
+}
+
 PyObject* PyConstDictInstance::mp_subscript_concrete(PyObject* item) {
+    if (mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "ConstDict iterators are not subscriptable");
+        return NULL;
+    }
+
     Type* item_type = extractTypeFrom(item->ob_type);
 
     if (item_type == type()->keyType()) {
@@ -425,4 +518,29 @@ void PyConstDictInstance::copyConstructFromPythonInstanceConcrete(ConstDictType*
 int PyConstDictInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
     // op == '__bool__'
     return type()->size(dataPtr()) != 0;
+}
+
+PyObject* PyConstDictInstance::tp_str_concrete() {
+    return tp_repr_concrete();
+}
+
+PyObject* PyConstDictInstance::tp_repr_concrete() {
+    if (mIteratorOffset == -1) {
+        return ((PyInstance*)this)->tp_repr_concrete();
+    }
+
+    std::ostringstream str;
+    ReprAccumulator accumulator(str);
+
+    if (mIteratorFlag == 0) {
+        type()->repr_keys(dataPtr(), accumulator);
+    }
+    if (mIteratorFlag == 1) {
+        type()->repr_values(dataPtr(), accumulator);
+    }
+    if (mIteratorFlag == 2) {
+        type()->repr_items(dataPtr(), accumulator);
+    }
+
+    return PyUnicode_FromString(str.str().c_str());
 }

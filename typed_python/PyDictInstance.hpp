@@ -64,6 +64,13 @@ public:
 
     static bool compare_to_python_concrete(DictType* listT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
+    bool compare_as_iterator_to_python_concrete(PyObject* other, int pyComparisonOp);
+
+    // override tp_repr so that we can check if the object is 'keys', 'values' or 'items'
+    PyObject* tp_repr_concrete();
+
+    PyObject* tp_str_concrete();
+
     /**
      * Function implementing python's dict::setdefault.
      *

@@ -55,7 +55,10 @@ public:
     static bool compare_to_python_concrete(ConstDictType* dictType, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
     static void copyConstructFromPythonInstanceConcrete(ConstDictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
+
+    bool compare_as_iterator_to_python_concrete(PyObject* other, int pyComparisonOp);
+
+    PyObject* tp_repr_concrete();
+
+    PyObject* tp_str_concrete();
 };
-
-
-

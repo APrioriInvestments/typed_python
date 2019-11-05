@@ -52,6 +52,36 @@ public:
 
     static DictType* Make(Type* key, Type* value, DictType* knownType=nullptr);
 
+    // hand 'visitor' each an instance_ptr for
+    // each value. if it returns 'false', exit early.
+    template<class visitor_type>
+    void visitValues(instance_ptr self, visitor_type visitor) {
+        hash_table_layout& l = **(hash_table_layout**)self;
+
+        for (long k = 0; k < l.items_reserved; k++) {
+            if (l.items_populated[k]) {
+                if (!visitor(l.items + m_bytes_per_key_value_pair * k + m_bytes_per_key)) {
+                    return;
+                }
+            }
+        }
+    }
+
+    // hand 'visitor' each key and value instance_ptr as a single tuple.
+    // if it returns 'false', exit early.
+    template<class visitor_type>
+    void visitKeyValuePairs(instance_ptr self, visitor_type visitor) {
+        hash_table_layout& l = **(hash_table_layout**)self;
+
+        for (long k = 0; k < l.items_reserved; k++) {
+            if (l.items_populated[k]) {
+                if (!visitor(l.items + m_bytes_per_key_value_pair * k)) {
+                    return;
+                }
+            }
+        }
+    }
+
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         hash_table_layout& l = **(hash_table_layout**)self;
@@ -144,9 +174,21 @@ public:
 
     void repr(instance_ptr self, ReprAccumulator& stream);
 
+    void repr_keys(instance_ptr self, ReprAccumulator& stream);
+
+    void repr_values(instance_ptr self, ReprAccumulator& stream);
+
+    void repr_items(instance_ptr self, ReprAccumulator& stream);
+
     typed_python_hash_type hash(instance_ptr left);
 
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
+    bool cmp(
+        instance_ptr left,
+        instance_ptr right,
+        int pyComparisonOp,
+        bool suppressExceptions,
+        bool compareValues=true
+    );
 
     int64_t refcount(instance_ptr self) const;
 

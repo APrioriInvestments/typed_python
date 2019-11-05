@@ -99,12 +99,100 @@ void DictType::repr(instance_ptr self, ReprAccumulator& stream) {
     stream << "}";
 }
 
+void DictType::repr_keys(instance_ptr self, ReprAccumulator& stream) {
+    PushReprState isNew(stream, self);
+
+    if (!isNew) {
+        stream << m_name << "(" << (void*)self << ")";
+        return;
+    }
+
+    stream << "dict_keys([";
+
+    hash_table_layout& l = **(hash_table_layout**)self;
+    bool isFirst = true;
+
+    for (long k = 0; k < l.items_reserved;k++) {
+        if (l.items_populated[k]) {
+            if (isFirst) {
+                isFirst = false;
+            } else {
+                stream << ", ";
+            }
+
+            m_key->repr(l.items + k * m_bytes_per_key_value_pair, stream);
+        }
+    }
+
+    stream << "])";
+}
+
+void DictType::repr_values(instance_ptr self, ReprAccumulator& stream) {
+    PushReprState isNew(stream, self);
+
+    if (!isNew) {
+        stream << m_name << "(" << (void*)self << ")";
+        return;
+    }
+
+    stream << "dict_values([";
+
+    hash_table_layout& l = **(hash_table_layout**)self;
+    bool isFirst = true;
+
+    for (long k = 0; k < l.items_reserved;k++) {
+        if (l.items_populated[k]) {
+            if (isFirst) {
+                isFirst = false;
+            } else {
+                stream << ", ";
+            }
+
+            m_value->repr(l.items + k * m_bytes_per_key_value_pair + m_bytes_per_key, stream);
+        }
+    }
+
+    stream << "])";
+}
+
+void DictType::repr_items(instance_ptr self, ReprAccumulator& stream) {
+    PushReprState isNew(stream, self);
+
+    if (!isNew) {
+        stream << m_name << "(" << (void*)self << ")";
+        return;
+    }
+
+    stream << "dict_items([";
+
+    hash_table_layout& l = **(hash_table_layout**)self;
+    bool isFirst = true;
+
+    for (long k = 0; k < l.items_reserved;k++) {
+        if (l.items_populated[k]) {
+            if (isFirst) {
+                isFirst = false;
+            } else {
+                stream << ", ";
+            }
+
+            stream << "(";
+            m_key->repr(l.items + k * m_bytes_per_key_value_pair, stream);
+            stream << ", ";
+            m_value->repr(l.items + k * m_bytes_per_key_value_pair + m_bytes_per_key, stream);
+            stream << ")";
+        }
+    }
+
+    stream << "])";
+}
+
 typed_python_hash_type DictType::hash(instance_ptr left) {
     throw std::logic_error(name() + " is not hashable");
 }
 
 //to make this fast(er), we do dict size comparison first, then keys, then values
-bool DictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
+bool DictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions, bool compareValues) {
     if (pyComparisonOp != Py_NE && pyComparisonOp != Py_EQ) {
         throw std::runtime_error("Ordered comparison not supported between objects of type " + name());
     }
@@ -127,11 +215,11 @@ bool DictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bo
             instance_ptr value = key + m_bytes_per_key;
             instance_ptr otherValue = lookupValueByKey(right, key);
 
-            if (!otherValue) {
+            if (!otherValue && compareValues) {
                 return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
             }
 
-            if (m_value->cmp(value, otherValue, Py_NE, suppressExceptions)) {
+            if (compareValues && m_value->cmp(value, otherValue, Py_NE, suppressExceptions)) {
                 return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
             }
         }
