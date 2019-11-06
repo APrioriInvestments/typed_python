@@ -257,6 +257,12 @@ class FunctionOverloadArg:
             return self._typeFilter.get()
         return self._typeFilter
 
+    def typeToUse(self, type):
+        """Return the type we should use if we're specializing this argument."""
+        if self.typeFilter is None:
+            return type
+        return self.typeFilter
+
     def __repr__(self):
         res = f"{self.name}: {self.typeFilter}"
         if self.defaultValue is not None:

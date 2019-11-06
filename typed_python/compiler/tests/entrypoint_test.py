@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Class, Member, Final
+from typed_python import ListOf, Class, Member, Final, TupleOf
 from typed_python._types import touchCompiledSpecializations
 from typed_python import Entrypoint, NotCompiled
 from typed_python.compiler.runtime import Runtime
@@ -42,6 +42,13 @@ FloatList = ListOf(float)
 
 
 class TestCompileSpecializedEntrypoints(unittest.TestCase):
+    def test_entrypoint_functions_work(self):
+        @Entrypoint
+        def f(x: TupleOf(int)):
+            return x
+
+        self.assertEqual(f.resultTypeFor((1, 2, 3)), TupleOf(int))
+
     def test_specialized_entrypoint(self):
         compiledAdd = Entrypoint(add)
 

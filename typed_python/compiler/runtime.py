@@ -269,7 +269,7 @@ def Entrypoint(pyFunc):
 
                 if i is not None:
                     o = pyFunc.overloads[i]
-                    argTypes = {o.args[i].name: signature[i] for i in range(len(args))}
+                    argTypes = {o.args[i].name: o.args[i].typeToUse(signature[i]) for i in range(len(args))}
                     Runtime.singleton().compile(o, argTypes)
                 signatures.add(signature)
 
@@ -287,7 +287,7 @@ def Entrypoint(pyFunc):
         if i is not None:
             o = pyFunc.overloads[i]
 
-            argTypes = {o.args[i].name: signature[i] for i in range(len(args))}
+            argTypes = {o.args[i].name: o.args[i].typeToUse(signature[i]) for i in range(len(args))}
             return Runtime.singleton().resultTypes(o, argTypes)
 
         raise Exception("No compilable dispatch found for these arguments.")
