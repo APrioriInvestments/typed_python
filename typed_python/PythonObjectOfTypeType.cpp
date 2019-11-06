@@ -16,12 +16,12 @@
 
 #include "AllTypes.hpp"
 
-void PythonObjectOfType::repr(instance_ptr self, ReprAccumulator& stream) {
+void PythonObjectOfType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     PyEnsureGilAcquired acquireTheGil;
 
     PyObject* p = getPyObj(self);
 
-    PyObjectStealer o(PyObject_Repr(p));
+    PyObjectStealer o(isStr ? PyObject_Str(p) : PyObject_Repr(p));
 
     if (!o) {
         stream << "<EXCEPTION>";

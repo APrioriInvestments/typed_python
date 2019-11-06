@@ -162,7 +162,7 @@ public:
         return this;
     }
 
-    void repr(instance_ptr self, ReprAccumulator& out);
+    void repr(instance_ptr self, ReprAccumulator& out, bool isStr);
 
     /* compare two types as closely as possible to how python would.
 

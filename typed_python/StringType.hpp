@@ -215,7 +215,7 @@ public:
 
     void constructor(instance_ptr self, int64_t bytes_per_codepoint, int64_t count, const char* data) const;
 
-    void repr(instance_ptr self, ReprAccumulator& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
 
     instance_ptr eltPtr(instance_ptr self, int64_t i) const;
 

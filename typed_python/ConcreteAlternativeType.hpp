@@ -58,8 +58,8 @@ public:
         return m_alternative->hash(left);
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
-        m_alternative->repr(self,stream);
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
+        m_alternative->repr(self,stream, isStr);
     }
 
     template<class buf_t>

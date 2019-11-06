@@ -1081,6 +1081,19 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(alt.x_0().f(), 1)
         self.assertEqual(str(alt.x_0()), "not_your_usual_str")
 
+    def test_alternatives_with_str_and_repr(self):
+        A = Alternative(
+            "A",
+            X={},
+            __str__=lambda self: "alt_str",
+            __repr__=lambda self: "alt_repr"
+        )
+
+        self.assertEqual(str(A.X()), "alt_str")
+        self.assertEqual(repr(A.X()), "alt_repr")
+        self.assertEqual(repr(ListOf(A)([A.X()])), "[alt_repr]")
+        self.assertEqual(str(ListOf(A)([A.X()])), "[alt_repr]")
+
     def test_alternative_magic_methods(self):
         A_attrs = {"q": "value-q", "z": "value-z"}
 

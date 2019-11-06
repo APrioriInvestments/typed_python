@@ -21,9 +21,8 @@
 
 class ReprAccumulator {
 public:
-    ReprAccumulator(std::ostringstream& stream, bool isStr=false) :
-        m_stream(stream),
-        m_isStr(isStr)
+    ReprAccumulator(std::ostringstream& stream) :
+        m_stream(stream)
     {
     }
 

@@ -155,7 +155,7 @@ bool SetType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp,
     return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
 }
 
-void SetType::repr(instance_ptr self, ReprAccumulator& stream) {
+void SetType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     PushReprState isNew(stream, self);
 
     if (!isNew) {
@@ -175,7 +175,7 @@ void SetType::repr(instance_ptr self, ReprAccumulator& stream) {
                 stream << ", ";
             }
 
-            m_key_type->repr(l.items + k * m_bytes_per_el, stream);
+            m_key_type->repr(l.items + k * m_bytes_per_el, stream, false);
         }
     }
 

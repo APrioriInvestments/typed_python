@@ -282,10 +282,13 @@ def Entrypoint(pyFunc):
         signature = tuple(pickSpecializationTypeFor(x) for x in args)
         args = tuple(pickSpecializationValueFor(x) for x in args)
 
-        for o in pyFunc.overloads:
-            if o.matchesTypes(signature):
-                argTypes = {o.args[i].name: signature[i] for i in range(len(args))}
-                return Runtime.singleton().resultTypes(o, argTypes)
+        i = pyFunc.indexOfOverloadMatching(*args)
+
+        if i is not None:
+            o = pyFunc.overloads[i]
+
+            argTypes = {o.args[i].name: signature[i] for i in range(len(args))}
+            return Runtime.singleton().resultTypes(o, argTypes)
 
         raise Exception("No compilable dispatch found for these arguments.")
 

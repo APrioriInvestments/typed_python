@@ -152,7 +152,7 @@ bool Alternative::cmpStatic(Alternative* altT, instance_ptr left, instance_ptr r
     return altT->m_subtypes[record_l.which].second->cmp(record_l.data, record_r.data, pyComparisonOp, false);
 }
 
-void Alternative::repr(instance_ptr self, ReprAccumulator& stream) {
+void Alternative::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     PushReprState isNew(stream, self);
 
     if (!isNew) {
@@ -160,7 +160,8 @@ void Alternative::repr(instance_ptr self, ReprAccumulator& stream) {
         return;
     }
 
-    auto it = m_methods.find(stream.isStrCall() ? "__str__" : "__repr__");
+    auto it = m_methods.find(isStr ? "__str__" : "__repr__");
+
     if (it != m_methods.end()) {
         PyEnsureGilAcquired acquireTheGil;
 
@@ -191,7 +192,7 @@ void Alternative::repr(instance_ptr self, ReprAccumulator& stream) {
 
     stream << m_subtypes[which(self)].first;
 
-    m_subtypes[which(self)].second->repr(eltPtr(self), stream);
+    m_subtypes[which(self)].second->repr(eltPtr(self), stream, isStr);
 }
 
 typed_python_hash_type Alternative::hash(instance_ptr left) {

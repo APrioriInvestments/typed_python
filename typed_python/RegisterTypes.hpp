@@ -97,7 +97,7 @@ public:
         m_name = "Bool";
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
         stream << (*(bool*)self ? "True":"False");
     }
 
@@ -114,7 +114,7 @@ public:
         m_name = "UInt8";
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
         stream << (uint64_t)*(uint8_t*)self << "u8";
     }
 
@@ -131,7 +131,7 @@ public:
         m_name = "UInt16";
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
         stream << (uint64_t)*(uint16_t*)self << "u16";
     }
 
@@ -145,7 +145,7 @@ public:
         m_name = "UInt32";
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
         stream << (uint64_t)*(uint32_t*)self << "u32";
     }
 
@@ -159,7 +159,7 @@ public:
         m_name = "UInt64";
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
         stream << *(uint64_t*)self << "u64";
     }
 
@@ -174,7 +174,7 @@ public:
         m_size = 1;
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
         stream << (int64_t)*(int8_t*)self << "i8";
     }
 
@@ -188,7 +188,7 @@ public:
         m_name = "Int16";
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
         stream << (int64_t)*(int16_t*)self << "i16";
     }
 
@@ -202,7 +202,7 @@ public:
         m_name = "Int32";
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
         stream << (int64_t)*(int32_t*)self << "i32";
     }
 
@@ -216,7 +216,7 @@ public:
         m_name = "Int64";
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
         stream << *(int64_t*)self;
     }
 
@@ -230,7 +230,7 @@ public:
         m_name = "Float32";
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
         stream << *(float*)self << "f32";
     }
 
@@ -244,7 +244,7 @@ public:
         m_name = "Float64";
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
         // this is never actually called
         stream << *(double*)self;
     }

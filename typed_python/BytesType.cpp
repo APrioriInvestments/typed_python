@@ -205,7 +205,7 @@ bool BytesType::isBinaryCompatibleWithConcrete(Type* other) {
     return true;
 }
 
-void BytesType::repr(instance_ptr self, ReprAccumulator& stream) {
+void BytesType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     stream << "b" << "'";
     long bytes = count(self);
     uint8_t* base = eltPtr(self,0);

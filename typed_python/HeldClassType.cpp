@@ -73,7 +73,7 @@ bool HeldClass::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, b
     return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
 }
 
-void HeldClass::repr(instance_ptr self, ReprAccumulator& stream) {
+void HeldClass::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     PushReprState isNew(stream, self);
 
     if (!isNew) {
@@ -91,7 +91,7 @@ void HeldClass::repr(instance_ptr self, ReprAccumulator& stream) {
         if (checkInitializationFlag(self, k)) {
             stream << std::get<0>(m_members[k]) << "=";
 
-            std::get<1>(m_members[k])->repr(eltPtr(self,k),stream);
+            std::get<1>(m_members[k])->repr(eltPtr(self,k), stream, false);
         } else {
             stream << std::get<0>(m_members[k]) << " not initialized";
         }

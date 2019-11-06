@@ -116,8 +116,8 @@ bool Class::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool 
     throw PythonExceptionSet();
 }
 
-void Class::repr(instance_ptr self, ReprAccumulator& stream) {
-    auto it = m_heldClass->getMemberFunctions().find(stream.isStrCall() ? "__str__" : "__repr__");
+void Class::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
+    auto it = m_heldClass->getMemberFunctions().find(isStr ? "__str__" : "__repr__");
 
     if (it != m_heldClass->getMemberFunctions().end()) {
         PyEnsureGilAcquired acquireTheGil;
@@ -127,7 +127,7 @@ void Class::repr(instance_ptr self, ReprAccumulator& stream) {
         std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
             it->second,
             selfAsPyObj
-            );
+        );
 
         if (res.first) {
             if (!res.second) {
@@ -154,7 +154,7 @@ void Class::repr(instance_ptr self, ReprAccumulator& stream) {
 
 
     layout& l = *instanceToLayout(self);
-    m_heldClass->repr(l.data, stream);
+    m_heldClass->repr(l.data, stream, isStr);
 }
 
 typed_python_hash_type Class::hash(instance_ptr left) {

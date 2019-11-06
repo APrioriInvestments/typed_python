@@ -87,7 +87,7 @@ public:
         return it->second;
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
         stream << m_name;
     }
 

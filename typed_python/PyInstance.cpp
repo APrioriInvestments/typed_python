@@ -1319,7 +1319,7 @@ PyObject* PyInstance::tp_repr_concrete() {
     std::ostringstream str;
     ReprAccumulator accumulator(str);
 
-    type()->repr(dataPtr(), accumulator);
+    type()->repr(dataPtr(), accumulator, false);
 
     return PyUnicode_FromString(str.str().c_str());
 }
@@ -1334,9 +1334,9 @@ PyObject* PyInstance::tp_str(PyObject *self) {
 
 PyObject* PyInstance::tp_str_concrete() {
     std::ostringstream str;
-    ReprAccumulator accumulator(str, true);
+    ReprAccumulator accumulator(str);
 
-    type()->repr(dataPtr(), accumulator);
+    type()->repr(dataPtr(), accumulator, true);
 
     return PyUnicode_FromString(str.str().c_str());
 }

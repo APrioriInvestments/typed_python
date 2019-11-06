@@ -69,7 +69,7 @@ DictType* DictType::Make(Type* key, Type* value, DictType* knownType) {
     return it->second;
 }
 
-void DictType::repr(instance_ptr self, ReprAccumulator& stream) {
+void DictType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     PushReprState isNew(stream, self);
 
     if (!isNew) {
@@ -90,9 +90,9 @@ void DictType::repr(instance_ptr self, ReprAccumulator& stream) {
                 stream << ", ";
             }
 
-            m_key->repr(l.items + k * m_bytes_per_key_value_pair, stream);
+            m_key->repr(l.items + k * m_bytes_per_key_value_pair, stream, false);
             stream << ": ";
-            m_value->repr(l.items + k * m_bytes_per_key_value_pair + m_bytes_per_key, stream);
+            m_value->repr(l.items + k * m_bytes_per_key_value_pair + m_bytes_per_key, stream, false);
         }
     }
 
@@ -120,7 +120,7 @@ void DictType::repr_keys(instance_ptr self, ReprAccumulator& stream) {
                 stream << ", ";
             }
 
-            m_key->repr(l.items + k * m_bytes_per_key_value_pair, stream);
+            m_key->repr(l.items + k * m_bytes_per_key_value_pair, stream, false);
         }
     }
 
@@ -148,7 +148,7 @@ void DictType::repr_values(instance_ptr self, ReprAccumulator& stream) {
                 stream << ", ";
             }
 
-            m_value->repr(l.items + k * m_bytes_per_key_value_pair + m_bytes_per_key, stream);
+            m_value->repr(l.items + k * m_bytes_per_key_value_pair + m_bytes_per_key, stream, false);
         }
     }
 
@@ -177,9 +177,9 @@ void DictType::repr_items(instance_ptr self, ReprAccumulator& stream) {
             }
 
             stream << "(";
-            m_key->repr(l.items + k * m_bytes_per_key_value_pair, stream);
+            m_key->repr(l.items + k * m_bytes_per_key_value_pair, stream, false);
             stream << ", ";
-            m_value->repr(l.items + k * m_bytes_per_key_value_pair + m_bytes_per_key, stream);
+            m_value->repr(l.items + k * m_bytes_per_key_value_pair + m_bytes_per_key, stream, false);
             stream << ")";
         }
     }

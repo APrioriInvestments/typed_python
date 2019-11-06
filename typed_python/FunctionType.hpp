@@ -492,7 +492,7 @@ public:
         buffer.writeEmpty(fieldNumber);
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isRepr) {
         stream << "<function " << m_name << ">";
     }
 
@@ -556,4 +556,3 @@ public:
 private:
     std::vector<Overload> mOverloads;
 };
-

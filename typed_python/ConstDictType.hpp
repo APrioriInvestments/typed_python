@@ -130,7 +130,7 @@ public:
         incKvPairCount(self, ct);
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
 
     void repr_keys(instance_ptr self, ReprAccumulator& stream);
 

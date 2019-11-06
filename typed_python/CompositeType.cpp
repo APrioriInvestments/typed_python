@@ -98,7 +98,7 @@ bool CompositeType::cmp(instance_ptr left, instance_ptr right, int pyComparisonO
     return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
 }
 
-void CompositeType::repr(instance_ptr self, ReprAccumulator& stream) {
+void CompositeType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     stream << "(";
 
     for (long k = 0; k < getTypes().size();k++) {
@@ -110,7 +110,7 @@ void CompositeType::repr(instance_ptr self, ReprAccumulator& stream) {
             stream << m_names[k] << "=";
         }
 
-        getTypes()[k]->repr(eltPtr(self,k),stream);
+        getTypes()[k]->repr(eltPtr(self,k),stream, false);
     }
     if (getTypes().size() == 1) {
         stream << ",";
@@ -204,4 +204,3 @@ bool Tuple::_updateAfterForwardTypesChanged() {
 
     return anyChanged || m_name != oldName;
 }
-

@@ -72,7 +72,7 @@ ConstDictType* ConstDictType::Make(Type* key, Type* value, ConstDictType* knownT
     return it->second;
 }
 
-void ConstDictType::repr(instance_ptr self, ReprAccumulator& stream) {
+void ConstDictType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     PushReprState isNew(stream, self);
 
     if (!isNew) {
@@ -89,9 +89,9 @@ void ConstDictType::repr(instance_ptr self, ReprAccumulator& stream) {
             stream << ", ";
         }
 
-        m_key->repr(kvPairPtrKey(self,k),stream);
+        m_key->repr(kvPairPtrKey(self,k),stream, false);
         stream << ": ";
-        m_value->repr(kvPairPtrValue(self,k),stream);
+        m_value->repr(kvPairPtrValue(self,k),stream, false);
     }
 
     stream << "}";
@@ -114,7 +114,7 @@ void ConstDictType::repr_keys(instance_ptr self, ReprAccumulator& stream) {
             stream << ", ";
         }
 
-        m_key->repr(kvPairPtrKey(self,k),stream);
+        m_key->repr(kvPairPtrKey(self,k),stream, false);
     }
 
     stream << "])";
@@ -138,9 +138,9 @@ void ConstDictType::repr_items(instance_ptr self, ReprAccumulator& stream) {
         }
 
         stream << "(";
-        m_key->repr(kvPairPtrKey(self,k), stream);
+        m_key->repr(kvPairPtrKey(self,k), stream, false);
         stream << ", ";
-        m_value->repr(kvPairPtrValue(self,k), stream);
+        m_value->repr(kvPairPtrValue(self,k), stream, false);
         stream << ")";
     }
 
@@ -164,7 +164,7 @@ void ConstDictType::repr_values(instance_ptr self, ReprAccumulator& stream) {
             stream << ", ";
         }
 
-        m_value->repr(kvPairPtrValue(self,k),stream);
+        m_value->repr(kvPairPtrValue(self,k), stream, false);
     }
 
     stream << "])";

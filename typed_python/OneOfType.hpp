@@ -76,7 +76,7 @@ public:
         m_types[*((uint8_t*)self)]->serialize(self+1, buffer, *(uint8_t*)self);
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
 
     typed_python_hash_type hash(instance_ptr left);
 

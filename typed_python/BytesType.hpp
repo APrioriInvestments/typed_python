@@ -40,7 +40,7 @@ public:
 
     bool isBinaryCompatibleWithConcrete(Type* other);
 
-    void repr(instance_ptr self, ReprAccumulator& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
@@ -108,4 +108,3 @@ public:
 
     void assign(instance_ptr self, instance_ptr other);
 };
-

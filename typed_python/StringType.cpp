@@ -828,9 +828,18 @@ void StringType::constructor(instance_ptr self, int64_t bytes_per_codepoint, int
     }
 }
 
-void StringType::repr(instance_ptr self, ReprAccumulator& stream) {
-    //as if it were bytes, which is totally wrong...
+void StringType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
+    if (isStr) {
+        // isStr=true should only come at the top-level of stringification. Composite
+        // types always repr their internals, and so we should never see this input
+        // because the interpreter would never need to call this function since it
+        // would have an actual pystring instead.
+        throw std::runtime_error("StringType::repr shouldn't ever get 'isStr=true'");
+    }
+
     stream << "\"";
+
+    //as if it were bytes, which is totally wrong...
     long bytes = count(self);
     uint8_t* base = eltPtr(self,0);
 

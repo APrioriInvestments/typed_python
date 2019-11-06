@@ -128,7 +128,7 @@ public:
         m_subtypes[which].second->deserialize(record.data, buffer, fieldAndWire.second);
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
 
     typed_python_hash_type hash(instance_ptr left);
 

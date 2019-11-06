@@ -71,8 +71,8 @@ public:
         m_base->deserialize(self, buffer, wireType);
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
-        m_base->repr(self,stream);
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
+        m_base->repr(self, stream, isStr);
     }
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {

@@ -125,7 +125,7 @@ std::string Instance::repr() const {
     ReprAccumulator accumulator(s);
 
     accumulator << std::showpoint;
-    mLayout->type->repr(mLayout->data, accumulator);
+    mLayout->type->repr(mLayout->data, accumulator, false);
     return s.str();
 }
 

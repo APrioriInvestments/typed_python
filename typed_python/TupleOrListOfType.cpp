@@ -40,7 +40,7 @@ bool TupleOrListOfType::_updateAfterForwardTypesChanged() {
     return anyChanged;
 }
 
-void TupleOrListOfType::repr(instance_ptr self, ReprAccumulator& stream) {
+void TupleOrListOfType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     PushReprState isNew(stream, self);
 
     if (!isNew) {
@@ -62,7 +62,7 @@ void TupleOrListOfType::repr(instance_ptr self, ReprAccumulator& stream) {
             stream << ", ";
         }
 
-        m_element_type->repr(eltPtr(self,k),stream);
+        m_element_type->repr(eltPtr(self,k), stream, false);
     }
 
     stream << (m_is_tuple ? ")" : "]");

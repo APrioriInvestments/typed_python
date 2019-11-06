@@ -86,8 +86,8 @@ std::string OneOfType::computeName() const {
     return res;
 }
 
-void OneOfType::repr(instance_ptr self, ReprAccumulator& stream) {
-    m_types[*((uint8_t*)self)]->repr(self+1, stream);
+void OneOfType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
+    m_types[*((uint8_t*)self)]->repr(self+1, stream, isStr);
 }
 
 typed_python_hash_type OneOfType::hash(instance_ptr left) {

@@ -16,11 +16,11 @@
 
 #include "AllTypes.hpp"
 
-void Type::repr(instance_ptr self, ReprAccumulator& out) {
+void Type::repr(instance_ptr self, ReprAccumulator& out, bool isStr) {
     assertForwardsResolved();
 
     this->check([&](auto& subtype) {
-        subtype.repr(self, out);
+        subtype.repr(self, out, isStr);
     });
 }
 

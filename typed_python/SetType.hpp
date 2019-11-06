@@ -26,7 +26,7 @@ class SetType : public Type {
     void constructor(instance_ptr self);
     void destroy(instance_ptr self);
     void copy_constructor(instance_ptr self, instance_ptr other);
-    void repr(instance_ptr self, ReprAccumulator& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
     int64_t refcount(instance_ptr self) const;
     bool _updateAfterForwardTypesChanged();
     int64_t size(instance_ptr self) const;

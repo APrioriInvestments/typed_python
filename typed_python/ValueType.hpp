@@ -40,8 +40,8 @@ public:
         return mInstance.hash();
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
-        mInstance.type()->repr(mInstance.data(), stream);
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
+        mInstance.type()->repr(mInstance.data(), stream, isStr);
     }
 
     template<class buf_t>
@@ -102,4 +102,3 @@ private:
 
     Instance mInstance;
 };
-

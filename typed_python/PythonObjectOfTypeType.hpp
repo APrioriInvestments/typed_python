@@ -134,7 +134,7 @@ public:
          getPyObj(self) = buffer.getContext().deserializePythonObject(buffer, wireType);
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 

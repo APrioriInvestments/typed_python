@@ -119,7 +119,7 @@ public:
         }
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
 
     typed_python_hash_type hash(instance_ptr left);
 

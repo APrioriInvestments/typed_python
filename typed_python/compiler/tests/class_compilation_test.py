@@ -289,6 +289,13 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(f().y, 0)
 
     def test_compile_class_repr_and_str(self):
+        class RegularClassWithReprAndString:
+            def __repr__(self):
+                return "repr"
+
+            def __str__(self):
+                return "str"
+
         class ClassWithReprAndStr(Class):
             def __repr__(self):
                 return "repr"
@@ -296,8 +303,11 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def __str__(self):
                 return "str"
 
-        self.assertEqual(str(ListOf(ClassWithReprAndStr)([ClassWithReprAndStr()])), "[str]")
+        self.assertEqual(str(ListOf(ClassWithReprAndStr)([ClassWithReprAndStr()])), "[repr]")
         self.assertEqual(repr(ListOf(ClassWithReprAndStr)([ClassWithReprAndStr()])), "[repr]")
+
+        self.assertEqual(str([RegularClassWithReprAndString()]), "[repr]")
+        self.assertEqual(repr([RegularClassWithReprAndString()]), "[repr]")
 
         @Entrypoint
         def callRepr(x):

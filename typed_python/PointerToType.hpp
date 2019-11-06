@@ -86,7 +86,7 @@ public:
         throw std::runtime_error("Can't deserialize Pointers");
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isRepr) {
         stream << "(" << m_element_type->name() << "*)" << *(void**)self;
     }
 
