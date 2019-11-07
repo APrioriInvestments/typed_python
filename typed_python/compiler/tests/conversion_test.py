@@ -115,6 +115,42 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(f(0, 1, "s"), False)
         self.assertEqual(f(1, 1, "s"), True)
 
+    def test_boolean_operators_with_side_effects(self):
+        # a function that appends 'effect' onto a list of effects
+        # and then returns result, so that we can track when we
+        # are actually executing a particular expression
+        def effectAndResult(effectList, effect, result):
+            effectList.append(effect)
+            return result
+
+        @Compiled
+        def f_and(x: int, y: int, z: str) -> ListOf(str):
+            result = ListOf(str)()
+
+            (effectAndResult(result, "x", x)
+                and effectAndResult(result, "y", y)
+                and effectAndResult(result, "z", z))
+
+            return result
+
+        self.assertEqual(f_and(0, 1, "s"), ["x"])
+        self.assertEqual(f_and(1, 0, "s"), ["x", "y"])
+        self.assertEqual(f_and(1, 1, "s"), ["x", "y", "z"])
+
+        @Compiled
+        def f_or(x: int, y: int, z: str) -> ListOf(str):
+            result = ListOf(str)()
+
+            (effectAndResult(result, "x", x)
+                and effectAndResult(result, "y", y)
+                and effectAndResult(result, "z", z))
+
+            return result
+
+        self.assertEqual(f_or(0, 0, ""), ["x"])
+        self.assertEqual(f_or(1, 0, ""), ["x", "y"])
+        self.assertEqual(f_or(1, 1, ""), ["x", "y", "z"])
+
     def test_object_to_int_conversion(self):
         @Function
         def toObject(o: object):

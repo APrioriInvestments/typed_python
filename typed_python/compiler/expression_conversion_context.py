@@ -188,9 +188,6 @@ class ExpressionConversionContext(object):
             if isMove:
                 returnTarget.expr.store(expression.nonref_expr)
             else:
-                # TODO: Is this really what I want to do?
-                if not expression.isReference:
-                    expression = self.pushMove(expression)
                 returnTarget.convert_copy_initialize(expression)
 
             self.pushTerminal(
@@ -781,32 +778,89 @@ class ExpressionConversionContext(object):
             return pythonObjectRepresentation(self, ast.s)
 
         if ast.matches.BoolOp:
-            with self.subcontext():
-                return_type = OneOfWrapper.mergeTypes((self.convert_expression_ast(v).expr_type.typeRepresentation for v in ast.values))
+            # compute the resulting bool-op type by evaluating each subexpression
+            # this is a little wasteful because we hit the expression
+            # once here to find out the subtype and then again to actually render it
+            # below.
+            resultTypes = []
+            for argIx, e in enumerate(ast.values):
+                with self.subcontext():
+                    resValue = self.convert_expression_ast(e)
 
-            def convertBoolOp(return_type, depth=0):
-                with self.subcontext() as sc:
-                    value = self.convert_expression_ast(ast.values[depth])
+                    if resValue is not None:
+                        # check whether converting to bool definitely causes an exception
+                        # if so, we can't produce this output type.
+                        if resValue.toBool() is None:
+                            resValue = None
+
+                if resValue is None:
+                    if argIx == 0:
+                        # we always throw. we swallowed the value with the subcontext
+                        # so we need to actually produce the code here.
+                        return self.convert_expression_ast(e)
+                    else:
+                        # we throw on this subexpression. this means the whole
+                        # expression may throw but may also return because the
+                        # first expression could possibly return. We exit the loop
+                        # because no new types will be produced, but will still
+                        # need to evaluate each subexpression and try writing
+                        # it into the output.
+                        break
+                else:
+                    # otherwise, there's a pathway that returns this type and
+                    # we need to be able to accept it.
+                    resultTypes.append(resValue.expr_type.typeRepresentation)
+
+            # this is the merge of all the possible types that could
+            # come out of the subexpression.
+            return_type = OneOfWrapper.mergeTypes(resultTypes)
+
+            # allocate a new slot for the final value. every pathway
+            # will either write into it and intialize it, or throw an
+            # exception. we are guaranteed that if control flow returns
+            # then the value is initialized.
+            result = self.allocateUninitializedSlot(return_type)
+
+            # define a function to recursively walk through the expressions in our chain.
+            # calling it pushes code that evaluates ast.values[depth:] in the current
+            # context.
+            def convertBoolOp(depth=0):
+                value = self.convert_expression_ast(ast.values[depth])
+
+                if value is None:
+                    # evaluating this particular subexpression produced an exception.
+                    # we can stop evaluating.
+                    return
+
+                if depth == len(ast.values) - 1:
+                    # this is the last node in the expression, and so therefore
+                    # the value of the slot in this particular pathway.
+                    value.convert_to_type_with_target(result)
+                    self.markUninitializedSlotInitialized(result)
+                else:
                     bool_value = TypedExpression.asBool(value)
-                    value_expr = value.convert_to_type(return_type).nonref_expr
-                    if bool_value is not None:
-                        if depth == len(ast.values) - 1:
-                            sc.expr = value_expr
-                        else:
-                            tail_expr = convertBoolOp(return_type, depth + 1)
 
-                            if ast.op.matches.And:
-                                sc.expr = native_ast.Expression.Branch(
-                                    cond=bool_value.nonref_expr, true=tail_expr, false=value_expr)
-                            elif ast.op.matches.Or:
-                                sc.expr = native_ast.Expression.Branch(
-                                    cond=bool_value.nonref_expr, true=value_expr, false=tail_expr)
-                            else:
-                                raise Exception(f"Unknown kind of Boolean operator: {ast.op.Name}")
+                    if bool_value is None:
+                        return
 
-                return sc.result
+                    if ast.op.matches.And:
+                        with self.ifelse(bool_value) as (ifTrue, ifFalse):
+                            with ifTrue:
+                                convertBoolOp(depth + 1)
+                            with ifFalse:
+                                value.convert_to_type_with_target(result)
+                                self.markUninitializedSlotInitialized(result)
+                    elif ast.op.matches.Or:
+                        with self.ifelse(bool_value) as (ifTrue, ifFalse):
+                            with ifTrue:
+                                value.convert_to_type_with_target(result)
+                                self.markUninitializedSlotInitialized(result)
+                            with ifFalse:
+                                convertBoolOp(depth + 1)
 
-            return TypedExpression(self, convertBoolOp(return_type), typeWrapper(return_type), False)
+            convertBoolOp()
+
+            return result
 
         if ast.matches.BinOp:
             lhs = self.convert_expression_ast(ast.left)

@@ -210,10 +210,6 @@ class OneOfWrapper(Wrapper):
         return "Maybe"
 
     def convert_to_type_with_target(self, context, expr, targetVal, explicit):
-        # TODO: Is this really what I want to do?
-        if not expr.isReference:
-            expr = context.pushMove(expr)
-
         isInitialized = context.push(bool, lambda tgt: tgt.expr.store(native_ast.const_bool_expr(False)))
 
         with context.switch(expr.expr.ElementPtrIntegers(0, 0).load(),
