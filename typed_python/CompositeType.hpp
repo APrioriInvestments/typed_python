@@ -31,6 +31,9 @@ public:
             m_types(types),
             m_names(names)
     {
+        for (long k = 0; k < names.size(); k++) {
+            m_nameToIndex[names[k]] = k;
+        }
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
@@ -163,6 +166,9 @@ public:
     const std::vector<std::string>& getNames() const {
         return m_names;
     }
+    const std::map<std::string, int>& getNameToIndex() const {
+        return m_nameToIndex;
+    }
 
 protected:
     template<class subtype>
@@ -191,6 +197,7 @@ protected:
     std::vector<Type*> m_types;
     std::vector<size_t> m_byte_offsets;
     std::vector<std::string> m_names;
+    std::map<std::string, int> m_nameToIndex;
     std::vector<size_t> m_serialize_typecodes; //codes to use when serializing/deserializing
     std::unordered_map<size_t, size_t> m_serialize_typecodes_to_position; //codes to use when serializing/deserializing
 };

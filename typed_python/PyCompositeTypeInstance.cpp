@@ -82,31 +82,9 @@ int PyCompositeTypeInstance::pyInquiryConcrete(const char* op, const char* opErr
 
 void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
     if (PyDict_Check(pyRepresentation)) {
-        if (namedTupleT->getTypes().size() < PyDict_Size(pyRepresentation)) {
-            throw std::runtime_error("Couldn't initialize type of " + namedTupleT->name() + " because supplied dictionary had too many items");
-        }
-        long actuallyUsed = 0;
+        static PyObject* emptyTuple = PyTuple_New(0);
 
-        namedTupleT->constructor(tgt,
-            [&](uint8_t* eltPtr, int64_t k) {
-                const std::string& name = namedTupleT->getNames()[k];
-                Type* t = namedTupleT->getTypes()[k];
-
-                PyObject* o = PyDict_GetItemString(pyRepresentation, name.c_str());
-                if (o) {
-                    copyConstructFromPythonInstance(t, eltPtr, o);
-                    actuallyUsed++;
-                }
-                else if (namedTupleT->is_default_constructible()) {
-                    t->constructor(eltPtr);
-                } else {
-                    throw std::logic_error("Can't default initialize argument " + name);
-                }
-            });
-
-        if (actuallyUsed != PyDict_Size(pyRepresentation)) {
-            throw std::runtime_error("Couldn't initialize type of " + namedTupleT->name() + " because supplied dictionary had unused arguments");
-        }
+        constructFromPythonArgumentsConcrete(namedTupleT, tgt, emptyTuple, pyRepresentation, isExplicit);
 
         return;
     }
@@ -114,30 +92,53 @@ void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(NamedTuple* n
     PyCompositeTypeInstance::copyConstructFromPythonInstanceConcrete(namedTupleT, tgt, pyRepresentation, isExplicit);
 }
 
-void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(NamedTuple* namedTupleT, uint8_t* data, PyObject* args, PyObject* kwargs) {
-    long actuallyUsed = 0;
-
+void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(NamedTuple* namedTupleT, uint8_t* data, PyObject* args, PyObject* kwargs, bool isExplicit) {
     if (kwargs) {
-        namedTupleT->constructor(
-            data,
+        iterate(kwargs, [&](PyObject* name) {
+            if (!PyUnicode_Check(name)) {
+                throw std::runtime_error(
+                    "Can't construct an instance of "
+                    + namedTupleT->name() + " with dictionary keys that aren't strings."
+                );
+            }
+
+            const char* nameAsCstr = PyUnicode_AsUTF8(name);
+
+            if (namedTupleT->getNameToIndex().find(nameAsCstr) == namedTupleT->getNameToIndex().end()) {
+                throw std::runtime_error(
+                    namedTupleT->name() + " doesn't have a member named '" + nameAsCstr + "'"
+                );
+            }
+        });
+
+        namedTupleT->constructor(data,
             [&](uint8_t* eltPtr, int64_t k) {
-                Type* eltType = namedTupleT->getTypes()[k];
-                PyObject* o = PyDict_GetItemString(kwargs, namedTupleT->getNames()[k].c_str());
+                const std::string& name = namedTupleT->getNames()[k];
+                Type* t = namedTupleT->getTypes()[k];
+
+                PyObject* o = PyDict_GetItemString(kwargs, name.c_str());
                 if (o) {
-                    copyConstructFromPythonInstance(eltType, eltPtr, o, true);
-                    actuallyUsed++;
+                    try {
+                        copyConstructFromPythonInstance(t, eltPtr, o, isExplicit);
+                    } catch(PythonExceptionSet&) {
+                        PyErr_Clear();
+                        throw std::runtime_error(
+                            "Can't initialize member '" + name + "' in " + namedTupleT->name() +
+                            " with an instance of type " + o->ob_type->tp_name
+                        );
+                    } catch(...) {
+                        throw std::runtime_error(
+                            "Can't initialize member '" + name + "' in " + namedTupleT->name() +
+                            " with an instance of type " + o->ob_type->tp_name
+                        );
+                    }
                 }
-                else if (eltType->is_default_constructible()) {
-                    eltType->constructor(eltPtr);
+                else if (namedTupleT->is_default_constructible()) {
+                    t->constructor(eltPtr);
                 } else {
-                    throw std::logic_error("Can't default initialize argument " + namedTupleT->getNames()[k]);
+                    throw std::logic_error("Can't default initialize member " + name + " of " + namedTupleT->name());
                 }
             });
-
-        if (actuallyUsed != PyDict_Size(kwargs)) {
-            namedTupleT->destroy(data);
-            throw std::runtime_error("Couldn't initialize type of " + namedTupleT->name() + " because supplied dictionary had unused arguments");
-        }
 
         return;
     }

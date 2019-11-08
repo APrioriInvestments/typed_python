@@ -650,6 +650,15 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             t(c=10)
 
+    def test_named_tuple_construction_bad_args(self):
+        T = NamedTuple(a=int, b=str)
+
+        with self.assertRaisesRegex(TypeError, "member named 'c'"):
+            T(c=100)
+
+        with self.assertRaisesRegex(TypeError, "member 'a'"):
+            T(a="hi")
+
     def test_named_tuple_str(self):
         t = NamedTuple(a=str, b=str)
 
