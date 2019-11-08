@@ -1542,7 +1542,7 @@ PyObject *disableNativeDispatch(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *enableNativeDispatch(PyObject* nullValue, PyObject* args) {
-    native_dispatch_disabled++;
+    native_dispatch_disabled--;
     return incref(Py_None);
 }
 

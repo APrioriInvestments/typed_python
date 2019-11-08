@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Class, Member, Final, TupleOf
+from typed_python import ListOf, Class, Member, Final, TupleOf, DisableCompiledCode
 from typed_python._types import touchCompiledSpecializations
 from typed_python import Entrypoint, NotCompiled
 from typed_python.compiler.runtime import Runtime
@@ -265,3 +265,44 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         time.time() - t0
 
         self.assertLess(time.time() - t0, .4)
+
+    def test_disable_compiled_code(self):
+        @Entrypoint
+        def sum(x: int):
+            res = 0.0
+            for i in range(x):
+                res += float(i)
+            return res
+
+        # prime the function
+        sum(10)
+
+        t0 = time.time()
+        sum(1000000)
+        t1 = time.time()
+
+        print(f"Took {t1 - t0} to compute 1mm sum.")
+
+        self.assertFalse(DisableCompiledCode.isDisabled())
+
+        with DisableCompiledCode():
+            self.assertTrue(DisableCompiledCode.isDisabled())
+
+            t2 = time.time()
+            sum(1000000)
+            t3 = time.time()
+
+            print(f"Took {t3 - t2} to compute 1mm sum without the compiler.")
+
+            self.assertGreater(t3 - t2, (t1 - t0) * 10)
+
+        self.assertFalse(DisableCompiledCode.isDisabled())
+
+        t4 = time.time()
+        sum(1000000)
+        t5 = time.time()
+
+        print(f"Took {t5 - t4} to compute 1mm sum with the compiler turned back on.")
+
+        # this should be fast again
+        self.assertLess(t5 - t4, (t1 - t0) * 2)
