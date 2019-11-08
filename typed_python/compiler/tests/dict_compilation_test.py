@@ -13,7 +13,6 @@
 #   limitations under the License.
 
 from typed_python import Dict, ListOf, Tuple, TupleOf, Entrypoint
-import pytest
 import typed_python._types as _types
 import unittest
 import time
@@ -284,7 +283,6 @@ class TestDictCompilation(unittest.TestCase):
 
         print("Speedup was ", ratio)
 
-    @pytest.mark.perf
     def test_dict_read_write_perf_releases_gil(self):
         def dict_setmany(d, count, passes):
             for _ in range(passes):
