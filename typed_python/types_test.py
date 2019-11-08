@@ -796,6 +796,35 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(a, deserialize(t, serialize(t, a)))
 
+    def test_dict_assign_coersion(self):
+        T = Dict(str, int)
+
+        t = T()
+        t["hi"] = 1.5
+
+        self.assertEqual(t, {"hi": 1})
+
+    def test_dict_clear(self):
+        T = Dict(str, TupleOf(int))
+
+        a = T()
+        aTup = TupleOf(int)([1, 2, 3])
+
+        self.assertEqual(_types.refcount(aTup), 1)
+        a["hi"] = aTup
+        self.assertEqual(_types.refcount(aTup), 2)
+        a.clear()
+        self.assertEqual(_types.refcount(aTup), 1)
+
+        self.assertNotIn("hi", a)
+
+        a["bye"] = aTup
+        a["good"] = (1, 2, 3, 4)
+
+        a.clear()
+
+        self.assertEqual(len(a), 0)
+
     def test_deserialize_primitive(self):
         x = deserialize(str, serialize(str, "a"))
         self.assertTrue(isinstance(x, str))

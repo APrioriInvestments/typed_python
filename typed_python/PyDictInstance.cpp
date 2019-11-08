@@ -128,6 +128,22 @@ PyObject* PyDictInstance::dictGet(PyObject* o, PyObject* args) {
     return NULL;
 }
 
+// static
+PyObject* PyDictInstance::dictClear(PyObject* o) {
+    PyDictInstance* self_w = (PyDictInstance*)o;
+
+    if (self_w->mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "dict iterators don't allow 'clear'");
+        return NULL;
+    }
+
+    Type* self_type = extractTypeFrom(o->ob_type);
+
+    ((DictType*)self_type)->clear(self_w->dataPtr());
+
+    return incref(Py_None);
+}
+
 PyObject* PyDictInstance::tp_iter_concrete() {
     return createIteratorToSelf(mIteratorFlag);
 }
@@ -348,7 +364,7 @@ int PyDictInstance::mp_ass_subscript_concrete_keytyped(PyObject* pyKey, instance
         return mp_ass_subscript_concrete_typed(key, value_w->dataPtr());
     } else {
         Instance val(type()->valueType(), [&](instance_ptr data) {
-            copyConstructFromPythonInstance(type()->valueType(), data, value);
+            copyConstructFromPythonInstance(type()->valueType(), data, value, true);
         });
 
         return mp_ass_subscript_concrete_typed(key, val.data());
@@ -371,8 +387,9 @@ int PyDictInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
 }
 
 PyMethodDef* PyDictInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [7] {
+    return new PyMethodDef [8] {
         {"get", (PyCFunction)PyDictInstance::dictGet, METH_VARARGS, NULL},
+        {"clear", (PyCFunction)PyDictInstance::dictClear, METH_NOARGS, NULL},
         {"items", (PyCFunction)PyDictInstance::dictItems, METH_NOARGS, NULL},
         {"keys", (PyCFunction)PyDictInstance::dictKeys, METH_NOARGS, NULL},
         {"values", (PyCFunction)PyDictInstance::dictValues, METH_NOARGS, NULL},

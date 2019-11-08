@@ -298,6 +298,16 @@ bool DictType::deleteKey(instance_ptr self, instance_ptr key) const {
     return false;
 }
 
+void DictType::clear(instance_ptr self) {
+    hash_table_layout& record = **(hash_table_layout**)self;
+
+    for (long k = 0; k < record.items_reserved; k++) {
+        if (record.items_populated[k]) {
+            deleteKey(self, keyAtSlot(self, k));
+        }
+    }
+}
+
 bool DictType::deleteKeyWithUninitializedValue(instance_ptr self, instance_ptr key) const {
     hash_table_layout& record = **(hash_table_layout**)self;
 
