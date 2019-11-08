@@ -133,10 +133,10 @@ void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(NamedTuple* name
                         );
                     }
                 }
-                else if (namedTupleT->is_default_constructible()) {
+                else if (t->is_default_constructible()) {
                     t->constructor(eltPtr);
                 } else {
-                    throw std::logic_error("Can't default initialize member " + name + " of " + namedTupleT->name());
+                    throw std::logic_error("Can't default initialize member '" + name + "' of " + namedTupleT->name());
                 }
             });
 
