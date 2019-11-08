@@ -2539,6 +2539,17 @@ class NativeTypesTests(unittest.TestCase):
         s2 = Set(int)([1])
         self.assertNotEqual(id(s2), id(s1))
 
+    def test_set_update(self):
+        s1 = Set(int)([1, 2, 3])
+
+        s1.update([4, 5, 6])
+
+        self.assertEqual(s1, Set(int)(range(1, 7)))
+
+        s1.update(Set(int)([7, 8, 9]))
+
+        self.assertEqual(s1, Set(int)(range(1, 10)))
+
     def test_set_len(self):
         s1 = Set(int)([1, 2, 3])
         s2 = Set(int)([1, 2, 3])

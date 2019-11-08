@@ -26,6 +26,7 @@ class PySetInstance : public PyInstance {
     static PyMethodDef* typeMethodsConcrete(Type* t);
     static PyObject* setPop(PyObject* o, PyObject* args);
     static PyObject* setAdd(PyObject* o, PyObject* args);
+    static PyObject* setUpdate(PyObject* o, PyObject* args);
     static PyObject* setContains(PyObject* o, PyObject* args);
     static PyObject* setDiscard(PyObject* o, PyObject* args);
     static PyObject* setRemove(PyObject* o, PyObject* args);
@@ -50,7 +51,7 @@ class PySetInstance : public PyInstance {
     int pyInquiryConcrete(const char* op, const char* opErrRep);
 
   private:
-    static int try_insert_key(PySetInstance* self, PyObject* pyKey, instance_ptr key);
+    static void insertKey(PySetInstance* self, PyObject* pyKey, instance_ptr key);
     static PyObject* try_remove(PyObject* o, PyObject* item, bool assertKeyError = false);
     static void copy_elements(PyObject* dst, PyObject* src);
     static PyObject* set_intersection(PyObject* o, PyObject* other);

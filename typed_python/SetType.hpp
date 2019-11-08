@@ -40,6 +40,21 @@ class SetType : public Type {
     bool slotPopulated(instance_ptr self, size_t offset) const;
     instance_ptr keyAtSlot(instance_ptr self, size_t offset) const;
 
+    // hand 'visitor' each set element as an instance_ptr.
+    // if it returns 'false', exit early.
+    template<class visitor_type>
+    void visitSetElements(instance_ptr self, visitor_type visitor) {
+        hash_table_layout& l = **(hash_table_layout**)self;
+
+        for (long k = 0; k < l.items_reserved; k++) {
+            if (l.items_populated[k]) {
+                if (!visitor(l.items + m_bytes_per_el * k)) {
+                    return;
+                }
+            }
+        }
+    }
+
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         hash_table_layout& l = **(hash_table_layout**)self;
