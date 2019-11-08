@@ -1546,6 +1546,10 @@ PyObject *enableNativeDispatch(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
+PyObject *isDispatchEnabled(PyObject* nullValue, PyObject* args) {
+    return incref(native_dispatch_disabled ? Py_False : Py_True);
+}
+
 PyObject *installNativeFunctionPointer(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 5) {
         PyErr_SetString(PyExc_TypeError, "installNativeFunctionPointer takes 5 positional arguments");
@@ -1771,6 +1775,7 @@ static PyMethodDef module_methods[] = {
     {"touchCompiledSpecializations", (PyCFunction)touchCompiledSpecializations, METH_VARARGS, NULL},
     {"disableNativeDispatch", (PyCFunction)disableNativeDispatch, METH_VARARGS, NULL},
     {"enableNativeDispatch", (PyCFunction)enableNativeDispatch, METH_VARARGS, NULL},
+    {"isDispatchEnabled", (PyCFunction)isDispatchEnabled, METH_VARARGS, NULL},
     {"refcount", (PyCFunction)refcount, METH_VARARGS, NULL},
     {"getOrSetTypeResolver", (PyCFunction)getOrSetTypeResolver, METH_VARARGS, NULL},
     {"getTypePointer", (PyCFunction)getTypePointer, METH_VARARGS, NULL},

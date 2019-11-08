@@ -312,6 +312,10 @@ class DisableCompiledCode:
     def __exit__(self, *args):
         typed_python._types.enableNativeDispatch()
 
+    @staticmethod
+    def isDisabled():
+        return not typed_python._types.isDispatchEnabled()
+
 
 def makeNamedTuple(**kwargs):
     return typed_python._types.NamedTuple(**{k: type(v) for k, v in kwargs.items()})(kwargs)

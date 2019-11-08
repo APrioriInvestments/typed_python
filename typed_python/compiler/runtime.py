@@ -18,7 +18,7 @@ import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
 import typed_python.compiler.llvm_compiler as llvm_compiler
 from typed_python import Function, NoneType, OneOf, _types
-from typed_python.internals import FunctionOverload
+from typed_python.internals import FunctionOverload, DisableCompiledCode
 
 _singleton = [None]
 
@@ -263,15 +263,16 @@ def Entrypoint(pyFunc):
         signature = tuple(pickSpecializationTypeFor(x) for x in args)
         args = tuple(pickSpecializationValueFor(x) for x in args)
 
-        with lock:
-            if signature not in signatures:
-                i = pyFunc.indexOfOverloadMatching(*args)
+        if not DisableCompiledCode.isDisabled():
+            with lock:
+                if signature not in signatures:
+                    i = pyFunc.indexOfOverloadMatching(*args)
 
-                if i is not None:
-                    o = pyFunc.overloads[i]
-                    argTypes = {o.args[i].name: o.args[i].typeToUse(signature[i]) for i in range(len(args))}
-                    Runtime.singleton().compile(o, argTypes)
-                signatures.add(signature)
+                    if i is not None:
+                        o = pyFunc.overloads[i]
+                        argTypes = {o.args[i].name: o.args[i].typeToUse(signature[i]) for i in range(len(args))}
+                        Runtime.singleton().compile(o, argTypes)
+                    signatures.add(signature)
 
         return pyFunc(*args)
 
