@@ -52,6 +52,8 @@ public:
 
     static PyObject* dictGet(PyObject* o, PyObject* args);
 
+    static PyObject* dictUpdate(PyObject* o, PyObject* args);
+
     static PyObject* dictClear(PyObject* o);
 
     static PyMethodDef* typeMethodsConcrete(Type* t);

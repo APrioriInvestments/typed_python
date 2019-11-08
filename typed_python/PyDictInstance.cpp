@@ -69,6 +69,62 @@ PyObject* PyDictInstance::dictValues(PyObject *o) {
 }
 
 // static
+PyObject* PyDictInstance::dictUpdate(PyObject* o, PyObject* args) {
+    PyDictInstance* self_w = (PyDictInstance*)o;
+
+    if (self_w->mIteratorOffset != -1) {
+        PyErr_SetString(PyExc_TypeError, "dict iterators don't support 'update'");
+        return NULL;
+    }
+
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "Dict.update takes one argument");
+        return NULL;
+    }
+
+    PyObjectHolder item(PyTuple_GetItem(args,0));
+
+    Type* item_type = extractTypeFrom(item->ob_type);
+    DictType* self_type = (DictType*)extractTypeFrom(o->ob_type);
+
+    if (self_type == item_type) {
+        instance_ptr selfPtr = self_w->dataPtr();
+
+        ((DictType*)item_type)->visitKeyValuePairsAsSeparateArgs(
+            ((PyDictInstance*)(PyObject*)item)->dataPtr(),
+            [&](instance_ptr key, instance_ptr value) {
+                instance_ptr existingLoc = self_type->lookupValueByKey(selfPtr, key);
+                if (existingLoc) {
+                    self_type->valueType()->assign(existingLoc, value);
+                } else {
+                    instance_ptr newLoc = self_type->insertKey(selfPtr, key);
+                    self_type->valueType()->copy_constructor(newLoc, value);
+                }
+
+                return true;
+            }
+        );
+
+        return incref(Py_None);
+    } else {
+        return translateExceptionToPyObject([&]() {
+            iterate(item, [&](PyObject* key) {
+                PyObjectHolder value(PyObject_GetItem(item, key));
+                if (!value) {
+                    throw PythonExceptionSet();
+                }
+
+                if (self_w->mp_ass_subscript_concrete(key, value) == -1) {
+                    throw PythonExceptionSet();
+                }
+            });
+
+            return incref(Py_None);
+        });
+    }
+}
+
+// static
 PyObject* PyDictInstance::dictGet(PyObject* o, PyObject* args) {
     PyDictInstance* self_w = (PyDictInstance*)o;
 
@@ -387,9 +443,10 @@ int PyDictInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
 }
 
 PyMethodDef* PyDictInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [8] {
+    return new PyMethodDef [9] {
         {"get", (PyCFunction)PyDictInstance::dictGet, METH_VARARGS, NULL},
         {"clear", (PyCFunction)PyDictInstance::dictClear, METH_NOARGS, NULL},
+        {"update", (PyCFunction)PyDictInstance::dictUpdate, METH_VARARGS, NULL},
         {"items", (PyCFunction)PyDictInstance::dictItems, METH_NOARGS, NULL},
         {"keys", (PyCFunction)PyDictInstance::dictKeys, METH_NOARGS, NULL},
         {"values", (PyCFunction)PyDictInstance::dictValues, METH_NOARGS, NULL},

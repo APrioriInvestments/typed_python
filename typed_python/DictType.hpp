@@ -82,6 +82,24 @@ public:
         }
     }
 
+    // hand 'visitor' each key and value instance_ptr as two distinct arguments.
+    // if it returns 'false', exit early.
+    template<class visitor_type>
+    void visitKeyValuePairsAsSeparateArgs(instance_ptr self, visitor_type visitor) {
+        hash_table_layout& l = **(hash_table_layout**)self;
+
+        for (long k = 0; k < l.items_reserved; k++) {
+            if (l.items_populated[k]) {
+                if (!visitor(
+                    l.items + m_bytes_per_key_value_pair * k,
+                    l.items + m_bytes_per_key_value_pair * k + m_bytes_per_key)
+                ) {
+                    return;
+                }
+            }
+        }
+    }
+
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         hash_table_layout& l = **(hash_table_layout**)self;

@@ -804,6 +804,22 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(t, {"hi": 1})
 
+    def test_dict_update(self):
+        T = Dict(str, int)
+        t = T()
+
+        t.update({"hi": 0})
+        self.assertEqual(t, {"hi": 0})
+
+        t.update({"hi": 1})
+        self.assertEqual(t, {"hi": 1})
+
+        t.update({"hi": 1.4})
+        self.assertEqual(t, {"hi": 1})
+
+        t.update(T({"hi": 2}))
+        self.assertEqual(t, {"hi": 2})
+
     def test_dict_clear(self):
         T = Dict(str, TupleOf(int))
 
