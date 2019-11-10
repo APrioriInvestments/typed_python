@@ -303,9 +303,14 @@ void DictType::clear(instance_ptr self) {
 
     for (long k = 0; k < record.items_reserved; k++) {
         if (record.items_populated[k]) {
-            deleteKey(self, keyAtSlot(self, k));
+            m_key->destroy(record.items + k * m_bytes_per_key_value_pair);
+            m_value->destroy(record.items + k * m_bytes_per_key_value_pair + m_bytes_per_key);
         }
+
+        record.items_populated[k] = 0;
     }
+
+    record.allItemsHaveBeenRemoved();
 }
 
 bool DictType::deleteKeyWithUninitializedValue(instance_ptr self, instance_ptr key) const {

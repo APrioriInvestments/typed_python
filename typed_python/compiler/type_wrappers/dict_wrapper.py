@@ -158,6 +158,30 @@ def dict_remove_key(instance, item, itemHash):
     return 0
 
 
+def dict_clear(instance):
+    slotIx = 0
+
+    while slotIx < instance._items_reserved:
+        if instance._items_populated[slotIx]:
+            instance.deleteItemByIndexUnsafe(slotIx)
+            instance._items_populated[slotIx] = 0
+
+        slotIx += 1
+
+    for i in range(instance._hash_table_size):
+        instance._hash_table_hashes[i] = EMPTY
+        instance._hash_table_slots[i] = -1
+
+    instance._hash_table_count = 0
+    instance._hash_table_empty_slots = instance._hash_table_size
+    instance._top_item_slot = 0
+
+
+def dict_update(instance, other):
+    for key in other:
+        instance[key] = other[key]
+
+
 def dict_delitem(instance, item):
     itemHash = hash(item)
 
@@ -314,7 +338,8 @@ class DictWrapper(DictWrapperBase):
                 "getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe",
                 "initializeValueByIndexUnsafe", "assignValueByIndexUnsafe",
                 "initializeKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
-                "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault", "pop"):
+                "_top_item_slot", "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault",
+                "pop", "clear", "update"):
             return expr.changeType(BoundCompiledMethodWrapper(self, attr))
 
         if attr == '_items_populated':
@@ -327,6 +352,12 @@ class DictWrapper(DictWrapperBase):
             return context.pushPod(
                 Int64,
                 expr.nonref_expr.ElementPtrIntegers(0, 3).load()
+            )
+
+        if attr == '_top_item_slot':
+            return context.pushPod(
+                Int64,
+                expr.nonref_expr.ElementPtrIntegers(0, 4).load()
             )
 
         if attr == '_hash_table_slots':
@@ -368,6 +399,17 @@ class DictWrapper(DictWrapperBase):
                 return None
             context.pushEffect(
                 instance.nonref_expr.ElementPtrIntegers(0, 8).store(val.nonref_expr)
+            )
+
+            return context.pushVoid()
+
+        if attr == '_top_item_slot':
+            val = expr.convert_to_type(int)
+            if val is None:
+                return None
+
+            context.pushEffect(
+                instance.nonref_expr.ElementPtrIntegers(0, 4).store(val.nonref_expr)
             )
 
             return context.pushVoid()
@@ -451,6 +493,14 @@ class DictWrapper(DictWrapperBase):
                 return context.call_py_function(dict_pop_nodefault, (instance, args[0]), {})
             else:
                 return context.call_py_function(dict_pop, (instance, args[0], args[1]), {})
+
+        if methodname == "clear":
+            if len(args) == 0:
+                return context.call_py_function(dict_clear, (instance,), {})
+
+        if methodname == "update":
+            if len(args) == 1:
+                return context.call_py_function(dict_update, (instance, args[0]), {})
 
         if len(args) == 1:
             if methodname == "get":

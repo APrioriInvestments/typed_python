@@ -421,3 +421,54 @@ class TestDictCompilation(unittest.TestCase):
         t0 = time.time()
         f(aDict, someStrings, 1000000)
         print(time.time() - t0, "to lookup 100mm strings")
+
+    def test_dict_clear_compiles(self):
+        T = Dict(str, str)
+
+        @Entrypoint
+        def clearIt(d):
+            d.clear()
+
+        for i in range(100):
+            d = T()
+
+            for passIx in range(3):
+                for j in range(i + 1):
+                    d[str(j)] = str(j)
+
+                for j in range(i + 1):
+                    assert str(j) in d
+
+                    if j % 4 in (0, 1, 2):
+                        del d[str(j)]
+
+                clearIt(d)
+
+            self.assertEqual(len(d), 0)
+
+            self.assertTrue("0" not in d)
+
+            d["1"] = "1"
+            self.assertTrue("1" in d)
+
+    def test_dict_update_compiles(self):
+        T = Dict(str, str)
+
+        @Entrypoint
+        def updateCompiled(d, d2):
+            d.update(d2)
+
+        someDicts = [
+            {str(i): str(i % mod) for i in range(iVals)}
+            for iVals in range(10) for mod in range(2, 10)
+        ]
+
+        for d1 in someDicts:
+            for d2 in someDicts:
+                aDict = T(d1)
+                aDict.update(d2)
+
+                aDict2 = T(d1)
+                updateCompiled(aDict2, T(d2))
+
+                self.assertEqual(aDict, aDict2)

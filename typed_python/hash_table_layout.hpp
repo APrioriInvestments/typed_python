@@ -34,6 +34,12 @@ class hash_table_layout {
 
     enum { EMPTY = -1, DELETED = -2 };
 
+    void setTo(int32_t* ptr, int32_t value, size_t count) {
+        for (size_t k = 0; k < count; k++) {
+            *(ptr++) = value;
+        }
+    }
+
     // return the index of the object indexed by 'hash', or -1
     template <class eq_func>
     int32_t find(int32_t kv_pair_size, typed_python_hash_type hash, const eq_func& compare) {
@@ -269,12 +275,27 @@ class hash_table_layout {
         }
     }
 
+    // called after we have deleted everything that's populated, and need to
+    // zero out the hash_table's internals.
+    void allItemsHaveBeenRemoved() {
+        if (!hash_table_slots) {
+            return;
+        }
+
+        hash_table_count = 0;
+        top_item_slot = 0;
+        hash_table_empty_slots = hash_table_size;
+
+        setTo(hash_table_slots, EMPTY, hash_table_size);
+        setTo(hash_table_hashes, EMPTY, hash_table_size);
+    }
+
     void resizeTable() {
         if (!hash_table_slots) {
             hash_table_slots = (int32_t*)malloc(7 * sizeof(int32_t));
-            std::memset(hash_table_slots, EMPTY, 7 * sizeof(int32_t));
+            setTo(hash_table_slots, EMPTY, 7);
             hash_table_hashes = (typed_python_hash_type*)malloc(7 * sizeof(typed_python_hash_type));
-            std::memset(hash_table_hashes, EMPTY, 7 * sizeof(typed_python_hash_type));
+            setTo(hash_table_hashes, EMPTY, 7);
             hash_table_size = 7;
             hash_table_count = 0;
             hash_table_empty_slots = hash_table_size;
@@ -288,10 +309,10 @@ class hash_table_layout {
             hash_table_size = computeNextPrime(hash_table_count * 4 + 7);
 
             hash_table_slots = (int32_t*)malloc(hash_table_size * sizeof(int32_t));
-            std::memset(hash_table_slots, EMPTY, hash_table_size * sizeof(int32_t));
+            setTo(hash_table_slots, EMPTY, hash_table_size);
             hash_table_hashes =
               (typed_python_hash_type*)malloc(hash_table_size * sizeof(typed_python_hash_type));
-            std::memset(hash_table_hashes, EMPTY, hash_table_size * sizeof(typed_python_hash_type));
+            setTo(hash_table_hashes, EMPTY, hash_table_size);
             hash_table_count = 0;
             hash_table_empty_slots = hash_table_size;
 

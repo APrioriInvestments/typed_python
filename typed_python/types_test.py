@@ -841,6 +841,31 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(len(a), 0)
 
+    def test_dict_clear_large(self):
+        T = Dict(str, str)
+
+        for i in range(100):
+            d = T()
+
+            for passIx in range(3):
+                for j in range(i + 1):
+                    d[str(j)] = str(j)
+
+                for j in range(i + 1):
+                    assert str(j) in d
+
+                    if j % 4 in (0, 1, 2):
+                        del d[str(j)]
+
+                d.clear()
+
+            self.assertEqual(len(d), 0)
+
+            self.assertTrue("0" not in d)
+
+            d["1"] = "1"
+            self.assertTrue("1" in d)
+
     def test_deserialize_primitive(self):
         x = deserialize(str, serialize(str, "a"))
         self.assertTrue(isinstance(x, str))
