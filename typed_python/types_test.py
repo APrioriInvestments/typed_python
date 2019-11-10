@@ -1922,6 +1922,16 @@ class NativeTypesTests(unittest.TestCase):
         aPointer.initialize(30)
         self.assertEqual(x[10], 30)
 
+    def test_pointer_to_has_no_len_and_is_not_iterable(self):
+        x = ListOf(int)([1, 2])
+
+        with self.assertRaises(TypeError):
+            len(x.pointerUnsafe(0))
+
+        with self.assertRaises(Exception):
+            for i in x.pointerUnsafe(0):
+                break
+
     def test_unsafe_pointers_to_uninitialized_list_items(self):
         # because this is testing unsafe operations, the test is
         # really just that we don't segfault!

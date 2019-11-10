@@ -1030,7 +1030,8 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
                         inType->getTypeCategory() == Type::TypeCategory::catDict ||
                         inType->getTypeCategory() == Type::TypeCategory::catSet ||
                         inType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative ||
-                        inType->getTypeCategory() == Type::TypeCategory::catClass
+                        inType->getTypeCategory() == Type::TypeCategory::catClass ||
+                        inType->getTypeCategory() == Type::TypeCategory::catPointerTo
                          ?
                 PyInstance::tp_iter
             :   0,                                      // getiterfunc tp_iter;

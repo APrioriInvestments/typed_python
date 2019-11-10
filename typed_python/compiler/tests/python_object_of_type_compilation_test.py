@@ -290,6 +290,9 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         NamedTuple1 = NamedTuple(a=int)
         OneOf2 = OneOf(int, str)
         IntTuple2 = Tuple(int, int)
+
+        x0 = ListOf(int)([1, 2])
+
         # Can define empty Alternative, but can't instantiate it.
         # A0 = Alternative("A0")
         A1 = Alternative("A1", a={}, b={})
@@ -372,9 +375,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (B4, B4.a(s='')),
             (B4, B4.a(s='a')),
             (B5, B5.a(s='')),
-            # TODO: The line below segfaults in the specialized entrypoint case,
-            # due to attempting set iteration on this type
-            # (PointerTo(Int64), x0.pointerUnsafe(0)),
+            (PointerTo(Int64), x0.pointerUnsafe(0)),
         ]
 
         @Entrypoint
