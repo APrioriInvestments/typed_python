@@ -504,7 +504,7 @@ class DictWrapper(DictWrapperBase):
 
         if len(args) == 1:
             if methodname == "get":
-                return self.convert_getitem(context, instance, args[0])
+                return self.convert_get(context, instance, args[0], context.constant(None))
 
             if methodname in ("getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe"):
                 index = args[0].convert_to_type(int)
@@ -582,7 +582,7 @@ class DictWrapper(DictWrapperBase):
         if item is None or expr is None:
             return None
 
-        item = item.convert_to_type(self.keyType)
+        item = item.convert_to_type(self.keyType, explicit=False)
         if item is None:
             return None
 
@@ -592,7 +592,7 @@ class DictWrapper(DictWrapperBase):
         if item is None or expr is None:
             return None
 
-        item = item.convert_to_type(self.keyType)
+        item = item.convert_to_type(self.keyType, explicit=False)
         if item is None:
             return None
 
@@ -602,12 +602,8 @@ class DictWrapper(DictWrapperBase):
         if item is None or expr is None:
             return None
 
-        item = item.convert_to_type(self.keyType)
+        item = item.convert_to_type(self.keyType, explicit=False)
         if item is None:
-            return None
-
-        default = default.convert_to_type(self.valueType)
-        if default is None:
             return None
 
         return context.call_py_function(dict_get, (expr, item, default), {})
@@ -616,7 +612,7 @@ class DictWrapper(DictWrapperBase):
         if key is None or expr is None or value is None:
             return None
 
-        key = key.convert_to_type(self.keyType)
+        key = key.convert_to_type(self.keyType, explicit=False)
         if key is None:
             return None
 

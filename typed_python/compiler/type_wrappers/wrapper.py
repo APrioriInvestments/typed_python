@@ -365,7 +365,7 @@ class Wrapper(object):
         canConvert = self.can_convert_to_type(target_type, explicit)
 
         if canConvert is False:
-            context.pushException(TypeError, "Definitely can't convert from type %s to type %s" % (self, target_type))
+            context.pushException(TypeError, "Couldn't initialize type %s from %s" % (target_type, self))
             return None
 
         # put conversion into its own function

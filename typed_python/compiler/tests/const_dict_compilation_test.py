@@ -90,6 +90,54 @@ class TestConstDictCompilation(unittest.TestCase):
             for key in bigger_d:
                 self.assertEqual(callOrExpr(lambda: d[key]), callOrExpr(lambda: compiledGetItem(d, key)))
 
+    def test_const_dict_getitem_coersion(self):
+        d = ConstDict(int, int)({1: 2})
+
+        with self.assertRaises(TypeError):
+            d.get(1.5)
+
+        with self.assertRaises(TypeError):
+            d[1.5]
+
+        @Entrypoint
+        def get(d, k):
+            return d.get(k)
+
+        @Entrypoint
+        def getitem(d, k):
+            return d[k]
+
+        @Entrypoint
+        def get_default(d, k, default):
+            return d.get(k, default)
+
+        # looking up should work
+        self.assertEqual(get(d, 1), 2)
+        self.assertEqual(get_default(d, 1, None), 2)
+        self.assertEqual(getitem(d, 1), 2)
+
+        # by default, 'get' returns None
+        self.assertEqual(get(d, 2), None)
+        self.assertEqual(d.get(2), None)
+
+        # and can be overridden with arbitrary types
+        self.assertEqual(get_default(d, 2, 123.5), 123.5)
+        self.assertEqual(d.get(2, 123.5), 123.5)
+
+        # getitem will throw an exception
+        with self.assertRaises(KeyError):
+            getitem(d, 2)
+
+        # keys don't coerce types like float to int.
+        with self.assertRaises(TypeError):
+            get(d, 1.5)
+
+        with self.assertRaises(TypeError):
+            get_default(d, 1.5, None)
+
+        with self.assertRaises(TypeError):
+            getitem(d, 1.5)
+
     def test_const_dict_contains(self):
         for dtype in dictTypes:
             @Compiled

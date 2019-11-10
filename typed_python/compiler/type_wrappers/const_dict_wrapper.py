@@ -106,7 +106,27 @@ def const_dict_getitem(constDict, key):
         else:
             return constDict.get_value_by_index_unsafe(mid)
 
-    raise Exception("Key doesn't exist")
+    raise KeyError(key)
+
+
+def const_dict_get(constDict, key, default):
+    # perform a binary search
+    lowIx = 0
+    highIx = len(constDict)
+
+    while lowIx < highIx:
+        mid = (lowIx + highIx) >> 1
+
+        keyAtVal = constDict.get_key_by_index_unsafe(mid)
+
+        if keyAtVal < key:
+            lowIx = mid + 1
+        elif key < keyAtVal:
+            highIx = mid
+        else:
+            return constDict.get_value_by_index_unsafe(mid)
+
+    return default
 
 
 def const_dict_contains(constDict, key):
@@ -198,7 +218,7 @@ class ConstDictWrapper(ConstDictWrapperBase):
         super().__init__(constDictType, None)
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("get_key_by_index_unsafe", "get_value_by_index_unsafe", "keys", "values", "items"):
+        if attr in ("get_key_by_index_unsafe", "get_value_by_index_unsafe", "keys", "values", "items", "get"):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -219,6 +239,12 @@ class ConstDictWrapper(ConstDictWrapperBase):
             ).convert_copy_initialize(instance)
 
             return res
+
+        if methodname == "get" and not kwargs:
+            if len(args) == 1:
+                return self.convert_get(context, instance, args[0], context.constant(None))
+            elif len(args) == 2:
+                return self.convert_get(context, instance, args[0], args[1])
 
         if methodname == "keys" and not args and not kwargs:
             return instance.changeType(ConstDictKeysWrapper(self.constDictType))
@@ -307,11 +333,21 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_getitem(self, context, instance, item):
-        item = item.convert_to_type(self.keyType)
+        item = item.convert_to_type(self.keyType, explicit=False)
         if item is None:
             return None
 
         return context.call_py_function(const_dict_getitem, (instance, item), {})
+
+    def convert_get(self, context, expr, item, default):
+        if item is None or expr is None or default is None:
+            return None
+
+        item = item.convert_to_type(self.keyType, explicit=False)
+        if item is None:
+            return None
+
+        return context.call_py_function(const_dict_get, (expr, item, default), {})
 
     def convert_len_native(self, expr):
         if isinstance(expr, TypedExpression):

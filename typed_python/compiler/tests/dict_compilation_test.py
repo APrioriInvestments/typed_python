@@ -86,14 +86,41 @@ class TestDictCompilation(unittest.TestCase):
     def test_dict_get_default(self):
         @Entrypoint
         def dict_get(x, y):
-            return x.get(y, -1)
+            return x.get(y, -1.5)
 
         x = Dict(int, int)()
 
         x[1] = 2
 
         self.assertEqual(dict_get(x, 1), 2)
-        self.assertEqual(dict_get(x, 2), -1)
+        self.assertEqual(dict_get(x, 2), -1.5)
+
+        with self.assertRaises(TypeError):
+            self.assertEqual(dict_get(x, 1.5), 2)
+
+        with self.assertRaises(TypeError):
+            self.assertEqual(x[1.5], 2)
+
+    def test_dict_get_nodefault(self):
+        @Entrypoint
+        def dict_get(x, y):
+            return x.get(y)
+
+        x = Dict(int, int)()
+
+        x[1] = 2
+
+        self.assertEqual(dict_get(x, 1), 2)
+        self.assertEqual(x.get(1), 2)
+
+        with self.assertRaises(TypeError):
+            self.assertEqual(x.get(1.5), 2)
+
+        with self.assertRaises(TypeError):
+            self.assertEqual(dict_get(x, 1.5), 2)
+
+        self.assertEqual(dict_get(x, 2), None)
+        self.assertEqual(x.get(2), None)
 
     def test_dict_setitem(self):
         @Entrypoint
@@ -111,6 +138,12 @@ class TestDictCompilation(unittest.TestCase):
         dict_setitem(x, 2, '300')
 
         self.assertEqual(x, {1: '3', 2: '300'})
+
+        with self.assertRaises(TypeError):
+            dict_setitem(x, 1.5, '200')
+
+        with self.assertRaises(TypeError):
+            x[1.5] = '200'
 
         @Entrypoint
         def dict_setmany(d, count):
