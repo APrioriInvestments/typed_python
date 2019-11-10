@@ -699,6 +699,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         c.x02 = 10
         self.assertEqual(f(c), 10)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_class_member_perf_with_final(self):
         class BaseClass(Class):
             x0 = Member(float)
