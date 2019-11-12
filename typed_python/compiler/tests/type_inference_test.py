@@ -12,10 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, Int64, Float64, Alternative, Value, String, ListOf
+from typed_python import Function, OneOf, Int64, Float64, Alternative, Value, String, ListOf, PythonObjectOfType
 from typed_python.compiler.runtime import Runtime, Entrypoint
 import unittest
-import pytest
 
 
 A = Alternative(
@@ -121,21 +120,15 @@ class TestTypeInference(unittest.TestCase):
         self.assertEqual(resultType(f, x=str), Value(str))
         self.assertEqual(set(resultType(f, x=OneOf(int, str)).Types), set([Value(int), Value(str)]))
 
-    @pytest.mark.skip(reason="to be addressed")
     def test_infer_list_item(self):
-        a = ListOf(str)(("a", "b", "c"))
-        b = [1, 2.5, "x"]
-
-        def f(x: int):
+        def f(a: ListOf(str), x: int):
             return a[x]
 
-        def g(x: int):
+        def g(b, x: int):
             return b[x]
 
-        # Currently: resultType is None
-        self.assertEqual(resultType(f, x=int), String)
-        # Currently: raises NotImplementedError
-        self.assertEqual(resultType(g, x=int), object)  # what should the resultType be?
+        self.assertEqual(resultType(f, a=ListOf(str), x=int), String)
+        self.assertTrue(issubclass(resultType(g, b=object, x=int), PythonObjectOfType))
 
     def test_infer_conditional_eval_exception(self):
         def exc():
@@ -162,10 +155,10 @@ class TestTypeInference(unittest.TestCase):
         self.assertEqual(resultType(and1, x=int, y=float), None)
         self.assertEqual(resultType(and2, x=int, y=float), Int64)
         self.assertEqual(resultType(and2, x=float, y=int), Float64)
-        self.assertEqual(resultType(and3, x=int, y=float), OneOf(Float64, Int64))
-        self.assertEqual(resultType(and3, x=float, y=int), OneOf(Float64, Int64))
+        self.assertEqual(set(resultType(and3, x=int, y=float).Types), set([Int64, Float64]))
+        self.assertEqual(set(resultType(and3, x=float, y=int).Types), set([Int64, Float64]))
         self.assertEqual(resultType(or1, x=int, y=float), None)
         self.assertEqual(resultType(or2, x=int, y=float), Int64)
         self.assertEqual(resultType(or2, x=float, y=int), Float64)
-        self.assertEqual(resultType(or3, x=int, y=float), OneOf(Float64, Int64))
-        self.assertEqual(resultType(or3, x=float, y=int), OneOf(Float64, Int64))
+        self.assertEqual(set(resultType(or3, x=int, y=float).Types), set([Int64, Float64]))
+        self.assertEqual(set(resultType(or3, x=float, y=int).Types), set([Int64, Float64]))
