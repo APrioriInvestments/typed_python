@@ -96,16 +96,6 @@ class ListOfWrapper(TupleOrListOfWrapper):
                     ).elemPtr(count.nonref_expr)
                 )
 
-        if methodname == "setSizeUnsafe":
-            if len(args) == 1:
-                count = args[0].toInt64()
-                if count is None:
-                    return
-
-                context.pushEffect(instance.nonref_expr.ElementPtrIntegers(0, 2).store(count.nonref_expr.cast(native_ast.Int32)))
-
-                return context.pushVoid()
-
         if methodname == "resize":
             if len(args) == 1:
                 count = args[0].toInt64()

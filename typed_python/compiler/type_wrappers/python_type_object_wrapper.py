@@ -16,6 +16,7 @@ import typed_python.compiler
 from typed_python import String, Int64, Bool, Float64, Type, PythonObjectOfType
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
+from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
@@ -89,5 +90,8 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
         if Type in self.typeRepresentation.Value.__bases__:
             # this is one of the type factories (ListOf, Dict, etc.)
             return super().convert_call(context, left, args, kwargs)
+
+        if issubclass(self.typeRepresentation.Value, CompilableBuiltin):
+            return self.typeRepresentation.Value.convert_type_call(context, left, args, kwargs)
 
         return typeWrapper(self.typeRepresentation.Value).convert_type_call(context, left, args, kwargs)

@@ -160,8 +160,8 @@ def _typedPythonTypeToTypeWrapper(t):
 
 
 def pythonObjectRepresentation(context, f):
-    if isinstance(f, type) and issubclass(f, CompilableBuiltin):
-        return TypedExpression(context, native_ast.nullExpr, f(), False)
+    if isinstance(f, CompilableBuiltin):
+        return TypedExpression(context, native_ast.nullExpr, f, False)
 
     if isinstance(f, types.FunctionType) and hasattr(f, '__typed_python_function__'):
         f = f.__typed_python_function__

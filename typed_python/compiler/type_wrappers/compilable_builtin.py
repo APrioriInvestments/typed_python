@@ -15,6 +15,8 @@
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler import native_ast
 
+import typed_python
+
 
 class CompilableBuiltin(Wrapper):
     """Base class for Wrappers that expose _themselves_.
@@ -32,7 +34,7 @@ class CompilableBuiltin(Wrapper):
 
         ...
         # this will dispatch to the 'convert_call' above.
-        return SomeCodeGenerator(x)
+        return SomeCodeGenerator()(x)
     """
     is_pod = True
     is_empty = True
@@ -45,8 +47,27 @@ class CompilableBuiltin(Wrapper):
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
+    def __eq__(self, other):
+        raise NotImplementedError(self)
+
+    @property
+    def __name__(self):
+        return str(self)
+
+    def __hash__(self):
+        raise NotImplementedError(self)
+
     def __str__(self):
         return type(self).__qualname__
 
     def __repr__(self):
         return type(self).__qualname__
+
+    @classmethod
+    def convert_type_call(cls, context, typeInst, args, kwargs):
+        if all(a.expr_type.is_compile_time_constant for a in args):
+            tw = cls(*[a.expr_type.getCompileTimeConstant() for a in args])
+
+            return typed_python.compiler.python_object_representation.pythonObjectRepresentation(context, tw)
+
+        raise Exception("Can't convert this")

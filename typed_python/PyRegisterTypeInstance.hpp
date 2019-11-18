@@ -498,6 +498,7 @@ public:
 
             if (isFloat(cat) && !otherIsAlternativeOrClass) {
                 double d = PyFloat_AsDouble(pyRepresentation);
+
                 if (d == -1.0 && PyErr_Occurred()) {
                     throw PythonExceptionSet();
                 }

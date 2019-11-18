@@ -12,12 +12,14 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.typed_expression import TypedExpression
+from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 
-from typed_python import NoneType, Int32, Bool
+from typed_python import NoneType, Int32, Bool, TupleOf, ListOf
 from typed_python.compiler.type_wrappers.util import min
 
 import typed_python.compiler.native_ast as native_ast
@@ -87,6 +89,67 @@ def tuple_of_hash(instance):
     return val
 
 
+class PreReservedTupleOrList(CompilableBuiltin):
+    def __init__(self, tupleType):
+        super().__init__()
+
+        assert issubclass(tupleType, (ListOf, TupleOf))
+        self.tupleType = tupleType
+        self.tupleTypeWrapper = typeWrapper(tupleType)
+        self.underlyingWrapperType = typeWrapper(tupleType.ElementType)
+
+    def __eq__(self, other):
+        return isinstance(other, PreReservedTupleOrList) and other.tupleType == self.tupleType
+
+    def __hash__(self):
+        return hash("PreReservedTupleOrList", self.tupleType)
+
+    def convert_call(self, context, instance, args, kwargs):
+        if len(args) == 1:
+            length = args[0].toInt64()
+            if length is None:
+                return None
+
+            return context.push(
+                self.tupleType,
+                lambda out:
+                    out.expr.store(
+                        runtime_functions.malloc.call(native_ast.const_int_expr(28))
+                            .cast(self.tupleTypeWrapper.getNativeLayoutType())
+                    ) >>
+                    out.expr.load().ElementPtrIntegers(0, 4).store(
+                        runtime_functions.malloc.call(
+                            length.nonref_expr
+                            .mul(native_ast.const_int_expr(self.underlyingWrapperType.getBytecount()))
+                        ).cast(native_ast.UInt8Ptr)
+                    ) >>
+                    out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>
+                    out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1)) >>
+                    out.expr.load().ElementPtrIntegers(0, 2).store(native_ast.const_int32_expr(0)) >>
+                    out.expr.load().ElementPtrIntegers(0, 3).store(length.nonref_expr.cast(native_ast.Int32))
+            )
+
+        return super().convert_call(context, instance, args, kwargs)
+
+
+def concatenate_tuple_or_list(l, r):
+    result = PreReservedTupleOrList(type(l))(len(l) + len(r))
+
+    ix = 0
+
+    for item in l:
+        result._initializeItemUnsafe(ix, item)
+        ix += 1
+        result.setSizeUnsafe(ix)
+
+    for item in r:
+        result._initializeItemUnsafe(ix, item)
+        ix += 1
+        result.setSizeUnsafe(ix)
+
+    return result
+
+
 class TupleOrListOfWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -138,19 +201,9 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         )
 
     def convert_bin_op(self, context, left, op, right, inplace):
-        if right.expr_type == left.expr_type:
+        if issubclass(right.expr_type.typeRepresentation, (TupleOf, ListOf)):
             if op.matches.Add:
-                return context.push(
-                    self,
-                    lambda new_tuple:
-                        context.converter.defineNativeFunction(
-                            'concatenate(' + self.typeRepresentation.__name__ + "," + right.expr_type.typeRepresentation.__name__ + ")",
-                            ('util', self, 'concatenate', right.expr_type),
-                            [self, self],
-                            self,
-                            self.generateConcatenateTuple
-                        ).call(new_tuple, left, right)
-                )
+                return context.call_py_function(concatenate_tuple_or_list, (left, right), {})
 
         if right.expr_type == left.expr_type:
             if op.matches.Eq:
@@ -169,6 +222,9 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_attribute(self, context, expr, attr):
+        if attr in ("_getItemUnsafe", "_initializeItemUnsafe", "setSizeUnsafe"):
+            return expr.changeType(BoundCompiledMethodWrapper(self, attr))
+
         if attr == '_hash_cache':
             return context.pushPod(
                 Int32,
@@ -191,46 +247,6 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
     def convert_hash(self, context, expr):
         return context.call_py_function(tuple_of_hash, (expr,), {})
-
-    def generateConcatenateTuple(self, context, out, left, right):
-        def elt_ref(tupPtrExpr, iExpr):
-            return context.pushReference(
-                self.underlyingWrapperType,
-                tupPtrExpr.ElementPtrIntegers(0, 4).load().cast(
-                    self.underlyingWrapperType.getNativeLayoutType().pointer()
-                ).elemPtr(iExpr)
-            )
-
-        left_size = left.convert_len()
-        right_size = right.convert_len()
-
-        context.pushEffect(
-            out.expr.store(
-                runtime_functions.malloc.call(native_ast.const_int_expr(28))
-                    .cast(self.getNativeLayoutType())
-            ) >>
-            out.expr.load().ElementPtrIntegers(0, 4).store(
-                runtime_functions.malloc.call(
-                    left_size.nonref_expr
-                    .add(right_size.nonref_expr)
-                    .mul(native_ast.const_int_expr(self.underlyingWrapperType.getBytecount()))
-                ).cast(native_ast.UInt8Ptr)
-            ) >>
-            out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>
-            out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1)) >>
-            out.expr.load().ElementPtrIntegers(0, 2).store(
-                left_size.nonref_expr.add(right_size.nonref_expr).cast(native_ast.Int32)
-            ) >>
-            out.expr.load().ElementPtrIntegers(0, 3).store(
-                left_size.nonref_expr.add(right_size.nonref_expr).cast(native_ast.Int32)
-            )
-        )
-
-        with context.loop(left_size) as i:
-            out.convert_getitem_unsafe(i).convert_copy_initialize(left.convert_getitem_unsafe(i))
-
-        with context.loop(right_size) as i:
-            out.convert_getitem_unsafe(i+left_size).convert_copy_initialize(right.convert_getitem_unsafe(i))
 
     def convert_getitem(self, context, expr, item):
         if item is None or expr is None:
@@ -281,6 +297,40 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if methodname == "_getItemUnsafe" and len(args) == 1:
+            index = args[0].convert_to_type(int)
+            if index is None:
+                return None
+
+            return self.convert_getitem_unsafe(context, instance, index)
+
+        if methodname == "setSizeUnsafe":
+            if len(args) == 1:
+                count = args[0].toInt64()
+                if count is None:
+                    return
+
+                context.pushEffect(
+                    instance.nonref_expr
+                    .ElementPtrIntegers(0, 2)
+                    .store(count.nonref_expr.cast(native_ast.Int32))
+                )
+
+                return context.pushVoid()
+
+        if methodname == "_initializeItemUnsafe" and len(args) == 2:
+            index = args[0].convert_to_type(int)
+            if index is None:
+                return None
+
+            value = args[1].convert_to_type(self.typeRepresentation.ElementType)
+            if value is None:
+                return None
+
+            self.convert_getitem_unsafe(context, instance, index).convert_copy_initialize(value)
+
+            return context.pushVoid()
+
         if methodname == "__iter__" and not args and not kwargs:
             res = context.push(
                 TupleOrListOfIteratorWrapper(self.typeRepresentation),

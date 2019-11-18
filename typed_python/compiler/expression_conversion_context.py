@@ -121,6 +121,9 @@ class ExpressionConversionContext(object):
                 )
             )
 
+        if isinstance(x, type):
+            return pythonObjectRepresentation(self, x)
+
         raise Exception(f"Couldn't convert {x} to a constant expression.")
 
     def pushVoid(self, t=None):

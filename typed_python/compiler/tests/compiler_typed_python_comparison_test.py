@@ -19,6 +19,7 @@ import unittest
 import traceback
 
 from typed_python.compiler.runtime import Runtime
+from typed_python import TupleOf, Float32, Float64, Int64, Int32, ListOf
 
 
 class Operation:
@@ -55,8 +56,8 @@ class Operation:
 
         return self._compiledFunctionCache[types]
 
-    def subsetOfTypesWorthTesting(self, argIndex, typeList):
-        """Return the subset of Type instances worth testing in the given argument."""
+    def subsetOfTypesWorthTesting(self, argTypesSoFar, typeList):
+        """Return the subset of TypeModel instances worth testing in the given argument."""
         return typeList
 
     def expectInterpreterDeviation(self, values):
@@ -68,7 +69,7 @@ class Operation:
         return False
 
 
-class Type:
+class TypeModel:
     """Base class for all types we want to test.
 
     This class models the process of producing instances of the type, understanding which
@@ -116,12 +117,15 @@ class Type:
     def areEquivalent(self, instanceA, instanceB):
         return instanceA == instanceB
 
+    def wantsToTestOperationOn(self, op, otherType, reversed):
+        return True
+
 
 def isnan(x):
     if isinstance(x, float):
         return numpy.isnan(x)
 
-    if isinstance(x, typed_python.Float32):
+    if isinstance(x, Float32):
         return isnan(float(x))
 
     return False
@@ -131,7 +135,7 @@ def isinf(x):
     if isinstance(x, float):
         return numpy.isinf(x)
 
-    if isinstance(x, typed_python.Float32):
+    if isinstance(x, Float32):
         return isinf(float(x))
 
     return False
@@ -141,7 +145,7 @@ def isfinite(x):
     if isinstance(x, float):
         return numpy.isfinite(x)
 
-    if isinstance(x, typed_python.Float32):
+    if isinstance(x, Float32):
         return isfinite(float(x))
 
     return True
@@ -151,7 +155,7 @@ def isneginf(x):
     if isinstance(x, float):
         return numpy.isneginf(x)
 
-    if isinstance(x, typed_python.Float32):
+    if isinstance(x, Float32):
         return isneginf(float(x))
 
     return False
@@ -228,9 +232,9 @@ class ArithmeticOperation(Operation):
                     if int(type(v)(v * 2)) != v:
                         return True
 
-        if self._name == "mod" and type(values[0]) == typed_python.Int32 and type(values[1]) == typed_python.Float32:
+        if self._name == "mod" and type(values[0]) == Int32 and type(values[1]) == Float32:
             # int32 % float32 with integers close to the float cutoff can have odd roundoff errors
-            if typed_python.Int32(typed_python.Float32(v)) != values[0]:
+            if Int32(Float32(v)) != values[0]:
                 return True
 
         if self._name in ("lshift", "pow"):
@@ -243,6 +247,15 @@ class ArithmeticOperation(Operation):
         if self._name == "pow" and isinf(values[1]):
             return True
 
+        if self._name == "add" and isinstance(values[0], (TupleOf, ListOf)) and isinstance(values[1], (TupleOf, ListOf)):
+            # adding tuples whose values can't be coerced will work when the object is a 'tuple' but not when
+            # it's a TupleOf
+            try:
+                values[0] + values[1]
+            except Exception:
+                return True
+            return False
+
         return False
 
     def expectCompilerDeviation(self, values, compilerTypes):
@@ -251,8 +264,27 @@ class ArithmeticOperation(Operation):
 
         return False
 
+    def subsetOfTypesWorthTesting(self, argTypesSoFar, typeList):
+        """Return the subset of TypeModel instances worth testing in the given argument."""
+        if argTypesSoFar:
+            return [
+                t for t in typeList
+                if argTypesSoFar[0].wantsToTestOperationOn(self, t, reversed=False) or
+                t.wantsToTestOperationOn(self, argTypesSoFar[0], reversed=True)
+            ]
 
-class Float(Type):
+        return typeList
+
+
+class RegisterTypeModel(TypeModel):
+    def wantsToTestOperationOn(self, op, otherType, reversed):
+        return isinstance(otherType, RegisterTypeModel)
+
+
+class FloatTypeModel(RegisterTypeModel):
+    def __str__(self):
+        return f"FloatTypeModel()"
+
     def pytype(self):
         return float
 
@@ -284,31 +316,37 @@ class Float(Type):
         return False
 
 
-class Float32(Type):
+class Float32TypeModel(RegisterTypeModel):
     def pytype(self):
-        return typed_python.Float32
+        return Float32
+
+    def __str__(self):
+        return f"Float32TypeModel()"
 
     def isOutOfBounds(self, instance):
-        if isfinite(instance) and typed_python.Float32(instance + 1) == instance:
+        if isfinite(instance) and Float32(instance + 1) == instance:
             return True
         return False
 
     def instances(self):
-        return [typed_python.Float32(f) for f in Float().instances()]
+        return [Float32(f) for f in FloatTypeModel().instances()]
 
     def equivalentOwnInstance(self, interpInstance):
-        return (True, typed_python.Float32(interpInstance))
+        return (True, Float32(interpInstance))
 
     def equivalentInterpreterInstance(self, instance):
         return (True, float(instance))
 
     def areEquivalent(self, instanceA, instanceB):
-        return Float().areEquivalent(float(instanceA), float(instanceB))
+        return FloatTypeModel().areEquivalent(float(instanceA), float(instanceB))
 
 
-class Int(Type):
+class IntTypeModel(RegisterTypeModel):
     def pytype(self):
         return int
+
+    def __str__(self):
+        return f"IntTypeModel()"
 
     def instances(self):
         return [
@@ -326,16 +364,19 @@ class Int(Type):
         return (True, instance)
 
 
-class SmallInt(Type):
+class SmallIntTypeModel(RegisterTypeModel):
     def __init__(self, tpType):
         self.tpType = tpType
         super().__init__()
+
+    def __str__(self):
+        return f"SmallIntTypeModel({self.tpType})"
 
     def pytype(self):
         return self.tpType
 
     def instances(self):
-        return [self.tpType(x) for x in Int().instances()]
+        return [self.tpType(x) for x in IntTypeModel().instances()]
 
     def isOutOfBounds(self, instance):
         maxSize = 1 << (self.tpType.Bits + (1 if self.tpType.IsUnsignedInt else 0))
@@ -348,7 +389,10 @@ class SmallInt(Type):
         return (True, int(instance))
 
 
-class Bool(Type):
+class BoolTypeModel(RegisterTypeModel):
+    def __str__(self):
+        return f"BoolTypeModel()"
+
     def pytype(self):
         return bool
 
@@ -362,36 +406,112 @@ class Bool(Type):
         return (True, instance)
 
 
+class TupleOfTypeModel(TypeModel):
+    def __init__(self, subtypeModel):
+        assert isinstance(subtypeModel, TypeModel), subtypeModel
+        self.subtypeModel = subtypeModel
+
+    def __str__(self):
+        return f"TupleOfTypeModel({self.subtypeModel})"
+
+    def pytype(self):
+        return TupleOf(self.subtypeModel.pytype())
+
+    def instances(self):
+        subInstances = self.subtypeModel.instances()
+
+        T = self.pytype()
+
+        res = []
+
+        res.append(T())
+
+        for i in range(len(subInstances)):
+            res.append(T(subInstances[:i]))
+
+        return res
+
+    def areEquivalent(self, i1, i2):
+        if len(i1) != len(i2):
+            return False
+
+        for i in range(len(i1)):
+            if not self.subtypeModel.areEquivalent(i1[i], i2[i]):
+                return False
+
+        return True
+
+    def equivalentOwnInstance(self, interpInstance):
+        try:
+            return True, self.pytype()(interpInstance)
+        except Exception:
+            return False, None
+
+    def equivalentInterpreterInstance(self, ownInstance):
+        res = []
+
+        for subElt in ownInstance:
+            isEquiv, equivVal = self.subtypeModel.equivalentInterpreterInstance(subElt)
+
+            if not isEquiv:
+                return False, None
+
+            res.append(equivVal)
+
+        return True, tuple(res)
+
+    def isOutOfBounds(self, value):
+        for i in value:
+            if self.subtypeModel.isOutOfBounds(i):
+                return True
+        return False
+
+    def wantsToTestOperationOn(self, op, otherType, reversed):
+        return isinstance(otherType, TupleOfTypeModel)
+
+
 allTypes = [
-    Float(),
-    Float32(),
-    Int(),
-    Bool(),
-    SmallInt(typed_python.Int32),
-    SmallInt(typed_python.Int16),
-    SmallInt(typed_python.Int8),
-    SmallInt(typed_python.UInt64),
-    SmallInt(typed_python.UInt32),
-    SmallInt(typed_python.UInt16),
-    SmallInt(typed_python.UInt8)
+    FloatTypeModel(),
+    Float32TypeModel(),
+    IntTypeModel(),
+    BoolTypeModel(),
+    SmallIntTypeModel(typed_python.Int32),
+    SmallIntTypeModel(typed_python.Int16),
+    SmallIntTypeModel(typed_python.Int8),
+    SmallIntTypeModel(typed_python.UInt64),
+    SmallIntTypeModel(typed_python.UInt32),
+    SmallIntTypeModel(typed_python.UInt16),
+    SmallIntTypeModel(typed_python.UInt8),
+    TupleOfTypeModel(FloatTypeModel()),
+    TupleOfTypeModel(IntTypeModel()),
+    TupleOfTypeModel(TupleOfTypeModel(IntTypeModel()))
 ]
 
 
 def typeModelForValue(val):
-    if isinstance(val, float):
-        return Float()
+    return typeModelForType(type(val))
 
-    if isinstance(val, typed_python.Float32):
-        return Float32()
 
-    if isinstance(val, int):
-        return Int()
+def typeModelForType(typ):
+    if issubclass(typ, TupleOf):
+        return TupleOfTypeModel(typeModelForType(typ.ElementType))
 
-    if isinstance(val, bool):
-        return Bool()
+    if typ is float or typ is Float64:
+        return FloatTypeModel()
 
-    if getattr(type(val), "Bits", None) is not None:
-        return SmallInt(type(val))
+    if typ is Float32:
+        return Float32TypeModel()
+
+    if typ is int or typ is Int64:
+        return IntTypeModel()
+
+    if typ is bool:
+        return BoolTypeModel()
+
+    if getattr(typ, "Bits", None) is not None:
+        return SmallIntTypeModel(typ)
+
+    assert False, f"dont know how to produce a type model for {typ}"
 
 
 class Scenario:
@@ -438,6 +558,9 @@ class Scenario:
             return True
 
         if typedPythonException:
+            if self.op.expectInterpreterDeviation(self.values):
+                return True
+
             self.failureDesc = "typed_python produced an exception but interpreter didn't:\n" + typedPythonException
             return False
 
@@ -609,7 +732,7 @@ class TestTypedPythonAgainstCompiler(unittest.TestCase):
         if len(argTypes) < op.arity():
             scenarios = []
 
-            for possibleArgType in op.subsetOfTypesWorthTesting(len(argTypes), allTypes):
+            for possibleArgType in op.subsetOfTypesWorthTesting(argTypes, allTypes):
                 scenarios.extend(self.scenariosWithArgs(op, argTypes + (possibleArgType,)))
 
             return scenarios

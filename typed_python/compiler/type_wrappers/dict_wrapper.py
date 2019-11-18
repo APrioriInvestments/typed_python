@@ -31,6 +31,12 @@ DELETED = -2
 
 
 class CPlusPlusStyleMod(CompilableBuiltin):
+    def __eq__(self, other):
+        return isinstance(other, CPlusPlusStyleMod)
+
+    def __hash__(self):
+        return hash("CPlusPlusStyleMod")
+
     def convert_call(self, context, instance, args, kwargs):
         if len(args) == 2 and args[0].expr_type.typeRepresentation == Int32 and args[1].expr_type.typeRepresentation == Int64:
             return context.pushPod(
@@ -55,7 +61,7 @@ def dict_add_slot(instance, itemHash, slot):
     if itemHash < 0:
         itemHash = -itemHash
 
-    offset = CPlusPlusStyleMod(itemHash, instance._hash_table_size)
+    offset = CPlusPlusStyleMod()(itemHash, instance._hash_table_size)
 
     while True:
         if instance._hash_table_slots[offset] == EMPTY or instance._hash_table_slots[offset] == DELETED:
@@ -84,7 +90,9 @@ def dict_slot_for_key(instance, itemHash, item):
     if itemHash < 0:
         itemHash = -itemHash
 
-    offset = CPlusPlusStyleMod(itemHash, instance._hash_table_size)
+    modFun = CPlusPlusStyleMod()
+
+    offset = modFun(itemHash, instance._hash_table_size)
 
     while True:
         slotIndex = int((slots + offset).get())
@@ -131,7 +139,7 @@ def dict_remove_key(instance, item, itemHash):
     if itemHash < 0:
         itemHash = -itemHash
 
-    offset = CPlusPlusStyleMod(itemHash, instance._hash_table_size)
+    offset = CPlusPlusStyleMod()(itemHash, instance._hash_table_size)
 
     while True:
         slotIndex = int((slots + offset).get())

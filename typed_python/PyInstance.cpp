@@ -323,15 +323,15 @@ PyObject* PyInstance::pyUnaryOperator(PyObject* lhs, const char* op, const char*
 
 PyObject* PyInstance::pyOperator(PyObject* lhs, PyObject* rhs, const char* op, const char* opErrRep) {
     return translateExceptionToPyObject([&]() {
-        PyObject* ret = nullptr;
         if (extractTypeFrom(lhs->ob_type)) {
+            PyObject* ret = nullptr;
             ret = specializeForType(lhs, [&](auto& subtype) {
                 return subtype.pyOperatorConcrete(rhs, op, opErrRep);
             });
-        }
 
-        if (ret && ret != Py_NotImplemented) {
-            return ret;
+            if (ret != Py_NotImplemented) {
+                return ret;
+            }
         }
 
         if (extractTypeFrom(rhs->ob_type)) {
@@ -387,7 +387,8 @@ int PyInstance::pyInquiry(PyObject* lhs, const char* op, const char* opErrRep) {
 }
 
 PyObject* PyInstance::pyUnaryOperatorConcrete(const char* op, const char* opErrRep) {
-    return incref(Py_NotImplemented);
+    PyErr_Format(PyExc_TypeError, "%s.%s is not implemented", type()->name().c_str(), op);
+    throw PythonExceptionSet();
 }
 
 PyObject* PyInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErrRep) {

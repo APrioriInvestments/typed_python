@@ -50,13 +50,17 @@ class PythonFreeObjectWrapper(Wrapper):
     def convert_call(self, context, left, args, kwargs):
         if all([x.expr_type.is_compile_time_constant for x in list(args) + list(kwargs.values())]):
             try:
-                return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+                res = typed_python.compiler.python_object_representation.pythonObjectRepresentation(
                     context,
                     self.typeRepresentation.Value(
                         *[a.expr_type.getCompileTimeConstant() for a in args],
                         **{k: v.expr_type.getCompileTimeConstant() for k, v in kwargs.items()}
                     )
                 )
+
+                print("CALLED ", left, " with ", args, " -> ", res)
+                return res
+
             except Exception as e:
                 context.pushException(type(e), str(e))
                 return
