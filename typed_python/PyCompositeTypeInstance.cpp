@@ -16,6 +16,10 @@
 
 #include "PyCompositeTypeInstance.hpp"
 
+Type* PyCompositeTypeInstance::actualType() {
+    return extractTypeFrom(((PyObject*)this)->ob_type);
+}
+
 CompositeType* PyCompositeTypeInstance::type() {
     Type* t = extractTypeFrom(((PyObject*)this)->ob_type);
 
@@ -213,7 +217,9 @@ PyObject* PyNamedTupleInstance::replacing(PyObject* o, PyObject* args, PyObject*
 
     NamedTuple* tupType = self->type();
 
-    // we should not allow passing any args, only kwargs are allower
+    Type* tupOrSubclassType = self->actualType();
+
+    // we should not allow passing any args, only kwargs are allowed
     if (!PyArg_ParseTuple(args, "")) {
         PyErr_Format(PyExc_ValueError, "Only keyword arguments are allowed.");
         return NULL;
@@ -241,8 +247,9 @@ PyObject* PyNamedTupleInstance::replacing(PyObject* o, PyObject* args, PyObject*
         }
     }
 
-    // return a copy with updated valuess
-    return PyInstance::initialize(tupType, [&](instance_ptr newInstanceData) {
+    // return a copy with updated valuess. We instantiate the subclass type. if it's a subclass,
+    // then it will have the correct memory layout.
+    return PyInstance::initialize(tupOrSubclassType, [&](instance_ptr newInstanceData) {
         //newInstanceData will point to the uninitialized memory we've allocated for the new tuple
 
         tupType->constructor(newInstanceData, [&](instance_ptr item_data, int index) {
@@ -272,7 +279,6 @@ PyObject* PyNamedTupleInstance::replacing(PyObject* o, PyObject* args, PyObject*
 }
 
 PyMethodDef* PyNamedTupleInstance::typeMethodsConcrete(Type* t) {
-
     return new PyMethodDef[2] {
         {"replacing", (PyCFunction)PyNamedTupleInstance::replacing, METH_VARARGS | METH_KEYWORDS, NULL},
         {NULL, NULL}

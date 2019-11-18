@@ -2607,6 +2607,17 @@ class NativeTypesTests(unittest.TestCase):
         nt = None
         self.assertEqual(_types.refcount(aList), 1)
 
+    def test_named_tuple_replacing_subclass(self):
+        class NTSubclass(NamedTuple(x=int, y=str)):
+            def f(self, y):
+                return self.replacing(y=y)
+
+        nt2 = NTSubclass(x=10, y="hi").replacing(x=20)
+
+        self.assertIsInstance(nt2, NTSubclass)
+        self.assertIsInstance(nt2.f("a string"), NTSubclass)
+        self.assertEqual(nt2.f("a string").y, "a string")
+
     def test_set_constructor_identity(self):
         s = Set(int)
         self.assertEqual(s.__qualname__, "Set(Int64)")

@@ -22,7 +22,11 @@ class PyCompositeTypeInstance : public PyInstance {
 public:
     typedef CompositeType modeled_type;
 
+    // return the CompositeType (not the subclass) that we're representing here.
     CompositeType* type();
+
+    // return the actual type (possibly a subclass) of this instance.
+    Type* actualType();
 
     PyObject* sq_item_concrete(Py_ssize_t ix);
 
