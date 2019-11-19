@@ -256,7 +256,7 @@ class Codebase:
     def importModulesByName(modules_by_name):
         """ Returns a dict mapping module names (str) to modules. """
         modules = {}
-        for mname in modules_by_name:
+        for mname in sorted(modules_by_name):
             try:
                 modules[mname] = importlib.import_module(mname)
             except Exception as e:
