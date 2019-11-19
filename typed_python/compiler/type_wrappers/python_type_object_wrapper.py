@@ -46,12 +46,13 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
             return int
         if typeRep == Float64:
             return float
-        elif typeRep == Bool:
+        if typeRep == Bool:
             return bool
-        elif typeRep == String:
+        if typeRep == String:
             return str
-        elif issubclass(typeRep, PythonObjectOfType):
+        if isinstance(typeRep, type) and issubclass(typeRep, PythonObjectOfType):
             return typeRep.PyType
+
         return typeRep
 
     @Wrapper.unwrapOneOfAndValue
@@ -85,6 +86,7 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
                     context,
                     typeRep
                 )
+
             return res
 
         if Type in self.typeRepresentation.Value.__bases__:

@@ -14,8 +14,9 @@
 
 from typed_python import ListOf, Class, Member, Final, TupleOf, DisableCompiledCode
 from typed_python._types import touchCompiledSpecializations
-from typed_python import Entrypoint, NotCompiled
+from typed_python import Entrypoint, NotCompiled, Function
 from typed_python.compiler.runtime import Runtime
+from flaky import flaky
 import traceback
 import threading
 import time
@@ -216,6 +217,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertEqual(AClass(x=23).g(10, 20.5), 30.5)
         self.assertEqual(AClass(x=23).g2(10, 20.5), 30.5)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_can_pass_functions_as_objects(self):
         def addsOne(x):
             return x + 1
@@ -225,7 +227,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         @Entrypoint
         def sumOver(count, f):
-            res = 0
+            res = 0.0
             for i in range(count):
                 res += f(i)
             return res
@@ -234,9 +236,69 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertEqual(sumOver(10, doubles), 90)
 
         # make sure it's fast
+        count = 100000000
+
         t0 = time.time()
-        sumOver(100000000, addsOne)
-        self.assertLess(time.time() - t0, .4)
+        sumOver(count, addsOne)
+        elapsed = time.time() - t0
+        self.assertLess(elapsed, .4)
+
+        @Entrypoint
+        def sumDoubles(count):
+            res = 0.0
+            for i in range(count):
+                res += i * i
+            return res
+
+        sumDoubles(1)
+
+        t0 = time.time()
+        sumDoubles(count)
+        elapsedNoFunc = time.time() - t0
+
+        ratio = elapsed / elapsedNoFunc
+
+        self.assertTrue(.7 <= ratio <= 1.3, ratio)
+
+    def test_type_of_passed_function_object(self):
+        @Entrypoint
+        def typeOf(f):
+            return type(f)
+
+        def f(x):
+            return x
+
+        self.assertEqual(typeOf(f), Function(f))
+
+    def test_sequential_append_performance(self):
+        @Entrypoint
+        def cumSum1(x):
+            out = type(x)()
+            for i in x:
+                out.append(i)
+            return out
+
+        @Entrypoint
+        def cumSum2(x):
+            out = type(x)()
+            for i in x:
+                out.append(i)
+            return out
+
+        i = ListOf(int)(range(1000000))
+
+        cumSum1(i)
+        cumSum2(i)
+
+        t0 = time.time()
+        cumSum1(i)
+        t1 = time.time()
+        cumSum2(i)
+        t2 = time.time()
+
+        ratio = (t2 - t1) / (t1 - t0)
+
+        self.assertTrue(.8 <= ratio <= 1.2, ratio)
 
     def test_nocompile_works(self):
         thisWouldNotBeVisible = set()

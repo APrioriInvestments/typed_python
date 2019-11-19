@@ -28,6 +28,9 @@ exception_type_llvm = llvmlite.ir.LiteralStructType([llvm_i8ptr, llvm_i32])
 pointer_size = 8
 
 
+CROSS_MODULE_INLINE_COMPLEXITY = 40
+
+
 def llvm_bool(i):
     return llvmlite.ir.Constant(llvm_i1, i)
 
@@ -502,12 +505,17 @@ class FunctionConverter:
             func = self.external_function_references[target.name]
         else:
             func = self.converter._functions_by_name[target.name]
-            if func.module is not self.module:
-                if target.name not in self.external_function_references:
-                    self.external_function_references[target.name] = \
-                        llvmlite.ir.Function(self.module, func.function_type, func.name)
 
-                func = self.external_function_references[target.name]
+            if func.module is not self.module:
+                # first, see if we'd like to inline this module
+                if self.converter.totalFunctionComplexity(target.name) < CROSS_MODULE_INLINE_COMPLEXITY:
+                    func = self.converter.repeatFunctionInModule(target.name, self.module)
+                else:
+                    if target.name not in self.external_function_references:
+                        self.external_function_references[target.name] = \
+                            llvmlite.ir.Function(self.module, func.function_type, func.name)
+
+                    func = self.external_function_references[target.name]
 
         return TypedLLVMValue(
             func,
@@ -1161,9 +1169,60 @@ class Converter(object):
         object.__init__(self)
         self._modules = {}
         self._functions_by_name = {}
+        self._function_definitions = {}
+
+        # total number of instructions in each function, by name
+        self._function_complexity = {}
+
+        self._inlineRequests = []
+
         self.verbose = False
 
+    def totalFunctionComplexity(self, name):
+        """Return the total number of instructions contained in a function.
+
+        The function must already have been defined in a prior parss. We use this
+        information to decide which functions to repeat in new module definitions.
+        """
+        if name in self._function_complexity:
+            return self._function_complexity[name]
+
+        res = 0
+        for block in self._functions_by_name[name].basic_blocks:
+            res += len(block.instructions)
+
+        self._function_complexity[name] = res
+
+        return res
+
+    def repeatFunctionInModule(self, name, module):
+        """Request that the function given by 'name' be inlined into 'module'.
+
+        It must already have been defined in another module.
+
+        Returns:
+            a fresh unpopulated function definition for the given function.
+        """
+        assert name in self._functions_by_name
+        assert self._functions_by_name[name].module != module
+
+        existingFunctionDef = self._functions_by_name[name]
+
+        funcType = existingFunctionDef.type
+        if funcType.is_pointer:
+            funcType = funcType.pointee
+
+        assert isinstance(funcType, llvmlite.ir.FunctionType)
+
+        self._functions_by_name[name] = llvmlite.ir.Function(module, funcType, name)
+
+        self._inlineRequests.append(name)
+
+        return self._functions_by_name[name]
+
     def add_functions(self, names_to_definitions):
+        names_to_definitions = dict(names_to_definitions)
+
         for name in names_to_definitions:
             assert name not in self._functions_by_name, "can't define %s twice" % name
 
@@ -1182,7 +1241,9 @@ class Converter(object):
                 [type_to_llvm_type(x[1]) for x in function.args]
             )
             self._functions_by_name[name] = llvmlite.ir.Function(module, func_type, name)
+
             self._functions_by_name[name].linkage = 'external'
+            self._function_definitions[name] = function
 
         if self.verbose:
             for name in names_to_definitions:
@@ -1202,49 +1263,56 @@ class Converter(object):
                 print("*************")
                 print()
 
-        for name in sorted(names_to_definitions):
-            definition = names_to_definitions[name]
-            func = self._functions_by_name[name]
-            func.attributes.personality = external_function_references["__gxx_personality_v0"]
+        while names_to_definitions:
+            for name in sorted(names_to_definitions):
+                definition = names_to_definitions.pop(name)
+                func = self._functions_by_name[name]
+                func.attributes.personality = external_function_references["__gxx_personality_v0"]
 
-            arg_assignments = {}
-            for i in range(len(func.args)):
-                arg_assignments[definition.args[i][0]] = \
-                    TypedLLVMValue(func.args[i], definition.args[i][1])
+                arg_assignments = {}
+                for i in range(len(func.args)):
+                    arg_assignments[definition.args[i][0]] = \
+                        TypedLLVMValue(func.args[i], definition.args[i][1])
 
-            block = func.append_basic_block('entry')
-            builder = llvmlite.ir.IRBuilder(block)
+                block = func.append_basic_block('entry')
+                builder = llvmlite.ir.IRBuilder(block)
 
-            try:
-                func_converter = FunctionConverter(
-                    module,
-                    func,
-                    self,
-                    builder,
-                    arg_assignments,
-                    definition.output_type,
-                    external_function_references
-                )
+                try:
+                    func_converter = FunctionConverter(
+                        module,
+                        func,
+                        self,
+                        builder,
+                        arg_assignments,
+                        definition.output_type,
+                        external_function_references
+                    )
 
-                func_converter.setup()
+                    func_converter.setup()
 
-                res = func_converter.convert(definition.body.body)
+                    res = func_converter.convert(definition.body.body)
 
-                func_converter.finalize()
+                    func_converter.finalize()
 
-                if res is not None:
-                    assert res.llvm_value is None
-                    if definition.output_type != native_ast.Void:
+                    if res is not None:
+                        assert res.llvm_value is None
+                        if definition.output_type != native_ast.Void:
+                            if not builder.block.is_terminated:
+                                builder.unreachable()
+                        else:
+                            builder.ret_void()
+                    else:
                         if not builder.block.is_terminated:
                             builder.unreachable()
-                    else:
-                        builder.ret_void()
-                else:
-                    if not builder.block.is_terminated:
-                        builder.unreachable()
 
-            except Exception:
-                print("function failing = " + name)
-                raise
+                except Exception:
+                    print("function failing = " + name)
+                    raise
+
+            # each function listed here was deemed 'inlinable', which means that we
+            # want to repeat its definition in this particular module.
+            for name in self._inlineRequests:
+                names_to_definitions[name] = self._function_definitions[name]
+            self._inlineRequests.clear()
 
         return str(module)

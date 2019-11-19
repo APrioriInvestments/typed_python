@@ -511,8 +511,8 @@ class TestCompilationStructures(unittest.TestCase):
             return res
 
         # prime the compilation
-        callsF1(1)
         callsF4(1)
+        callsF1(1)
 
         t0 = time.time()
         callsF1(100000000)
@@ -524,11 +524,9 @@ class TestCompilationStructures(unittest.TestCase):
         callsShallowly = t2 - t1
         ratio = callsDeeply / callsShallowly
 
-        # we expect calling f1 to be slower, but not much.
-        # eventually we should be able to note that 'f4' can't throw
-        # which would get rid of some of the extra code we're generating.
-        self.assertLessEqual(1.0, ratio)
-        self.assertLessEqual(ratio, 2.0)
+        # inlining should work across invocations, regardless of order
+        self.assertLessEqual(.9, ratio)
+        self.assertLessEqual(ratio, 1.1)
         print(f"Deeper call tree code was {ratio} times slow.")
 
     def test_exception_handling_preserves_refcount(self):
