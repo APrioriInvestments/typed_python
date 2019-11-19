@@ -106,9 +106,10 @@ class Codebase:
 
             codebase = Codebase(root, files, modules)
 
-            _root_level_module_codebase_cache[module] = codebase
+            if 'suppressFun' not in kwargs:
+                _root_level_module_codebase_cache[module] = codebase
 
-            return _root_level_module_codebase_cache[module]
+            return codebase
 
     @staticmethod
     def FromRootlevelPath(rootPath, **kwargs):
@@ -118,13 +119,22 @@ class Codebase:
         return codebase
 
     @staticmethod
-    def _walkDiskRepresentation(rootPath, prefix=None, extensions=('.py',), maxTotalBytes=100 * 1024 * 1024):
+    def _walkDiskRepresentation(
+        rootPath,
+        prefix=None,
+        extensions=('.py',),
+        maxTotalBytes=100 * 1024 * 1024,
+        suppressFun=None
+    ):
         """ Utility method that collects the code for a given root module.
 
             Parameters:
             -----------
             rootPath : str
                 the root path for which to gather code
+
+            suppressFun : a function(path) that returns True if the module path shouldn't
+                be included in the codebase.
 
             Returns:
             --------
@@ -142,6 +152,10 @@ class Codebase:
         def walkDisk(path, so_far):
             if so_far.startswith("."):
                 return  # skip hidden directories
+
+            if suppressFun is not None:
+                if suppressFun(so_far):
+                    return
 
             for name in os.listdir(path):
                 fullpath = os.path.join(path, name)
