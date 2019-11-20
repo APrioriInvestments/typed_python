@@ -86,6 +86,19 @@ public:
         }
     }
 
+    // hand 'visitor' each key and value instance_ptr as two separate arguments.
+    // if it returns 'false', exit early.
+    template<class visitor_type>
+    void visitKeyValuePairsSeparately(instance_ptr self, visitor_type visitor) {
+        size_t ct = count(self);
+
+        for (long k = 0; k < ct; k++) {
+            if (!visitor(kvPairPtrKey(self, k), kvPairPtrValue(self, k))) {
+                return;
+            }
+        }
+    }
+
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         size_t ct = count(self);
@@ -142,37 +155,55 @@ public:
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions, bool compareValues=true);
 
-    void addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const;
+    void addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr output);
 
     TupleOfType* tupleOfKeysType() const {
         return TupleOfType::Make(m_key);
     }
 
-    void subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const;
+    void subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr rhs, instance_ptr output);
 
-    instance_ptr kvPairPtrKey(instance_ptr self, int64_t i) const;
+    instance_ptr kvPairPtrKey(instance_ptr self, int64_t i);
 
-    instance_ptr kvPairPtrValue(instance_ptr self, int64_t i) const;
+    instance_ptr kvPairPtrValue(instance_ptr self, int64_t i);
 
-    void incKvPairCount(instance_ptr self, int by = 1) const;
+    void incKvPairCount(instance_ptr self, int by = 1);
 
-    void sortKvPairs(instance_ptr self) const;
+    void sortKvPairs(instance_ptr self);
 
-    instance_ptr keyTreePtr(instance_ptr self, int64_t i) const;
+    instance_ptr keyTreePtr(instance_ptr self, int64_t i);
 
-    bool instanceIsSubtrees(instance_ptr self) const;
+    bool instanceIsSubtrees(instance_ptr self);
 
-    int64_t refcount(instance_ptr self) const;
+    int64_t refcount(instance_ptr self);
 
-    int64_t count(instance_ptr self) const;
+    int64_t count(instance_ptr self);
 
-    int64_t size(instance_ptr self) const;
+    int64_t size(instance_ptr self);
 
-    int64_t lookupIndexByKey(instance_ptr self, instance_ptr key) const;
+    int64_t lookupIndexByKey(instance_ptr self, instance_ptr key);
 
-    instance_ptr lookupValueByKey(instance_ptr self, instance_ptr key) const;
+    instance_ptr lookupValueByKey(instance_ptr self, instance_ptr key);
 
-    void constructor(instance_ptr self, int64_t space, bool isPointerTree) const;
+    void constructor(instance_ptr self, int64_t space, bool isPointerTree);
+
+    template<class constructor_fun>
+    void constructor(instance_ptr self, int64_t space, const constructor_fun& initializer) {
+        constructor(self, space, false);
+
+        try {
+            for (long ix = 0; ix < space; ix++) {
+                initializer(kvPairPtrKey(self, ix), kvPairPtrValue(self, ix));
+
+                incKvPairCount(self);
+            }
+
+            sortKvPairs(self);
+        } catch(...) {
+            destroy(self);
+            throw;
+        }
+    }
 
     void constructor(instance_ptr self);
 

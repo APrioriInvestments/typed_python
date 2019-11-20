@@ -247,7 +247,7 @@ bool ConstDictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonO
     }
 }
 
-void ConstDictType::addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const {
+void ConstDictType::addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr output) {
     std::vector<instance_ptr> keep;
 
     int64_t lhsCount = count(lhs);
@@ -276,7 +276,7 @@ void ConstDictType::addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr ou
     sortKvPairs(output);
 }
 
-void ConstDictType::subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const {
+void ConstDictType::subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr rhs, instance_ptr output) {
     TupleOfType* tupleType = tupleOfKeysType();
 
     int64_t lhsCount = count(lhs);
@@ -306,7 +306,7 @@ void ConstDictType::subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr r
     incKvPairCount(output, written);
 }
 
-instance_ptr ConstDictType::kvPairPtrKey(instance_ptr self, int64_t i) const {
+instance_ptr ConstDictType::kvPairPtrKey(instance_ptr self, int64_t i) {
     if (!(*(layout**)self)) {
         return self;
     }
@@ -316,7 +316,7 @@ instance_ptr ConstDictType::kvPairPtrKey(instance_ptr self, int64_t i) const {
     return record.data + m_bytes_per_key_value_pair * i;
 }
 
-instance_ptr ConstDictType::kvPairPtrValue(instance_ptr self, int64_t i) const {
+instance_ptr ConstDictType::kvPairPtrValue(instance_ptr self, int64_t i) {
     if (!(*(layout**)self)) {
         return self;
     }
@@ -326,7 +326,7 @@ instance_ptr ConstDictType::kvPairPtrValue(instance_ptr self, int64_t i) const {
     return record.data + m_bytes_per_key_value_pair * i + m_bytes_per_key;
 }
 
-void ConstDictType::incKvPairCount(instance_ptr self, int by) const {
+void ConstDictType::incKvPairCount(instance_ptr self, int by) {
     if (by == 0) {
         return;
     }
@@ -335,7 +335,7 @@ void ConstDictType::incKvPairCount(instance_ptr self, int by) const {
     record.count += by;
 }
 
-void ConstDictType::sortKvPairs(instance_ptr self) const {
+void ConstDictType::sortKvPairs(instance_ptr self) {
     if (!*(layout**)self) {
         return;
     }
@@ -381,7 +381,7 @@ void ConstDictType::sortKvPairs(instance_ptr self) const {
     }
 }
 
-instance_ptr ConstDictType::keyTreePtr(instance_ptr self, int64_t i) const {
+instance_ptr ConstDictType::keyTreePtr(instance_ptr self, int64_t i) {
     if (!(*(layout**)self)) {
         return self;
     }
@@ -391,7 +391,7 @@ instance_ptr ConstDictType::keyTreePtr(instance_ptr self, int64_t i) const {
     return record.data + m_bytes_per_key_subtree_pair * i;
 }
 
-bool ConstDictType::instanceIsSubtrees(instance_ptr self) const {
+bool ConstDictType::instanceIsSubtrees(instance_ptr self) {
     if (!(*(layout**)self)) {
         return self;
     }
@@ -401,7 +401,7 @@ bool ConstDictType::instanceIsSubtrees(instance_ptr self) const {
     return record.subpointers != 0;
 }
 
-int64_t ConstDictType::refcount(instance_ptr self) const {
+int64_t ConstDictType::refcount(instance_ptr self) {
     if (!(*(layout**)self)) {
         return 0;
     }
@@ -411,7 +411,7 @@ int64_t ConstDictType::refcount(instance_ptr self) const {
     return record.refcount;
 }
 
-int64_t ConstDictType::count(instance_ptr self) const {
+int64_t ConstDictType::count(instance_ptr self) {
     if (!(*(layout**)self)) {
         return 0;
     }
@@ -425,7 +425,7 @@ int64_t ConstDictType::count(instance_ptr self) const {
     return record.count;
 }
 
-int64_t ConstDictType::size(instance_ptr self) const {
+int64_t ConstDictType::size(instance_ptr self) {
     if (!(*(layout**)self)) {
         return 0;
     }
@@ -433,7 +433,7 @@ int64_t ConstDictType::size(instance_ptr self) const {
     return (*(layout**)self)->count;
 }
 
-int64_t ConstDictType::lookupIndexByKey(instance_ptr self, instance_ptr key) const {
+int64_t ConstDictType::lookupIndexByKey(instance_ptr self, instance_ptr key) {
     if (!(*(layout**)self)) {
         return -1;
     }
@@ -460,7 +460,7 @@ int64_t ConstDictType::lookupIndexByKey(instance_ptr self, instance_ptr key) con
     return -1;
 }
 
-instance_ptr ConstDictType::lookupValueByKey(instance_ptr self, instance_ptr key) const {
+instance_ptr ConstDictType::lookupValueByKey(instance_ptr self, instance_ptr key) {
     int64_t offset = lookupIndexByKey(self, key);
     if (offset == -1) {
         return 0;
@@ -468,7 +468,7 @@ instance_ptr ConstDictType::lookupValueByKey(instance_ptr self, instance_ptr key
     return kvPairPtrValue(self, offset);
 }
 
-void ConstDictType::constructor(instance_ptr self, int64_t space, bool isPointerTree) const {
+void ConstDictType::constructor(instance_ptr self, int64_t space, bool isPointerTree) {
     assertForwardsResolved();
     if (space == 0) {
         (*(layout**)self) = nullptr;

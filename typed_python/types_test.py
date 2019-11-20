@@ -343,6 +343,47 @@ class NativeTypesTests(unittest.TestCase):
             T({1: [2, 3]})
         )
 
+    def test_const_dict_add_mappable(self):
+        T = ConstDict(int, int)
+
+        self.assertEqual(
+            T({1: 2}) + {2: 3},
+            {1: 2, 2: 3}
+        )
+
+        self.assertEqual(
+            T({1: 2}) + ConstDict(int, OneOf(int, None))({2: 3}),
+            {1: 2, 2: 3}
+        )
+
+        self.assertEqual(
+            T({1: 2}) + ConstDict(int, OneOf(int, None))({2: 3}),
+            {1: 2, 2: 3}
+        )
+
+    def test_const_dict_add_mappable_with_exceptions(self):
+        T = ConstDict(int, TupleOf(int))
+
+        to = TupleOf(int)((1,))
+
+        self.assertEqual(_types.refcount(to), 1)
+
+        t = T({1: to})
+
+        self.assertEqual(_types.refcount(to), 2)
+
+        t = t + {2: (1, 2, 3)}
+
+        self.assertEqual(t, {1: (1,), 2: (1, 2, 3)})
+
+        try:
+            t = t + {3: to, 4: "hi"}
+        except TypeError:
+            pass
+
+        # the refcount of 'to' should not have increased
+        self.assertEqual(_types.refcount(to), 2)
+
     def test_one_of_alternative(self):
         X = Alternative("X", V={'a': int})
         Ox = OneOf(None, X)

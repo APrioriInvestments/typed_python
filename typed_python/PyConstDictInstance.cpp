@@ -299,8 +299,30 @@ PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
                 type()->addDicts(dataPtr(), w_rhs->dataPtr(), data);
             });
         } else {
-            if (!PyDict_Check(rhs))
+            // to convert the RHS to the appropriate const dict type, RHS must
+            // be a finite, iterable mapping.
+
+            // check that it's mappable
+            if (!PyMapping_Check(rhs)) {
                 return incref(Py_NotImplemented);
+            }
+
+            // check that its iterable
+            PyObjectStealer iterator(PyObject_GetIter(rhs));
+
+            if (!iterator) {
+                PyErr_Clear();
+                return incref(Py_NotImplemented);
+            }
+
+            // check that its finite
+            int64_t len = PyObject_Length(rhs);
+
+            if (len == -1) {
+                PyErr_Clear();
+                return incref(Py_NotImplemented);
+            }
+
             Instance other(type(), [&](instance_ptr data) {
                 copyConstructFromPythonInstance(type(), data, rhs, true);
             });
@@ -315,7 +337,7 @@ PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
             return incref(Py_NotImplemented);
         Type* tupleOfKeysType = type()->tupleOfKeysType();
 
-        //convert rhs to a relevant dict type.
+        //convert rhs to a relevant tuple of keys type.
         Instance keys(tupleOfKeysType, [&](instance_ptr data) {
             copyConstructFromPythonInstance(tupleOfKeysType, data, rhs, true);
         });
@@ -483,36 +505,68 @@ bool PyConstDictInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObjec
 }
 
 void PyConstDictInstance::copyConstructFromPythonInstanceConcrete(ConstDictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    if (!isExplicit) {
+        PyInstance::copyConstructFromPythonInstanceConcrete(dictType, tgt, pyRepresentation, isExplicit);
+    }
+
     if (PyDict_Check(pyRepresentation) && isExplicit) {
-        dictType->constructor(tgt, PyDict_Size(pyRepresentation), false);
+        PyObject *key, *value;
+        Py_ssize_t pos = 0;
 
-        try {
-            PyObject *key, *value;
-            Py_ssize_t pos = 0;
+        dictType->constructor(tgt, PyDict_Size(pyRepresentation), [&](instance_ptr outKey, instance_ptr outVal) {
+            PyDict_Next(pyRepresentation, &pos, &key, &value);
 
-            int i = 0;
-
-            while (PyDict_Next(pyRepresentation, &pos, &key, &value)) {
-                copyConstructFromPythonInstance(dictType->keyType(), dictType->kvPairPtrKey(tgt, i), key, true);
-                try {
-                    copyConstructFromPythonInstance(dictType->valueType(), dictType->kvPairPtrValue(tgt, i), value, true);
-                } catch(...) {
-                    dictType->keyType()->destroy(dictType->kvPairPtrKey(tgt,i));
-                    throw;
-                }
-                dictType->incKvPairCount(tgt);
-                i++;
+            copyConstructFromPythonInstance(dictType->keyType(), outKey, key, true);
+            try {
+                copyConstructFromPythonInstance(dictType->valueType(), outVal, value, true);
+            } catch(...) {
+                dictType->keyType()->destroy(outKey);
+                throw;
             }
-
-            dictType->sortKvPairs(tgt);
-        } catch(...) {
-            dictType->destroy(tgt);
-            throw;
-        }
+        });
         return;
     }
 
-    PyInstance::copyConstructFromPythonInstanceConcrete(dictType, tgt, pyRepresentation, isExplicit);
+    PyObject *iterator = PyObject_GetIter(pyRepresentation);
+
+    if (!iterator) {
+        throw PythonExceptionSet();
+    }
+
+    int64_t len = PyObject_Length(pyRepresentation);
+
+    if (len == -1) {
+        if (PyErr_Occurred()) {
+            throw PythonExceptionSet();
+        }
+        len = 0;
+    }
+
+    dictType->constructor(tgt, len, [&](instance_ptr outKey, instance_ptr outVal) {
+        PyObjectStealer key(PyIter_Next(iterator));
+
+        if (!key) {
+            if (PyErr_Occurred()) {
+                throw PythonExceptionSet();
+            }
+            throw std::runtime_error("Length didn't match number of iterator items");
+        }
+
+        PyObjectStealer value(PyObject_GetItem(pyRepresentation, key));
+
+        if (!value) {
+            throw PythonExceptionSet();
+        }
+
+        copyConstructFromPythonInstance(dictType->keyType(), outKey, key, true);
+
+        try {
+            copyConstructFromPythonInstance(dictType->valueType(), outVal, value, true);
+        } catch(...) {
+            dictType->keyType()->destroy(outKey);
+            throw;
+        }
+    });
 }
 
 int PyConstDictInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
