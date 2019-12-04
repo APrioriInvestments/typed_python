@@ -17,7 +17,7 @@ import os
 import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
 import typed_python.compiler.llvm_compiler as llvm_compiler
-from typed_python import Function, NoneType, OneOf, _types
+from typed_python import Function, NoneType, OneOf, _types, Value
 from typed_python.internals import FunctionOverload, DisableCompiledCode
 
 _singleton = [None]
@@ -210,12 +210,18 @@ def pickSpecializationTypeFor(x):
     if isinstance(x, types.FunctionType):
         return Function(x)
 
+    if isinstance(x, type):
+        return Value(x)
+
     return type(x)
 
 
 def pickSpecializationValueFor(x):
     if isinstance(x, types.FunctionType):
         return Function(x)
+
+    if isinstance(x, type):
+        return x
 
     return x
 

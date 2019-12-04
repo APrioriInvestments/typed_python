@@ -152,6 +152,15 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
             r = specialized_f(x)
             self.assertTrue(r)
 
+    def test_can_pass_types_as_values(self):
+        @Entrypoint
+        def append(T, x):
+            res = ListOf(T)()
+            res.append(x)
+            return res
+
+        self.assertEqual(append(int, 1.5), [1])
+
     def test_can_use_entrypoints_from_functions(self):
         @Entrypoint
         def f(x):
