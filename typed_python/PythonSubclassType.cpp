@@ -56,3 +56,70 @@ PythonSubclass* PythonSubclass::Make(Type* base, PyTypeObject* pyType) {
     return it->second;
 }
 
+
+typed_python_hash_type PythonSubclass::hash(instance_ptr left) {
+    if (m_hashFun) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObjectStealer selfAsObject(PyInstance::initialize(this, [&](instance_ptr selfData) {
+            this->copy_constructor(selfData, left);
+        }));
+
+        PyObjectStealer result(
+            PyObject_CallFunctionObjArgs(
+                m_hashFun,
+                //the typecast is necessary since this is a varargs function, and so the
+                //C-style calling convention doesn't know to transform the PyObjectStealer
+                //into a PyObject*
+                (PyObject*)selfAsObject,
+                NULL
+            )
+        );
+
+        if (!result) {
+            throw PythonExceptionSet();
+        }
+
+        if (!PyLong_Check(result)) {
+            throw std::runtime_error("Expected " + this->name() + ".__hash__ to return an integer");
+        }
+
+        return PyLong_AsLong(result);
+    }
+
+    return m_base->hash(left);
+}
+
+void PythonSubclass::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
+    if (!isStr && m_reprFun) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObjectStealer selfAsObject(PyInstance::initialize(this, [&](instance_ptr selfData) {
+            this->copy_constructor(selfData, self);
+        }));
+
+        PyObjectStealer result(
+            PyObject_CallFunctionObjArgs(
+                m_reprFun,
+                //the typecast is necessary since this is a varargs function, and so the
+                //C-style calling convention doesn't know to transform the PyObjectStealer
+                //into a PyObject*
+                (PyObject*)selfAsObject,
+                NULL
+            )
+        );
+
+        if (!result) {
+            throw PythonExceptionSet();
+        }
+
+        if (!PyUnicode_Check(result)) {
+            throw std::runtime_error("Expected " + this->name() + ".__repr__ to return a string");
+        }
+
+        stream << PyUnicode_AsUTF8(result);
+        return;
+    }
+
+    m_base->repr(self, stream, isStr);
+}

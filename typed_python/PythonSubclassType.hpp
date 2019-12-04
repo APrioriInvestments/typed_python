@@ -27,6 +27,28 @@ public:
         mTypeRep = (PyTypeObject*)incref((PyObject*)typePtr);
         m_name = typePtr->tp_name;
 
+        m_reprFun = PyObject_GetAttrString((PyObject*)typePtr, "__repr__");
+
+        if (!m_reprFun) {
+            PyErr_Clear();
+        }
+
+        // make sure we don't get the __repr__ from our own implementation
+        // in the base class. We want to get the subclass' version.
+        if (!PyFunction_Check(m_reprFun)) {
+            m_reprFun = nullptr;
+        }
+
+        m_hashFun = PyObject_GetAttrString((PyObject*)typePtr, "__hash__");
+
+        if (!m_hashFun) {
+            PyErr_Clear();
+        }
+
+        if (!PyFunction_Check(m_hashFun)) {
+            m_hashFun = nullptr;
+        }
+
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
@@ -57,9 +79,7 @@ public:
         return anyChanged;
     }
 
-    typed_python_hash_type hash(instance_ptr left) {
-        return m_base->hash(left);
-    }
+    typed_python_hash_type hash(instance_ptr left);
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
@@ -71,9 +91,7 @@ public:
         m_base->deserialize(self, buffer, wireType);
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
-        m_base->repr(self, stream, isStr);
-    }
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
         return m_base->cmp(left, right, pyComparisonOp, suppressExceptions);
@@ -104,4 +122,9 @@ public:
     PyTypeObject* pyType() const {
         return mTypeRep;
     }
+
+private:
+    PyObject* m_reprFun;
+
+    PyObject* m_hashFun;
 };
