@@ -279,6 +279,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(typeOf(f), Function(f))
 
+    @flaky(max_runs=3, min_passes=1)
     def test_sequential_append_performance(self):
         @Entrypoint
         def cumSum1(x):
