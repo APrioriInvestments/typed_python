@@ -127,6 +127,9 @@ class TypedExpression(object):
     def convert_delitem(self, item):
         return self.expr_type.convert_delitem(self.context, self, item)
 
+    def convert_getslice(self, lower, upper, step):
+        return self.expr_type.convert_getslice(self.context, self, lower, upper, step)
+
     def convert_getitem(self, item):
         return self.expr_type.convert_getitem(self.context, self, item)
 

@@ -154,6 +154,35 @@ class StringWrapper(RefcountedWrapper):
 
         return super().convert_bin_op(context, left, op, right, inplace)
 
+    def convert_getslice(self, context, expr, lower, upper, step):
+        if step is not None:
+            raise Exception("Slicing with a step isn't supported yet")
+
+        if lower is None and upper is None:
+            return self
+
+        if lower is None and upper is not None:
+            lower = context.constant(0)
+
+        lower = lower.toInt64()
+        if lower is None:
+            return
+
+        upper = upper.toInt64()
+        if upper is None:
+            return
+
+        return context.push(
+            str,
+            lambda strRef: strRef.expr.store(
+                runtime_functions.string_getslice_int64.call(
+                    expr.nonref_expr.cast(native_ast.VoidPtr),
+                    lower.nonref_expr,
+                    upper.nonref_expr
+                ).cast(self.layoutType)
+            )
+        )
+
     def convert_getitem(self, context, expr, item):
         item = item.toInt64()
 

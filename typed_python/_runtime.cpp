@@ -130,6 +130,10 @@ extern "C" {
         return StringType::getitem(lhs, index);
     }
 
+    StringType::layout* nativepython_runtime_string_getslice_int64(StringType::layout* lhs, int64_t start, int64_t stop) {
+        return StringType::getsubstr(lhs, start, stop);
+    }
+
     StringType::layout* nativepython_runtime_string_from_utf8_and_len(const char* utf8_str, int64_t len) {
         return StringType::createFromUtf8(utf8_str, len);
     }

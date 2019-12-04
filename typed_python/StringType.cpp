@@ -471,10 +471,6 @@ StringType::layout* StringType::getsubstr(layout* l, int64_t start, int64_t stop
         return l;
     }
 
-    if (start >= stop) {
-        return nullptr;
-    }
-
     if (start < 0) {
         start += l->pointcount;
         if (start < 0) start = 0;
@@ -488,6 +484,10 @@ StringType::layout* StringType::getsubstr(layout* l, int64_t start, int64_t stop
 
     if (stop > l->pointcount)
         stop = l->pointcount;
+
+    if (start >= stop) {
+        return nullptr;
+    }
 
     size_t datalength = stop - start;
     size_t datasize = datalength * l->bytes_per_codepoint;

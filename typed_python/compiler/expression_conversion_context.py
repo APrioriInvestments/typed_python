@@ -887,16 +887,41 @@ class ExpressionConversionContext(object):
             return operand.convert_unary_op(ast.op)
 
         if ast.matches.Subscript:
-            assert ast.slice.matches.Index
-
             val = self.convert_expression_ast(ast.value)
             if val is None:
                 return None
-            index = self.convert_expression_ast(ast.slice.value)
-            if index is None:
-                return None
 
-            return val.convert_getitem(index)
+            if ast.slice.matches.Index:
+                index = self.convert_expression_ast(ast.slice.value)
+                if index is None:
+                    return None
+
+                return val.convert_getitem(index)
+            elif ast.slice.matches.Slice:
+                if ast.slice.lower is None:
+                    lower = None
+                else:
+                    lower = self.convert_expression_ast(ast.slice.lower)
+                    if lower is None:
+                        return lower
+
+                if ast.slice.upper is None:
+                    upper = None
+                else:
+                    upper = self.convert_expression_ast(ast.slice.upper)
+                    if upper is None:
+                        return upper
+
+                if ast.slice.step is None:
+                    step = None
+                else:
+                    step = self.convert_expression_ast(ast.slice.step)
+                    if step is None:
+                        return step
+
+                return val.convert_getslice(lower, upper, step)
+            else:
+                assert False, type(ast.slice)
 
         if ast.matches.Call:
             lhs = self.convert_expression_ast(ast.func)

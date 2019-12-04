@@ -154,6 +154,16 @@ class TestStringCompilation(unittest.TestCase):
             for i in range(-20, 20):
                 self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
 
+    def test_string_getitem_slice(self):
+        def getitem(x: str, y: int):
+            return x[:y]
+
+        getitemCompiled = Compiled(getitem)
+
+        for s in ["", "asdf", "a", "asdfasdf"]:
+            for i in range(-5, 10):
+                self.assertEqual(getitem(s, i), getitemCompiled(s, i), (s, i))
+
     def test_string_lower_upper(self):
 
         @Compiled
