@@ -193,12 +193,23 @@ void PyNamedTupleInstance::mirrorTypeInformationIntoPyTypeConcrete(NamedTuple* t
 }
 
 int PyNamedTupleInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
-    PyErr_Format(
-        PyExc_AttributeError,
-        "Cannot set attributes on instance of type '%s' because it is immutable",
-        type()->name().c_str()
-    );
-    return -1;
+    if (!PyUnicode_Check(attrName)) {
+        PyErr_SetString(PyExc_AttributeError, "attribute is not a string");
+        return -1;
+    }
+
+    int ix = type()->indexOfName(PyUnicode_AsUTF8(attrName));
+
+    if (ix >= 0) {
+        PyErr_Format(
+            PyExc_AttributeError,
+            "Cannot set attributes on instance of type '%s' because it is immutable",
+            ((PyObject*)this)->ob_type->tp_name
+        );
+        return -1;
+    }
+
+    return PyInstance::tp_setattr_concrete(attrName, attrVal);
 }
 
 /**

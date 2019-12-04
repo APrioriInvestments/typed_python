@@ -297,7 +297,7 @@ class NativeTypesTests(unittest.TestCase):
                 tuple(range(x))
             )
 
-        with self.assertRaisesRegex(AttributeError, "do not accept attributes"):
+        with self.assertRaisesRegex(AttributeError, "has no attribute 'x'"):
             tupleOfInt((1, 2, 3)).x = 2
 
     def test_one_of_and_types(self):

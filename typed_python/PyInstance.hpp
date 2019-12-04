@@ -224,9 +224,9 @@ public:
     static int reversePyOpOrdering(int op);
 
     template<class T>
-    static int specializeForTypeReturningInt(PyObject* obj, const T& f) {
+    static int specializeForTypeReturningInt(PyObject* obj, const T& f, Type* typeOverride = nullptr) {
         try {
-            return specialize(obj, f);
+            return specialize(obj, f, typeOverride);
         } catch(PythonExceptionSet& e) {
             return -1;
         } catch(std::exception& e) {

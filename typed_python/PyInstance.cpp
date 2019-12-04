@@ -1109,10 +1109,11 @@ int PyInstance::tp_setattro(PyObject *o, PyObject* attrName, PyObject* attrVal) 
 int PyInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
     PyErr_Format(
         PyExc_AttributeError,
-        "Instances of type '%s' do not accept attributes",
-        attrName,
-        type()->name().c_str()
+        "'%s' object has no attribute '%S'",
+        type()->name().c_str(),
+        attrName
     );
+
     return -1;
 }
 

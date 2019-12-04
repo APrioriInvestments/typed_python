@@ -44,6 +44,12 @@ public:
         }, type()->getBaseType());
     }
 
+    int tp_setattr_concrete(PyObject* pyAttrName, PyObject* attrVal) {
+        return specializeForTypeReturningInt((PyObject*)this, [&](auto& subtype) {
+            return subtype.tp_setattr_concrete(pyAttrName, attrVal);
+        }, type()->getBaseType());
+    }
+
     static bool pyValCouldBeOfTypeConcrete(modeled_type* eltType, PyObject* pyRepresentation, bool isExplicit) {
         Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
@@ -73,4 +79,3 @@ public:
         return 1;
     }
 };
-

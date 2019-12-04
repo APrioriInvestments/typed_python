@@ -33,6 +33,27 @@ class NamedTupleTests(unittest.TestCase):
         self.assertEqual(t(a=1, b=2).a, 1)
         self.assertEqual(t(a=1, b=2).b, 2)
 
+    def test_error_message_when_assigning_bad_attributes(self):
+        T = NamedTuple(a=int)
+
+        class A(T):
+            pass
+
+        with self.assertRaisesRegex(AttributeError, "'NamedTuple\\(a=Int64\\)' object has no attribute 'z'"):
+            T().z = 20
+
+        with self.assertRaisesRegex(AttributeError, "'A' object has no attribute 'z'"):
+            A().z = 20
+
+        with self.assertRaisesRegex(
+            AttributeError,
+            "Cannot set attributes on instance of type 'NamedTuple\\(a=Int64\\)' because it is immutable"
+        ):
+            T().a = 20
+
+        with self.assertRaisesRegex(AttributeError, "Cannot set attributes on instance of type 'A' because it is immutable"):
+            A().a = 20
+
     def test_named_tuple_construction(self):
         t = NamedTuple(a=int, b=int)
 
