@@ -1572,6 +1572,11 @@ class NativeTypesTests(unittest.TestCase):
                 self.assertEqual(tupleOfInt(tup1) + tupleOfInt(tup2), tupleOfInt(tup1+tup2))
                 self.assertEqual(tupleOfInt(tup1) + tup2, tupleOfInt(tup1+tup2))
 
+    def test_stringification_of_none(self):
+        T = TupleOf(OneOf(None, str))
+
+        self.assertEqual(str(T([None, 'hi'])), '(None, "hi")')
+
     def test_slice_tuple_of(self):
         tupleOfInt = TupleOf(int)
 

@@ -76,6 +76,6 @@ public:
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
-        stream << "NoneType";
+        stream << "None";
     }
 };
