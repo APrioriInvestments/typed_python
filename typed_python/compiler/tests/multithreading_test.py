@@ -187,6 +187,7 @@ class TestMultithreading(unittest.TestCase):
 
         self.assertFalse(lock.locked())
 
+    @flaky(max_runs=3, min_passes=1)
     def test_lock_perf(self):
         lock = threading.Lock()
         recursiveLock = threading.RLock()

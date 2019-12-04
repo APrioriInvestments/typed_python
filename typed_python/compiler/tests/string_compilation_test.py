@@ -17,6 +17,7 @@ from typed_python.test_util import currentMemUsageMb
 from typed_python.compiler.runtime import Runtime
 import unittest
 import time
+import flaky
 
 
 def Compiled(f):
@@ -366,6 +367,7 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(s.rstrip(), rstrip(s), s)
             self.assertEqual(s.lstrip(), lstrip(s), s)
 
+    @flaky.flaky(max_runs=3, min_passes=1)
     def test_string_strip_perf(self):
         bigS = " " * 1000000
         littleS = " "
