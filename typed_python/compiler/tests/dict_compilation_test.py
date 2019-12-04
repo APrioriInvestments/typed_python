@@ -505,3 +505,24 @@ class TestDictCompilation(unittest.TestCase):
                 updateCompiled(aDict2, T(d2))
 
                 self.assertEqual(aDict, aDict2)
+
+    def test_dict_pop_many(self):
+        @Entrypoint
+        def f(x: Dict(int, int)):
+            keys = ListOf(int)()
+
+            for key in x:
+                keys.append(key)
+
+            for key in keys:
+                assert key in x
+                x.pop(key)
+
+        x = Dict(int, int)()
+
+        for i in range(100):
+            x[int(i)] = 0
+
+        f(x)
+
+        self.assertEqual(len(x), 0)

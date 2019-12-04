@@ -125,16 +125,16 @@ def dict_next_slot(instance, slotIx):
 
 
 def dict_remove_key(instance, item, itemHash):
-    slots = instance._hash_table_slots
-
-    if not slots:
-        raise KeyError(item)
-
     if instance._items_reserved > (instance._hash_table_count + 2) * 4:
         instance._compressItemTableUnsafe()
 
     if instance._hash_table_count < instance._hash_table_size >> 3:
         instance._resizeTableUnsafe()
+
+    slots = instance._hash_table_slots
+
+    if not slots:
+        raise KeyError(item)
 
     if itemHash < 0:
         itemHash = -itemHash
