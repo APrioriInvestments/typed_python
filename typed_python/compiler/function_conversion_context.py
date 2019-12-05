@@ -362,8 +362,8 @@ class FunctionConversionContext(object):
     def generateDestructors(self, variableStates):
         destructors = []
 
-        for name in variableStates.variablesThatMightBeActive():
-            if self.variableNeedsDestructor(name):
+        for name in self._varname_to_type:
+            if isinstance(name, str) and self.variableNeedsDestructor(name):
                 context = ExpressionConversionContext(self, variableStates)
 
                 slot_expr = self.localVariableExpression(context, name)
@@ -400,7 +400,6 @@ class FunctionConversionContext(object):
 
     def assignToLocalVariable(self, varname, val_to_store, variableStates):
         """Ensure we have appropriate storage allocated for 'varname', and assign 'val_to_store' to it."""
-
         if varname not in self.variablesAssigned:
             # make sure we know this variable is new. We'll have to
             # re-execute this converter now that we know about this
@@ -668,6 +667,7 @@ class FunctionConversionContext(object):
             cond = cond_context.convert_expression_ast(ast.test)
             if cond is None:
                 return cond_context.finalize(None, exceptionsTakeFrom=ast), False
+
             cond = cond.toBool()
             if cond is None:
                 return cond_context.finalize(None, exceptionsTakeFrom=ast), False

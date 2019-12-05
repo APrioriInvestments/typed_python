@@ -47,6 +47,27 @@ class TestListOfCompilation(unittest.TestCase):
             self.assertEqual(fastval, slowval)
         return t_py, t_fast
 
+    def test_list_of_list_refcounts(self):
+        @Compiled
+        def f(x: ListOf(ListOf(int)), z):
+            if z:
+                y = x[0]  # noqa
+
+                return x
+
+            return 10
+
+        aList = ListOf(ListOf(int))()
+        aList.resize(1)
+
+        interiorList = aList[0]
+
+        rc = _types.refcount(interiorList)
+
+        f(aList, True)
+
+        self.assertEqual(rc, _types.refcount(interiorList))
+
     def test_list_of_float(self):
         def f(x: ListOf(float), y: ListOf(float)) -> float:
             j = 0
