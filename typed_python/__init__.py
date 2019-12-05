@@ -17,6 +17,7 @@ __version__ = "0.1.1"
 from typed_python.internals import (
     Member, Final, Function, UndefinedBehaviorException, makeNamedTuple, DisableCompiledCode
 )
+from typed_python._types import bytecount, refcount
 from typed_python.module import Module
 from typed_python.type_function import TypeFunction
 from typed_python.hash import sha_hash
