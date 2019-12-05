@@ -260,6 +260,30 @@ class TestListOfCompilation(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aTup), 11)
 
+    def test_list_extend(self):
+        T = ListOf(int)
+        @Compiled
+        def f(x: T, y: T):
+            x.extend(y)
+
+        t = T([1, 2, 3])
+        t2 = T([1, 2, 3])
+
+        f(t, t2)
+
+        self.assertEqual(t, [1, 2, 3, 1, 2, 3])
+
+        t = T([1, 2, 3])
+        t2 = T([1, 2, 3])
+
+        for _ in range(5):
+            print(len(t))
+
+            f(t, t)
+            t2.extend(t2)
+
+            self.assertEqual(t, t2)
+
     def test_list_append(self):
         T = ListOf(int)
 

@@ -17,12 +17,23 @@ from typed_python.compiler.type_wrappers.tuple_of_wrapper import TupleOrListOfWr
 from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import PointerTo
+from typed_python import PointerTo, ListOf
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+def list_of_extend(aList, extendWith):
+    if isinstance(extendWith, ListOf):
+        # don't iterate in case 'extendWith' is 'aList', in which case we could
+        # segfault if the list gets resized underneath us
+        for i in range(len(extendWith)):
+            aList.append(extendWith[i])
+    else:
+        for thing in extendWith:
+            aList.append(thing)
 
 
 class ListOfWrapper(TupleOrListOfWrapper):
@@ -46,7 +57,8 @@ class ListOfWrapper(TupleOrListOfWrapper):
         return context.pushPod(int, expr.nonref_expr.ElementPtrIntegers(0, 3).load().cast(native_ast.Int64))
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("copy", "resize", "reserve", "reserved", "append", "clear", "pop", "setSizeUnsafe", "pointerUnsafe"):
+        if attr in ("copy", "resize", "reserve", "reserved", "extend", "append",
+                    "clear", "pop", "setSizeUnsafe", "pointerUnsafe"):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -131,6 +143,10 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         self.generateResize
                     ).call(instance, count, val)
                 )
+
+        if methodname == "extend":
+            if len(args) == 1:
+                return context.call_py_function(list_of_extend, (instance, args[0]), {})
 
         if methodname == "append":
             if len(args) == 1:
