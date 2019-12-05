@@ -154,6 +154,27 @@ class TestStringCompilation(unittest.TestCase):
             for i in range(-20, 20):
                 self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
 
+    def test_string_ord(self):
+        @Compiled
+        def callOrd(x: str):
+            return ord(x)
+
+        self.assertEqual(callOrd("a"), ord("a"))
+        self.assertEqual(callOrd("\x00"), ord("\x00"))
+        self.assertEqual(callOrd("\xFF"), ord("\xFF"))
+        self.assertEqual(callOrd("\u1234"), ord("\u1234"))
+
+        with self.assertRaisesRegex(TypeError, "of length 4 found"):
+            callOrd("asdf")
+
+    def test_string_chr(self):
+        @Compiled
+        def callChr(x: int):
+            return chr(x)
+
+        for i in range(0, 0x10ffff + 1):
+            self.assertEqual(ord(callChr(i)), i)
+
     def test_string_getitem_slice(self):
         def getitem(x: str, y: int):
             return x[:y]

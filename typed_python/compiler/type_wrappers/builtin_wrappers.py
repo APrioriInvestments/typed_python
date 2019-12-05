@@ -22,7 +22,7 @@ class BuiltinWrapper(Wrapper):
     is_pod = True
     is_empty = False
     is_pass_by_ref = False
-    SUPPORTED_FUNCTIONS = (round, trunc, floor, ceil, format, dir)
+    SUPPORTED_FUNCTIONS = (round, trunc, floor, ceil, format, dir, ord, chr)
 
     def __init__(self, builtin):
         assert builtin in self.SUPPORTED_FUNCTIONS
@@ -33,6 +33,7 @@ class BuiltinWrapper(Wrapper):
 
     def convert_call(self, context, expr, args, kwargs):
         builtin = self.typeRepresentation
+
         if len(args) == 1 and not kwargs:
             return args[0].convert_builtin(builtin)
 

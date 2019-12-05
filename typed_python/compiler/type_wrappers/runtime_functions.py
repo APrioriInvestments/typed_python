@@ -325,6 +325,18 @@ class_cmp = externalCallTarget(
     UInt64, Void.pointer(), Void.Pointer(), Int64
 )
 
+string_chr_int64 = externalCallTarget(
+    "nativepython_runtime_string_chr",
+    Void.pointer(),
+    Int64
+)
+
+string_ord = externalCallTarget(
+    "nativepython_runtime_string_ord",
+    Int64,
+    Void.pointer()
+)
+
 string_getslice_int64 = externalCallTarget(
     "nativepython_runtime_string_getslice_int64",
     Void.pointer(),

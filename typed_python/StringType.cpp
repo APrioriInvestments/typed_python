@@ -430,6 +430,61 @@ bool StringType::isupper(layout *l) {
     return found_one;
 }
 
+StringType::layout* StringType::singleFromCodepoint(int64_t codePoint) {
+    int bytesPerCodepoint;
+    if (codePoint <= 0xFF) {
+        bytesPerCodepoint = 1;
+    } else if (codePoint <= 0xFFFF) {
+        bytesPerCodepoint = 2;
+    } else {
+        bytesPerCodepoint = 4;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + bytesPerCodepoint;
+
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = bytesPerCodepoint;
+    new_layout->pointcount = 1;
+
+    //we could figure out if we can represent this with a smaller encoding.
+    if (bytesPerCodepoint == 1) {
+        ((uint8_t*)new_layout->data)[0] = codePoint;
+    }
+    if (bytesPerCodepoint == 2) {
+        ((uint16_t*)new_layout->data)[0] = codePoint;
+    }
+    if (bytesPerCodepoint == 4) {
+        ((uint32_t*)new_layout->data)[0] = codePoint;
+    }
+
+    return new_layout;
+}
+
+
+uint32_t StringType::getord(layout* lhs) {
+    if (!lhs) {
+        return 0;
+    }
+
+    if (lhs->pointcount != 1) {
+        return 0;
+    }
+
+    if (lhs->bytes_per_codepoint == 1) {
+        return ((uint8_t*)lhs->data)[0];
+    }
+    if (lhs->bytes_per_codepoint == 2) {
+        return ((uint16_t*)lhs->data)[0];
+    }
+    if (lhs->bytes_per_codepoint == 4) {
+        return ((uint32_t*)lhs->data)[0];
+    }
+
+    return 0;
+}
+
 StringType::layout* StringType::getitem(layout* lhs, int64_t offset) {
     if (!lhs) {
         return lhs;
@@ -889,11 +944,15 @@ int64_t StringType::bytes_per_codepoint(instance_ptr self) const {
 }
 
 int64_t StringType::count(instance_ptr self) const {
-    if (*(layout**)self == nullptr) {
+    return countStatic(*(layout**)self);
+}
+
+int64_t StringType::countStatic(StringType::layout* self) {
+    if (self == nullptr) {
         return 0;
     }
 
-    return (*(layout**)self)->pointcount;
+    return self->pointcount;
 }
 
 void StringType::destroy(instance_ptr self) {

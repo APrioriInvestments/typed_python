@@ -265,6 +265,16 @@ class IntWrapper(ArithmeticTypeWrapper):
             return context.pushPod(self, expr.nonref_expr)
 
     def convert_builtin(self, f, context, expr, a1=None):
+        if f is chr and a1 is None:
+            return context.push(
+                str,
+                lambda strRef: strRef.expr.store(
+                    runtime_functions.string_chr_int64.call(
+                        expr.toInt64().nonref_expr
+                    ).cast(strRef.expr_type.layoutType)
+                )
+            )
+
         if f is round:
             if a1 is None:
                 return context.pushPod(

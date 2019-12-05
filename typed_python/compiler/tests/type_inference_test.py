@@ -162,3 +162,18 @@ class TestTypeInference(unittest.TestCase):
         self.assertEqual(resultType(or2, x=float, y=int), Float64)
         self.assertEqual(set(resultType(or3, x=int, y=float).Types), set([Int64, Float64]))
         self.assertEqual(set(resultType(or3, x=float, y=int).Types), set([Int64, Float64]))
+
+    def test_infer_type_of_assignment_with_guard(self):
+        def f(x):
+            if isinstance(x, int):
+                y = x
+            else:
+                y = 0
+
+            return y
+
+        self.assertEqual(resultType(f, x=OneOf(None, int)), Int64)
+        self.assertEqual(resultType(f, x=OneOf(None, int, float)), Int64)
+        self.assertEqual(resultType(f, x=int), Int64)
+        self.assertEqual(resultType(f, x=None), Int64)
+        self.assertEqual(resultType(f, x=float), Int64)

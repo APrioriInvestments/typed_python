@@ -154,6 +154,19 @@ class StringWrapper(RefcountedWrapper):
 
         return super().convert_bin_op(context, left, op, right, inplace)
 
+    def convert_builtin(self, f, context, expr, a1=None):
+        if a1 is None and f is ord:
+            return context.pushPod(
+                int,
+                runtime_functions.string_ord.call(
+                    expr.nonref_expr.cast(native_ast.VoidPtr)
+                )
+            )
+
+        print(a1, f)
+
+        return super().convert_builtin(f, context, expr, a1)
+
     def convert_getslice(self, context, expr, lower, upper, step):
         if step is not None:
             raise Exception("Slicing with a step isn't supported yet")

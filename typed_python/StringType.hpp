@@ -207,6 +207,10 @@ public:
 
     static uint32_t getpoint(layout *l, uint64_t i);
 
+    static uint32_t getord(layout *l);
+
+    static layout* singleFromCodepoint(int64_t codePoint);
+
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
     static char cmpStatic(layout* left, layout* right);
@@ -222,6 +226,8 @@ public:
     int64_t bytes_per_codepoint(instance_ptr self) const;
 
     int64_t count(instance_ptr self) const;
+
+    static int64_t countStatic(StringType::layout* self);
 
     void constructor(instance_ptr self) {
         *(layout**)self = 0;

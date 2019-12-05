@@ -130,6 +130,34 @@ extern "C" {
         return StringType::getitem(lhs, index);
     }
 
+    StringType::layout* nativepython_runtime_string_chr(int64_t code) {
+        if (code < 0 || code > 0x10ffff) {
+            PyEnsureGilAcquired getTheGil;
+
+            PyErr_Format(
+                PyExc_ValueError, "chr() arg not in range(0x10ffff)"
+            );
+
+            throw PythonExceptionSet();
+        }
+
+        return StringType::singleFromCodepoint(code);
+    }
+
+    int64_t nativepython_runtime_string_ord(StringType::layout* lhs) {
+        if (StringType::countStatic(lhs) != 1) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(
+                PyExc_TypeError, "ord() expected a character, but string of length %d found",
+                StringType::countStatic(lhs)
+            );
+
+            throw PythonExceptionSet();
+        }
+
+        return StringType::getord(lhs);
+    }
+
     StringType::layout* nativepython_runtime_string_getslice_int64(StringType::layout* lhs, int64_t start, int64_t stop) {
         return StringType::getsubstr(lhs, start, stop);
     }
