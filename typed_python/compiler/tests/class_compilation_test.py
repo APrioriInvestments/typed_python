@@ -12,15 +12,26 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, Int64, UInt64, Int16, \
-    Float32, Float64, String, Final, PointerTo, makeNamedTuple, Compiled, Function, Held
-import typed_python._types as _types
-from typed_python.compiler.runtime import Entrypoint
-from flaky import flaky
-import unittest
 import time
 import psutil
 from math import trunc, floor, ceil
+import unittest
+from flaky import flaky
+from typed_python import Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, Int64, UInt64, Int16, \
+    Float32, Float64, String, Final, PointerTo, makeNamedTuple, Compiled, Function, Held
+import typed_python._types as _types
+from typed_python.compiler.runtime import Entrypoint, Runtime
+
+
+def resultType(f, **kwargs):
+    return Runtime.singleton().resultTypes(f, kwargs)
+
+
+def result_or_exception(f, *p):
+    try:
+        return f(*p)
+    except Exception as e:
+        return type(e)
 
 
 class AClass(Class):
@@ -947,8 +958,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
             compiled_f = Compiled(f)
             r1 = f(C(""))
             r2 = compiled_f(C(""))
-            if r1 != r2:
-                print("mismatch")
             self.assertEqual(r1, r2)
 
     def test_compile_class_reverse_methods(self):
@@ -1298,12 +1307,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertTrue(finalMem < initMem + 2)
 
     def test_compile_class_comparison_defaults(self):
-
-        def result_or_exception(f, *p):
-            try:
-                return f(*p)
-            except Exception as e:
-                return type(e)
 
         class C(Class, Final):
             i = Member(int)

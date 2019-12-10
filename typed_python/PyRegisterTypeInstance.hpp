@@ -43,7 +43,7 @@ inline float bitInvert(float in) { return 0.0; }
 //implement mod the same way python does for unsigned integers.
 inline uint64_t pyMod(uint64_t l, uint64_t r) {
     if (r == 0) {
-        PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
+        PyErr_Format(PyExc_ZeroDivisionError, "integer division or modulo by zero");
         throw PythonExceptionSet();
     }
 
@@ -57,7 +57,7 @@ inline int64_t pyMod(int64_t l, int64_t r) {
     }
 
     if (r == 0) {
-        PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
+        PyErr_Format(PyExc_ZeroDivisionError, "integer division or modulo by zero");
         throw PythonExceptionSet();
     }
 
@@ -86,7 +86,7 @@ T pyModFloat(T l, T r) {
         return 0.0;
     }
     if (r == 0.0) {
-        PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
+        PyErr_Format(PyExc_ZeroDivisionError, "float modulo");
         throw PythonExceptionSet();
     }
 
@@ -252,7 +252,7 @@ inline float pyFloatDiv(float l, float r)        { return l / r; }
 
 inline int64_t pyFloorDiv(int64_t l, int64_t r)   {
     if (r == 0) {
-        PyErr_Format(PyExc_TypeError, "pyFloorDiv by 0");
+        PyErr_Format(PyExc_ZeroDivisionError, "integer division or modulo by zero");
         throw PythonExceptionSet();
     }
     if (l < 0 && l == -l && r == -1) {
@@ -276,7 +276,7 @@ inline uint8_t pyFloorDiv(uint8_t l, uint8_t r)    { return l / r; }
 inline bool pyFloorDiv(bool l, bool r)             { return l / r; }
 inline double pyFloorDiv(double l, double r) {
     if (r == 0.0) {
-        PyErr_Format(PyExc_TypeError, "pyFloorDiv by 0");
+        PyErr_Format(PyExc_ZeroDivisionError, "float divmod()");
         throw PythonExceptionSet();
     }
     double result = (l - pyMod(l, r))/r;
@@ -291,7 +291,7 @@ inline float pyFloorDiv(float l, float r) { return pyFloorDiv((double)l, (double
 template <class T>
 inline double pyPow(T l, T r) {
     if (l == 0 && r < 0) {
-        PyErr_Format(PyExc_TypeError, "pyPow div by 0");
+        PyErr_Format(PyExc_TypeError, "0.0 cannot be raised to a negative power");
         throw PythonExceptionSet();
     }
     double result = std::pow(l, r);
@@ -358,7 +358,8 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
 
     if (strcmp(op, "__truediv__") == 0) {
         if (other == 0) {
-            PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
+            PyErr_Format(PyExc_ZeroDivisionError,
+                std::is_floating_point<T>::value ? "float division by zero" : "division by zero");
             throw PythonExceptionSet();
         }
         return registerValueToPyValue(pyFloatDiv(self, other));
@@ -366,7 +367,8 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
 
     if (strcmp(op, "__floordiv__") == 0) {
         if (other == 0) {
-            PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
+            PyErr_Format(PyExc_ZeroDivisionError,
+                std::is_floating_point<T>::value ? "float divmod()" : "integer division or modulo by zero");
             throw PythonExceptionSet();
         }
         return registerValueToPyValue(T(pyFloorDiv(self,other)));
@@ -374,7 +376,8 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
 
     if (strcmp(op, "__mod__") == 0) {
         if (other == 0) {
-            PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
+            PyErr_Format(PyExc_ZeroDivisionError,
+                std::is_floating_point<T>::value ? "float modulo" : "integer division or modulo by zero");
             throw PythonExceptionSet();
         }
 

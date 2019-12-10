@@ -348,8 +348,9 @@ def expr_str(self):
     if self.matches.Sequence:
         return "\n".join(str(x) for x in self.vals)
     if self.matches.Finally:
+        label = " [" + self.name + "]" if self.name else ""
         return (
-            "try:\n" + indent(str(self.expr)) + "\nfinally:\n"
+            "try:\n" + indent(str(self.expr)) + "\nfinally:" + label + "\n"
             + indent("\n".join(str(x) for x in self.teardowns))
         )
     if self.matches.TryCatch:

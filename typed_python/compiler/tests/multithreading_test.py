@@ -156,8 +156,8 @@ class TestMultithreading(unittest.TestCase):
                 return 10
 
         # these methods will hit 'l' using the interpreter
-        lockFun(lock)
-        lockFun(recursiveLock)
+        self.assertEqual(lockFun(lock), 10)
+        self.assertEqual(lockFun(recursiveLock), 10)
 
         self.assertFalse(lock.locked())
 
@@ -177,8 +177,8 @@ class TestMultithreading(unittest.TestCase):
 
         # these methods will hit the lock objects directly, bypassing
         # the interpreter and using C code.
-        lockFun(lock)
-        recursiveLockFun(recursiveLock)
+        self.assertEqual(lockFun(lock), 10)
+        self.assertEqual(recursiveLockFun(recursiveLock), 10)
 
         self.assertFalse(lock.locked())
 

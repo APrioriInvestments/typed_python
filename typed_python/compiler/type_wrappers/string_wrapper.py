@@ -153,6 +153,16 @@ class StringWrapper(RefcountedWrapper):
                     )
                 )
 
+        # emulate a few specific error strings
+        if op.matches.Add and left.expr_type.typeRepresentation is String \
+                and right.expr_type.is_arithmetic:
+            if right.expr_type.typeRepresentation.IsInteger:
+                return context.pushException(TypeError, "must be str, not int")
+            elif right.expr_type.typeRepresentation.IsFloat:
+                return context.pushException(TypeError, "must be str, not float")
+            elif right.expr_type.typeRepresentation is Bool:
+                return context.pushException(TypeError, "must be str, not bool")
+
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_builtin(self, f, context, expr, a1=None):
@@ -265,6 +275,10 @@ class StringWrapper(RefcountedWrapper):
         return super().convert_attribute(context, instance, attr)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if not (methodname in ("find", "split", "join", 'strip', 'rstrip', 'lstrip')
+                or methodname in self._str_methods or methodname in self._bool_methods):
+            return context.pushException(AttributeError, methodname)
+
         if kwargs:
             return super().convert_method_call(context, instance, methodname, args, kwargs)
 

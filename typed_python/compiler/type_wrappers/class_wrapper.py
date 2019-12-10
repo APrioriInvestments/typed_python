@@ -370,6 +370,9 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
     def convert_method_call(self, context, instance, methodName, args, kwargs):
         # figure out which signature we'd want to use on the given args/kwargs
         func = self.getMethodOrPropertyBody(methodName)
+        if func is None:
+            context.pushException(AttributeError, methodName)
+            return None
 
         if self.typeRepresentation.IsFinal:
             # we can sidestep the vtable entirely

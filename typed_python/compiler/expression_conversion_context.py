@@ -24,8 +24,8 @@ from typed_python.compiler.python_object_representation import pythonObjectRepre
 from typed_python.compiler.python_object_representation import pythonObjectRepresentationType
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
-from typed_python import NoneType, Alternative, OneOf, Int32, ListOf, String, Tuple, NamedTuple, TupleOf
-from typed_python._types import getTypePointer
+from typed_python import NoneType, Alternative, OneOf, Bool, Int32, ListOf, String, Tuple, NamedTuple, TupleOf
+from typed_python._types import getTypePointer, TypeFor
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
@@ -136,6 +136,59 @@ class ExpressionConversionContext(object):
 
         raise Exception(f"Couldn't get a type for {x} to a constant expression.")
 
+    def matchExceptionObject(self, exc):
+        """Return expression that tests whether current exception is an instance of exception class exc
+        """
+        return self.push(
+            Bool,
+            lambda oExpr:
+            oExpr.expr.store(
+                runtime_functions.match_exception.call(
+                    native_ast.const_uint64_expr(id(exc)).cast(native_ast.Void.pointer())
+                )
+            )
+        )
+
+    def matchGivenExceptionObject(self, given, exc):
+        """Return expression that tests whether current exception is an instance of exception class exc
+        """
+        return self.push(
+            Bool,
+            lambda oExpr:
+            oExpr.expr.store(
+                runtime_functions.match_given_exception.call(
+                    given.nonref_expr.cast(native_ast.Void.pointer()),
+                    native_ast.const_uint64_expr(id(exc)).cast(native_ast.Void.pointer())
+                )
+            )
+        )
+
+    def fetchExceptionObject(self, exc):
+        """Get a TypedExpression that represents the currently raised exception, as an object typed as ObjectOfType(exc)
+        Don't generate unless you know there is an exception.
+        The exception state is cleared.
+        """
+        return self.push(
+            TypeFor(exc),
+            lambda oExpr:
+            oExpr.expr.store(
+                runtime_functions.fetch_exception.call().cast(oExpr.expr_type.getNativeLayoutType())
+            )
+        )
+
+    def getExceptionObject(self, exc):
+        """Get a TypedExpression that represents the last caught exception, as an object typed as ObjectOfType(exc)
+        Don't generate unless you know there is an exception.
+        The exception state is not cleared.
+        """
+        return self.push(
+            TypeFor(exc),
+            lambda oExpr:
+            oExpr.expr.store(
+                runtime_functions.get_exception.call().cast(oExpr.expr_type.getNativeLayoutType())
+            )
+        )
+
     def constant(self, x, allowArbitrary=False):
         """Return a TypedExpression representing 'x'.
 
@@ -222,7 +275,7 @@ class ExpressionConversionContext(object):
             ExpressionIntermediate.Effect(expression)
         )
 
-    def pushReturnValue(self, expression, isMove=False):
+    def pushReturnValue(self, expression, isMove=False, blockName=None):
         """Push an expression returning 'expression' in the current function context.
 
         If 'isMove', then don't incref the result.
@@ -245,12 +298,17 @@ class ExpressionConversionContext(object):
                 returnTarget.convert_copy_initialize(expression)
 
             self.pushTerminal(
-                native_ast.Expression.Return(arg=None)
+                native_ast.Expression.Return(arg=None, blockName=blockName)
             )
         else:
-            self.pushTerminal(
-                native_ast.Expression.Return(arg=expression.nonref_expr)
-            )
+            if blockName is not None:
+                self.pushTerminal(
+                    native_ast.Expression.Return(arg=None, blockName=blockName)
+                )
+            else:
+                self.pushTerminal(
+                    native_ast.Expression.Return(arg=expression.nonref_expr)
+                )
 
     def pushTerminal(self, expression):
         """Push a native expression that does not return control flow."""
@@ -1099,12 +1157,45 @@ class ExpressionConversionContext(object):
 
         return self.pushExceptionObject(exceptionVal)
 
-    def pushExceptionObject(self, exceptionObject):
+    def pushExceptionClear(self):
+        nativeExpr = (
+            runtime_functions.clear_exception.call()
+        )
+        self.pushEffect(nativeExpr)
+
+    def pushExceptionObject(self, exceptionObject, clear_exc=False):
+        if exceptionObject is None:
+            exceptionObject = self.zero(object)
         nativeExpr = (
             runtime_functions.initialize_exception.call(
                 exceptionObject.nonref_expr.cast(native_ast.VoidPtr)
             )
         )
+        if clear_exc:
+            nativeExpr = nativeExpr >> runtime_functions.clear_exc_info.call()
+
+        nativeExpr = nativeExpr >> native_ast.Expression.Throw(
+            expr=native_ast.Expression.Constant(
+                val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())
+            )
+        )
+
+        self.pushEffect(nativeExpr)
+
+    def pushExceptionObjectWithCause(self, exceptionObject, causeObject, deferred=False):
+        if exceptionObject is None:
+            exceptionObject = self.zero(object)
+        if causeObject.expr_type.typeRepresentation is NoneType:
+            causeObject = self.zero(object)
+
+        nativeExpr = (
+            runtime_functions.initialize_exception_w_cause.call(
+                exceptionObject.nonref_expr.cast(native_ast.VoidPtr),
+                causeObject.nonref_expr.cast(native_ast.VoidPtr)
+            )
+        )
+        if deferred:
+            nativeExpr = nativeExpr >> runtime_functions.clear_exc_info.call()
 
         nativeExpr = nativeExpr >> native_ast.Expression.Throw(
             expr=native_ast.Expression.Constant(

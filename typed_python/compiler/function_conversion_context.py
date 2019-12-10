@@ -27,6 +27,7 @@ from typed_python.internals import makeFunctionType
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 from typed_python import _types, Type
+import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.expression_conversion_context import ExpressionConversionContext
 from typed_python.compiler.function_stack_state import FunctionStackState
 from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
@@ -34,6 +35,13 @@ from typed_python.compiler.type_wrappers.python_type_object_wrapper import Pytho
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
 from typed_python import OneOf, Function, Tuple, Forward, Class
+
+# Constants for control flow instructions
+CONTROL_FLOW_DEFAULT = 0
+CONTROL_FLOW_EXCEPTION = 1
+CONTROL_FLOW_BREAK = 2
+CONTROL_FLOW_CONTINUE = 3
+CONTROL_FLOW_RETURN = 4
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
@@ -626,7 +634,7 @@ class FunctionConversionContext(object):
 
                 destructors.append(
                     native_ast.Teardown.Always(
-                        expr=context.finalize(None).with_comment("Cleanup for variable %s" % name)
+                        expr=context.finalize(None).with_comment(f"Cleanup for variable {name}")
                     )
                 )
 
@@ -664,8 +672,8 @@ class FunctionConversionContext(object):
             # make sure we know this variable is new. We'll have to
             # re-execute this converter now that we know about this
             # variable, because right now we generate initializers
-            # for our variables only when the converter excutes
-            # with a stable list of assigned varibles (and types)
+            # for our variables only when the converter executes
+            # with a stable list of assigned variables (and types)
             self.variablesAssigned.add(varname)
             self.markTypesAreUnstable()
 
@@ -852,7 +860,7 @@ class FunctionConversionContext(object):
 
             return True
 
-    def convert_statement_ast(self, ast, variableStates: FunctionStackState):
+    def convert_statement_ast(self, ast, variableStates: FunctionStackState, return_to=None, in_loop=False, try_flow=None):
         """Convert a single statement to native_ast.
 
         Args:
@@ -860,6 +868,13 @@ class FunctionConversionContext(object):
             variableStates - a description of what's known about the types of our variables.
                 This data structure will be _modified_ by the calling code to include what's
                 known about the types of values when control flow leaves this statement.
+            return_to - label to return to. Only set within a 'try' statement.
+                If None, return normally.
+            try_flow - variable containing deferred control flow instruction.  Specifically, what
+                control flow should be followed after the 'finally' block.
+                Only set within a 'try' statement.
+                0=default, 1=unhandled exception, 2=break, 3=continue, 4=return
+            in_loop - are we within a 'for' or 'while' statement?
         Returns:
             a pair (native_ast.Expression, flowReturns) giving an expression representing the
             statement in native code, and a boolean indicating whether control flow might
@@ -868,7 +883,7 @@ class FunctionConversionContext(object):
         """
 
         try:
-            return self._convert_statement_ast(ast, variableStates)
+            return self._convert_statement_ast(ast, variableStates, return_to=return_to, in_loop=in_loop, try_flow=try_flow)
         except Exception as e:
             types = {
                 varname: self._varname_to_type.get(varname)
@@ -882,7 +897,7 @@ class FunctionConversionContext(object):
                 e.args = (newMessage,)
             raise
 
-    def _convert_statement_ast(self, ast, variableStates: FunctionStackState):
+    def _convert_statement_ast(self, ast, variableStates: FunctionStackState, return_to=None, in_loop=False, try_flow=None):
         """same as 'convert_statement_ast'."""
 
         if ast.matches.Expr and ast.value.matches.Str:
@@ -947,7 +962,13 @@ class FunctionConversionContext(object):
             if e is None:
                 return subcontext.finalize(None, exceptionsTakeFrom=ast), False
 
-            subcontext.pushReturnValue(e)
+            if return_to is not None:
+                if try_flow:
+                    subcontext.pushEffect(try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_RETURN)))
+                self.assignToLocalVariable(".return_value", e, variableStates)
+                subcontext.pushEffect(runtime_functions.clear_exc_info.call())
+
+            subcontext.pushReturnValue(e, blockName=return_to)
 
             return subcontext.finalize(None, exceptionsTakeFrom=ast), False
 
@@ -971,7 +992,8 @@ class FunctionConversionContext(object):
             if cond.expr.matches.Constant:
                 truth_val = cond.expr.val.truth_value()
 
-                branch, flow_returns = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse, variableStates)
+                branch, flow_returns = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse, variableStates,
+                                                                       return_to=return_to, try_flow=try_flow)
 
                 return cond_context.finalize(None, exceptionsTakeFrom=ast) >> branch, flow_returns
 
@@ -981,8 +1003,8 @@ class FunctionConversionContext(object):
             self.restrictByCondition(variableStatesTrue, ast.test, result=True)
             self.restrictByCondition(variableStatesFalse, ast.test, result=False)
 
-            true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue)
-            false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse)
+            true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue, return_to=return_to, try_flow=try_flow)
+            false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse, return_to=return_to, try_flow=try_flow)
 
             variableStates.becomeMerge(
                 variableStatesTrue if true_returns else None,
@@ -1018,7 +1040,9 @@ class FunctionConversionContext(object):
                     truth_value = cond.expr.val.truth_value()
 
                     if not truth_value:
-                        branch, flow_returns = self.convert_statement_list_ast(ast.orelse, variableStates)
+                        branch, flow_returns = self.convert_statement_list_ast(
+                            ast.orelse, variableStates, return_to=return_to, try_flow=try_flow
+                        )
                         return cond_context.finalize(None, exceptionsTakeFrom=ast) >> branch, flow_returns
                     else:
                         isWhileTrue = True
@@ -1031,13 +1055,17 @@ class FunctionConversionContext(object):
                 self.restrictByCondition(variableStatesTrue, ast.test, result=True)
                 self.restrictByCondition(variableStatesFalse, ast.test, result=False)
 
-                true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue)
+                true, true_returns = self.convert_statement_list_ast(
+                    ast.body, variableStatesTrue, return_to=return_to, in_loop=True, try_flow=try_flow
+                )
 
                 if isWhileTrue:
                     if "loop_break" in true.returnTargets():
                         isWhileTrue = False
 
-                false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse)
+                false, false_returns = self.convert_statement_list_ast(
+                    ast.orelse, variableStatesFalse, return_to=return_to, try_flow=try_flow
+                )
 
                 variableStates.becomeMerge(
                     variableStatesTrue if true_returns else None,
@@ -1057,7 +1085,190 @@ class FunctionConversionContext(object):
                     )
 
         if ast.matches.Try:
-            raise NotImplementedError()
+            # .exception_occurred turns on once any exception occurs
+            # .control_flow indicates the control flow instruction that is deferred until after the 'finally' block
+            #   0=default, 1=unhandled exception, 2=break, 3=continue, 4=return
+            exception_occurred = native_ast.Expression.StackSlot(name=f".exception_occurred{ast.line_number}", type=native_ast.Bool)
+            control_flow = native_ast.Expression.StackSlot(name=f".control_flow{ast.line_number}", type=native_ast.Int64)
+
+            body_context = ExpressionConversionContext(self, variableStates)
+            body, body_returns = self.convert_statement_list_ast(
+                ast.body, variableStates, in_loop=in_loop, return_to=f"end_of_try{ast.line_number}", try_flow=control_flow
+            )
+            body_context.pushEffect(body)
+
+            handlers_context = ExpressionConversionContext(self, variableStates)
+
+            working_context = ExpressionConversionContext(self, variableStates)
+            working = runtime_functions.catch_exception.call() \
+                >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION))
+            working_returns = True
+
+            for h in reversed(ast.handlers):
+                cond_context = ExpressionConversionContext(self, variableStates)
+                if h.type is None:
+                    exc_match = BaseException
+                    exc_type = BaseException
+                else:
+                    if h.type.matches.Tuple:
+                        # TODO: figure out compile-time Value for tuple of constant objects
+                        types = [cond_context.convert_expression_ast(elt).expr_type.typeRepresentation.Value for elt in h.type.elts]
+                        exc_type = tuple(types)
+                        # exc_type = OneOf(*[Value(t) for t in types])
+                        exc_type = BaseException
+                    else:
+                        exc_match = cond_context.convert_expression_ast(h.type).expr_type.typeRepresentation.Value
+                        exc_type = exc_match
+                cond = cond_context.matchExceptionObject(exc_match)
+
+                handler_context = ExpressionConversionContext(self, variableStates)
+                if h.name is None:
+                    handler_context.pushEffect(runtime_functions.catch_exception.call())
+                else:
+                    h_name = h.name
+                    self.assignToLocalVariable(h_name, handler_context.fetchExceptionObject(exc_type), variableStates)
+
+                handler, handler_returns = self.convert_statement_list_ast(
+                    h.body, variableStates, in_loop=in_loop, return_to=f"end_of_try{ast.line_number}", try_flow=control_flow
+                )
+
+                if h.name is not None:
+                    cleanup_context = ExpressionConversionContext(self, variableStates)
+                    self.localVariableExpression(cleanup_context, h_name).convert_destroy()
+                    cleanup_context.markVariableNotInitialized(h_name)
+                    handler = native_ast.Expression.Finally(
+                        expr=handler,
+                        teardowns=[
+                            native_ast.Teardown.Always(
+                                expr=cleanup_context.finalize(None).with_comment(f"Cleanup for {h_name}")
+                            )
+                        ]
+                    )
+                    variableStates.variableUninitialized(h_name)
+
+                variableStatesMatch = variableStates.clone()
+                variableStatesOtherwise = variableStates.clone()
+
+                variableStates.becomeMerge(
+                    variableStatesMatch if handler_returns else None,
+                    variableStatesOtherwise if working_returns else None
+                )
+                working = native_ast.Expression.Branch(
+                    cond=cond_context.finalize(cond.nonref_expr),
+                    true=handler_context.finalize(handler >> runtime_functions.clear_exc_info.call()),
+                    false=working_context.finalize(working)
+                )
+                working_returns = handler_returns or working_returns
+
+            handlers_context.pushEffect(working_context.finalize(working))
+
+            orelse_context = ExpressionConversionContext(self, variableStates)
+            if len(ast.orelse) > 0:
+                orelse, orelse_returns = self.convert_statement_list_ast(
+                    ast.orelse, variableStates, in_loop=in_loop, return_to=f"end_of_try{ast.line_number}", try_flow=control_flow
+                )
+                orelse_context.pushEffect(orelse)
+            else:
+                orelse, orelse_returns = None, True
+
+            final_context = ExpressionConversionContext(self, variableStates)
+            if ast.finalbody is not None:
+                final, final_returns = self.convert_statement_list_ast(
+                    ast.finalbody, variableStates, in_loop=in_loop, return_to=f"end_of_finally{ast.line_number}", try_flow=control_flow
+                )
+                final = final.withReturnTargetName(f"end_of_finally{ast.line_number}")
+                final_returns = True
+                final_context.pushEffect(final)
+            else:
+                final, final_returns = None, True
+
+            complete = exception_occurred.store(native_ast.falseExpr) \
+                >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_DEFAULT)) \
+                >> native_ast.Expression.TryCatch(
+                    expr=body_context.finalize(None),
+                    handler=exception_occurred.store(native_ast.trueExpr)
+                    >> native_ast.Expression.TryCatch(
+                        expr=handlers_context.finalize(None),
+                        handler=runtime_functions.catch_exception.call()
+                        >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION))
+                    )
+            )
+            if orelse:
+                complete = complete >> native_ast.Expression.Branch(
+                    cond=exception_occurred.load(),
+                    false=native_ast.Expression.TryCatch(
+                        expr=orelse_context.finalize(None) >> native_ast.nullExpr,
+                        handler=exception_occurred.store(native_ast.trueExpr)
+                        >> runtime_functions.catch_exception.call()
+                        >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION))
+                    )
+                )
+
+            complete = complete.withReturnTargetName(f"end_of_try{ast.line_number}")
+
+            if final:
+                complete = complete >> native_ast.Expression.TryCatch(
+                    expr=final_context.finalize(None),
+                    handler=exception_occurred.store(native_ast.trueExpr)
+                    >> runtime_functions.catch_exception.call()
+                    >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION))
+                )
+
+            if self.isLocalVariable(".return_value"):
+                return_context = ExpressionConversionContext(self, variableStates)
+                rtn, _ = self.convert_statement_ast(
+                    python_ast.Statement.Return(
+                        value=python_ast.Expr.Name(id=".return_value"), filename="", line_number=0, col_offset=0
+                    ),
+                    variableStates,
+                    in_loop=in_loop,
+                    return_to=return_to,
+                    try_flow=try_flow
+                )
+
+                complete = complete >> native_ast.Expression.Branch(
+                    cond=control_flow.load().eq(CONTROL_FLOW_RETURN),
+                    true=native_ast.Expression.Branch(
+                        cond=exception_occurred.load(),
+                        true=runtime_functions.clear_exc_info.call()
+                    )
+                    >> return_context.finalize(rtn)
+                )
+            if in_loop:
+                break_context = ExpressionConversionContext(self, variableStates)
+                brk, _ = self.convert_statement_ast(
+                    python_ast.Statement.Break(filename="", line_number=0, col_offset=0),
+                    variableStates,
+                    in_loop=in_loop,
+                    return_to=return_to,
+                    try_flow=try_flow
+                )
+                complete = complete >> native_ast.Expression.Branch(
+                    cond=control_flow.load().eq(CONTROL_FLOW_BREAK),
+                    true=runtime_functions.clear_exc_info.call() >> break_context.finalize(brk)
+                )
+
+                cont_context = ExpressionConversionContext(self, variableStates)
+                cont, _ = self.convert_statement_ast(
+                    python_ast.Statement.Continue(filename="", line_number=0, col_offset=0),
+                    variableStates,
+                    in_loop=in_loop,
+                    return_to=return_to,
+                    try_flow=try_flow
+                )
+                complete = complete >> native_ast.Expression.Branch(
+                    cond=control_flow.load().eq(CONTROL_FLOW_CONTINUE),
+                    true=runtime_functions.clear_exc_info.call() >> cont_context.finalize(cont)
+                )
+
+            raise_context = ExpressionConversionContext(self, variableStates)
+            raise_context.pushExceptionObject(None, clear_exc=True)
+            complete = complete >> native_ast.Expression.Branch(
+                cond=control_flow.load().eq(CONTROL_FLOW_EXCEPTION),
+                true=raise_context.finalize(None)
+            )
+
+            return (complete, ((body_returns and orelse_returns) or working_returns) and final_returns)
 
         if ast.matches.For:
             if not ast.target.matches.Name:
@@ -1079,7 +1290,9 @@ class FunctionConversionContext(object):
                 for subexpr in iteration_expressions:
                     self.assignToLocalVariable(target_var_name, subexpr, variableStates)
 
-                    thisOne, thisOneReturns = self.convert_statement_list_ast(ast.body, variableStates)
+                    thisOne, thisOneReturns = self.convert_statement_list_ast(
+                        ast.body, variableStates, return_to=return_to, in_loop=True, try_flow=try_flow
+                    )
 
                     # if we hit 'continue', just come to the end of this expression
                     thisOne = thisOne.withReturnTargetName("loop_continue")
@@ -1087,9 +1300,11 @@ class FunctionConversionContext(object):
                     iterator_setup_context.pushEffect(thisOne)
 
                     if not thisOneReturns:
-                        return iterator_setup_context.finalize(None, exceptionsTakeFrom=ast), False
+                        return iterator_setup_context.finalize(None, exceptionsTakeFrom=ast).withReturnTargetName("loop_break"), False
 
-                thisOne, thisOneReturns = self.convert_statement_list_ast(ast.orelse, variableStates)
+                thisOne, thisOneReturns = self.convert_statement_list_ast(
+                    ast.orelse, variableStates, return_to=return_to, in_loop=in_loop, try_flow=try_flow
+                )
 
                 iterator_setup_context.pushEffect(thisOne)
 
@@ -1137,8 +1352,12 @@ class FunctionConversionContext(object):
                     variableStatesTrue = variableStates.clone()
                     variableStatesFalse = variableStates.clone()
 
-                    true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue)
-                    false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse)
+                    true, true_returns = self.convert_statement_list_ast(
+                        ast.body, variableStatesTrue, in_loop=True, return_to=return_to, try_flow=try_flow
+                    )
+                    false, false_returns = self.convert_statement_list_ast(
+                        ast.orelse, variableStatesFalse, in_loop=True, return_to=return_to, try_flow=try_flow
+                    )
 
                     variableStates.becomeMerge(
                         variableStatesTrue if true_returns else None,
@@ -1161,10 +1380,18 @@ class FunctionConversionContext(object):
 
         if ast.matches.Raise:
             expr_context = ExpressionConversionContext(self, variableStates)
-            toThrow = expr_context.convert_expression_ast(ast.exc)
 
-            expr_context.pushExceptionObject(toThrow)
-            return expr_context.finalize(None, exceptionsTakeFrom=ast), False
+            if ast.exc is None:
+                toThrow = None  # means reraise
+            else:
+                toThrow = expr_context.convert_expression_ast(ast.exc)
+
+            if ast.cause is None:
+                expr_context.pushExceptionObject(toThrow)
+            else:
+                excCause = expr_context.convert_expression_ast(ast.cause)
+                expr_context.pushExceptionObjectWithCause(toThrow, excCause)
+            return expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast), False
 
         if ast.matches.Delete:
             exprs = None
@@ -1180,53 +1407,195 @@ class FunctionConversionContext(object):
             return exprs, True
 
         if ast.matches.With:
-            assert len(ast.items) == 1 and ast.items[0].optional_vars is None
+            # with EXPRESSION as TARGET:
+            #     SUITE
+            #
+            # is semantically equivalent to:
+            #
+            # manager = (EXPRESSION)
+            # enter = type(manager).__enter__
+            # exit = type(manager).__exit__
+            # value = enter(manager)
+            # hit_except = False
+            #
+            # try:
+            #     TARGET = value
+            #     SUITE
+            # except:
+            #     hit_except = True
+            #     if not exit(manager, *sys.exc_info()):
+            #         raise
+            # finally:
+            #     if not hit_except:
+            #         exit(manager, None, None, None)
+            #             assert len(ast.items) == 1
 
-            expr_context = ExpressionConversionContext(self, variableStates)
+            assert len(ast.items) == 1
+            # TODO: 'with' with multiple context managers
+            # with A() as a, B() as b:
+            #     SUITE
+            #
+            # is semantically equivalent to:
+            #
+            # with A() as a:
+            #     with B() as b:
+            #         SUITE
 
-            arg = expr_context.convert_expression_ast(ast.items[0].context_expr)
+            # .exception_occurred indicates if any exception has occurred
+            # .control_flow indicates the control flow instruction that is deferred until after the '__exit__'
+            #   0=default, 1=unhandled exception, 2=break, 3=continue, 4=return
+            # .exception_tuple stores exc_info, if needed
+            exception_occurred = native_ast.Expression.StackSlot(name=f".exception_occurred{ast.line_number}", type=native_ast.Bool)
+            control_flow = native_ast.Expression.StackSlot(name=f".control_flow{ast.line_number}", type=native_ast.Int64)
+            exception_tuple = native_ast.Expression.StackSlot(
+                name=f".exception_tuple{ast.line_number}",
+                type=typeWrapper(Tuple(object, object, object)).layoutType
+            )
 
-            if arg is None:
-                return expr_context.finalize(None, exceptionsTakeFrom=ast), False
+            enter_context = ExpressionConversionContext(self, variableStates)
 
-            withResponse = arg.convert_context_manager_enter()
+            item = enter_context.convert_expression_ast(ast.items[0].context_expr)
+            if item is None:
+                return enter_context.finalize(None, exceptionsTakeFrom=ast), False
+            item_var = f".item{ast.line_number}"
+            self.assignToLocalVariable(item_var, item, variableStates)
 
-            if withResponse is None:
-                return expr_context.finalize(None, exceptionsTakeFrom=ast), False
+            item_enter = self.localVariableExpression(enter_context, item_var).convert_context_manager_enter()
+            if item_enter is None:
+                return enter_context.finalize(None, exceptionsTakeFrom=ast), False
 
-            true, true_returns = self.convert_statement_list_ast(ast.body, variableStates)
+            body_context = ExpressionConversionContext(self, variableStates)
+            v = ast.items[0].optional_vars
+            if v is not None:
+                self.assignToLocalVariable(v.id, item_enter.changeContext(body_context), variableStates)
+            body, body_returns = self.convert_statement_list_ast(
+                ast.body, variableStates, in_loop=in_loop, return_to=f"exit{ast.line_number}", try_flow=control_flow
+            )
+
+            cond_context = ExpressionConversionContext(self, variableStates)
+            cond_context.pushEffect(runtime_functions.fetch_exception_tuple.call(exception_tuple.elemPtr(0).cast(native_ast.VoidPtr)))
+            t = TypedExpression(cond_context, exception_tuple, typeWrapper(Tuple(object, object, object)), True)
+            item_exit = self.localVariableExpression(cond_context, item_var).convert_context_manager_exit(
+                [t.convert_getitem(cond_context.constant(0)),
+                 t.convert_getitem(cond_context.constant(1)),
+                 t.convert_getitem(cond_context.constant(2))]
+            )
+            if item_exit is None:
+                return cond_context.finalize(None, exceptionsTakeFrom=ast), False
+            item_exit = item_exit.toBool()
+
+            handler_context = ExpressionConversionContext(self, variableStates)
+            handler = native_ast.Expression.TryCatch(
+                expr=native_ast.Expression.Branch(
+                    cond=cond_context.finalize(item_exit.nonref_expr, exceptionsTakeFrom=ast),
+                    true=control_flow.store(native_ast.const_int_expr(0)),
+                    false=control_flow.store(native_ast.const_int_expr(1))
+                ),
+                handler=control_flow.store(native_ast.const_int_expr(1))
+                >> runtime_functions.catch_exception.call()
+            )
+
+            complete = exception_occurred.store(native_ast.falseExpr) \
+                >> control_flow.store(native_ast.const_int_expr(0)) \
+                >> enter_context.finalize(None) \
+                >> native_ast.Expression.TryCatch(
+                    expr=body_context.finalize(body),
+                    handler=exception_occurred.store(native_ast.trueExpr)
+                    >> handler_context.finalize(handler)
+            ).withReturnTargetName(f"exit{ast.line_number}")
 
             exit_context = ExpressionConversionContext(self, variableStates)
-
-            arg.changeContext(exit_context).convert_context_manager_exit(
+            item_exit = self.localVariableExpression(exit_context, item_var).convert_context_manager_exit(
                 [exit_context.constant(None) for _ in range(3)]
             )
+            if item_exit is None:
+                return exit_context.finalize(None, exceptionsTakeFrom=ast), False
 
-            return (
-                native_ast.Expression.Finally(
-                    expr=expr_context.finalize(true, exceptionsTakeFrom=ast),
-                    teardowns=[native_ast.Teardown.Always(
-                        expr=exit_context.finalize(None, exceptionsTakeFrom=ast)
-                    )]
-                ),
-                true_returns
+            complete = complete >> native_ast.Expression.Branch(
+                cond=exception_occurred.load(),
+                false=exit_context.finalize(None, exceptionsTakeFrom=ast)
             )
+
+            if self.isLocalVariable(".return_value"):
+                return_context = ExpressionConversionContext(self, variableStates)
+                rtn, _ = self.convert_statement_ast(
+                    python_ast.Statement.Return(
+                        value=python_ast.Expr.Name(id=".return_value"), filename="", line_number=0, col_offset=0
+                    ),
+                    variableStates,
+                    in_loop=in_loop,
+                    return_to=return_to,
+                    try_flow=try_flow
+                )
+
+                complete = complete >> native_ast.Expression.Branch(
+                    cond=control_flow.load().eq(4),
+                    true=return_context.finalize(rtn)
+                )
+
+            if in_loop:
+                break_context = ExpressionConversionContext(self, variableStates)
+                brk, _ = self.convert_statement_ast(
+                    python_ast.Statement.Break(filename="", line_number=0, col_offset=0),
+                    variableStates,
+                    in_loop=in_loop,
+                    return_to=return_to,
+                    try_flow=try_flow
+                )
+                complete = complete >> native_ast.Expression.Branch(
+                    cond=control_flow.load().eq(2),
+                    true=break_context.finalize(brk)
+                )
+
+                cont_context = ExpressionConversionContext(self, variableStates)
+                cont, _ = self.convert_statement_ast(
+                    python_ast.Statement.Continue(filename="", line_number=0, col_offset=0),
+                    variableStates,
+                    in_loop=in_loop,
+                    return_to=return_to,
+                    try_flow=try_flow
+                )
+                complete = complete >> native_ast.Expression.Branch(
+                    cond=control_flow.load().eq(3),
+                    true=cont_context.finalize(cont)
+                )
+
+            raise_context = ExpressionConversionContext(self, variableStates)
+            raise_context.pushExceptionObject(None)
+            complete = complete >> native_ast.Expression.Branch(
+                cond=control_flow.load().eq(1),
+                true=raise_context.finalize(None)
+            )
+
+            return complete, True
 
         if ast.matches.Break:
             # for the moment, we have to pretend as if the 'break' did return control flow,
             # or else a while loop that always ends in break/continue will look like it doesn't
             # return, when in fact it does.
-            return native_ast.Expression.Return(
-                blockName="loop_break"
-            ), True
+            if return_to is not None:
+                if try_flow:
+                    return try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_BREAK)) \
+                        >> runtime_functions.clear_exc_info.call() \
+                        >> native_ast.Expression.Return(blockName=return_to), True
+                else:
+                    return native_ast.Expression.Return(blockName=return_to), True
+            else:
+                return native_ast.Expression.Return(blockName="loop_break"), True
 
         if ast.matches.Continue:
             # for the moment, we have to pretend as if the 'continue' did return control flow,
             # or else a while loop that always ends in break/continue will look like it doesn't
             # return, when in fact it does.
-            return native_ast.Expression.Return(
-                blockName="loop_continue"
-            ), True
+            if return_to is not None:
+                if try_flow:
+                    return try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_CONTINUE)) \
+                        >> runtime_functions.clear_exc_info.call() \
+                        >> native_ast.Expression.Return(blockName=return_to), True
+                else:
+                    return native_ast.Expression.Return(blockName=return_to), True
+            else:
+                return native_ast.Expression.Return(blockName="loop_continue"), True
 
         if ast.matches.Assert:
             expr_context = ExpressionConversionContext(self, variableStates)
@@ -1376,7 +1745,9 @@ class FunctionConversionContext(object):
     def convert_function_body(self, statements, variableStates: FunctionStackState):
         return self.convert_statement_list_ast(statements, variableStates, toplevel=True)
 
-    def convert_statement_list_ast(self, statements, variableStates: FunctionStackState, toplevel=False):
+    def convert_statement_list_ast(
+            self, statements, variableStates: FunctionStackState, toplevel=False, return_to=None, in_loop=False, try_flow=None
+    ):
         """Convert a sequence of statements to a native expression.
 
         After executing this statement, variableStates will contain the known states of the
@@ -1387,6 +1758,8 @@ class FunctionConversionContext(object):
             variableStates - a FunctionStackState object,
             toplevel - is this at the root of a function, so that flowing off the end should
                 produce a Return expression?
+            return_to - if any of these statements alter control flow (return, break, continue), this is the name of the
+                finally block that we should return to first
 
         Returns:
             a tuple (expr: native_ast.Expression, controlFlowReturns: bool) giving the result, and
@@ -1394,7 +1767,9 @@ class FunctionConversionContext(object):
         """
         exprAndReturns = []
         for s in statements:
-            expr, controlFlowReturns = self.convert_statement_ast(s, variableStates)
+            expr, controlFlowReturns = self.convert_statement_ast(
+                s, variableStates, return_to=return_to, in_loop=in_loop, try_flow=try_flow
+            )
 
             exprAndReturns.append((expr, controlFlowReturns))
 
@@ -1420,7 +1795,9 @@ class FunctionConversionContext(object):
                     python_ast.Statement.Return(
                         value=None, filename="", line_number=0, col_offset=0
                     ),
-                    variableStates
+                    variableStates,
+                    return_to=return_to,
+                    try_flow=try_flow
                 )
             )
 
