@@ -120,6 +120,52 @@ initialize_exception = externalCallTarget(
     Void.pointer()
 )
 
+initialize_exception_w_cause = externalCallTarget(
+    "np_initialize_exception_w_cause",
+    Void,
+    Void.pointer(),
+    Void.pointer()
+)
+
+clear_exception = externalCallTarget(
+    "np_clear_exception",
+    Void
+)
+
+clear_exc_info = externalCallTarget(
+    "np_clear_exc_info",
+    Void
+)
+
+match_exception = externalCallTarget(
+    "np_match_exception",
+    Bool,
+    Void.pointer()
+)
+
+match_given_exception = externalCallTarget(
+    "np_match_given_exception",
+    Bool,
+    Void.pointer(),
+    Void.pointer()
+)
+
+fetch_exception = externalCallTarget(
+    "np_fetch_exception",
+    Void.pointer()
+)
+
+catch_exception = externalCallTarget(
+    "np_catch_exception",
+    Void
+)
+
+fetch_exception_tuple = externalCallTarget(
+    "np_fetch_exception_tuple",
+    Void,
+    Void.pointer()
+)
+
 builtin_pyobj_by_name = externalCallTarget(
     "np_builtin_pyobj_by_name",
     Void.pointer(),
@@ -676,7 +722,7 @@ np_dir = externalCallTarget(
 
 pyobj_rlocktype_unlock = externalCallTarget(
     "np_pyobj_rlocktype_unlock",
-    Void,
+    Bool,
     Void.pointer()
 )
 
@@ -688,7 +734,7 @@ pyobj_rlocktype_lock = externalCallTarget(
 
 pyobj_locktype_unlock = externalCallTarget(
     "np_pyobj_locktype_unlock",
-    Void,
+    Bool,
     Void.pointer()
 )
 

@@ -16,13 +16,48 @@ import time
 import traceback
 import unittest
 from flaky import flaky
+import psutil
 
 from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class,
-    _types, Compiled, Dict, NoneType, Final, PythonObjectOfType
+    _types, Compiled, Dict, NoneType, Member, Final, PythonObjectOfType
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
+
+
+def result_or_exception(f, *p):
+    try:
+        return f(*p)
+    except Exception as e:
+        return type(e)
+
+
+def result_or_exception_str(f, *p):
+    try:
+        return f(*p)
+    except Exception as e:
+        return str(type(e)) + " " + str(e)
+
+
+# ad hoc transformation of specific error strings occurring during tests, for compatibility between python versions
+def emulate_older_errors(s):
+    return s.replace('TypeError: can only concatenate str (not "int") to str', 'TypeError: must be str, not int')
+
+
+def result_or_exception_tb(f, *p):
+    try:
+        return f(*p)
+    except BaseException as e:
+        return str(type(e)) + "\n" + emulate_older_errors(traceback.format_exc())
+
+
+def repeat_test(f, *a):
+    for i in range(10000):
+        try:
+            f(*a)
+        except Exception:
+            pass
 
 
 class TestCompilationStructures(unittest.TestCase):
@@ -776,9 +811,9 @@ class TestCompilationStructures(unittest.TestCase):
         def testContinue(x):
             res = 0
             for i in x:
-                res += i
                 if i > len(x) / 2:
                     continue
+                res += i
 
             return res
 
@@ -1247,3 +1282,1281 @@ class TestCompilationStructures(unittest.TestCase):
 
         with NoPythonObjectTypes():
             f([1, 2, 3], 0, 2)
+
+    def test_try_simple(self):
+
+        def f0(x: int) -> str:
+            ret = "try "
+            try:
+                ret += str(1/x) + " "
+            except TypeError:
+                ret += "catch "
+            finally:
+                ret += "finally"
+            return ret
+
+        def f1(x: int) -> str:
+            ret = "try "
+            try:
+                ret += str(1/x) + " "
+            except Exception:  # noqa: E722
+                raise NotImplementedError("custom")
+                ret += "catch "
+            finally:
+                ret += "finally"
+            return ret
+
+        def f2(x: int) -> str:
+            ret = "try "
+            try:
+                ret += str(1/x) + " "
+            except Exception:
+                ret += "catch "
+            finally:
+                ret += "finally"
+            return ret
+
+        def f3(x: int) -> str:
+            ret = "try "
+            try:
+                ret += str(1/x) + " "
+            except Exception:
+                ret += "catch "
+            return ret
+
+        def f4(x: int) -> str:
+            ret = "try "
+            try:
+                ret += str(1/x) + " "
+            except Exception:
+                ret += "catch "
+            else:
+                ret += "else "
+            return ret
+
+        def f5(x: int) -> str:
+            ret = "try "
+            try:
+                ret += str(1/x) + " "
+                if x == 1:
+                    ret += x
+            except ZeroDivisionError as ex:
+                ret += "catch1 " + str(type(ex))
+            except TypeError as ex:
+                ret += "catch2 " + str(type(ex))
+            except Exception:
+                ret += "catchdefault "
+            finally:
+                ret += "finally"
+            return ret
+
+        def f6(x: int) -> str:
+            ret = "try "
+            try:
+                ret += str(1/x) + " "
+                if x == 1:
+                    ret += x
+            except ArithmeticError:
+                ret += "catch1 "
+                # TODO: The compiled code will have type(ex) = ArithmeticError instead of ZeroDivisionError.
+                # TODO: Also, there are variations between interpreted and compiled code in the string representations of errors.
+            except TypeError as ex:
+                ret += "catch2 " + str(type(ex))
+            except Exception:
+                ret += "catchdefault "
+            finally:
+                ret += "finally"
+                return ret
+
+        def f7(x: int) -> str:
+            ret = "try "
+            try:
+                ret += str(1/x) + " "
+            except ZeroDivisionError as ex:
+                ret += "catch " + " " + str(ex) + " "
+            finally:
+                ret += "finally " + str(ex)  # noqa: F821
+                # Ensure that this is detected as error "variable 'ex' referenced before assignment" in compiled case
+            return ret
+
+        def f7a(x: int) -> str:
+            ex = "might be overwritten"
+            ret = "try "
+            try:
+                ret += str(1/x) + " "
+            except ZeroDivisionError as ex:
+                ret += "catch " + " " + str(ex) + " "
+            finally:
+                ret += "finally " + str(ex)
+                # Ensure that this is detected as error "variable 'ex' referenced before assignment" in compiled case
+            return ret
+
+        # TODO: support finally in situation where control flow exits try block
+        def f8(x: int) -> str:
+            ret = "start "
+            for i in [0, 1]:
+                ret += str(i) + " "
+                if i > x:
+                    try:
+                        ret += "try"
+                        if x < 10:
+                            break
+                    finally:
+                        ret += "finally"
+            return ret
+
+        def f9(x: int) -> int:
+            try:
+                t = 0
+                for i in range(10):
+                    t += i
+                    if i > x * 10:
+                        return t
+            finally:
+                t = 123
+            return t+1
+
+        def f10(x: int) -> int:
+            try:
+                t = 456
+                return t
+            finally:
+                t = 123
+            return t
+
+        def f11(x: int) -> int:
+            try:
+                if x == 0:
+                    return int(1/0)
+                elif x == 1:
+                    raise SyntaxError("aaa")
+            except Exception as e:
+                raise NotImplementedError("bbb") from e
+            return 0
+
+        def f12(x: int) -> int:
+            try:
+                if x == 0:
+                    return int(1/0)
+                elif x == 1:
+                    raise SyntaxError("aaa")
+            except Exception:
+                raise NotImplementedError("bbb") from None
+            return 0
+
+        def f13(x: int) -> int:
+            try:
+                return 111
+            finally:
+                return 222
+
+        def f14(x: int) -> str:
+            ret = "try "
+            try:
+                ret += str(1/x) + " "
+                if x == 1:
+                    ret += x
+            except SyntaxError:
+                ret += "catch1 "
+            except (TypeError, ArithmeticError):
+                ret += "catch2 "
+            except Exception:
+                ret += "catchdefault "
+            finally:
+                ret += "finally"
+                return ret
+
+        def f15(x: int) -> str:
+            ret = "begin "
+            try:
+                ret += "return "
+                ret += str(1/x) + " "
+                return ret
+            except Exception:
+                ret += "except "
+            finally:
+                ret += "finally "
+                return "But return this instead: " + ret
+
+        def f16(x: int) -> str:
+            ret = "begin "
+            try:
+                ret += "return "
+                ret += str(1/x) + " "
+                return ret
+            except Exception:
+                ret += "except "
+                return "Exception " + ret
+            finally:
+                ret += "finally "
+
+        def f17(x: int) -> str:
+            ret = "begin "
+            try:
+                ret += "return "
+                ret += str(1/(x-1)) + " " + str(1/x) + " "
+                return ret
+            except Exception:
+                ret += "except "
+                ret += str(1/x) + " "
+                return "Exception " + ret
+            finally:
+                ret += "finally "
+                return ret
+
+        def f18(x: int) -> int:
+            try:
+                return x
+            finally:
+                x += 1
+                return x
+
+        def f19(x: int) -> str:
+            try:
+                ret = "try "
+            except Exception:
+                ret = "exception "
+            else:
+                ret += "else "
+                return ret
+            finally:
+                if x == 0:
+                    return "override"
+
+        def f20(x: int) -> str:
+            try:
+                ret = "try "
+                if x < 10:
+                    return ret
+            except Exception:
+                ret = "exception "
+            else:
+                ret += "else "
+                return ret
+            finally:
+                if x == 0:
+                    return "override"
+
+        def f21(x: int) -> str:
+            ret = "start "
+            for i in [0, 1]:
+                ret += str(i) + " "
+                if i > x:
+                    try:
+                        ret += "try"
+                        break
+                    finally:
+                        return "override"
+            return ret
+
+        def f22(x: int) -> str:
+            ret = "start "
+            for i in [0, 1]:
+                ret += str(i) + " "
+                if i > x:
+                    try:
+                        ret += "try"
+                        if x < 10:
+                            return "try"
+                    finally:
+                        if x < 10:
+                            break
+            return ret
+
+        def f23(x: int) -> str:
+            ret = "start "
+            for i in [0, 1, 2]:
+                ret += str(i) + " "
+                try:
+                    ret += "try "
+                    if i == 0:
+                        continue
+                    ret += "looping "
+                finally:
+                    ret += "finally "
+                    if x == 1:
+                        return "override "
+            return ret
+
+        def f24(x: int) -> str:
+            ret = "start "
+            for i in [0, 1]:
+                ret += str(i) + " "
+                if i > x:
+                    try:
+                        ret += "try"
+                        return "try"
+                    finally:
+                        break
+            return ret
+
+        def f25(x: int) -> str:
+            ret = "start "
+            for i in [0, 1]:
+                ret += str(i) + " "
+                if i > x:
+                    try:
+                        ret += "try"
+                        ret += str(1/x)
+                    finally:
+                        break
+            return ret
+
+        # Assertion failure: not self.block.is_terminated
+        def t1(a: int) -> int:
+            try:
+                return 1
+            finally:
+                return 2
+
+        # compiles
+        def t2(a: int) -> int:
+            try:
+                if a == 1:
+                    return 1
+            finally:
+                return 2
+
+        # Assertion failure: not self.block.is_terminated
+        def t3(a: int) -> int:
+            try:
+                return 1
+            finally:
+                pass
+            return 3
+
+        # failure: [f14] Tuples of exceptions not supported yet.
+        # failures: [f15, f16, f17, f19, f20, f21, f22, f23, f24]
+
+        for f in [f0, f1, f2, f3, f4, f5, f6, f7, f7a, f8, f9, f10, f11, f12, f13, f18, f25]:
+            c_f = Compiled(f)
+            for v in [0, 1]:
+                r1 = result_or_exception_tb(f, v)
+                r2 = result_or_exception_tb(c_f, v)
+                self.assertEqual(r1, r2, (str(f), v))
+
+    @flaky(max_runs=5, min_passes=1)
+    def test_try_general(self):
+        def g1(a: int, b: int, c: int, d: int) -> str:
+            ret = "start "
+            try:
+                ret += "try " + str(a) + " "
+                if a == 1:
+                    ret += str(1/0)
+                elif a == 2:
+                    ret += a
+                elif a == 3:
+                    raise NotImplementedError("in body")
+                elif a == 4:
+                    return ret
+            except ArithmeticError:
+                ret += "catch1 " + str(b) + " "
+                if b == 1:
+                    ret += str(1/0)
+                elif b == 2:
+                    ret += b
+                elif b == 3:
+                    raise NotImplementedError("in handler")
+                elif b == 4:
+                    return ret
+                elif b == 5:
+                    raise
+                # TODO: The compiled code will have type(ex) = ArithmeticError instead of ZeroDivisionError.
+                # TODO: Also, there are variations between interpreted and compiled code in the string representations of errors.
+            except TypeError:
+                ret += "catch2 " + str(b) + " "
+                if b == 1:
+                    ret += str(1/0)
+                elif b == 2:
+                    ret += b
+                elif b == 3:
+                    raise NotImplementedError("in handler")
+                elif b == 4:
+                    return ret
+                elif b == 5:
+                    raise
+            except Exception:
+                ret += "catchdefault " + str(b) + " "
+                if b == 1:
+                    ret += str(1/0)
+                elif b == 2:
+                    ret += b
+                elif b == 3:
+                    raise NotImplementedError("in handler")
+                elif b == 4:
+                    return ret
+                elif b == 5:
+                    raise
+            else:
+                ret += "else " + str(c) + " "
+                if c == 1:
+                    ret += str(1/0)
+                elif c == 2:
+                    ret += b
+                elif c == 3:
+                    raise NotImplementedError("in else")
+                elif c == 4:
+                    return ret
+            finally:
+                ret += "finally " + str(d) + " "
+                if d == 1:
+                    ret += str(1/0)
+                elif d == 2:
+                    ret += b
+                elif d == 3:
+                    raise NotImplementedError("in finally")
+                elif d == 4:
+                    return ret
+            ret += "end "
+            return ret
+
+        def g2(a: int, b: int, c: int, d: int) -> str:
+            ret = "start "
+            for i in [1, 2, 3]:
+                try:
+                    ret += "try" + str(i) + ':' + str(a) + " "
+                    if a == 1:
+                        ret += str(1/0)
+                    elif a == 2:
+                        ret += a
+                    elif a == 3:
+                        break
+                    elif a == 4:
+                        continue
+                    elif a == 5:
+                        ret += "return within try "
+                        return ret
+                    ret += "a "
+                except ZeroDivisionError:
+                    ret += "except "
+                    if b == 1:
+                        ret += str(1/0)
+                    elif b == 2:
+                        ret += b
+                    elif b == 3:
+                        break
+                    elif b == 4:
+                        continue
+                    elif b == 5:
+                        ret += "return within except "
+                        return ret
+                    ret += "b "
+                else:
+                    ret += "else "
+                    if c == 1:
+                        ret += str(1/0)
+                    elif c == 2:
+                        ret += c
+                    elif c == 3:
+                        ret += "return within except "
+                        return ret
+                    ret += "c "
+                finally:
+                    ret += "finally "
+                    if d == 1:
+                        ret += str(1/0)
+                    elif d == 2:
+                        ret += d
+                    elif d == 3:
+                        ret += "return within finally "
+                        return ret
+                    ret += "d "
+            ret += "end"
+            return ret
+
+        def g3(x: int):
+            try:
+                if x == 1:
+                    raise SyntaxError()
+            finally:
+                if x == 1:
+                    raise NotImplementedError()
+
+        def g4(x: int):
+            try:
+                if x == 1:
+                    raise SyntaxError()
+            except Exception:
+                pass
+            finally:
+                pass
+
+        def g4a(x: int):
+            try:
+                if x == 1:
+                    raise SyntaxError()
+            except Exception as ex:
+                ex
+            finally:
+                pass
+
+        def g5(x: int) -> int:
+            t = x
+            for i in range(x+100):
+                t += i
+            return t
+
+        def g11(x: int) -> int:
+            try:
+                if x == 0:
+                    return int(1/0)
+                elif x == 1:
+                    raise SyntaxError("aaa")
+            except Exception as e:
+                raise NotImplementedError("bbb") from e
+            return 0
+
+        perf_test_cases = [
+            (g1, (3, 3, 0, 3), 2.0),
+            (g4, (1,), 2.0),
+            (g4, (0,), 2.0),
+            (g4a, (1,), 2.0),
+            (g4a, (0,), 2.0),
+            (g1, (0, 0, 0, 0), 2.0),
+            (g1, (0, 0, 0, 4), 2.0),
+            (g1, (4, 0, 0, 0), 2.0),
+            (g1, (3, 0, 0, 0), 2.0),
+            (g1, (3, 3, 0, 3), 2.0),
+            (g1, (3, 4, 0, 0), 2.0)
+        ]
+
+        for f, a, limit in perf_test_cases:
+            c_f = Compiled(f)
+            m0 = psutil.Process().memory_info().rss / 1024
+            t0 = time.time()
+            repeat_test(f, *a)
+            t1 = time.time()
+            m1 = psutil.Process().memory_info().rss / 1024
+            m2 = m1
+            t2 = time.time()
+            repeat_test(c_f, *a)
+            t3 = time.time()
+            m3 = psutil.Process().memory_info().rss / 1024
+
+            ratio = (t3 - t2) / (t1 - t0)
+            print(f"{f.__name__}{a}: compiled/interpreted is {ratio:.2%}.")
+
+            # performance is poor, so don't fail yet
+            # self.assertLessEqual(ratio, limit, (f.__name__, a))
+
+            # osx memory usage rises, but not others
+            self.assertLessEqual(m3 - m2, m1 - m0 + 512, (f.__name__, a))
+
+        for f in [g1]:
+            c_f = Compiled(f)
+            for a in [0, 1, 2, 3, 4]:
+                for b in [0, 1, 2, 3, 4, 5]:
+                    for c in [0, 1, 2, 3, 4]:
+                        for d in [0, 1, 2, 3, 4]:
+                            r1 = result_or_exception_tb(f, a, b, c, d)
+                            r2 = result_or_exception_tb(c_f, a, b, c, d)
+                            self.assertEqual(r1, r2, (str(f), a, b, c, d))
+        for f in [g2]:
+            c_f = Compiled(f)
+            for a in [0, 1, 2, 3, 4, 5]:
+                for b in [0, 1, 2, 3, 4, 5]:
+                    for c in [0, 1, 2, 3]:
+                        for d in [0, 1, 2, 3]:
+                            r1 = result_or_exception_tb(f, a, b, c, d)
+                            r2 = result_or_exception_tb(c_f, a, b, c, d)
+                            self.assertEqual(r1, r2, (str(f), a, b, c, d))
+
+    def test_try_nested(self):
+
+        def n1(x: int, y: int) -> str:
+            try:
+                ret = "try1 "
+                if x == 1:
+                    ret += str(1/0)
+                elif x == 2:
+                    ret += x
+                elif x == 3:
+                    raise NotImplementedError("try1")
+                elif x == 4:
+                    return ret
+                ret += str(x) + " "
+                try:
+                    ret += "try2 "
+                    if y == 1:
+                        ret += str(1/0)
+                    elif y == 2:
+                        ret += y
+                    elif y == 3:
+                        raise NotImplementedError("try2")
+                    elif y == 4:
+                        return ret
+                    ret += str(y) + " "
+                except ArithmeticError:
+                    ret += "catch1 "
+                finally:
+                    ret += "finally1 "
+            except TypeError as ex:
+                ret += "catch2 " + str(type(ex))
+            finally:
+                ret += "finally2"
+            return ret
+
+        def n2(x: int, y: int) -> str:
+            ret = "start "
+            i = 0
+            while i < 3:
+                i += 1
+                ret += "(" + str(i) + ": "
+                try:
+                    ret + "try1 "
+                    if x == 1:
+                        ret += str(1/0)
+                    elif x == 2:
+                        ret += x
+                    elif x == 3:
+                        raise NotImplementedError("try1")
+                    elif x == 4:
+                        break
+                    elif x == 5:
+                        continue
+                    elif x == 6:
+                        return ret
+                    ret += str(x) + " "
+                    try:
+                        ret += "try2 "
+                        if y == 1:
+                            ret += str(1/0)
+                        elif y == 2:
+                            ret += y
+                        elif y == 3:
+                            raise NotImplementedError("try2")
+                        elif y == 4:
+                            break
+                        elif y == 5:
+                            continue
+                        elif y == 6:
+                            return ret
+                        ret += str(y) + " "
+                    except ArithmeticError:
+                        ret += "catch1 "
+                    finally:
+                        ret += "finally1 "
+                except TypeError as ex:
+                    ret += "catch2 " + str(type(ex))
+                finally:
+                    ret += "finally2 "
+                ret += ") "
+            ret += "done "
+            return ret
+
+        for f in [n1]:
+            c_f = Compiled(f)
+            for a in [0, 1, 2, 3, 4]:
+                for b in [0, 1, 2, 3, 4]:
+                    r1 = result_or_exception_tb(f, a, b)
+                    r2 = result_or_exception_tb(c_f, a, b)
+                    self.assertEqual(r1, r2, (str(f), a, b))
+        for f in [n2]:
+            c_f = Compiled(f)
+            for a in [0, 1, 2, 3, 4, 5, 6]:
+                for b in [0, 1, 2, 3, 4, 5, 6]:
+                    r1 = result_or_exception_tb(f, a, b)
+                    r2 = result_or_exception_tb(c_f, a, b)
+                    self.assertEqual(r1, r2, (str(f), a, b))
+
+    def test_try_reraise(self):
+
+        # Test reraise directly in exception handler
+        def reraise1(a: int, b: int) -> str:
+            ret = "start "
+            try:
+                if a == 1:
+                    ret += str(1/0)
+                elif a == 2:
+                    ret += a
+            except Exception:
+                ret += "caught "
+                if b == 1:
+                    raise
+            ret += "end"
+            return ret
+
+        # Test reraise in function called by exception handler
+        def reraise2(a: int, b: int) -> str:
+            ret = "start "
+            try:
+                if a == 1:
+                    ret += str(1/0)
+                elif a == 2:
+                    ret += a
+            except Exception:
+                ret += reraise(b)
+            ret += "end"
+            return ret
+
+        # Test if reraise is possible if 'try' is interpreted but 'raise' is compiled.
+        # Might be unlikely, but ensures we are following the language rules.
+        def reraise0(a: int, b: int) -> str:
+            ret = "start "
+            try:
+                if a == 1:
+                    ret += str(1/0)
+                elif a == 2:
+                    ret += a
+            except Exception:
+                ret += Compiled(reraise)(b)
+            ret += "end"
+            return ret
+
+        def reraise(b: int) -> str:
+            if b == 1:
+                raise
+            return "caught "
+
+        # Test raise outside of handler
+        # TODO: traceback is different in this case.  Usually 'raise' does not get a traceback line, but in this case it does.
+        c_reraise = Compiled(reraise)
+        for b in [0, 1]:
+            r1 = result_or_exception_str(reraise, b)
+            r2 = result_or_exception_str(c_reraise, b)
+            self.assertEqual(r1, r2, b)
+
+        # Test raise inside handler
+        c_reraise1 = Compiled(reraise1)
+        c_reraise2 = Compiled(reraise2)
+        for a in [0, 1, 2]:
+            for b in [0, 1]:
+                # functional results should be the same for all 3 functions, compiled or interpreted
+                r0 = result_or_exception(reraise0, a, b)
+                r1 = result_or_exception(reraise1, a, b)
+                r2 = result_or_exception(c_reraise1, a, b)
+                r3 = result_or_exception(reraise2, a, b)
+                r4 = result_or_exception(c_reraise2, a, b)
+                self.assertEqual(r0, r1, (a, b))
+                self.assertEqual(r0, r2, (a, b))
+                self.assertEqual(r0, r3, (a, b))
+                self.assertEqual(r0, r4, (a, b))
+                # tracebacks should be the same for each function, compiled or interpreted
+                r1 = result_or_exception_tb(reraise1, a, b)
+                r2 = result_or_exception_tb(c_reraise1, a, b)
+                r3 = result_or_exception_tb(reraise2, a, b)
+                r4 = result_or_exception_tb(c_reraise2, a, b)
+                self.assertEqual(r1, r2, (a, b))
+                self.assertEqual(r3, r4, (a, b))
+
+    def test_context_manager_functionality(self):
+
+        class ConMan1():
+            def __init__(self, a, b, c, t):
+                self.a = a
+                self.b = b
+                self.c = c
+                self.t = t  # trace
+
+            def __enter__(self):
+                self.t.append("__enter__")
+                if self.a == 1:
+                    self.t.append("raise in __enter__")
+                    raise SyntaxError()
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                self.t.append(f"__exit__ {str(exc_type)} {exc_val}")
+                if self.b == 1:
+                    self.t.append("raise in __exit__")
+                    raise NotImplementedError()
+                self.t.append(f"__exit__ returns {self.c == 1}")
+                return self.c == 1
+
+        class ConMan2(Class, Final):
+            a = Member(int)
+            b = Member(int)
+            c = Member(int)
+            t = Member(ListOf(str))
+
+            def __init__(self, a: int, b: int, c: int, t: ListOf(str)):
+                self.a = a
+                self.b = b
+                self.c = c
+                self.t = t
+
+            def __enter__(self):
+                self.t.append("__enter__")
+                if self.a == 1:
+                    self.t.append("raise in __enter__")
+                    raise SyntaxError()
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                self.t.append(f"__exit__ {str(exc_type)} {exc_val}")
+                if self.b == 1:
+                    self.t.append("raise in __exit__")
+                    raise NotImplementedError()
+                self.t.append(f"__exit__ returns {self.c == 1}")
+                return self.c == 1
+
+        def with_cm_simple1(a, b, c, d, t) -> int:
+            t.append("start")
+            with ConMan1(a, b, c, t):
+                t.append("body")
+                if d == 1:
+                    t.append("raise")
+                    raise ZeroDivisionError()
+                elif d == 2:
+                    t.append("return1")
+                    return 1
+            t.append("return2")
+            return 2
+
+        def with_cm_simple2(a: int, b: int, c: int, d: int, t: ListOf(str)) -> int:
+            t.append("start")
+            with ConMan2(a, b, c, t):
+                t.append("body")
+                if d == 1:
+                    t.append("raise")
+                    raise ZeroDivisionError()
+                elif d == 2:
+                    t.append("return1")
+                    return 1
+            t.append("return2")
+            return 2
+
+        def with_cm_simple_mixed(a: int, b: int, c: int, d: int, t: ListOf(str)) -> int:
+            t.append("start")
+            with ConMan1(a, b, c, t):
+                t.append("body")
+                if d == 1:
+                    t.append("raise")
+                    raise ZeroDivisionError()
+                elif d == 2:
+                    t.append("return1")
+                    return 1
+            t.append("return2")
+            return 2
+
+        def with_cm_nested1(a, b, c, d, e, f, g, h, t) -> int:
+            t.append("start")
+            with ConMan1(a, b, c, t) as x:
+                t.append(f"outerbody {x.a} {x.b} {x.c}")
+                with ConMan1(e, f, g, t) as y:
+                    t.append(f"innerbody {y.a} {y.b} {y.c}")
+                    if h == 1:
+                        t.append("innerraise")
+                        raise FileNotFoundError()
+                    elif h == 2:
+                        t.append("innerreturn3")
+                        return 3
+                if d == 1:
+                    t.append("outerraise")
+                    raise ZeroDivisionError()
+                elif d == 2:
+                    t.append("outerreturn1")
+                    return 1
+            t.append("return2")
+            return 2
+
+        def with_cm_nested2(a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: int, t: ListOf(str)) -> int:
+            t.append("start")
+            with ConMan2(a, b, c, t) as x:
+                t.append(f"outerbody {x.a} {x.b} {x.c}")
+                with ConMan2(e, f, g, t) as y:
+                    t.append(f"innerbody {y.a} {y.b} {y.c}")
+                    if h == 1:
+                        t.append("innerraise")
+                        raise FileNotFoundError()
+                    elif h == 2:
+                        t.append("innerreturn3")
+                        return 3
+                if d == 1:
+                    t.append("outerraise")
+                    raise ZeroDivisionError()
+                elif d == 2:
+                    t.append("outerreturn1")
+                    return 1
+            t.append("return2")
+            return 2
+
+        def with_no_enter() -> str:
+            not_a_cm = "not a context manager"
+            with not_a_cm:
+                pass
+            return "done"
+
+        class EnterWrongSignature(Class, Final):
+            def __enter__(self, x):
+                return self
+
+            def __exit__(self, x, y, z):
+                return True
+
+        def with_enter_wrong_sig() -> str:
+            with EnterWrongSignature():
+                pass
+            return "done"
+
+# Note difference in error string, depending on definition of __exit__, even though it is an '__enter__' error.
+
+# >>> class EnterWrongSignature1():
+# ...     def __enter__(self, x):
+# ...             return self
+# ...     def __exit__(self):
+# ...             return True
+# ...
+# >>> with EnterWrongSignature1():
+# ...     pass
+# ...
+# Traceback (most recent call last):
+#   File "<stdin>", line 1, in <module>
+# TypeError: __enter__() missing 1 required positional argument: 'x'
+
+# >>> class EnterWrongSignature2():
+# ...     def __enter__(self, x):
+# ...             return self
+# ...
+# >>> with EnterWrongSignature2():
+# ...     pass
+# ...
+# Traceback (most recent call last):
+#   File "<stdin>", line 1, in <module>
+# AttributeError: __exit__
+
+        class ExitWrongSignature(Class, Final):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, x: int):
+                return self
+
+        def with_exit_wrong_sig(a: int) -> str:
+            with ExitWrongSignature():
+                if a == 1:
+                    raise SyntaxError()
+            return "done"
+
+        class EnterNoExit(Class, Final):
+            def __enter__(self):
+                return self
+
+        def with_no_exit(a: int) -> str:
+            with EnterNoExit():
+                if a == 1:
+                    raise SyntaxError()
+                elif a == 2:
+                    return "return inside with"
+            return "done"
+
+        def with_cm_loop1(a, b, c, d, t) -> int:
+            t.append("start")
+            for i in range(3):
+                t.append(f"{i}:")
+                with ConMan1(a, b, c, t):
+                    t.append("body")
+                    if d == 1 and i == 1:
+                        t.append("raise")
+                        raise ZeroDivisionError()
+                    elif d == 2 and i == 1:
+                        t.append("break")
+                        break
+                    elif d == 3 and i == 1:
+                        t.append("continue")
+                        continue
+                    elif d == 4 and i == 1:
+                        t.append("return1")
+                        return 1
+                    t.append("end of body")
+            t.append("return2")
+            return 2
+
+        def with_cm_loop2(a: int, b: int, c: int, d: int, t: ListOf(str)) -> int:
+            t.append("start")
+            for i in range(3):
+                t.append(f"{i}:")
+                with ConMan2(a, b, c, t):
+                    t.append("body")
+                    if d == 1 and i == 1:
+                        t.append("raise")
+                        raise ZeroDivisionError()
+                    elif d == 2 and i == 1:
+                        t.append("break")
+                        break
+                    elif d == 3 and i == 1:
+                        t.append("continue")
+                        continue
+                    elif d == 4 and i == 1:
+                        t.append("return1")
+                        return 1
+                    t.append("end of body")
+            t.append("return2")
+            return 2
+
+        c_with_enter_wrong_sig = Compiled(with_enter_wrong_sig)
+        r1 = result_or_exception(with_enter_wrong_sig)
+        r2 = result_or_exception(c_with_enter_wrong_sig)
+        # both are TypeError, but string description is different
+        self.assertEqual(r1, r2)
+
+        c_with_exit_wrong_sig = Compiled(with_exit_wrong_sig)
+        r1 = result_or_exception(with_exit_wrong_sig)
+        r2 = result_or_exception(c_with_exit_wrong_sig)
+        # both are TypeError, but string description is different
+        self.assertEqual(r1, r2)
+
+        c_with_no_enter = Compiled(with_no_enter)
+        r1 = result_or_exception_tb(with_no_enter)
+        r2 = result_or_exception_tb(c_with_no_enter)
+        self.assertEqual(r1, r2)
+
+        c_with_no_exit = Compiled(with_no_exit)
+        for a in [0, 1, 2]:
+            r1 = result_or_exception_tb(with_no_exit, a)
+            r2 = result_or_exception_tb(c_with_no_exit, a)
+            self.assertEqual(r1, r2, a)
+
+        for a in [0, 1]:
+            for b in [0, 1]:
+                for c in [0, 1]:
+                    for d in [0, 1, 2]:
+                        t1 = []
+                        r1 = result_or_exception(with_cm_simple1, a, b, c, d, t1)
+                        t2 = ListOf(str)([])
+                        r2 = result_or_exception(Compiled(with_cm_simple2), a, b, c, d, t2)
+                        self.assertEqual(r1, r2, (a, b, c, d))
+                        self.assertEqual(t1, t2, (a, b, c, d))
+                        t3 = ListOf(str)([])
+                        r3 = result_or_exception(Compiled(with_cm_simple_mixed), a, b, c, d, t3)
+                        self.assertEqual(r1, r3, (a, b, c, d))
+                        self.assertEqual(t1, t3, (a, b, c, d))
+
+        for a in [0, 1]:
+            for b in [0, 1]:
+                for c in [0, 1]:
+                    for d in [0, 1, 2, 3, 4]:
+                        t1 = []
+                        r1 = result_or_exception(with_cm_loop1, a, b, c, d, t1)
+                        t2 = ListOf(str)([])
+                        r2 = result_or_exception(Compiled(with_cm_loop2), a, b, c, d, t2)
+                        self.assertEqual(r1, r2, (a, b, c, d))
+                        self.assertEqual(t1, t2, (a, b, c, d))
+
+        for a in [0, 1]:
+            for b in [0, 1]:
+                for c in [0, 1]:
+                    for d in [0, 1, 2]:
+                        for e in [0, 1]:
+                            for f in [0, 1]:
+                                for g in [0, 1]:
+                                    for h in [0, 1, 2]:
+                                        t1 = []
+                                        r1 = result_or_exception(with_cm_nested1, a, b, c, d, e, f, g, h, t1)
+                                        t2 = ListOf(str)([])
+                                        r2 = result_or_exception(Compiled(with_cm_nested2), a, b, c, d, e, f, g, h, t2)
+                                        self.assertEqual(r1, r2, (a, b, c, d))
+                                        self.assertEqual(t1, t2, (a, b, c, d))
+
+    def test_context_manager_perf(self):
+
+        class ConMan1():
+            def __init__(self, a, b, c):
+                self.a = a
+                self.b = b
+                self.c = c
+
+            def __enter__(self):
+                if self.a == 1:
+                    raise SyntaxError()
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                if self.b == 1:
+                    raise NotImplementedError()
+                return self.c == 1
+
+        class ConMan2(Class, Final):
+            a = Member(int)
+            b = Member(int)
+            c = Member(int)
+
+            def __init__(self, a: int, b: int, c: int):
+                self.a = a
+                self.b = b
+                self.c = c
+
+            def __enter__(self):
+                if self.a == 1:
+                    raise SyntaxError()
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                if self.b == 1:
+                    raise NotImplementedError()
+                return self.c == 1
+
+        def with_cm_simple1(a, b, c, d) -> int:
+            with ConMan1(a, b, c):
+                if d == 1:
+                    raise ZeroDivisionError()
+                elif d == 2:
+                    return 1
+            return 2
+
+        def with_cm_simple2(a: int, b: int, c: int, d: int, t: ListOf(str)) -> int:
+            with ConMan2(a, b, c):
+                if d == 1:
+                    raise ZeroDivisionError()
+                elif d == 2:
+                    return 1
+            return 2
+
+        perf_test_cases = [
+            (with_cm_simple1, Compiled(with_cm_simple2), (0, 0, 0, 0), 1.0),
+            (with_cm_simple1, Compiled(with_cm_simple2), (0, 0, 0, 1), 1.0),
+            (with_cm_simple1, Compiled(with_cm_simple2), (0, 0, 1, 0), 1.0),
+            (with_cm_simple1, Compiled(with_cm_simple2), (0, 0, 1, 1), 1.0),
+            (with_cm_simple1, Compiled(with_cm_simple2), (0, 1, 0, 0), 1.0),
+            (with_cm_simple1, Compiled(with_cm_simple2), (1, 0, 0, 0), 1.0),
+        ]
+
+        for f1, f2, a, limit in perf_test_cases:
+            m0 = psutil.Process().memory_info().rss / 1024
+            t0 = time.time()
+            repeat_test(f1, *a)
+            t1 = time.time()
+            m1 = psutil.Process().memory_info().rss / 1024
+            m2 = m1
+            t2 = time.time()
+            repeat_test(f2, *a)
+            t3 = time.time()
+            m3 = psutil.Process().memory_info().rss / 1024
+
+            ratio = (t3 - t2) / (t1 - t0)
+            print(f"{f1.__name__}{a}: compiled/interpreted is {ratio:.2%}.")
+
+            # performance is poor, so don't compare yet
+            # self.assertLessEqual(ratio, limit, (f1.__name__, a))
+
+            self.assertLessEqual(m3 - m2, m1 - m0 + 512, (f1.__name__, a))
+
+    def test_context_manager_assignment(self):
+
+        class ConMan1():
+            def __init__(self, a, b, c, t):
+                self.a = a
+                self.b = b
+                self.c = c
+                self.t = t  # trace
+
+            def __enter__(self):
+                self.t.append("__enter__")
+                if self.a == 1:
+                    self.t.append("raise in __enter__")
+                    raise SyntaxError()
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                self.t.append(f"__exit__ {str(exc_type)}")
+                if self.b == 1:
+                    self.t.append("raise in __exit__")
+                    raise NotImplementedError()
+                self.t.append(f"__exit__ returns {self.c == 1}")
+                return self.c == 1
+
+        class ConMan2(Class, Final):
+            a = Member(int)
+            b = Member(int)
+            c = Member(int)
+            t = Member(ListOf(str))
+
+            def __init__(self, a: int, b: int, c: int, t: ListOf(str)):
+                self.a = a
+                self.b = b
+                self.c = c
+                self.t = t
+
+            def __enter__(self):
+                self.t.append("__enter__")
+                if self.a == 1:
+                    self.t.append("raise in __enter__")
+                    raise SyntaxError()
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                self.t.append(f"__exit__ {str(exc_type)}")
+                if self.b == 1:
+                    self.t.append("raise in __exit__")
+                    raise NotImplementedError()
+                self.t.append(f"__exit__ returns {self.c == 1}")
+                return self.c == 1
+
+        def with_cm_assign1(a, b, c, d, t) -> int:
+            t.append("start")
+            with ConMan1(a, b, c, t) as x:
+                t.append(f"body {x.a} {x.b} {x.c}")
+                if d == 1:
+                    t.append("raise")
+                    raise ZeroDivisionError()
+                elif d == 2:
+                    t.append("return1")
+                    return 1
+            t.append("return2")
+            return 2
+
+        def with_cm_assign2(a: int, b: int, c: int, d: int, t: ListOf(str)) -> int:
+            t.append("start")
+            with ConMan2(a, b, c, t) as x:
+                t.append(f"body {x.a} {x.b} {x.c}")
+                if d == 1:
+                    t.append("raise")
+                    raise ZeroDivisionError()
+                elif d == 2:
+                    t.append("return1")
+                    return 1
+            t.append("return2")
+            return 2
+
+        def with_cm_multiple1(a, b, c, d, e, f, g, h, t):
+            t.append("start")
+            with ConMan1(a, b, c, t) as x, ConMan1(e, f, g, t) as y:
+                t.append(f"body {x.a} {x.b} {x.c} {y.a} {y.b} {y.c}")
+                if d == 1 or h == 1:
+                    t.append("raise")
+                    raise ZeroDivisionError()
+                elif d == 2 or h == 2:
+                    t.append("return1")
+                    return 1
+            t.append("return2")
+            return 2
+
+        def with_cm_multiple2(a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: int, t: ListOf(str)):
+            t.append("start")
+            with ConMan2(a, b, c, t) as x, ConMan2(e, f, g, t) as y:
+                t.append(f"body {x.a} {x.b} {x.c} {y.a} {y.b} {y.c}")
+                if d == 1 or h == 1:
+                    t.append("raise")
+                    raise ZeroDivisionError()
+                elif d == 2 or h == 2:
+                    t.append("return1")
+                    return 1
+            t.append("return2")
+            return 2
+
+        for a in [0, 1]:
+            for b in [0, 1]:
+                for c in [0, 1]:
+                    for d in [0, 1, 2]:
+                        t1 = []
+                        r1 = result_or_exception(with_cm_assign1, a, b, c, d, t1)
+                        t2 = ListOf(str)([])
+                        r2 = result_or_exception(Compiled(with_cm_assign2), a, b, c, d, t2)
+                        self.assertEqual(r1, r2, (a, b, c, d))
+                        self.assertEqual(t1, t2, (a, b, c, d))
+
+        # TODO: support multiple context managers
+        # for a in [0]:
+        #     for b in [0]:
+        #         for c in [0]:
+        #             for d in [0]:
+        #                 for e in [0, 1]:
+        #                     for f in [0, 1]:
+        #                         for g in [0, 1]:
+        #                             for h in [0, 1, 2]:
+        #                                 t1 = []
+        #                                 r1 = result_or_exception(with_cm_multiple1, a, b, c, d, e, f, g, h, t1)
+        #                                 t2 = ListOf(str)([])
+        #                                 r2 = result_or_exception(Compiled(with_cm_multiple2), a, b, c, d, e, f, g, h, t2)
+        #                                 self.assertEqual(r1, r2, (a, b, c, d, e, f, g, h))
+        #                                 self.assertEqual(t1, t2, (a, b, c, d, e, f, g, h))

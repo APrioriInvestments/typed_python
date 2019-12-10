@@ -236,32 +236,192 @@ extern "C" {
     void np_initialize_exception(PythonObjectOfType::layout_type* layout) {
         PyEnsureGilAcquired getTheGil;
 
-        PyTypeObject* tp = layout->pyObj->ob_type;
-        bool hasBaseE = false;
+        PyObject* prevType;
+        PyObject* prevValue;
+        PyObject* prevTraceback;
+        PyErr_GetExcInfo(&prevType, &prevValue, &prevTraceback);
 
-        while (tp) {
-            if (tp == (PyTypeObject*)PyExc_BaseException) {
-                hasBaseE = true;
+        if (layout) {
+            PyTypeObject* tp = layout->pyObj->ob_type;
+            bool hasBaseE = false;
+
+            while (tp) {
+                if (tp == (PyTypeObject*)PyExc_BaseException) {
+                    hasBaseE = true;
+                }
+                tp = tp->tp_base;
             }
-            tp = tp->tp_base;
+
+            if (!hasBaseE) {
+                PyErr_Format(
+                    PyExc_TypeError,
+                    "exceptions must derive from BaseException, not %S",
+                    (PyObject*)layout->pyObj->ob_type
+                );
+
+                return;
+            }
+
+            if (prevValue) {
+                PyException_SetContext(layout->pyObj, prevValue);
+            }
+            decref(prevType);
+            decref(prevTraceback);
+            PyErr_Restore((PyObject*)incref(layout->pyObj->ob_type), incref(layout->pyObj), nullptr);
         }
+        else {
+            if (!prevValue) {
+                decref(prevType);
+                decref(prevValue);
+                decref(prevTraceback);
+                PyErr_SetString(PyExc_RuntimeError, "No active exception to reraise");
+                throw PythonExceptionSet();
+            }
+            PyErr_Restore(prevType, prevValue, prevTraceback);
+        }
+    }
 
-        if (!hasBaseE) {
-            PyErr_Format(
-                PyExc_TypeError,
-                "exceptions must derive from BaseException, not %S",
-                (PyObject*)layout->pyObj->ob_type
-            );
+    void np_initialize_exception_w_cause(
+            PythonObjectOfType::layout_type* layoutExc,
+            PythonObjectOfType::layout_type* layoutCause
+            ) {
+        PyEnsureGilAcquired getTheGil;
 
+        if (layoutExc) {
+            PyTypeObject* tp = layoutExc->pyObj->ob_type;
+            bool hasBaseE = false;
+
+            while (tp) {
+                if (tp == (PyTypeObject*)PyExc_BaseException) {
+                    hasBaseE = true;
+                }
+                tp = tp->tp_base;
+            }
+
+            if (!hasBaseE) {
+                PyErr_Format(
+                    PyExc_TypeError,
+                    "exceptions must derive from BaseException, not %S",
+                    (PyObject*)layoutExc->pyObj->ob_type
+                );
+
+                return;
+            }
+
+            PyException_SetCause(layoutExc->pyObj, layoutCause ? incref(layoutCause->pyObj) : NULL);
+            PyErr_Restore((PyObject*)incref(layoutExc->pyObj->ob_type), incref(layoutExc->pyObj), nullptr);
+        }
+        else {
+            PyObject* prevType;
+            PyObject* prevValue;
+            PyObject* prevTraceback;
+            PyErr_GetExcInfo(&prevType, &prevValue, &prevTraceback);
+
+            if (!prevValue) {
+                decref(prevType);
+                decref(prevValue);
+                decref(prevTraceback);
+                PyErr_SetString(PyExc_RuntimeError, "No active exception to reraise");
+                throw PythonExceptionSet();
+            }
+            PyException_SetCause(prevValue, layoutCause ? incref(layoutCause->pyObj) : NULL);
+            PyErr_Restore(prevType, prevValue, prevTraceback);
+        }
+    }
+
+    void np_clear_exception() {
+        PyEnsureGilAcquired getTheGil;
+        PyErr_Clear();
+    }
+
+    void np_clear_exc_info() {
+        PyEnsureGilAcquired getTheGil;
+        PyErr_SetExcInfo(NULL, NULL, NULL);
+    }
+
+    void np_fetch_exception_tuple(instance_ptr inst) {
+        PyEnsureGilAcquired getTheGil;
+
+        //PyErr_SetString(PyExc_TypeError, "specific value");
+        PyObject* type;
+        PyObject* value;
+        PyObject* traceback;
+        PyErr_Fetch(&type, &value, &traceback);
+        if (!value) {
             return;
         }
+        PyErr_NormalizeException(&type, &value, &traceback);
+        if (traceback) {
+            PyException_SetTraceback(value, traceback);
+        }
 
-        PyErr_Restore((PyObject*)incref(layout->pyObj->ob_type), incref(layout->pyObj), nullptr);
+        PyObject* p = PyTuple_New(3);
+        PyTuple_SetItem(p, 0, type ? type : incref(Py_None));
+        PyTuple_SetItem(p, 1, value ? value : incref(Py_None));
+        PyTuple_SetItem(p, 2, traceback ? traceback : incref(Py_None));
+
+        Type* return_type = Tuple::Make({PythonObjectOfType::AnyPyObject(), PythonObjectOfType::AnyPyObject(), PythonObjectOfType::AnyPyObject()});
+        PyInstance::copyConstructFromPythonInstance(return_type, inst, p, true);
+
+        // Since we've caught it, need to save it as the most recently caught exception.
+        PyErr_SetExcInfo(type, value, traceback);
+    }
+
+   bool np_match_exception(PyObject* exc) {
+        PyEnsureGilAcquired getTheGil;
+        return PyErr_ExceptionMatches(exc);
+    }
+
+    bool np_match_given_exception(PythonObjectOfType::layout_type* given, PyObject* exc) {
+        PyEnsureGilAcquired getTheGil;
+        return PyErr_GivenExceptionMatches(given->pyObj, exc);
+    }
+
+    // fetch = catch + return the caught exception
+    // This should be only called within an exception handler, so we know there
+    // is an exception waiting for us to fetch.
+    PythonObjectOfType::layout_type* np_fetch_exception() {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* type;
+        PyObject* value;
+        PyObject* traceback;
+
+        PyErr_Fetch(&type, &value, &traceback);
+        PyErr_NormalizeException(&type, &value, &traceback);
+        if (traceback) {
+            PyException_SetTraceback(value, traceback);
+        }
+
+        PythonObjectOfType::layout_type* ret = PythonObjectOfType::createLayout(value);
+
+        // Since we've caught it, need to save it as the most recently caught exception.
+        PyErr_SetExcInfo(type, value, traceback);
+
+        return ret;
+    }
+
+    // This should be only called within an exception handler, so we know there
+    // is an exception waiting for us to fetch.
+    void np_catch_exception() {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* type;
+        PyObject* value;
+        PyObject* traceback;
+
+        PyErr_Fetch(&type, &value, &traceback);
+        PyErr_NormalizeException(&type, &value, &traceback);
+        if (traceback) {
+            PyException_SetTraceback(value, traceback);
+        }
+
+        // Since we've caught it, need to save it as the most recently caught exception.
+        PyErr_SetExcInfo(type, value, traceback);
     }
 
     void np_add_traceback(const char* funcname, const char* filename, int lineno) {
         PyEnsureGilAcquired getTheGil;
-
         _PyTraceback_Add(funcname, filename, lineno);
     }
 
@@ -1108,10 +1268,11 @@ extern "C" {
         return true;
     }
 
-    void np_pyobj_locktype_unlock(PythonObjectOfType::layout_type* lockPtr) {
+    bool np_pyobj_locktype_unlock(PythonObjectOfType::layout_type* lockPtr) {
         PyThread_release_lock(
             ((np_lockobject_equivalent*)(lockPtr->pyObj))->lock_lock
         );
+        return false; // __exit__ returning false means don't suppress exceptions
     }
 
     typedef struct {
@@ -1160,7 +1321,7 @@ extern "C" {
         return true;
     }
 
-    void np_pyobj_rlocktype_unlock(PythonObjectOfType::layout_type* lockPtr) {
+    bool np_pyobj_rlocktype_unlock(PythonObjectOfType::layout_type* lockPtr) {
         np_lockobject_rlockobject* lockObj = (np_lockobject_rlockobject*)(lockPtr->pyObj);
 
         unsigned long tid = PyThread_get_thread_ident();
@@ -1175,6 +1336,7 @@ extern "C" {
             lockObj->rlock_owner = 0;
             PyThread_release_lock(lockObj->rlock_lock);
         }
+        return false; // __exit__ returning false means don't suppress exceptions
     }
 
     int64_t np_str_to_int64(StringType::layout* s) {

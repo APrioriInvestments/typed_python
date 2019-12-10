@@ -819,7 +819,19 @@ class FunctionConverter:
 
         if expr.matches.Return:
             if expr.blockName is not None:
-                assert expr.arg is None, expr.arg
+                # assert expr.arg is None, expr.arg
+                if expr.arg is not None:
+                    # write the value into the return slot
+                    arg = self.convert(expr.arg)
+
+                    if arg is None:
+                        # the expression threw an exception so we can't actually
+                        # return
+                        return
+
+                    if not self.output_type.matches.Void:
+                        assert self.return_slot is not None
+                        self.builder.store(arg.llvm_value, self.return_slot)
 
                 controlFlowSwitch = self.teardown_handler.controlFlowSwitchForReturn(name=expr.blockName)
 
@@ -1237,7 +1249,9 @@ class FunctionConverter:
             target_resume_block = self.builder.append_basic_block()
 
             if result is not None:
-                self.builder.branch(target_resume_block)
+                # TODO: revert this - it just lets me do some testing, but it's not correct in general
+                if not self.builder.block.is_terminated:
+                    self.builder.branch(target_resume_block)
 
             new_handler.generate_trycatch_unwind(target_resume_block, generator)
 
@@ -1281,7 +1295,7 @@ class FunctionConverter:
             if expr.name is not None:
                 finalBlock = self.builder.append_basic_block(self.teardown_handler.blockName() + "_resume")
 
-                if finally_result is not None:
+                if finally_result is not None and not self.builder.block.is_terminated:
                     self.builder.branch(finalBlock)
                 else:
                     # we didn't have a result, so the block we're on is already

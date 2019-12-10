@@ -1580,3 +1580,65 @@ class TestAlternativeCompilation(unittest.TestCase):
             callMethod2(A.Y(y=20), 10),
             Entrypoint(callMethod2)(A.Y(y=20), 10)
         )
+
+    @pytest.mark.skip(reason="not supported")
+    def test_context_manager(self):
+
+        def A_enter(self):
+            self.a.append("enter")
+            return "target"
+
+        def A_exit(self, exc_type, exc_val, exc_tb):
+            self.a.append("exit")
+            self.a.append(str(exc_type))
+            return True
+
+        A = Alternative("A", a={'a': ListOf(str)},
+                        __enter__=A_enter,
+                        __exit__=A_exit
+                        )
+
+        def f0(x: int) -> ListOf(str):
+            context_manager = A.a()
+            with context_manager:
+                context_manager.a.append(str(1 / x))
+            return context_manager.a
+
+        def f(x: int) -> ListOf(str):
+            context_manager = A.a()
+            with context_manager as v:
+                context_manager.a.append(v)
+                context_manager.a.append(str(1 / x))
+            return context_manager.a
+
+        class ConMan():
+            def __init__(self):
+                self.a = []
+
+            def __enter__(self):
+                self.a.append("Enter")
+                return "Target"
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                self.a.append("Exit")
+                if exc_type is not None:
+                    self.a.append(str(exc_type))
+                if exc_val is not None:
+                    self.a.append(str(exc_val))
+                if exc_tb is not None:
+                    self.a.append(str(exc_tb))
+                return True
+
+        def g(x: int) -> ListOf(str):
+            context_manager = ConMan()
+            with context_manager as v:
+                context_manager.a.append(v)
+                context_manager.a.append(str(1 / x))
+            return context_manager.a
+
+        for fn in [f, g]:
+            c_fn = Compiled(fn)
+            for v in [0, 1]:
+                r0 = fn(v)
+                r1 = c_fn(v)
+                self.assertEqual(r0, r1)
