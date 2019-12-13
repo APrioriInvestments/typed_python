@@ -291,6 +291,9 @@ class Wrapper(object):
         )
 
     def convert_unary_op(self, context, expr, op):
+        if op.matches.Not:
+            return self.convert_bool_cast(context, expr).convert_unary_op(op)
+
         return context.pushException(
             TypeError,
             "Can't apply unary op %s to type '%s'" % (op, expr.expr_type)

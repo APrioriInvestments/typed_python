@@ -423,3 +423,22 @@ class TestListOfCompilation(unittest.TestCase):
 
         x = ListOf(int)([])
         self.assertFalse(chkList(x))
+
+    def test_not_list(self):
+        @Compiled
+        def chkListInt(x: ListOf(int)):
+            return not x
+
+        x = ListOf(int)([])
+        self.assertTrue(chkListInt(x))
+        x.append(0)
+        self.assertFalse(chkListInt(x))
+
+        @Compiled
+        def chkListListInt(x: ListOf(ListOf(int))):
+            return not x
+
+        x = ListOf(ListOf(int))()
+        self.assertTrue(chkListListInt(x))
+        x.append(ListOf(int)())
+        self.assertFalse(chkListListInt(x))
