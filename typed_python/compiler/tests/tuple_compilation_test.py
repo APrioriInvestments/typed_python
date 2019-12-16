@@ -191,10 +191,29 @@ class TestTupleCompilation(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "convert from type Float64 to type List"):
             makeNtX(1.2)
 
-    def test_compiled_named_tuple(self):
+    def test_compile_make_named_tuple(self):
         @Entrypoint
         def makeNt(x, y):
             return makeNamedTuple(x=x, y=y)
 
         self.assertEqual(makeNt(1, 2), makeNamedTuple(x=1, y=2))
         self.assertEqual(makeNt(1, "2"), makeNamedTuple(x=1, y="2"))
+
+    def test_compiled_tuple_construction(self):
+        def makeNamed(x, y):
+            return NamedTuple(x=type(x), y=type(y))((x, y))
+
+        def makeUnnamed(x, y):
+            return Tuple(type(x), type(y))((x, y))
+
+        def check(f, x, y):
+            compiledRes = Entrypoint(f)(x, y)
+            interpRes = f(x, y)
+
+            self.assertEqual(compiledRes, interpRes)
+            self.assertEqual(type(compiledRes), type(interpRes))
+
+        check(makeNamed, 1, 2)
+        check(makeNamed, 1, "2")
+        check(makeUnnamed, 1, 2)
+        check(makeUnnamed, 1, "2")

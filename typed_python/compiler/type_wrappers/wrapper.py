@@ -457,6 +457,50 @@ class Wrapper(object):
     def convert_type_call(self, context, typeInst, args, kwargs):
         raise Exception(f"We can't call type {self.typeRepresentation} with args {args} and kwargs {kwargs}")
 
+    def convert_call_on_container_expression(self, context, inst, argExpr):
+        """Convert a case where we are calling x([...]) or similar.
+
+        We can't just convert expressions like (1, 2, 3) to containers directly because
+        we'd lose the information about what kind of object they are (they have to be
+        represented as 'list' or 'tuple' which loses the typing information). This is
+        especially true in the case of list and dict because they're mutable, so whatever
+        type information we thought we could infer isn't stable. So instead, we look
+        for cases where we can see that the resulting container is directly passed to a
+        type function and give it the chance to do something efficient if it knows
+        how to.
+
+        The default implementation simply renders the expression and calls 'self' with
+        it.
+
+        Args:
+            context - an ExpressionConversionContext
+            inst - a TypedExpression giving the instance being called.
+            argExpr - a python_ast.Expr object representing the expression we're converting
+        """
+        argVal = context.convert_expression_ast(argExpr)
+
+        if argVal is None:
+            return argVal
+
+        return inst.convert_call((argVal,), {})
+
+    def convert_type_call_on_container_expression(self, context, typeInst, argExpr):
+        """Like convert_call_on_container_expression, but on us as a TYPE.
+
+        Args:
+            context - an ExpressionConversionContext
+            typeInst - a TypedExpression giving the instance of the type object itself,
+                which we probably don't care about since most type objects are represented
+                as 'void' and have no actual instance information.
+            argExpr - a python_ast.Expr object representing the expression we're converting
+        """
+        argVal = context.convert_expression_ast(argExpr)
+
+        if argVal is None:
+            return argVal
+
+        return typeInst.convert_call((argVal,), {})
+
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         return context.pushException(
             TypeError,

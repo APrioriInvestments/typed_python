@@ -198,3 +198,17 @@ class TestTupleOfCompilation(unittest.TestCase):
         finalMem = psutil.Process().memory_info().rss / 1024 ** 2
 
         self.assertTrue(finalMem < initMem + 5)
+
+    def test_create_tuple_of_directly_from_list(self):
+        def makeT():
+            return TupleOf(int)([1, 2, 3, 4])
+
+        self.assertEqual(makeT(), Compiled(makeT)())
+        self.assertEqual(type(makeT()), type(Compiled(makeT)()))
+
+    def test_create_tuple_of_directly_from_tuple(self):
+        def makeT():
+            return TupleOf(int)((1, 2, 3, 4))
+
+        self.assertEqual(makeT(), Compiled(makeT)())
+        self.assertEqual(type(makeT()), type(Compiled(makeT)()))

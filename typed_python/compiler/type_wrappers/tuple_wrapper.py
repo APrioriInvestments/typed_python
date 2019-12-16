@@ -145,6 +145,43 @@ class TupleWrapper(Wrapper):
     def get_iteration_expressions(self, context, expr):
         return [self.refAs(context, expr, i) for i in range(len(self.subTypeWrappers))]
 
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        context.pushException(TypeError, f"Can't initialize {self.typeRepresentation} with this signature")
+        return
+
+    def convert_type_call_on_container_expression(self, context, typeInst, argExpr):
+        if not (argExpr.matches.Tuple or argExpr.matches.List):
+            return super().convert_type_call_on_container_expression(context, typeInst, argExpr)
+
+        if len(self.typeRepresentation.ElementTypes) != len(argExpr.elts):
+            context.pushException(TypeError, f"Wrong number of arguments to construct '{self.typeRepresentation}'")
+            return
+
+        args = []
+        for tupArg in argExpr.elts:
+            convertedArg = context.convert_expression_ast(tupArg)
+            if convertedArg is None:
+                return None
+            args.append(convertedArg)
+
+        typeConvertedArgs = []
+        for i in range(len(args)):
+            typeConvertedArg = args[i].convert_to_type(self.typeRepresentation.ElementTypes[i])
+            if typeConvertedArg is None:
+                return None
+            typeConvertedArgs.append(typeConvertedArg)
+
+        uninitializedTuple = context.allocateUninitializedSlot(self)
+
+        for i in range(len(args)):
+            uninitializedChildElement = self.refAs(context, uninitializedTuple, i)
+            uninitializedChildElement.convert_copy_initialize(typeConvertedArgs[i])
+
+        context.markUninitializedSlotInitialized(uninitializedTuple)
+
+        # the tuple is now initialized
+        return uninitializedTuple
+
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
         if not explicit:
             return super().convert_to_type_with_target(context, e, targetVal, explicit)

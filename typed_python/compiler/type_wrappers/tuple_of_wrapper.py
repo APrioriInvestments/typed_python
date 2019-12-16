@@ -347,6 +347,43 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
+    def convert_type_call_on_container_expression(self, context, typeInst, argExpr):
+        if not (argExpr.matches.Tuple or argExpr.matches.List):
+            return super().convert_type_call_on_container_expression(context, typeInst, argExpr)
+
+        # we're calling TupleOf(T) or ListOf(T) with an expression like [1, 2, 3, ...]
+
+        # first allocate something of the right size
+        aTup = PreReservedTupleOrList(self.typeRepresentation).convert_call(
+            context,
+            None,
+            (context.constant(len(argExpr.elts)),),
+            {}
+        )
+
+        # for each expression, push it onto the front and then update the
+        # size. We have to do it this way so that if we throw an exception
+        # in the middle of constructing the tuple, we teardown the intermediate
+        # tuple the right way.
+        for i in range(len(argExpr.elts)):
+            val = context.convert_expression_ast(argExpr.elts[i])
+            if val is None:
+                return None
+
+            aTup.convert_method_call(
+                "_initializeItemUnsafe",
+                (context.constant(i), val),
+                {}
+            )
+
+            aTup.convert_method_call(
+                "setSizeUnsafe",
+                (context.constant(i + 1),),
+                {}
+            )
+
+        return aTup
+
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
         if not explicit:
             return super().convert_to_type_with_target(context, e, targetVal, explicit)

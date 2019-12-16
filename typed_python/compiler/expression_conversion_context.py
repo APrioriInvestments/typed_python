@@ -929,6 +929,21 @@ class ExpressionConversionContext(object):
             if lhs is None:
                 return None
 
+            if len(ast.args) == 1 and len(ast.keywords) == 0:
+                arg = ast.args[0]
+
+                if (
+                    arg.matches.List
+                    or arg.matches.Tuple
+                    or arg.matches.Dict
+                    or arg.matches.Set
+                    or arg.matches.ListComp
+                    or arg.matches.GeneratorExp
+                    or arg.matches.DictComp
+                    or arg.matches.SetComp
+                ):
+                    return lhs.expr_type.convert_call_on_container_expression(self, lhs, arg)
+
             for a in ast.args:
                 assert not a.matches.Starred, "not implemented yet"
 

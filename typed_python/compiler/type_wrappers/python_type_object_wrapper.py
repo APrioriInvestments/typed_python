@@ -55,6 +55,13 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
         return typeRep
 
     @Wrapper.unwrapOneOfAndValue
+    def convert_call_on_container_expression(self, context, inst, argExpr):
+        if issubclass(self.typeRepresentation.Value, CompilableBuiltin):
+            return self.typeRepresentation.Value.convert_type_call_on_container_expression(context, inst, argExpr)
+
+        return typeWrapper(self.typeRepresentation.Value).convert_type_call_on_container_expression(context, inst, argExpr)
+
+    @Wrapper.unwrapOneOfAndValue
     def convert_call(self, context, left, args, kwargs):
         if self.typeRepresentation.Value is bool:
             return args[0].convert_bool_cast()
