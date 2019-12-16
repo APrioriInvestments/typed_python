@@ -17,6 +17,7 @@ import typed_python._types as _types
 import unittest
 import time
 import threading
+from flaky import flaky
 
 
 class TestDictCompilation(unittest.TestCase):
@@ -316,6 +317,7 @@ class TestDictCompilation(unittest.TestCase):
 
         print("Speedup was ", ratio)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_dict_read_write_perf_releases_gil(self):
         def dict_setmany(d, count, passes):
             for _ in range(passes):
