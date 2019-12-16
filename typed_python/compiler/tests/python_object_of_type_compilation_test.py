@@ -510,3 +510,35 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         self.assertEqual(f(1, 2), 8)
         self.assertEqual(g("a", "b"), False)
+
+    def test_create_lists(self):
+        @Compiled
+        def f():
+            return [1, 2, 3, 4]
+
+        res = f()
+        self.assertEqual(res, [1, 2, 3, 4])
+
+    def test_create_tuples(self):
+        @Compiled
+        def f():
+            return (1, 2, 3, 4)
+
+        res = f()
+        self.assertEqual(res, (1, 2, 3, 4))
+
+    def test_create_set(self):
+        @Compiled
+        def f():
+            return {1, 2, 3, 4}
+
+        res = f()
+        self.assertEqual(res, {1, 2, 3, 4})
+
+    def test_create_dict(self):
+        @Compiled
+        def f():
+            return {1: 2, "hi": "bye"}
+
+        res = f()
+        self.assertEqual(res, {1: 2, "hi": "bye"})

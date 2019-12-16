@@ -212,3 +212,10 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         self.assertEqual(makeT(), Compiled(makeT)())
         self.assertEqual(type(makeT()), type(Compiled(makeT)()))
+
+    def test_create_tuple_of_from_untyped(self):
+        def makeT(aList):
+            return TupleOf(int)(aList)
+
+        self.assertEqual(makeT([1, 2, 3, 4]), Compiled(makeT)([1, 2, 3, 4]))
+        self.assertEqual(makeT({1: 2}), Compiled(makeT)({1: 2}))

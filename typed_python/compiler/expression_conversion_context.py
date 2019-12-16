@@ -980,9 +980,6 @@ class ExpressionConversionContext(object):
 
             return lhs.convert_bin_op(ast.ops[0], r)
 
-        if ast.matches.Tuple:
-            raise NotImplementedError("not implemented yet")
-
         if ast.matches.IfExp:
             test = self.convert_expression_ast(ast.test)
             if test is None:
@@ -1045,6 +1042,58 @@ class ExpressionConversionContext(object):
                     return None
 
             return pythonObjectRepresentation(self, "").convert_method_call("join", (items_to_join,), {})
+
+        if ast.matches.List:
+            aList = self.constant(list).convert_call([], {})
+
+            for e in ast.elts:
+                eVal = self.convert_expression_ast(e)
+                if eVal is None:
+                    return None
+
+                aList.convert_method_call("append", (eVal,), {})
+
+            return aList
+
+        if ast.matches.Tuple:
+            aList = self.constant(list).convert_call([], {})
+
+            for e in ast.elts:
+                eVal = self.convert_expression_ast(e)
+                if eVal is None:
+                    return None
+
+                aList.convert_method_call("append", (eVal,), {})
+
+            return self.constant(tuple).convert_call([aList], {})
+
+        if ast.matches.Set:
+            aList = self.constant(set).convert_call([], {})
+
+            for e in ast.elts:
+                eVal = self.convert_expression_ast(e)
+                if eVal is None:
+                    return None
+
+                aList.convert_method_call("add", (eVal,), {})
+
+            return aList
+
+        if ast.matches.Dict:
+            aList = self.constant(dict).convert_call([], {})
+
+            for keyExpr, valExpr in zip(ast.keys, ast.values):
+                keyVal = self.convert_expression_ast(keyExpr)
+                if keyVal is None:
+                    return None
+
+                valVal = self.convert_expression_ast(valExpr)
+                if valVal is None:
+                    return None
+
+                aList.convert_method_call("__setitem__", (keyVal, valVal), {})
+
+            return aList
 
         raise ConversionException("can't handle python expression type %s" % ast.Name)
 
