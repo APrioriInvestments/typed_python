@@ -7,4 +7,4 @@ coverage:
       default:
         base: auto
         threshold: 0.5
-
+        informational: true
