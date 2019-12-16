@@ -29,8 +29,7 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
         return "TypeObject(%s)" % self.typeRepresentation.Value.__qualname__
 
     def convert_str_cast(self, context, instance):
-        typ = self.typedPythonTypeToRegularType(self.typeRepresentation.Value)
-        return context.constant(str(typ))
+        return context.constant(str(self.typeRepresentation.Value))
 
     @staticmethod
     def typedPythonTypeToRegularType(typeRep):
