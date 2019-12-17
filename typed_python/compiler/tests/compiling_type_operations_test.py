@@ -44,9 +44,44 @@ class TestCompilingTypeOperations(unittest.TestCase):
         ]:
             check(typ)
 
+    def test_type_of(self):
+        @Entrypoint
+        def f(x):
+            return type(x)
+
+        self.assertEqual(f(10), int)
+        self.assertEqual(f(10.5), float)
+        self.assertEqual(f(Int32(10)), Int32)
+
     def test_type_of_list_of_int(self):
         def f(x):
             return type(x).ElementType is Int64
 
         self.assertTrue(f(ListOf(int)()))
         self.assertTrue(Entrypoint(f)(ListOf(int)()))
+
+    def test_type_invalid_member_accesses(self):
+        @Entrypoint
+        def f():
+            ListOf(int).notAMember
+
+        with self.assertRaisesRegex(AttributeError, "has no attribute 'notAMember'"):
+            f()
+
+    def test_type_invalid_unbound_member_call(self):
+        @Entrypoint
+        def f():
+            ListOf(int).append(10)
+
+        with self.assertRaisesRegex(TypeError, "requires a '.*' object but received"):
+            f()
+
+    def test_type_valid_unbound_member_call(self):
+        @Entrypoint
+        def f(x):
+            ListOf(int).append(x, 10)
+
+        aList = ListOf(int)()
+        f(aList)
+
+        self.assertEqual(aList, [10])

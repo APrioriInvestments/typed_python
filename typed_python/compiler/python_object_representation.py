@@ -21,6 +21,7 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
+from typed_python.compiler.type_wrappers.method_descriptor_wrapper import MethodDescriptorWrapper
 from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 from typed_python.compiler.type_wrappers.module_wrapper import ModuleWrapper
 from typed_python.compiler.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
@@ -57,8 +58,12 @@ from types import ModuleType
 from typed_python._types import TypeFor, bytecount
 from typed_python import (
     Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16,
-    UInt8, Float64, Float32, Bool, String, Bytes, NoneType, makeNamedTuple
+    UInt8, Float64, Float32, Bool, String, Bytes, NoneType, makeNamedTuple,
+    ListOf
 )
+
+# the type of bound C methods on types.
+method_descriptor = type(ListOf(int).append)
 
 _type_to_type_wrapper_cache = {}
 
@@ -250,6 +255,14 @@ def pythonObjectRepresentation(context, f):
             context,
             native_ast.nullExpr,
             PythonFreeFunctionWrapper(f),
+            False
+        )
+
+    if isinstance(f, method_descriptor):
+        return TypedExpression(
+            context,
+            native_ast.nullExpr,
+            MethodDescriptorWrapper(f),
             False
         )
 
