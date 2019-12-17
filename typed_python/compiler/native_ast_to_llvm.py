@@ -597,20 +597,6 @@ class FunctionConverter:
 
             return TypedLLVMValue(value, native_ast.Type.Struct(names_and_types))
 
-        if expr.matches.Attribute:
-            val = self.convert(expr.left)
-            if val.native_type.matches.Struct:
-                attr = expr.attr
-                for i in range(len(val.native_type.element_types)):
-                    if val.native_type.element_types[i][0] == attr:
-                        return TypedLLVMValue(
-                            self.builder.extract_value(val.llvm_value, i),
-                            val.native_type.element_types[i][1]
-                        )
-                assert False, "Type %s doesn't have attribute %s" % (val.native_type, attr)
-            else:
-                assert False, "Can't take attribute on something of type %s" % val.native_type
-
         if expr.matches.StructElementByIndex:
             val = self.convert(expr.left)
             if val.native_type.matches.Struct:

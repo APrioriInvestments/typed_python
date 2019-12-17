@@ -273,8 +273,6 @@ def expr_str(self):
         return "(%s(%s))" % (str(self.op), str(self.operand))
     if self.matches.Variable:
         return self.name
-    if self.matches.Attribute:
-        return "(" + str(self.left) + ")." + self.attr
     if self.matches.ElementPtr:
         return "(" + str(self.left) + ").gep" + \
             "(" + ",".join(str(r) for r in self.offsets) + ")"
