@@ -429,7 +429,8 @@ class FunctionConversionContext(object):
             pass
         elif slot_ref.expr_type.is_pod:
             slot_ref.convert_copy_initialize(val_to_store)
-            subcontext.markVariableInitialized(varname)
+            if not variableStates.isDefinitelyInitialized(varname):
+                subcontext.markVariableInitialized(varname)
         else:
             if variableStates.isDefinitelyInitialized(varname):
                 slot_ref.convert_assign(val_to_store)
