@@ -306,7 +306,7 @@ class FunctionConversionContext(object):
         for name in self.variablesAssigned:
             # this is a variable in the function that we assigned to. we need to ensure that
             # the initializer flag is zero
-            if not self.variableIsAlwaysEmpty(name):
+            if not self.variableIsAlwaysEmpty(name) and name not in argnames:
                 context = ExpressionConversionContext(self, variableStates)
                 context.markVariableNotInitialized(name)
                 to_add.append(context.finalize(None))
@@ -349,6 +349,7 @@ class FunctionConversionContext(object):
                             )
                         )
                         context.markVariableInitialized(name)
+                        variableStates.variableAssigned(name, slot_type.typeRepresentation)
                     else:
                         # need to make a stackslot for this variable
                         var_expr = context.inputArg(slot_type, name)
