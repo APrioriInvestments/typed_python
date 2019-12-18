@@ -555,7 +555,17 @@ Arguments = Arguments.define(Alternative(
         "kw_defaults": TupleOf(Expr),
         "kwarg": OneOf(Arg, None),
         "defaults": TupleOf(Expr)
-    }
+    },
+    totalArgCount=lambda self:
+        len(self.args)
+        + (1 if self.vararg else 0)
+        + (1 if self.kwarg else 0)
+        + len(self.kwonlyargs),
+    argumentNames=lambda self:
+        [a.arg for a in self.args]
+        + ([self.vararg.arg] if self.vararg else [])
+        + [a.arg for a in self.kwonlyargs]
+        + ([self.kwarg.arg] if self.kwarg else [])
 ))
 
 Arg = Arg.define(Alternative(

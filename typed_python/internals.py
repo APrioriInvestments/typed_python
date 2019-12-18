@@ -245,6 +245,17 @@ def Function(f):
 
 class FunctionOverloadArg:
     def __init__(self, name, defaultVal, typeFilter, isStarArg, isKwarg):
+        """Initialize a single argument descriptor in a FunctionOverload
+
+        Args:
+            name (str) the actual name of the argument in the function
+            defaultVal - None or a tuple with one element containing the python value
+                specified as the default value for this argument
+            isStarArg (bool) - if True, then this is a '*arg', of which there can be
+                at most one.
+            isKwarg (bool) - if True, then this is a '**kwarg' of which there can be
+                at most one at the end of the signature.
+        """
         self.name = name
         self.defaultValue = defaultVal
         self._typeFilter = typeFilter
@@ -266,7 +277,7 @@ class FunctionOverloadArg:
     def __repr__(self):
         res = f"{self.name}: {self.typeFilter}"
         if self.defaultValue is not None:
-            res += " = " + str(self.defaultValue)
+            res += " = " + str(self.defaultValue[0])
         if self.isKwarg:
             res = "**" + res
         if self.isStarArg:
@@ -277,6 +288,15 @@ class FunctionOverloadArg:
 
 class FunctionOverload:
     def __init__(self, functionTypeObject, index, f, returnType):
+        """Initialize a FunctionOverload.
+
+        Args:
+            functionTypeObject - a _types.Function type object representing the function
+            index - the index within the _types.Function sequence of overloads we represent
+            f - the actual python function we're wrapping
+            returnType - the return type annotation, or None if None provided. (if None was
+                specified, that would be the NoneType)
+        """
         self.functionTypeObject = functionTypeObject
         self.index = index
 
@@ -287,6 +307,20 @@ class FunctionOverload:
     @property
     def name(self):
         return self.functionObj.__name__
+
+    def minPositionalCount(self):
+        for i in range(len(self.args)):
+            a = self.args[i]
+            if a.defaultValue or a.isStarArg or a.isKwarg:
+                return i
+        return len(self.args)
+
+    def maxPositionalCount(self):
+        for i in range(len(self.args)):
+            a = self.args[i]
+            if a.isStarArg:
+                return None
+        return len(self.args)
 
     def addArg(self, name, defaultVal, typeFilter, isStarArg, isKwarg):
         self.args = self.args + (FunctionOverloadArg(name, defaultVal, typeFilter, isStarArg, isKwarg),)

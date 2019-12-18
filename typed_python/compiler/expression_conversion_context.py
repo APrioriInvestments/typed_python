@@ -15,13 +15,16 @@
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
+import types
+
+from typed_python.internals import makeFunction, FunctionOverload
 from typed_python.compiler.function_stack_state import FunctionStackState
 from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.python_object_representation import pythonObjectRepresentation
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
-from typed_python import NoneType, Alternative, OneOf, Int32, ListOf, String
+from typed_python import NoneType, Alternative, OneOf, Int32, ListOf, String, Tuple, NamedTuple
 from typed_python._types import getTypePointer
 
 builtinValueIdToNameAndValue = {id(v): (k, v) for k, v in __builtins__.items()}
@@ -39,6 +42,7 @@ ExpressionIntermediate = Alternative(
 )
 
 _memoizedThingsById = {}
+_pyFuncToFuncCache = {}
 
 
 class ExpressionConversionContext(object):
@@ -97,7 +101,16 @@ class ExpressionConversionContext(object):
             )
         )
 
-    def constant(self, x):
+    def constant(self, x, allowArbitrary=False):
+        """Return a TypedExpression representing 'x'.
+
+        By default, we allow only simple constants that map directly into machine code,
+        builtins for which we have a definition, and types.
+
+        If 'allowArbitrary' then all other values will be memoized and held as PyObject*
+        in the generated code. Otherwise we'll throw an exception.
+        """
+
         if isinstance(x, str):
             return typed_python.compiler.type_wrappers.string_wrapper.StringWrapper().constant(self, x)
         if isinstance(x, bool):
@@ -581,17 +594,147 @@ class ExpressionConversionContext(object):
                 native_ast.CallTarget.Pointer(expr=funcPtr.cast(nativeFunType.pointer())).call(*native_args)
             )
 
-    def call_py_function(self, f, args, kwargs, returnTypeOverload=None):
-        if kwargs:
-            raise NotImplementedError("Kwargs not implemented for py-function dispatch yet")
+    def mapFunctionArguments(self, name, functionOverload: FunctionOverload, args, kwargs):
+        """Figure out how to call 'functionOverload' with 'args' and 'kwargs'.
 
-        call_target = self.functionContext.converter.convert(f, [a.expr_type for a in args], returnTypeOverload)
+        This takes care of doing things like mapping keyword arguments, default values, etc.
+
+        It does _not_ deal at all with types, so it's fine to use the typed-form of a non-typed
+        function.
+
+        This function may generate code to construct the relevant arguments.
+
+        Args:
+            functionOverload - a FunctionOverload we're trying to map to
+            args - a list of positional argument TypedExpression objects.
+            kwargs - a dict of keyword argument TypedExpression objects.
+
+        Returns:
+            If we can map, a list of TypedExpression objects mapping to
+            the argument names of the function, in the order that they appear.
+
+            Otherwise, None, and an exception will have been generated.
+        """
+        outArgs = []
+        curTargetIx = 0
+
+        minPositional = functionOverload.minPositionalCount()
+        maxPositional = functionOverload.maxPositionalCount()
+
+        if minPositional == maxPositional:
+            positionalMsg = f"{minPositional}"
+        else:
+            positionalMsg = f"from {minPositional} to {maxPositional}"
+
+        if args and not functionOverload.args:
+            self.pushException(
+                TypeError,
+                f"{name}() takes {positionalMsg} positional arguments but {len(args)} were given"
+            )
+            return
+
+        if kwargs and not functionOverload.args:
+            self.pushException(
+                TypeError,
+                f"{name}() got an unexpected keyword argument '{list(kwargs)[0]}'"
+            )
+            return
+
+        for a in args:
+            if functionOverload.args[curTargetIx].isStarArg:
+                if len(outArgs) <= curTargetIx:
+                    outArgs.append([a])
+                else:
+                    outArgs[-1].append(a)
+            else:
+                outArgs.append(a)
+                curTargetIx += 1
+
+                if curTargetIx > len(functionOverload.args):
+                    self.pushException(
+                        TypeError,
+                        f"{name}() takes {positionalMsg} positional arguments but {len(args)} were given"
+                    )
+                    return
+
+        unconsumedKwargs = dict(kwargs)
+
+        while len(outArgs) < len(functionOverload.args):
+            arg = functionOverload.args[len(outArgs)]
+
+            if arg.isStarArg:
+                outArgs.append([])
+            elif arg.isKwarg:
+                outArgs.append(unconsumedKwargs)
+                assert len(outArgs) == len(functionOverload.args)
+                unconsumedKwargs = {}
+            elif arg.name in kwargs:
+                outArgs.append(unconsumedKwargs[arg.name])
+                del unconsumedKwargs[arg.name]
+            elif arg.defaultValue is not None:
+                outArgs.append(self.constant(arg.defaultValue[0], allowArbitrary=True))
+            else:
+                self.pushException(
+                    TypeError,
+                    f"{name}() missing required positional argument: {arg.name}"
+                )
+                return
+
+        for argName in unconsumedKwargs:
+            self.pushException(TypeError, f"{name}() got an unexpected keyword argument '{argName}'")
+            return
+
+        for i in range(len(functionOverload.args)):
+            if functionOverload.args[i].isStarArg:
+                outArgs[i] = self.makeStarArgTuple(outArgs[i])
+                assert outArgs[i] is not None
+            elif functionOverload.args[i].isKwarg:
+                outArgs[i] = self.makeKwargDict(outArgs[i])
+
+        return outArgs
+
+    def makeStarArgTuple(self, tupleArgs):
+        """Produce the argument that will be passed to a *args argument.
+
+        Note that this version returns a typed tuple, which is not identical
+        to what the interpreter does which is return a normal tuple. Eventually
+        we should try to do better than this.
+
+        Args:
+            tupleArgs - a list of TypedExpression objects giving the arguments
+                that were packed into the tuple.
+
+        Returns:
+            a TypedExpression for the tuple
+        """
+        tupleType = Tuple(*[a.expr_type.typeRepresentation for a in tupleArgs])
+        return typeWrapper(tupleType).createFromArgs(self, tupleArgs)
+
+    def makeKwargDict(self, kwargs):
+        tupleType = NamedTuple(**{k: v.expr_type.typeRepresentation for k, v in kwargs.items()})
+
+        return typeWrapper(tupleType).convert_type_call(self, None, (), kwargs)
+
+    def call_py_function(self, f, args, kwargs, returnTypeOverload=None):
+        if not isinstance(f, types.FunctionType):
+            raise Exception(f"Can't convert a py function of type {type(f)}")
+
+        if f not in _pyFuncToFuncCache:
+            _pyFuncToFuncCache[f] = makeFunction(f.__name__, f)
+        typedFunc = _pyFuncToFuncCache[f]
+
+        concreteArgs = self.mapFunctionArguments(f.__name__, typedFunc.overloads[0], args, kwargs)
+
+        if concreteArgs is None:
+            return None
+
+        call_target = self.functionContext.converter.convert(f, [a.expr_type for a in concreteArgs], returnTypeOverload)
 
         if call_target is None:
             self.pushException(TypeError, "Function %s was not convertible." % f.__qualname__)
             return
 
-        return self.call_typed_call_target(call_target, args, kwargs)
+        return self.call_typed_call_target(call_target, concreteArgs, kwargs)
 
     def call_typed_call_target(self, call_target, args, kwargs):
         # force arguments to a type appropriate for argpassing
@@ -944,23 +1087,54 @@ class ExpressionConversionContext(object):
                 ):
                     return lhs.expr_type.convert_call_on_container_expression(self, lhs, arg)
 
-            for a in ast.args:
-                assert not a.matches.Starred, "not implemented yet"
-
             args = []
             kwargs = {}
 
             for a in ast.args:
-                args.append(self.convert_expression_ast(a))
-                if args[-1] is None:
-                    return None
+                if a.matches.Starred:
+                    toStar = self.convert_expression_ast(a.value)
+                    if toStar is None:
+                        return None
+
+                    fixedExpressions = toStar.get_iteration_expressions()
+
+                    if fixedExpressions is None:
+                        # we don't know how to iterate over these at the compiler level.
+                        # really we should be passing this entire call to the interpreter
+                        # now and seeing if it can handle it.
+                        raise Exception(
+                            f"Don't know how to *args call with argument of type "
+                            f"{toStar.expr_type.typeRepresentation} yet"
+                        )
+
+                    args.extend(fixedExpressions)
+                else:
+                    args.append(self.convert_expression_ast(a))
+
+                    if args[-1] is None:
+                        return None
 
             for keywordArg in ast.keywords:
                 argname = keywordArg.arg
 
-                kwargs[argname] = self.convert_expression_ast(keywordArg.value)
-                if kwargs[argname] is None:
-                    return None
+                if argname is None:
+                    # this is a **kwarg
+                    toStarKwarg = self.convert_expression_ast(keywordArg.value)
+                    if toStarKwarg is None:
+                        return None
+
+                    if not issubclass(toStarKwarg.expr_type.typeRepresentation, NamedTuple):
+                        raise Exception(
+                            f"Don't know how to **args call with argument of type "
+                            f"{toStarKwarg.expr_type.typeRepresentation} yet"
+                        )
+
+                    for ix, name in enumerate(toStarKwarg.expr_type.typeRepresentation.ElementNames):
+                        kwargs[name] = toStarKwarg.expr_type.refAs(self, toStarKwarg, ix)
+                else:
+                    kwargs[argname] = self.convert_expression_ast(keywordArg.value)
+                    if kwargs[argname] is None:
+                        return None
 
             return lhs.convert_call(args, kwargs)
 

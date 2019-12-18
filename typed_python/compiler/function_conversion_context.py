@@ -78,7 +78,6 @@ class FunctionConversionContext(object):
 
         self._typesAreUnstable = False
         self._functionOutputTypeKnown = False
-        self._star_args_name = None
         self._native_args = None
 
         self._constructInitialVarnameToType()
@@ -133,7 +132,7 @@ class FunctionConversionContext(object):
 
         variableStates = FunctionStackState()
 
-        initializer_expr = self.initializeVariableStates(self._argnames, self._star_args_name, variableStates)
+        initializer_expr = self.initializeVariableStates(self._argnames, variableStates)
 
         body_native_expr, controlFlowReturns = self.convert_function_body(self._statements, variableStates)
 
@@ -187,44 +186,19 @@ class FunctionConversionContext(object):
     def _constructInitialVarnameToType(self):
         input_types = self._input_types
 
-        if self._ast_arg.vararg is not None:
-            self._star_args_name = self._ast_arg.vararg.val.arg
-
-        if self._star_args_name is None:
-            if len(input_types) != len(self._ast_arg.args):
-                raise ConversionException(
-                    "Expected %s arguments but got %s" % (len(self._ast_arg.args), len(input_types))
-                )
-        else:
-            if len(input_types) < len(self._ast_arg.args):
-                raise ConversionException(
-                    "Expected at least %s arguments but got %s" %
-                    (len(self._ast_arg.args), len(input_types))
-                )
-
-        self._native_args = []
-        for i in range(len(self._ast_arg.args)):
-            self._varname_to_type[self._ast_arg.args[i].arg] = input_types[i]
-            if not input_types[i].is_empty:
-                self._native_args.append((self._ast_arg.args[i].arg, input_types[i].getNativePassingType()))
-
-        self._argnames = [a.arg for a in self._ast_arg.args]
-
-        if self._star_args_name is not None:
-            star_args_count = len(input_types) - len(self._ast_arg.args)
-
-            for i in range(len(self._ast_arg.args), len(input_types)):
-                self._native_args.append(
-                    ('.star_args.%s' % (i - len(self._ast_arg.args)),
-                        input_types[i].getNativePassingType())
-                )
-
-            starargs_type = native_ast.Struct(
-                [('f_%s' % i, input_types[i+len(self._ast_arg.args)])
-                    for i in range(star_args_count)]
+        if len(input_types) != self._ast_arg.totalArgCount():
+            raise ConversionException(
+                "Expected at least %s arguments but got %s" %
+                (len(self._ast_arg.args), len(input_types))
             )
 
-            self._varname_to_type[self._star_args_name] = starargs_type
+        self._argnames = self._ast_arg.argumentNames()
+
+        self._native_args = []
+        for i, argName in enumerate(self._argnames):
+            self._varname_to_type[self._argnames[i]] = input_types[i]
+            if not input_types[i].is_empty:
+                self._native_args.append((self._argnames[i], input_types[i].getNativePassingType()))
 
         if self._output_type is not None:
             self._varname_to_type[FunctionOutput] = typeWrapper(self._output_type)
@@ -299,7 +273,7 @@ class FunctionConversionContext(object):
 
         self._varname_to_type[varname] = typeWrapper(final_type)
 
-    def initializeVariableStates(self, argnames, stararg_name, variableStates):
+    def initializeVariableStates(self, argnames, variableStates):
         to_add = []
 
         # first, mark every variable that we plan on assigning to as not initialized.
@@ -316,7 +290,7 @@ class FunctionConversionContext(object):
                 variableStates.variableAssigned(name, self._varname_to_type[name].typeRepresentation)
 
         for name in argnames:
-            if name is not FunctionOutput and name != stararg_name:
+            if name is not FunctionOutput:
                 if name not in self._varname_to_type:
                     raise ConversionException("Couldn't find a type for argument %s" % name)
                 slot_type = self._varname_to_type[name]
@@ -382,24 +356,6 @@ class FunctionConversionContext(object):
                 )
 
         return destructors
-
-    def construct_starargs_around(self, res, star_args_name):
-        args_type = self._varname_to_type[star_args_name]
-
-        stararg_slot = self.named_var_expr(star_args_name)
-
-        return (
-            args_type.convert_initialize(
-                self,
-                stararg_slot,
-                [
-                    TypedExpression(
-                        native_ast.Expression.Variable(".star_args.%s" % i),
-                        args_type.element_types[i][1]
-                    )
-                    for i in range(len(args_type.element_types))]
-            ).with_comment("initialize *args slot") + res
-        )
 
     def assignToLocalVariable(self, varname, val_to_store, variableStates):
         """Ensure we have appropriate storage allocated for 'varname', and assign 'val_to_store' to it."""

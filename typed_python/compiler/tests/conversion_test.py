@@ -794,3 +794,147 @@ class TestCompilationStructures(unittest.TestCase):
 
         for thing in [ListOf(int)(range(10)), Tuple(int, int, int, int)((1, 2, 3, 4))]:
             self.assertEqual(testContinue(thing), Entrypoint(testContinue)(thing))
+
+    def test_call_function_with_wrong_number_of_arguments(self):
+        def f(x, y):
+            return x + y
+
+        @Compiled
+        def callIt(x):
+            return f(x)
+
+        with self.assertRaisesRegex(TypeError, "f.. missing required positional argument: y"):
+            callIt(1)
+
+    def test_call_function_with_default_arguments(self):
+        def f(x, y=1):
+            return x + y
+
+        @Entrypoint
+        def callIt(x):
+            return f(x)
+
+        self.assertEqual(callIt(10), f(10))
+
+    def test_call_function_with_named_args_ordering(self):
+        def f(x, y):
+            return x
+
+        @Entrypoint
+        def callWithArgsReversed(x, y):
+            return f(y=y, x=x)
+
+        self.assertEqual(callWithArgsReversed(2, 3), 2)
+
+    def test_call_function_with_named_args(self):
+        def f(x=1, y=10):
+            return x + y
+
+        def callWithX(x):
+            return f(x=x)
+
+        def callWithY(y):
+            return f(y=y)
+
+        def callWithXY(x, y):
+            return f(y=y, x=x)
+
+        callWithXCompiled = Compiled(callWithX)
+        callWithYCompiled = Compiled(callWithY)
+        callWithXYCompiled = Compiled(callWithXY)
+
+        self.assertEqual(callWithX(2), callWithXCompiled(2))
+        self.assertEqual(callWithY(2), callWithYCompiled(2))
+        self.assertEqual(callWithXY(2, 3), callWithXYCompiled(2, 3))
+
+    def test_call_function_with_star_args(self):
+        def f(*args):
+            return args
+
+        @Entrypoint
+        def callIt(x, y, z):
+            return f(x, y, z)
+
+        self.assertEqual(callIt(1, 2.5, "hi"), Tuple(int, float, str)((1, 2.5, "hi")))
+
+    def test_call_function_with_kwargs(self):
+        def f(**kwargs):
+            return kwargs
+
+        @Entrypoint
+        def callIt(x, y, z):
+            return f(x=x, y=y, z=z)
+
+        self.assertEqual(callIt(1, 2.5, "hi"), NamedTuple(x=int, y=float, z=str)(x=1, y=2.5, z="hi"))
+
+    def test_call_function_with_excess_named_arg(self):
+        def f(x=1, y=2):
+            return x + y
+
+        @Entrypoint
+        def callIt(x, y, z):
+            return f(x=x, y=y, z=z)
+
+        with self.assertRaisesRegex(TypeError, "got an unexpected keyword argument 'z'"):
+            callIt(1, 2, 3)
+
+    def test_star_arg_call_function(self):
+        def f(x, y):
+            return x + y
+
+        @Entrypoint
+        def callIt(a):
+            return f(*a)
+
+        self.assertEqual(callIt(Tuple(int, int)((1, 2))), 3)
+
+    def test_star_kwarg_call_function(self):
+        def f(x, y):
+            return x + y
+
+        @Entrypoint
+        def callIt(a):
+            return f(**a)
+
+        self.assertEqual(callIt(NamedTuple(x=int, y=int)((1, 2))), 3)
+
+    def test_star_kwarg_intermediate_is_fast(self):
+        def f(x, y):
+            return x + y
+
+        def g(**kwargs):
+            return f(**kwargs)
+
+        def sumUsingG(a):
+            res = 0.0
+            for i in range(a):
+                res += g(x=2, y=i)
+            return res
+
+        def sumUsingF(a):
+            res = 0.0
+            for i in range(a):
+                res += f(x=2, y=i)
+            return res
+
+        sumUsingGCompiled = Compiled(sumUsingG)
+        sumUsingFCompiled = Compiled(sumUsingF)
+
+        self.assertEqual(sumUsingG(100), sumUsingGCompiled(100))
+
+        t0 = time.time()
+        sumUsingGCompiled(1000000)
+        elapsedG = time.time() - t0
+
+        t0 = time.time()
+        sumUsingFCompiled(1000000)
+        elapsedF = time.time() - t0
+
+        t0 = time.time()
+        sumUsingG(1000000)
+        elapsedGPy = time.time() - t0
+
+        print("Compiled is ", elapsedGPy / elapsedG, " times faster")
+
+        # check that the extra call to 'g' doesn't introduce any overhead
+        self.assertTrue(.75 <= elapsedF / elapsedG <= 1.25)

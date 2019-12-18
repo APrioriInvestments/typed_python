@@ -378,3 +378,11 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         # this should be fast again
         self.assertLess(t5 - t4, (t1 - t0) * 2)
+
+    def test_call_entrypoint_with_default_argument(self):
+        @Entrypoint
+        def f(x, y=1, z=2):
+            return x + y + z
+
+        self.assertEqual(f(1), 4)
+        self.assertEqual(f(1, 4), 7)

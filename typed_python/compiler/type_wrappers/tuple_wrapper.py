@@ -164,6 +164,13 @@ class TupleWrapper(Wrapper):
                 return None
             args.append(convertedArg)
 
+        return self.createFromArgs(context, args)
+
+    def createFromArgs(self, context, args):
+        """Initialize a new tuple of this type from a set of arguments.
+
+        This will attempt to convert the tuple.
+        """
         typeConvertedArgs = []
         for i in range(len(args)):
             typeConvertedArg = args[i].convert_to_type(self.typeRepresentation.ElementTypes[i])
