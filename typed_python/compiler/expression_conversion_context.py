@@ -530,7 +530,7 @@ class ExpressionConversionContext(object):
         if self.teardowns:
             expr = native_ast.Expression.Finally(expr=expr, teardowns=self.teardowns)
 
-        if exceptionsTakeFrom:
+        if exceptionsTakeFrom and expr.couldThrow():
             expr = native_ast.Expression.TryCatch(
                 expr=expr,
                 varname=self.functionContext.allocateLetVarname(),

@@ -425,6 +425,32 @@ def expr_with_return_target_name(self, name):
     )
 
 
+def expr_could_throw(self):
+    if self.matches.Throw:
+        return True
+
+    if self.matches.Call:
+        return True
+
+    if self.matches.MakeStruct:
+        for _, e in self.args:
+            if e.couldThrow():
+                return True
+
+    for name in self.ElementType.ElementNames:
+        child = getattr(self, name)
+
+        if isinstance(child, Expression):
+            if child.couldThrow():
+                return True
+        elif isinstance(child, TupleOf(Expression)):
+            for c in child:
+                if c.couldThrow():
+                    return True
+
+    return False
+
+
 Expression = Expression.define(Alternative(
     "Expression",
     Constant={'val': Constant},
@@ -510,7 +536,8 @@ Expression = Expression.define(Alternative(
     elemPtr=lambda self, *exprs: Expression.ElementPtr(left=self, offsets=[ensureExpr(e) for e in exprs]),
     is_simple=expr_is_simple,
     returnTargets=expr_return_targets,
-    withReturnTargetName=expr_with_return_target_name
+    withReturnTargetName=expr_with_return_target_name,
+    couldThrow=expr_could_throw
 ))
 
 
