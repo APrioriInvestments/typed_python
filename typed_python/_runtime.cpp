@@ -1165,4 +1165,33 @@ extern "C" {
         decref(float_obj);
         return ret;
     }
+
+    /*****
+     call 'PyIter_Next', but adapt the result to meet our runtime requirements.
+
+     PyIter_Next returns NULL if there are no remaining items, but can also throw an exception.
+
+     This function retains the convention that upon exhausting the container we return 'nullptr',
+     but raises the exception if its present.
+    ******/
+    PythonObjectOfType::layout_type* np_pyobj_iter_next(PythonObjectOfType::layout_type* toIterate) {
+        PyEnsureGilAcquired getTheGil;
+
+        if (!PyIter_Check(toIterate->pyObj)) {
+            PyErr_Format(PyExc_TypeError, "iter() returned non-iterator of type '%s'", toIterate->pyObj->ob_type->tp_name);
+            throw PythonExceptionSet();
+        }
+
+        PyObject* res = PyIter_Next(toIterate->pyObj);
+
+        if (!res) {
+            if (PyErr_Occurred()) {
+                throw PythonExceptionSet();
+            }
+
+            return nullptr;
+        }
+
+        return PythonObjectOfType::stealToCreateLayout(res);
+    }
 }

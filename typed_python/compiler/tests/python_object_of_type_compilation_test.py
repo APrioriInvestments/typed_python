@@ -542,3 +542,40 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         res = f()
         self.assertEqual(res, {1: 2, "hi": "bye"})
+
+    def test_iterate_object(self):
+        def toList(x):
+            res = list()
+            resAp = res.append
+            for i in x:
+                resAp(i)
+            return res
+
+        toListCompiled = Compiled(toList)
+
+        self.assertEqual(
+            toList(range(10)), toListCompiled(range(10))
+        )
+
+        self.assertEqual(
+            toList(x + 1 for x in range(10)), toListCompiled(x + 1 for x in range(10))
+        )
+
+        # check that iterating something that's not an interator throws an exception
+        class HasBadIter:
+            def __iter__(self):
+                return 10
+
+        for form in [toList, toListCompiled]:
+            with self.assertRaisesRegex(TypeError, "iter.. returned non-iterator of type 'int'"):
+                form(HasBadIter())
+
+        def generator(x):
+            for i in range(x):
+                yield i
+
+            raise Exception("Boo!")
+
+        for form in [toList, toListCompiled]:
+            with self.assertRaisesRegex(Exception, "Boo!"):
+                form(generator(10))

@@ -47,19 +47,39 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             )
         )
 
-    def convert_default_initialize(self, context, target):
-        if isinstance(None, self.typeRepresentation):
+    def convert_default_initialize(self, context, target, forceToNone=False):
+        if isinstance(None, self.typeRepresentation) or forceToNone:
             target.convert_copy_initialize(
                 TypedExpression(
                     context,
+                    runtime_functions.get_pyobj_None.call().cast(self.getNativeLayoutType()),
                     self,
-                    runtime_functions.get_pyobj_None.call(),
                     False
-                ).cast(self.getNativeLayoutType())
+                )
             )
             return
 
         context.pushException(TypeError, "Can't default-initialize %s" % self.typeRepresentation.__qualname__)
+
+    def convert_next(self, context, expr):
+        nextRes = context.push(
+            object,
+            lambda objPtr: objPtr.expr.store(
+                runtime_functions.pyobj_iter_next.call(expr.nonref_expr.cast(VoidPtr))
+                .cast(self.getNativeLayoutType())
+            )
+        )
+
+        canContinue = context.pushPod(
+            bool,
+            nextRes.nonref_expr.cast(native_ast.Int64).gt(0)
+        )
+
+        with context.ifelse(nextRes.nonref_expr.cast(native_ast.Int64)) as (ifTrue, ifFalse):
+            with ifFalse:
+                self.convert_default_initialize(context, nextRes, forceToNone=True)
+
+        return nextRes, canContinue
 
     def convert_attribute(self, context, instance, attr):
         assert isinstance(attr, str)

@@ -197,7 +197,6 @@ call_pyobj = externalCallTarget(
 
 get_pyobj_None = externalCallTarget(
     "nativepython_runtime_get_pyobj_None",
-    Void,
     Void.pointer()
 )
 
@@ -675,6 +674,12 @@ pyobj_locktype_unlock = externalCallTarget(
 pyobj_locktype_lock = externalCallTarget(
     "np_pyobj_locktype_lock",
     Bool,
+    Void.pointer()
+)
+
+pyobj_iter_next = externalCallTarget(
+    "np_pyobj_iter_next",
+    Void.pointer(),
     Void.pointer()
 )
 
