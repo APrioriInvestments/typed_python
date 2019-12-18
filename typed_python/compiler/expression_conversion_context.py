@@ -141,7 +141,7 @@ class ExpressionConversionContext(object):
         assert type.is_pod
         assert not type.is_pass_by_ref
 
-        varname = self.functionContext.let_varname()
+        varname = self.functionContext.allocateLetVarname()
 
         self.intermediates.append(
             ExpressionIntermediate.Simple(name=varname, expr=expression)
@@ -151,7 +151,7 @@ class ExpressionConversionContext(object):
 
     def pushLet(self, type, expression, isReference):
         """Push an arbitrary expression onto the stack."""
-        varname = self.functionContext.let_varname()
+        varname = self.functionContext.allocateLetVarname()
 
         self.intermediates.append(
             ExpressionIntermediate.Simple(name=varname, expr=expression)
@@ -218,7 +218,7 @@ class ExpressionConversionContext(object):
         )
 
     def let(self, e1, e2):
-        v = self.functionContext.let_varname()
+        v = self.functionContext.allocateLetVarname()
 
         return native_ast.Expression.Let(
             var=v,
@@ -239,7 +239,7 @@ class ExpressionConversionContext(object):
         """Push a reference to an object that's guaranteed to be alive for the duration of the expression."""
         type = typeWrapper(type)
 
-        varname = self.functionContext.let_varname()
+        varname = self.functionContext.allocateLetVarname()
 
         self.intermediates.append(
             ExpressionIntermediate.Simple(name=varname, expr=expression)
@@ -250,7 +250,7 @@ class ExpressionConversionContext(object):
     def allocateUninitializedSlot(self, type):
         type = typeWrapper(type)
 
-        varname = self.functionContext.stack_varname()
+        varname = self.functionContext.allocateStackVarname()
 
         resExpr = TypedExpression(
             self,
@@ -289,7 +289,7 @@ class ExpressionConversionContext(object):
         if type.is_pod:
             wantsTeardown = False
 
-        varname = self.functionContext.stack_varname()
+        varname = self.functionContext.allocateStackVarname()
 
         resExpr = TypedExpression(
             self,
@@ -533,7 +533,7 @@ class ExpressionConversionContext(object):
         if exceptionsTakeFrom:
             expr = native_ast.Expression.TryCatch(
                 expr=expr,
-                varname=self.functionContext.let_varname(),
+                varname=self.functionContext.allocateLetVarname(),
                 handler=runtime_functions.add_traceback.call(
                     native_ast.const_utf8_cstr(self.functionContext.name),
                     native_ast.const_utf8_cstr(exceptionsTakeFrom.filename),

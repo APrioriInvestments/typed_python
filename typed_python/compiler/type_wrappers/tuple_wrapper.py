@@ -82,7 +82,7 @@ class TupleWrapper(Wrapper):
                 .cast(self.subTypeWrappers[which].getNativeLayoutType().pointer())
         )
 
-    def convert_len(self, context):
+    def convert_len(self, context, instance):
         return context.constant(len(self.subTypeWrappers))
 
     def convert_bool_cast(self, context, e):

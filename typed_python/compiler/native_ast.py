@@ -313,9 +313,14 @@ def expr_str(self):
             return "while " + c + ":\n"\
                    + indent(t).rstrip() + "\nelse:\n" + indent(f).rstrip()
     if self.matches.Return:
+        if self.blockName is not None:
+            return "return to " + self.blockName
+
         s = (str(self.arg) if self.arg is not None else "")
+
         if "\n" in s:
             return "return (" + s + ")"
+
         return "return " + s
     if self.matches.Let:
         if self.val.matches.Sequence and len(self.val.vals) > 1:
@@ -383,6 +388,43 @@ def expr_is_simple(expr):
     return False
 
 
+def expr_return_targets(expr):
+    if expr.matches.Finally:
+        return expr.expr.returnTargets() - set([expr.name])
+
+    if expr.matches.Return:
+        if expr.blockName:
+            return set([expr.blockName])
+        else:
+            return set()
+
+    if expr.matches.MakeStruct:
+        res = set()
+        for _, e in expr.args:
+            res |= e.returnTargets()
+        return res
+
+    res = set()
+
+    for name in expr.ElementType.ElementNames:
+        child = getattr(expr, name)
+
+        if isinstance(child, Expression):
+            res |= child.returnTargets()
+        elif isinstance(child, TupleOf(Expression)):
+            for c in child:
+                res |= c.returnTargets()
+
+    return res
+
+
+def expr_with_return_target_name(self, name):
+    return Expression.Finally(
+        expr=self,
+        name=name
+    )
+
+
 Expression = Expression.define(Alternative(
     "Expression",
     Constant={'val': Constant},
@@ -417,11 +459,14 @@ Expression = Expression.define(Alternative(
         'while_true': Expression,
         'orelse': Expression
     },
-    Return={'arg': OneOf(Expression, None)},
+    # return control flow to a higher point in the stack. If 'name' is None, exit the function.
+    # otherwise, search for the first 'finally' block above it with that name and return to that
+    # scope. In that case 'arg' must be 'None'.
+    Return={'arg': OneOf(None, Expression), 'blockName': OneOf(None, str)},
     Let={'var': str, 'val': Expression, 'within': Expression},
     # evaluate 'expr', and then call teardowns if we passed through a named 'ActivatesTeardown'
-    # clause
-    Finally={'expr': Expression, 'teardowns': TupleOf(Teardown)},
+    # clause. If name is nonempty, then we can explicitly 'return' to it
+    Finally={'expr': Expression, 'teardowns': TupleOf(Teardown), 'name': OneOf(None, str)},
     Sequence={'vals': TupleOf(Expression)},
     ActivatesTeardown={'name': str},
     StackSlot={'name': str, 'type': Type},
@@ -463,7 +508,9 @@ Expression = Expression.define(Alternative(
     cast=lambda self, targetType: Expression.Cast(left=self, to_type=targetType),
     with_comment=lambda self, c: Expression.Comment(comment=c, expr=self),
     elemPtr=lambda self, *exprs: Expression.ElementPtr(left=self, offsets=[ensureExpr(e) for e in exprs]),
-    is_simple=expr_is_simple
+    is_simple=expr_is_simple,
+    returnTargets=expr_return_targets,
+    withReturnTargetName=expr_with_return_target_name
 ))
 
 

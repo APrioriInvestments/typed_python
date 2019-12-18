@@ -31,8 +31,12 @@ pointer_size = 8
 CROSS_MODULE_INLINE_COMPLEXITY = 40
 
 
-def llvm_bool(i):
+def llvmBool(i):
     return llvmlite.ir.Constant(llvm_i1, i)
+
+
+def llvmI64(i):
+    return llvmlite.ir.Constant(llvm_i64, i)
 
 
 def assertTagDictsSame(left_tags, right_tags):
@@ -172,67 +176,121 @@ class TypedLLVMValue(object):
         return str(self)
 
 
-class TeardownOnScopeExit:
-    def __init__(self, converter, parent_scope):
+class TeardownHandler:
+    """Machinery for generating code to call destructors when we exit blocks of code.
+
+    We can exit a Finally block in four ways: through normal control flow (we generate
+    the code for this case separately), through a 'return to target' where we
+    return control flow to the post-teardown of the first Finally with the given name
+    above us on the stack, through a exception handling, and through a regular
+    'return' statement (that exits the function entirely).
+
+    Each instance of this class has a pointer to its parent scope. The code converter
+    instantiates a new TeardownHandler each time it wants to intercept destructor
+    control flow (when we create a Finally or a TryCatch).
+
+    Each TeardownHandler creates a block that it uses to invoke all the destructors
+    and then resume control flow.  It initializes an empty block and then waits
+    for the main code converter to send it incoming jumps from code below it
+    that contains throw/return expressions.
+
+    Once code below it has finished converting, we can resolve a teardown handler
+    either as a try/catch handler or as a 'finally' handler. In either case, the
+    handler populates the basic block with the relevant teardowns and then
+    generates code to propagate control flow, either to a catch statement,
+    to the parent stack, or to the resumption of the control flow at that moment.
+    """
+
+    def __init__(self, converter, parent_scope, name=None):
         self.converter = converter
         self.builder = converter.builder
+        self.name = name
 
         self.incoming_tags = {}  # dict from block->name->(True or llvm_value)
 
-        # is the incoming block from a scope trying to return (True)
-        # or propagate an exception (False)
-        self.incoming_is_return = {}  # dict from block->(True/False or llvm_value)
+        # is the incoming block from a scope trying to 'return' (integer number of stack frames)
+        # or propagate an exception (-1)
+        self.incomingControlFlowSwitch = {}  # dict from block->(an integer or an llvm_value)
 
         self._block = None
 
         self.incoming_blocks = set()
         self.parent_scope = parent_scope
-        self.height = 0 if parent_scope is None else parent_scope.height+1
-        self.return_is_generated = False
+        self.height = 0 if parent_scope is None else parent_scope.height + 1
 
-    def generate_is_return(self):
+        # track whether we've
+        self._isConsumed = False
+
+    def _generateControlFlowSwitchExpr(self):
+        """Generate an expression in the body block indicating whether we are a 'return'.
+
+        The expression will be an integer that contains a -1 if we are an exception,
+        otherwise an integer giving the number of scopes we should unwind before
+        resuming execution when entering the unwind handler.
+        """
         assert self._block is not None
 
-        assert self.incoming_is_return
+        assert self.incomingControlFlowSwitch
 
-        assert len(self.incoming_is_return) == len(self.incoming_blocks)
+        assert len(self.incomingControlFlowSwitch) == len(self.incoming_blocks)
 
-        assert not self.return_is_generated
-        self.return_is_generated = True
+        assert not self._isConsumed
+        self._isConsumed = True
 
-        if len(self.incoming_is_return) == 1:
-            return list(self.incoming_is_return.values())[0]
+        if len(self.incomingControlFlowSwitch) == 1:
+            return list(self.incomingControlFlowSwitch.values())[0]
 
-        if all([v is True for v in self.incoming_is_return.values()]):
-            return True
-
-        if all([v is False for v in self.incoming_is_return.values()]):
-            return False
+        if all([isinstance(v, int) for v in self.incomingControlFlowSwitch.values()]):
+            vals = set(self.incomingControlFlowSwitch.values())
+            if len(vals) == 1:
+                return list(vals)[0]
 
         with self.builder.goto_block(self._block):
-            is_return = self.builder.phi(llvm_i1, name='is_return_flow_%s' % self.height)
+            switchVal = self.builder.phi(llvm_i64, name='control_flow_switch_%s' % self.height)
 
-            for b, val in self.incoming_is_return.items():
-                if isinstance(val, bool):
-                    val = llvm_bool(val)
-                is_return.add_incoming(val, b)
+            for b, val in self.incomingControlFlowSwitch.items():
+                if isinstance(val, int):
+                    val = llvmI64(val)
+                switchVal.add_incoming(val, b)
 
-            return is_return
+            return switchVal
 
-    def accept_incoming(self, block, tags, is_return):
-        assert block not in self.incoming_is_return
-        assert not self.return_is_generated
+    def controlFlowSwitchForReturn(self, name=None):
+        if name is None:
+            return self.height + 2
 
-        if isinstance(is_return, llvmlite.ir.Constant):
-            is_return = is_return.constant
+        if self.name == name:
+            return 0
 
-        self.incoming_is_return[block] = is_return
+        if self.parent_scope is None:
+            raise Exception(f"Couldn't find a 'Finally' with name '{name}'")
+
+        return 1 + self.parent_scope.controlFlowSwitchForReturn(name)
+
+    def controlFlowSwitchForException(self):
+        return -1
+
+    def acceptIncoming(self, block, tags, controlFlowIdentifier):
+        assert block not in self.incomingControlFlowSwitch, "This block already jumped to us"
+        assert not self._isConsumed, "This TeardownHandler was already consumed"
+
+        if isinstance(controlFlowIdentifier, llvmlite.ir.Constant):
+            controlFlowIdentifier = controlFlowIdentifier.constant
+
+        self.incomingControlFlowSwitch[block] = controlFlowIdentifier
         self.incoming_blocks.add(block)
         self.incoming_tags[block] = dict(tags)
 
         if self._block is None:
-            self._block = self.builder.append_basic_block("scope_exit_handler_%d" % self.height)
+            self._block = self.builder.append_basic_block(self.blockName())
+
         return self._block
+
+    def blockName(self):
+        name = "scope_exit_handler_%d" % self.height
+        if self.name is not None:
+            name += "_" + self.name
+        return name
 
     def generate_tags(self):
         tags = {}
@@ -266,7 +324,7 @@ class TeardownOnScopeExit:
 
             for b in incoming:
                 if isinstance(incoming[b], bool):
-                    val = llvm_bool(incoming[b])
+                    val = llvmBool(incoming[b])
                 else:
                     val = incoming[b]
                 phinode.add_incoming(val, b)
@@ -280,12 +338,12 @@ class TeardownOnScopeExit:
 
         return tags
 
-    def generate_teardown(self, teardown_callback, return_slot=None, exception_slot=None):
-        if not self.incoming_is_return:
+    def generate_teardown(self, teardown_callback, return_slot=None, exception_slot=None, normal_slot=None):
+        if not self.incomingControlFlowSwitch:
             assert self._block is None
             return
 
-        is_return = self.generate_is_return()
+        controlFlowSwitch = self._generateControlFlowSwitchExpr()
 
         with self.builder.goto_block(self._block):
             tags = self.generate_tags()
@@ -293,25 +351,78 @@ class TeardownOnScopeExit:
             teardown_callback(tags)
 
             if self.parent_scope is not None:
-                block = self.parent_scope.accept_incoming(
-                    self.builder.block,
-                    tags,
-                    is_return
-                )
-                self.builder.branch(block)
-            else:
-                if is_return is True:
-                    if return_slot is None:
-                        self.builder.ret_void()
-                    else:
-                        self.builder.ret(self.builder.load(return_slot))
-                elif is_return is False:
-                    self.converter.generate_throw_expression(
-                        self.builder.load(exception_slot)
+                if isinstance(controlFlowSwitch, int):
+                    # we know exactly how control flow will go - just generate
+                    # the relevant code and directly branch to the next block
+                    if controlFlowSwitch == 0:
+                        assert normal_slot is not None
+
+                        self.builder.branch(normal_slot)
+                        return
+
+                    controlFlowSwitch -= 1
+
+                    block = self.parent_scope.acceptIncoming(
+                        self.builder.block,
+                        tags,
+                        controlFlowSwitch
                     )
+
+                    self.builder.branch(block)
                 else:
-                    assert isinstance(is_return, llvmlite.ir.Value)
-                    with self.builder.if_else(is_return) as (then, otherwise):
+                    if normal_slot is not None:
+                        assert self.name is not None
+
+                        wantsPropagate = self.builder.icmp_signed("!=", controlFlowSwitch, llvmI64(0))
+
+                        with self.builder.if_else(wantsPropagate) as (then, otherwise):
+                            with then:
+                                block = self.parent_scope.acceptIncoming(
+                                    self.builder.block,
+                                    tags,
+                                    self.builder.sub(
+                                        controlFlowSwitch,
+                                        llvmI64(1)
+                                    )
+                                )
+
+                                self.builder.branch(block)
+
+                            with otherwise:
+                                self.builder.branch(normal_slot)
+
+                        self.builder.unreachable()
+                    else:
+                        assert self.name is None, self.name
+                        block = self.parent_scope.acceptIncoming(
+                            self.builder.block,
+                            tags,
+                            self.builder.sub(
+                                controlFlowSwitch,
+                                llvmI64(1)
+                            )
+                        )
+
+                        self.builder.branch(block)
+            else:
+                assert self.name is None
+
+                if isinstance(controlFlowSwitch, int):
+                    if controlFlowSwitch >= 0:
+                        if return_slot is None:
+                            self.builder.ret_void()
+                        else:
+                            self.builder.ret(self.builder.load(return_slot))
+                    else:
+                        self.converter.generate_throw_expression(
+                            self.builder.load(exception_slot)
+                        )
+                else:
+                    assert isinstance(controlFlowSwitch, llvmlite.ir.Value)
+
+                    isReturn = self.builder.icmp_signed(">=", controlFlowSwitch, llvmI64(0))
+
+                    with self.builder.if_else(isReturn) as (then, otherwise):
                         with then:
                             if return_slot is None:
                                 self.builder.ret_void()
@@ -324,34 +435,47 @@ class TeardownOnScopeExit:
                     self.builder.unreachable()
 
     def generate_trycatch_unwind(self, target_resume_block, generator):
-        if not self.incoming_is_return:
+        if not self.incomingControlFlowSwitch:
             assert self._block is None
             return
 
-        is_return = self.generate_is_return()
+        controlFlowSwitch = self._generateControlFlowSwitchExpr()
 
         with self.builder.goto_block(self._block):
             tags = self.generate_tags()
 
-            if is_return is True:
-                block = self.parent_scope.accept_incoming(
-                    self.builder.block,
-                    tags,
-                    is_return
-                )
-                self.builder.branch(block)
-                return
+            if isinstance(controlFlowSwitch, int):
+                if controlFlowSwitch == 0:
+                    raise Exception("Please don't jump to a try-catch")
 
-            if is_return is False:
+                if controlFlowSwitch >= 0:
+                    block = self.parent_scope.acceptIncoming(
+                        self.builder.block,
+                        tags,
+                        controlFlowSwitch - 1
+                    )
+                    self.builder.branch(block)
+                    return
+
                 generator(tags, target_resume_block)
                 return
 
-            assert isinstance(is_return, llvmlite.ir.Value)
-            with self.builder.if_then(is_return):
-                block = self.parent_scope.accept_incoming(
+            assert isinstance(controlFlowSwitch, llvmlite.ir.Value)
+
+            isReturn = self.builder.icmp_signed(
+                ">",
+                controlFlowSwitch,
+                llvmI64(0)
+            )
+
+            with self.builder.if_then(isReturn):
+                block = self.parent_scope.acceptIncoming(
                     self.builder.block,
                     tags,
-                    is_return
+                    self.builder.sub(
+                        controlFlowSwitch,
+                        llvmI64(1)
+                    )
                 )
                 self.builder.branch(block)
 
@@ -404,7 +528,7 @@ class FunctionConverter:
 
         # if populated, we are expected to write our return value to 'return_slot' and jump here
         # on return
-        self.teardown_handler = TeardownOnScopeExit(self, None)
+        self.teardown_handler = TeardownHandler(self, None)
 
     def finalize(self):
         self.teardown_handler.generate_teardown(lambda tags: None, self.return_slot, self.exception_slot)
@@ -438,10 +562,10 @@ class FunctionConverter:
                 [self.builder.extract_value(res, 0)]
             )
 
-            block = self.teardown_handler.accept_incoming(
+            block = self.teardown_handler.acceptIncoming(
                 self.builder.block,
                 self.tags_initialized,
-                is_return=False
+                self.teardown_handler.controlFlowSwitchForException()
             )
 
             self.builder.branch(block)
@@ -475,7 +599,7 @@ class FunctionConverter:
         exception_ptr = self.builder.bitcast(
             self.builder.call(
                 self.external_function_references["__cxa_allocate_exception"],
-                [llvmlite.ir.Constant(llvm_i64, pointer_size)],
+                [llvmI64(pointer_size)],
                 name="alloc_e"
             ),
             llvm_i8ptr.as_pointer()
@@ -685,26 +809,44 @@ class FunctionConverter:
                     return TypedLLVMValue(self.builder.uitofp(lhs.llvm_value, target_type), expr.to_type)
 
         if expr.matches.Return:
-            if expr.arg is not None:
-                # write the value into the return slot
-                arg = self.convert(expr.arg)
+            if expr.blockName is not None:
+                assert expr.arg is None, expr.arg
 
-                if arg is None:
-                    return
+                controlFlowSwitch = self.teardown_handler.controlFlowSwitchForReturn(name=expr.blockName)
 
-                if not self.output_type.matches.Void:
-                    assert self.return_slot is not None
-                    self.builder.store(arg.llvm_value, self.return_slot)
+                block = self.teardown_handler.acceptIncoming(
+                    self.builder.block,
+                    self.tags_initialized,
+                    controlFlowSwitch
+                )
 
-            block = self.teardown_handler.accept_incoming(
-                self.builder.block,
-                self.tags_initialized,
-                is_return=True
-            )
+                self.builder.branch(block)
+                return TypedLLVMValue(None, native_ast.Type.Void())
+            else:
+                # this is a naked 'return'
+                if expr.arg is not None:
+                    # write the value into the return slot
+                    arg = self.convert(expr.arg)
 
-            self.builder.branch(block)
+                    if arg is None:
+                        # the expression threw an exception so we can't actually
+                        # return
+                        return
 
-            return
+                    if not self.output_type.matches.Void:
+                        assert self.return_slot is not None
+                        self.builder.store(arg.llvm_value, self.return_slot)
+
+                controlFlowSwitch = self.teardown_handler.controlFlowSwitchForReturn(name=None)
+
+                block = self.teardown_handler.acceptIncoming(
+                    self.builder.block,
+                    self.tags_initialized,
+                    controlFlowSwitch
+                )
+
+                self.builder.branch(block)
+                return
 
         if expr.matches.Branch:
             cond = self.convert(expr.cond)
@@ -771,9 +913,9 @@ class FunctionConverter:
                     else:
                         tag_llvm_value = self.builder.phi(llvm_i1, 'is_initialized.merge.' + tag)
                         if isinstance(true_val, bool):
-                            true_val = llvm_bool(true_val)
+                            true_val = llvmBool(true_val)
                         if isinstance(false_val, bool):
-                            false_val = llvm_bool(false_val)
+                            false_val = llvmBool(false_val)
 
                         tag_llvm_value.add_incoming(true_val, true_block)
                         tag_llvm_value.add_incoming(false_val, false_block)
@@ -984,8 +1126,8 @@ class FunctionConverter:
 
             try:
                 if func.native_type.value_type.can_throw:
-                    normal_target = self.builder.append_basic_block('asdf')
-                    exception_target = self.builder.append_basic_block('bsdf')
+                    normal_target = self.builder.append_basic_block()
+                    exception_target = self.builder.append_basic_block()
 
                     llvm_call_result = self.builder.invoke(
                         func.llvm_value,
@@ -1038,10 +1180,10 @@ class FunctionConverter:
                 self.exception_slot
             )
 
-            block = self.teardown_handler.accept_incoming(
+            block = self.teardown_handler.acceptIncoming(
                 self.builder.block,
                 self.tags_initialized,
-                False
+                self.teardown_handler.controlFlowSwitchForException()
             )
 
             self.builder.branch(block)
@@ -1049,8 +1191,7 @@ class FunctionConverter:
             return
 
         if expr.matches.TryCatch:
-
-            self.teardown_handler = TeardownOnScopeExit(
+            self.teardown_handler = TeardownHandler(
                 self,
                 self.teardown_handler
             )
@@ -1081,7 +1222,7 @@ class FunctionConverter:
                     if handler_res is not None:
                         self.builder.branch(resume_normal_block)
 
-            target_resume_block = self.builder.append_basic_block('csdf')
+            target_resume_block = self.builder.append_basic_block()
 
             if result is not None:
                 self.builder.branch(target_resume_block)
@@ -1099,9 +1240,10 @@ class FunctionConverter:
             return self.namedCallTargetToLLVM(expr.target)
 
         if expr.matches.Finally:
-            self.teardown_handler = TeardownOnScopeExit(
+            self.teardown_handler = TeardownHandler(
                 self,
-                self.teardown_handler
+                self.teardown_handler,
+                expr.name
             )
 
             new_handler = self.teardown_handler
@@ -1124,7 +1266,22 @@ class FunctionConverter:
                     for teardown in expr.teardowns:
                         self.convert_teardown(teardown)
 
-            new_handler.generate_teardown(generate_teardowns)
+            if expr.name is not None:
+                finalBlock = self.builder.append_basic_block(self.teardown_handler.blockName() + "_resume")
+
+                if finally_result is not None:
+                    self.builder.branch(finalBlock)
+                else:
+                    # we didn't have a result, so the block we're on is already
+                    # terminated (either because it returned or threw an exception)
+                    # and so it can't jump.
+                    pass
+
+                self.builder.position_at_start(finalBlock)
+            else:
+                finalBlock = None
+
+            new_handler.generate_teardown(generate_teardowns, normal_slot=finalBlock)
 
             return finally_result
 

@@ -34,12 +34,12 @@ class NativeFunctionConversionContext:
     def identity(self):
         return self._identity
 
-    def let_varname(self):
+    def allocateLetVarname(self):
         self.varnames += 1
         return ".var_%s" % self.varnames
 
-    def stack_varname(self):
-        return self.let_varname()
+    def allocateStackVarname(self):
+        return self.allocateLetVarname()
 
     def typesAreUnstable(self):
         return False

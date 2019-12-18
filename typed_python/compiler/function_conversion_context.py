@@ -71,9 +71,11 @@ class FunctionConversionContext(object):
         self._argumentsWithoutStackslots = set()  # arguments that we don't bother to copy into the stack
         self._varname_to_type = {}
         self._free_variable_lookup = free_variable_lookup
-        self._temp_let_var = 0
-        self._temp_stack_var = 0
-        self._temp_iter_var = 0
+
+        self.tempLetVarIx = 0
+        self._tempStackVarIx = 0
+        self._tempIterVarIx = 0
+
         self._typesAreUnstable = False
         self._functionOutputTypeKnown = False
         self._star_args_name = None
@@ -125,9 +127,9 @@ class FunctionConversionContext(object):
         return True
 
     def convertToNativeFunction(self):
-        self._temp_let_var = 0
-        self._temp_stack_var = 0
-        self._temp_iter_var = 0
+        self.tempLetVarIx = 0
+        self._tempStackVarIx = 0
+        self._tempIterVarIx = 0
 
         variableStates = FunctionStackState()
 
@@ -238,13 +240,13 @@ class FunctionConversionContext(object):
     def markTypesAreUnstable(self):
         self._typesAreUnstable = True
 
-    def let_varname(self):
-        self._temp_let_var += 1
-        return "letvar.%s" % (self._temp_let_var-1)
+    def allocateLetVarname(self):
+        self.tempLetVarIx += 1
+        return "letvar.%s" % (self.tempLetVarIx-1)
 
-    def stack_varname(self):
-        self._temp_stack_var += 1
-        return "stackvar.%s" % (self._temp_stack_var-1)
+    def allocateStackVarname(self):
+        self._tempStackVarIx += 1
+        return "stackvar.%s" % (self._tempStackVarIx-1)
 
     def externalScopeVarExpr(self, subcontext, varname):
         """If 'varname' refers to a known variable that doesn't use a stack slot, return an expression for it.
@@ -580,6 +582,20 @@ class FunctionConversionContext(object):
             return True
 
     def convert_statement_ast(self, ast, variableStates: FunctionStackState):
+        """Convert a single statement to native_ast.
+
+        Args:
+            ast - the python_ast.Statement to convert
+            variableStates - a description of what's known about the types of our variables.
+                This data structure will be _modified_ by the calling code to include what's
+                known about the types of values when control flow leaves this statement.
+        Returns:
+            a pair (native_ast.Expression, flowReturns) giving an expression representing the
+            statement in native code, and a boolean indicating whether control flow might
+            return to the caller. If false, then we can assume that the code throws an
+            exception or 'returns' from the function.
+        """
+
         try:
             return self._convert_statement_ast(ast, variableStates)
         except Exception as e:
@@ -596,6 +612,8 @@ class FunctionConversionContext(object):
             raise
 
     def _convert_statement_ast(self, ast, variableStates: FunctionStackState):
+        """same as 'convert_statement_ast'."""
+
         if ast.matches.Expr and ast.value.matches.Str:
             return native_ast.Expression(), True
 
@@ -737,6 +755,10 @@ class FunctionConversionContext(object):
 
                 true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue)
 
+                if isWhileTrue:
+                    if "loop_break" in true.returnTargets():
+                        isWhileTrue = False
+
                 false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse)
 
                 variableStates.becomeMerge(
@@ -749,8 +771,10 @@ class FunctionConversionContext(object):
                 if variableStates == initVariableStates:
                     return (
                         native_ast.Expression.While(
-                            cond=cond_context.finalize(cond.nonref_expr, exceptionsTakeFrom=ast), while_true=true, orelse=false
-                        ),
+                            cond=cond_context.finalize(cond.nonref_expr, exceptionsTakeFrom=ast),
+                            while_true=true.withReturnTargetName("loop_continue"),
+                            orelse=false
+                        ).withReturnTargetName("loop_break"),
                         (true_returns or false_returns) and not isWhileTrue
                     )
 
@@ -779,6 +803,9 @@ class FunctionConversionContext(object):
 
                     thisOne, thisOneReturns = self.convert_statement_list_ast(ast.body, variableStates)
 
+                    # if we hit 'continue', just come to the end of this expression
+                    thisOne = thisOne.withReturnTargetName("loop_continue")
+
                     iterator_setup_context.pushEffect(thisOne)
 
                     if not thisOneReturns:
@@ -788,7 +815,11 @@ class FunctionConversionContext(object):
 
                 iterator_setup_context.pushEffect(thisOne)
 
-                return iterator_setup_context.finalize(None, exceptionsTakeFrom=ast), thisOneReturns
+                wholeLoopExpr = iterator_setup_context.finalize(None, exceptionsTakeFrom=ast)
+
+                wholeLoopExpr = wholeLoopExpr.withReturnTargetName("loop_break")
+
+                return wholeLoopExpr, thisOneReturns
             else:
                 # create a variable to hold the iterator, and instantiate it there
                 iter_varname = target_var_name + ".iter." + str(ast.line_number)
@@ -843,8 +874,10 @@ class FunctionConversionContext(object):
                         return (
                             iterator_setup_context.finalize(None, exceptionsTakeFrom=ast) >>
                             native_ast.Expression.While(
-                                cond=cond_context.finalize(is_populated, exceptionsTakeFrom=ast), while_true=true, orelse=false
-                            ),
+                                cond=cond_context.finalize(is_populated, exceptionsTakeFrom=ast),
+                                while_true=true.withReturnTargetName("loop_continue"),
+                                orelse=false
+                            ).withReturnTargetName("loop_break"),
                             true_returns or false_returns
                         )
 
@@ -900,6 +933,22 @@ class FunctionConversionContext(object):
                 ),
                 true_returns
             )
+
+        if ast.matches.Break:
+            # for the moment, we have to pretend as if the 'break' did return control flow,
+            # or else a while loop that always ends in break/continue will look like it doesn't
+            # return, when in fact it does.
+            return native_ast.Expression.Return(
+                blockName="loop_break"
+            ), True
+
+        if ast.matches.Continue:
+            # for the moment, we have to pretend as if the 'continue' did return control flow,
+            # or else a while loop that always ends in break/continue will look like it doesn't
+            # return, when in fact it does.
+            return native_ast.Expression.Return(
+                blockName="loop_continue"
+            ), True
 
         if ast.matches.Assert:
             expr_context = ExpressionConversionContext(self, variableStates)

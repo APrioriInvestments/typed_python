@@ -119,10 +119,12 @@ class Wrapper(object):
 
         If continue_iteration is False, then next_value will be ignored. It should be a reference.
         """
-        return context.pushException(
+        context.pushException(
             AttributeError,
             "%s object cannot be iterated" % self
         )
+
+        return None, None
 
     def convert_attribute(self, context, instance, attribute):
         """Produce code to access 'attribute' on an object represented by TypedExpression 'instance'."""

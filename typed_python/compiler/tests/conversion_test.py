@@ -736,3 +736,61 @@ class TestCompilationStructures(unittest.TestCase):
         for identity, timesCalculated in Runtime.singleton().converter._times_calculated.items():
             if identity not in oldTimesCalculated:
                 self.assertLessEqual(timesCalculated, 4, identity)
+
+    def test_converting_break_in_while(self):
+        def testBreak(x):
+            res = 0
+
+            while True:
+                x = x - 1
+                res = res + x
+
+                if x < 0:
+                    break
+
+            return res + 1
+
+        self.assertEqual(testBreak(10), Entrypoint(testBreak)(10))
+
+    def test_converting_continue_in_while(self):
+        def testContinue(x):
+            res = 0
+
+            while x > 0:
+                x = x - 1
+                res = res + x
+
+                if x % 2 == 0:
+                    continue
+
+                res = res + 10
+
+            return res
+
+        self.assertEqual(testContinue(10), Entrypoint(testContinue)(10))
+
+    def test_converting_break_in_foreach(self):
+        def testBreak(x):
+            res = 0
+            for i in x:
+                res += i
+                if i > len(x) / 2:
+                    break
+
+            return res
+
+        for thing in [ListOf(int)(range(10)), Tuple(int, int, int, int)((1, 2, 3, 4))]:
+            self.assertEqual(testBreak(thing), Entrypoint(testBreak)(thing))
+
+    def test_converting_continue_in_foreach(self):
+        def testContinue(x):
+            res = 0
+            for i in x:
+                res += i
+                if i > len(x) / 2:
+                    continue
+
+            return res
+
+        for thing in [ListOf(int)(range(10)), Tuple(int, int, int, int)((1, 2, 3, 4))]:
+            self.assertEqual(testContinue(thing), Entrypoint(testContinue)(thing))
