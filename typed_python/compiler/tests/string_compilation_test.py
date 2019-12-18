@@ -411,7 +411,7 @@ class TestStringCompilation(unittest.TestCase):
 
         compiledStripMany = Compiled(stripMany)
 
-        for s, expectedRatio, passCount in [(bigS, 1.5, 100), (littleS, .25, 10000)]:
+        for s, expectedRatio, passCount in [(bigS, 2.0, 100), (littleS, .25, 10000)]:
             t0 = time.time()
             stripMany(s, passCount)
             t1 = time.time()
