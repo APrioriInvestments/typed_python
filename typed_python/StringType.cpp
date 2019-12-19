@@ -194,9 +194,23 @@ int64_t StringType::find(layout *l, layout *sub, int64_t start, int64_t stop) {
 
     if (stop > l->pointcount)
         stop = l->pointcount;
+
     stop -= (sub->pointcount - 1);
+
     if (start < 0 || stop < 0 || start >= stop || sub->pointcount > l->pointcount || start > l->pointcount - sub->pointcount)
         return -1;
+
+    if (l->bytes_per_codepoint == 1 and sub->bytes_per_codepoint == 1 && sub->pointcount == 1) {
+        const uint8_t* lPtr = (const uint8_t*)l->data;
+        const uint8_t subChar = sub->data[0];
+
+        for (int64_t i = start; i < stop; i++) {
+            if (lPtr[i] == subChar) {
+                return i;
+            }
+        }
+        return -1;
+    }
 
     for (int64_t i = start; i < stop; i++) {
         bool match = true;
@@ -216,6 +230,7 @@ int64_t StringType::find(layout *l, layout *sub, int64_t start, int64_t stop) {
 void StringType::split_3(ListOfType::layout* outList, layout* l, int64_t max) {
     if (!outList)
         throw std::invalid_argument("missing return argument");
+
     static ListOfType* listofstring = ListOfType::Make(StringType::Make());
     listofstring->resize((instance_ptr)&outList, 0, 0);
 
@@ -270,24 +285,74 @@ void StringType::split_3(ListOfType::layout* outList, layout* l, int64_t max) {
 void StringType::split(ListOfType::layout* outList, layout* l, layout* sep, int64_t max) {
     if (!outList)
         throw std::invalid_argument("missing return argument");
+
     static ListOfType* listofstring = ListOfType::Make(StringType::Make());
     listofstring->resize((instance_ptr)&outList, 0, 0);
 
-    if (!sep || !sep->pointcount)
+    if (!sep || !sep->pointcount) {
         throw std::invalid_argument("ValueError: empty separator");
+    }
     else if (!l || !l->pointcount || max == 0) {
         listofstring->append((instance_ptr)&outList, (instance_ptr)&l);
+    }
+    else if (l->bytes_per_codepoint == 1 and sep->bytes_per_codepoint == 1 and sep->pointcount == 1) {
+        int64_t cur = 0;
+        int64_t count = 0;
+
+        listofstring->reserve((instance_ptr)&outList, 10);
+
+        uint8_t* lData = (uint8_t*)l->data;
+        uint8_t sepChar = *(uint8_t*)sep->data;
+
+        while (cur < l->pointcount) {
+            int64_t match = cur;
+
+            while (match < l->pointcount && lData[match] != sepChar) {
+                match++;
+            }
+
+            if (match >= l->pointcount) {
+                break;
+            }
+
+            layout* piece = getsubstr(l, cur, match);
+
+            if (outList->count == outList->reserved) {
+                listofstring->reserve((instance_ptr)&outList, outList->reserved * 1.5);
+            }
+
+            ((layout**)outList->data)[outList->count++] = piece;
+
+            cur = match + 1;
+
+            count++;
+
+            if (max >= 0 && count >= max)
+                break;
+        }
+        layout* remainder = getsubstr(l, cur, l->pointcount);
+        listofstring->append((instance_ptr)&outList, (instance_ptr)&remainder);
+        destroyStatic((instance_ptr)&remainder);
     }
     else {
         int64_t cur = 0;
         int64_t count = 0;
+
+        listofstring->reserve((instance_ptr)&outList, 10);
+
         while (cur < l->pointcount) {
             int64_t match = find(l, sep, cur, l->pointcount);
             if (match < 0)
                 break;
+
             layout* piece = getsubstr(l, cur, match);
-            listofstring->append((instance_ptr)&outList, (instance_ptr)&piece);
-            destroyStatic((instance_ptr)&piece);
+
+            if (outList->count == outList->reserved) {
+                listofstring->reserve((instance_ptr)&outList, outList->reserved * 1.5);
+            }
+
+            ((layout**)outList->data)[outList->count++] = piece;
+
             cur = match + sep->pointcount;
             count++;
             if (max >= 0 && count >= max)

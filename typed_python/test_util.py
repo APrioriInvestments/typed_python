@@ -13,6 +13,8 @@
 #   limitations under the License.
 
 import psutil
+import time
+from typed_python import Entrypoint
 
 
 def currentMemUsageMb(residentOnly=True):
@@ -20,3 +22,26 @@ def currentMemUsageMb(residentOnly=True):
         return psutil.Process().memory_info().rss / 1024 ** 2
     else:
         return psutil.Process().memory_info().vms / 1024 ** 2
+
+
+def compilerPerformanceComparison(f, *args, assertResultsEquivalent=True):
+    """Call 'f' with args in entrypointed/unentrypointed form and benchmark
+
+    If 'assertResultsEquivalent' check that the two results are '=='.
+
+    Returns:
+        (elapsedCompiled, elapsedUncompiled)
+    """
+    fEntrypointed = Entrypoint(f)
+    fEntrypointed(*args)
+
+    t0 = time.time()
+    compiledRes = fEntrypointed(*args)
+    t1 = time.time()
+    uncompiledRes = f(*args)
+    t2 = time.time()
+
+    if assertResultsEquivalent:
+        assert compiledRes == uncompiledRes, (compiledRes, uncompiledRes)
+
+    return (t1 - t0, t2 - t1)

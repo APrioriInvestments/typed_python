@@ -13,8 +13,9 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python import Int64, Bool, String, NoneType, Int32
+from typed_python import Int64, Bool, String, Int32
 
+from typed_python.compiler.type_wrappers.list_of_wrapper import MasqueradingListOfWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 
@@ -354,48 +355,44 @@ class StringWrapper(RefcountedWrapper):
                 else:
                     return context.call_py_function(strJoinIterable, (separator, itemsToJoin), {})
         elif methodname == "split":
-            if len(args) == 2:
+            if len(args) == 0:
                 return context.push(
-                    NoneType,
-                    lambda Ref: Ref.expr.store(
+                    MasqueradingListOfWrapper(ListOf(str)),
+                    lambda outStrings: outStrings.expr.store(
                         runtime_functions.string_split_2.call(
-                            args[0].nonref_expr.cast(VoidPtr),
-                            args[1].nonref_expr.cast(VoidPtr)
-                        )
+                            instance.nonref_expr.cast(VoidPtr)
+                        ).cast(outStrings.expr_type.getNativeLayoutType())
                     )
                 )
-            elif len(args) == 3 and args[2].expr_type.typeRepresentation == String:
+            elif len(args) == 1 and args[0].expr_type.typeRepresentation == String:
                 return context.push(
-                    NoneType,
-                    lambda Ref: Ref.expr.store(
+                    MasqueradingListOfWrapper(ListOf(str)),
+                    lambda outStrings: outStrings.expr.store(
                         runtime_functions.string_split_3.call(
-                            args[0].nonref_expr.cast(VoidPtr),
-                            args[1].nonref_expr.cast(VoidPtr),
-                            args[2].nonref_expr.cast(VoidPtr)
-                        )
+                            instance.nonref_expr.cast(VoidPtr),
+                            args[0].nonref_expr.cast(VoidPtr)
+                        ).cast(outStrings.expr_type.getNativeLayoutType())
                     )
                 )
-            elif len(args) == 3 and args[2].expr_type.typeRepresentation == Int64:
+            elif len(args) == 1 and args[0].expr_type.typeRepresentation == Int64:
                 return context.push(
-                    NoneType,
-                    lambda Ref: Ref.expr.store(
+                    MasqueradingListOfWrapper(ListOf(str)),
+                    lambda outStrings: outStrings.expr.store(
                         runtime_functions.string_split_3max.call(
-                            args[0].nonref_expr.cast(VoidPtr),
-                            args[1].nonref_expr.cast(VoidPtr),
-                            args[2].nonref_expr
-                        )
+                            instance.nonref_expr.cast(VoidPtr),
+                            args[0].nonref_expr
+                        ).cast(outStrings.expr_type.getNativeLayoutType())
                     )
                 )
-            elif len(args) == 4:
+            elif len(args) == 2 and args[0].expr_type.typeRepresentation == String and args[1].expr_type.typeRepresentation == Int64:
                 return context.push(
-                    NoneType,
-                    lambda Ref: Ref.expr.store(
+                    MasqueradingListOfWrapper(ListOf(str)),
+                    lambda outStrings: outStrings.expr.store(
                         runtime_functions.string_split.call(
+                            instance.nonref_expr.cast(VoidPtr),
                             args[0].nonref_expr.cast(VoidPtr),
-                            args[1].nonref_expr.cast(VoidPtr),
-                            args[2].nonref_expr.cast(VoidPtr),
-                            args[3].nonref_expr
-                        )
+                            args[1].nonref_expr
+                        ).cast(outStrings.expr_type.getNativeLayoutType())
                     )
                 )
 

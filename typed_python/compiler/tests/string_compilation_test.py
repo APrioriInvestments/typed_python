@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import _types, Function, ListOf, TupleOf, Dict, ConstDict
-from typed_python.test_util import currentMemUsageMb
+from typed_python.test_util import currentMemUsageMb, compilerPerformanceComparison
 from typed_python.compiler.runtime import Runtime
 import unittest
 import time
@@ -429,33 +429,19 @@ class TestStringCompilation(unittest.TestCase):
     def test_string_split(self):
         @Compiled
         def c_split(s: str, sep: str, max: int) -> ListOf(str):
-            r = ListOf(str)()
-            s.split(r, s, sep, max)
-            return r
+            return s.split(sep, max)
 
         @Compiled
         def c_split_2(s: str) -> ListOf(str):
-            r = ListOf(str)()
-            s.split(r, s)
-            return r
+            return s.split()
 
         @Compiled
         def c_split_3(s: str, sep: str) -> ListOf(str):
-            r = ListOf(str)()
-            s.split(r, s, sep)
-            return r
+            return s.split(sep)
 
         @Compiled
         def c_split_3max(s: str, max: int) -> ListOf(str):
-            r = ListOf(str)()
-            s.split(r, s, max)
-            return r
-
-        @Compiled
-        def c_split_initialized(s: str, lst: ListOf(str)) -> ListOf(str):
-            r = ListOf(str)(lst)
-            s.split(r, s)
-            return r
+            return s.split(max)
 
         # unexpected standard behavior:
         #   "   abc   ".split(maxsplit=0) = "abc   "  *** not "abc" nor "   abc   " ***
@@ -474,9 +460,6 @@ class TestStringCompilation(unittest.TestCase):
                 self.assertEqual(_types.refcount(result[1]), 1)
             baseline = callOrExceptNoType(lambda: s.split())
             self.assertEqual(result, baseline, f"{s} -> {result}")
-            result = callOrExceptNoType(c_split_initialized, s, ["a", "b", "c"])
-            if result[0] == "Normal":
-                self.assertEqual(_types.refcount(result[1]), 1)
             self.assertEqual(result, baseline, "{} -> {}".format(s, result))
             for m in range(-2, 10):
                 result = callOrExceptNoType(c_split_3max, s, m)
@@ -505,36 +488,34 @@ class TestStringCompilation(unittest.TestCase):
                 result = c_split(s, " ", 9)
         endusage = currentMemUsageMb()
         self.assertLess(endusage, startusage + 1)
-        """
-        def rep_find(s, subs):
-            result = 0
-            for i in range(1000):
-                for sub in subs:
-                    result += s.find(sub)
-            return result
 
-        @Compiled
-        def c_rep_find(s: str, subs: ListOf(str)) -> int:
-            result = 0
-            for i in range(1000):
-                for sub in subs:
-                    result += s.find(sub)
-            return result
+    @flaky.flaky(max_runs=3, min_passes=1)
+    def test_string_split_perf(self):
+        def splitAndCount(s: str, sep: str, times: int):
+            res = 0
 
-        def test_find_perf(f, s, subs):
-            t0 = time.time()
-            f(s,subs)
-            return time.time() - t0
+            for i in range(times):
+                res += len(s.split(sep))
 
-        s = "a" * 100000 + "b" + "a" * 100000
-        subs = ["aaa", "aba","aab","baa", "bbb"]
-        c_elapsed = test_find_perf(c_rep_find, s, subs)
-        elapsed = test_find_perf(rep_find, s, subs)
-        self.assertTrue(c_elapsed < elapsed,
-                "Slow Performance: compiled took {0} sec versus baseline {1}"
-                .format(c_elapsed, elapsed)
+            return res
+
+        compiled, uncompiled = compilerPerformanceComparison(splitAndCount, ("a" + ",") * 100, ",", 100000)
+
+        # our string split function is about 6 times slower than python. Mostly due to memory management
+        # issues.
+        print(uncompiled / compiled, " times faster in compiler")
+
+        self.assertTrue(
+            compiled < uncompiled * 10,
+            f"Expected compiled time {compiled} to be not much slower than uncompiled time {uncompiled}. "
+            f"Compiler was {compiled / uncompiled} times slower."
         )
-        """
+
+    def test_type_of_string_split(self):
+        def splitType():
+            return type("asdf".split("s"))
+
+        self.assertEqual(splitType(), Compiled(splitType)())
 
     def validate_joining_strings(self, function, make_obj):
         # Test data, the fields are: description, separator, items, expected output

@@ -359,6 +359,11 @@ class FunctionConversionContext(object):
 
     def assignToLocalVariable(self, varname, val_to_store, variableStates):
         """Ensure we have appropriate storage allocated for 'varname', and assign 'val_to_store' to it."""
+
+        # don't let us store a mutable masquerade value, since then it could
+        # escape and be modified in a way that would violate the type constraints
+        val_to_store = val_to_store.convert_mutable_masquerade_to_untyped()
+
         if varname not in self.variablesAssigned:
             # make sure we know this variable is new. We'll have to
             # re-execute this converter now that we know about this
@@ -605,9 +610,7 @@ class FunctionConversionContext(object):
             subcontext = ExpressionConversionContext(self, variableStates)
 
             if ast.value is None:
-                e = subcontext.convert_expression_ast(
-                    python_ast.Expr.Num(n=python_ast.NumericConstant.None_())
-                )
+                e = subcontext.constant(None)
             else:
                 e = subcontext.convert_expression_ast(ast.value)
 

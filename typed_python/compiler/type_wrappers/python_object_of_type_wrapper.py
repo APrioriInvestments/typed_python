@@ -85,13 +85,12 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         assert isinstance(attr, str)
         return context.push(
             self,
-            lambda targetSlot:
-                targetSlot.expr.store(
-                    runtime_functions.getattr_pyobj.call(
-                        instance.nonref_expr.cast(VoidPtr),
-                        native_ast.const_utf8_cstr(attr)
-                    ).cast(self.getNativeLayoutType())
-                )
+            lambda targetSlot: targetSlot.expr.store(
+                runtime_functions.getattr_pyobj.call(
+                    instance.nonref_expr.cast(VoidPtr),
+                    native_ast.const_utf8_cstr(attr)
+                ).cast(self.getNativeLayoutType())
+            )
         )
 
     def convert_set_attribute(self, context, instance, attr, val):

@@ -22,6 +22,7 @@ class BuiltinWrapper(Wrapper):
     is_pod = True
     is_empty = False
     is_pass_by_ref = False
+
     SUPPORTED_FUNCTIONS = (round, trunc, floor, ceil, format, dir, ord, chr)
 
     def __init__(self, builtin):

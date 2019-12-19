@@ -70,20 +70,52 @@ extern "C" {
         StringType::join(outString, separator, toJoin);
     }
 
-    void nativepython_runtime_string_split(ListOfType::layout* outList, StringType::layout* l, StringType::layout* sep, int64_t max) {
+    ListOfType::layout* nativepython_runtime_string_split(StringType::layout* l, StringType::layout* sep, int64_t max) {
+        static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfStringT->constructor((instance_ptr)&outList);
+
         StringType::split(outList, l, sep, max);
+
+        return outList;
     }
 
-    void nativepython_runtime_string_split_2(ListOfType::layout* outList, StringType::layout* l) {
+    ListOfType::layout* nativepython_runtime_string_split_2(StringType::layout* l) {
+        static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfStringT->constructor((instance_ptr)&outList);
+
         StringType::split_3(outList, l, -1);
+
+        return outList;
     }
 
-    void nativepython_runtime_string_split_3(ListOfType::layout* outList, StringType::layout* l, StringType::layout* sep) {
+    ListOfType::layout* nativepython_runtime_string_split_3(StringType::layout* l, StringType::layout* sep) {
+        static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfStringT->constructor((instance_ptr)&outList);
+
         StringType::split(outList, l, sep, -1);
+
+        return outList;
     }
 
-    void nativepython_runtime_string_split_3max(ListOfType::layout* outList, StringType::layout* l, int64_t max) {
+    ListOfType::layout* nativepython_runtime_string_split_3max(StringType::layout* l, int64_t max) {
+        static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfStringT->constructor((instance_ptr)&outList);
+
         StringType::split_3(outList, l, max);
+
+        return outList;
     }
 
     bool nativepython_runtime_string_isalpha(StringType::layout* l) {

@@ -400,26 +400,26 @@ string_join = externalCallTarget(
 
 string_split = externalCallTarget(
     "nativepython_runtime_string_split",
-    Void,
-    Void.pointer(), Void.pointer(), Void.pointer(), Int64
+    Void.pointer(),
+    Void.pointer(), Void.pointer(), Int64
 )
 
 string_split_2 = externalCallTarget(
     "nativepython_runtime_string_split_2",
-    Void,
-    Void.pointer(), Void.pointer()
+    Void.pointer(),
+    Void.pointer()
 )
 
 string_split_3 = externalCallTarget(
     "nativepython_runtime_string_split_3",
-    Void,
-    Void.pointer(), Void.pointer(), Void.pointer()
+    Void.pointer(),
+    Void.pointer(), Void.pointer()
 )
 
 string_split_3max = externalCallTarget(
     "nativepython_runtime_string_split_3max",
-    Void,
-    Void.pointer(), Void.pointer(), Int64
+    Void.pointer(),
+    Void.pointer(), Int64
 )
 
 string_isalpha = externalCallTarget(

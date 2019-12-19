@@ -84,6 +84,7 @@ class Wrapper(object):
     def __init__(self, typeRepresentation):
         super().__init__()
 
+        # this is the representation of this type _in the compiler_
         self.typeRepresentation = typeRepresentation
         self._conversionCache = {}
 
@@ -95,6 +96,19 @@ class Wrapper(object):
 
     def __hash__(self):
         return hash(self.typeRepresentation)
+
+    @property
+    def interpreterTypeRepresentation(self):
+        """Return the typeRepresentation we should use _at the interpreter_ level.
+
+        This can be different than self.typeRepresentation if we are masquerading
+        as another type. This should be the type we would expect if we called
+
+            type(x)
+
+        where x is an instance of the type covered by the wrapper.
+        """
+        return self.typeRepresentation
 
     def getNativePassingType(self):
         if self.is_pass_by_ref:
@@ -189,6 +203,16 @@ class Wrapper(object):
 
     def convert_default_initialize(self, context, target):
         raise NotImplementedError(self)
+
+    def convert_mutable_masquerade_to_untyped(self, context, instance):
+        """If we are masquerading as an untyped type, convert us to that type."""
+        return instance
+
+    def convert_mutable_masquerade_to_typed(self, context, instance):
+        """If we are masquerading as a mutable untyped type, strip the masquerade
+
+        This causes the value to resolve to the actual representation type."""
+        return instance
 
     def convert_call(self, context, left, args, kwargs):
         return context.pushException(TypeError, "Can't call %s with args of type (%s)" % (

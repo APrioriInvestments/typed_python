@@ -740,6 +740,9 @@ class ExpressionConversionContext(object):
         # force arguments to a type appropriate for argpassing
         native_args = [a.as_native_call_arg() for a in args if not a.expr_type.is_empty]
 
+        args = [a.convert_mutable_masquerade_to_untyped() for a in args]
+        kwargs = {k: v.convert_mutable_masquerade_to_untyped() for k, v in kwargs.items()}
+
         if call_target.output_type is None:
             # this always throws
             assert len(call_target.named_call_target.arg_types) == len(native_args)
@@ -893,6 +896,12 @@ class ExpressionConversionContext(object):
         return None
 
     def convert_expression_ast(self, ast):
+        """Convert a python_ast.Expression node to a TypedExpression.
+
+        Returns:
+            None if the expression doesn't return control flow to the caller
+            or a TypedExpression.
+        """
         if ast.matches.Attribute:
             attr = ast.attr
             val = self.convert_expression_ast(ast.value)
