@@ -550,9 +550,9 @@ class TestCompilationStructures(unittest.TestCase):
         callsF1(1)
 
         t0 = time.time()
-        callsF1(100000000)
+        callsF1(10000000)
         t1 = time.time()
-        callsF4(100000000)
+        callsF4(10000000)
         t2 = time.time()
 
         callsDeeply = t1 - t0
@@ -865,7 +865,7 @@ class TestCompilationStructures(unittest.TestCase):
         def callIt(x, y, z):
             return f(x=x, y=y, z=z)
 
-        self.assertEqual(callIt(1, 2.5, "hi"), NamedTuple(x=int, y=float, z=str)(x=1, y=2.5, z="hi"))
+        self.assertEqual(callIt(1, 2.5, "hi"), dict(x=1, y=2.5, z="hi"))
 
     def test_call_function_with_excess_named_arg(self):
         def f(x=1, y=2):
@@ -888,15 +888,38 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callIt(Tuple(int, int)((1, 2))), 3)
 
+    def test_star_kwarg_type(self):
+        def f(**kwargs):
+            return type(kwargs)
+
+        @Entrypoint
+        def callIt():
+            return f(x=10, y=20)
+
+        self.assertEqual(callIt(), dict)
+
+    def test_star_kwarg_as_dict(self):
+        def f(**kwargs):
+            return kwargs
+
+        @Entrypoint
+        def callIt():
+            return f(x=10, y=20)
+
+        self.assertEqual(callIt(), dict(x=10, y=20))
+
     def test_star_kwarg_call_function(self):
         def f(x, y):
             return x + y
 
-        @Entrypoint
-        def callIt(a):
-            return f(**a)
+        def g(**kwargs):
+            return f(**kwargs)
 
-        self.assertEqual(callIt(NamedTuple(x=int, y=int)((1, 2))), 3)
+        @Entrypoint
+        def callIt(x, y):
+            return g(y=y, x=x)
+
+        self.assertEqual(callIt(1, 2), 3)
 
     def test_star_kwarg_intermediate_is_fast(self):
         def f(x, y):
@@ -905,13 +928,13 @@ class TestCompilationStructures(unittest.TestCase):
         def g(**kwargs):
             return f(**kwargs)
 
-        def sumUsingG(a):
+        def sumUsingG(a: int):
             res = 0.0
             for i in range(a):
                 res += g(x=2, y=i)
             return res
 
-        def sumUsingF(a):
+        def sumUsingF(a: int):
             res = 0.0
             for i in range(a):
                 res += f(x=2, y=i)
@@ -937,4 +960,65 @@ class TestCompilationStructures(unittest.TestCase):
         print("Compiled is ", elapsedGPy / elapsedG, " times faster")
 
         # check that the extra call to 'g' doesn't introduce any overhead
-        self.assertTrue(.75 <= elapsedF / elapsedG <= 1.25)
+        self.assertTrue(.75 <= elapsedF / elapsedG <= 1.25, elapsedF / elapsedG)
+
+    def test_star_arg_intermediate_is_fast(self):
+        def f(x, y):
+            return x + y
+
+        def g(*args):
+            return f(*args)
+
+        def sumUsingG(a: int):
+            res = 0.0
+            for i in range(a):
+                res += g(i, 2)
+            return res
+
+        def sumUsingF(a: int):
+            res = 0.0
+            for i in range(a):
+                res += f(i, 2)
+            return res
+
+        sumUsingGCompiled = Compiled(sumUsingG)
+        sumUsingFCompiled = Compiled(sumUsingF)
+
+        self.assertEqual(sumUsingG(100), sumUsingGCompiled(100))
+
+        t0 = time.time()
+        sumUsingGCompiled(1000000)
+        elapsedG = time.time() - t0
+
+        t0 = time.time()
+        sumUsingFCompiled(1000000)
+        elapsedF = time.time() - t0
+
+        t0 = time.time()
+        sumUsingG(1000000)
+        elapsedGPy = time.time() - t0
+
+        print("Compiled is ", elapsedGPy / elapsedG, " times faster")
+
+        # check that the extra call to 'g' doesn't introduce any overhead
+        self.assertTrue(.75 <= elapsedF / elapsedG <= 1.25, elapsedF / elapsedG)
+
+    def test_star_args_of_masquerade(self):
+        def f(*args):
+            return args[1]
+
+        @Entrypoint
+        def callF():
+            return f(1, "a b c".split())
+
+        self.assertEqual(callF.resultTypeFor(), list)
+
+    def test_star_args_type(self):
+        def f(*args):
+            return type(args)
+
+        @Entrypoint
+        def callF():
+            return f(1, 2, 3)
+
+        self.assertEqual(callF(), tuple)

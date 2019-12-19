@@ -95,7 +95,7 @@ class Wrapper(object):
         return self.typeRepresentation == other.typeRepresentation
 
     def __hash__(self):
-        return hash(self.typeRepresentation)
+        return hash((type(self), self.typeRepresentation))
 
     @property
     def interpreterTypeRepresentation(self):
@@ -206,12 +206,6 @@ class Wrapper(object):
 
     def convert_mutable_masquerade_to_untyped(self, context, instance):
         """If we are masquerading as an untyped type, convert us to that type."""
-        return instance
-
-    def convert_mutable_masquerade_to_typed(self, context, instance):
-        """If we are masquerading as a mutable untyped type, strip the masquerade
-
-        This causes the value to resolve to the actual representation type."""
         return instance
 
     def convert_call(self, context, left, args, kwargs):

@@ -246,6 +246,12 @@ class PythonToNativeConverter(object):
         if callback is not None:
             self.installLinktimeHook(identity, callback)
 
+        if self._currentlyConverting is None:
+            # force the function to resolve immediately
+            self._resolveAllInflightFunctions()
+            self._installInflightFunctions(name)
+            self._inflight_function_conversions.clear()
+
         return self._targets[new_name]
 
     def getTypedCallTarget(self, name, input_types, output_type):
@@ -289,6 +295,39 @@ class PythonToNativeConverter(object):
                 freevars[f.__code__.co_freevars[i]] = f.__closure__[i].cell_contents
 
         return pyast, freevars
+
+    def demasqueradeCallTargetOutput(self, callTarget: TypedCallTarget):
+        """Ensure we are returning the correct 'interpreterType' from callTarget.
+
+        In some cases, we may return a 'masquerade' type in compiled code. This is fine
+        for other compiled code, but the interpreter needs us to transform the result back
+        to the right interpreter type. For instance, we may be returning a *args tuple.
+
+        Returns:
+            a new TypedCallTarget where the output type has the right return type.
+        """
+        if callTarget.output_type is None:
+            return callTarget
+
+        if callTarget.output_type.interpreterTypeRepresentation == callTarget.output_type.typeRepresentation:
+            return callTarget
+
+        def generator(context, out, *args):
+            assert out is not None, "we should have an output because no masquerade types are pass-by-value"
+
+            res = context.call_typed_call_target(callTarget, args)
+
+            out.convert_copy_initialize(res.convert_mutable_masquerade_to_untyped())
+
+        res = self.defineNativeFunction(
+            "demasquerade_" + callTarget.name,
+            ("demasquerade", callTarget.name),
+            callTarget.input_types,
+            typeWrapper(callTarget.output_type.interpreterTypeRepresentation),
+            generator
+        )
+
+        return res
 
     def generateCallConverter(self, callTarget: TypedCallTarget):
         """Given a call target that's optimized for llvm-level dispatch (with individual

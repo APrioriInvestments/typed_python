@@ -12,7 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, Int64, Float64, Alternative, Value, String, ListOf, PythonObjectOfType
+from typed_python import (
+    Function, OneOf, Int64, Float64, Alternative,
+    Value, String, ListOf, NoneType
+)
 from typed_python.compiler.runtime import Runtime, Entrypoint
 import unittest
 
@@ -40,7 +43,7 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(resultType(f, x=int, y=int), Int64)
         self.assertEqual(resultType(f, x=int, y=float), Float64)
-        self.assertEqual(resultType(f, x=int, y=str), None)
+        self.assertEqual(resultType(f, x=int, y=str), NoneType)
 
     def test_sequential_assignment(self):
         def f(x):
@@ -128,7 +131,7 @@ class TestTypeInference(unittest.TestCase):
             return b[x]
 
         self.assertEqual(resultType(f, a=ListOf(str), x=int), String)
-        self.assertTrue(issubclass(resultType(g, b=object, x=int), PythonObjectOfType))
+        self.assertEqual(resultType(g, b=object, x=int), object)
 
     def test_infer_conditional_eval_exception(self):
         def exc():
@@ -152,12 +155,12 @@ class TestTypeInference(unittest.TestCase):
         def or3(x, y):
             return x or y or exc()
 
-        self.assertEqual(resultType(and1, x=int, y=float), None)
+        self.assertEqual(resultType(and1, x=int, y=float), NoneType)
         self.assertEqual(resultType(and2, x=int, y=float), Int64)
         self.assertEqual(resultType(and2, x=float, y=int), Float64)
         self.assertEqual(set(resultType(and3, x=int, y=float).Types), set([Int64, Float64]))
         self.assertEqual(set(resultType(and3, x=float, y=int).Types), set([Int64, Float64]))
-        self.assertEqual(resultType(or1, x=int, y=float), None)
+        self.assertEqual(resultType(or1, x=int, y=float), NoneType)
         self.assertEqual(resultType(or2, x=int, y=float), Int64)
         self.assertEqual(resultType(or2, x=float, y=int), Float64)
         self.assertEqual(set(resultType(or3, x=int, y=float).Types), set([Int64, Float64]))

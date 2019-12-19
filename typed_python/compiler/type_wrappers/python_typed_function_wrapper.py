@@ -63,7 +63,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             context.pushException(TypeError, f"Failed to dispatch to {self} with args {args}")
             return
 
-        return context.call_typed_call_target(callTarget, args, {})
+        return context.call_typed_call_target(callTarget, args)
 
     @staticmethod
     def pickCallSignatureToImplement(overload, argTypes):
@@ -143,8 +143,6 @@ class PythonTypedFunctionWrapper(Wrapper):
                 self.typeRepresentation,
                 argTypes
             )
-
-            print("Possible return types are ", possibleTypes)
 
             returnType = OneOfWrapper.mergeTypes(possibleTypes)
 
@@ -290,8 +288,7 @@ class PythonTypedFunctionWrapper(Wrapper):
 
                     successful = context.call_typed_call_target(
                         testSingleOverloadForm,
-                        (outputSlot.changeType(PointerTo(overloadRetType), False),) + args,
-                        {}
+                        (outputSlot.changeType(PointerTo(overloadRetType), False),) + args
                     )
 
                     with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):

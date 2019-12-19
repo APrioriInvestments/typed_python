@@ -17,10 +17,10 @@ from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWra
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from typed_python.compiler.type_wrappers.arithmetic_wrapper import FloatWrapper, IntWrapper
-
+from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, OneOf, PointerTo, Bool, Int32
+from typed_python import NoneType, _types, PointerTo, Bool, Int32
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -447,10 +447,7 @@ class ClassWrapper(RefcountedWrapper):
 
         # compute the return type of dispatching to this function. it will be a one-of if we
         # might dispatch to multiple possible functions.
-        if len(resultTypes) == 1:
-            output_type = typeWrapper(list(resultTypes)[0])
-        else:
-            output_type = typeWrapper(OneOf(*resultTypes))
+        output_type = OneOfWrapper.mergeTypes(resultTypes)
 
         dispatchToOverloads = context.converter.defineNativeFunction(
             f'call_method.{self}.{methodName}.{argTypes[1:]}',
@@ -460,7 +457,7 @@ class ClassWrapper(RefcountedWrapper):
             lambda context, outputVar, *args: self.generateMethodDispatch(context, methodName, output_type, args)
         )
 
-        return context.call_typed_call_target(dispatchToOverloads, [instance] + args, {})
+        return context.call_typed_call_target(dispatchToOverloads, [instance] + args)
 
     def generateMethodDispatch(self, context, methodName, methodReturnType, args):
         """Generate native code that tries to dispatch to each of func's overloads
@@ -504,8 +501,7 @@ class ClassWrapper(RefcountedWrapper):
 
                     successful = context.call_typed_call_target(
                         testSingleOverloadForm,
-                        (outputSlot.changeType(PointerTo(overloadRetType), False),) + args,
-                        {}
+                        (outputSlot.changeType(PointerTo(overloadRetType), False),) + args
                     )
 
                     with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
@@ -707,7 +703,7 @@ class ClassWrapper(RefcountedWrapper):
             raise Exception(f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}")
 
         outputVar.changeType(typeWrapper(retType), True).convert_copy_initialize(
-            context.call_function_pointer(funcPtr, convertedArgs, {}, typeWrapper(retType))
+            context.call_function_pointer(funcPtr, convertedArgs, typeWrapper(retType))
         )
 
         context.pushReturnValue(context.constant(True))
@@ -741,8 +737,7 @@ class ClassWrapper(RefcountedWrapper):
             if convertedArgs[-1] is None:
                 return None
 
-        kwargs = {}
-        res = context.call_function_pointer(funcPtr, convertedArgs, kwargs, typeWrapper(retType))
+        res = context.call_function_pointer(funcPtr, convertedArgs, typeWrapper(retType))
 
         return res
 

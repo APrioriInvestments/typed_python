@@ -17,7 +17,10 @@ import os
 import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
 import typed_python.compiler.llvm_compiler as llvm_compiler
-from typed_python import Function, NoneType, OneOf, _types, Value
+import typed_python
+
+from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
+from typed_python import Function, NoneType, _types, Value
 from typed_python.internals import FunctionOverload, DisableCompiledCode
 
 _singleton = [None]
@@ -25,14 +28,17 @@ _singleton = [None]
 typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
 
 
-def toSingleType(setOfTypes):
-    if not setOfTypes:
+def toInterpreterType(setOfTypes):
+    res = OneOfWrapper.mergeTypes(setOfTypes)
+    if res is None:
         return None
 
-    if len(setOfTypes) == 1:
-        return list(setOfTypes)[0]
+    res = res.interpreterTypeRepresentation
 
-    return OneOf(*setOfTypes)
+    if issubclass(res, typed_python.PythonObjectOfType):
+        return res.PyType
+
+    return res
 
 
 class Runtime:
@@ -56,71 +62,8 @@ class Runtime:
         self.llvm_compiler.mark_converter_verbose()
         self.llvm_compiler.mark_llvm_codegen_verbose()
 
-    def resultTypes(self, f, argument_types):
-        with self.lock:
-            argument_types = dict(argument_types or {})
-
-            if isinstance(f, FunctionOverload):
-                for a in f.args:
-                    assert not a.isStarArg, 'dont support star args yet'
-                    assert not a.isKwarg, 'dont support keyword yet'
-
-                def chooseTypeFilter(a):
-                    return argument_types.pop(a.name, a.typeFilter or object)
-
-                input_wrappers = [typeWrapper(chooseTypeFilter(a)) for a in f.args]
-
-                if len(argument_types):
-                    raise Exception("No argument exists for type overrides %s" % argument_types)
-
-                self.timesCompiled += 1
-
-                callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType, assertIsRoot=True)
-
-                assert callTarget is not None
-
-                wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
-
-                targets = self.converter.extract_new_function_definitions()
-
-                self.llvm_compiler.add_functions(targets)
-
-                # if the callTargetName isn't in the list, then we already compiled it and installed it.
-                fp = self.llvm_compiler.function_pointer_by_name(wrappingCallTargetName)
-
-                f._installNativePointer(
-                    fp.fp,
-                    callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
-                    [i.typeRepresentation for i in input_wrappers]
-                )
-
-                self._collectLinktimeHooks()
-
-                return toSingleType(set([callTarget.output_type.typeRepresentation] if callTarget.output_type is not None else []))
-
-            if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
-                results = set()
-
-                for o in f.overloads:
-                    results.add(self.resultTypes(o, argument_types))
-
-                return toSingleType(results)
-
-            if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'BoundMethod':
-                results = set()
-
-                for o in f.Function.overloads:
-                    arg_types = dict(argument_types)
-                    arg_types[o.args[0].name] = typeWrapper(f.Class)
-                    results.add(self.resultTypes(o, arg_types))
-
-                return results
-
-            if callable(f):
-                result = Function(f)
-                return self.resultTypes(result, argument_types)
-
-            assert False, f
+    def resultTypes(self, func, argument_types):
+        return self.compile(func, argument_types, returnOutputType=True)
 
     def _collectLinktimeHooks(self):
         while True:
@@ -136,7 +79,7 @@ class Runtime:
 
             callback(fp)
 
-    def compile(self, f, argument_types=None):
+    def compile(self, f, argument_types=None, returnOutputType=False):
         """Compile a single FunctionOverload and install the pointer
 
         If provided, 'argument_types' can be a dictionary from variable name to a type.
@@ -165,6 +108,8 @@ class Runtime:
 
                 callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType, assertIsRoot=True)
 
+                callTarget = self.converter.demasqueradeCallTargetOutput(callTarget)
+
                 assert callTarget is not None
 
                 wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
@@ -184,24 +129,49 @@ class Runtime:
 
                 self._collectLinktimeHooks()
 
-                return targets
+                if returnOutputType:
+                    return toInterpreterType(
+                        set([callTarget.output_type.interpreterTypeRepresentation] if callTarget.output_type is not None else [])
+                    )
+                else:
+                    return targets
 
             if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
+                results = set()
+
                 for o in f.overloads:
-                    self.compile(o, argument_types)
-                return f
+                    result = self.compile(o, argument_types, returnOutputType=returnOutputType)
+
+                    if returnOutputType:
+                        results.add(result)
+
+                if returnOutputType:
+                    return toInterpreterType(results)
+                else:
+                    return f
 
             if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'BoundMethod':
+                results = set()
+
                 for o in f.Function.overloads:
                     arg_types = dict(argument_types)
                     arg_types[o.args[0].name] = typeWrapper(f.Class)
-                    self.compile(o, arg_types)
-                return f
+                    result = self.compile(o, arg_types, returnOutputType=returnOutputType)
+
+                    if returnOutputType:
+                        results.add()
+
+                if returnOutputType:
+                    return toInterpreterType(results)
+                else:
+                    return f
 
             if callable(f):
-                result = Function(f)
-                self.compile(result, argument_types)
-                return result
+                return self.compile(
+                    Function(f),
+                    argument_types,
+                    returnOutputType=returnOutputType
+                )
 
             assert False, f
 

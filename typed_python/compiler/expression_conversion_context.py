@@ -26,6 +26,8 @@ from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
 from typed_python import NoneType, Alternative, OneOf, Int32, ListOf, String, Tuple, NamedTuple
 from typed_python._types import getTypePointer
+from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
+from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 
 builtinValueIdToNameAndValue = {id(v): (k, v) for k, v in __builtins__.items()}
 
@@ -560,10 +562,7 @@ class ExpressionConversionContext(object):
 
         return expr
 
-    def call_function_pointer(self, funcPtr, args, kwargs, returnType):
-        if kwargs:
-            raise NotImplementedError("Kwargs not implemented for py-function dispatch yet")
-
+    def call_function_pointer(self, funcPtr, args, returnType):
         # force arguments to a type appropriate for argpassing
         native_args = [a.as_native_call_arg() for a in args if not a.expr_type.is_empty]
 
@@ -615,6 +614,9 @@ class ExpressionConversionContext(object):
 
             Otherwise, None, and an exception will have been generated.
         """
+        args = [a.convert_mutable_masquerade_to_untyped() for a in args]
+        kwargs = {k: v.convert_mutable_masquerade_to_untyped() for k, v in kwargs.items()}
+
         outArgs = []
         curTargetIx = 0
 
@@ -707,13 +709,29 @@ class ExpressionConversionContext(object):
         Returns:
             a TypedExpression for the tuple
         """
-        tupleType = Tuple(*[a.expr_type.typeRepresentation for a in tupleArgs])
-        return typeWrapper(tupleType).createFromArgs(self, tupleArgs)
+        tupleType = Tuple(*[a.expr_type.interpreterTypeRepresentation for a in tupleArgs])
+
+        return typeWrapper(tupleType).createFromArgs(self, tupleArgs).changeType(
+            TypedTupleMasqueradingAsTuple(tupleType)
+        )
 
     def makeKwargDict(self, kwargs):
-        tupleType = NamedTuple(**{k: v.expr_type.typeRepresentation for k, v in kwargs.items()})
+        tupleType = NamedTuple(**{k: v.expr_type.interpreterTypeRepresentation for k, v in kwargs.items()})
 
-        return typeWrapper(tupleType).convert_type_call(self, None, (), kwargs)
+        return typeWrapper(tupleType).convert_type_call(self, None, (), kwargs).changeType(
+            NamedTupleMasqueradingAsDict(tupleType)
+        )
+
+    def logDiagnostic(self, *args):
+        realArgs = []
+
+        for a in args:
+            if isinstance(a, TypedExpression):
+                realArgs.append(a)
+            else:
+                realArgs.append(self.constant(a))
+
+        self.constant(print).convert_call(realArgs, {})
 
     def call_py_function(self, f, args, kwargs, returnTypeOverload=None):
         if not isinstance(f, types.FunctionType):
@@ -734,14 +752,11 @@ class ExpressionConversionContext(object):
             self.pushException(TypeError, "Function %s was not convertible." % f.__qualname__)
             return
 
-        return self.call_typed_call_target(call_target, concreteArgs, kwargs)
+        return self.call_typed_call_target(call_target, concreteArgs)
 
-    def call_typed_call_target(self, call_target, args, kwargs):
+    def call_typed_call_target(self, call_target, args):
         # force arguments to a type appropriate for argpassing
         native_args = [a.as_native_call_arg() for a in args if not a.expr_type.is_empty]
-
-        args = [a.convert_mutable_masquerade_to_untyped() for a in args]
-        kwargs = {k: v.convert_mutable_masquerade_to_untyped() for k, v in kwargs.items()}
 
         if call_target.output_type is None:
             # this always throws
@@ -1132,11 +1147,14 @@ class ExpressionConversionContext(object):
                     if toStarKwarg is None:
                         return None
 
-                    if not issubclass(toStarKwarg.expr_type.typeRepresentation, NamedTuple):
+                    if not isinstance(toStarKwarg.expr_type, NamedTupleMasqueradingAsDict):
                         raise Exception(
                             f"Don't know how to **args call with argument of type "
-                            f"{toStarKwarg.expr_type.typeRepresentation} yet"
+                            f"{toStarKwarg.expr_type} yet"
                         )
+
+                    # unwrap this to a NamedTuple
+                    toStarKwarg = toStarKwarg.convert_masquerade_to_typed()
 
                     for ix, name in enumerate(toStarKwarg.expr_type.typeRepresentation.ElementNames):
                         kwargs[name] = toStarKwarg.expr_type.refAs(self, toStarKwarg, ix)
@@ -1178,7 +1196,12 @@ class ExpressionConversionContext(object):
                     false_res = self.convert_expression_ast(ast.orelse)
 
                 if true_res.expr_type != false_res.expr_type:
-                    out_type = typeWrapper(OneOf(true_res.expr_type.typeRepresentation, false_res.expr_type.typeRepresentation))
+                    out_type = typeWrapper(
+                        OneOf(
+                            true_res.expr_type.interpreterTypeRepresentation,
+                            false_res.expr_type.interpreterTypeRepresentation
+                        )
+                    )
                 else:
                     out_type = true_res.expr_type
 

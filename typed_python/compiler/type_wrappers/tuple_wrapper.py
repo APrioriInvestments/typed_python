@@ -14,8 +14,9 @@
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
-from typed_python import _types, Int32, OneOf, Bool
+from typed_python import _types, Int32, Bool
 
+from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -33,7 +34,10 @@ class TupleWrapper(Wrapper):
         bytecount = _types.bytecount(t)
 
         self.subTypeWrappers = tuple(typeWrapper(sub_t) for sub_t in t.ElementTypes)
-        self.unionType = OneOf(*tuple(t.ElementTypes))
+        self.unionType = OneOfWrapper.mergeTypes(t.ElementTypes)
+        if self.unionType is not None:
+            self.unionType = self.unionType.interpreterTypeRepresentation
+
         self.byteOffsets = [0]
 
         for i in range(len(self.subTypeWrappers)-1):
@@ -93,6 +97,10 @@ class TupleWrapper(Wrapper):
         if index is None:
             return None
 
+        if not len(self.subTypeWrappers):
+            context.pushException(IndexError, f"tuple index out of range")
+            return None
+
         # if the argument is a constant, we can be very precise about what type
         # we're going to get out of the indexing operation
         if index.expr.matches.Constant:
@@ -123,7 +131,7 @@ class TupleWrapper(Wrapper):
                             result.convert_copy_initialize(converted)
                             context.markUninitializedSlotInitialized(result)
                     else:
-                        context.pushException(IndexError, f"{i} not in [0, {len(self.subTypeWrappers)})")
+                        context.pushException(IndexError, "tuple index out of range")
 
         return result
 

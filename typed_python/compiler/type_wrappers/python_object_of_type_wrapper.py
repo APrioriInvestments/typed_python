@@ -19,7 +19,11 @@ from typed_python.compiler.typed_expression import TypedExpression
 from typed_python import OneOf
 import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.native_ast import VoidPtr
+import typed_python
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
+
+
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
 class PythonObjectOfTypeWrapper(RefcountedWrapper):
@@ -84,7 +88,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
     def convert_attribute(self, context, instance, attr):
         assert isinstance(attr, str)
         return context.push(
-            self,
+            object,
             lambda targetSlot: targetSlot.expr.store(
                 runtime_functions.getattr_pyobj.call(
                     instance.nonref_expr.cast(VoidPtr),
@@ -116,7 +120,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             return None
 
         return context.push(
-            self,
+            object,
             lambda targetSlot:
                 targetSlot.expr.store(
                     runtime_functions.getitem_pyobj.call(
@@ -273,6 +277,10 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
         target_type = targetVal.expr_type
+
+        if targetVal.expr_type == typeWrapper(object):
+            targetVal.convert_copy_initialize(e)
+            return context.constant(True)
 
         t = target_type.typeRepresentation
 

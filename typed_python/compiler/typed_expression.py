@@ -209,8 +209,11 @@ class TypedExpression(object):
     def convert_mutable_masquerade_to_untyped(self):
         return self.expr_type.convert_mutable_masquerade_to_untyped(self.context, self)
 
-    def convert_mutable_masquerade_to_typed(self):
-        return self.expr_type.convert_mutable_masquerade_to_typed(self.context, self)
+    def convert_masquerade_to_untyped(self):
+        return self.expr_type.convert_masquerade_to_untyped(self.context, self)
+
+    def convert_masquerade_to_typed(self):
+        return self.expr_type.convert_masquerade_to_typed(self.context, self)
 
     def convert_next(self):
         return self.expr_type.convert_next(self.context, self)

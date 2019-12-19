@@ -17,11 +17,11 @@ from math import trunc, floor, ceil
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python import NoneType, _types, OneOf, Bool, Int32
+from typed_python import NoneType, _types, Bool, Int32
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 from typed_python.compiler.native_ast import VoidPtr
-
+from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
@@ -440,9 +440,7 @@ class AlternativeWrapper(RefcountedWrapper):
                     context.pushException(AttributeError, "Object has no attribute %s" % attribute)
             return self.refAs(context, instance, validIndices[0]).convert_attribute(attribute)
         else:
-            outputType = typeWrapper(
-                list(possibleTypes)[0] if len(possibleTypes) == 1 else OneOf(*possibleTypes)
-            )
+            outputType = OneOfWrapper.mergeTypes(possibleTypes)
 
             output = context.allocateUninitializedSlot(outputType)
 

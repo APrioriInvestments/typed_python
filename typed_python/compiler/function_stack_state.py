@@ -1,4 +1,5 @@
 from typed_python import OneOf
+from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 
 
 def mergeTypes(t1, t2):
@@ -20,7 +21,7 @@ def removeTypeFrom(type, toRemove):
         if len(types) == 1:
             return types[0]
 
-        return OneOf(*types)
+        return OneOfWrapper.mergeTypes(types).interpreterTypeRepresentation
     return type
 
 

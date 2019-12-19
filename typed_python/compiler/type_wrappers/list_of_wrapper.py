@@ -405,10 +405,9 @@ class MasqueradingListOfWrapper(ListOfWrapper):
         return list
 
     def convert_mutable_masquerade_to_untyped(self, context, instance):
-        return context.constant(list).convert_call([instance], {})
-
-    def convert_mutable_masquerade_to_typed(self, context, instance):
-        return instance.changeType(typeWrapper(self.typeRepresentation))
+        return context.constant(list).convert_call([instance], {}).changeType(
+            typeWrapper(list)
+        )
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
         # Allow the typed form of the object to perform the conversion

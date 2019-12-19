@@ -63,7 +63,7 @@ class OneOfWrapper(Wrapper):
         allTypes = set()
         for t in types:
             if isinstance(t, Wrapper):
-                t = t.typeRepresentation
+                t = t.interpreterTypeRepresentation
 
             if isinstance(t, OneOf):
                 allTypes.update(t.Types)

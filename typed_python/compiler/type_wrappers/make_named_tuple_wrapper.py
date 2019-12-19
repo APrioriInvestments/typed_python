@@ -37,7 +37,7 @@ class MakeNamedTupleWrapper(Wrapper):
         if args:
             context.pushException(TypeError, f"makeNamedTuple takes 0 positional arguments but {len(args)} were given")
 
-        argTypes = {k: v.expr_type.typeRepresentation for k, v in kwargs.items()}
+        argTypes = {k: v.expr_type.interpreterTypeRepresentation for k, v in kwargs.items()}
 
         namedTupleType = NamedTuple(**argTypes)
 
