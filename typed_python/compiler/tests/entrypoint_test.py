@@ -12,10 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Class, Member, Final, TupleOf, DisableCompiledCode
+from typed_python import ListOf, Class, Member, Final, TupleOf, DisableCompiledCode, Int64
 from typed_python._types import touchCompiledSpecializations
 from typed_python import Entrypoint, NotCompiled, Function
-from typed_python.compiler.runtime import Runtime
+from typed_python.compiler.runtime import Runtime, RuntimeEventVisitor
 from flaky import flaky
 import traceback
 import threading
@@ -386,3 +386,21 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(f(1), 4)
         self.assertEqual(f(1, 4), 7)
+
+    def test_event_visitors(self):
+        out = {}
+
+        class Visitor(RuntimeEventVisitor):
+            def onNewFunction(self, f, inputTypes, outputType, variables):
+                out[f] = (inputTypes, outputType, variables)
+
+        @Entrypoint
+        def f(x):
+            y = x + 1
+            return str(y)
+
+        with Visitor():
+            f.resultTypeFor(0)
+
+        self.assertTrue(f.__wrapped_function__ in out, out)
+        self.assertEqual(out[f.__wrapped_function__][2]['y'], Int64)

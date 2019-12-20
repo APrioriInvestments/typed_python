@@ -134,6 +134,7 @@ class PythonToNativeConverter(object):
         self._new_native_functions = set()
         self._used_names = set()
         self._linktimeHooks = []
+        self._visitors = []
 
         # the identity of the function we're currently evaluating.
         # we use this to track which functions need to get rebuilt when
@@ -142,7 +143,11 @@ class PythonToNativeConverter(object):
 
         self._dependencies = FunctionDependencyGraph()
 
-        self.verbose = False
+    def addVisitor(self, visitor):
+        self._visitors.append(visitor)
+
+    def removeVisitor(self, visitor):
+        self._visitors.remove(visitor)
 
     def identityToName(self, identity):
         """Convert a function identity to the link-time name for the function.
@@ -162,9 +167,6 @@ class PythonToNativeConverter(object):
 
         for u in self._new_native_functions:
             res[u] = self._definitions[u]
-
-            if self.verbose:
-                print(self._targets[u])
 
         self._new_native_functions = set()
 
@@ -540,6 +542,15 @@ class PythonToNativeConverter(object):
                     self._currentlyConverting = None
 
         for identifier, functionConverter in self._inflight_function_conversions.items():
+            if identifier[:1] == ("pyfunction",):
+                for v in self._visitors:
+                    v.onNewFunction(
+                        identifier[1],
+                        identifier[2],
+                        identifier[3],
+                        {k: v.typeRepresentation for k, v in functionConverter._varname_to_type.items() if isinstance(k, str)}
+                    )
+
             if identifier not in self._inflight_definitions:
                 raise Exception(
                     f"Expected a definition for {identifier} depended on by:\n"

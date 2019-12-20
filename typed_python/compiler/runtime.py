@@ -41,6 +41,22 @@ def toInterpreterType(setOfTypes):
     return res
 
 
+class RuntimeEventVisitor:
+    """Base class for a Visitor that gets to see what's going on in the runtime.
+
+    Clients should subclass this and pass it to 'addEventVisitor' in the runtime
+    to find out about events like function typing assignments.
+    """
+    def onNewFunction(self, function, inputTypes, outputType, variableTypes):
+        pass
+
+    def __enter__(self):
+        Runtime.singleton().addEventVisitor(self)
+
+    def __exit__(self, *args):
+        Runtime.singleton().removeEventVisitor(self)
+
+
 class Runtime:
     @staticmethod
     def singleton():
@@ -61,6 +77,12 @@ class Runtime:
     def verboselyDisplayNativeCode(self):
         self.llvm_compiler.mark_converter_verbose()
         self.llvm_compiler.mark_llvm_codegen_verbose()
+
+    def addEventVisitor(self, visitor: RuntimeEventVisitor):
+        self.converter.addVisitor(visitor)
+
+    def removeEventVisitor(self, visitor: RuntimeEventVisitor):
+        self.converter.removeVisitor(visitor)
 
     def resultTypes(self, func, argument_types):
         return self.compile(func, argument_types, returnOutputType=True)
@@ -222,15 +244,17 @@ def Entrypoint(pyFunc):
     compilation has completed.
     """
     wrapInStatic = False
-    if not isinstance(pyFunc, _types.Function):
-        if isinstance(pyFunc, staticmethod):
-            pyFunc = pyFunc.__func__
+
+    typedFunc = pyFunc
+    if not isinstance(typedFunc, _types.Function):
+        if isinstance(typedFunc, staticmethod):
+            typedFunc = typedFunc.__func__
             wrapInStatic = True
 
-        if not callable(pyFunc):
-            raise Exception(f"Can only compile functions, not {pyFunc}")
+        if not callable(typedFunc):
+            raise Exception(f"Can only compile functions, not {typedFunc}")
 
-        pyFunc = Function(pyFunc)
+        typedFunc = Function(typedFunc)
 
     lock = threading.RLock()
     signatures = set()
@@ -242,28 +266,29 @@ def Entrypoint(pyFunc):
         if True or not DisableCompiledCode.isDisabled():
             with lock:
                 if signature not in signatures:
-                    i = pyFunc.indexOfOverloadMatching(*args)
+                    i = typedFunc.indexOfOverloadMatching(*args)
 
                     if i is not None:
-                        o = pyFunc.overloads[i]
+                        o = typedFunc.overloads[i]
                         argTypes = {o.args[i].name: o.args[i].typeToUse(signature[i]) for i in range(len(args))}
                         Runtime.singleton().compile(o, argTypes)
 
                     signatures.add(signature)
 
-        return pyFunc(*args)
+        return typedFunc(*args)
 
-    inner.__qualname__ = str(pyFunc)
-    inner.__typed_python_function__ = pyFunc
+    inner.__qualname__ = str(typedFunc)
+    inner.__typed_python_function__ = typedFunc
+    inner.__wrapped_function__ = pyFunc
 
     def resultTypeFor(*args):
         signature = tuple(pickSpecializationTypeFor(x) for x in args)
         args = tuple(pickSpecializationValueFor(x) for x in args)
 
-        i = pyFunc.indexOfOverloadMatching(*args)
+        i = typedFunc.indexOfOverloadMatching(*args)
 
         if i is not None:
-            o = pyFunc.overloads[i]
+            o = typedFunc.overloads[i]
 
             argTypes = {o.args[i].name: o.args[i].typeToUse(signature[i]) for i in range(len(args))}
             return Runtime.singleton().resultTypes(o, argTypes)
