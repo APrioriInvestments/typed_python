@@ -415,6 +415,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(isinstance(XorX2(X()), X))
         self.assertTrue(isinstance(XorX2(X2()), X2))
 
+    @flaky(max_runs=3, min_passes=1)
     def test_tuple_of_tuple_of(self):
         tupleOfInt = TupleOf(int)
         tupleOfTupleOfInt = TupleOf(tupleOfInt)
