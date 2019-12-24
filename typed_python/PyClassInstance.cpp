@@ -322,19 +322,14 @@ void PyClassInstance::constructFromPythonArgumentsConcrete(Class* classT, uint8_
 
     Function* initMethod = it->second;
 
-    PyObject* selfAsObject = PyInstance::initialize(classT, [&](instance_ptr selfData) {
-        classT->copy_constructor(selfData, data);
-    });
+    PyObjectStealer selfAsObject(
+        PyInstance::initialize(classT, [&](instance_ptr selfData) {
+            classT->copy_constructor(selfData, data);
+        })
+    );
 
-    PyObjectStealer targetArgTuple(PyTuple_New(PyTuple_Size(args)+1));
+    auto res = PyFunctionInstance::tryToCallAnyOverload(initMethod, selfAsObject, args, kwargs);
 
-    PyTuple_SetItem(targetArgTuple, 0, selfAsObject); //steals the reference to the new 'selfAsObject'
-
-    for (long k = 0; k < PyTuple_Size(args); k++) {
-        PyTuple_SetItem(targetArgTuple, k+1, incref(PyTuple_GetItem(args, k))); //have to incref because of stealing
-    }
-
-    auto res = PyFunctionInstance::tryToCallAnyOverload(initMethod, nullptr, targetArgTuple, kwargs);
     if (!res.first) {
         throw std::runtime_error("Cannot find a valid overload of __init__ with these arguments.");
     }

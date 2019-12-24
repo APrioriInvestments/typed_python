@@ -1060,12 +1060,19 @@ class TestCompilationStructures(unittest.TestCase):
         def callF3(x, y):
             return f(x, y=y)
 
+        @Entrypoint
+        def callF4(x, y):
+            return f(x, x=y)
+
         self.assertEqual(callF1(10), 10)
 
         with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
             callF2(0, 1)
 
         self.assertEqual(callF3(10, 2), 11)
+
+        with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
+            callF4(0, 1)
 
     def test_typed_functions_dispatch_based_on_names(self):
         @Function

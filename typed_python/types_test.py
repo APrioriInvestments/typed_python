@@ -784,7 +784,7 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(a, deserialize(t, serialize(t, a)))
 
-    def test_dict_assign_coersion(self):
+    def test_dict_assign_coercion(self):
         T = Dict(str, int)
 
         t = T()

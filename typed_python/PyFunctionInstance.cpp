@@ -15,6 +15,7 @@
 ******************************************************************************/
 
 #include "PyFunctionInstance.hpp"
+#include "FunctionCallArgMapping.hpp"
 
 Function* PyFunctionInstance::type() {
     return (Function*)extractTypeFrom(((PyObject*)this)->ob_type);
@@ -29,14 +30,14 @@ PyFunctionInstance::tryToCallAnyOverload(const Function* f, PyObject* self,
     for (long tryToConvertExplicitly = 0; tryToConvertExplicitly <= 1; tryToConvertExplicitly++) {
         for (const auto& overload: f->getOverloads()) {
             std::pair<bool, PyObject*> res =
-                PyFunctionInstance::tryToCallOverload(overload, self, args, kwargs, tryToConvertExplicitly);
+                PyFunctionInstance::tryToCallOverload(overload, self, args, kwargs, tryToConvertExplicitly, false, f->isEntrypoint());
             if (res.first) {
                 return res;
             }
         }
     }
 
-    std::string argTupleTypeDesc = PyFunctionInstance::argTupleTypeDescription(args, kwargs);
+    std::string argTupleTypeDesc = PyFunctionInstance::argTupleTypeDescription(self, args, kwargs);
 
     PyErr_Format(
         PyExc_TypeError, "Cannot find a valid overload of '%s' with arguments of type %s",
@@ -48,57 +49,26 @@ PyFunctionInstance::tryToCallAnyOverload(const Function* f, PyObject* self,
 }
 
 // static
-std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs, bool convertExplicitly, bool dontActuallyCall) {
-    PyObjectStealer targetArgTuple(PyTuple_New(PyTuple_Size(args)+(self?1:0)));
-    Function::Matcher matcher(f);
-
-    int write_slot = 0;
+std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
+        const Function::Overload& f,
+        PyObject* self,
+        PyObject* args,
+        PyObject* kwargs,
+        bool convertExplicitly,
+        bool dontActuallyCall,
+        bool isEntrypoint
+) {
+    FunctionCallArgMapping mapping(f);
 
     if (self) {
-        PyTuple_SetItem(targetArgTuple, write_slot++, incref(self));
-        matcher.requiredTypeForArg(nullptr);
+        mapping.pushPositionalArg(self);
     }
 
     for (long k = 0; k < PyTuple_Size(args); k++) {
-        PyObjectHolder elt(PyTuple_GetItem(args, k));
-
-        //what type would we need for this unnamed arg?
-        Type* targetType = matcher.requiredTypeForArg(nullptr);
-
-        if (!matcher.stillMatches()) {
-            return std::make_pair(false, nullptr);
-        }
-
-        if (!targetType) {
-            incref(elt);
-            PyTuple_SetItem(targetArgTuple, write_slot++, elt);
-        }
-        else {
-            try {
-                PyObject* targetObj =
-                    PyInstance::initializePythonRepresentation(targetType, [&](instance_ptr data) {
-                        copyConstructFromPythonInstance(targetType, data, elt, convertExplicitly);
-                    });
-
-                PyTuple_SetItem(targetArgTuple, write_slot++, targetObj);
-            }
-            catch(PythonExceptionSet& e) {
-                PyErr_Clear();
-                //not a valid conversion, but keep going
-                return std::make_pair(false, nullptr);
-            }
-            catch(...) {
-                //not a valid conversion, but keep going
-                return std::make_pair(false, nullptr);
-            }
-        }
+        mapping.pushPositionalArg(PyTuple_GetItem(args, k));
     }
 
-    PyObjectHolder newKwargs;
-
     if (kwargs) {
-        newKwargs.steal(PyDict_New());
-
         PyObject *key, *value;
         Py_ssize_t pos = 0;
 
@@ -108,39 +78,32 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
                 return std::make_pair(true, nullptr);
             }
 
-            //what type would we need for this unnamed arg?
-            Type* targetType = matcher.requiredTypeForArg(PyUnicode_AsUTF8(key));
+            mapping.pushKeywordArg(PyUnicode_AsUTF8(key), value);
+        }
+    }
 
-            if (!matcher.stillMatches()) {
-                return std::make_pair(false, nullptr);
-            }
+    mapping.finishedPushing();
 
-            if (!targetType) {
-                PyDict_SetItem(newKwargs, key, value);
-            }
-            else {
-                try {
-                    PyObjectStealer convertedValue(
-                        PyInstance::initializePythonRepresentation(targetType, [&](instance_ptr data) {
-                            copyConstructFromPythonInstance(targetType, data, value, convertExplicitly);
-                        })
-                    );
+    if (!mapping.isValid()) {
+        return std::make_pair(false, nullptr);
+    }
 
-                    PyDict_SetItem(newKwargs, key, convertedValue);
-                }
-                catch(PythonExceptionSet& e) {
-                    PyErr_Clear();
-                    //not a valid conversion, but keep going
-                    return std::make_pair(false, nullptr);
-                } catch(...) {
-                    //not a valid conversion
-                    return std::make_pair(false, nullptr);
-                }
+    //first, see if we can short-circuit without producing temporaries, which
+    //can be slow.
+    for (long k = 0; k < f.getArgs().size(); k++) {
+        auto arg = f.getArgs()[k];
+
+        if (arg.getIsNormalArg() && arg.getTypeFilter()) {
+            if (!PyInstance::pyValCouldBeOfType(arg.getTypeFilter(), mapping.getSingleValueArgs()[k], convertExplicitly)) {
+                return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
             }
         }
     }
 
-    if (!matcher.definitelyMatches()) {
+    //perform argument coercion
+    mapping.applyTypeCoercion(convertExplicitly);
+
+    if (!mapping.isValid()) {
         return std::make_pair(false, nullptr);
     }
 
@@ -154,13 +117,16 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
     bool hadNativeDispatch = false;
 
     if (!native_dispatch_disabled) {
-        auto tried_and_result = dispatchFunctionCallToNative(f, targetArgTuple, newKwargs);
+        auto tried_and_result = dispatchFunctionCallToNative(f, mapping, isEntrypoint);
         hadNativeDispatch = tried_and_result.first;
         result.steal(tried_and_result.second);
     }
 
     if (!hadNativeDispatch) {
-        result.steal(PyObject_Call((PyObject*)f.getFunctionObj(), targetArgTuple, newKwargs));
+        PyObjectStealer argTup(mapping.buildPositionalArgTuple());
+        PyObjectStealer kwargD(mapping.buildKeywordArgTuple());
+
+        result.steal(PyObject_Call((PyObject*)f.getFunctionObj(), (PyObject*)argTup, (PyObject*)kwargD));
     }
 
     //exceptions pass through directly
@@ -199,12 +165,16 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCall(const Function* f, PyOb
 }
 
 // static
-std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(const Function::Overload& overload, PyObject* argTuple, PyObject *kwargs) {
+std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(const Function::Overload& overload, const FunctionCallArgMapping& mapper, bool isEntrypoint) {
     for (const auto& spec: overload.getCompiledSpecializations()) {
-        auto res = dispatchFunctionCallToCompiledSpecialization(overload, spec, argTuple, kwargs);
+        auto res = dispatchFunctionCallToCompiledSpecialization(overload, spec, mapper);
         if (res.first) {
             return res;
         }
+    }
+
+    if (isEntrypoint) {
+
     }
 
     return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
@@ -213,8 +183,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(cons
 std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpecialization(
                                                         const Function::Overload& overload,
                                                         const Function::CompiledSpecialization& specialization,
-                                                        PyObject* argTuple,
-                                                        PyObject *kwargs
+                                                        const FunctionCallArgMapping& mapper
                                                         ) {
     Type* returnType = specialization.getReturnType();
 
@@ -222,23 +191,17 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
         throw std::runtime_error("Malformed function specialization: missing a return type.");
     }
 
-    if (PyTuple_Size(argTuple) != overload.getArgs().size() || overload.getArgs().size() != specialization.getArgTypes().size()) {
-        return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
-    }
-
-    if (kwargs && PyDict_Size(kwargs)) {
-        return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
-    }
-
     std::vector<Instance> instances;
 
     // first, see if we can short-circuit
     for (long k = 0; k < overload.getArgs().size(); k++) {
         auto arg = overload.getArgs()[k];
-        Type* argType = specialization.getArgTypes()[k];
+        if (arg.getIsNormalArg()) {
+            Type* argType = specialization.getArgTypes()[k];
 
-        if (!pyValCouldBeOfType(argType, PyTuple_GetItem(argTuple, k), false)) {
-            return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
+            if (!PyInstance::pyValCouldBeOfType(argType, mapper.getSingleValueArgs()[k], false)) {
+                return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
+            }
         }
     }
 
@@ -246,25 +209,11 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
         auto arg = overload.getArgs()[k];
         Type* argType = specialization.getArgTypes()[k];
 
-        if (arg.getIsKwarg() || arg.getIsStarArg()) {
-            return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
-        }
+        std::pair<Instance, bool> res = mapper.extractArgWithType(k, argType);
 
-        try {
-            PyObjectHolder arg(PyTuple_GetItem(argTuple, k));
-
-            instances.push_back(
-                Instance::createAndInitialize(argType, [&](instance_ptr p) {
-                    copyConstructFromPythonInstance(argType, p, arg);
-                })
-            );
-        } catch(PythonExceptionSet& s) {
-            // failed to convert, but keep going
-            PyErr_Clear();
-            return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
-        }
-        catch(...) {
-            // not a valid conversion
+        if (res.second) {
+            instances.push_back(res.first);
+        } else {
             return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
         }
     }
@@ -357,14 +306,14 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
 PyObject* PyFunctionInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
     for (long convertExplicitly = 0; convertExplicitly <= 1; convertExplicitly++) {
         for (const auto& overload: type()->getOverloads()) {
-            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, args, kwargs, convertExplicitly);
+            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, args, kwargs, convertExplicitly, false, type()->isEntrypoint());
             if (res.first) {
                 return res.second;
             }
         }
     }
 
-    std::string argTupleTypeDesc = argTupleTypeDescription(args, kwargs);
+    std::string argTupleTypeDesc = argTupleTypeDescription(nullptr, args, kwargs);
 
     PyErr_Format(
         PyExc_TypeError, "'%s' cannot find a valid overload with arguments of type %s",
@@ -375,10 +324,16 @@ PyObject* PyFunctionInstance::tp_call_concrete(PyObject* args, PyObject* kwargs)
     return NULL;
 }
 
-std::string PyFunctionInstance::argTupleTypeDescription(PyObject* args, PyObject* kwargs) {
+std::string PyFunctionInstance::argTupleTypeDescription(PyObject* self, PyObject* args, PyObject* kwargs) {
     std::ostringstream outTypes;
     outTypes << "(";
     bool first = true;
+
+    if (self) {
+        outTypes << self->ob_type->tp_name;
+        first = false;
+    }
+
     for (long k = 0; k < PyTuple_Size(args); k++) {
         if (!first) {
             outTypes << ",";
@@ -440,7 +395,9 @@ PyObject* PyFunctionInstance::indexOfOverloadMatching(PyObject* self, PyObject* 
         for (const auto& overload: f->getOverloads()) {
             std::pair<bool, PyObject*> res =
                 PyFunctionInstance::tryToCallOverload(
-                    overload, nullptr, args, kwargs, tryToConvertExplicitly, true /* dontActuallyCall */
+                    overload, nullptr, args, kwargs, tryToConvertExplicitly,
+                    true /* dontActuallyCall */,
+                    false /* isEntrypoint */
                 );
 
             if (res.first) {
@@ -456,15 +413,31 @@ PyObject* PyFunctionInstance::indexOfOverloadMatching(PyObject* self, PyObject* 
 
 
 /* static */
-PyObject* PyFunctionInstance::overload(PyObject* cls, PyObject* args, PyObject* kwargs) {
+PyObject* PyFunctionInstance::withEntrypoint(PyObject* funcObj, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {"isEntrypoint", NULL};
+    int isWithEntrypoint;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "p", (char**)kwlist, &isWithEntrypoint)) {
+        return nullptr;
+    }
+
+    Function* resType = (Function*)((PyInstance*)(funcObj))->type();
+
+    resType = resType->withEntrypoint(isWithEntrypoint);
+
+    return PyInstance::initialize(resType, [&](instance_ptr p) {});
+}
+
+/* static */
+PyObject* PyFunctionInstance::overload(PyObject* funcObj, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() {
         if (kwargs && PyDict_Size(kwargs)) {
             throw std::runtime_error("Can't call 'overload' with kwargs");
         }
 
-        Function* resType = (Function*)PyInstance::unwrapTypeArgToTypePtr(cls);
+        Function* resType = (Function*)((PyInstance*)(funcObj))->type();
 
-        if (!resType) {
+        if (!resType || resType->getTypeCategory() != Type::TypeCategory::catFunction) {
             throw std::runtime_error("Expected 'cls' to be a Function.");
         }
 
@@ -506,9 +479,10 @@ PyObject* PyFunctionInstance::overload(PyObject* cls, PyObject* args, PyObject* 
 
 /* static */
 PyMethodDef* PyFunctionInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [3] {
+    return new PyMethodDef [4] {
         {"indexOfOverloadMatching", (PyCFunction)PyFunctionInstance::indexOfOverloadMatching, METH_VARARGS | METH_KEYWORDS, NULL},
-        {"overload", (PyCFunction)PyFunctionInstance::overload, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
+        {"overload", (PyCFunction)PyFunctionInstance::overload, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"withEntrypoint", (PyCFunction)PyFunctionInstance::withEntrypoint, METH_VARARGS | METH_KEYWORDS, NULL},
         {NULL, NULL}
     };
 }

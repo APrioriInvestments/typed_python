@@ -657,6 +657,8 @@ class ExpressionConversionContext(object):
         minPositional = functionOverload.minPositionalCount()
         maxPositional = functionOverload.maxPositionalCount()
 
+        consumedPositionalNames = set()
+
         if minPositional == maxPositional:
             positionalMsg = f"{minPositional}"
         else:
@@ -681,6 +683,8 @@ class ExpressionConversionContext(object):
                 else:
                     outArgs[-1].value.append(a)
             else:
+                consumedPositionalNames.add(functionOverload.args[curTargetIx].name)
+
                 outArgs.append(FunctionArgMapping.Arg(value=a))
                 curTargetIx += 1
 
@@ -692,6 +696,10 @@ class ExpressionConversionContext(object):
             if arg.isStarArg:
                 outArgs.append(FunctionArgMapping.StarArgs(value=()))
             elif arg.isKwarg:
+                for name in unconsumedKwargs:
+                    if name in consumedPositionalNames:
+                        return f"{name}() got multiple values for argument '{name}'"
+
                 outArgs.append(FunctionArgMapping.Kwargs(value=unconsumedKwargs.items()))
                 assert len(outArgs) == len(functionOverload.args)
                 unconsumedKwargs = {}

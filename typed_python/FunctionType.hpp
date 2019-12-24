@@ -335,92 +335,13 @@ public:
         size_t mMaxPositionalArgs;
     };
 
-    class Matcher {
-    public:
-        Matcher(const Overload& overload) :
-                mOverload(overload),
-                mArgs(overload.getArgs())
-        {
-            m_used.resize(overload.getArgs().size());
-            m_matches = true;
-        }
-
-        bool stillMatches() const {
-            return m_matches;
-        }
-
-        //called at the end to see if this was a valid match
-        bool definitelyMatches() const {
-            if (!m_matches) {
-                return false;
-            }
-
-            for (long k = 0; k < m_used.size(); k++) {
-                if (!m_used[k] && !mArgs[k].getDefaultValue() && mArgs[k].getIsNormalArg()) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        //push the state machine forward.
-        Type* requiredTypeForArg(const char* name) {
-            if (!name) {
-                for (long k = 0; k < m_used.size(); k++) {
-                    if (!m_used[k]) {
-                        if (mArgs[k].getIsNormalArg()) {
-                            m_used[k] = true;
-                            return mArgs[k].getTypeFilter();
-                        }
-                        else if (mArgs[k].getIsStarArg()) {
-                            //this doesn't consume the star arg
-                            return mArgs[k].getTypeFilter();
-                        }
-                        else {
-                            //this is a kwarg, but we didn't give a name.
-                            m_matches = false;
-                            return nullptr;
-                        }
-                    }
-                }
-            }
-            else if (name) {
-                for (long k = 0; k < m_used.size(); k++) {
-                    if (!m_used[k]) {
-                        if (mArgs[k].getIsNormalArg() && mArgs[k].getName() == name) {
-                            m_used[k] = true;
-                            return mArgs[k].getTypeFilter();
-                        }
-                        else if (mArgs[k].getIsNormalArg()) {
-                            //just keep going
-                        }
-                        else if (mArgs[k].getIsStarArg()) {
-                            //just keep going
-                        } else {
-                            //this is a kwarg
-                            return mArgs[k].getTypeFilter();
-                        }
-                    }
-                }
-            }
-
-            m_matches = false;
-            return nullptr;
-        }
-
-    private:
-        const Overload& mOverload;
-        const std::vector<FunctionArg>& mArgs;
-        std::vector<char> m_used;
-        bool m_matches;
-    };
-
     Function(std::string inName,
-            const std::vector<Overload>& overloads
+            const std::vector<Overload>& overloads,
+            bool isEntrypoint
             ) :
         Type(catFunction),
-        mOverloads(overloads)
+        mOverloads(overloads),
+        mIsEntrypoint(isEntrypoint)
     {
         int countOfSignatures = 0;
         for (auto& o: overloads) {
@@ -441,18 +362,21 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
-    static Function* Make(std::string inName, std::vector<Overload>& overloads) {
+    static Function* Make(std::string inName, std::vector<Overload>& overloads, bool isEntrypoint) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        typedef std::pair<const std::string, const std::vector<Overload> > keytype;
+        typedef std::tuple<const std::string, const std::vector<Overload>, bool> keytype;
 
         static std::map<keytype, Function*> m;
 
-        auto it = m.find(keytype(inName, overloads));
+        auto it = m.find(keytype(inName, overloads, isEntrypoint));
         if (it == m.end()) {
-            it = m.insert(std::make_pair(keytype(inName, overloads), new Function(inName, overloads))).first;
+            it = m.insert(std::pair<keytype, Function*>(
+                keytype(inName, overloads, isEntrypoint),
+                new Function(inName, overloads, isEntrypoint)
+            )).first;
         }
 
         return it->second;
@@ -475,7 +399,7 @@ public:
             overloads.push_back(o);
         }
 
-        return Function::Make(f1->m_name, overloads);
+        return Function::Make(f1->m_name, overloads, false);
     }
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
@@ -553,6 +477,16 @@ public:
         mOverloads[whichOverload].touchCompiledSpecializations();
     }
 
+    bool isEntrypoint() const {
+        return mIsEntrypoint;
+    }
+
+    Function* withEntrypoint(bool isEntrypoint) {
+        return Function::Make(name(), mOverloads, isEntrypoint);
+    }
+
 private:
     std::vector<Overload> mOverloads;
+
+    bool mIsEntrypoint;
 };

@@ -18,6 +18,8 @@
 
 #include "PyInstance.hpp"
 
+class FunctionCallArgMapping;
+
 class PyFunctionInstance : public PyInstance {
 public:
     typedef Function modeled_type;
@@ -32,11 +34,13 @@ public:
 
     static std::pair<bool, PyObject*> tryToCallAnyOverload(const Function* f, PyObject* self, PyObject* args, PyObject* kwargs);
 
-    static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs, bool convertExplicitly, bool dontActuallyCall=false);
+    static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs, bool convertExplicitly, bool dontActuallyCall, bool isEntrypoint);
 
     //perform a linear scan of all specializations contained in overload and attempt to dispatch to each one.
-    //returns <true, result or none> if we dispatched.
-    static std::pair<bool, PyObject*> dispatchFunctionCallToNative(const Function::Overload& overload, PyObject* argTuple, PyObject *kwargs);
+    //returns <true, result or none> if we dispatched..
+    //if 'isEntrypoint', then if we don't match a compiled specialization, ask the runtime to produce
+    //one for us.
+    static std::pair<bool, PyObject*> dispatchFunctionCallToNative(const Function::Overload& overload, const FunctionCallArgMapping& mapping, bool isEntrypoint);
 
     //attempt to dispatch to this one exact specialization by converting each arg to the relevant type. if
     //we can't convert, then return <false, nullptr>. If we do dispatch, return <true, result or none> and set
@@ -44,15 +48,14 @@ public:
     static std::pair<bool, PyObject*> dispatchFunctionCallToCompiledSpecialization(
                                                 const Function::Overload& overload,
                                                 const Function::CompiledSpecialization& specialization,
-                                                PyObject* argTuple,
-                                                PyObject *kwargs
+                                                const FunctionCallArgMapping& mapping
                                                 );
 
     static PyObject* createOverloadPyRepresentation(Function* f);
 
     PyObject* tp_call_concrete(PyObject* args, PyObject* kwargs);
 
-    static std::string argTupleTypeDescription(PyObject* args, PyObject* kwargs);
+    static std::string argTupleTypeDescription(PyObject* self, PyObject* args, PyObject* kwargs);
 
     static void mirrorTypeInformationIntoPyTypeConcrete(Function* inType, PyTypeObject* pyType);
 
@@ -63,6 +66,8 @@ public:
     static PyObject* indexOfOverloadMatching(PyObject* self, PyObject* args, PyObject* kwargs);
 
     static PyObject* overload(PyObject* cls, PyObject* args, PyObject* kwargs);
+
+    static PyObject* withEntrypoint(PyObject* funcObj, PyObject* args, PyObject* kwargs);
 
     static Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj);
 

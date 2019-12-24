@@ -699,7 +699,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
             )
         );
 
-        resType = Function::Make(PyUnicode_AsUTF8(nameObj), overloads);
+        resType = Function::Make(PyUnicode_AsUTF8(nameObj), overloads, false);
     }
 
     return incref((PyObject*)PyInstance::typeObj(resType));

@@ -20,7 +20,7 @@ from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
     Int16, UInt64, Float32, ListOf, TupleOf, OneOf, NamedTuple, Class, Alternative,
-    ConstDict, PointerTo, Member, _types, Forward, Final
+    ConstDict, PointerTo, Member, _types, Forward, Final, Function
 )
 
 
@@ -172,6 +172,20 @@ class NativeClassTypesTests(unittest.TestCase):
         gc.collect()
         self.assertLess(currentMemUsageMb() - memUsage, 1.0)
 
+    def test_typed_function_call_doesnt_leak(self):
+        @Function
+        def f(x, y):
+            return x + y
+
+        self.executeInLoop(lambda: f(1, 2))
+
+    def test_typed_function_call_with_star_args_doesnt_leak(self):
+        @Function
+        def f(*args):
+            return len(args)
+
+        self.executeInLoop(lambda: f(1, 2))
+
     def test_class_create_doesnt_leak(self):
         self.executeInLoop(lambda: ClassWithInit(cwi=ClassWithInit()))
 
@@ -292,12 +306,12 @@ class NativeClassTypesTests(unittest.TestCase):
             c.g(1, 2)
 
     def test_class_function_sends_args_to_right_place(self):
-        def g(a, b, c=10, *args, d=20, **kwargs):
-            return (a, b, args, kwargs)
+        def g(a, b, c=10, d=20, *args, **kwargs):
+            return (a, b, d, args, kwargs)
 
         class C(Class, Final):
-            def g(self, a, b, c=10, *args, d=20, **kwargs):
-                return (a, b, args, kwargs)
+            def g(self, a, b, c=10, d=20, *args, **kwargs):
+                return (a, b, d, args, kwargs)
 
         c = C()
 
@@ -315,7 +329,7 @@ class NativeClassTypesTests(unittest.TestCase):
         assertSame(lambda formOfG: formOfG(a=1, b=2, c=20, d=30))
         assertSame(lambda formOfG: formOfG(1, 2, 3, 4))
         assertSame(lambda formOfG: formOfG(1, 2, 3, 4, 5, 6))
-        assertSame(lambda formOfG: formOfG(1, 2, 3, 4, 5, 6, d=10, q=20))
+        assertSame(lambda formOfG: formOfG(1, 2, 3, 4, 5, 6, q=20))
 
     def test_class_function_type_dispatch(self):
         class C(Class, Final):

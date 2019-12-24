@@ -165,8 +165,10 @@ def makeFunction(name, f, classType=None):
     if spec.varargs is not None:
         arg_types.append((spec.varargs, getAnn(spec.varargs), None, True, False))
 
-    for arg in spec.kwonlyargs:
-        arg_types.append((arg, getAnn(arg), (spec.kwonlydefaults.get(arg),), False, False))
+    if spec.kwonlyargs:
+        raise Exception("Keyword only args not supported yet")
+        # for arg in spec.kwonlyargs:
+        #     arg_types.append((arg, getAnn(arg), (spec.kwonlydefaults.get(arg),), False, False))
 
     if spec.varkw is not None:
         arg_types.append((spec.varkw, getAnn(spec.varkw), None, False, True))

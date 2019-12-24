@@ -90,7 +90,7 @@ class TestConstDictCompilation(unittest.TestCase):
             for key in bigger_d:
                 self.assertEqual(callOrExpr(lambda: d[key]), callOrExpr(lambda: compiledGetItem(d, key)))
 
-    def test_const_dict_getitem_coersion(self):
+    def test_const_dict_getitem_coercion(self):
         d = ConstDict(int, int)({1: 2})
 
         with self.assertRaises(TypeError):

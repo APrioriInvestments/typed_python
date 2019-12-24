@@ -33,14 +33,23 @@ PyObject* PyBoundMethodInstance::tp_call_concrete(PyObject* args, PyObject* kwar
 
     for (long convertExplicitly = 0; convertExplicitly <= 1; convertExplicitly++) {
         for (const auto& overload: f->getOverloads()) {
-            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, objectInstance, args, kwargs, convertExplicitly);
+            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(
+                overload,
+                objectInstance,
+                args,
+                kwargs,
+                convertExplicitly,
+                false, /* dontActuallyCall=false because we do want to call. */
+                f->isEntrypoint()
+            );
+
             if (res.first) {
                 return res.second;
             }
         }
     }
 
-    std::string argTupleTypeDesc = PyFunctionInstance::argTupleTypeDescription(args, kwargs);
+    std::string argTupleTypeDesc = PyFunctionInstance::argTupleTypeDescription(objectInstance, args, kwargs);
 
     PyErr_Format(
         PyExc_TypeError, "'%s' cannot find a valid overload with arguments of type %s",
