@@ -144,11 +144,7 @@ def makeFunction(name, f, classType=None):
     for i, argname in enumerate(spec.args):
         default = getDefault(i)
 
-        ann = getAnn(argname)
-        if ann is None and i == 0 and classType is not None:
-            ann = classType
-
-        arg_types.append((argname, ann, default, False, False))
+        arg_types.append((argname, getAnn(argname), default, False, False))
 
     return_type = None
 

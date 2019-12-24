@@ -36,6 +36,9 @@ class MasqueradeWrapper(Wrapper):
     def getNativeLayoutType(self):
         return typeWrapper(self.typeRepresentation).getNativeLayoutType()
 
+    def convert_mutable_masquerade_to_untyped_type(self):
+        raise NotImplementedError("Subclasses implement")
+
     def convert_mutable_masquerade_to_untyped(self, context, instance):
         raise NotImplementedError("Subclasses implement")
 

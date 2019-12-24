@@ -263,7 +263,7 @@ def Entrypoint(pyFunc):
         signature = tuple(pickSpecializationTypeFor(x) for x in args)
         args = tuple(pickSpecializationValueFor(x) for x in args)
 
-        if True or not DisableCompiledCode.isDisabled():
+        if not DisableCompiledCode.isDisabled():
             with lock:
                 if signature not in signatures:
                     i = typedFunc.indexOfOverloadMatching(*args)

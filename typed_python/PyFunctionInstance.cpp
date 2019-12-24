@@ -172,8 +172,9 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
     if (f.getReturnType()) {
         try {
             PyObject* newRes = PyInstance::initializePythonRepresentation(f.getReturnType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(f.getReturnType(), data, result, true);
-                });
+                copyConstructFromPythonInstance(f.getReturnType(), data, result, true);
+            });
+
             return std::make_pair(true, newRes);
         } catch (std::exception& e) {
             PyErr_SetString(PyExc_TypeError, e.what());
@@ -455,9 +456,95 @@ PyObject* PyFunctionInstance::indexOfOverloadMatching(PyObject* self, PyObject* 
 
 
 /* static */
+PyObject* PyFunctionInstance::overload(PyObject* cls, PyObject* args, PyObject* kwargs) {
+    return translateExceptionToPyObject([&]() {
+        if (kwargs && PyDict_Size(kwargs)) {
+            throw std::runtime_error("Can't call 'overload' with kwargs");
+        }
+
+        Function* resType = (Function*)PyInstance::unwrapTypeArgToTypePtr(cls);
+
+        if (!resType) {
+            throw std::runtime_error("Expected 'cls' to be a Function.");
+        }
+
+        iterate(args, [&](PyObject* arg) {
+            Type* argT = PyInstance::extractTypeFrom(arg->ob_type);
+
+            if (!argT) {
+                argT = PyInstance::unwrapTypeArgToTypePtr(arg);
+
+                if (!argT && PyFunction_Check(arg)) {
+                    // unwrapTypeArgToTypePtr sets an exception if it can't convert.
+                    // we want to clear it so we can try the unwrapping directly.
+                    PyErr_Clear();
+
+                    PyObjectStealer name(PyObject_GetAttrString(arg, "__name__"));
+                    if (!name) {
+                        throw PythonExceptionSet();
+                    }
+
+                    argT = convertPythonObjectToFunction(name, arg);
+                }
+
+                if (!argT) {
+                    throw PythonExceptionSet();
+                }
+            }
+
+            if (argT->getTypeCategory() != Type::TypeCategory::catFunction) {
+                throw std::runtime_error("'overload' requires arguments to be Function types");
+            }
+
+            resType = Function::merge(resType, (Function*)argT);
+        });
+
+        return PyInstance::initialize(resType, [&](instance_ptr p) {});
+    });
+}
+
+
+/* static */
 PyMethodDef* PyFunctionInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [2] {
+    return new PyMethodDef [3] {
         {"indexOfOverloadMatching", (PyCFunction)PyFunctionInstance::indexOfOverloadMatching, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"overload", (PyCFunction)PyFunctionInstance::overload, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {NULL, NULL}
     };
+}
+
+Function* PyFunctionInstance::convertPythonObjectToFunction(PyObject* name, PyObject *funcObj) {
+    static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");
+
+    if (!internalsModule) {
+        PyErr_SetString(PyExc_TypeError, "Internal error: couldn't find typed_python.internals");
+        return nullptr;
+    }
+
+    static PyObject* makeFunction = PyObject_GetAttrString(internalsModule, "makeFunction");
+
+    if (!makeFunction) {
+        PyErr_SetString(PyExc_TypeError, "Internal error: couldn't find typed_python.internals.makeFunction");
+        return nullptr;
+    }
+
+    PyObject* fRes = PyObject_CallFunctionObjArgs(makeFunction, name, funcObj, NULL);
+
+    if (!fRes) {
+        return nullptr;
+    }
+
+    if (!PyType_Check(fRes)) {
+        PyErr_SetString(PyExc_TypeError, "Internal error: expected typed_python.internals.makeFunction to return a type");
+        return nullptr;
+    }
+
+    Type* actualType = PyInstance::extractTypeFrom((PyTypeObject*)fRes);
+
+    if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catFunction) {
+        PyErr_Format(PyExc_TypeError, "Internal error: expected makeFunction to return a Function. Got %S", fRes);
+        return nullptr;
+    }
+
+    return (Function*)actualType;
 }

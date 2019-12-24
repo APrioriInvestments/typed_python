@@ -61,4 +61,9 @@ public:
     static PyMethodDef* typeMethodsConcrete(Type* t);
 
     static PyObject* indexOfOverloadMatching(PyObject* self, PyObject* args, PyObject* kwargs);
+
+    static PyObject* overload(PyObject* cls, PyObject* args, PyObject* kwargs);
+
+    static Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj);
+
 };

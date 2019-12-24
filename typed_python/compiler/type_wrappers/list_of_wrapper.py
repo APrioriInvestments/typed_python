@@ -404,6 +404,9 @@ class MasqueradingListOfWrapper(ListOfWrapper):
     def interpreterTypeRepresentation(self):
         return list
 
+    def convert_mutable_masquerade_to_untyped_type(self):
+        return typeWrapper(list)
+
     def convert_mutable_masquerade_to_untyped(self, context, instance):
         return context.constant(list).convert_call([instance], {}).changeType(
             typeWrapper(list)

@@ -26,6 +26,7 @@
 #include "NullSerializationContext.hpp"
 #include "util.hpp"
 #include "PyInstance.hpp"
+#include "PyFunctionInstance.hpp"
 #include "SerializationBuffer.hpp"
 #include "DeserializationBuffer.hpp"
 #include "PythonSerializationContext.hpp"
@@ -702,42 +703,6 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
     }
 
     return incref((PyObject*)PyInstance::typeObj(resType));
-}
-
-Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj) {
-    static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");
-
-    if (!internalsModule) {
-        PyErr_SetString(PyExc_TypeError, "Internal error: couldn't find typed_python.internals");
-        return nullptr;
-    }
-
-    static PyObject* makeFunction = PyObject_GetAttrString(internalsModule, "makeFunction");
-
-    if (!makeFunction) {
-        PyErr_SetString(PyExc_TypeError, "Internal error: couldn't find typed_python.internals.makeFunction");
-        return nullptr;
-    }
-
-    PyObject* fRes = PyObject_CallFunctionObjArgs(makeFunction, name, funcObj, NULL);
-
-    if (!fRes) {
-        return nullptr;
-    }
-
-    if (!PyType_Check(fRes)) {
-        PyErr_SetString(PyExc_TypeError, "Internal error: expected typed_python.internals.makeFunction to return a type");
-        return nullptr;
-    }
-
-    Type* actualType = PyInstance::extractTypeFrom((PyTypeObject*)fRes);
-
-    if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catFunction) {
-        PyErr_Format(PyExc_TypeError, "Internal error: expected makeFunction to return a Function. Got %S", fRes);
-        return nullptr;
-    }
-
-    return (Function*)actualType;
 }
 
 PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
@@ -1704,7 +1669,7 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
         std::string fieldName(PyUnicode_AsUTF8(key));
 
         if (PyFunction_Check(value)) {
-            functions[fieldName] = convertPythonObjectToFunction(key, value);
+            functions[fieldName] = PyFunctionInstance::convertPythonObjectToFunction(key, value);
             if (functions[fieldName] == nullptr) {
                 //error code is already set
                 return nullptr;

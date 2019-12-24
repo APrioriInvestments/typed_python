@@ -247,7 +247,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         uncompiled_res = c.loop(1000000)
         uncompiled_time = time.time() - t0
 
-        Runtime.singleton().compile(AClass.loop)
+        Runtime.singleton().compile(AClass.loop, dict(self=AClass))
 
         t0 = time.time()
         compiled_res = c.loop(1000000)

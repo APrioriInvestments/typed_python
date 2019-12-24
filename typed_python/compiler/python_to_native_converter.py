@@ -125,6 +125,9 @@ class FunctionDependencyGraph:
 class PythonToNativeConverter(object):
     def __init__(self):
         object.__init__(self)
+
+        # if True, then insert additional code to check for undefined behavior.
+        self.generateDebugChecks = False
         self._link_name_for_identity = {}
         self._definitions = {}
         self._targets = {}
@@ -233,6 +236,9 @@ class PythonToNativeConverter(object):
         else:
             self._dependencies.addRoot(identity)
 
+        if callback is not None:
+            self.installLinktimeHook(identity, callback)
+
         if identity in self._link_name_for_identity:
             return self._targets[self._link_name_for_identity[identity]]
 
@@ -244,9 +250,6 @@ class PythonToNativeConverter(object):
         )
 
         self._targets[new_name] = self.getTypedCallTarget(new_name, input_types, output_type)
-
-        if callback is not None:
-            self.installLinktimeHook(identity, callback)
 
         if self._currentlyConverting is None:
             # force the function to resolve immediately

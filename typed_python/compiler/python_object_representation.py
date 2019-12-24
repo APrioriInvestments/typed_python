@@ -282,3 +282,13 @@ def pythonObjectRepresentation(context, f):
         return TypedExpression(context, native_ast.nullExpr, ModuleWrapper(f), False)
 
     return TypedExpression(context, native_ast.nullExpr, PythonFreeObjectWrapper(f), False)
+
+
+def pythonObjectRepresentationType(f):
+    if isinstance(f, str):
+        return StringWrapper()
+
+    if isinstance(f, bytes):
+        return BytesWrapper()
+
+    return pythonObjectRepresentation(None, f).expr_type

@@ -371,7 +371,7 @@ class ClassWrapper(RefcountedWrapper):
         for isExplicit in [False, True]:
             for o in func.overloads:
                 # check each overload that we might match.
-                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(o, argTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(o, argTypes, {}, isExplicit)
 
                 if mightMatch is False:
                     return resultTypes
@@ -421,7 +421,7 @@ class ClassWrapper(RefcountedWrapper):
         # of a base class implementation.
 
         # first, see if there is exacly one possible overload
-        overloadAndIsExplicit = PythonTypedFunctionWrapper.pickSingleOverloadForCall(func, argTypes)
+        overloadAndIsExplicit = PythonTypedFunctionWrapper.pickSingleOverloadForCall(func, argTypes, {})
 
         if overloadAndIsExplicit is not None:
             return self.dispatchToSingleOverload(
@@ -484,7 +484,7 @@ class ClassWrapper(RefcountedWrapper):
 
         for isExplicit in [False, True]:
             for overloadIndex, overload in enumerate(func.overloads):
-                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, argTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, argTypes, {}, isExplicit)
 
                 if mightMatch is not False:
                     overloadRetType = overload.returnType or object
@@ -548,7 +548,7 @@ class ClassWrapper(RefcountedWrapper):
 
         for isExplicit in [False, True]:
             for overloadIndex, overload in enumerate(func.overloads):
-                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, argTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, argTypes, {}, isExplicit)
 
                 if mightMatch is not False:
                     overloadRetType = overload.returnType or object
@@ -723,6 +723,11 @@ class ClassWrapper(RefcountedWrapper):
 
         retType = overload.returnType or object
 
+        if context.functionContext.converter.generateDebugChecks:
+            with context.ifelse(funcPtr.cast(native_ast.Int64)) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushException(TypeError, "EMPTY SLOT")
+
         convertedArgs = []
         actualArgs = (instance,) + tuple(args)
 
@@ -781,7 +786,7 @@ class ClassWrapper(RefcountedWrapper):
 
         returnType = funcOverload.returnType if funcOverload.returnType is not None else object
 
-        typeWrapper(pyImpl).compileCall(converter, returnType, argTypes, callback)
+        typeWrapper(pyImpl).compileCall(converter, returnType, argTypes, {}, callback)
 
         return True
 

@@ -1022,3 +1022,94 @@ class TestCompilationStructures(unittest.TestCase):
             return f(1, 2, 3)
 
         self.assertEqual(callF(), tuple)
+
+    def test_typed_functions_with_star_args(self):
+        @Function
+        def f(x: int):
+            return 1
+
+        @f.overload
+        def f(x: int, *args):
+            return 1 + len(args)
+
+        @Entrypoint
+        def callF1(x):
+            return f(x)
+
+        @Entrypoint
+        def callF2(x, y):
+            return f(x, y)
+
+        self.assertEqual(callF1(0), 1)
+        self.assertEqual(callF2(0, 1), 2)
+
+    def test_typed_functions_with_kwargs(self):
+        @Function
+        def f(x, **kwargs):
+            return x + len(kwargs)
+
+        @Entrypoint
+        def callF1(x):
+            return f(x)
+
+        @Entrypoint
+        def callF2(x, y):
+            return f(x, y)
+
+        @Entrypoint
+        def callF3(x, y):
+            return f(x, y=y)
+
+        self.assertEqual(callF1(10), 10)
+
+        with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
+            callF2(0, 1)
+
+        self.assertEqual(callF3(10, 2), 11)
+
+    def test_typed_functions_dispatch_based_on_names(self):
+        @Function
+        def f(x):
+            return "x"
+
+        @f.overload
+        def f(y):
+            return "y"
+
+        @Entrypoint
+        def callFUnnamed(x):
+            return f(x)
+
+        @Entrypoint
+        def callFWithY(x):
+            return f(y=x)
+
+        @Entrypoint
+        def callFWithX(x):
+            return f(x=x)
+
+        self.assertEqual(callFUnnamed(10), "x")
+        self.assertEqual(callFWithX(10), "x")
+        self.assertEqual(callFWithY(10), "y")
+
+    def test_typed_functions_with_oneof(self):
+        @Function
+        def f(x: OneOf(int, float)):
+            return x + 1.0
+
+        @Entrypoint
+        def callF(x):
+            return f(x)
+
+        @Entrypoint
+        def callF2(x: OneOf(int, float, str)):
+            return f(x)
+
+        self.assertEqual(callF(1.5), 2.5)
+        self.assertEqual(callF(1), 2.0)
+
+        self.assertEqual(callF2(1.5), 2.5)
+        self.assertEqual(callF2(1), 2.0)
+
+        with self.assertRaisesRegex(TypeError, r"convert from type OneOf\(Int64, Float64, String\) to type OneOf\(Int64, Float64\)"):
+            callF2("h")

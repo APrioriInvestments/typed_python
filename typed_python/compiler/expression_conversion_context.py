@@ -22,9 +22,10 @@ from typed_python.compiler.function_stack_state import FunctionStackState
 from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.python_object_representation import pythonObjectRepresentation
+from typed_python.compiler.python_object_representation import pythonObjectRepresentationType
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
-from typed_python import NoneType, Alternative, OneOf, Int32, ListOf, String, Tuple, NamedTuple
+from typed_python import NoneType, Alternative, OneOf, Int32, ListOf, String, Tuple, NamedTuple, TupleOf
 from typed_python._types import getTypePointer
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
@@ -45,6 +46,15 @@ ExpressionIntermediate = Alternative(
 
 _memoizedThingsById = {}
 _pyFuncToFuncCache = {}
+
+
+FunctionArgMapping = Alternative(
+    "FunctionArgMapping",
+    Arg=dict(value=object),
+    Constant=dict(value=object),
+    StarArgs=dict(value=ListOf(object)),
+    Kwargs=dict(value=TupleOf(Tuple(str, object)))
+)
 
 
 class ExpressionConversionContext(object):
@@ -103,6 +113,29 @@ class ExpressionConversionContext(object):
             )
         )
 
+    @staticmethod
+    def constantType(self, x, allowArbitrary=False):
+        """Return the Wrapper for the type we'd get if we called self.constant(x)
+        """
+
+        if isinstance(x, str):
+            return typed_python.compiler.type_wrappers.string_wrapper.StringWrapper()
+        if isinstance(x, (bool, int, Int32, float)):
+            return typeWrapper(type(x))
+        if x is None:
+            return typeWrapper(type(None))
+
+        if id(x) in builtinValueIdToNameAndValue and builtinValueIdToNameAndValue[id(x)][1] is x:
+            return object
+
+        if isinstance(x, type):
+            return pythonObjectRepresentationType(x)
+
+        if allowArbitrary:
+            return typeWrapper(object)
+
+        raise Exception(f"Couldn't get a type for {x} to a constant expression.")
+
     def constant(self, x, allowArbitrary=False):
         """Return a TypedExpression representing 'x'.
 
@@ -139,6 +172,9 @@ class ExpressionConversionContext(object):
 
         if isinstance(x, type):
             return pythonObjectRepresentation(self, x)
+
+        if allowArbitrary:
+            return self.constantPyObject(x)
 
         raise Exception(f"Couldn't convert {x} to a constant expression.")
 
@@ -593,7 +629,86 @@ class ExpressionConversionContext(object):
                 native_ast.CallTarget.Pointer(expr=funcPtr.cast(nativeFunType.pointer())).call(*native_args)
             )
 
-    def mapFunctionArguments(self, name, functionOverload: FunctionOverload, args, kwargs):
+    @staticmethod
+    def mapFunctionArguments(functionOverload: FunctionOverload, args, kwargs) -> OneOf(str, ListOf(FunctionArgMapping)):
+        """Figure out how to call 'functionOverload' with 'args' and 'kwargs'.
+
+        This takes care of doing things like mapping keyword arguments, default values, etc.
+
+        It does _not_ deal at all with types, so it's fine to use the typed-form of a non-typed
+        function. The args in 'args/kwargs' can be any object.
+
+        Args:
+            functionOverload - a FunctionOverload we're trying to map to
+            args - a list of positional arguments. They can be of any type.
+            kwargs - a dict of keyword arguments. They can be of any type.
+
+        Returns:
+            A ListOf(FunctionArgMapping) mapping to the arguments of the function,
+            in the order in which the names appear.
+
+            Otherwise, a string error message.
+        """
+        name = functionOverload.name
+
+        outArgs = ListOf(FunctionArgMapping)()
+        curTargetIx = 0
+
+        minPositional = functionOverload.minPositionalCount()
+        maxPositional = functionOverload.maxPositionalCount()
+
+        if minPositional == maxPositional:
+            positionalMsg = f"{minPositional}"
+        else:
+            positionalMsg = f"from {minPositional} to {maxPositional}"
+
+        if args and not functionOverload.args:
+            return f"{name}() takes {positionalMsg} positional arguments but {len(args)} were given"
+
+        if kwargs and not functionOverload.args:
+            return f"{name}() got an unexpected keyword argument '{list(kwargs)[0]}'"
+
+        for a in args:
+            if curTargetIx >= len(functionOverload.args):
+                return f"{name}() takes {positionalMsg} positional arguments but {len(args)} were given"
+
+            if functionOverload.args[curTargetIx].isKwarg:
+                return f"{name}() takes {positionalMsg} positional arguments but {len(args)} were given"
+
+            if functionOverload.args[curTargetIx].isStarArg:
+                if len(outArgs) <= curTargetIx:
+                    outArgs.append(FunctionArgMapping.StarArgs([a]))
+                else:
+                    outArgs[-1].value.append(a)
+            else:
+                outArgs.append(FunctionArgMapping.Arg(value=a))
+                curTargetIx += 1
+
+        unconsumedKwargs = dict(kwargs)
+
+        while len(outArgs) < len(functionOverload.args):
+            arg = functionOverload.args[len(outArgs)]
+
+            if arg.isStarArg:
+                outArgs.append(FunctionArgMapping.StarArgs(value=()))
+            elif arg.isKwarg:
+                outArgs.append(FunctionArgMapping.Kwargs(value=unconsumedKwargs.items()))
+                assert len(outArgs) == len(functionOverload.args)
+                unconsumedKwargs = {}
+            elif arg.name in kwargs:
+                outArgs.append(FunctionArgMapping.Arg(value=unconsumedKwargs[arg.name]))
+                del unconsumedKwargs[arg.name]
+            elif arg.defaultValue is not None:
+                outArgs.append(FunctionArgMapping.Constant(value=arg.defaultValue[0]))
+            else:
+                return f"{name}() missing required positional argument: {arg.name}"
+
+        for argName in unconsumedKwargs:
+            return f"{name}() got an unexpected keyword argument '{argName}'"
+
+        return outArgs
+
+    def buildFunctionArguments(self, functionOverload: FunctionOverload, args, kwargs):
         """Figure out how to call 'functionOverload' with 'args' and 'kwargs'.
 
         This takes care of doing things like mapping keyword arguments, default values, etc.
@@ -617,83 +732,75 @@ class ExpressionConversionContext(object):
         args = [a.convert_mutable_masquerade_to_untyped() for a in args]
         kwargs = {k: v.convert_mutable_masquerade_to_untyped() for k, v in kwargs.items()}
 
+        argsOrErr = self.mapFunctionArguments(functionOverload, args, kwargs)
+
+        if isinstance(argsOrErr, str):
+            self.pushException(TypeError, argsOrErr)
+            return
+
         outArgs = []
-        curTargetIx = 0
 
-        minPositional = functionOverload.minPositionalCount()
-        maxPositional = functionOverload.maxPositionalCount()
-
-        if minPositional == maxPositional:
-            positionalMsg = f"{minPositional}"
-        else:
-            positionalMsg = f"from {minPositional} to {maxPositional}"
-
-        if args and not functionOverload.args:
-            self.pushException(
-                TypeError,
-                f"{name}() takes {positionalMsg} positional arguments but {len(args)} were given"
-            )
-            return
-
-        if kwargs and not functionOverload.args:
-            self.pushException(
-                TypeError,
-                f"{name}() got an unexpected keyword argument '{list(kwargs)[0]}'"
-            )
-            return
-
-        for a in args:
-            if functionOverload.args[curTargetIx].isStarArg:
-                if len(outArgs) <= curTargetIx:
-                    outArgs.append([a])
-                else:
-                    outArgs[-1].append(a)
-            else:
-                outArgs.append(a)
-                curTargetIx += 1
-
-                if curTargetIx > len(functionOverload.args):
-                    self.pushException(
-                        TypeError,
-                        f"{name}() takes {positionalMsg} positional arguments but {len(args)} were given"
-                    )
-                    return
-
-        unconsumedKwargs = dict(kwargs)
-
-        while len(outArgs) < len(functionOverload.args):
-            arg = functionOverload.args[len(outArgs)]
-
-            if arg.isStarArg:
-                outArgs.append([])
-            elif arg.isKwarg:
-                outArgs.append(unconsumedKwargs)
-                assert len(outArgs) == len(functionOverload.args)
-                unconsumedKwargs = {}
-            elif arg.name in kwargs:
-                outArgs.append(unconsumedKwargs[arg.name])
-                del unconsumedKwargs[arg.name]
-            elif arg.defaultValue is not None:
-                outArgs.append(self.constant(arg.defaultValue[0], allowArbitrary=True))
-            else:
-                self.pushException(
-                    TypeError,
-                    f"{name}() missing required positional argument: {arg.name}"
-                )
-                return
-
-        for argName in unconsumedKwargs:
-            self.pushException(TypeError, f"{name}() got an unexpected keyword argument '{argName}'")
-            return
-
-        for i in range(len(functionOverload.args)):
-            if functionOverload.args[i].isStarArg:
-                outArgs[i] = self.makeStarArgTuple(outArgs[i])
-                assert outArgs[i] is not None
-            elif functionOverload.args[i].isKwarg:
-                outArgs[i] = self.makeKwargDict(outArgs[i])
+        for mappingArg in argsOrErr:
+            if mappingArg.matches.Arg:
+                outArgs.append(mappingArg.value)
+            elif mappingArg.matches.Constant:
+                outArgs.append(self.constant(mappingArg.value, allowArbitrary=True))
+            elif mappingArg.matches.StarArgs:
+                outArgs.append(self.makeStarArgTuple(mappingArg.value))
+            elif mappingArg.matches.Kwargs:
+                outArgs.append(self.makeKwargDict(dict(mappingArg.value)))
 
         return outArgs
+
+    @staticmethod
+    def computeFunctionArgumentTypeSignature(functionOverload: FunctionOverload, args, kwargs):
+        """Figure out the concrete type assignments we'd give to each variable if we call with args/kwargs.
+
+        This takes care of doing things like mapping keyword arguments, default values, etc.
+
+        It does _not_ deal at all with types, so it's fine to use the typed-form of a non-typed
+        function.
+
+        This function may generate code to construct the relevant arguments.
+
+        Args:
+            functionOverload - a FunctionOverload we're trying to map to
+            args - a list of positional argument Wrapper objects.
+            kwargs - a dict of keyword argument Wrapper objects.
+
+        Returns:
+            If we can map, a list of WRapper objects mapping to the argument
+            types of the function, in the order that they appear.
+
+            Otherwise, None, and an exception will have been generated.
+        """
+        args = [a.convert_mutable_masquerade_to_untyped_type() for a in args]
+        kwargs = {k: v.convert_mutable_masquerade_to_untyped_type() for k, v in kwargs.items()}
+
+        argsOrErr = ExpressionConversionContext.mapFunctionArguments(functionOverload, args, kwargs)
+
+        if isinstance(argsOrErr, str):
+            return None
+
+        outArgs = []
+
+        for mappingArg in argsOrErr:
+            if mappingArg.matches.Arg:
+                outArgs.append(mappingArg.value)
+            elif mappingArg.matches.Constant:
+                outArgs.append(ExpressionConversionContext.constantType(mappingArg.value, allowArbitrary=True))
+            elif mappingArg.matches.StarArgs:
+                outArgs.append(ExpressionConversionContext.makeStarArgTupleType(mappingArg.value))
+            elif mappingArg.matches.Kwargs:
+                outArgs.append(ExpressionConversionContext.makeKwargDictType(dict(mappingArg.value)))
+
+        return outArgs
+
+    @staticmethod
+    def makeStarArgTupleType(tupleArgs):
+        tupleType = Tuple(*[a.interpreterTypeRepresentation for a in tupleArgs])
+
+        return TypedTupleMasqueradingAsTuple(tupleType)
 
     def makeStarArgTuple(self, tupleArgs):
         """Produce the argument that will be passed to a *args argument.
@@ -714,6 +821,12 @@ class ExpressionConversionContext(object):
         return typeWrapper(tupleType).createFromArgs(self, tupleArgs).changeType(
             TypedTupleMasqueradingAsTuple(tupleType)
         )
+
+    @staticmethod
+    def makeKwargDictType(kwargs):
+        tupleType = NamedTuple(**{k: v.interpreterTypeRepresentation for k, v in kwargs.items()})
+
+        return NamedTupleMasqueradingAsDict(tupleType)
 
     def makeKwargDict(self, kwargs):
         tupleType = NamedTuple(**{k: v.expr_type.interpreterTypeRepresentation for k, v in kwargs.items()})
@@ -741,7 +854,7 @@ class ExpressionConversionContext(object):
             _pyFuncToFuncCache[f] = makeFunction(f.__name__, f)
         typedFunc = _pyFuncToFuncCache[f]
 
-        concreteArgs = self.mapFunctionArguments(f.__name__, typedFunc.overloads[0], args, kwargs)
+        concreteArgs = self.buildFunctionArguments(typedFunc.overloads[0], args, kwargs)
 
         if concreteArgs is None:
             return None
