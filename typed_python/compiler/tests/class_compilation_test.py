@@ -12,24 +12,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, Int64, UInt64, Int16, \
-    Float32, Float64, String, Final, PointerTo, makeNamedTuple
+from typed_python import Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, Int64, UInt64, Int16, \
+    Float32, Float64, String, Final, PointerTo, makeNamedTuple, Compiled, Function
 import typed_python._types as _types
-from typed_python.compiler.runtime import Runtime, Entrypoint
+from typed_python.compiler.runtime import Entrypoint
 from flaky import flaky
 import unittest
 import time
 import psutil
 from math import trunc, floor, ceil
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
-
-
-def resultType(f, **kwargs):
-    return Runtime.singleton().resultTypes(f, kwargs)
 
 
 class AClass(Class):
@@ -227,9 +218,9 @@ class TestClassCompilationCompilation(unittest.TestCase):
         c2 = AChildClass()
 
         t0 = time.time()
-        addCaller(c, 200 * 1000000)
+        addCaller(c, 200 * 100000)
         t1 = time.time()
-        addCaller(c2, 200 * 1000000)
+        addCaller(c2, 200 * 100000)
         t2 = time.time()
 
         elapsed1 = t1 - t0
@@ -247,7 +238,10 @@ class TestClassCompilationCompilation(unittest.TestCase):
         uncompiled_res = c.loop(1000000)
         uncompiled_time = time.time() - t0
 
-        Runtime.singleton().compile(AClass.loop, dict(self=AClass))
+        self.assertEqual(
+            AClass.loop.resultTypeFor(AClass, int).typeRepresentation,
+            Float64
+        )
 
         t0 = time.time()
         compiled_res = c.loop(1000000)
@@ -405,10 +399,16 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def f(self, y: str) -> str:  # noqa
                 return y + "hi"
 
-        self.assertEqual(resultType(lambda c, a: c.f(a), c=TestClass, a=int), Int64)
-        self.assertEqual(resultType(lambda c, a: c.f(a), c=TestClass, a=str), String)
-        self.assertEqual(set(resultType(lambda c, a: c.f(a), c=TestClass, a=OneOf(str, int)).Types), set(OneOf(str, int).Types))
-        self.assertEqual(set(resultType(lambda c, a: c.f(a), c=TestClass, a=object).Types), set(OneOf(str, int).Types))
+        self.assertEqual(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, int).typeRepresentation, Int64)
+        self.assertEqual(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, str).typeRepresentation, String)
+        self.assertEqual(
+            set(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, OneOf(str, int)).typeRepresentation.Types),
+            set(OneOf(str, int).Types)
+        )
+        self.assertEqual(
+            set(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, object).typeRepresentation.Types),
+            set(OneOf(str, int).Types)
+        )
 
         @Compiled
         def callWithStr(c: TestClass, x: str):
@@ -634,13 +634,14 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def f(self, x: float) -> float:  # noqa
                 return x * 2
 
+        @Function
         def f(x):
             return BaseClass().f(x)
 
-        self.assertEqual(resultType(f, x=int), Int64)
-        self.assertEqual(resultType(f, x=float), Float64)
-        self.assertEqual(resultType(f, x=OneOf(int, float)), OneOf(float, int))
-        self.assertEqual(resultType(f, x=object), OneOf(float, int))
+        self.assertEqual(f.resultTypeFor(int).typeRepresentation, Int64)
+        self.assertEqual(f.resultTypeFor(float).typeRepresentation, Float64)
+        self.assertEqual(f.resultTypeFor(OneOf(int, float)).typeRepresentation, OneOf(float, int))
+        self.assertEqual(f.resultTypeFor(object).typeRepresentation, OneOf(float, int))
 
     def test_dispatch_with_no_specified_output_types(self):
         class BaseClass(Class):
@@ -657,14 +658,16 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def f(self, x: float):  # noqa
                 return x * 2
 
+        @Function
         def f(x):
             return BaseClass().f(x)
 
+        @Function
         def fFinal(x):
             return BaseClassFinal().f(x)
 
-        self.assertEqual(resultType(f, x=OneOf(int, float)), object)
-        self.assertEqual(resultType(fFinal, x=OneOf(int, float)), OneOf(float, int))
+        self.assertEqual(f.resultTypeFor(OneOf(int, float)).typeRepresentation.PyType, object)
+        self.assertEqual(fFinal.resultTypeFor(OneOf(int, float)).typeRepresentation, OneOf(float, int))
 
     def test_classes_with_lots_of_members(self):
         class BaseClass(Class):
@@ -1578,3 +1581,34 @@ class TestClassCompilationCompilation(unittest.TestCase):
         v = ClassWithoutInplaceOp(s="start")
         r2 = Compiled(inplace)(v)
         self.assertEqual(r2.s, expected.s)
+
+    def test_defining_float_doesnt_allow_implicit_conversion(self):
+        aList = ListOf(float)()
+
+        class C(Class):
+            def __float__(self):
+                return 1.0
+
+        with self.assertRaisesRegex(TypeError, "Couldn't initialize type Float64 from C"):
+            aList.append(C())
+
+        @Function
+        def requiresAFloat(f: float):
+            return f
+
+        with self.assertRaisesRegex(TypeError, "cannot find a valid overload with arguments"):
+            requiresAFloat(C())
+
+        @Compiled
+        def tryToAppend(aList: ListOf(float)):
+            aList.append(C())
+
+        with self.assertRaisesRegex(TypeError, "Can't convert from type C to type Float64"):
+            tryToAppend(aList)
+
+        @Compiled
+        def tryToCallRequiresAFloat():
+            requiresAFloat(C())
+
+        with self.assertRaisesRegex(TypeError, "Can't convert from type C to type Float64"):
+            tryToCallRequiresAFloat()

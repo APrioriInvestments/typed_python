@@ -398,7 +398,7 @@ extern "C" {
     }
 
     void np_destroy_pyobj_handle(PythonObjectOfType::layout_type* p) {
-        PythonObjectOfType::decrefLayoutWithoutHoldingTheGil(p);
+        PythonObjectOfType::destroyLayoutIfRefcountIsZero(p);
     }
 
     int64_t nativepython_runtime_mod_int64_int64(int64_t l, int64_t r) {

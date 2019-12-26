@@ -13,9 +13,12 @@
 #   limitations under the License.
 
 
-from typed_python import PointerTo, _types
+from typed_python import PointerTo
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
+from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
+from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
+
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -29,6 +32,9 @@ class PythonTypedFunctionWrapper(Wrapper):
     is_pass_by_ref = False
 
     def __init__(self, f):
+        if isinstance(f, typed_python._types.Function):
+            f = type(f)
+
         super().__init__(f)
 
     def getNativeLayoutType(self):
@@ -70,9 +76,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                 kwargs
             )
 
-            signature = self.pickCallSignatureToImplement(overload, [a.expr_type for a in argsToPass])
-
-            actualArgTypes = tuple([a.typeFilter for a in signature.overloads[0].args])
+            actualArgTypes = self.pickCallSignatureToImplement(overload, [a.expr_type for a in argsToPass])
 
             # these are the actual arguments as the function itself will expect to see them.
             # specifically, there is exactly one argument for each argument name in the function
@@ -112,7 +116,9 @@ class PythonTypedFunctionWrapper(Wrapper):
 
                 return
 
-            return context.call_typed_call_target(singleConvertedOverload, argsToPass)
+            res = context.call_typed_call_target(singleConvertedOverload, argsToPass)
+
+            return res
 
         # there are multiple possible overloads. We'll need to check each one in turn to see
         # which one to trigger.
@@ -135,6 +141,37 @@ class PythonTypedFunctionWrapper(Wrapper):
         return context.call_typed_call_target(callTarget, args + list(kwargs.values()))
 
     @staticmethod
+    def pickSpecializationTypeFor(overloadArg, argType: Wrapper):
+        """Given that we are passing 'argType' to 'overloadArg', figure out what Wrapper we
+        ought to use.
+        """
+        if overloadArg.isStarArg:
+            assert isinstance(argType, TypedTupleMasqueradingAsTuple)
+
+            if overloadArg.typeFilter is not None:
+                return TypedTupleMasqueradingAsTuple(
+                    typed_python.Tuple(*[overloadArg.typeFilter for _ in argType.typeRepresentation.ElementTypes])
+                )
+            else:
+                return argType
+
+        elif overloadArg.isKwarg:
+            assert isinstance(argType, NamedTupleMasqueradingAsDict)
+
+            if overloadArg.typeFilter is not None:
+                return NamedTupleMasqueradingAsDict(
+                    typed_python.NamedTuple(
+                        **{name: overloadArg.typeFilter for name in argType.typeRepresentation.ElementNames}
+                    )
+                )
+            else:
+                return argType
+        else:
+            if overloadArg.typeFilter is not None:
+                return typeWrapper(overloadArg.typeFilter)
+            return argType
+
+    @staticmethod
     def pickCallSignatureToImplement(overload, argTypes):
         """Pick the actual signature to use when calling 'overload' with 'argTypes'
 
@@ -147,35 +184,19 @@ class PythonTypedFunctionWrapper(Wrapper):
             argTypes - a list of typed_python Type objects
 
         Returns:
-            a typed_python.Function object representing the signature we'll implement
-            for this overload.
+            a list of Wrapper objects for each named argument in the function
         """
-        argTuples = []
+        functionArgTypes = []
 
         if len(argTypes) != len(overload.args):
             raise Exception(f"Signature mismatch; can't call {overload} with {argTypes}")
 
         for i, arg in enumerate(overload.args):
-            # when choosing the signature we want to generate for a given call signature,
-            # we specialize anything with _no signature at all_, but otherwise take the given
-            # signature. Otherwise, we'd produce an exorbitant number of signatures (for every
-            # possible subtype combination we encounter in code).
-
-            if arg.typeFilter is None:
-                argType = argTypes[i].typeRepresentation
-            else:
-                argType = arg.typeFilter or object
-
-            argTuples.append(
-                (arg.name, argType, arg.defaultValue, arg.isStarArg, arg.isKwarg)
+            functionArgTypes.append(
+                PythonTypedFunctionWrapper.pickSpecializationTypeFor(arg, argTypes[i])
             )
 
-        return _types.Function(
-            overload.name,
-            overload.returnType or object,
-            None,
-            tuple(argTuples)
-        )
+        return functionArgTypes
 
     def compileCall(self, converter, returnType, argTypes, kwargTypes, callback):
         """Compile this function being called with a particular signature.
@@ -277,7 +298,7 @@ class PythonTypedFunctionWrapper(Wrapper):
 
                         callTarget = converter.convert(o.functionObj, actualArgTypes, None)
 
-                        if callTarget is not None:
+                        if callTarget is not None and callTarget.output_type is not None:
                             returnTypes.append(callTarget.output_type)
 
                     if mightMatch is True:
@@ -399,9 +420,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             outputVar - a TypedExpression(PointerTo(returnType)) we're supposed to initialize.
             args - the arguments to pass to the method (including the instance)
         """
-        signature = self.pickCallSignatureToImplement(overload, [a.expr_type for a in args])
-
-        argTypes = [a.typeFilter for a in signature.overloads[0].args]
+        argTypes = self.pickCallSignatureToImplement(overload, [a.expr_type for a in args])
 
         retType = overload.returnType or typeWrapper(object).typeRepresentation
 

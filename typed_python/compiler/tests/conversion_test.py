@@ -17,13 +17,8 @@ import traceback
 import unittest
 from flaky import flaky
 
-from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, _types
+from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, _types, Compiled
 from typed_python.compiler.runtime import Runtime, Entrypoint
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
 
 
 class TestCompilationStructures(unittest.TestCase):
@@ -49,9 +44,7 @@ class TestCompilationStructures(unittest.TestCase):
                 self.assertEqual(typeToString(x), str(type(x)))
 
     def checkFunctionOfIntegers(self, f):
-        r = Runtime.singleton()
-
-        f_fast = r.compile(f)
+        f_fast = Compiled(f)
 
         for i in range(100):
             self.assertEqual(f_fast(i), f(i))
@@ -109,11 +102,11 @@ class TestCompilationStructures(unittest.TestCase):
 
     def test_boolean_operators(self):
         @Compiled
-        def f(x: int, y: int, z: str) -> bool:
+        def f(x: int, y: int, z: float) -> bool:
             return x and y and z
 
-        self.assertEqual(f(0, 1, "s"), False)
-        self.assertEqual(f(1, 1, "s"), True)
+        self.assertEqual(f(0, 1, 1.5), False)
+        self.assertEqual(f(1, 1, 1.5), True)
 
     def test_boolean_operators_with_side_effects(self):
         # a function that appends 'effect' onto a list of effects
@@ -181,11 +174,9 @@ class TestCompilationStructures(unittest.TestCase):
         self.checkFunctionOfIntegers(f)
 
     def test_call_untyped_function(self):
-        @Function
-        def f(x):
+        @Compiled
+        def f(x: object):
             return x
-
-        Runtime.singleton().compile(f)
 
         x = []
 
@@ -195,11 +186,9 @@ class TestCompilationStructures(unittest.TestCase):
         def g(x):
             return x
 
-        @Function
-        def f(x):
+        @Compiled
+        def f(x: object):
             return g(x)
-
-        Runtime.singleton().compile(f)
 
         x = []
 
@@ -270,8 +259,8 @@ class TestCompilationStructures(unittest.TestCase):
 
         g_typed = Function(g)
 
-        Runtime.singleton().compile(g_typed, {'x': int})
-        Runtime.singleton().compile(g_typed, {'x': float})
+        g_typed.resultTypeFor(int)
+        g_typed.resultTypeFor(float)
 
         self.assertEqual(g(10), g_typed(10))
 
@@ -295,42 +284,33 @@ class TestCompilationStructures(unittest.TestCase):
         def f(x):
             return x
 
-        @Function
+        @Compiled
         def g(x: int):
             return f(x+1)
-
-        Runtime.singleton().compile(g)
-        Runtime.singleton().compile(f)
 
         self.assertEqual(g(10), 11)
 
     def test_adding_with_nones_throws(self):
-        @Function
+        @Compiled
         def g():
             return None + None
-
-        Runtime.singleton().compile(g)
 
         with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
             g()
 
     def test_exception_before_return_propagated(self):
-        @Function
+        @Compiled
         def g():
             None+None
             return None
-
-        Runtime.singleton().compile(g)
 
         with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
             g()
 
     def test_call_function_with_none(self):
-        @Function
+        @Compiled
         def g(x: None):
             return None
-
-        Runtime.singleton().compile(g)
 
         self.assertEqual(g(None), None)
 
@@ -338,11 +318,9 @@ class TestCompilationStructures(unittest.TestCase):
         def f(x):
             return x
 
-        @Function
+        @Compiled
         def g(x: int):
             return f(None)
-
-        Runtime.singleton().compile(g)
 
         self.assertEqual(g(1), None)
 
@@ -351,16 +329,13 @@ class TestCompilationStructures(unittest.TestCase):
             x+z
             return y
 
-        @Function
+        @Compiled
         def works(x: int):
             return f(x, None, x)
 
-        @Function
+        @Compiled
         def throws(x: int):
             return f(None, None, x)
-
-        Runtime.singleton().compile(works)
-        Runtime.singleton().compile(throws)
 
         self.assertEqual(works(1), None)
         with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
@@ -370,13 +345,11 @@ class TestCompilationStructures(unittest.TestCase):
         def f(x):
             return x
 
-        @Function
+        @Compiled
         def g(x: int):
             y = f(None)
             z = y
             return z
-
-        Runtime.singleton().compile(g)
 
         self.assertEqual(g(1), None)
 
@@ -480,7 +453,7 @@ class TestCompilationStructures(unittest.TestCase):
 
     def test_can_raise_exceptions(self):
         @Compiled
-        def aFunctionThatRaises(x):
+        def aFunctionThatRaises(x: object):
             raise AttributeError(f"you gave me {x}")
 
         with self.assertRaisesRegex(AttributeError, "you gave me hihi"):
@@ -609,7 +582,7 @@ class TestCompilationStructures(unittest.TestCase):
             assert False, x
             return x
 
-        self.assertEqual(check.resultTypeFor(10), None)
+        self.assertEqual(check.resultTypeFor(int), None)
 
         with self.assertRaises(AssertionError):
             check(10)
@@ -800,7 +773,7 @@ class TestCompilationStructures(unittest.TestCase):
             return x + y
 
         @Compiled
-        def callIt(x):
+        def callIt(x: int):
             return f(x)
 
         with self.assertRaisesRegex(TypeError, "f.. missing required positional argument: y"):
@@ -830,13 +803,13 @@ class TestCompilationStructures(unittest.TestCase):
         def f(x=1, y=10):
             return x + y
 
-        def callWithX(x):
+        def callWithX(x: int):
             return f(x=x)
 
-        def callWithY(y):
+        def callWithY(y: int):
             return f(y=y)
 
-        def callWithXY(x, y):
+        def callWithXY(x: int, y: int):
             return f(y=y, x=x)
 
         callWithXCompiled = Compiled(callWithX)
@@ -1011,7 +984,7 @@ class TestCompilationStructures(unittest.TestCase):
         def callF():
             return f(1, "a b c".split())
 
-        self.assertEqual(callF.resultTypeFor(), list)
+        self.assertEqual(callF.resultTypeFor().interpreterTypeRepresentation.PyType, list)
 
     def test_star_args_type(self):
         def f(*args):
@@ -1120,3 +1093,20 @@ class TestCompilationStructures(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, r"convert from type OneOf\(Int64, Float64, String\) to type OneOf\(Int64, Float64\)"):
             callF2("h")
+
+    def test_can_call_function_with_typed_function_as_argument(self):
+        @Function
+        def add(x: int, y: int):
+            return x + y
+
+        def g(x, y):
+            return x + y
+
+        @Function
+        def callIt(x: int, f: add):
+            return f(x, 1)
+
+        self.assertEqual(callIt(1, add), 2)
+
+        with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
+            callIt(1, g)

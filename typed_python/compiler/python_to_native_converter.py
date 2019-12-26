@@ -19,13 +19,11 @@ import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 from sortedcontainers import SortedSet
 from typed_python.compiler.directed_graph import DirectedGraph
-from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
+from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
 from typed_python.compiler.function_conversion_context import FunctionConversionContext
 from typed_python.compiler.native_function_conversion_context import NativeFunctionConversionContext
-
-NoneExprType = NoneWrapper()
 
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
@@ -37,6 +35,8 @@ VALIDATE_FUNCTION_DEFINITIONS_STABLE = False
 class TypedCallTarget(object):
     def __init__(self, named_call_target, input_types, output_type):
         super().__init__()
+
+        assert isinstance(output_type, Wrapper) or output_type is None
 
         self.named_call_target = named_call_target
         self.input_types = input_types
@@ -438,6 +438,7 @@ class PythonToNativeConverter(object):
                     dirtyUpstream = True
 
                 name = self._link_name_for_identity[identity]
+
                 self._targets[name] = self.getTypedCallTarget(name, functionConverter._input_types, actual_output_type)
 
             if dirtyUpstream:

@@ -398,22 +398,6 @@ class StringWrapper(RefcountedWrapper):
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        if not explicit:
-            return super().convert_to_type_with_target(context, e, targetVal, explicit)
-
-        target_type = targetVal.expr_type
-
-        if target_type.typeRepresentation == Bool:
-            context.pushEffect(
-                targetVal.expr.store(
-                    self.convert_len_native(e.nonref_expr).neq(0)
-                )
-            )
-            return context.constant(True)
-
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
-
     def convert_bool_cast(self, context, expr):
         return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
 

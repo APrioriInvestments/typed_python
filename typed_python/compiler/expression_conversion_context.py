@@ -19,7 +19,6 @@ import types
 
 from typed_python.internals import makeFunction, FunctionOverload
 from typed_python.compiler.function_stack_state import FunctionStackState
-from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.python_object_representation import pythonObjectRepresentation
 from typed_python.compiler.python_object_representation import pythonObjectRepresentationType
@@ -31,8 +30,6 @@ from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrappe
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 
 builtinValueIdToNameAndValue = {id(v): (k, v) for k, v in __builtins__.items()}
-
-NoneExprType = NoneWrapper()
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
@@ -1238,6 +1235,7 @@ class ExpressionConversionContext(object):
             for a in ast.args:
                 if a.matches.Starred:
                     toStar = self.convert_expression_ast(a.value)
+
                     if toStar is None:
                         return None
 

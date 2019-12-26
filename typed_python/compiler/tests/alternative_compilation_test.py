@@ -12,21 +12,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Int16, UInt64, Float32, Function, Alternative, Forward, \
-    Dict, ConstDict, ListOf, PointerTo
+from typed_python import TypeFunction, Int16, UInt64, Float32, Alternative, Forward, \
+    Dict, ConstDict, ListOf, PointerTo, Compiled
 import typed_python._types as _types
-from typed_python.compiler.runtime import Runtime
 from typed_python import Entrypoint
 import unittest
 import pytest
 import time
 import psutil
 from math import trunc, floor, ceil
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
 
 
 class TestAlternativeCompilation(unittest.TestCase):
@@ -473,7 +467,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         for v in test_values:
             r1 = format(v)
             r2 = specialized_format(v)
-            self.assertEqual(r1, r2)
+            self.assertEqual(r1, r2, type(v))
 
     def test_compile_alternative_bytes(self):
         A = Alternative("A", a={'a': int}, b={'b': str},

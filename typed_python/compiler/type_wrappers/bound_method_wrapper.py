@@ -13,9 +13,7 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-
 import typed_python.compiler
-from typed_python import Bool
 
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
@@ -58,18 +56,5 @@ class BoundMethodWrapper(Wrapper):
             kwargs
         )
 
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        if not explicit:
-            return super().convert_to_type_with_target(context, e, targetVal, explicit)
-
-        target_type = targetVal.expr_type
-
-        if target_type.typeRepresentation == Bool:
-            context.pushEffect(
-                targetVal.expr.store(
-                    context.constant(True)
-                )
-            )
-            return context.constant(True)
-
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+    def convert_bool_cast(self, context, e):
+        return context.constant(True)

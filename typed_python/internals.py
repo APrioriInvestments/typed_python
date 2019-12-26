@@ -115,6 +115,12 @@ magicMethodTypes = {
 
 
 def makeFunction(name, f, classType=None):
+    if isinstance(f, typed_python._types.Function):
+        return type(f)
+
+    if isinstance(f, type) and issubclass(f, typed_python._types.Function):
+        return f
+
     spec = inspect.getfullargspec(f)
 
     def getAnn(argname):
@@ -211,7 +217,11 @@ class ClassMetaclass(type):
                         staticFunctions[eltName],
                         makeFunction(eltName, elt.__func__)
                     )
-            elif isinstance(elt, FunctionType):
+            elif (
+                isinstance(elt, FunctionType)
+                or isinstance(elt, typed_python._types.Function)
+                or isinstance(elt, type) and issubclass(elt, typed_python._types.Function)
+            ):
                 if eltName not in memberFunctions:
                     memberFunctions[eltName] = makeFunction(eltName, elt, actualClass)
                 else:
@@ -266,12 +276,6 @@ class FunctionOverloadArg:
             return self._typeFilter.get()
         return self._typeFilter
 
-    def typeToUse(self, type):
-        """Return the type we should use if we're specializing this argument."""
-        if self.typeFilter is None:
-            return type
-        return self.typeFilter
-
     def __repr__(self):
         res = f"{self.name}: {self.typeFilter}"
         if self.defaultValue is not None:
@@ -319,6 +323,21 @@ class FunctionOverload:
             if a.isStarArg:
                 return None
         return len(self.args)
+
+    def asSignature(self, argTypes):
+        assert len(argTypes) == len(self.args)
+
+        argTuples = []
+
+        for i, arg in enumerate(self.args):
+            argTuples.append((arg.name, argTypes[i], arg.defaultValue, arg.isStarArg, arg.isKwarg))
+
+        return typed_python._types.Function(
+            self.name,
+            self.returnType or object,
+            None,
+            tuple(argTuples)
+        )
 
     def addArg(self, name, defaultVal, typeFilter, isStarArg, isKwarg):
         self.args = self.args + (FunctionOverloadArg(name, defaultVal, typeFilter, isStarArg, isKwarg),)

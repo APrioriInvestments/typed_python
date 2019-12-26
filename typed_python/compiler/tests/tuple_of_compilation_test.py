@@ -12,24 +12,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, TupleOf
+from typed_python import Function, TupleOf, Compiled
 import typed_python._types as _types
-from typed_python.compiler.runtime import Runtime
 import unittest
 import time
 import psutil
 
 
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
-
-
 class TestTupleOfCompilation(unittest.TestCase):
     def checkFunction(self, f, argsToCheck):
-        r = Runtime.singleton()
-
-        f_fast = r.compile(f)
+        f_fast = Compiled(f)
 
         t_py = 0.0
         t_fast = 0.0
@@ -118,7 +110,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         for compileIt in [False, True]:
             if compileIt:
-                Runtime.singleton().compile(f)
+                f = Compiled(f)
 
             intTup = TupleOf(int)(list(range(1000)))
 
@@ -214,7 +206,7 @@ class TestTupleOfCompilation(unittest.TestCase):
         self.assertEqual(type(makeT()), type(Compiled(makeT)()))
 
     def test_create_tuple_of_from_untyped(self):
-        def makeT(aList):
+        def makeT(aList: object):
             return TupleOf(int)(aList)
 
         self.assertEqual(makeT([1, 2, 3, 4]), Compiled(makeT)([1, 2, 3, 4]))

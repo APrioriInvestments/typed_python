@@ -18,20 +18,14 @@ from typed_python import (
     Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
     Float32, Float64, Final,
-    PointerTo
+    PointerTo, Compiled
 )
 
 import unittest
 import psutil
-from typed_python.compiler.runtime import Runtime
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
 from typed_python._types import refcount
 from typed_python import Entrypoint
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
 
 
 class HoldsAnA:
@@ -55,7 +49,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
     def test_can_pass_object_in_and_out(self):
         @Compiled
-        def f(x):
+        def f(x: object):
             return x
 
         for thing in [0, 10, f, str]:
@@ -63,7 +57,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
     def test_can_assign(self):
         @Compiled
-        def f(x):
+        def f(x: object):
             y = x
             return y
 
@@ -73,7 +67,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
     def test_member_access(self):
         @Compiled
-        def f(x):
+        def f(x: object):
             return x.a
 
         x = '1'
@@ -103,7 +97,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
     def test_getitem(self):
         @Compiled
-        def f(x):
+        def f(x: object):
             return x[10]
 
         self.assertEqual(f({10: "hi"}), "hi")
@@ -113,7 +107,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
     def test_delitem(self):
         @Compiled
-        def f(x, item):
+        def f(x: object, item: object):
             del x[item]
 
         d = {1: 2, 3: 4}
@@ -125,18 +119,47 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             f(d, 1)
 
     def test_binary_ops(self):
-        fcn = [
-            lambda x, y: x + y,
-            lambda x, y: x - y,
-            lambda x, y: x * y,
-            lambda x, y: x / y,
-            lambda x, y: x // y,
-            lambda x, y: x & y,
-            lambda x, y: x | y,
-            lambda x, y: x ^ y,
-            lambda x, y: x ** y,
-            lambda x, y: x % y
-        ]
+        fcn = []
+
+        @fcn.append
+        def add(x: object, y: object):
+            return x + y
+
+        @fcn.append
+        def sub(x: object, y: object):
+            return x - y
+
+        @fcn.append
+        def mul(x: object, y: object):
+            return x * y
+
+        @fcn.append
+        def div(x: object, y: object):
+            return x / y
+
+        @fcn.append
+        def truediv(x: object, y: object):
+            return x // y
+
+        @fcn.append
+        def bitAnd(x: object, y: object):
+            return x & y
+
+        @fcn.append
+        def bitOr(x: object, y: object):
+            return x | y
+
+        @fcn.append
+        def bitXor(x: object, y: object):
+            return x ^ y
+
+        @fcn.append
+        def pow(x: object, y: object):
+            return x ** y
+
+        @fcn.append
+        def mod(x: object, y: object):
+            return x % y
 
         for f in fcn:
             compiled = Compiled(f)
@@ -147,12 +170,23 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
                 compiled(2.5, "hi")
 
     def test_unary_ops(self):
-        fcn = [
-            lambda x: +x,
-            lambda x: -x,
-            lambda x: ~x,
-            lambda x: not x,
-        ]
+        fcn = []
+
+        @fcn.append
+        def pos(x: object):
+            return +x
+
+        @fcn.append
+        def neg(x: object):
+            return -x
+
+        @fcn.append
+        def inv(x: object):
+            return ~x
+
+        @fcn.append
+        def objNot(x: object):
+            return not x
 
         for f in fcn:
             compiled = Compiled(f)
@@ -163,7 +197,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
     def test_setitem(self):
         @Compiled
-        def f(x, item, y):
+        def f(x: object, item: object, y: object):
             x[item] = y
 
         d = {}
@@ -175,7 +209,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
     def test_call_with_args_and_kwargs(self):
         @Compiled
-        def f(x, a, k):
+        def f(x: object, a: object, k: object):
             return x(a, keyword=k)
 
         def aFunc(*args, **kwargs):
@@ -185,7 +219,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
     def test_len(self):
         @Compiled
-        def f(x):
+        def f(x: object):
             return len(x)
 
         self.assertEqual(f([1, 2, 3]), 3)
@@ -196,10 +230,26 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             return x
 
         @Compiled
-        def fro_and_to(x):
+        def fro_and_to(x: object):
             return OneOf(String, Int64)(x)
 
         self.assertEqual(fro_and_to("ab"), "ab")
+
+    def test_object_conversions_2(self):
+        T = ListOf(int)
+
+        @Function
+        def toObject(x: object):
+            return x
+
+        @Compiled
+        def to_and_fro(x: T) -> T:
+            return T(toObject(toObject(x)))
+
+        t = T([1, 2, 3])
+        self.assertEqual(refcount(t), 1)
+        to_and_fro(t)
+        self.assertEqual(refcount(t), 1)
 
     def test_object_conversions(self):
         NT1 = NamedTuple(a=int, b=float, c=str, d=str)
@@ -246,7 +296,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
                 return T(toObject(x))
 
             @Compiled
-            def fro_and_to(x):
+            def fro_and_to(x: object):
                 return toObject(T(x))
 
             if T in [Float32, Float64]:
@@ -264,7 +314,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
                                                "Class", "Dict", "ConstDict", "Set"]:
                 self.assertEqual(refcount(x), 1)
                 self.assertEqual(to_and_fro(x), x)
-                self.assertEqual(refcount(x), 1)
+                self.assertEqual(refcount(x), 1, T)
                 self.assertEqual(fro_and_to(x), x)
                 self.assertEqual(refcount(x), 1)
 
@@ -544,7 +594,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         self.assertEqual(res, {1: 2, "hi": "bye"})
 
     def test_iterate_object(self):
-        def toList(x):
+        def toList(x: object):
             res = list()
             resAp = res.append
             for i in x:

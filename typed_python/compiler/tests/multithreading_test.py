@@ -18,11 +18,11 @@ import unittest
 
 from flaky import flaky
 from typed_python import (
-    Function, Class, Member, Alternative, TupleOf, ListOf, ConstDict, SerializationContext, Entrypoint
+    Class, Member, Alternative, TupleOf, ListOf, ConstDict, SerializationContext,
+    Entrypoint, Compiled
 )
 
 import typed_python._types as _types
-from typed_python.compiler.runtime import Runtime
 
 
 def thread_apply(f, argtuples):
@@ -41,11 +41,6 @@ def thread_apply(f, argtuples):
         t.join()
 
     return [results.get(i) for i in range(len(argtuples))]
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
 
 
 class AClass(Class):

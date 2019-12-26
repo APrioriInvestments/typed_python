@@ -48,7 +48,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         def f(x: TupleOf(int)):
             return x
 
-        self.assertEqual(f.resultTypeFor((1, 2, 3)), TupleOf(int))
+        self.assertEqual(f.resultTypeFor(object).typeRepresentation, TupleOf(int))
 
     def test_specialized_entrypoint(self):
         compiledAdd = Entrypoint(add)
@@ -64,20 +64,34 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertEqual(compiled(10), 11)
 
     def test_specialized_entrypoint_doesnt_recompile(self):
+        def add(x, y):
+            return x + y
+
         compiledAdd = Entrypoint(add)
 
         compileCount = Runtime.singleton().timesCompiled
 
-        someInts = IntList(range(1000))
-        someFloats = FloatList(range(1000))
+        for i in range(10):
+            compiledAdd(i, 1)
 
-        for _ in range(10):
-            compiledAdd(someInts, 1)
-
-        for _ in range(10):
-            compiledAdd(someFloats, 1)
+        for i in range(10):
+            compiledAdd(i, 1.5)
 
         self.assertEqual(Runtime.singleton().timesCompiled - compileCount, 2)
+
+    def test_specialized_entrypoint_dispatch_perf(self):
+        def add(x, y):
+            return x + y
+
+        compiledAdd = Entrypoint(add)
+
+        t0 = time.time()
+
+        for i in range(1000000):
+            compiledAdd(i, 1)
+
+        # I get about .5 seconds on my laptop
+        self.assertTrue(time.time() - t0 < 3.0, time.time() - t0)
 
     def test_specialized_entrypoint_perf_difference(self):
         compiledAdd = Entrypoint(add)
@@ -125,7 +139,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         t0 = time.time()
         while time.time() - t0 < 10.0:
-            touchCompiledSpecializations(sumFun.__typed_python_function__.overloads[0].functionTypeObject, 0)
+            touchCompiledSpecializations(sumFun.overloads[0].functionTypeObject, 0)
 
         done[0] = True
 
@@ -222,6 +236,8 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         t0 = time.time()
         AClass(x=23).f(100000000)
         self.assertLess(time.time() - t0, 2.0)
+
+        print(AClass(x=23).g)
 
         self.assertEqual(AClass(x=23).g(10, 20.5), 30.5)
         self.assertEqual(AClass(x=23).g2(10, 20.5), 30.5)
@@ -400,7 +416,45 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
             return str(y)
 
         with Visitor():
-            f.resultTypeFor(0)
+            f.resultTypeFor(int)
 
-        self.assertTrue(f.__wrapped_function__ in out, out)
-        self.assertEqual(out[f.__wrapped_function__][2]['y'], Int64)
+        self.assertTrue(f.overloads[0].functionObj in out, out)
+        self.assertEqual(out[f.overloads[0].functionObj][2]['y'], Int64)
+
+    def test_star_args_on_entrypoint(self):
+        @Entrypoint
+        def argCount(*args):
+            return len(args)
+
+        self.assertEqual(argCount(1, 2, 3), 3)
+        self.assertEqual(argCount(1, 2, 3, 4), 4)
+
+    def test_star_args_on_entrypoint_typed(self):
+        @Entrypoint
+        def argCount():
+            return 0
+
+        @argCount.overload
+        def argCount(x, *args: int):
+            return x + argCount(*args)
+
+        self.assertEqual(argCount(), 0)
+        self.assertEqual(argCount(1), 1)
+        self.assertEqual(argCount(1, 2), 3)
+
+        with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
+            argCount(1, 2, "hi")
+
+        self.assertEqual(argCount.resultTypeFor().typeRepresentation, Int64)
+        self.assertEqual(argCount.resultTypeFor(int).typeRepresentation, Int64)
+        self.assertEqual(argCount.resultTypeFor(int, int).typeRepresentation, Int64)
+
+        self.assertEqual(argCount.resultTypeFor(int, int, str), None)
+
+    def test_entrypoint_no_coercion(self):
+        @Entrypoint
+        def f(x):
+            return type(x)
+
+        self.assertEqual(f(1.5), float)
+        self.assertEqual(f(1), int)

@@ -30,8 +30,6 @@ from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
 from typed_python import OneOf
 
-NoneExprType = NoneWrapper()
-
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
@@ -56,6 +54,9 @@ class FunctionConversionContext(object):
             free_variable_lookup - a dict from name to the actual python object in this
                 function's closure. We don't distinguish between local and global scope yet.
         """
+        if name == "exc":
+            assert output_type is None, output_type
+
         self.name = name
         self.variablesAssigned = computeAssignedVariables(statements)
         self.variablesRead = computeReadVariables(statements)
@@ -249,6 +250,8 @@ class FunctionConversionContext(object):
         )
 
     def upsizeVariableType(self, varname, new_type):
+        if varname is FunctionOutput and self.name == "exc1":
+            raise Exception("BOO")
         if self._varname_to_type.get(varname) is None:
             if new_type is None:
                 return

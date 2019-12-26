@@ -12,15 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, ListOf, Tuple
+from typed_python import ListOf, Tuple, Compiled, Entrypoint
 import typed_python._types as _types
-from typed_python.compiler.runtime import Runtime
 import unittest
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
 
 
 class TestPointerToCompilation(unittest.TestCase):
@@ -63,7 +57,7 @@ class TestPointerToCompilation(unittest.TestCase):
         def check(x):
             self.assertEqual(
                 testfun(x),
-                Runtime.singleton().compile(testfun, {'x': type(x)})(x)
+                Entrypoint(testfun)(x)
             )
 
         check(False)
@@ -84,3 +78,16 @@ class TestPointerToCompilation(unittest.TestCase):
 
         self.assertEqual(testfun(T()), 1)
         self.assertEqual(compiledFun(T()), 1)
+
+    def test_pointer_bool(self):
+        T = ListOf(int)
+
+        def testfun(x: T):
+            pointer = x.pointerUnsafe(0)
+
+            return bool(pointer)
+
+        compiledFun = Compiled(testfun)
+
+        self.assertEqual(testfun(T([1])), True)
+        self.assertEqual(compiledFun(T([1])), True)

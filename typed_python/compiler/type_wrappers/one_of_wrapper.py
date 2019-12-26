@@ -212,6 +212,8 @@ class OneOfWrapper(Wrapper):
     def convert_to_type_with_target(self, context, expr, targetVal, explicit):
         isInitialized = context.push(bool, lambda tgt: tgt.expr.store(native_ast.const_bool_expr(False)))
 
+        allSucceed = True
+
         with context.switch(expr.expr.ElementPtrIntegers(0, 0).load(),
                             range(len(self.typeRepresentation.Types)),
                             False) as indicesAndContexts:
@@ -220,9 +222,15 @@ class OneOfWrapper(Wrapper):
                     concreteChild = self.refAs(context, expr, ix)
 
                     converted = concreteChild.expr_type.convert_to_type_with_target(context, concreteChild, targetVal, explicit)
+                    if not (converted.expr.matches.Constant and converted.expr.val.truth_value()):
+                        allSucceed = False
+
                     context.pushEffect(
                         isInitialized.expr.store(converted.nonref_expr)
                     )
+
+        if allSucceed:
+            return context.constant(True)
 
         return isInitialized
 
@@ -324,17 +332,19 @@ class OneOfWrapper(Wrapper):
         return super().convert_type_call(context, typeInst, args, kwargs)
 
     def convert_bool_cast(self, context, expr):
-        return expr.convert_to_type(bool)
+        return expr.unwrap(lambda e: e.convert_bool_cast())
 
     def convert_int_cast(self, context, expr):
-        return expr.convert_to_type(int)
+        return expr.unwrap(lambda e: e.convert_int_cast())
 
     def convert_float_cast(self, context, expr):
-        return expr.convert_to_type(float)
+        return expr.unwrap(lambda e: e.convert_float_cast())
 
-    # TODO:
-    # We're using the default convert_str_cast() for now, which goes to the interpreter.
-    # But would be good to have a direct convert_str_cast for OneOf.
+    def convert_builtin(self, f, context, expr, a1=None):
+        return expr.unwrap(lambda e: e.convert_builtin(f, a1))
 
     def convert_bytes_cast(self, context, expr):
-        return expr.convert_to_type(bytes)
+        return expr.unwrap(lambda e: e.convert_bytes_cast())
+
+    def convert_str_cast(self, context, expr):
+        return expr.unwrap(lambda e: e.convert_str_cast())

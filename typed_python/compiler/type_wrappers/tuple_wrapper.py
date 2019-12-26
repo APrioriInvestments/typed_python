@@ -14,7 +14,7 @@
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
-from typed_python import _types, Int32, Bool
+from typed_python import _types, Int32
 
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
@@ -198,19 +198,6 @@ class TupleWrapper(Wrapper):
         return uninitializedTuple
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        if not explicit:
-            return super().convert_to_type_with_target(context, e, targetVal, explicit)
-
-        target_type = targetVal.expr_type
-
-        if target_type.typeRepresentation == Bool:
-            context.pushEffect(
-                targetVal.expr.store(
-                    context.constant(len(self.subTypeWrappers) != 0)
-                )
-            )
-            return context.constant(True)
-
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
 

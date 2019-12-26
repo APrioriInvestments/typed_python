@@ -535,6 +535,8 @@ public:
 
     PyObject* tp_repr_concrete();
 
+    static PyObject* tp_descr_get(PyObject* func, PyObject* obj, PyObject* type);
+
     static PyObject* tp_str(PyObject *o);
 
     PyObject* tp_str_concrete();

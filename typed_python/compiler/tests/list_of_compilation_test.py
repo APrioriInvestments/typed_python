@@ -12,25 +12,17 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Function, TupleOf, OneOf
+from typed_python import ListOf, Function, TupleOf, OneOf, Compiled
 import typed_python._types as _types
-from typed_python.compiler.runtime import Runtime
 import unittest
 import time
 import numpy
 import psutil
 
 
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
-
-
 class TestListOfCompilation(unittest.TestCase):
     def checkFunction(self, f, argsToCheck):
-        r = Runtime.singleton()
-
-        f_fast = r.compile(f)
+        f_fast = Compiled(f)
 
         t_py = 0.0
         t_fast = 0.0
@@ -49,7 +41,7 @@ class TestListOfCompilation(unittest.TestCase):
 
     def test_list_of_list_refcounts(self):
         @Compiled
-        def f(x: ListOf(ListOf(int)), z):
+        def f(x: ListOf(ListOf(int)), z: bool):
             if z:
                 y = x[0]  # noqa
 
@@ -158,7 +150,7 @@ class TestListOfCompilation(unittest.TestCase):
 
         for compileIt in [False, True]:
             if compileIt:
-                Runtime.singleton().compile(f)
+                f = Compiled(f)
 
             intTup = ListOf(int)(list(range(1000)))
 

@@ -24,7 +24,6 @@ from typed_python import NoneType, _types, PointerTo, Bool, Int32
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
-from math import trunc, floor, ceil
 
 
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
@@ -140,18 +139,6 @@ class ClassWrapper(RefcountedWrapper):
 
             elif self.typeRepresentation in otherType.typeRepresentation.MRO:
                 raise Exception("Downcast in compiled code not implemented yet")
-
-        if otherType.typeRepresentation == Bool:
-            y = self.generate_method_call(context, "__bool__", (e,))
-            if y is not None:
-                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            else:
-                y = self.generate_method_call(context, "__len__", (e,))
-                if y is not None:
-                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
-                else:
-                    context.pushEffect(targetVal.expr.store(context.constant(True)))
-                return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
@@ -602,9 +589,7 @@ class ClassWrapper(RefcountedWrapper):
             outputVar - a TypedExpression(PointerTo(returnType)) we're supposed to initialize.
             args - the arguments to pass to the method (including the instance)
         """
-        signature = PythonTypedFunctionWrapper.pickCallSignatureToImplement(overload, [a.expr_type for a in args])
-
-        argTypes = [a.typeFilter for a in signature.overloads[0].args]
+        argTypes = PythonTypedFunctionWrapper.pickCallSignatureToImplement(overload, [a.expr_type for a in args])
 
         retType = overload.returnType or object
 
@@ -666,7 +651,9 @@ class ClassWrapper(RefcountedWrapper):
         # get the Function object representing this entrypoint as a signature.
         # we specialize on the types in 'argTypes' because we might be specializing
         # a generic method on a specific subtype.
-        signature = PythonTypedFunctionWrapper.pickCallSignatureToImplement(overload, argTypes)
+        signature = overload.asSignature(
+            [a.typeRepresentation for a in PythonTypedFunctionWrapper.pickCallSignatureToImplement(overload, argTypes)]
+        )
 
         assert len(signature.overloads[0].args) == len(argTypes)
 
@@ -712,7 +699,9 @@ class ClassWrapper(RefcountedWrapper):
         # get the Function object representing this entrypoint as a signature.
         # we specialize on the types in 'argTypes' because we might be specializing
         # a generic method on a specific subtype.
-        signature = PythonTypedFunctionWrapper.pickCallSignatureToImplement(overload, argTypes)
+        signature = overload.asSignature(
+            [a.typeRepresentation for a in PythonTypedFunctionWrapper.pickCallSignatureToImplement(overload, argTypes)]
+        )
 
         # each entrypoint generates a slot we could call.
         dispatchSlot = _types.allocateClassMethodDispatch(self.typeRepresentation, methodName, signature)
@@ -906,48 +895,7 @@ class ClassWrapper(RefcountedWrapper):
         return self.generate_method_call(context, "__abs__", (expr,))
 
     def convert_builtin(self, f, context, expr, a1=None):
-        # handle builtins with additional arguments here:
-        if f is format:
-            if a1 is not None:
-                return self.generate_method_call(context, "__format__", (expr, a1))
-            else:
-                return self.generate_method_call(context, "__format__", (expr, context.constant(''))) \
-                    or self.generate_method_call(context, "__str__", (expr,)) \
-                    or expr.convert_str_cast()
-        if f is round:
-            if a1 is not None:
-                return self.generate_method_call(context, "__round__", (expr, a1)) \
-                    or context.pushPod(
-                        float,
-                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
-                )
-            else:
-                return self.generate_method_call(context, "__round__", (expr, context.constant(0))) \
-                    or context.pushPod(
-                        float,
-                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, context.constant(0))
-                )
-        if a1 is not None:
-            return None
-        # handle builtins with no additional arguments here:
-        if f is trunc:
-            return self.generate_method_call(context, "__trunc__", (expr,)) \
-                or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
-        if f is floor:
-            expr_float = self.convert_float_cast(context, expr, False)
-            return self.generate_method_call(context, "__floor__", (expr,)) \
-                or (expr_float and context.pushPod(float, runtime_functions.floor_float64.call(expr_float.nonref_expr)))
-        if f is ceil:
-            expr_float = self.convert_float_cast(context, expr, False)
-            return self.generate_method_call(context, "__ceil__", (expr,)) \
-                or (expr_float and context.pushPod(float, runtime_functions.ceil_float64.call(expr_float.nonref_expr)))
-        if f is complex:
-            return self.generate_method_call(context, "__complex__", (expr,))
-        if f is dir:
-            return self.generate_method_call(context, "__dir__", (expr,)) \
-                or super().convert_builtin(f, context, expr)
-
-        return super().convert_builtin(f, context, expr, a1)
+        return self.convert_builtin_using_methodcall_or_converting_to_float(f, context, expr, a1)
 
     def convert_unary_op(self, context, expr, op):
         magic = "__pos__" if op.matches.UAdd else \

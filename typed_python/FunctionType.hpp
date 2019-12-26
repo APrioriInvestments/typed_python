@@ -399,7 +399,7 @@ public:
             overloads.push_back(o);
         }
 
-        return Function::Make(f1->m_name, overloads, false);
+        return Function::Make(f1->m_name, overloads, f1->isEntrypoint() || f2->isEntrypoint());
     }
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {

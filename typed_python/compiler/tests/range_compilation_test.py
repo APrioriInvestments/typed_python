@@ -12,20 +12,14 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Function
-from typed_python.compiler.runtime import Runtime
+from typed_python import ListOf, Compiled
 import unittest
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
 
 
 class TestRangeCompilation(unittest.TestCase):
     def test_sum_with_range(self):
         @Compiled
-        def sumWithRange(x):
+        def sumWithRange(x: int):
             res = 0
             for i in range(x):
                 res += (i+1)
@@ -36,7 +30,7 @@ class TestRangeCompilation(unittest.TestCase):
 
     def test_range_with_two_values(self):
         @Compiled
-        def sumWithRangePair(x, y):
+        def sumWithRangePair(x: int, y: int):
             res = 0
             for i in range(x, y):
                 res += i

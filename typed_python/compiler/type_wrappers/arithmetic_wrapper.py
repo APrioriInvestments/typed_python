@@ -204,10 +204,6 @@ class IntWrapper(ArithmeticTypeWrapper):
             )
             return context.constant(True)
 
-        if target_type.typeRepresentation == Bool and explicit:
-            targetVal.convert_copy_initialize(e != 0)
-            return context.constant(True)
-
         if isinstance(target_type, IntWrapper):
             context.pushEffect(
                 targetVal.expr.store(
@@ -218,6 +214,14 @@ class IntWrapper(ArithmeticTypeWrapper):
                             signed=target_type.typeRepresentation.IsSignedInt
                         )
                     )
+                )
+            )
+            return context.constant(True)
+
+        if isinstance(target_type, BoolWrapper):
+            context.pushEffect(
+                targetVal.expr.store(
+                    e.nonref_expr.neq(e.expr_type.getNativeLayoutType().zero())
                 )
             )
             return context.constant(True)
@@ -601,8 +605,12 @@ class FloatWrapper(ArithmeticTypeWrapper):
             )
             return context.constant(True)
 
-        if target_type.typeRepresentation == Bool:
-            targetVal.convert_copy_initialize(e != 0.0)
+        if isinstance(target_type, BoolWrapper):
+            context.pushEffect(
+                targetVal.expr.store(
+                    e.nonref_expr.neq(e.expr_type.getNativeLayoutType().zero())
+                )
+            )
             return context.constant(True)
 
         if isinstance(target_type, IntWrapper):

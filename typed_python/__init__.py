@@ -50,4 +50,4 @@ String = _types.String()
 Bytes = _types.Bytes()
 EmbeddedMessage = _types.EmbeddedMessage()
 
-from typed_python.compiler.runtime import Entrypoint, NotCompiled  # noqa
+from typed_python.compiler.runtime import Entrypoint, Compiled, NotCompiled  # noqa

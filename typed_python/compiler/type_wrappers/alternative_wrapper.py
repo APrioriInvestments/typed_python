@@ -12,8 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from math import trunc, floor, ceil
-
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -68,26 +66,6 @@ class SimpleAlternativeWrapper(Wrapper):
             target.expr.store(toStore.nonref_expr)
         )
 
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        # there is deliberately no code path for "not explicit" here
-        # Alternative conversions must be explicit
-        assert targetVal.isReference
-
-        target_type = targetVal.expr_type
-        if target_type.typeRepresentation == Bool:
-            y = self.generate_method_call(context, "__bool__", (e,))
-            if y is not None:
-                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            else:
-                y = self.generate_method_call(context, "__len__", (e,))
-                if y is not None:
-                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
-                else:
-                    context.pushEffect(targetVal.expr.store(context.constant(True)))
-                return context.constant(True)
-
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
-
     def convert_call(self, context, expr, args, kwargs):
         return self.generate_method_call(context, "__call__", [expr] + args)
 
@@ -139,47 +117,7 @@ class SimpleAlternativeWrapper(Wrapper):
             or super().convert_bytes_cast(context, e)
 
     def convert_builtin(self, f, context, expr, a1=None):
-        # handle builtins with additional arguments here:
-        if f is format:
-            if a1 is not None:
-                return self.generate_method_call(context, "__format__", (expr, a1))
-            else:
-                return self.generate_method_call(context, "__format__", (expr, context.constant(''))) \
-                    or expr.convert_str_cast()
-        if f is round:
-            if a1 is not None:
-                return self.generate_method_call(context, "__round__", (expr, a1)) \
-                    or context.pushPod(
-                        float,
-                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
-                )
-            else:
-                return self.generate_method_call(context, "__round__", (expr, context.constant(0))) \
-                    or context.pushPod(
-                        float,
-                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, context.constant(0))
-                )
-        if a1 is not None:
-            return None
-        # handle builtins with no additional arguments here:
-        if f is trunc:
-            return self.generate_method_call(context, "__trunc__", (expr,)) \
-                or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
-        if f is floor:
-            expr_float = self.convert_float_cast(context, expr, False)
-            return self.generate_method_call(context, "__floor__", (expr,)) \
-                or (expr_float and context.pushPod(float, runtime_functions.floor_float64.call(expr_float.nonref_expr)))
-        if f is ceil:
-            expr_float = self.convert_float_cast(context, expr, False)
-            return self.generate_method_call(context, "__ceil__", (expr,)) \
-                or (expr_float and context.pushPod(float, runtime_functions.ceil_float64.call(expr_float.nonref_expr)))
-        if f is complex:
-            return self.generate_method_call(context, "__complex__", (expr, ))
-        if f is dir:
-            return self.generate_method_call(context, "__dir__", (expr, )) \
-                or super().convert_builtin(f, context, expr)
-
-        return super().convert_builtin(f, context, expr, a1)
+        return self.convert_builtin_using_methodcall_or_converting_to_float(f, context, expr, a1)
 
     def convert_unary_op(self, context, expr, op):
         magic = "__pos__" if op.matches.UAdd else \
@@ -312,18 +250,6 @@ class ConcreteSimpleAlternativeWrapper(Wrapper):
         if target_type == typeWrapper(self.alternativeType):
             targetVal.convert_copy_initialize(e.changeType(target_type))
             return context.constant(True)
-
-        if target_type.typeRepresentation == Bool:
-            y = self.generate_method_call(context, "__bool__", (e,))
-            if y is not None:
-                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            else:
-                y = self.generate_method_call(context, "__len__", (e,))
-                if y is not None:
-                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
-                else:
-                    context.pushEffect(targetVal.expr.store(context.constant(True)))
-                return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
@@ -479,26 +405,6 @@ class AlternativeWrapper(RefcountedWrapper):
             return context.constant(False)
         return context.pushPod(bool, instance.nonref_expr.ElementPtrIntegers(0, 1).load().eq(index))
 
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        # there is deliberately no code path for "not explicit" here
-        # Alternative conversions must be explicit
-        assert targetVal.isReference
-
-        target_type = targetVal.expr_type
-        if target_type.typeRepresentation == Bool:
-            y = self.generate_method_call(context, "__bool__", (e,))
-            if y is not None:
-                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            else:
-                y = self.generate_method_call(context, "__len__", (e,))
-                if y is not None:
-                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
-                else:
-                    context.pushEffect(targetVal.expr.store(context.constant(True)))
-                return context.constant(True)
-
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
-
     def convert_call(self, context, expr, args, kwargs):
         return self.generate_method_call(context, "__call__", [expr] + args)
 
@@ -546,47 +452,7 @@ class AlternativeWrapper(RefcountedWrapper):
             or super().convert_bytes_cast(context, e)
 
     def convert_builtin(self, f, context, expr, a1=None):
-        # handle builtins with additional arguments here:
-        if f is format:
-            if a1 is not None:
-                return self.generate_method_call(context, "__format__", (expr, a1))
-            else:
-                return self.generate_method_call(context, "__format__", (expr, context.constant(''))) \
-                    or expr.convert_str_cast()
-        if f is round:
-            if a1 is not None:
-                return self.generate_method_call(context, "__round__", (expr, a1)) \
-                    or context.pushPod(
-                        float,
-                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
-                )
-            else:
-                return self.generate_method_call(context, "__round__", (expr, context.constant(0))) \
-                    or context.pushPod(
-                        float,
-                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, context.constant(0))
-                )
-        if a1 is not None:
-            return None
-        # handle builtins with no additional arguments here:
-        if f is trunc:
-            return self.generate_method_call(context, "__trunc__", (expr,)) \
-                or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
-        if f is floor:
-            expr_float = self.convert_float_cast(context, expr, False)
-            return self.generate_method_call(context, "__floor__", (expr,)) \
-                or (expr_float and context.pushPod(float, runtime_functions.floor_float64.call(expr_float.nonref_expr)))
-        if f is ceil:
-            expr_float = self.convert_float_cast(context, expr, False)
-            return self.generate_method_call(context, "__ceil__", (expr,)) \
-                or (expr_float and context.pushPod(float, runtime_functions.ceil_float64.call(expr_float.nonref_expr)))
-        if f is complex:
-            return self.generate_method_call(context, "__complex__", (expr, ))
-        if f is dir:
-            return self.generate_method_call(context, "__dir__", (expr, )) \
-                or super().convert_builtin(f, context, expr)
-
-        return super().convert_builtin(f, context, expr, a1)
+        return self.convert_builtin_using_methodcall_or_converting_to_float(f, context, expr, a1)
 
     def convert_unary_op(self, context, expr, op):
         magic = "__pos__" if op.matches.UAdd else \
@@ -722,18 +588,6 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         if target_type == typeWrapper(self.alternativeType):
             targetVal.convert_copy_initialize(e.changeType(target_type))
             return context.constant(True)
-
-        if target_type.typeRepresentation == Bool:
-            y = self.generate_method_call(context, "__bool__", (e,))
-            if y is not None:
-                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            else:
-                y = self.generate_method_call(context, "__len__", (e,))
-                if y is not None:
-                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
-                else:
-                    context.pushEffect(targetVal.expr.store(context.constant(True)))
-                return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 

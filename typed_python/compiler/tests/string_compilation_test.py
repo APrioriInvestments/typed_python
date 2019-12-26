@@ -12,17 +12,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import _types, Function, ListOf, TupleOf, Dict, ConstDict
+from typed_python import _types, ListOf, TupleOf, Dict, ConstDict, Compiled
 from typed_python.test_util import currentMemUsageMb, compilerPerformanceComparison
-from typed_python.compiler.runtime import Runtime
 import unittest
 import time
 import flaky
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
 
 
 someStrings = [

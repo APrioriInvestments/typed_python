@@ -18,8 +18,7 @@ import numpy
 import unittest
 import traceback
 
-from typed_python.compiler.runtime import Runtime
-from typed_python import TupleOf, Float32, Float64, Int64, Int32, ListOf
+from typed_python import TupleOf, Float32, Float64, Int64, Int32, ListOf, Function
 
 
 class Operation:
@@ -49,10 +48,8 @@ class Operation:
 
     def getCompiledLambda(self, types):
         if types not in self._compiledFunctionCache:
-            self._compiledFunctionCache[types] = Runtime.singleton().compile(
-                self.getLambda(),
-                {f"a{i + 1}": types[i] for i in range(self.arity())}
-            )
+            self._compiledFunctionCache[types] = Function(self.getLambda())
+            self._compiledFunctionCache[types].resultTypeFor(*types)
 
         return self._compiledFunctionCache[types]
 

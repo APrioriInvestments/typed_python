@@ -170,7 +170,7 @@ public:
     }
 
     // flatten all the args for passing to regular python
-    PyObject* buildPositionalArgTuple() {
+    PyObject* buildPositionalArgTuple() const {
         size_t count = 0;
         for (long k = 0; k < mArgs.size(); k++) {
             if (mArgs[k].getIsNormalArg()) {
@@ -201,7 +201,22 @@ public:
         return tup;
     }
 
-    PyObject* buildKeywordArgTuple() {
+    PyObject* buildStarArgTuple() const {
+        for (long k = 0; k < mArgs.size(); k++) {
+            if (mArgs[k].getIsStarArg()) {
+                PyObject* res = PyTuple_New(mStarArgValues.size());
+                long count = 0;
+                for (auto subElt: mStarArgValues) {
+                    PyTuple_SetItem(res, count++, incref(subElt));
+                }
+                return res;
+            }
+        }
+
+        return nullptr;
+    }
+
+    PyObject* buildKeywordArgTuple() const {
         for (long k = 0; k < mArgs.size(); k++) {
             if (mArgs[k].getIsKwarg()) {
                 PyObject* res = PyDict_New();
@@ -213,6 +228,24 @@ public:
         }
 
         return nullptr;
+    }
+
+    PyObject* extractFunctionArgumentValues() const {
+        PyObject* res = PyTuple_New(mArgs.size());
+
+        for (long k = 0; k < mArgs.size(); k++) {
+            if (mArgs[k].getIsNormalArg()) {
+                PyTuple_SetItem(res, k, incref(mSingleValueArgs[k]));
+            } else if (mArgs[k].getIsStarArg()) {
+                PyTuple_SetItem(res, k, buildStarArgTuple());
+            } else if (mArgs[k].getIsKwarg()) {
+                PyTuple_SetItem(res, k, buildKeywordArgTuple());
+            } else {
+                throw std::runtime_error("unreachable");
+            }
+        }
+
+        return res;
     }
 
     std::pair<Instance, bool> extractArgWithType(int argIx, Type* argType) const {
@@ -235,7 +268,7 @@ public:
             }
         } else if (mArgs[argIx].getIsStarArg()) {
             if (argType->getTypeCategory() != Type::TypeCategory::catTuple) {
-                throw std::runtime_error("Invalid type signature for *args");
+                throw std::runtime_error("Invalid type signature for *args: " + argType->name());
             }
 
             Tuple* tup = (Tuple*)argType;

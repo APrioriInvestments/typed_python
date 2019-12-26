@@ -415,6 +415,17 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(isinstance(XorX2(X()), X))
         self.assertTrue(isinstance(XorX2(X2()), X2))
 
+    def test_function_as_type_arg(self):
+        @Function
+        def f(x: int):
+            return x
+
+        self.assertEqual(type(f).__typed_python_category__, "Function")
+
+        aTup = Tuple(type(f))
+        self.assertEqual(aTup.ElementTypes[0], type(f))
+        self.assertEqual(aTup.ElementTypes[0].__typed_python_category__, "Function")
+
     @flaky(max_runs=3, min_passes=1)
     def test_tuple_of_tuple_of(self):
         tupleOfInt = TupleOf(int)

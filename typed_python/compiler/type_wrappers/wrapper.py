@@ -17,7 +17,7 @@ import typed_python.compiler
 from typed_python import _types, OneOf, ListOf
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.native_ast import VoidPtr
-
+from math import trunc, floor, ceil
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
@@ -383,7 +383,14 @@ class Wrapper(object):
 
         We return a TypedExpression, or None if the operation always throws an exception.
 
-        Subclasses are not generally expected to override this function.
+        Subclasses are not generally expected to override this function. Instead they
+        should override _can_convert_to_type, _can_convert_from_type, convert_to_type_with_target,
+        and convert_to_self_with_target.
+
+        Note that this is not the pathway used by 'float(x)', 'bool(x)', 'int(x)', 'str(x)' etc,
+        which are converted by the convert_(float|int|bool|str|bytes)_cast functions etc. This is
+        to ensure that objects (particularly, class instances) that define __float__ don't end
+        up being _implicitly_ convertible to float.
 
         Args:
             context - an ExpressionConversionContext
@@ -538,6 +545,53 @@ class Wrapper(object):
             )
         )
 
+    def convert_builtin_using_methodcall_or_converting_to_float(self, f, context, expr, a1=None):
+        # TODO: this should go in some common wrapper base class for alternatives and classes, along with
+        # generate method call
+        if f is format:
+            if a1 is not None:
+                return self.generate_method_call(context, "__format__", (expr, a1)) \
+                    or expr.convert_str_cast()
+            else:
+                return self.generate_method_call(context, "__format__", (expr, context.constant(''))) \
+                    or expr.convert_str_cast()
+
+        if f is round:
+            if a1 is None:
+                a1 = context.constant(0)
+
+            res = self.generate_method_call(context, "__round__", (expr, a1))
+
+            if res is not None:
+                return res
+
+            expr = expr.toFloat64()
+            if expr is None:
+                return None
+
+            return expr.convert_builtin(f, a1)
+
+        if a1 is not None:
+            return None
+
+        # handle builtins with no additional arguments here:
+        methodName = {trunc: '__trunc__', floor: '__floor__', ceil: '__ceil__', complex: '__complex__', dir: '__dir__'}
+        if f in methodName:
+            res = self.generate_method_call(context, methodName[f], (expr,))
+            if res is not None:
+                return res
+
+            if f is complex:
+                return None
+
+            if f in (floor, ceil, trunc):
+                expr = expr.toFloat64()
+                if expr is None:
+                    return expr
+                return expr.convert_builtin(f)
+
+        return Wrapper.convert_builtin(self, f, context, expr, a1)
+
     def generate_method_call(self, context, method, args):
         """
         Generate code to call the named method with these arguments.
@@ -547,10 +601,14 @@ class Wrapper(object):
         :return: intermediate compiled result, or None if method does not exist or can't be called with these args
         """
         t = self.typeRepresentation
+
         f = getattr(t, method, None)
+
         if f is None:
             return None
+
         f_cat = getattr(f, "__typed_python_category__", None)
+
         if f_cat != "Function":
             # For Alternatives, member attributes are Functions.
             # For Classes, member attributes are method_descriptors instead of Functions,
@@ -560,6 +618,7 @@ class Wrapper(object):
                 if f is None:
                     return None
                 f_cat = getattr(f, "__typed_python_category__", None)
+
         if f_cat is None or f_cat != "Function":
             return None
 

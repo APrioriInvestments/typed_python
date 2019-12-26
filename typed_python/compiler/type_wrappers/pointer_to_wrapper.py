@@ -16,7 +16,7 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 
-from typed_python import PointerTo, Bool
+from typed_python import PointerTo
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -58,18 +58,6 @@ class PointerToWrapper(Wrapper):
 
     def convert_destroy(self, context, instance):
         pass
-
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        target_type = targetVal.expr_type
-
-        if not explicit:
-            return super().convert_to_type_with_target(context, e, targetVal, explicit)
-
-        if target_type.typeRepresentation == Bool:
-            targetVal.convert_copy_initialize(e != context.zero(self))
-            return context.constant(True)
-
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_int_cast(self, context, e, raiseException=True):
         return e.nonref_expr.cast(native_ast.Int64)
@@ -193,4 +181,4 @@ class PointerToWrapper(Wrapper):
         return super().convert_type_call(context, typeInst, args, kwargs)
 
     def convert_bool_cast(self, context, e):
-        return e.convert_to_type(bool)
+        return context.pushPod(bool, e.nonref_expr.cast(native_ast.Int64).neq(0))

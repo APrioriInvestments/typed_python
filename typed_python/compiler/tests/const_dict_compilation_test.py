@@ -12,17 +12,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, ConstDict, String, TupleOf, ListOf, Tuple
+from typed_python import ConstDict, String, TupleOf, ListOf, Tuple, Compiled
 import typed_python._types as _types
-from typed_python.compiler.runtime import Runtime
 from typed_python import Entrypoint
 import unittest
 import time
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
 
 
 dictTypes = [

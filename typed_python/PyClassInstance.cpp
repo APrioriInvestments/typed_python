@@ -479,7 +479,7 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
             defined++;
 
         if (!defined || !defined->ml_name) {
-            PyDict_SetItemString(pyType->tp_dict, p.first.c_str(), typePtrToPyTypeRepresentation(p.second));
+            PyDict_SetItemString(pyType->tp_dict, p.first.c_str(), PyInstance::initialize(p.second, [&](instance_ptr) {}));
         }
     }
 
@@ -506,10 +506,12 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
         PyDict_SetItemString(
             pyType->tp_dict,
             nameAndObj.first.c_str(),
-            PyInstance::initializePythonRepresentation(nameAndObj.second, [&](instance_ptr data){
+            PyStaticMethod_New(
+                PyInstance::initializePythonRepresentation(nameAndObj.second, [&](instance_ptr data){
                 //nothing to do - functions like this are just types.
-            })
-            );
+                })
+            )
+        );
     }
 }
 

@@ -12,16 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, Forward, ConstDict, Class, Final, Member, ListOf
+from typed_python import OneOf, TupleOf, Forward, ConstDict, Class, Final, Member, ListOf, Compiled
 from typed_python import Value as ValueType
 import typed_python._types as _types
-from typed_python.compiler.runtime import Runtime
 import unittest
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
 
 
 # a simple recursive 'value' type for testing
@@ -285,3 +279,24 @@ class TestOneOfOfCompilation(unittest.TestCase):
 
         self.assertEqual(f(TupleOf(int)((1,))), 1)
         self.assertEqual(f(ListOf(float)((1.5,))), 1.5)
+
+    def test_oneof_to_bool(self):
+        @Compiled
+        def f(c: OneOf(int, float)):
+            if c:
+                return "yes"
+            return "no"
+
+        self.assertEqual(f(1), "yes")
+        self.assertEqual(f(1.5), "yes")
+        self.assertEqual(f(0), "no")
+        self.assertEqual(f(0.0), "no")
+
+    def test_oneof_round(self):
+        def f(c: OneOf(int, float)):
+            return round(c)
+
+        fComp = Compiled(f)
+
+        for thing in [0, 0.0, 1, 1.5]:
+            self.assertEqual(f(thing), fComp(thing))

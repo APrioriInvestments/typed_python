@@ -19,7 +19,7 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 
-from typed_python import NoneType, Int32, Bool, TupleOf, ListOf
+from typed_python import NoneType, Int32, TupleOf, ListOf
 from typed_python.compiler.type_wrappers.util import min
 
 import typed_python.compiler.native_ast as native_ast
@@ -383,22 +383,6 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             )
 
         return aTup
-
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        if not explicit:
-            return super().convert_to_type_with_target(context, e, targetVal, explicit)
-
-        target_type = targetVal.expr_type
-
-        if target_type.typeRepresentation == Bool:
-            context.pushEffect(
-                targetVal.expr.store(
-                    self.convert_len_native(e).neq(0)
-                )
-            )
-            return context.constant(True)
-
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:

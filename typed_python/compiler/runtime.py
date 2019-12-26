@@ -20,8 +20,10 @@ import typed_python.compiler.llvm_compiler as llvm_compiler
 import typed_python
 
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
+from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
+from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
+from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from typed_python import Function, NoneType, _types, Value
-from typed_python.internals import FunctionOverload, DisableCompiledCode
 
 _singleton = [None]
 
@@ -84,9 +86,6 @@ class Runtime:
     def removeEventVisitor(self, visitor: RuntimeEventVisitor):
         self.converter.removeVisitor(visitor)
 
-    def resultTypes(self, func, argument_types):
-        return self.compile(func, argument_types, returnOutputType=True)
-
     def _collectLinktimeHooks(self):
         while True:
             identityAndCallback = self.converter.popLinktimeHook()
@@ -101,121 +100,147 @@ class Runtime:
 
             callback(fp)
 
-    def compile(self, f, argument_types=None, returnOutputType=False):
-        """Compile a single FunctionOverload and install the pointer
+    @staticmethod
+    def passingTypeForValue(arg):
+        if isinstance(arg, types.FunctionType):
+            return type(Function(arg))
 
-        If provided, 'argument_types' can be a dictionary from variable name to a type.
-        this will take precedence over any types specified on the function. Keep in mind
-        that function overloads already filter by type, so if you specify a type that's
-        not compatible with the type argument of the existing overload, the resulting
-        specialization will never be called.
+        elif isinstance(arg, type):
+            return Value(arg)
+
+        return type(arg)
+
+    @staticmethod
+    def pickSpecializationTypeFor(overloadArg, argValue, argumentsAreTypes=False):
+        """Compute the typeWrapper we'll use for this particular argument based on 'argValue'.
+
+        Args:
+            overloadArg - the internals.FunctionOverloadArg instance representing this argument.
+                This tells us whether we're dealing with a normal positional/keyword argument or
+                a *arg / **kwarg, where the typeFilter applies to the items of the tuple but
+                not the tuple itself.
+            argValue - the value being passed for this argument. If 'argumentsAreTypes' is true,
+                then this is the actual type, not the value.
+
+        Returns:
+            the Wrapper or type instance to use for this argument.
         """
-        with self.lock:
-            argument_types = argument_types or {}
-
-            if isinstance(f, FunctionOverload):
-                for a in f.args:
-                    assert not a.isStarArg, 'dont support star args yet'
-                    assert not a.isKwarg, 'dont support keyword yet'
-
-                def chooseTypeFilter(a):
-                    return argument_types.pop(a.name, a.typeFilter or object)
-
-                input_wrappers = [typeWrapper(chooseTypeFilter(a)) for a in f.args]
-
-                if len(argument_types):
-                    raise Exception("No argument exists for type overrides %s" % argument_types)
-
-                self.timesCompiled += 1
-
-                callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType, assertIsRoot=True)
-
-                callTarget = self.converter.demasqueradeCallTargetOutput(callTarget)
-
-                assert callTarget is not None
-
-                wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
-
-                targets = self.converter.extract_new_function_definitions()
-
-                self.llvm_compiler.add_functions(targets)
-
-                # if the callTargetName isn't in the list, then we already compiled it and installed it.
-                fp = self.llvm_compiler.function_pointer_by_name(wrappingCallTargetName)
-
-                f._installNativePointer(
-                    fp.fp,
-                    callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
-                    [i.typeRepresentation for i in input_wrappers]
+        if not argumentsAreTypes:
+            if overloadArg.isStarArg:
+                argType = TypedTupleMasqueradingAsTuple(
+                    typed_python.Tuple(*[Runtime.passingTypeForValue(v) for v in argValue])
                 )
-
-                self._collectLinktimeHooks()
-
-                if returnOutputType:
-                    return toInterpreterType(
-                        set([callTarget.output_type.interpreterTypeRepresentation] if callTarget.output_type is not None else [])
+            elif overloadArg.isKwarg:
+                argType = NamedTupleMasqueradingAsDict(
+                    typed_python.NamedTuple(
+                        **{k: Runtime.passingTypeForValue(v) for k, v in argValue.items()}
                     )
-                else:
-                    return targets
+                )
+            else:
+                argType = typeWrapper(Runtime.passingTypeForValue(argValue))
+        else:
+            argType = typeWrapper(argValue)
 
-            if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
-                results = set()
+        resType = PythonTypedFunctionWrapper.pickSpecializationTypeFor(overloadArg, argType)
 
-                for o in f.overloads:
-                    result = self.compile(o, argument_types, returnOutputType=returnOutputType)
+        if argType.can_convert_to_type(resType, True) is False:
+            return None
 
-                    if returnOutputType:
-                        results.add(result)
+        if (overloadArg.isStarArg or overloadArg.isKwarg) and resType != argType:
+            return None
 
-                if returnOutputType:
-                    return toInterpreterType(results)
-                else:
-                    return f
+        return resType
 
-            if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'BoundMethod':
-                results = set()
+    def compileFunctionOverload(self, typedFunc, overloadIx, arguments, argumentsAreTypes=False):
+        """Attempt to compile typedFunc.overloads[overloadIx]' with the given arguments.
 
-                for o in f.Function.overloads:
-                    arg_types = dict(argument_types)
-                    arg_types[o.args[0].name] = typeWrapper(f.Class)
-                    result = self.compile(o, arg_types, returnOutputType=returnOutputType)
+        Args:
+            typedFunc - a typed_python.Function instance
+            overloadIx - an integer giving the index of the overload we're interested in
+            arguments - a list of values (or types if 'argumentsAreTypes') for each of the
+                named function arguments contained in the overload
+            argumentsAreTypes - if true, then we've provided types or Wrapper instances
+                instead of actual values.
 
-                    if returnOutputType:
-                        results.add()
+        Returns:
+            None if it is not possible to match this overload with these arguments or
+            a TypedCallTarget.
+        """
 
-                if returnOutputType:
-                    return toInterpreterType(results)
-                else:
-                    return f
+        overload = typedFunc.overloads[overloadIx]
 
-            if callable(f):
-                return self.compile(
-                    Function(f),
-                    argument_types,
-                    returnOutputType=returnOutputType
+        assert len(arguments) == len(overload.args)
+
+        with self.lock:
+            inputWrappers = []
+
+            for i in range(len(arguments)):
+                inputWrappers.append(
+                    self.pickSpecializationTypeFor(overload.args[i], arguments[i], argumentsAreTypes)
                 )
 
-            assert False, f
+            if any(x is None for x in inputWrappers):
+                # this signature is unmatchable with these arguments.
+                return None
 
+            self.timesCompiled += 1
 
-def pickSpecializationTypeFor(x):
-    if isinstance(x, types.FunctionType):
-        return Function(x)
+            callTarget = self.converter.convert(overload.functionObj, inputWrappers, overload.returnType, assertIsRoot=True)
 
-    if isinstance(x, type):
-        return Value(x)
+            callTarget = self.converter.demasqueradeCallTargetOutput(callTarget)
 
-    return type(x)
+            assert callTarget is not None
 
+            wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
 
-def pickSpecializationValueFor(x):
-    if isinstance(x, types.FunctionType):
-        return Function(x)
+            targets = self.converter.extract_new_function_definitions()
 
-    if isinstance(x, type):
-        return x
+            self.llvm_compiler.add_functions(targets)
 
-    return x
+            # if the callTargetName isn't in the list, then we already compiled it and installed it.
+            fp = self.llvm_compiler.function_pointer_by_name(wrappingCallTargetName)
+
+            overload._installNativePointer(
+                fp.fp,
+                callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
+                [i.typeRepresentation for i in inputWrappers]
+            )
+
+            self._collectLinktimeHooks()
+
+            return callTarget
+
+    def resultTypeForCall(self, funcObj, argTypes, kwargTypes):
+        """Determine the result of calling funcObj with things of type 'argTypes' and 'kwargTypes'
+
+        Args:
+            funcObj - a typed_python.Function object.
+            argTypes - a list of Type or Wrapper objects
+            kwargs - a dict of keyword Type or Wrapper objects
+
+        Returns:
+            None if control flow doesn't return a result (say, because it always
+            throws an exception) or a Wrapper object describing the return types.
+        """
+        assert isinstance(funcObj, typed_python._types.Function)
+
+        argTypes = [typeWrapper(a) for a in argTypes]
+        kwargTypes = {k: typeWrapper(v) for k, v in kwargTypes.items()}
+
+        possibleTypes = []
+
+        for overloadIx in range(len(funcObj.overloads)):
+            overload = funcObj.overloads[overloadIx]
+            ExpressionConversionContext = typed_python.compiler.expression_conversion_context.ExpressionConversionContext
+            argumentSignature = ExpressionConversionContext.computeFunctionArgumentTypeSignature(overload, argTypes, kwargTypes)
+
+            if argumentSignature is not None:
+                callTarget = self.compileFunctionOverload(funcObj, overloadIx, argumentSignature, argumentsAreTypes=True)
+
+                if callTarget is not None and callTarget.output_type is not None:
+                    possibleTypes.append(callTarget.output_type)
+
+        return OneOfWrapper.mergeTypes(possibleTypes)
 
 
 def NotCompiled(pyFunc):
@@ -256,48 +281,25 @@ def Entrypoint(pyFunc):
 
         typedFunc = Function(typedFunc)
 
-    lock = threading.RLock()
-    signatures = set()
-
-    def inner(*args):
-        signature = tuple(pickSpecializationTypeFor(x) for x in args)
-        args = tuple(pickSpecializationValueFor(x) for x in args)
-
-        if not DisableCompiledCode.isDisabled():
-            with lock:
-                if signature not in signatures:
-                    i = typedFunc.indexOfOverloadMatching(*args)
-
-                    if i is not None:
-                        o = typedFunc.overloads[i]
-                        argTypes = {o.args[i].name: o.args[i].typeToUse(signature[i]) for i in range(len(args))}
-                        Runtime.singleton().compile(o, argTypes)
-
-                    signatures.add(signature)
-
-        return typedFunc(*args)
-
-    inner.__qualname__ = str(typedFunc)
-    inner.__typed_python_function__ = typedFunc
-    inner.__wrapped_function__ = pyFunc
-
-    def resultTypeFor(*args):
-        signature = tuple(pickSpecializationTypeFor(x) for x in args)
-        args = tuple(pickSpecializationValueFor(x) for x in args)
-
-        i = typedFunc.indexOfOverloadMatching(*args)
-
-        if i is not None:
-            o = typedFunc.overloads[i]
-
-            argTypes = {o.args[i].name: o.args[i].typeToUse(signature[i]) for i in range(len(args))}
-            return Runtime.singleton().resultTypes(o, argTypes)
-
-        raise Exception("No compilable dispatch found for these arguments.")
-
-    inner.resultTypeFor = resultTypeFor
+    typedFunc = typedFunc.withEntrypoint(True)
 
     if wrapInStatic:
-        inner = staticmethod(inner)
+        return staticmethod(typedFunc)
 
-    return inner
+    return typedFunc
+
+
+def Compiled(pyFunc):
+    """Compile a pyFunc, which must have a type annotation for all arguments"""
+    f = Entrypoint(pyFunc)
+    types = []
+    for a in f.overloads[0].args:
+        if a.typeFilter is None:
+            raise Exception(f"@Compiled requires that {pyFunc} has an explicit type annotation for every argument.")
+        if a.isStarArg or a.isKwarg:
+            raise Exception(f"@Compiled is not compatible with *args or **kwargs because the signature is not fully known.")
+        types.append(a.typeFilter)
+
+    f.resultTypeFor(*types)
+
+    return f

@@ -26,21 +26,21 @@ public:
 
     Function* type();
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
-        return true;
-    }
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit);
+
+    static void copyConstructFromPythonInstanceConcrete(modeled_type* type, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
 
     static std::pair<bool, PyObject*> tryToCall(const Function* f, PyObject* arg0=nullptr, PyObject* arg1=nullptr, PyObject* arg2=nullptr);
 
     static std::pair<bool, PyObject*> tryToCallAnyOverload(const Function* f, PyObject* self, PyObject* args, PyObject* kwargs);
 
-    static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs, bool convertExplicitly, bool dontActuallyCall, bool isEntrypoint);
+    static std::pair<bool, PyObject*> tryToCallOverload(const Function* f, long overloadIx, PyObject* self, PyObject* args, PyObject* kwargs, bool convertExplicitly, bool dontActuallyCall);
 
     //perform a linear scan of all specializations contained in overload and attempt to dispatch to each one.
     //returns <true, result or none> if we dispatched..
     //if 'isEntrypoint', then if we don't match a compiled specialization, ask the runtime to produce
     //one for us.
-    static std::pair<bool, PyObject*> dispatchFunctionCallToNative(const Function::Overload& overload, const FunctionCallArgMapping& mapping, bool isEntrypoint);
+    static std::pair<bool, PyObject*> dispatchFunctionCallToNative(const Function* f, long overloadIx, const FunctionCallArgMapping& mapping);
 
     //attempt to dispatch to this one exact specialization by converting each arg to the relevant type. if
     //we can't convert, then return <false, nullptr>. If we do dispatch, return <true, result or none> and set
@@ -63,11 +63,11 @@ public:
 
     static PyMethodDef* typeMethodsConcrete(Type* t);
 
-    static PyObject* indexOfOverloadMatching(PyObject* self, PyObject* args, PyObject* kwargs);
-
     static PyObject* overload(PyObject* cls, PyObject* args, PyObject* kwargs);
 
     static PyObject* withEntrypoint(PyObject* funcObj, PyObject* args, PyObject* kwargs);
+
+    static PyObject* resultTypeFor(PyObject* funcObj, PyObject* args, PyObject* kwargs);
 
     static Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj);
 

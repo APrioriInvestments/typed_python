@@ -19,7 +19,7 @@ from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import Bo
 from typed_python.compiler.type_wrappers.util import min
 from typed_python.compiler.typed_expression import TypedExpression
 
-from typed_python import NoneType, Tuple, Bool
+from typed_python import NoneType, Tuple
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -360,22 +360,6 @@ class ConstDictWrapper(ConstDictWrapperBase):
 
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
-
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        if not explicit:
-            return super().convert_to_type_with_target(context, e, targetVal, explicit)
-
-        target_type = targetVal.expr_type
-
-        if target_type.typeRepresentation == Bool:
-            context.pushEffect(
-                targetVal.expr.store(
-                    self.convert_len_native(e).neq(0)
-                )
-            )
-            return context.constant(True)
-
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_bool_cast(self, context, expr):
         return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))

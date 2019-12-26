@@ -143,9 +143,7 @@ public:
         getPyObj(self) = incref(Py_None);
     }
 
-    static void decrefLayoutWithoutHoldingTheGil(layout_type* p) {
-        p->refcount--;
-
+    static void destroyLayoutIfRefcountIsZero(layout_type* p) {
         if (p->refcount == 0) {
             PyEnsureGilAcquired getTheGil;
             decref(p->pyObj);

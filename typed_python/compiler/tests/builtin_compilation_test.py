@@ -15,15 +15,9 @@
 import unittest
 from math import isnan
 
-from typed_python import Function, ListOf, TupleOf, NamedTuple, Dict, ConstDict, \
+from typed_python import ListOf, TupleOf, NamedTuple, Dict, ConstDict, \
     Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Bool, Float64, Float32, \
-    String, Bytes, Alternative, Set, OneOf
-from typed_python.compiler.runtime import Runtime
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
+    String, Bytes, Alternative, Set, OneOf, Compiled
 
 
 def result_or_exception(f, *p):

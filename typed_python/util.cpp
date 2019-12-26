@@ -32,6 +32,7 @@ bool unpackTupleToTypes(PyObject* tuple, std::vector<Type*>& out) {
         Type* targetType = NULL;
 
         targetType = PyInstance::tryUnwrapPyInstanceToType(entry);
+
         if (!targetType) {
             PyErr_Format(PyExc_TypeError, "Expected a type in position %d of type tuple. Got %S instead.", i, (PyObject*)entry);
             return false;

@@ -16,21 +16,15 @@ import operator
 import sys
 from math import isfinite, trunc, floor, ceil
 from typed_python import (
-    Function, OneOf,
+    OneOf,
     Bool,
     Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
-    Float32, Float64
+    Float32, Float64, Compiled
 )
 from typed_python.type_promotion import computeArithmeticBinaryResultType
 from typed_python import Entrypoint
-from typed_python.compiler.runtime import Runtime
 import unittest
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
 
 
 In = OneOf(int, float)
@@ -113,33 +107,24 @@ ALL_OPERATIONS = [
 
 
 class TestArithmeticCompilation(unittest.TestCase):
-    def test_runtime_singleton(self):
-        self.assertTrue(Runtime.singleton() is Runtime.singleton())
-
     def test_compile_simple(self):
-        @Function
+        @Compiled
         def f(x: int) -> int:
             return x+x+x
-
-        r = Runtime.singleton()
-        r.compile(f.overloads[0])
 
         self.assertEqual(f(20), 60)
         self.assertEqual(f(10), 30)
 
     def test_in_to_out(self):
+        @Compiled
         def identity(x: In) -> Out:
             return x
 
-        compiled_identity = Runtime.singleton().compile(identity)
-
-        self.assertIsInstance(compiled_identity(0.5), float)
-        self.assertIsInstance(compiled_identity(0.0), float)
-        self.assertIsInstance(compiled_identity(1), int)
+        self.assertIsInstance(identity(0.5), float)
+        self.assertIsInstance(identity(0.0), float)
+        self.assertIsInstance(identity(1), int)
 
     def SKIPtest_binary_operators(self):
-        r = Runtime.singleton()
-
         failures = 0
         successes = 0
         for f in ALL_OPERATIONS:
@@ -157,7 +142,7 @@ class TestArithmeticCompilation(unittest.TestCase):
                 lvals = list(lvals) + [x / 3 for x in lvals]
                 rvals = list(rvals) + [x / 3 for x in rvals]
 
-            f_fast = r.compile(f)
+            f_fast = Compiled(f)
 
             for val1 in lvals:
                 for val2 in rvals:
@@ -180,9 +165,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(failures, 0, successes)
 
     def checkFunctionOfIntegers(self, f):
-        r = Runtime.singleton()
-
-        f_fast = r.compile(f)
+        f_fast = Compiled(f)
 
         for i in range(100):
             self.assertEqual(f_fast(i), f(i))

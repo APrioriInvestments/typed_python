@@ -14,9 +14,9 @@
 
 from typed_python import (
     Function, OneOf, Int64, Float64, Alternative,
-    Value, String, ListOf, NoneType
+    Value, String, ListOf
 )
-from typed_python.compiler.runtime import Runtime, Entrypoint
+from typed_python.compiler.runtime import Entrypoint
 import unittest
 
 
@@ -27,33 +27,27 @@ A = Alternative(
 )
 
 
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
-
-
-def resultType(f, **kwargs):
-    return Runtime.singleton().resultTypes(f, kwargs)
-
-
 class TestTypeInference(unittest.TestCase):
     def test_basic_inference(self):
+        @Function
         def f(x, y):
             return x + y
 
-        self.assertEqual(resultType(f, x=int, y=int), Int64)
-        self.assertEqual(resultType(f, x=int, y=float), Float64)
-        self.assertEqual(resultType(f, x=int, y=str), NoneType)
+        self.assertEqual(f.resultTypeFor(int, int).typeRepresentation, Int64)
+        self.assertEqual(f.resultTypeFor(int, float).typeRepresentation, Float64)
+        self.assertEqual(f.resultTypeFor(int, str), None)
 
     def test_sequential_assignment(self):
+        @Function
         def f(x):
             y = "hi"
             y = x
             return y
 
-        self.assertEqual(resultType(f, x=int), Int64)
+        self.assertEqual(f.resultTypeFor(int).typeRepresentation, Int64)
 
     def test_if_short_circuit(self):
+        @Function
         def f(x):
             if True:
                 y = x
@@ -61,9 +55,10 @@ class TestTypeInference(unittest.TestCase):
                 y = "hi"
             return y
 
-        self.assertEqual(resultType(f, x=int), Int64)
+        self.assertEqual(f.resultTypeFor(int).typeRepresentation, Int64)
 
     def test_if_merging(self):
+        @Function
         def f(x):
             if x % 2 == 0:
                 y = x
@@ -71,102 +66,122 @@ class TestTypeInference(unittest.TestCase):
                 y = "hi"
             return y
 
-        self.assertEqual(set(resultType(f, x=int).Types), set([Int64, String]))
+        self.assertEqual(set(f.resultTypeFor(int).typeRepresentation.Types), set([Int64, String]))
 
     def test_isinstance_propagates(self):
+        @Function
         def f(x):
             if isinstance(x, int):
                 return x
             else:
                 return 0
 
-        self.assertEqual(resultType(f, x=OneOf(str, int)), Int64)
+        self.assertEqual(f.resultTypeFor(OneOf(str, int)).typeRepresentation, Int64)
 
     def test_alternative_inference(self):
+        @Function
         def f(anA):
             return anA.x
 
-        self.assertEqual(set(resultType(f, anA=A).Types), set([Int64, String]))
+        self.assertEqual(set(f.resultTypeFor(A).typeRepresentation.Types), set([Int64, String]))
 
     def test_alternative_inference_with_branch(self):
+        @Function
         def f(anA):
             if anA.matches.X:
                 return anA.x
             else:
                 return 0
 
-        self.assertEqual(resultType(f, anA=A), Int64)
+        self.assertEqual(f.resultTypeFor(A).typeRepresentation, Int64)
 
     def test_alternative_inference_with_nonsense_branch(self):
+        @Function
         def f(anA):
             if anA.matches.NotReal:
                 return "compiler realizes we can't get here"
             else:
                 return 0
 
-        self.assertEqual(resultType(f, anA=A), Int64)
+        self.assertEqual(f.resultTypeFor(A).typeRepresentation, Int64)
 
     def test_no_result_from_while_true(self):
+        @Function
         def f(x):
             while True:
                 x = x + 1
                 if x > 10000:
                     return x
 
-        self.assertEqual(resultType(f, x=int), Int64)
+        self.assertEqual(f.resultTypeFor(int).typeRepresentation, Int64)
         self.assertEqual(Entrypoint(f)(10), 10001)
 
     def test_infer_type_object(self):
+        @Function
         def f(x):
             return type(x)
 
-        self.assertEqual(resultType(f, x=str), Value(str))
-        self.assertEqual(set(resultType(f, x=OneOf(int, str)).Types), set([Value(int), Value(str)]))
+        self.assertEqual(f.resultTypeFor(str).typeRepresentation, Value(str))
+        self.assertEqual(
+            set(f.resultTypeFor(OneOf(int, str)).typeRepresentation.Types),
+            set([Value(int), Value(str)])
+        )
 
     def test_infer_list_item(self):
+        @Function
         def f(a: ListOf(str), x: int):
             return a[x]
 
+        @Function
         def g(b, x: int):
             return b[x]
 
-        self.assertEqual(resultType(f, a=ListOf(str), x=int), String)
-        self.assertEqual(resultType(g, b=object, x=int), object)
+        self.assertEqual(f.resultTypeFor(ListOf(str), int).typeRepresentation, String)
+        self.assertEqual(g.resultTypeFor(object, int).typeRepresentation.PyType, object)
 
     def test_infer_conditional_eval_exception(self):
+        @Function
         def exc():
             raise Exception('error')
 
+        @Function
         def and1(x, y):
             return exc() and x and y
 
+        @Function
         def and2(x, y):
             return x and exc() and y
 
+        @Function
         def and3(x, y):
             return x and y and exc()
 
+        @Function
         def or1(x, y):
             return exc() or x or y
 
+        @Function
         def or2(x, y):
             return x or exc() or y
 
+        @Function
         def or3(x, y):
             return x or y or exc()
 
-        self.assertEqual(resultType(and1, x=int, y=float), NoneType)
-        self.assertEqual(resultType(and2, x=int, y=float), Int64)
-        self.assertEqual(resultType(and2, x=float, y=int), Float64)
-        self.assertEqual(set(resultType(and3, x=int, y=float).Types), set([Int64, Float64]))
-        self.assertEqual(set(resultType(and3, x=float, y=int).Types), set([Int64, Float64]))
-        self.assertEqual(resultType(or1, x=int, y=float), NoneType)
-        self.assertEqual(resultType(or2, x=int, y=float), Int64)
-        self.assertEqual(resultType(or2, x=float, y=int), Float64)
-        self.assertEqual(set(resultType(or3, x=int, y=float).Types), set([Int64, Float64]))
-        self.assertEqual(set(resultType(or3, x=float, y=int).Types), set([Int64, Float64]))
+        self.assertEqual(exc.resultTypeFor(), None)
+        self.assertEqual(and1.resultTypeFor(int, float), None)
+        self.assertEqual(and2.resultTypeFor(int, float).typeRepresentation, Int64)
+        self.assertEqual(and2.resultTypeFor(float, int).typeRepresentation, Float64)
+        self.assertEqual(set(and3.resultTypeFor(int, float).typeRepresentation.Types), set([Int64, Float64]))
+        self.assertEqual(set(and3.resultTypeFor(float, int).typeRepresentation.Types), set([Int64, Float64]))
+        self.assertEqual(or1.resultTypeFor(int, float), None)
+        self.assertEqual(or2.resultTypeFor(int, float).typeRepresentation, Int64)
+        self.assertEqual(or2.resultTypeFor(float, int).typeRepresentation, Float64)
+        self.assertEqual(set(or3.resultTypeFor(int, float).typeRepresentation.Types), set([Int64, Float64]))
+        self.assertEqual(set(or3.resultTypeFor(float, int).typeRepresentation.Types), set([Int64, Float64]))
 
     def test_infer_type_of_assignment_with_guard(self):
+        @Function
         def f(x):
             if isinstance(x, int):
                 y = x
@@ -175,8 +190,8 @@ class TestTypeInference(unittest.TestCase):
 
             return y
 
-        self.assertEqual(resultType(f, x=OneOf(None, int)), Int64)
-        self.assertEqual(resultType(f, x=OneOf(None, int, float)), Int64)
-        self.assertEqual(resultType(f, x=int), Int64)
-        self.assertEqual(resultType(f, x=None), Int64)
-        self.assertEqual(resultType(f, x=float), Int64)
+        self.assertEqual(f.resultTypeFor(OneOf(None, int)).typeRepresentation, Int64)
+        self.assertEqual(f.resultTypeFor(OneOf(None, int, float)).typeRepresentation, Int64)
+        self.assertEqual(f.resultTypeFor(int).typeRepresentation, Int64)
+        self.assertEqual(f.resultTypeFor(None).typeRepresentation, Int64)
+        self.assertEqual(f.resultTypeFor(float).typeRepresentation, Int64)

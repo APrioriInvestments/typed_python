@@ -12,16 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, Tuple, NamedTuple, Class, Member, ListOf
+from typed_python import Tuple, NamedTuple, Class, Member, ListOf, Compiled
 import typed_python._types as _types
-from typed_python.compiler.runtime import Runtime
 import unittest
 from typed_python import Entrypoint, makeNamedTuple
-
-
-def Compiled(f):
-    f = Function(f)
-    return Runtime.singleton().compile(f)
 
 
 class TestTupleCompilation(unittest.TestCase):

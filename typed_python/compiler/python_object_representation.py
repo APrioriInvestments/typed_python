@@ -12,7 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import types
 import threading
 import _thread
 
@@ -103,6 +102,8 @@ def _typedPythonTypeToTypeWrapper(t):
         t = TypeFor(t)
         assert hasattr(t, '__typed_python_category__'), t
 
+    assert isinstance(t, type), t
+
     if t in _concreteWrappers:
         return _concreteWrappers[t]
 
@@ -167,9 +168,6 @@ def _typedPythonTypeToTypeWrapper(t):
 def pythonObjectRepresentation(context, f):
     if isinstance(f, CompilableBuiltin):
         return TypedExpression(context, native_ast.nullExpr, f, False)
-
-    if isinstance(f, types.FunctionType) and hasattr(f, '__typed_python_function__'):
-        f = f.__typed_python_function__
 
     if f is len:
         return TypedExpression(context, native_ast.nullExpr, LenWrapper(), False)

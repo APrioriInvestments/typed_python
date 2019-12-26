@@ -32,15 +32,15 @@ PyObject* PyBoundMethodInstance::tp_call_concrete(PyObject* args, PyObject* kwar
     );
 
     for (long convertExplicitly = 0; convertExplicitly <= 1; convertExplicitly++) {
-        for (const auto& overload: f->getOverloads()) {
+        for (long overloadIx = 0; overloadIx < f->getOverloads().size(); overloadIx++) {
             std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(
-                overload,
+                f,
+                overloadIx,
                 objectInstance,
                 args,
                 kwargs,
                 convertExplicitly,
-                false, /* dontActuallyCall=false because we do want to call. */
-                f->isEntrypoint()
+                false /* dontActuallyCall=false because we do want to call. */
             );
 
             if (res.first) {

@@ -15,7 +15,7 @@
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import Bytes, Int32, Bool
+from typed_python import Bytes, Int32
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -151,22 +151,6 @@ class BytesWrapper(RefcountedWrapper):
                 ).cast(self.layoutType)
             )
         )
-
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        if not explicit:
-            return super().convert_to_type_with_target(context, e, targetVal, explicit)
-
-        target_type = targetVal.expr_type
-
-        if target_type.typeRepresentation == Bool:
-            context.pushEffect(
-                targetVal.expr.store(
-                    self.convert_len_native(e.nonref_expr).neq(0)
-                )
-            )
-            return context.constant(True)
-
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_bool_cast(self, context, expr):
         return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))

@@ -1042,7 +1042,8 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_getset = 0,                             // struct PyGetSetDef*
             .tp_base = 0,                               // struct _typeobject*
             .tp_dict = PyDict_New(),                    // PyObject*
-            .tp_descr_get = 0,                          // descrgetfunc
+            .tp_descr_get = inType->getTypeCategory() == Type::TypeCategory::catFunction ?
+                PyInstance::tp_descr_get : 0,           // descrgetfunc
             .tp_descr_set = 0,                          // descrsetfunc
             .tp_dictoffset = 0,                         // Py_ssize_t
             .tp_init = 0,                               // initproc
@@ -1318,6 +1319,14 @@ PyObject* PyInstance::tp_repr(PyObject *self) {
     );
 }
 
+// static
+PyObject* PyInstance::tp_descr_get(PyObject* func, PyObject* obj, PyObject* type) {
+    if (obj == Py_None || obj == NULL) {
+        return incref(func);
+    }
+    return PyMethod_New(func, obj);
+}
+
 PyObject* PyInstance::tp_repr_concrete() {
     std::ostringstream str;
     ReprAccumulator accumulator(str);
@@ -1587,6 +1596,7 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
             return PythonSubclass::Make(nativeT, pyType);
         } else {
             Type* res = PyInstance::extractTypeFrom(pyType);
+
             if (res) {
                 // we have a native type -> return it
                 return res;
@@ -1598,8 +1608,13 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
     }
 
     if (PyDict_Contains(nonTypesAcceptedAsTypes(), typearg)) {
+        PyObject* nonType = PyDict_GetItem(nonTypesAcceptedAsTypes(), typearg);
+        if (!nonType) {
+            return nullptr;
+        }
+
         return PythonObjectOfType::Make(
-            (PyTypeObject*)PyDict_GetItem(nonTypesAcceptedAsTypes(), typearg),
+            (PyTypeObject*)nonType,
             typearg
         );
     }
