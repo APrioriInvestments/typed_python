@@ -54,9 +54,6 @@ class FunctionConversionContext(object):
             free_variable_lookup - a dict from name to the actual python object in this
                 function's closure. We don't distinguish between local and global scope yet.
         """
-        if name == "exc":
-            assert output_type is None, output_type
-
         self.name = name
         self.variablesAssigned = computeAssignedVariables(statements)
         self.variablesRead = computeReadVariables(statements)

@@ -824,10 +824,10 @@ class ExpressionConversionContext(object):
 
         This takes care of doing things like mapping keyword arguments, default values, etc.
 
-        It does _not_ deal at all with types, so it's fine to use the typed-form of a non-typed
-        function.
-
-        This function may generate code to construct the relevant arguments.
+        It's also careful to apply the typing annotations on typed functions to the types.
+        It does also checks whether it's possible to map to those types, and if its definitely
+        _not_ possible, this will return None. However, it's always possible
+        you will receive a typing form that you can't successfully map to at runtime.
 
         Args:
             functionOverload - a FunctionOverload we're trying to map to
@@ -850,15 +850,47 @@ class ExpressionConversionContext(object):
 
         outArgs = []
 
-        for mappingArg in argsOrErr:
+        for overloadArg, mappingArg in zip(functionOverload.args, argsOrErr):
             if mappingArg.matches.Arg:
-                outArgs.append(mappingArg.value)
+                if overloadArg.typeFilter is None:
+                    outArgs.append(mappingArg.value)
+                else:
+                    if mappingArg.value.can_convert_to_type(typeWrapper(overloadArg.typeFilter), True) is False:
+                        return None
+                    outArgs.append(typeWrapper(overloadArg.typeFilter))
+
             elif mappingArg.matches.Constant:
-                outArgs.append(ExpressionConversionContext.constantType(mappingArg.value, allowArbitrary=True))
+                constType = ExpressionConversionContext.constantType(mappingArg.value, allowArbitrary=True)
+
+                if overloadArg.typeFilter is None:
+                    outArgs.append(constType)
+                else:
+                    if constType.can_convert_to_type(typeWrapper(overloadArg.typeFilter), True) is False:
+                        return None
+
+                    outArgs.append(typeWrapper(overloadArg.typeFilter))
             elif mappingArg.matches.StarArgs:
-                outArgs.append(ExpressionConversionContext.makeStarArgTupleType(mappingArg.value))
+                if overloadArg.typeFilter is None:
+                    outArgs.append(ExpressionConversionContext.makeStarArgTupleType(mappingArg.value))
+                else:
+                    for t in mappingArg.value:
+                        if t.can_convert_to_type(typeWrapper(overloadArg.typeFilter), True) is False:
+                            return None
+
+                    outArgs.append(ExpressionConversionContext.makeStarArgTupleType(
+                        [typeWrapper(overloadArg.typeFilter) for _ in mappingArg.value]
+                    ))
             elif mappingArg.matches.Kwargs:
-                outArgs.append(ExpressionConversionContext.makeKwargDictType(dict(mappingArg.value)))
+                if overloadArg.typeFilter is None:
+                    outArgs.append(ExpressionConversionContext.makeKwargDictType(dict(mappingArg.value)))
+                else:
+                    for _, t in mappingArg.value:
+                        if t.can_convert_to_type(typeWrapper(overloadArg.typeFilter), True) is False:
+                            return None
+
+                    outArgs.append(ExpressionConversionContext.makeKwargDictType(
+                        dict({k: typeWrapper(overloadArg.typeFilter) for k, v in mappingArg.value.items()})
+                    ))
 
         return outArgs
 

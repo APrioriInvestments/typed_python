@@ -193,7 +193,7 @@ class PythonTypedFunctionWrapper(Wrapper):
         argNames = [None for _ in argTypes] + list(kwargTypes)
 
         return converter.defineNativeFunction(
-            f'implement_function.{self}{argTypes}->{returnType}',
+            f'implement_function.{self}{argTypes}.{kwargTypes}->{returnType}',
             ('implement_function.', self, returnType, tuple(argTypes), tuple(kwargTypes.items())),
             list(argTypes) + list(kwargTypes.values()),
             returnType,

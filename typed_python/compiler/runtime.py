@@ -231,7 +231,9 @@ class Runtime:
 
         for overloadIx in range(len(funcObj.overloads)):
             overload = funcObj.overloads[overloadIx]
+
             ExpressionConversionContext = typed_python.compiler.expression_conversion_context.ExpressionConversionContext
+
             argumentSignature = ExpressionConversionContext.computeFunctionArgumentTypeSignature(overload, argTypes, kwargTypes)
 
             if argumentSignature is not None:

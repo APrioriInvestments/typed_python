@@ -1133,3 +1133,20 @@ class TestCompilationStructures(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
             callIt(1, g)
+
+    def test_check_type_of_method_conversion(self):
+        @Entrypoint
+        def g(x: OneOf(None, ListOf(int))):
+            return type(x)
+
+        self.assertEqual(g([1, 2, 3]), ListOf(int))
+        self.assertEqual(g(None), type(None))
+
+    def test_check_is_on_unlike_things(self):
+        @Entrypoint
+        def g(x, y):
+            return x is y
+
+        self.assertFalse(g([], []))
+        self.assertTrue(g(None, None))
+        self.assertFalse(g(ListOf(int)(), TupleOf(int)()))

@@ -799,3 +799,15 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "__float__ returned non-float"):
             callFloat(C())
+
+    def test_check_is(self):
+        @Entrypoint
+        def g(x: object, y: object):
+            return x is y
+
+        self.assertEqual(g(None, None), True)
+
+        aList = []
+
+        self.assertEqual(g([], aList), False)
+        self.assertEqual(g(aList, aList), True)

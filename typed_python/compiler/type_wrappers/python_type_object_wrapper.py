@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 import typed_python.compiler
-from typed_python import String, Int64, Bool, Float64, Type, PythonObjectOfType
+from typed_python import String, Int64, Bool, NoneType, Float64, Type, PythonObjectOfType
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
@@ -49,6 +49,8 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
             return bool
         if typeRep == String:
             return str
+        if typeRep == NoneType:
+            return type(None)
         if isinstance(typeRep, type) and issubclass(typeRep, PythonObjectOfType):
             return typeRep.PyType
 

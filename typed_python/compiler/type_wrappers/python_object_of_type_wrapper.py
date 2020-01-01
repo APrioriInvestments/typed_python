@@ -18,7 +18,7 @@ from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWra
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python import OneOf
 import typed_python.compiler.native_ast as native_ast
-from typed_python.compiler.native_ast import VoidPtr
+from typed_python.compiler.native_ast import VoidPtr, UInt64
 import typed_python
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
@@ -167,6 +167,14 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         rAsObj = r.convert_to_type(object)
         if rAsObj is None:
             return None
+
+        if op.matches.Is:
+            return context.pushPod(
+                bool,
+                l.nonref_expr.ElementPtrIntegers(0, 1).cast(UInt64.pointer()).load().eq(
+                    rAsObj.nonref_expr.ElementPtrIntegers(0, 1).cast(UInt64.pointer()).load()
+                )
+            )
 
         tgt = runtime_functions.pyOpToBinaryCallTarget.get(op)
 
