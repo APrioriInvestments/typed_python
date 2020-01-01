@@ -251,7 +251,7 @@ public:
                 const FunctionArg* arg1 = argForPositionalArgument(k);
                 const FunctionArg* arg2 = other.argForPositionalArgument(k);
 
-                if (!arg1->getDefaultValue() && !arg2->getDefaultValue() && arg1->getTypeFilter() && arg2->getTypeFilter()) {
+                if (arg1 && arg2 && !arg1->getDefaultValue() && !arg2->getDefaultValue() && arg1->getTypeFilter() && arg2->getTypeFilter()) {
                     if (arg1->getTypeFilter()->canConstructFrom(arg2->getTypeFilter(), false) == Maybe::False) {
                         return true;
                     }
@@ -261,15 +261,7 @@ public:
             return false;
         }
 
-        bool isSignature() const {
-            return mFunctionObj == nullptr;
-        }
-
         PyFunctionObject* getFunctionObj() const {
-            if (!mFunctionObj) {
-                throw std::runtime_error("Cannot access the function object of a function signature.");
-            }
-
             return mFunctionObj;
         }
 
@@ -296,10 +288,6 @@ public:
         }
 
         void addCompiledSpecialization(compiled_code_entrypoint e, Type* returnType, const std::vector<Type*>& argTypes) {
-            if (!mFunctionObj) {
-                throw std::runtime_error("Can't add a compiled specialization to a signature");
-            }
-
             mCompiledSpecializations.push_back(CompiledSpecialization(e,returnType,argTypes));
         }
 
@@ -343,17 +331,6 @@ public:
         mOverloads(overloads),
         mIsEntrypoint(isEntrypoint)
     {
-        int countOfSignatures = 0;
-        for (auto& o: overloads) {
-            if (o.isSignature()) {
-                countOfSignatures++;
-            }
-        }
-
-        if (countOfSignatures != 0 && countOfSignatures != overloads.size()) {
-            throw std::runtime_error("Can't create a FunctionType with some concrete and some signatures.");
-        }
-
         m_name = inName;
         m_is_simple = false;
         m_is_default_constructible = true;
@@ -436,16 +413,6 @@ public:
     void assign(instance_ptr self, instance_ptr other) {
     }
 
-    bool isSignature() const {
-        for (auto& s: mOverloads) {
-            if (s.isSignature()) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     const std::vector<Overload>& getOverloads() const {
         return mOverloads;
     }
@@ -456,10 +423,6 @@ public:
                     Type* returnType,
                     const std::vector<Type*>& argTypes
                     ) {
-        if (isSignature()) {
-            throw std::runtime_error("Can't add a specialization to a Signature");
-        }
-
         if (whichOverload < 0 || whichOverload >= mOverloads.size()) {
             throw std::runtime_error("Invalid overload index.");
         }

@@ -277,7 +277,10 @@ class FunctionOverloadArg:
         return self._typeFilter
 
     def __repr__(self):
-        res = f"{self.name}: {self.typeFilter}"
+        res = f"{self.name}"
+        if self.typeFilter is not None:
+            res += f": {self.typeFilter}"
+
         if self.defaultValue is not None:
             res += " = " + str(self.defaultValue[0])
         if self.isKwarg:
@@ -323,21 +326,6 @@ class FunctionOverload:
             if a.isStarArg:
                 return None
         return len(self.args)
-
-    def asSignature(self, argTypes):
-        assert len(argTypes) == len(self.args)
-
-        argTuples = []
-
-        for i, arg in enumerate(self.args):
-            argTuples.append((arg.name, argTypes[i], arg.defaultValue, arg.isStarArg, arg.isKwarg))
-
-        return typed_python._types.Function(
-            self.name,
-            self.returnType or object,
-            None,
-            tuple(argTuples)
-        )
 
     def addArg(self, name, defaultVal, typeFilter, isStarArg, isKwarg):
         self.args = self.args + (FunctionOverloadArg(name, defaultVal, typeFilter, isStarArg, isKwarg),)

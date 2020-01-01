@@ -1047,6 +1047,29 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
             callF4(0, 1)
 
+    def test_typed_functions_with_typed_kwargs(self):
+        @Function
+        def f(**kwargs: int):
+            return "int"
+
+        @f.overload
+        def f(**kwargs: str):
+            return "str"
+
+        self.assertEqual(f(), "int")
+        self.assertEqual(f(x=1), "int")
+        self.assertEqual(f(x=1.5), "int")
+        self.assertEqual(f(x="1"), "str")
+
+        @Entrypoint
+        def callF(**kwargs):
+            return f(**kwargs)
+
+        self.assertEqual(callF(), "int")
+        self.assertEqual(callF(x=1), "int")
+        self.assertEqual(callF(x=1.5), "int")
+        self.assertEqual(callF(x="1"), "str")
+
     def test_typed_functions_dispatch_based_on_names(self):
         @Function
         def f(x):
@@ -1091,7 +1114,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(callF2(1.5), 2.5)
         self.assertEqual(callF2(1), 2.0)
 
-        with self.assertRaisesRegex(TypeError, r"convert from type OneOf\(Int64, Float64, String\) to type OneOf\(Int64, Float64\)"):
+        with self.assertRaisesRegex(TypeError, r"Failed to find an overload"):
             callF2("h")
 
     def test_can_call_function_with_typed_function_as_argument(self):

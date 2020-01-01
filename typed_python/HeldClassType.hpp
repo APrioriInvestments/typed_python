@@ -29,9 +29,12 @@ class Class;
 //this takes an instance_ptr for a Class object (not the HeldClass)
 typedef void (*destructor_fun_type)(void* inst);
 
-typedef Function* function_signature_type;
+// represents a concrete call signature with positional arguments packed
+// into the tuple and the named arguments packed into the named tuple.
+// we'll end up with a each distinct function call signat
+typedef std::tuple<Type*, Tuple*, NamedTuple*> function_call_signature_type;
 
-typedef std::pair<std::string, Function*> method_signature_type;
+typedef std::pair<std::string, function_call_signature_type> method_call_signature_type;
 
 typedef void* untyped_function_ptr;
 
@@ -83,8 +86,8 @@ public:
         // these members are explicitly leaked so that the layout of the C class is
         // comprehensible to the llvm code layer. maps and sets have a nontrivial layout,
         // and so it's more stable to just hold them as pointers.
-        mDispatchIndices(*new std::map<method_signature_type, size_t>()),
-        mDispatchDefinitions(*new std::map<size_t, method_signature_type>()),
+        mDispatchIndices(*new std::map<method_call_signature_type, size_t>()),
+        mDispatchDefinitions(*new std::map<size_t, method_call_signature_type>()),
         mIndicesNeedingDefinition(*new std::set<size_t>())
     {
     }
@@ -111,18 +114,18 @@ public:
         allocateUpcastDispatchTables();
     }
 
-    size_t allocateMethodDispatch(std::string funcName, const function_signature_type& signature) {
+    size_t allocateMethodDispatch(std::string funcName, const function_call_signature_type& signature) {
         assertHoldingTheGil();
 
-        auto it = mDispatchIndices.find(method_signature_type(funcName, signature));
+        auto it = mDispatchIndices.find(method_call_signature_type(funcName, signature));
         if (it != mDispatchIndices.end()) {
             return it->second;
         }
 
         size_t newIndex = mDispatchIndices.size();
 
-        mDispatchIndices[method_signature_type(funcName, signature)] = newIndex;
-        mDispatchDefinitions[newIndex] = method_signature_type(funcName, signature);
+        mDispatchIndices[method_call_signature_type(funcName, signature)] = newIndex;
+        mDispatchDefinitions[newIndex] = method_call_signature_type(funcName, signature);
 
         // check if we need to allocate a bigger function pointer table. If we do,
         // we must leave the existing one in place, because compiled code may be
@@ -186,7 +189,7 @@ public:
         return mInterfaceClass;
     }
 
-    method_signature_type dispatchDefinitionForSlot(size_t slotIx) const {
+    method_call_signature_type dispatchDefinitionForSlot(size_t slotIx) const {
         auto it = mDispatchDefinitions.find(slotIx);
         if (it == mDispatchDefinitions.end()) {
             throw std::runtime_error("Invalid slot");
@@ -217,9 +220,9 @@ private:
 
     size_t mFuncPtrsUsed;
 
-    std::map<method_signature_type, size_t>& mDispatchIndices;
+    std::map<method_call_signature_type, size_t>& mDispatchIndices;
 
-    std::map<size_t, method_signature_type>& mDispatchDefinitions;
+    std::map<size_t, method_call_signature_type>& mDispatchDefinitions;
 
     std::set<size_t>& mIndicesNeedingDefinition;
 };
@@ -680,7 +683,7 @@ public:
         if (m_memberFunctions.find("__getattribute__") != m_memberFunctions.end()) { m_hasGetAttributeMagicMethod = true; }
     }
 
-    size_t allocateMethodDispatch(std::string funcName, function_signature_type signature) {
+    size_t allocateMethodDispatch(std::string funcName, function_call_signature_type signature) {
         size_t result = dispatchTableAs(this)->allocateMethodDispatch(funcName, signature);
 
         // make sure we add this dispatch to every child that implements us as an interface

@@ -273,7 +273,50 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         return super()._can_convert_from_type(otherType, explicit)
 
     def convert_bool_cast(self, context, e):
-        return e.convert_to_type(bool)
+        return context.pushPod(
+            bool,
+            runtime_functions.pyobj_to_bool.call(
+                e.nonref_expr.cast(VoidPtr)
+            )
+        )
+
+    def convert_int_cast(self, context, e):
+        return context.pushPod(
+            int,
+            runtime_functions.pyobj_to_int64.call(
+                e.nonref_expr.cast(VoidPtr)
+            )
+        )
+
+    def convert_float_cast(self, context, e):
+        return context.pushPod(
+            float,
+            runtime_functions.pyobj_to_float64.call(
+                e.nonref_expr.cast(VoidPtr)
+            )
+        )
+
+    def convert_bytes_cast(self, context, e):
+        return context.push(
+            bytes,
+            lambda bytesOut:
+                bytesOut.expr.store(
+                    runtime_functions.pyobj_to_bytes.call(
+                        e.nonref_expr.cast(VoidPtr)
+                    ).cast(bytesOut.expr_type.getNativeLayoutType())
+                )
+        )
+
+    def convert_str_cast(self, context, e):
+        return context.push(
+            str,
+            lambda strOut:
+                strOut.expr.store(
+                    runtime_functions.pyobj_to_str.call(
+                        e.nonref_expr.cast(VoidPtr)
+                    ).cast(strOut.expr_type.getNativeLayoutType())
+                )
+        )
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
         target_type = targetVal.expr_type

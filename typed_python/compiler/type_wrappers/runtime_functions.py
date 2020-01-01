@@ -272,13 +272,6 @@ pyobj_to_typed = externalCallTarget(
     Bool
 )
 
-instance_to_bool = externalCallTarget(
-    "np_runtime_instance_to_bool",
-    Bool,
-    Void.pointer(),
-    UInt64,
-)
-
 add_traceback = externalCallTarget(
     "np_add_traceback",
     Void,
@@ -679,6 +672,36 @@ pyobj_locktype_lock = externalCallTarget(
 
 pyobj_iter_next = externalCallTarget(
     "np_pyobj_iter_next",
+    Void.pointer(),
+    Void.pointer()
+)
+
+pyobj_to_bool = externalCallTarget(
+    "np_pyobj_to_bool",
+    Bool,
+    Void.pointer()
+)
+
+pyobj_to_int64 = externalCallTarget(
+    "np_pyobj_to_int64",
+    Int64,
+    Void.pointer()
+)
+
+pyobj_to_float64 = externalCallTarget(
+    "np_pyobj_to_float64",
+    Float64,
+    Void.pointer()
+)
+
+pyobj_to_str = externalCallTarget(
+    "np_pyobj_to_str",
+    Void.pointer(),
+    Void.pointer()
+)
+
+pyobj_to_bytes = externalCallTarget(
+    "np_pyobj_to_bytes",
     Void.pointer(),
     Void.pointer()
 )

@@ -289,13 +289,15 @@ PyObject *getVTablePointer(PyObject* nullValue, PyObject* args) {
 
 PyObject *allocateClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObject* kwargs)
 {
-    static const char *kwlist[] = {"classType", "methodName", "signature", NULL};
+    static const char *kwlist[] = {"classType", "methodName", "retType", "argTupleType", "kwargTupleType", NULL};
 
     PyObject* pyClassType;
     const char* methodName;
-    PyObject* pyFuncType;
+    PyObject* pyFuncRetType;
+    PyObject* pyFuncArgType;
+    PyObject* pyFuncKwargType;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OsO", (char**)kwlist, &pyClassType, &methodName, &pyFuncType)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OsOOO", (char**)kwlist, &pyClassType, &methodName, &pyFuncRetType, &pyFuncArgType, &pyFuncKwargType)) {
         return NULL;
     }
 
@@ -305,19 +307,29 @@ PyObject *allocateClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObj
             throw std::runtime_error("Expected 'classType' to be a Class");
         }
 
-        Type* funcType = PyInstance::unwrapTypeArgToTypePtr(pyFuncType);
-        if (!funcType || funcType->getTypeCategory() != Type::TypeCategory::catFunction) {
-            throw std::runtime_error("Expected 'signature' to be a Function");
-        }
-        Function* funcTypeAsFunc = (Function*)funcType;
-        if (funcTypeAsFunc->getOverloads().size() != 1 || !funcTypeAsFunc->isSignature()) {
-            throw std::runtime_error(
-                "Expected 'signature' to be a Function with "
-                "exactly 1 argument and to be a signature only."
-            );
+        Type* funcRetType = PyInstance::unwrapTypeArgToTypePtr(pyFuncRetType);
+        if (!funcRetType) {
+            throw std::runtime_error("Expected 'retType' to be a Type");
         }
 
-        size_t dispatchSlot = ((Class*)classType)->getHeldClass()->allocateMethodDispatch(methodName, funcTypeAsFunc);
+        Type* funcArgType = PyInstance::unwrapTypeArgToTypePtr(pyFuncArgType);
+        if (!funcArgType || funcArgType->getTypeCategory() != Type::TypeCategory::catTuple) {
+            throw std::runtime_error("Expected 'argTuple' to be a Tuple");
+        }
+
+        Type* funcKwargType = PyInstance::unwrapTypeArgToTypePtr(pyFuncKwargType);
+        if (!funcKwargType || funcKwargType->getTypeCategory() != Type::TypeCategory::catNamedTuple) {
+            throw std::runtime_error("Expected 'kwargTupleType' to be a Tuple");
+        }
+
+        size_t dispatchSlot = ((Class*)classType)->getHeldClass()->allocateMethodDispatch(
+            methodName,
+            function_call_signature_type(
+                funcRetType,
+                (Tuple*)funcArgType,
+                (NamedTuple*)funcKwargType
+            )
+        );
 
         return PyLong_FromLong(dispatchSlot);
     });
@@ -379,12 +391,14 @@ PyObject *getClassMethodDispatchSignature(PyObject* nullValue, PyObject* args, P
 
         ClassDispatchTable* cdt = heldImplementing->dispatchTableAs(heldInterface);
 
-        method_signature_type sig = cdt->dispatchDefinitionForSlot(slot);
+        method_call_signature_type sig = cdt->dispatchDefinitionForSlot(slot);
 
         return PyTuple_Pack(
-            2,
+            4,
             PyUnicode_FromString(sig.first.c_str()),
-            PyInstance::typeObj(sig.second)
+            PyInstance::typeObj(std::get<0>(sig.second)),
+            PyInstance::typeObj(std::get<1>(sig.second)),
+            PyInstance::typeObj(std::get<2>(sig.second))
         );
     });
 }
@@ -608,8 +622,8 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
         PyObjectHolder funcObj(PyTuple_GetItem(args,2));
         PyObjectHolder argTuple(PyTuple_GetItem(args,3));
 
-        if (!PyFunction_Check(funcObj) && funcObj != Py_None) {
-            PyErr_SetString(PyExc_TypeError, "Third arg should be a function object or None (for a signature).");
+        if (!PyFunction_Check(funcObj)) {
+            PyErr_SetString(PyExc_TypeError, "Third arg should be a function object");
             return NULL;
         }
 
@@ -685,15 +699,13 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                 ));
         }
 
-        if (funcObj != Py_None) {
-            incref(funcObj);
-        }
+        incref(funcObj);
 
         std::vector<Function::Overload> overloads;
 
         overloads.push_back(
             Function::Overload(
-                (PyFunctionObject*)(funcObj != Py_None ? (PyObject*)funcObj : nullptr),
+                (PyFunctionObject*)(PyObject*)funcObj,
                 rType,
                 argList
             )

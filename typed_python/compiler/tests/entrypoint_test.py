@@ -98,6 +98,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         for T in [IntList, FloatList]:
             aList = T(range(1000000))
+            compiledAdd(T([1]), 1)
 
             t0 = time.time()
             add(aList, 1)

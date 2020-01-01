@@ -266,13 +266,11 @@ extern "C" {
 
         PyObjectStealer o(PyInstance::extractPythonObject(inst, tp));
         if (!o) {
-            PyErr_PrintEx(0);
-            throw std::runtime_error("nativepython_runtime_repr: failed to extract python object");
+            throw PythonExceptionSet();
         }
         PyObject *r = PyObject_Repr(o);
         if (!r) {
-            PyErr_PrintEx(0);
-            throw std::runtime_error("nativepython_runtime_repr: PyObject_Repr returned 0");
+            throw PythonExceptionSet();
         }
         Py_ssize_t s;
         const char* c = PyUnicode_AsUTF8AndSize(r, &s);
@@ -286,13 +284,11 @@ extern "C" {
 
         PyObjectStealer o(PyInstance::extractPythonObject(inst, tp));
         if (!o) {
-            PyErr_PrintEx(0);
-            throw std::runtime_error("nativepython_runtime_str: failed to extract python object");
+            throw PythonExceptionSet();
         }
         PyObject *r = PyObject_Str(o);
         if (!r) {
-            PyErr_PrintEx(0);
-            throw std::runtime_error("nativepython_runtime_str: PyObject_Str returned 0");
+            throw PythonExceptionSet();
         }
         Py_ssize_t s;
         const char* c = PyUnicode_AsUTF8AndSize(r, &s);
@@ -575,20 +571,6 @@ extern "C" {
         } catch(...) {
             return false;
         }
-    }
-
-    bool np_runtime_instance_to_bool(instance_ptr i, Type* tp) {
-        PyEnsureGilAcquired getTheGil;
-
-        PyObjectStealer o(PyInstance::extractPythonObject(i, tp));
-
-        int r = PyObject_IsTrue(o);
-
-        if (r == -1) {
-            throw PythonExceptionSet();
-        }
-
-        return r;
     }
 
     PythonObjectOfType::layout_type* np_runtime_to_pyobj(instance_ptr obj, Type* tp) {
@@ -1196,6 +1178,70 @@ extern "C" {
         double ret = PyFloat_AsDouble(float_obj);
         decref(float_obj);
         return ret;
+    }
+
+    double np_pyobj_to_float64(PythonObjectOfType::layout_type* obj) {
+        PyEnsureGilAcquired getTheGil;
+
+        double res = PyFloat_AsDouble(obj->pyObj);
+        if (PyErr_Occurred()) {
+            throw PythonExceptionSet();
+        }
+        return res;
+    }
+
+    int64_t np_pyobj_to_int64(PythonObjectOfType::layout_type* obj) {
+        PyEnsureGilAcquired getTheGil;
+
+        int64_t res = PyLong_AsLong(obj->pyObj);
+        if (PyErr_Occurred()) {
+            throw PythonExceptionSet();
+        }
+        return res;
+    }
+
+    BytesType::layout* np_pyobj_to_bytes(PythonObjectOfType::layout_type* obj) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObjectStealer bytesRep(PyObject_Bytes(obj->pyObj));
+
+        if (!bytesRep) {
+            throw PythonExceptionSet();
+        }
+
+        char* buf;
+        Py_ssize_t size;
+
+        PyBytes_AsStringAndSize((PyObject*)bytesRep, &buf, &size);
+
+        return BytesType::createFromPtr(buf, size);
+    }
+
+    StringType::layout* np_pyobj_to_str(PythonObjectOfType::layout_type* obj) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObjectStealer repr(PyObject_Str(obj->pyObj));
+        if (!repr) {
+            throw PythonExceptionSet();
+        }
+
+        Py_ssize_t s;
+
+        const char* c = PyUnicode_AsUTF8AndSize(repr, &s);
+
+        return StringType::createFromUtf8(c, s);
+    }
+
+    bool np_pyobj_to_bool(PythonObjectOfType::layout_type* obj) {
+        PyEnsureGilAcquired getTheGil;
+
+        bool res = PyObject_IsTrue(obj->pyObj);
+
+        if (PyErr_Occurred()) {
+            throw PythonExceptionSet();
+        }
+
+        return res;
     }
 
     /*****

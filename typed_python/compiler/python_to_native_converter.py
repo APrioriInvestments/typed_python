@@ -462,7 +462,7 @@ class PythonToNativeConverter(object):
 
         interfaceClass, implementingClass, slotIndex = dispatch
 
-        name, signature = _types.getClassMethodDispatchSignature(interfaceClass, implementingClass, slotIndex)
+        name, retType, argTypeTuple, kwargTypeTuple = _types.getClassMethodDispatchSignature(interfaceClass, implementingClass, slotIndex)
 
         # generate a callback that takes the linked function pointer and jams
         # it into the relevant slot in the vtable once it's produced
@@ -471,8 +471,17 @@ class PythonToNativeConverter(object):
 
         # we are compiling the function 'name' in 'implementingClass' to be installed when
         # viewing an instance of 'implementingClass' as 'interfaceClass' that's function
-        # 'name' called with signature 'signature'
-        assert ClassWrapper.compileMethodInstantiation(self, interfaceClass, implementingClass, name, signature, callback=installOverload)
+        # 'name' called with signature '(*argTypeTuple, **kwargTypeTuple) -> retType'
+        assert ClassWrapper.compileMethodInstantiation(
+            self,
+            interfaceClass,
+            implementingClass,
+            name,
+            retType,
+            argTypeTuple,
+            kwargTypeTuple,
+            callback=installOverload
+        )
 
         return True
 

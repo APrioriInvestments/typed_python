@@ -629,3 +629,173 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         for form in [toList, toListCompiled]:
             with self.assertRaisesRegex(Exception, "Boo!"):
                 form(generator(10))
+
+    def test_bool_of_arbitrary(self):
+        class C:
+            def __bool__(self):
+                return False
+
+        @Compiled
+        def f(x: object):
+            if x:
+                return True
+            return False
+
+        self.assertEqual(f([]), False)
+        self.assertEqual(f([1]), True)
+        self.assertEqual(f(C()), False)
+
+    def test_int_of_arbitrary(self):
+        class C:
+            def __int__(self):
+                return 123
+
+        @Compiled
+        def f(x: object):
+            return int(x)
+
+        self.assertEqual(f(10), 10)
+        self.assertEqual(f(C()), 123)
+
+    def test_float_of_arbitrary(self):
+        class C:
+            def __float__(self):
+                return 123.5
+
+        @Compiled
+        def f(x: object):
+            return float(x)
+
+        self.assertEqual(f(10.5), 10.5)
+        self.assertEqual(f(10), 10.0)
+        self.assertEqual(f(C()), 123.5)
+
+    def test_str_of_arbitrary(self):
+        class C:
+            def __str__(self):
+                return "hihi"
+
+        @Compiled
+        def f(x: object):
+            return str(x)
+
+        self.assertEqual(f(10.5), "10.5")
+        self.assertEqual(f([]), "[]")
+        self.assertEqual(f(C()), "hihi")
+
+    def test_bytes_of_arbitrary(self):
+        class C:
+            def __bytes__(self):
+                return b"hihi"
+
+        @Compiled
+        def f(x: object):
+            return bytes(x)
+
+        self.assertEqual(f(b"10.5"), b"10.5")
+        self.assertEqual(f(list(b"12")), b"12")
+        self.assertEqual(f(C()), b"hihi")
+
+    def test_exception_in_arbitrary_pyobj_conversion(self):
+        class C:
+            def __bool__(self):
+                raise Exception("bad bool call")
+
+            def __float__(self):
+                raise Exception("bad float call")
+
+            def __int__(self):
+                raise Exception("bad int call")
+
+            def __str__(self):
+                raise Exception("bad str call")
+
+            def __bytes__(self):
+                raise Exception("bad bytes call")
+
+        @Compiled
+        def callBool(x: object):
+            return bool(x)
+
+        @Compiled
+        def callInt(x: object):
+            return int(x)
+
+        @Compiled
+        def callStr(x: object):
+            return str(x)
+
+        @Compiled
+        def callFloat(x: object):
+            return float(x)
+
+        @Compiled
+        def callBytes(x: object):
+            return bytes(x)
+
+        with self.assertRaisesRegex(Exception, "bad bool call"):
+            callBool(C())
+
+        with self.assertRaisesRegex(Exception, "bad int call"):
+            callInt(C())
+
+        with self.assertRaisesRegex(Exception, "bad str call"):
+            callStr(C())
+
+        with self.assertRaisesRegex(Exception, "bad bytes call"):
+            callBytes(C())
+
+        with self.assertRaisesRegex(Exception, "bad float call"):
+            callFloat(C())
+
+    def test_invalid_return_value_in_arbitrary_pyobj_conversion(self):
+        class C:
+            def __bool__(self):
+                return "not valid"
+
+            def __float__(self):
+                return "not valid"
+
+            def __int__(self):
+                return "not valid"
+
+            def __str__(self):
+                return 0
+
+            def __bytes__(self):
+                return 0
+
+        @Compiled
+        def callBool(x: object):
+            return bool(x)
+
+        @Compiled
+        def callInt(x: object):
+            return int(x)
+
+        @Compiled
+        def callStr(x: object):
+            return str(x)
+
+        @Compiled
+        def callFloat(x: object):
+            return float(x)
+
+        @Compiled
+        def callBytes(x: object):
+            return bytes(x)
+
+        with self.assertRaisesRegex(Exception, "__bool__ should return bool, returned str"):
+            callBool(C())
+
+        with self.assertRaisesRegex(Exception, "__int__ returned non-int"):
+            callInt(C())
+
+        with self.assertRaisesRegex(Exception, "__str__ returned non-string"):
+            callStr(C())
+
+        with self.assertRaisesRegex(Exception, "__bytes__ returned non-bytes"):
+            callBytes(C())
+
+        with self.assertRaisesRegex(Exception, "__float__ returned non-float"):
+            callFloat(C())

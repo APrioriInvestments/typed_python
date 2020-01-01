@@ -111,7 +111,7 @@ class ExpressionConversionContext(object):
         )
 
     @staticmethod
-    def constantType(self, x, allowArbitrary=False):
+    def constantType(x, allowArbitrary=False):
         """Return the Wrapper for the type we'd get if we called self.constant(x)
         """
 
@@ -758,6 +758,67 @@ class ExpressionConversionContext(object):
         return outArgs
 
     @staticmethod
+    def computeOverloadSignature(functionOverload: FunctionOverload, args, kwargs):
+        """Figure out the concrete type assignments we'd need to give to each _argument_ to call 'functionOverload'
+
+        Args:
+            functionOverload - a FunctionOverload we're trying to map to
+            args - a list of positional argument Wrapper objects.
+            kwargs - a dict of keyword argument Wrapper objects.
+
+        Returns:
+            If we can map, a pair (argsOut, kwargsOut) giving the updated type wrapper assignments.
+            There will be one entry in each of argsOut/kwargsOut for each entry in the inputs,
+            updated to reflect the required typing judgments that are applied by the overload's
+            signature.
+
+            Note that we _dont_ actually check if the argument Wrappers are convertible.
+            So it's possible to return a signature that can't be reached by 'args' and
+            'kwargs'.
+
+            Otherwise, if the mapping cannot be done, return None.
+        """
+        args = [a.convert_mutable_masquerade_to_untyped_type() for a in args]
+        kwargs = {k: v.convert_mutable_masquerade_to_untyped_type() for k, v in kwargs.items()}
+
+        argsOrErr = ExpressionConversionContext.mapFunctionArguments(
+            functionOverload,
+            [i for i in range(len(args))],
+            {argName: argName for argName in kwargs}
+        )
+
+        if isinstance(argsOrErr, str):
+            return None
+
+        outArgTypes = list(args)
+        outKwargTypes = dict(kwargs)
+
+        def setType(which, T):
+            if isinstance(which, int):
+                outArgTypes[which] = typeWrapper(T)
+            elif isinstance(which, str):
+                outKwargTypes[which] = typeWrapper(T)
+            else:
+                assert False, type(which)
+
+        for overloadArg, mappingArg in zip(functionOverload.args, argsOrErr):
+            if overloadArg.typeFilter is not None:
+                if mappingArg.matches.Arg:
+                    setType(mappingArg.value, overloadArg.typeFilter)
+                elif mappingArg.matches.Constant:
+                    pass
+                elif mappingArg.matches.StarArgs:
+                    for v in mappingArg.value:
+                        setType(v, overloadArg.typeFilter)
+                elif mappingArg.matches.Kwargs:
+                    for name, _ in mappingArg.value:
+                        setType(name, overloadArg.typeFilter)
+                else:
+                    assert False, "Unreachable"
+
+        return outArgTypes, outKwargTypes
+
+    @staticmethod
     def computeFunctionArgumentTypeSignature(functionOverload: FunctionOverload, args, kwargs):
         """Figure out the concrete type assignments we'd give to each variable if we call with args/kwargs.
 
@@ -774,7 +835,7 @@ class ExpressionConversionContext(object):
             kwargs - a dict of keyword argument Wrapper objects.
 
         Returns:
-            If we can map, a list of WRapper objects mapping to the argument
+            If we can map, a list of Wrapper objects mapping to the argument
             types of the function, in the order that they appear.
 
             Otherwise, None, and an exception will have been generated.

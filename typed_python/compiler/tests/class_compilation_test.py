@@ -1610,5 +1610,109 @@ class TestClassCompilationCompilation(unittest.TestCase):
         def tryToCallRequiresAFloat():
             requiresAFloat(C())
 
-        with self.assertRaisesRegex(TypeError, "Can't convert from type C to type Float64"):
+        with self.assertRaisesRegex(TypeError, "Failed to find an overload"):
             tryToCallRequiresAFloat()
+
+    def compileCheck(self, f):
+        self.assertEqual(f(), Compiled(f)())
+
+    def test_class_can_override_default_args(self):
+        class B(Class):
+            def f(self, x=10) -> int:
+                return x
+
+        class C(B):
+            def f(self, x=20) -> int:
+                return x + 100
+
+        class D(C, Final):
+            def f(self, x=30) -> int:
+                return x + 200
+
+        self.compileCheck(lambda: B().f())
+        self.compileCheck(lambda: B().f(10))
+        self.compileCheck(lambda: B().f(20))
+        self.compileCheck(lambda: C().f())
+        self.compileCheck(lambda: C().f(10))
+        self.compileCheck(lambda: C().f(20))
+        self.compileCheck(lambda: D().f())
+        self.compileCheck(lambda: D().f(10))
+        self.compileCheck(lambda: D().f(20))
+
+    def test_class_methods_and_named_arguments(self):
+        class B(Class):
+            def f(self, **kwargs: int) -> int:
+                return 0
+
+        class C(B):
+            def f(self, x, y) -> int:
+                return x + y
+
+            def f(self, x) -> int:  # noqa
+                return x + 100
+
+            def f(self) -> int:  # noqa
+                return 1000
+
+        self.assertEqual(B().f(x=10, y=20), 0)
+        self.assertEqual(C().f(x=10, y=20), 30)
+
+        self.compileCheck(lambda: B().f())
+        self.compileCheck(lambda: C().f())
+
+        self.compileCheck(lambda: B().f(x=10, y=20))
+        self.compileCheck(lambda: C().f(x=10, y=20))
+
+    def test_class_method_star_arg_type_dispatch(self):
+        class B(Class):
+            def f(self, *args: int, **kwargs: int) -> int:
+                return 0
+
+        self.assertEqual(B().f(1.5, x=2.5), 0)
+        self.compileCheck(lambda: B().f(1.5, x=2.5))
+
+    def test_class_methods_obey_star_arg_type_assignments(self):
+        class B(Class):
+            def f(self, *args, **kwargs) -> int:
+                return 0
+
+        class C(B):
+            def f(self, *args: int, **kwargs: int) -> int:
+                return 1
+
+            def f(self, *args: str, **kwargs: str) -> int:  # noqa
+                return 2
+
+            def f(self, *args: int, **kwargs: str) -> int:  # noqa
+                return 3
+
+            def f(self, *args: str, **kwargs: int) -> int:  # noqa
+                return 4
+
+        self.assertEqual(C().f(), 1)
+        self.assertEqual(C().f(1), 1)
+        self.assertEqual(C().f("1"), 2)
+        self.assertEqual(C().f(1, x="2"), 3)
+        self.assertEqual(C().f("1", x=2), 4)
+
+        for T in [B, C]:
+            self.compileCheck(lambda: T().f())
+            self.compileCheck(lambda: T().f(1, 2))
+            self.compileCheck(lambda: T().f(x=1, y=2))
+            self.compileCheck(lambda: T().f(1, y=2))
+            self.compileCheck(lambda: T().f(1, y=2))
+
+            self.compileCheck(lambda: T().f('1', '2'))
+            self.compileCheck(lambda: T().f(x='1', y='2'))
+            self.compileCheck(lambda: T().f('1', y='2'))
+            self.compileCheck(lambda: T().f('1', y='2'))
+
+            self.compileCheck(lambda: T().f('1', 2))
+            self.compileCheck(lambda: T().f(x='1', y=2))
+            self.compileCheck(lambda: T().f('1', y=2))
+            self.compileCheck(lambda: T().f('1', y=2))
+
+            self.compileCheck(lambda: T().f(1, '2'))
+            self.compileCheck(lambda: T().f(x=1, y='2'))
+            self.compileCheck(lambda: T().f(1, y='2'))
+            self.compileCheck(lambda: T().f(1, y='2'))
