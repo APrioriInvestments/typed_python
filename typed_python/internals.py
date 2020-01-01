@@ -358,3 +358,8 @@ class DisableCompiledCode:
 
 def makeNamedTuple(**kwargs):
     return typed_python._types.NamedTuple(**{k: type(v) for k, v in kwargs.items()})(kwargs)
+
+
+def isCompiled():
+    """Returns True if we're in compiled code, False otherwise."""
+    return False

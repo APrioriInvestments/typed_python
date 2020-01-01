@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Class, Member, Final, TupleOf, DisableCompiledCode, Int64
+from typed_python import ListOf, Class, Member, Final, TupleOf, DisableCompiledCode, Int64, isCompiled
 from typed_python._types import touchCompiledSpecializations
 from typed_python import Entrypoint, NotCompiled, Function
 from typed_python.compiler.runtime import Runtime, RuntimeEventVisitor
@@ -21,6 +21,7 @@ import traceback
 import threading
 import time
 import unittest
+import numpy
 
 
 def add(aList, toAdd):
@@ -481,3 +482,27 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
                 return 0
 
         self.assertEqual(X.sum(10), sum(range(11)))
+
+    def test_is_compiled(self):
+        @Entrypoint
+        def callIsCompiled():
+            return isCompiled()
+
+        self.assertTrue(callIsCompiled())
+
+        with DisableCompiledCode():
+            self.assertFalse(callIsCompiled())
+
+    def test_entrypoint_always_compiles_when_called_with_numpy_array(self):
+        @Entrypoint
+        def f(x: ListOf(int)):
+            assert isCompiled()
+
+            res = 0
+            for i in x:
+                res += i
+            return res
+
+        a = numpy.arange(100).astype('int')
+
+        self.assertEqual(f(a), a.sum())
