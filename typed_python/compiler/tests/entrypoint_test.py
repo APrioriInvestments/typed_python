@@ -459,3 +459,25 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(f(1.5), float)
         self.assertEqual(f(1), int)
+
+    def test_entrypoint_and_static_recursion_untyped_classes(self):
+        class X:
+            @staticmethod
+            @Entrypoint
+            def sum(x):
+                if x > 0:
+                    return X.sum(x - 1) + x
+                return 0
+
+        self.assertEqual(X.sum(10), sum(range(11)))
+
+    def test_entrypoint_and_static_recursion_typed_classes(self):
+        class X(Class):
+            @staticmethod
+            @Entrypoint
+            def sum(x):
+                if x > 0:
+                    return X.sum(x - 1) + x
+                return 0
+
+        self.assertEqual(X.sum(10), sum(range(11)))
