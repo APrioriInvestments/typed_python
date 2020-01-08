@@ -567,8 +567,7 @@ class TestDictCompilation(unittest.TestCase):
                 if thing[0]:
                     x[thing[1]] = 1
                 else:
-                    if thing[1] in x:
-                        del x[thing[1]]
+                    x.pop(thing[1], None)
 
         # this sequence exposed a severe bug in the dict_wrapper. The code below should
         # find others if the bug reappears

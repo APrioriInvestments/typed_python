@@ -459,7 +459,7 @@ class NativeTypesTests(unittest.TestCase):
 
         elapsed = time.time() - t0
         print("Took ", elapsed, " to do 1mm")
-        self.check_expected_performance(elapsed)
+        self.check_expected_performance(elapsed, expected=1.5)
 
     def test_default_initializer_oneof(self):
         x = OneOf(None, int)
