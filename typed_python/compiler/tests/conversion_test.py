@@ -17,7 +17,7 @@ import traceback
 import unittest
 from flaky import flaky
 
-from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, _types, Compiled
+from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, _types, Compiled, Dict
 from typed_python.compiler.runtime import Runtime, Entrypoint
 
 
@@ -1150,3 +1150,28 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertFalse(g([], []))
         self.assertTrue(g(None, None))
         self.assertFalse(g(ListOf(int)(), TupleOf(int)()))
+
+    def test_if_condition_throws(self):
+        def throws():
+            raise Exception("Boo")
+
+        @Entrypoint
+        def shouldThrow():
+            x = ListOf(int)()
+            y = Dict(int, int)()
+
+            if x in y:
+                return True
+            else:
+                return False
+
+        with self.assertRaisesRegex(Exception, "Can't convert"):
+            shouldThrow()
+
+    def test_if_with_return_types(self):
+        @Entrypoint
+        def popCheck(d, x):
+            if x in d:
+                d.pop(x)
+
+        popCheck(Dict(int, int)(), 1)

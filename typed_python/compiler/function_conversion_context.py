@@ -639,7 +639,7 @@ class FunctionConversionContext(object):
 
             result_expr = subcontext.convert_expression_ast(ast.value)
 
-            return subcontext.finalize(result_expr, exceptionsTakeFrom=ast), result_expr is not None
+            return subcontext.finalize(None, exceptionsTakeFrom=ast), result_expr is not None
 
         if ast.matches.If:
             cond_context = ExpressionConversionContext(self, variableStates)
@@ -656,7 +656,7 @@ class FunctionConversionContext(object):
 
                 branch, flow_returns = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse, variableStates)
 
-                return cond.expr >> branch, flow_returns
+                return cond_context.finalize(None, exceptionsTakeFrom=ast) >> branch, flow_returns
 
             variableStatesTrue = variableStates.clone()
             variableStatesFalse = variableStates.clone()
@@ -752,7 +752,7 @@ class FunctionConversionContext(object):
 
             to_iterate = iterator_setup_context.convert_expression_ast(ast.iter)
             if to_iterate is None:
-                return iterator_setup_context.finalize(to_iterate, exceptionsTakeFrom=ast), False
+                return iterator_setup_context.finalize(None, exceptionsTakeFrom=ast), False
 
             iteration_expressions = to_iterate.get_iteration_expressions()
 
@@ -787,7 +787,7 @@ class FunctionConversionContext(object):
 
                 iterator_object = to_iterate.convert_method_call("__iter__", (), {})
                 if iterator_object is None:
-                    return iterator_setup_context.finalize(iterator_object, exceptionsTakeFrom=ast), False
+                    return iterator_setup_context.finalize(None, exceptionsTakeFrom=ast), False
 
                 self.assignToLocalVariable(iter_varname, iterator_object, variableStates)
 

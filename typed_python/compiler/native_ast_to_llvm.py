@@ -851,6 +851,9 @@ class FunctionConverter:
         if expr.matches.Branch:
             cond = self.convert(expr.cond)
 
+            if cond is None:
+                return None
+
             cond_llvm = cond.llvm_value
 
             zero_like = llvmlite.ir.Constant(cond_llvm.type, 0)
