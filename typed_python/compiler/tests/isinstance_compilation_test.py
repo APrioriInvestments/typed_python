@@ -60,3 +60,11 @@ class TestIsinstanceCompilation(unittest.TestCase):
         self.assertFalse(isTupleOfInt(0))
         self.assertFalse(isTupleOfInt((1, 2)))
         self.assertTrue(isTupleOfInt(TupleOf(int)((1, 2))))
+
+    def test_isinstance_typeof_none(self):
+        @Entrypoint
+        def isNone(x):
+            return isinstance(x, type(None))
+
+        self.assertFalse(isNone(0))
+        self.assertTrue(isNone(None))
