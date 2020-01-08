@@ -18,6 +18,7 @@ import unittest
 import time
 import threading
 from flaky import flaky
+import numpy
 
 
 class TestDictCompilation(unittest.TestCase):
@@ -528,3 +529,62 @@ class TestDictCompilation(unittest.TestCase):
         f(x)
 
         self.assertEqual(len(x), 0)
+
+    def test_dict_up_and_down(self):
+        @Entrypoint
+        def f(targets):
+            x = Dict(int, int)()
+
+            for target in targets:
+                for i in range(len(x), target):
+                    assert i not in x
+                    x[i] = i
+                    assert i in x
+                    assert i + 1 not in x
+
+                for i in range(target, len(x)):
+                    assert i in x
+                    x.pop(i)
+                    assert i not in x
+
+                assert len(x) == target
+
+        C = 10
+        for i1 in range(C):
+            for i2 in range(C):
+                for i3 in range(C):
+                    for i4 in range(C):
+                        for i5 in range(C):
+                            f(ListOf(int)([i1, i2, i3, i4, i5]))
+
+    def test_dict_fuzz(self):
+        # try adding and removing items repeatedly, in an effort to fill the table up
+        @Entrypoint
+        def f(actions: ListOf(Tuple(bool, int))):
+            x = Dict(int, int)()
+
+            for thing in actions:
+                if thing[0]:
+                    x[thing[1]] = 1
+                else:
+                    if thing[1] in x:
+                        del x[thing[1]]
+
+        # this sequence exposed a severe bug in the dict_wrapper. The code below should
+        # find others if the bug reappears
+        f([(True, 3), (False, 17), (False, 3), (True, 34), (True, 36), (True, 0), (False, 0),
+           (False, 38), (False, 34), (True, 11), (True, 37), (True, 33), (False, 4), (True, 16)])
+
+        for length in range(5, 15):
+            print("Trying length ", length)
+            for trials in range(10000):
+                actions = []
+
+                for i in range(length):
+                    actions.append((numpy.random.uniform() > .5, numpy.random.choice(40)))
+
+                try:
+                    f(actions)
+                except Exception:
+                    print(actions)
+                    raise

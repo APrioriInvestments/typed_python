@@ -55,7 +55,7 @@ class CPlusPlusStyleMod(CompilableBuiltin):
 
 def dict_add_slot(instance, itemHash, slot):
     if (instance._hash_table_count * 2 + 1 > instance._hash_table_size or
-            instance._hash_table_empty_slots < instance._hash_table_size >> 2 + 1):
+            instance._hash_table_empty_slots < (instance._hash_table_size >> 2) + 1):
         instance._resizeTableUnsafe()
 
     if itemHash < 0:
@@ -93,6 +93,8 @@ def dict_slot_for_key(instance, itemHash, item):
     modFun = CPlusPlusStyleMod()
 
     offset = modFun(itemHash, instance._hash_table_size)
+
+    assert instance._hash_table_empty_slots > 0
 
     while True:
         slotIndex = int((slots + offset).get())
