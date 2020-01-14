@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from types import FunctionType
-from typed_python._types import Forward
+from typed_python._types import Forward, ListOf, TupleOf, Dict, ConstDict
 
 _type_to_typefunction = {}
 
@@ -72,10 +72,10 @@ class ConcreteTypeFunction(object):
         if isinstance(arg, (type, float, int, bool, str, bytes)):
             return arg
 
-        if isinstance(arg, (tuple, list)):
+        if isinstance(arg, (tuple, list, TupleOf, ListOf)):
             return tuple(self.mapArg(x) for x in arg)
 
-        if isinstance(arg, dict):
+        if isinstance(arg, (dict, Dict, ConstDict)):
             return tuple(sorted([(k, self.mapArg(v)) for k, v in arg.items()]))
 
         if isinstance(arg, FunctionType):

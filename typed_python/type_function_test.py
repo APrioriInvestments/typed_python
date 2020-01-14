@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Class, Alternative, Member, SerializationContext, Forward
+from typed_python import TypeFunction, Class, Alternative, Member, SerializationContext, Forward, ListOf
 import unittest
 
 
@@ -95,3 +95,20 @@ class TypeFunctionTest(unittest.TestCase):
             context.deserialize(context.serialize(l_l)),
             l_l
         )
+
+    def test_type_function_on_typed_lists(self):
+        @TypeFunction
+        def SumThem(x):
+            summedValues = sum(x)
+
+            class C:
+                X = summedValues
+
+            return C
+
+        self.assertIs(
+            SumThem([1, 2, 3]),
+            SumThem(ListOf(int)([1, 2, 3]))
+        )
+
+        self.assertEqual(SumThem(ListOf(int)([1, 2, 3])).X, 6)
