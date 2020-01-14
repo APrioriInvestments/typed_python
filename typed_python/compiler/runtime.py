@@ -18,7 +18,7 @@ import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
 import typed_python.compiler.llvm_compiler as llvm_compiler
 import typed_python
-
+from typed_python.type_function import ConcreteTypeFunction
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
@@ -57,6 +57,30 @@ class RuntimeEventVisitor:
 
     def __exit__(self, *args):
         Runtime.singleton().removeEventVisitor(self)
+
+
+class PrintNewFunctionVisitor(RuntimeEventVisitor):
+    """A simple visitor that prints out all the functions that get compiled.
+
+    Usage:
+        @Entrypoint
+        def f():
+            return 0
+
+        with PrintNewFunctionVisitor():
+            # this should print out the fact that we compiled 'f'
+            f()
+    """
+    def onNewFunction(self, f, inputTypes, outputType, variables):
+        print("compiling ", f)
+        print("   inputs: ", inputTypes)
+        print("   output: ", outputType)
+        print("   vars: ")
+        for varname, varVal in variables.items():
+            if isinstance(varVal, type) and issubclass(varVal, Value):
+                print("        ", varname, " which is a Value(", varVal.Value, " of type ", type(varVal.Value), ")")
+            else:
+                print("        ", varname, varVal)
 
 
 class Runtime:
@@ -106,6 +130,9 @@ class Runtime:
             return type(Function(arg))
 
         elif isinstance(arg, type):
+            return Value(arg)
+
+        elif isinstance(arg, ConcreteTypeFunction):
             return Value(arg)
 
         return type(arg)

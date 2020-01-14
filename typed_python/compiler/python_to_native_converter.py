@@ -22,7 +22,7 @@ from typed_python.compiler.directed_graph import DirectedGraph
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
-from typed_python.compiler.function_conversion_context import FunctionConversionContext
+from typed_python.compiler.function_conversion_context import FunctionConversionContext, FunctionOutput
 from typed_python.compiler.native_function_conversion_context import NativeFunctionConversionContext
 
 
@@ -560,7 +560,7 @@ class PythonToNativeConverter(object):
                     v.onNewFunction(
                         identifier[1],
                         identifier[2],
-                        identifier[3],
+                        functionConverter._varname_to_type.get(FunctionOutput),
                         {k: v.typeRepresentation for k, v in functionConverter._varname_to_type.items() if isinstance(k, str)}
                     )
 
