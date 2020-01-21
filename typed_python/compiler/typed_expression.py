@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import UInt64
+from typed_python import UInt64, PointerTo
 from typed_python.python_ast import BinaryOp, ComparisonOp, BooleanOp
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -49,6 +49,15 @@ class TypedExpression(object):
 
     def changeContext(self, newContext):
         return TypedExpression(newContext, self.expr, self.expr_type, self.isReference)
+
+    def asPointer(self):
+        """Change from being a reference to 'T' to being a _value_ of type 'T*'"""
+        assert self.isReference
+
+        return self.changeType(
+            typeWrapper(PointerTo(self.expr_type.typeRepresentation)),
+            False
+        )
 
     def changeType(self, newType, isReferenceOverride=None):
         """Return a TypedExpression with the same native_ast content but a different type-wrapper."""

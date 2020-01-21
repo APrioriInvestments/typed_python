@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Function, TupleOf, OneOf, Compiled
+from typed_python import ListOf, Function, TupleOf, OneOf, Compiled, Entrypoint
 import typed_python._types as _types
 import unittest
 import time
@@ -434,3 +434,38 @@ class TestListOfCompilation(unittest.TestCase):
         self.assertTrue(chkListListInt(x))
         x.append(ListOf(int)())
         self.assertFalse(chkListListInt(x))
+
+    def test_convert_tuple_of_to_list(self):
+        @Entrypoint
+        def convertTo(x, T):
+            return T(x)
+
+        self.assertEqual(
+            convertTo(TupleOf(int)([1, 2, 3]), ListOf(int)),
+            [1, 2, 3]
+        )
+
+        self.assertEqual(
+            convertTo(TupleOf(float)([1.5, 2.5, 3.5]), ListOf(int)),
+            [1, 2, 3]
+        )
+
+        self.assertEqual(
+            ListOf(int)(TupleOf(float)([1.5, 2.5, 3.5])),
+            [1, 2, 3]
+        )
+
+        self.assertEqual(
+            ListOf(OneOf(int, str))(TupleOf(float)([1.5, 2.5, 3.5])),
+            [1, 2, 3]
+        )
+
+        self.assertEqual(
+            convertTo(TupleOf(float)([1.5, 2.5, 3.5]), ListOf(OneOf(int, str))),
+            [1, 2, 3]
+        )
+
+        # in a loop, so we can see we're not violating any refcounts
+        for _ in range(100):
+            with self.assertRaisesRegex(TypeError, "not str"):
+                convertTo(TupleOf(float)([1.5, 2.5, "3.5"]), ListOf(OneOf(int, str)))

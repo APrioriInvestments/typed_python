@@ -132,6 +132,49 @@ class PreReservedTupleOrList(CompilableBuiltin):
         return super().convert_call(context, instance, args, kwargs)
 
 
+class InitializeRef(CompilableBuiltin):
+    def __eq__(self, other):
+        return isinstance(other, InitializeRef)
+
+    def __hash__(self):
+        return hash("InitializeRef")
+
+    def convert_call(self, context, instance, args, kwargs):
+        """InitializeRef()(target, sourceVal) -> bool.
+
+        Initializes 'target' with the contents of 'sourceVal', returning True on success
+        and False on failure.
+
+        'target' must be a reference expression to an uninitialized value.
+        """
+        if len(args) == 2:
+            return args[0].expr_type.convert_to_type_with_target(
+                context,
+                args[0],
+                args[1],
+                True
+            )
+
+        return super().convert_call(context, instance, args, kwargs)
+
+
+def initialize_tuple_or_list_from_other(targetPtr, src):
+    ct = len(src)
+
+    target = PreReservedTupleOrList(type(targetPtr).ElementType)(ct)
+
+    ix = 0
+    for item in src:
+        if not InitializeRef()(item, target._getItemUnsafe(ix)):
+            return False
+        ix += 1
+        target.setSizeUnsafe(ix)
+
+    targetPtr.initialize(target)
+
+    return True
+
+
 def concatenate_tuple_or_list(l, r):
     result = PreReservedTupleOrList(type(l))(len(l) + len(r))
 
@@ -346,6 +389,35 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             return res
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
+
+    def _can_convert_from_type(self, otherType, explicit):
+        if explicit and isinstance(otherType, TupleOrListOfWrapper):
+            sourceEltType = typeWrapper(otherType.typeRepresentation.ElementType)
+            destEltType = typeWrapper(self.typeRepresentation.ElementType)
+
+            return sourceEltType.can_convert_to_type(destEltType, True)
+
+        return super()._can_convert_from_type(otherType, explicit)
+
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
+        if explicit and isinstance(targetVal.expr_type, TupleOrListOfWrapper):
+            canConvert = self._can_convert_from_type(sourceVal.expr_type, True)
+
+            if canConvert is False:
+                return context.constant(False)
+
+            res = context.call_py_function(
+                initialize_tuple_or_list_from_other,
+                (targetVal.asPointer(), sourceVal),
+                {}
+            )
+
+            if canConvert is True:
+                return context.constant(True)
+
+            return res
+
+        return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
 
     def convert_type_call_on_container_expression(self, context, typeInst, argExpr):
         if not (argExpr.matches.Tuple or argExpr.matches.List):
