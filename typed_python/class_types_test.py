@@ -20,7 +20,7 @@ from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
     Int16, UInt64, Float32, ListOf, TupleOf, OneOf, NamedTuple, Class, Alternative,
-    ConstDict, PointerTo, Member, _types, Forward, Final, Function
+    ConstDict, PointerTo, Member, _types, Forward, Final, Function, Entrypoint
 )
 
 
@@ -1443,3 +1443,22 @@ class NativeClassTypesTests(unittest.TestCase):
                 C() ^ v
             with self.assertRaises(TypeError):
                 C() | v
+
+    def test_class_assign_coerces(self):
+        class C(Class, Final):
+            m = Member(int)
+
+            def assign(self, x: float):
+                self.m = x
+
+        aC = C()
+        aC.assign(1.5)
+        self.assertEqual(aC.m, 1)
+
+        @Entrypoint
+        def callAssign(c: C, f: float):
+            c.assign(f)
+
+        callAssign(aC, 2.5)
+
+        self.assertEqual(aC.m, 2)

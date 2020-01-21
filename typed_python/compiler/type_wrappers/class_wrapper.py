@@ -724,6 +724,10 @@ class ClassWrapper(RefcountedWrapper):
 
         attr_type = typeWrapper(self.typeRepresentation.MemberTypes[ix])
 
+        value = value.convert_to_type(attr_type)
+        if value is None:
+            return None
+
         if attr_type.is_pod:
             return context.pushEffect(
                 self.memberPtr(instance, ix).store(value.nonref_expr)
