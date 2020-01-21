@@ -184,13 +184,13 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(cons
             throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime");
         }
 
-        static PyObject* runtimeClass = PyObject_GetAttrString(runtimeModule, "Runtime");
+        PyObject* runtimeClass = PyObject_GetAttrString(runtimeModule, "Runtime");
 
         if (!runtimeClass) {
             throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime.Runtime");
         }
 
-        static PyObject* singleton = PyObject_CallMethod(runtimeClass, "singleton", "");
+        PyObject* singleton = PyObject_CallMethod(runtimeClass, "singleton", "");
 
         if (!singleton) {
             if (PyErr_Occurred()) {
