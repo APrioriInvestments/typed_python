@@ -26,6 +26,7 @@ from typed_python.compiler.type_wrappers.python_typed_function_wrapper import Py
 from typed_python import Function, NoneType, _types, Value
 
 _singleton = [None]
+_singletonLock = threading.Lock()
 
 typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
 
@@ -86,11 +87,12 @@ class PrintNewFunctionVisitor(RuntimeEventVisitor):
 class Runtime:
     @staticmethod
     def singleton():
-        if _singleton[0] is None:
-            _singleton[0] = Runtime()
+        with _singletonLock:
+            if _singleton[0] is None:
+                _singleton[0] = Runtime()
 
-        if os.getenv("TP_COMPILER_VERBOSE"):
-            _singleton[0].verboselyDisplayNativeCode()
+            if os.getenv("TP_COMPILER_VERBOSE"):
+                _singleton[0].verboselyDisplayNativeCode()
 
         return _singleton[0]
 
