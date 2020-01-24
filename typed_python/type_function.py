@@ -1,4 +1,4 @@
-#   Copyright 2019 typed_python Authors
+#   Copyright 2019-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -12,9 +12,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import threading
+
 from types import FunctionType
 from typed_python._types import Forward, ListOf, TupleOf, Dict, ConstDict
 
+_typeFunctionLock = threading.RLock()
 _type_to_typefunction = {}
 
 
@@ -84,32 +87,33 @@ class ConcreteTypeFunction(object):
         raise TypeError("Instance of type '%s' is not a valid argument to a type function" % type(arg))
 
     def __call__(self, *args, **kwargs):
-        args = tuple(self.mapArg(a) for a in args)
-        kwargs = tuple(sorted([(k, self.mapArg(v)) for k, v in kwargs.items()]))
+        with _typeFunctionLock:
+            args = tuple(self.mapArg(a) for a in args)
+            kwargs = tuple(sorted([(k, self.mapArg(v)) for k, v in kwargs.items()]))
 
-        key = (args, kwargs)
+            key = (args, kwargs)
 
-        if key in self._memoForKey:
-            return self._memoForKey[key]
+            if key in self._memoForKey:
+                return self._memoForKey[key]
 
-        forward = Forward(self.nameFor(args, kwargs))
+            forward = Forward(self.nameFor(args, kwargs))
 
-        self._memoForKey[key] = forward
-        _type_to_typefunction[forward] = (self, key)
+            self._memoForKey[key] = forward
+            _type_to_typefunction[forward] = (self, key)
 
-        try:
-            resultType = self._concreteTypeFunction(*args, **dict(kwargs))
+            try:
+                resultType = self._concreteTypeFunction(*args, **dict(kwargs))
 
-            forward.define(resultType)
+                forward.define(resultType)
 
-            self._memoForKey[key] = resultType
+                self._memoForKey[key] = resultType
 
-            _type_to_typefunction[resultType] = (self, key)
+                _type_to_typefunction[resultType] = (self, key)
 
-            return resultType
-        except Exception as e:
-            self._memoForKey[key] = e
-            raise
+                return resultType
+            except Exception as e:
+                self._memoForKey[key] = e
+                raise
 
 
 def TypeFunction(f):
