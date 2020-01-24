@@ -469,3 +469,14 @@ class TestListOfCompilation(unittest.TestCase):
         for _ in range(100):
             with self.assertRaisesRegex(TypeError, "not str"):
                 convertTo(TupleOf(float)([1.5, 2.5, "3.5"]), ListOf(OneOf(int, str)))
+
+    def test_pop_behind_if(self):
+        @Entrypoint
+        def f(aList):
+            if aList[-1] < 0:
+                aList.pop()
+
+            return aList
+
+        self.assertEqual(f(ListOf(int)((0,))), [0])
+        self.assertEqual(f(ListOf(int)((-1,))), [])

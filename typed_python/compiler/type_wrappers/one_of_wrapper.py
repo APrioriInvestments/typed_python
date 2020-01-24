@@ -222,12 +222,14 @@ class OneOfWrapper(Wrapper):
                     concreteChild = self.refAs(context, expr, ix)
 
                     converted = concreteChild.expr_type.convert_to_type_with_target(context, concreteChild, targetVal, explicit)
-                    if not (converted.expr.matches.Constant and converted.expr.val.truth_value()):
-                        allSucceed = False
 
-                    context.pushEffect(
-                        isInitialized.expr.store(converted.nonref_expr)
-                    )
+                    if converted is not None:
+                        if not (converted.expr.matches.Constant and converted.expr.val.truth_value()):
+                            allSucceed = False
+
+                        context.pushEffect(
+                            isInitialized.expr.store(converted.nonref_expr)
+                        )
 
         if allSucceed:
             return context.constant(True)

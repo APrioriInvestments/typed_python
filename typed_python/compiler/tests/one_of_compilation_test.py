@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import OneOf, TupleOf, Forward, ConstDict, Class, Final, Member, ListOf, Compiled
+from typed_python import OneOf, TupleOf, Forward, ConstDict, Class, Final, Member, ListOf, Compiled, Entrypoint
 from typed_python import Value as ValueType
 import typed_python._types as _types
 import unittest
@@ -300,3 +300,13 @@ class TestOneOfOfCompilation(unittest.TestCase):
 
         for thing in [0, 0.0, 1, 1.5]:
             self.assertEqual(f(thing), fComp(thing))
+
+    def test_len_of_none_or_listof(self):
+        @Entrypoint
+        def iterate(x: OneOf(None, ListOf(int))):
+            res = ListOf(int)()
+            for i in range(len(x)):
+                res.append(x[i])
+            return res
+
+        self.assertEqual(iterate(ListOf(int)([1, 2, 3])), [1, 2, 3])
