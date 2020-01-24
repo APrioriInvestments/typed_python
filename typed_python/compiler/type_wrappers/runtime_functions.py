@@ -31,7 +31,7 @@ Float32 = native_ast.Float32
 Void = native_ast.Void
 
 
-def externalCallTarget(name, output, *inputs, varargs=False):
+def externalCallTarget(name, output, *inputs, varargs=False, intrinsic=False):
     return native_ast.CallTarget.Named(
         target=native_ast.NamedCallTarget(
             name=name,
@@ -39,7 +39,7 @@ def externalCallTarget(name, output, *inputs, varargs=False):
             output_type=output,
             external=True,
             varargs=varargs,
-            intrinsic=False,
+            intrinsic=intrinsic,
             can_throw=False
         )
     )
@@ -97,6 +97,19 @@ malloc = externalCallTarget("malloc", UInt8Ptr, Int64)
 realloc = externalCallTarget("realloc", UInt8Ptr, UInt8Ptr, Int64)
 memcpy = externalCallTarget("memcpy", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 memmove = externalCallTarget("memmove", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
+
+log32 = externalCallTarget("llvm.log.f32", Float32, Float32, intrinsic=True)
+log64 = externalCallTarget("llvm.log.f64", Float64, Float64, intrinsic=True)
+
+exp32 = externalCallTarget("llvm.exp.f32", Float32, Float32, intrinsic=True)
+exp64 = externalCallTarget("llvm.exp.f64", Float64, Float64, intrinsic=True)
+
+cos32 = externalCallTarget("llvm.cos.f32", Float32, Float32, intrinsic=True)
+cos64 = externalCallTarget("llvm.cos.f64", Float64, Float64, intrinsic=True)
+
+sin32 = externalCallTarget("llvm.sin.f32", Float32, Float32, intrinsic=True)
+sin64 = externalCallTarget("llvm.sin.f64", Float64, Float64, intrinsic=True)
+
 
 initialize_exception = externalCallTarget(
     "np_initialize_exception",

@@ -18,7 +18,7 @@ import time
 import numpy
 
 from typed_python import (
-    Float32, UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8
+    Float32, UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8, Float64
 )
 
 from typed_python import Entrypoint
@@ -83,3 +83,28 @@ class TestMathFunctionsCompilation(unittest.TestCase):
 
         # I get about .9x, so we're a little slower than numpy but not much
         print("speedup vs numpy is", speedupVsNumpy)
+
+    def test_math_log_sin_exp_float(self):
+        def callcos(x):
+            return math.cos(x)
+
+        def callsin(x):
+            return math.sin(x)
+
+        def calllog(x):
+            return math.log(x)
+
+        def callexp(x):
+            return math.exp(x)
+
+        for mathFun in [callcos, callsin, calllog, callexp]:
+            compiled = Entrypoint(mathFun)
+
+            self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, Float64)
+            self.assertEqual(compiled.resultTypeFor(Float32).typeRepresentation, Float32)
+
+            self.assertEqual(compiled(1.0), mathFun(1.0))
+            self.assertIsInstance(compiled(1.0), float)
+
+            self.assertLess(abs(float(compiled(Float32(1.0))) - mathFun(1.0)), 1e-6)
+            self.assertIsInstance(compiled(Float32(1.0)), Float32)
