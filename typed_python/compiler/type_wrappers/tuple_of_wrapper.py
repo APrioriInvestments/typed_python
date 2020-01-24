@@ -400,7 +400,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         return super()._can_convert_from_type(otherType, explicit)
 
     def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
-        if explicit and isinstance(targetVal.expr_type, TupleOrListOfWrapper):
+        if explicit and isinstance(sourceVal.expr_type, TupleOrListOfWrapper):
             canConvert = self._can_convert_from_type(sourceVal.expr_type, True)
 
             if canConvert is False:
