@@ -413,7 +413,11 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
     serializePythonObject((PyObject*)o->ob_type, b, 0);
     PyObjectStealer objDict(PyObject_GenericGetDict(o, nullptr));
     if (!objDict) {
-        throw std::runtime_error(std::string("Object of type ") + o->ob_type->tp_name + " had no dict.");
+        PyErr_Format(PyExc_TypeError,
+            "Object %S (of type %S) had no dict", o, o->ob_type
+        );
+
+        throw PythonExceptionSet();
     }
     serializePythonObject(objDict, b, 1);
     b.writeEndCompound();

@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python._types import serialize, deserialize
+from typed_python._types import serialize, deserialize, Type
 from typed_python.python_ast import convertFunctionToAlgebraicPyAst, evaluateFunctionPyAst, Expr, Statement
 from typed_python.hash import sha_hash
 from typed_python.type_function import ConcreteTypeFunction, isTypeFunctionType, reconstructTypeFunctionType
@@ -223,6 +223,19 @@ class SerializationContext(object):
             if isTF is not None:
                 return (reconstructTypeFunctionType, isTF, None)
 
+            if not issubclass(inst, Type):
+                # this is a regular class
+                classMembers = {}
+
+                for name, memb in inst.__dict__.items():
+                    getset_descriptor = type(type.__dict__['__doc__'])
+                    wrapper_descriptor = type(object.__repr__)
+
+                    if name != "__dict__" and not isinstance(memb, (wrapper_descriptor, getset_descriptor)):
+                        classMembers[name] = memb
+
+                return (type, (inst.__name__, inst.__bases__, {}), classMembers)
+
         if isinstance(inst, numpy.ndarray):
             return inst.__reduce__()
 
@@ -295,9 +308,6 @@ class SerializationContext(object):
         if isinstance(instance, datetime.tzinfo):
             return True
 
-        if isinstance(instance, type):
-            return True
-
         if isinstance(instance, numpy.dtype):
             return True
 
@@ -313,6 +323,12 @@ class SerializationContext(object):
             instance.__name__ = representation['name']
             instance.__qualname__ = representation['qualname']
 
+            return True
+
+        if isinstance(instance, type):
+            if representation is not None:
+                for k, v in representation.items():
+                    setattr(instance, k, v)
             return True
 
         return False

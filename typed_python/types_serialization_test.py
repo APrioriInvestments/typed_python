@@ -1191,3 +1191,22 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(t2.x, t.x)
         self.assertEqual(t2.y, t.x)
+
+    def test_serialize_untyped_classes(self):
+        sc = SerializationContext({})
+
+        class B(object):
+            def __init__(self, x):
+                self.x = x
+
+            def g(self):
+                return self.x
+
+        class C(B):
+            def f(self):
+                return self.x + 10
+
+        C2 = sc.deserialize(sc.serialize(C))
+
+        self.assertEqual(C2(20).f(), 30)
+        self.assertEqual(C2(20).g(), 20)
