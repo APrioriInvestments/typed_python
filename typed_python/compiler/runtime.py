@@ -180,11 +180,11 @@ class Runtime:
 
         return resType
 
-    def compileFunctionOverload(self, typedFunc, overloadIx, arguments, argumentsAreTypes=False):
+    def compileFunctionOverload(self, functionType, overloadIx, arguments, argumentsAreTypes=False):
         """Attempt to compile typedFunc.overloads[overloadIx]' with the given arguments.
 
         Args:
-            typedFunc - a typed_python.Function instance
+            functionType - a typed_python.Function _type_
             overloadIx - an integer giving the index of the overload we're interested in
             arguments - a list of values (or types if 'argumentsAreTypes') for each of the
                 named function arguments contained in the overload
@@ -195,13 +195,21 @@ class Runtime:
             None if it is not possible to match this overload with these arguments or
             a TypedCallTarget.
         """
-
-        overload = typedFunc.overloads[overloadIx]
+        overload = functionType.overloads[overloadIx]
 
         assert len(arguments) == len(overload.args)
 
         with self.lock:
             inputWrappers = []
+
+            closureType = functionType.ClosureType
+
+            for closureVarName, closureVarPath in overload.closureVarLookups.items():
+                inputWrappers.append(
+                    typeWrapper(
+                        PythonTypedFunctionWrapper.closurePathToCellType(closureVarPath, closureType)
+                    )
+                )
 
             for i in range(len(arguments)):
                 inputWrappers.append(
@@ -214,7 +222,14 @@ class Runtime:
 
             self.timesCompiled += 1
 
-            callTarget = self.converter.convert(overload.functionObj, inputWrappers, overload.returnType, assertIsRoot=True)
+            callTarget = self.converter.convert(
+                overload.name,
+                overload.functionCode,
+                overload.functionGlobals,
+                inputWrappers,
+                overload.returnType,
+                assertIsRoot=True
+            )
 
             callTarget = self.converter.demasqueradeCallTargetOutput(callTarget)
 
@@ -252,6 +267,10 @@ class Runtime:
             throws an exception) or a Wrapper object describing the return types.
         """
         assert isinstance(funcObj, typed_python._types.Function)
+
+        # walk over the closure of funcObj and figure out the appropriate types
+        # of each cell.
+        funcObj = _types.prepareArgumentToBePassedToCompiler(funcObj)
 
         argTypes = [typeWrapper(a) for a in argTypes]
         kwargTypes = {k: typeWrapper(v) for k, v in kwargTypes.items()}
@@ -322,7 +341,12 @@ def Entrypoint(pyFunc):
 
 def Compiled(pyFunc):
     """Compile a pyFunc, which must have a type annotation for all arguments"""
-    f = Entrypoint(pyFunc)
+
+    # note that we have to call 'prepareArgumentToBePassedToCompiler' which
+    # captures the current closure of 'pyFunc' as it currently stands, since 'Compiled'
+    # is supposed to compile the function _as it currently stands_.
+
+    f = _types.prepareArgumentToBePassedToCompiler(Entrypoint(pyFunc))
     types = []
     for a in f.overloads[0].args:
         if a.typeFilter is None:

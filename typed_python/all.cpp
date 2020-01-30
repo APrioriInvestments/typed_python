@@ -57,5 +57,6 @@ compile the entire group all at once.
 #include "StringType.cpp"
 #include "TupleOrListOfType.cpp"
 #include "Type.cpp"
+#include "FunctionType.cpp"
 
 #include "SerializationBuffer.cpp"

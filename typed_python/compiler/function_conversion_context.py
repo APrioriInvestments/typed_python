@@ -17,20 +17,29 @@ import typed_python.python_ast as python_ast
 from typed_python.compiler.python_ast_analysis import (
     computeAssignedVariables,
     computeReadVariables,
-    computeFunctionArgVariables
+    computeFunctionArgVariables,
+    computeVariablesAssignedOnlyOnce,
+    computeVariablesReadByClosures,
+    extractFunctionDefs
 )
+from typed_python.internals import makeFunctionType
 
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
+from typed_python import _types, Type
 from typed_python.compiler.expression_conversion_context import ExpressionConversionContext
 from typed_python.compiler.function_stack_state import FunctionStackState
 from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
 from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
-from typed_python import OneOf
+from typed_python import OneOf, Function, Tuple, Forward, Class
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+# storage for mutually recursive function types
+_closureCycleMemo = {}
 
 
 class FunctionOutput:
@@ -40,7 +49,7 @@ class FunctionOutput:
 class FunctionConversionContext(object):
     """Helper function for converting a single python function given some input and output types"""
 
-    def __init__(self, converter, name, identity, ast_arg, statements, input_types, output_type, free_variable_lookup):
+    def __init__(self, converter, name, identity, ast_arg, statements, input_types, output_type, closureVarnames, globalVars):
         """Initialize a FunctionConverter
 
         Args:
@@ -51,13 +60,62 @@ class FunctionConversionContext(object):
             statements - a list of python_ast.Statement objects making up the body of the function
             input_types - a list of the input types actually passed to us
             output_type - the output type (if proscribed), or None
-            free_variable_lookup - a dict from name to the actual python object in this
-                function's closure. We don't distinguish between local and global scope yet.
+            closureVarnames - names of the variables in this function's closure
+            globalVars - a dict from name to the actual python object in the globals for this function
         """
         self.name = name
         self.variablesAssigned = computeAssignedVariables(statements)
         self.variablesRead = computeReadVariables(statements)
-        self.variablesBound = computeFunctionArgVariables(ast_arg)
+        self.variablesBound = computeFunctionArgVariables(ast_arg) | set(closureVarnames)
+
+        # the set of variables that are captured in closures in this function.
+        # this includes recursive functions, which will not be in the closure itself
+        # since they get bound in the closure varnames.
+        self.variablesReadByClosures = computeVariablesReadByClosures(statements)
+
+        # the set of variables that have exactly one definition. If these are 'deffed'
+        # functions, we don't have to worry about them changing type and so they can be
+        # bound to the closure directly (in which case we don't even assign them to slots)
+        self.variablesAssignedOnlyOnce = computeVariablesAssignedOnlyOnce(statements)
+
+        functionDefs, assignedLambdas, freeLambdas = extractFunctionDefs(statements)
+
+        # the list of 'def' statements and 'Lambda' expressions. each one engenders a function type.
+        self.functionDefs = functionDefs + freeLambdas
+
+        # all 'def' operations that are assigned exactly once. These defs are special
+        # because we just assume that the binding is active without even evaluating the
+        # def. Other bindings (lambdas, etc), require us to track slots for the closure itself
+        self.functionDefsAssignedOnce = {
+            fd.name: fd for fd in functionDefs if fd.name in self.variablesAssignedOnlyOnce
+        }
+
+        # add any lambdas that get assigned exactly once.
+        for name, lambdaFunc in assignedLambdas:
+            if name in self.variablesAssignedOnlyOnce:
+                self.functionDefsAssignedOnce[name] = lambdaFunc
+
+        # the current _type_ that we're using for this def,
+        self.functionDefToType = {}
+
+        # variables in closure slots that are not single-assignment function defs need slots
+        self.variablesNeedingClosureSlots = set([
+            c for c in self.variablesReadByClosures
+            if c not in self.functionDefsAssignedOnce
+        ])
+
+        # for all typed functions we have ever defined, the original untyped function.
+        # This grows with each pass and is there to help us when we're walking types
+        # looking for our own closures to replace.
+        self.typedFunctionTypeToClosurelessFunctionType = {}
+
+        # bidirectional map between the 'def' and the resulting function object
+        self.functionDefToClosurelessFunctionTypeCache = {}
+        self.closurelessFunctionTypeToDef = {}
+
+        # if we assign a closure, the type of it. Initially None because we have to fill it
+        # out with something...
+        self.closureType = None
 
         self.converter = converter
         self.identity = identity
@@ -68,7 +126,8 @@ class FunctionConversionContext(object):
         self._output_type = output_type
         self._argumentsWithoutStackslots = set()  # arguments that we don't bother to copy into the stack
         self._varname_to_type = {}
-        self._free_variable_lookup = free_variable_lookup
+        self._globals = globalVars
+        self._closureVarnames = closureVarnames
 
         self.tempLetVarIx = 0
         self._tempStackVarIx = 0
@@ -86,9 +145,29 @@ class FunctionConversionContext(object):
     def isLocalVariable(self, name):
         return name in self.variablesBound or name in self.variablesAssigned
 
+    def isClosureVariable(self, name):
+        return name in self._closureVarnames
+
+    def shouldReadAndWriteVariableFromClosure(self, varname):
+        return varname in self.variablesReadByClosures
+
     def localVariableExpression(self, context: ExpressionConversionContext, name):
         """Return an TypedExpression reference for the local variable given by  'name'"""
-        slot_type = self._varname_to_type[name]
+        if name in self.functionDefsAssignedOnce:
+            return self.localVariableExpression(context, ".closure").changeType(
+                self.functionDefToType[self.functionDefsAssignedOnce[name]]
+            )
+
+        if self.shouldReadAndWriteVariableFromClosure(name):
+            return (
+                self.localVariableExpression(context, ".closure")
+                .convert_attribute(name, nocheck=True)
+            )
+
+        if name == ".closure":
+            slot_type = typeWrapper(self.closureType)
+        else:
+            slot_type = self._varname_to_type[name]
 
         return TypedExpression(
             context,
@@ -116,6 +195,10 @@ class FunctionConversionContext(object):
         if name in self._argumentsWithoutStackslots:
             return False
 
+        if name in self.variablesReadByClosures:
+            # destroying the closure itself will handle this
+            return False
+
         varType = self._varname_to_type.get(name)
 
         if varType is None or varType.is_empty or varType.is_pod:
@@ -123,12 +206,162 @@ class FunctionConversionContext(object):
 
         return True
 
+    def closurePathToName(self, name):
+        if name in self.functionDefsAssignedOnce:
+            # this is another function in the closure. We want to just bind it directly
+            # to our closure
+            return [self.functionDefToType[self.functionDefsAssignedOnce[name]]]
+
+        return [name]
+
+    def computeTypeForFunctionDef(self, ast):
+        untypedFuncType = self.functionDefToClosurelessFunction(ast)
+
+        typedFuncType = untypedFuncType.withClosureType(self.closureType)
+        typedFuncType = typedFuncType.withOverloadVariableBindings(
+            0,
+            {name: self.closurePathToName(name)
+             for name in untypedFuncType.overloads[0].closureVarLookups}
+        )
+
+        return untypedFuncType, typedFuncType
+
+    def currentClosureLookupKey(self):
+        usedTypes = {}
+        for var in self.variablesNeedingClosureSlots:
+            if var in self._varname_to_type:
+                usedTypes[var] = self.stripClosureTypes(self._varname_to_type[var].typeRepresentation)
+
+        return (self.identity, tuple(sorted(usedTypes.items())))
+
+    def stripClosureTypes(self, nativeType):
+        res = self.replaceClosureTypeWith(nativeType, wantsCurrentClosure=False)
+        if res is None:
+            return nativeType
+        return res
+
+    def replaceClosureTypesIn(self, nativeType):
+        res = self.replaceClosureTypeWith(nativeType, wantsCurrentClosure=True)
+        if res is None:
+            return nativeType
+        return res
+
+    def replaceClosureTypeWith(self, nativeType, wantsCurrentClosure):
+        """Return 'nativeType' stripped of any references to our closure, or None if unchanged."""
+        assert isinstance(nativeType, type) and issubclass(nativeType, Type), (nativeType, type(nativeType))
+
+        if nativeType in self.typedFunctionTypeToClosurelessFunctionType:
+            untypedFuncType = self.typedFunctionTypeToClosurelessFunctionType[nativeType]
+
+            if not wantsCurrentClosure:
+                return untypedFuncType
+
+            origDef = self.closurelessFunctionTypeToDef[untypedFuncType]
+
+            resType = self.functionDefToType[origDef]
+
+            if resType == nativeType:
+                return None
+
+            return resType
+
+        # this is a deliberately simple implementation - not good enough at all.
+        # we're ignoring tuples, named tuples, etc, all of which we'll need to be
+        # able to handle, including recursively defined forwards, eventually.
+        # for now, oneof is good enough. you have to write some weird stuff where
+        # you put mutually recursive functions into objects to break this.
+        if issubclass(nativeType, OneOf):
+            elts = []
+            anyDifferent = False
+
+            for e in nativeType.Types:
+                elts.append(self.replaceClosureTypeWith(e, wantsCurrentClosure))
+                if elts[-1] is None:
+                    elts[-1] = e
+                else:
+                    anyDifferent = True
+
+            if anyDifferent:
+                return OneOf(*elts)
+
+        return None
+
+    def buildClosureTypes(self):
+        """Determine the type of the closure we'll build, plus any recursive function definitions.
+
+        We rely on passing over the function multiple times to build up the information about each
+        closure we need to generate. On the final pass, this set of types will be stable and we can
+        generate an appropriate closure.
+        """
+        closureKey = self.currentClosureLookupKey()
+
+        if closureKey in _closureCycleMemo:
+            self.closureType, self.functionDefToType = _closureCycleMemo[closureKey]
+            return
+
+        # we need to build a closure type.
+        if not self.variablesNeedingClosureSlots:
+            # we don't need any slots at all
+            self.closureType = Tuple()
+        else:
+            self.closureType = Forward(self.name + ".closure")
+
+        self.functionDefToType = {
+            fd: Forward(fd.name if fd.matches.FunctionDef else "<lambda>")
+            for fd in self.functionDefs
+        }
+
+        # walk over the function defs and actually build them
+        for ast in self.functionDefs:
+            untypedFuncType, typedFuncType = self.computeTypeForFunctionDef(ast)
+
+            self.functionDefToType[ast] = self.functionDefToType[ast].define(typedFuncType)
+            self.typedFunctionTypeToClosurelessFunctionType[typedFuncType] = untypedFuncType
+
+        if self.variablesNeedingClosureSlots:
+            # now build the closure type itself and replace the forward with the defined class
+            closureMembers = []
+
+            replacedVarTypes = {}
+
+            for var in sorted(self.variablesNeedingClosureSlots):
+                if var in self._varname_to_type:
+                    replacedVarTypes[var] = self.replaceClosureTypesIn(
+                        self._varname_to_type[var].typeRepresentation
+                    )
+
+                    closureMembers.append((var, replacedVarTypes[var], None))
+
+            memberFunctions = {
+                '__init__':
+                makeFunctionType('__init__', lambda self: None, isMethod=True, assumeClosuresGlobal=True)
+            }
+
+            self.closureType = self.closureType.define(
+                _types.Class(self.name + ".closure", (), True, tuple(closureMembers), tuple(memberFunctions.items()), (), (), ())
+            )
+
+            assert not _types.is_default_constructible(self.closureType)
+
+            # now rebuild each of our var types. we have to do this after
+            # setting 'closureType' because otherwise we'll end up with undefined
+            # forwards floating around.
+            for var in self._varname_to_type:
+                if var in replacedVarTypes:
+                    self._varname_to_type[var] = typeWrapper(replacedVarTypes[var])
+                elif isinstance(self._varname_to_type[var], type):
+                    self._varname_to_type[var] = typeWrapper(self.replaceClosureTypesIn(self._varname_to_type[var].typeRepresentation))
+
+        _closureCycleMemo[closureKey] = (self.closureType, dict(self.functionDefToType))
+
     def convertToNativeFunction(self):
         self.tempLetVarIx = 0
         self._tempStackVarIx = 0
         self._tempIterVarIx = 0
 
         variableStates = FunctionStackState()
+
+        self.buildClosureTypes()
 
         initializer_expr = self.initializeVariableStates(self._argnames, variableStates)
 
@@ -184,13 +417,18 @@ class FunctionConversionContext(object):
     def _constructInitialVarnameToType(self):
         input_types = self._input_types
 
-        if len(input_types) != self._ast_arg.totalArgCount():
-            raise ConversionException(
-                "Expected at least %s arguments but got %s" %
-                (len(self._ast_arg.args), len(input_types))
-            )
+        self._argnames = list(self._closureVarnames) + list(self._ast_arg.argumentNames())
 
-        self._argnames = self._ast_arg.argumentNames()
+        if len(input_types) != self._ast_arg.totalArgCount() + len(self._closureVarnames):
+            raise ConversionException(
+                "%s expected at least %s arguments but got %s. Expected argnames are %s. Input types are %s" %
+                (
+                    self.name,
+                    self._ast_arg.totalArgCount() + len(self._closureVarnames),
+                    len(input_types),
+                    self._argnames, input_types
+                )
+            )
 
         self._native_args = []
         for i, argName in enumerate(self._argnames):
@@ -273,8 +511,32 @@ class FunctionConversionContext(object):
 
         self._varname_to_type[varname] = typeWrapper(final_type)
 
+    def closureDestructor(self, variableStates):
+        if not issubclass(self.closureType, Class):
+            return []
+
+        context = ExpressionConversionContext(self, variableStates)
+
+        closure = self.localVariableExpression(context, ".closure")
+        closure.convert_destroy()
+
+        return [context.finalize(None)]
+
+    def closureInitializer(self, variableStates):
+        if not issubclass(self.closureType, Class):
+            return []
+
+        context = ExpressionConversionContext(self, variableStates)
+
+        self.localVariableExpression(context, ".closure").convert_default_initialize(force=True)
+
+        return [context.finalize(None)]
+
     def initializeVariableStates(self, argnames, variableStates):
-        to_add = []
+        to_add = self.closureInitializer(variableStates)
+
+        # reset this
+        self._argumentsWithoutStackslots = set()
 
         # first, mark every variable that we plan on assigning to as not initialized.
         for name in self.variablesAssigned:
@@ -304,7 +566,7 @@ class FunctionConversionContext(object):
 
                     if slot_type.is_empty:
                         pass
-                    elif name in self.variablesBound and name not in self.variablesAssigned:
+                    elif name in self.variablesBound and name not in self.variablesAssigned and name not in self.variablesReadByClosures:
                         # this variable is bound but never assigned, so we don't need to
                         # generate a stackslot. We can just read it directly from our arguments
                         self._argumentsWithoutStackslots.add(name)
@@ -312,10 +574,7 @@ class FunctionConversionContext(object):
                         # we can just copy this into the stackslot directly. no destructor needed
                         context.pushEffect(
                             native_ast.Expression.Store(
-                                ptr=native_ast.Expression.StackSlot(
-                                    name=name,
-                                    type=slot_type.getNativeLayoutType()
-                                ),
+                                ptr=self.localVariableExpression(context, name).expr,
                                 val=(
                                     native_ast.Expression.Variable(name=name) if not slot_type.is_pass_by_ref else
                                     native_ast.Expression.Variable(name=name).load()
@@ -355,7 +614,28 @@ class FunctionConversionContext(object):
                     )
                 )
 
+        for expr in self.closureDestructor(variableStates):
+            destructors.append(
+                native_ast.Teardown.Always(
+                    expr=expr
+                )
+            )
+
         return destructors
+
+    def isInitializedVarExpr(self, context, name):
+        if self.variableIsAlwaysEmpty(name):
+            return context.constant(True)
+
+        return TypedExpression(
+            context,
+            native_ast.Expression.StackSlot(
+                name=name + ".isInitialized",
+                type=native_ast.Bool
+            ),
+            bool,
+            isReference=True
+        )
 
     def assignToLocalVariable(self, varname, val_to_store, variableStates):
         """Ensure we have appropriate storage allocated for 'varname', and assign 'val_to_store' to it."""
@@ -377,9 +657,21 @@ class FunctionConversionContext(object):
 
         self.upsizeVariableType(varname, val_to_store.expr_type)
 
+        # we should already be filtering this out at the expression level
+        assert varname not in self.functionDefsAssignedOnce
+
+        if self.shouldReadAndWriteVariableFromClosure(varname):
+            self.localVariableExpression(subcontext, ".closure").convert_set_attribute(varname, val_to_store)
+            subcontext.markVariableInitialized(varname)
+            return
+
         assignedType = val_to_store.expr_type.typeRepresentation
 
         slot_ref = self.localVariableExpression(subcontext, varname)
+
+        if slot_ref is None:
+            # this happens if the variable has never been assigned
+            return
 
         # convert the value to the target type now that we've upsized it
         val_to_store = val_to_store.convert_to_type(slot_ref.expr_type)
@@ -592,6 +884,15 @@ class FunctionConversionContext(object):
             return subcontext.finalize(None, exceptionsTakeFrom=ast), succeeds
 
         if ast.matches.Assign:
+            if (
+                len(ast.targets) == 1
+                and ast.targets[0].matches.Name
+                and ast.value.matches.Lambda
+                and ast.targets[0].id in self.variablesAssignedOnlyOnce
+            ):
+                # this is like a 'def'
+                return native_ast.Expression(), True
+
             subcontext = ExpressionConversionContext(self, variableStates)
 
             val_to_store = subcontext.convert_expression_ast(ast.value)
@@ -936,14 +1237,56 @@ class FunctionConversionContext(object):
 
             return expr_context.finalize(None, exceptionsTakeFrom=ast), not definitelyFails
 
+        if ast.matches.FunctionDef:
+            if ast.name in self.functionDefsAssignedOnce:
+                # this is a no-op. for performance reasons, we assume that the function
+                # is valid (and are OK with not throwing an exception even though
+                # that's a deviation from normal python), because otherwise we would
+                # have to be checking in a slot every time we want to access this function
+                return native_ast.nullExpr, True
+
+            context = ExpressionConversionContext(self, variableStates)
+
+            res = self.localVariableExpression(context, ".closure").changeType(
+                self.functionDefToType[ast]
+            )
+
+            self.assignToLocalVariable(ast.name, res, variableStates)
+
+            return context.finalize(None, exceptionsTakeFrom=ast), True
+
         raise ConversionException("Can't handle python ast Statement.%s" % ast.Name)
+
+    def functionDefToClosurelessFunction(self, ast):
+        # parse the code into a function object with no closure.
+        if ast not in self.functionDefToClosurelessFunctionTypeCache:
+            untypedFunction = python_ast.evaluateFunctionDefWithLocalsInCells(
+                ast,
+                globals=self._globals,
+                locals={name: None for name in (self.variablesBound | self.variablesAssigned)}
+            )
+
+            tpFunction = Function(untypedFunction)
+
+            self.functionDefToClosurelessFunctionTypeCache[ast] = type(tpFunction)
+            self.closurelessFunctionTypeToDef[type(tpFunction)] = ast
+
+            for varname in tpFunction.overloads[0].closureVarLookups:
+                assert varname in self.variablesReadByClosures
+
+            self.converter._code_to_ast_cache[untypedFunction.__code__] = ast
+
+        # this function object has a totally bogus closure - it will just have 'None'
+        # for each variable it references. We'll need to replace the closure variable binding
+        # rules and have it extract its closure
+        return self.functionDefToClosurelessFunctionTypeCache[ast]
 
     def freeVariableLookup(self, name):
         if self.isLocalVariable(name):
             return None
 
-        if name in self._free_variable_lookup:
-            return self._free_variable_lookup[name]
+        if name in self._globals:
+            return self._globals[name]
 
         if name in __builtins__:
             return __builtins__[name]

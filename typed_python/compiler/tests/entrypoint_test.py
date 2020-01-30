@@ -14,7 +14,7 @@
 
 from typed_python import ListOf, Class, Member, Final, TupleOf, DisableCompiledCode, Int64, isCompiled
 from typed_python._types import touchCompiledSpecializations
-from typed_python import Entrypoint, NotCompiled, Function
+from typed_python import Entrypoint, NotCompiled
 from typed_python.compiler.runtime import Runtime, RuntimeEventVisitor
 from flaky import flaky
 import traceback
@@ -287,16 +287,6 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertTrue(.7 <= ratio <= 1.3, ratio)
 
-    def test_type_of_passed_function_object(self):
-        @Entrypoint
-        def typeOf(f):
-            return type(f)
-
-        def f(x):
-            return x
-
-        self.assertEqual(typeOf(f), Function(f))
-
     @flaky(max_runs=3, min_passes=1)
     def test_sequential_append_performance(self):
         @Entrypoint
@@ -420,8 +410,8 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         with Visitor():
             f.resultTypeFor(int)
 
-        self.assertTrue(f.overloads[0].functionObj in out, out)
-        self.assertEqual(out[f.overloads[0].functionObj][2]['y'], Int64)
+        self.assertTrue(f.overloads[0].functionCode in out, out)
+        self.assertEqual(out[f.overloads[0].functionCode][2]['y'], Int64)
 
     def test_star_args_on_entrypoint(self):
         @Entrypoint
@@ -444,7 +434,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertEqual(argCount(1), 1)
         self.assertEqual(argCount(1, 2), 3)
 
-        with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
+        with self.assertRaisesRegex(TypeError, "annot find a valid overload"):
             argCount(1, 2, "hi")
 
         self.assertEqual(argCount.resultTypeFor().typeRepresentation, Int64)

@@ -70,6 +70,7 @@ bool Class::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool 
 
             std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
                 it->second,
+                nullptr,
                 leftAsPyObj,
                 rightAsPyObj
                 );
@@ -126,6 +127,7 @@ void Class::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
 
         std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
             it->second,
+            nullptr,
             selfAsPyObj
         );
 
@@ -167,6 +169,7 @@ typed_python_hash_type Class::hash(instance_ptr left) {
 
         std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
             it->second,
+            nullptr,
             leftAsPyObj
             );
         if (res.first) {
@@ -194,21 +197,8 @@ typed_python_hash_type Class::hash(instance_ptr left) {
     return m_heldClass->hash(l.data);
 }
 
-void Class::emptyConstructor(instance_ptr self) {
-    if (!m_is_default_constructible) {
-        throw std::runtime_error(m_name + " is not default-constructible");
-    }
-
-    initializeInstance(self, (layout*)malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
-
-    layout& l = *instanceToLayout(self);
-    l.refcount = 1;
-
-    m_heldClass->emptyConstructor(l.data);
-}
-
-void Class::constructor(instance_ptr self) {
-    if (!m_is_default_constructible) {
+void Class::constructor(instance_ptr self, bool allowEmpty) {
+    if (!m_is_default_constructible and !allowEmpty) {
         throw std::runtime_error(m_name + " is not default-constructible");
     }
 

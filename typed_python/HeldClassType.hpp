@@ -490,8 +490,6 @@ public:
 
     void setAttribute(instance_ptr self, int memberIndex, instance_ptr other) const;
 
-    void emptyConstructor(instance_ptr self);
-
     //don't default construct classes
     static bool wantsToDefaultConstruct(Type* t) {
         return t->is_default_constructible() && t->getTypeCategory() != TypeCategory::catClass;

@@ -237,9 +237,7 @@ public:
         }
     }
 
-    void emptyConstructor(instance_ptr self);
-
-    void constructor(instance_ptr self);
+    void constructor(instance_ptr self, bool allowEmpty=false);
 
     void destroy(instance_ptr self);
 

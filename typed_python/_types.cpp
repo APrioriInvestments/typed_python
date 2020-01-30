@@ -74,6 +74,24 @@ PyObject *MakePointerToType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(PointerTo::Make(t)));
 }
 
+PyObject *MakeTypedCellType(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "TypedCell takes 1 positional argument.");
+        return NULL;
+    }
+
+    PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
+
+    Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "TypedCell needs a type.");
+        return NULL;
+    }
+
+    return incref((PyObject*)PyInstance::typeObj(TypedCellType::Make(t)));
+}
+
 PyObject *MakeTupleOfType(PyObject* nullValue, PyObject* args) {
     return MakeTupleOrListOfType(nullValue, args, true);
 }
@@ -225,6 +243,9 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
 }
 
 
+PyObject *MakePyCellType(PyObject* nullValue, PyObject* args) {
+    return incref((PyObject*)PyInstance::typeObj(::PyCellType::Make()));
+}
 PyObject *MakeBoolType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::Bool::Make()));
 }
@@ -439,6 +460,20 @@ PyObject *installClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObje
     });
 }
 
+PyObject *prepareArgumentToBePassedToCompiler(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {"obj", NULL};
+
+    PyObject* obj;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist, &obj)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        return PyFunctionInstance::prepareArgumentToBePassedToCompiler(obj);
+    });
+}
+
 PyObject *getDispatchIndexForType(PyObject* nullValue, PyObject* args, PyObject* kwargs)
 {
     static const char *kwlist[] = {"interfaceClass", "implementingClass", NULL};
@@ -588,7 +623,7 @@ PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 4 && PyTuple_Size(args) != 2) {
+    if (PyTuple_Size(args) != 5 && PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "Function takes 2 or 4 arguments");
         return NULL;
     }
@@ -621,6 +656,12 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
         PyObjectHolder retType(PyTuple_GetItem(args,1));
         PyObjectHolder funcObj(PyTuple_GetItem(args,2));
         PyObjectHolder argTuple(PyTuple_GetItem(args,3));
+
+        int assumeClosureGlobal = PyObject_IsTrue(PyTuple_GetItem(args,4));
+
+        if (assumeClosureGlobal == -1) {
+            return NULL;
+        }
 
         if (!PyFunction_Check(funcObj)) {
             PyErr_SetString(PyExc_TypeError, "Third arg should be a function object");
@@ -703,15 +744,84 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
 
         std::vector<Function::Overload> overloads;
 
+        std::vector<std::string> closureVarnames;
+        std::vector<Type*> closureVarTypes;
+        std::map<std::string, PyObject*> globalsInCells;
+        std::map<std::string, ClosureVariableBinding> closureBindings;
+
+        PyObject* closure = PyFunction_GetClosure(funcObj);
+
+        if (closure) {
+            PyObjectStealer coFreevars(PyObject_GetAttrString(PyFunction_GetCode(funcObj), "co_freevars"));
+
+            if (!coFreevars) {
+                return NULL;
+            }
+
+            if (!PyTuple_Check(coFreevars)) {
+                PyErr_Format(PyExc_TypeError, "f.__code__.co_freevars was not a tuple");
+                return NULL;
+            }
+
+            if (PyTuple_Size(coFreevars) != PyTuple_Size(closure)) {
+                PyErr_Format(PyExc_TypeError, "f.__code__.co_freevars had a different number of elements than the closure");
+                return NULL;
+            }
+
+            for (long ix = 0; ix < PyTuple_Size(coFreevars); ix++) {
+                PyObject* varname = PyTuple_GetItem(coFreevars, ix);
+                if (!PyUnicode_Check(varname)) {
+                    PyErr_Format(PyExc_TypeError, "f.__code__.co_freevars was not all strings");
+                    return NULL;
+                }
+                closureVarnames.push_back(std::string(PyUnicode_AsUTF8(varname)));
+            }
+
+            if (assumeClosureGlobal) {
+                for (long ix = 0; ix < PyTuple_Size(closure); ix++) {
+                    PyObject* cell = PyTuple_GetItem(closure, ix);
+                    if (!PyCell_Check(cell)) {
+                        PyErr_Format(PyExc_TypeError, "Function closure needs to all be cells.");
+                        return NULL;
+                    }
+
+                    globalsInCells[closureVarnames[ix]] = incref(cell);
+                }
+            }
+            else {
+                for (long ix = 0; ix < PyTuple_Size(closure); ix++) {
+                    closureVarTypes.push_back(PyCellType::Make());
+                    closureBindings[closureVarnames[ix]] = (
+                        ClosureVariableBinding() + 0 + ix + ClosureVariableBindingStep::AccessCell()
+                    );
+                }
+            }
+        }
+
         overloads.push_back(
             Function::Overload(
-                (PyFunctionObject*)(PyObject*)funcObj,
+                PyFunction_GetCode(funcObj),
+                PyFunction_GetGlobals(funcObj),
+                PyFunction_GetDefaults(funcObj),
+                PyFunction_GetAnnotations(funcObj),
+                globalsInCells,
+                closureVarnames,
+                closureBindings,
                 rType,
                 argList
             )
         );
 
-        resType = Function::Make(PyUnicode_AsUTF8(nameObj), overloads, false);
+        resType = Function::Make(
+            PyUnicode_AsUTF8(nameObj),
+            overloads,
+            Tuple::Make({
+                assumeClosureGlobal ?
+                    NamedTuple::Make({}, {}) :
+                    NamedTuple::Make(closureVarTypes, closureVarnames)
+                }),
+            false
+        );
     }
 
     return incref((PyObject*)PyInstance::typeObj(resType));
@@ -1681,7 +1791,8 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
         std::string fieldName(PyUnicode_AsUTF8(key));
 
         if (PyFunction_Check(value)) {
-            functions[fieldName] = PyFunctionInstance::convertPythonObjectToFunction(key, value);
+            functions[fieldName] = PyFunctionInstance::convertPythonObjectToFunctionType(key, value, true, false);
+
             if (functions[fieldName] == nullptr) {
                 //error code is already set
                 return nullptr;
@@ -1717,7 +1828,7 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
 
     return incref((PyObject*)PyInstance::typeObj(
         ::Alternative::Make(name, definitions, functions)
-        ));
+    ));
 }
 
 PyObject *getTypePointer(PyObject* nullValue, PyObject* args) {
@@ -1764,6 +1875,7 @@ static PyMethodDef module_methods[] = {
     {"installClassDestructor", (PyCFunction)installClassDestructor, METH_VARARGS | METH_KEYWORDS, NULL},
     {"classGetDispatchIndex", (PyCFunction)classGetDispatchIndex, METH_VARARGS | METH_KEYWORDS, NULL},
     {"getDispatchIndexForType", (PyCFunction)getDispatchIndexForType, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"prepareArgumentToBePassedToCompiler", (PyCFunction)prepareArgumentToBePassedToCompiler, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 
@@ -1829,6 +1941,8 @@ PyInit__types(void)
     PyModule_AddObject(module, "Function", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catFunction)));
     PyModule_AddObject(module, "BoundMethod", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catBoundMethod)));
     PyModule_AddObject(module, "EmbeddedMessage", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catEmbeddedMessage)));
+    PyModule_AddObject(module, "TypedCell", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catTypedCell)));
+    PyModule_AddObject(module, "PyCell", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPyCell)));
     PyModule_AddObject(module, "PythonObjectOfType", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPythonObjectOfType)));
 
 

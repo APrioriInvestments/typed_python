@@ -47,6 +47,16 @@ public:
 
     bool _updateAfterForwardTypesChanged();
 
+    bool isPODConcrete() {
+        for (auto t: m_types) {
+            if (!t->isPOD()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     std::string computeName() const;
 
     template<class buf_t>

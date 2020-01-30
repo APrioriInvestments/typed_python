@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from types import FunctionType
+from types import FunctionType, ModuleType
 
 import _thread
 import threading
@@ -28,6 +28,11 @@ _nonTypesAcceptedAsTypes = {
     threading.Lock: _thread.LockType,
     threading.RLock: _thread.RLock,
 }
+
+
+class CellAccess:
+    "A singleton object for use in ClosureVariableBinding representation"
+    pass
 
 
 class UndefinedBehaviorException(BaseException):
@@ -51,6 +56,14 @@ class Final:
     we don't have to look up method dispatch in the vtable.
     """
     pass
+
+
+def closurePassingType(x):
+    """Determine the type we'll use to represent 'x' in a closure."""
+    if isinstance(x, (type, ModuleType, FunctionType)):
+        return typed_python.Value(x)
+
+    return type(x)
 
 
 class Member:
@@ -114,8 +127,14 @@ magicMethodTypes = {
 }
 
 
-def makeFunction(name, f, classType=None):
+def makeFunctionType(name, f, isMethod=False, ignoreAnnotations=False, assumeClosuresGlobal=False):
     if isinstance(f, typed_python._types.Function):
+        if assumeClosuresGlobal:
+            if typed_python.bytecount(type(f).ClosureType):
+                # we need to build the equivalent function with global closures
+                assert len(f.overloads) == 1, "Can't do this for multiple overloads yet"
+                return makeFunctionType(name, f.extractPyFun(0), isMethod, ignoreAnnotations, assumeClosuresGlobal)
+
         return type(f)
 
     if isinstance(f, type) and issubclass(f, typed_python._types.Function):
@@ -125,6 +144,9 @@ def makeFunction(name, f, classType=None):
 
     def getAnn(argname):
         """ Return the annotated type for the given argument or None. """
+        if ignoreAnnotations:
+            return None
+
         if argname not in spec.annotations:
             return None
         else:
@@ -154,13 +176,13 @@ def makeFunction(name, f, classType=None):
 
     return_type = None
 
-    if 'return' in spec.annotations:
+    if 'return' in spec.annotations and not ignoreAnnotations:
         ann = spec.annotations.get('return')
         if ann is None:
             ann = type(None)
         return_type = ann
 
-    if classType is not None and name in magicMethodTypes:
+    if isMethod and name in magicMethodTypes:
         tgtType = magicMethodTypes[name]
 
         if return_type is None:
@@ -179,7 +201,7 @@ def makeFunction(name, f, classType=None):
     if spec.varkw is not None:
         arg_types.append((spec.varkw, getAnn(spec.varkw), None, False, True))
 
-    return typed_python._types.Function(name, return_type, f, tuple(arg_types))
+    return typed_python._types.Function(name, return_type, f, tuple(arg_types), assumeClosuresGlobal)
 
 
 class ClassMetaclass(type):
@@ -201,21 +223,19 @@ class ClassMetaclass(type):
         classMembers = []
         properties = {}
 
-        actualClass = typed_python._types.Forward(name)
-
         for eltName, elt in namespace.order:
             if isinstance(elt, Member):
                 members.append((eltName, elt._type, elt._default_value))
                 classMembers.append((eltName, elt))
             elif isinstance(elt, property):
-                properties[eltName] = makeFunction(eltName, elt.fget)
+                properties[eltName] = makeFunctionType(eltName, elt.fget, assumeClosuresGlobal=True)
             elif isinstance(elt, staticmethod):
                 if eltName not in staticFunctions:
-                    staticFunctions[eltName] = makeFunction(eltName, elt.__func__)
+                    staticFunctions[eltName] = makeFunctionType(eltName, elt.__func__, assumeClosuresGlobal=True)
                 else:
                     staticFunctions[eltName] = typed_python._types.Function(
                         staticFunctions[eltName],
-                        makeFunction(eltName, elt.__func__)
+                        makeFunctionType(eltName, elt.__func__, assumeClosuresGlobal=True)
                     )
             elif (
                 isinstance(elt, FunctionType)
@@ -223,16 +243,16 @@ class ClassMetaclass(type):
                 or isinstance(elt, type) and issubclass(elt, typed_python._types.Function)
             ):
                 if eltName not in memberFunctions:
-                    memberFunctions[eltName] = makeFunction(eltName, elt, actualClass)
+                    memberFunctions[eltName] = makeFunctionType(eltName, elt, isMethod=True, assumeClosuresGlobal=True)
                 else:
                     memberFunctions[eltName] = typed_python._types.Function(
                         memberFunctions[eltName],
-                        makeFunction(eltName, elt, actualClass)
+                        makeFunctionType(eltName, elt, isMethod=True, assumeClosuresGlobal=True)
                     )
             else:
                 classMembers.append((eltName, elt))
 
-        actualClass = actualClass.define(typed_python._types.Class(
+        return typed_python._types.Class(
             name,
             tuple(bases),
             isFinal,
@@ -241,14 +261,12 @@ class ClassMetaclass(type):
             tuple(staticFunctions.items()),
             tuple(properties.items()),
             tuple(classMembers)
-        ))
-
-        return actualClass
+        )
 
 
 def Function(f):
     """Turn a normal python function into a 'typed_python.Function' which obeys type restrictions."""
-    return makeFunction(f.__name__, f)()
+    return makeFunctionType(f.__name__, f)(f)
 
 
 class FunctionOverloadArg:
@@ -292,26 +310,33 @@ class FunctionOverloadArg:
 
 
 class FunctionOverload:
-    def __init__(self, functionTypeObject, index, f, returnType):
+    def __init__(self, functionTypeObject, index, code, funcGlobals, funcGlobalsInCells, closureVarLookups, returnType):
         """Initialize a FunctionOverload.
 
         Args:
             functionTypeObject - a _types.Function type object representing the function
             index - the index within the _types.Function sequence of overloads we represent
-            f - the actual python function we're wrapping
+            code - the code object for the function we're wrapping
+            funcGlobals - the globals for the function we're wrapping
+            funcGlobalsInCells - a dict of cells that also act like globals
+            closureVarLookups - a dict from str to a list of ClosureVariableBindingSteps indicating
+                how each function's closure variables are found in the closure of the
+                actual function.
             returnType - the return type annotation, or None if None provided. (if None was
                 specified, that would be the NoneType)
         """
         self.functionTypeObject = functionTypeObject
         self.index = index
-
-        self.functionObj = f
+        self.closureVarLookups = closureVarLookups
+        self.functionCode = code
+        self.functionGlobals = funcGlobals
+        self.funcGlobalsInCells = funcGlobalsInCells
         self.returnType = returnType
         self.args = ()
 
     @property
     def name(self):
-        return self.functionObj.__name__
+        return self.functionTypeObject.__name__
 
     def minPositionalCount(self):
         for i in range(len(self.args)):
@@ -338,7 +363,13 @@ class FunctionOverload:
         )
 
     def _installNativePointer(self, fp, returnType, argumentTypes):
-        typed_python._types.installNativeFunctionPointer(self.functionTypeObject, self.index, fp, returnType, tuple(argumentTypes))
+        typed_python._types.installNativeFunctionPointer(
+            self.functionTypeObject,
+            self.index,
+            fp,
+            returnType,
+            tuple(argumentTypes)[len(self.closureVarLookups):]
+        )
 
 
 class DisableCompiledCode:

@@ -17,7 +17,7 @@ import traceback
 import unittest
 from flaky import flaky
 
-from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, _types, Compiled, Dict
+from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, _types, Compiled, Dict, NoneType
 from typed_python.compiler.runtime import Runtime, Entrypoint
 
 
@@ -242,7 +242,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Can't convert"):
             f((1, 2, 3))
 
-    def test_mutually_recursive_untyped_functions(self):
+    def test_perf_of_mutually_recursive_untyped_functions(self):
         def q(x):
             return x-1
 
@@ -257,10 +257,7 @@ class TestCompilationStructures(unittest.TestCase):
                 return z(f(x-1)) * z(2) + f(x-2)
             return 1
 
-        g_typed = Function(g)
-
-        g_typed.resultTypeFor(int)
-        g_typed.resultTypeFor(float)
+        g_typed = Entrypoint(g)
 
         self.assertEqual(g(10), g_typed(10))
 
@@ -269,6 +266,7 @@ class TestCompilationStructures(unittest.TestCase):
             g(input)
             untyped_duration = time.time() - t0
 
+            g_typed(input)
             t0 = time.time()
             g_typed(input)
             typed_duration = time.time() - t0
@@ -340,6 +338,17 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(works(1), None)
         with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
             throws(1)
+
+    def test_return_none(self):
+        def f(x):
+            return x
+
+        @Compiled
+        def g():
+            return f(None)
+
+        self.assertEqual(g.resultTypeFor().typeRepresentation, NoneType)
+        self.assertEqual(g(), None)
 
     def test_assign_with_none(self):
         def f(x):
@@ -468,10 +477,6 @@ class TestCompilationStructures(unittest.TestCase):
             self.assertIn('aFunctionThatRaises', trace)
 
     def test_stacktraces_show_up(self):
-        @Entrypoint
-        def f1(x):
-            return f2(x)
-
         def f2(x):
             return f3(x)
 
@@ -480,6 +485,10 @@ class TestCompilationStructures(unittest.TestCase):
 
         def f4(x):
             raise Exception(f"X is {x}")
+
+        @Entrypoint
+        def f1(x):
+            return f2(x)
 
         try:
             f1("hihi")
@@ -491,7 +500,7 @@ class TestCompilationStructures(unittest.TestCase):
             self.assertIn("f4", trace)
 
     @flaky(max_runs=3, min_passes=1)
-    def test_inlining_is_fast(self):
+    def test_perf_of_inlined_functions_doesnt_degrade(self):
         def f1(x):
             return f2(x)
 
@@ -517,6 +526,10 @@ class TestCompilationStructures(unittest.TestCase):
             for i in range(times):
                 res += f4(i)
             return res
+
+        @Entrypoint
+        def getit(f):
+            return f
 
         # prime the compilation
         callsF4(1)
@@ -708,7 +721,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         for identity, timesCalculated in Runtime.singleton().converter._times_calculated.items():
             if identity not in oldTimesCalculated:
-                self.assertLessEqual(timesCalculated, 4, identity)
+                self.assertLessEqual(timesCalculated, 6, identity)
 
     def test_converting_break_in_while(self):
         def testBreak(x):
@@ -776,7 +789,7 @@ class TestCompilationStructures(unittest.TestCase):
         def callIt(x: int):
             return f(x)
 
-        with self.assertRaisesRegex(TypeError, "f.. missing required positional argument: y"):
+        with self.assertRaisesRegex(TypeError, "annot find a valid overload"):
             callIt(1)
 
     def test_call_function_with_default_arguments(self):
@@ -848,7 +861,7 @@ class TestCompilationStructures(unittest.TestCase):
         def callIt(x, y, z):
             return f(x=x, y=y, z=z)
 
-        with self.assertRaisesRegex(TypeError, "got an unexpected keyword argument 'z'"):
+        with self.assertRaisesRegex(TypeError, "annot find a valid over"):
             callIt(1, 2, 3)
 
     def test_star_arg_call_function(self):
@@ -894,7 +907,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callIt(1, 2), 3)
 
-    def test_star_kwarg_intermediate_is_fast(self):
+    def test_perf_of_star_kwarg_intermediate_is_fast(self):
         def f(x, y):
             return x + y
 
@@ -935,7 +948,7 @@ class TestCompilationStructures(unittest.TestCase):
         # check that the extra call to 'g' doesn't introduce any overhead
         self.assertTrue(.75 <= elapsedF / elapsedG <= 1.25, elapsedF / elapsedG)
 
-    def test_star_arg_intermediate_is_fast(self):
+    def test_perf_of_star_arg_intermediate_is_fast(self):
         def f(x, y):
             return x + y
 
@@ -1131,7 +1144,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callIt(1, add), 2)
 
-        with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
+        with self.assertRaisesRegex(TypeError, "annot find a valid overload"):
             callIt(1, g)
 
     def test_check_type_of_method_conversion(self):

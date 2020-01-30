@@ -54,6 +54,10 @@ public:
         assertWireTypesEqual(wireType, WireType::EMPTY);
     }
 
+    bool isPODConcrete() {
+        return true;
+    }
+
     void constructor(instance_ptr self) {}
 
     void destroy(instance_ptr self) {}

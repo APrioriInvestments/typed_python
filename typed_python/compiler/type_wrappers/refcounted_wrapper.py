@@ -64,17 +64,24 @@ class RefcountedWrapper(Wrapper):
         expr = expr.expr
         other = other.nonref_expr
 
-        context.pushEffect(
-            native_ast.Expression.Branch(
-                cond=other,
-                false=expr.store(other),
-                true=(
-                    expr.store(other) >>
-                    self.get_refcount_ptr_expr(expr.load()).atomic_add(1) >>
-                    native_ast.nullExpr
+        if self.CAN_BE_NULL:
+            context.pushEffect(
+                native_ast.Expression.Branch(
+                    cond=other,
+                    false=expr.store(other),
+                    true=(
+                        expr.store(other) >>
+                        self.get_refcount_ptr_expr(expr.load()).atomic_add(1) >>
+                        native_ast.nullExpr
+                    )
                 )
             )
-        )
+        else:
+            context.pushEffect(
+                expr.store(other) >>
+                self.get_refcount_ptr_expr(expr.load()).atomic_add(1) >>
+                native_ast.nullExpr
+            )
 
     def convert_destroy(self, context, target):
         assert target.isReference

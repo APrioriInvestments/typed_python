@@ -23,6 +23,7 @@ from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
 from typed_python.compiler.type_wrappers.method_descriptor_wrapper import MethodDescriptorWrapper
 from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 from typed_python.compiler.type_wrappers.module_wrapper import ModuleWrapper
+from typed_python.compiler.type_wrappers.typed_cell_wrapper import TypedCellWrapper
 from typed_python.compiler.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
 from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
@@ -55,7 +56,7 @@ from typed_python.compiler.type_wrappers.python_object_of_type_wrapper import Py
 from typed_python.compiler.type_wrappers.abs_wrapper import AbsWrapper
 from typed_python.compiler.type_wrappers.repr_wrapper import ReprWrapper
 from types import ModuleType
-from typed_python._types import TypeFor, bytecount
+from typed_python._types import TypeFor, bytecount, prepareArgumentToBePassedToCompiler
 from typed_python import (
     Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16,
     UInt8, Float64, Float32, Bool, String, Bytes, NoneType, makeNamedTuple,
@@ -147,6 +148,9 @@ def _typedPythonTypeToTypeWrapper(t):
     if t.__typed_python_category__ == "OneOf":
         return OneOfWrapper(t)
 
+    if t.__typed_python_category__ == "TypedCell":
+        return TypedCellWrapper(t)
+
     if t.__typed_python_category__ == "PythonObjectOfType":
         if t is threading.RLock:
             t = _thread.RLock
@@ -163,7 +167,7 @@ def _typedPythonTypeToTypeWrapper(t):
     if t.__typed_python_category__ == "Set":
         return SetWrapper(t)
 
-    assert False, t
+    assert False, (t, getattr(t, '__typed_python_category__', None))
 
 
 def pythonObjectRepresentation(context, f):
@@ -270,9 +274,14 @@ def pythonObjectRepresentation(context, f):
 
     if hasattr(f, '__typed_python_category__'):
         if f.__typed_python_category__ == "Function":
+            f = prepareArgumentToBePassedToCompiler(f)
+
+            if bytecount(f.ClosureType):
+                raise Exception(f"Function {f} has nonempty closure {f.ClosureType}")
+
             return TypedExpression(
                 context,
-                native_ast.nullExpr,
+                typedPythonTypeToTypeWrapper(f.ClosureType).getNativeLayoutType().zero(),
                 PythonTypedFunctionWrapper(f),
                 False
             )

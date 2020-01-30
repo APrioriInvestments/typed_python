@@ -20,7 +20,7 @@ from typed_python.compiler.type_wrappers.arithmetic_wrapper import FloatWrapper,
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, PointerTo, Bool, Int32, Tuple, NamedTuple
+from typed_python import NoneType, _types, PointerTo, Bool, Int32, Tuple, NamedTuple, bytecount
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -70,6 +70,7 @@ class ClassWrapper(RefcountedWrapper):
     is_pass_by_ref = True
 
     BYTES_BEFORE_INIT_BITS = 16  # the refcount and vtable are both 8 byte integers.
+    CAN_BE_NULL = False
 
     def __init__(self, t):
         super().__init__(t)
@@ -254,8 +255,15 @@ class ClassWrapper(RefcountedWrapper):
             .rshift(native_ast.const_uint64_expr(48))
         )
 
-    def convert_default_initialize(self, context, instance):
-        return context.pushException(TypeError, f"Can't default initialize instances of {self}")
+    def convert_default_initialize(self, context, instance, force=False):
+        if not _types.is_default_constructible(self.typeRepresentation) and not force:
+            return context.pushException(TypeError, f"Can't default initialize instances of {self}")
+
+        # just initialize it. We will not have an __init__ because __init__ makes
+        # a class not default constructible.
+        newVal = self.convert_type_call(context, None, [], {})
+
+        return instance.convert_copy_initialize(newVal)
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -697,7 +705,9 @@ class ClassWrapper(RefcountedWrapper):
         # in the inputs and less precise in the outputs.
         pyImpl = implementingClass.MemberFunctions[methodName]
 
-        typeWrapper(pyImpl).compileCall(converter, retType, argTypes, kwargTypes, callback)
+        assert bytecount(pyImpl.ClosureType) == 0, "Class methods should have empty closures."
+
+        typeWrapper(pyImpl).compileCall(converter, retType, argTypes, kwargTypes, callback, False)
 
         return True
 
@@ -787,22 +797,23 @@ class ClassWrapper(RefcountedWrapper):
                 .ElementPtrIntegers(self.BYTES_BEFORE_INIT_BITS + byteOffset).store(native_ast.const_uint8_expr(0))
             )
 
-        for i in range(len(self.classType.MemberTypes)):
-            if _types.wantsToDefaultConstruct(self.classType.MemberTypes[i]):
-                name = self.classType.MemberNames[i]
+        if _types.is_default_constructible(self.typeRepresentation):
+            for i in range(len(self.classType.MemberTypes)):
+                if _types.wantsToDefaultConstruct(self.classType.MemberTypes[i]):
+                    name = self.classType.MemberNames[i]
 
-                if name in self.classType.MemberDefaultValues:
-                    defVal = self.classType.MemberDefaultValues.get(name)
-                    context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_copy_initialize(
-                        typed_python.compiler.python_object_representation.pythonObjectRepresentation(context, defVal)
-                    )
-                else:
-                    context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_default_initialize()
-                context.pushEffect(self.setIsInitializedExpr(out, i))
+                    if name in self.classType.MemberDefaultValues:
+                        defVal = self.classType.MemberDefaultValues.get(name)
+                        context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_copy_initialize(
+                            typed_python.compiler.python_object_representation.pythonObjectRepresentation(context, defVal)
+                        )
+                    else:
+                        context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_default_initialize()
+                    context.pushEffect(self.setIsInitializedExpr(out, i))
 
         if '__init__' in self.typeRepresentation.MemberFunctions:
             initFuncType = typeWrapper(self.typeRepresentation.MemberFunctions['__init__'])
-            initFuncType.convert_call(context, context.pushVoid(initFuncType), (out,) + args, {})
+            initFuncType.convert_call(context, context.push(initFuncType, lambda expr: None), (out,) + args, {})
         else:
             if len(args):
                 context.pushException(

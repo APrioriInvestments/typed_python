@@ -884,7 +884,7 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
 _pyAstToCodeObjectCache = {}
 
 
-def evaluateFunctionPyAst(pyAst):
+def evaluateFunctionPyAst(pyAst, globals=None):
     assert isinstance(pyAst, (Expr.Lambda, Statement.FunctionDef))
 
     filename = pyAst.filename
@@ -906,7 +906,7 @@ def evaluateFunctionPyAst(pyAst):
     elif isinstance(pyAst, Expr):
         pyAstModule = Module.Expression(body=pyAst)
 
-    globals = {}
+    globals = dict(globals) if globals is not None else {}
 
     if pyAstModule.matches.Expression:
         if pyAst not in _pyAstToCodeObjectCache:
@@ -928,3 +928,50 @@ def evaluateFunctionPyAst(pyAst):
     _originalAstCache[res] = pyAst
 
     return res
+
+
+def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals):
+    assert isinstance(pyAst, Statement.FunctionDef) or isinstance(pyAst, Expr.Lambda)
+
+    # make a new FunctionDef that defines a function
+    # def f(l1, l2, ...):  #l1 ... lN in locals
+    #   def pyAst():
+    #       ...
+    #   return pyAst
+    #
+    # and then call 'f' to get the closure out
+
+    # strip out the decorator definitions. We just want the underlying function
+    # object itself.
+    if pyAst.matches.FunctionDef:
+        statements = [
+            Statement.FunctionDef(
+                name=pyAst.name,
+                args=pyAst.args,
+                body=pyAst.body,
+                decorator_list=(),
+                returns=pyAst.returns,
+                line_number=pyAst.line_number,
+                col_offset=pyAst.col_offset,
+                filename=pyAst.filename,
+            ),
+            Statement.Return(value=Expr.Name(id=pyAst.name, ctx=ExprContext.Load()))
+        ]
+    else:
+        statements = [Statement.Return(value=pyAst)]
+
+    pyAstBuilder = Statement.FunctionDef(
+        name="__typed_python_func_builder__",
+        args=Arguments.Item(
+            args=[Arg.Item(arg=name, annotation=None) for name in locals],
+            vararg=None,
+            kwarg=None
+        ),
+        body=statements,
+        returns=None
+    )
+
+    func = evaluateFunctionPyAst(pyAstBuilder, globals)
+    inner = func(*[val for name, val in locals.items()])
+
+    return inner

@@ -68,13 +68,14 @@ class PythonFreeObjectWrapper(Wrapper):
 
     def convert_attribute(self, context, instance, attribute):
         try:
-            return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
-                context,
-                getattr(self.typeRepresentation.Value, attribute)
-            )
-        except Exception as e:
-            context.pushException(type(e), str(e))
-            return
+            attrVal = getattr(self.typeRepresentation.Value, attribute)
+        except Exception:
+            return instance.convert_to_type(object).convert_attribute(attribute)
+
+        return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+            context,
+            attrVal
+        )
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
         target_type = targetVal.expr_type

@@ -169,6 +169,7 @@ void Alternative::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
 
         std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
             it->second,
+            nullptr,
             selfAsPyObj
         );
 

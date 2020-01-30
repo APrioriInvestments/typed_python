@@ -12,6 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import types
+
 import typed_python.python_ast as python_ast
 import typed_python.ast_util as ast_util
 import typed_python._types as _types
@@ -133,6 +135,7 @@ class PythonToNativeConverter(object):
         self._targets = {}
         self._inflight_definitions = {}
         self._inflight_function_conversions = {}
+        self._code_to_ast_cache = {}
         self._times_calculated = {}
         self._new_native_functions = set()
         self._used_names = set()
@@ -184,8 +187,8 @@ class PythonToNativeConverter(object):
         self._used_names.add(res)
         return res
 
-    def createConversionContext(self, identity, f, input_types, output_type):
-        pyast, freevars = self._callable_to_ast_and_vars(f)
+    def createConversionContext(self, identity, funcName, funcCode, funcGlobals, input_types, output_type):
+        pyast = self._code_to_ast(funcCode)
 
         if isinstance(pyast, python_ast.Statement.FunctionDef):
             body = pyast.body
@@ -197,7 +200,17 @@ class PythonToNativeConverter(object):
                 filename=pyast.body.filename
             )]
 
-        return FunctionConversionContext(self, f.__name__, identity, pyast.args, body, input_types, output_type, freevars)
+        return FunctionConversionContext(
+            self,
+            funcName,
+            identity,
+            pyast.args,
+            body,
+            input_types,
+            output_type,
+            [x for x in funcCode.co_freevars if x not in funcGlobals],
+            funcGlobals
+        )
 
     def installLinktimeHook(self, identity, callback):
         """Call 'callback' with the native function pointer for 'identity' after compilation has finished."""
@@ -283,7 +296,10 @@ class PythonToNativeConverter(object):
             output_type
         )
 
-    def _callable_to_ast_and_vars(self, f):
+    def _code_to_ast(self, f):
+        if f in self._code_to_ast_cache:
+            return self._code_to_ast_cache[f]
+
         pyast = ast_util.pyAstFor(f)
 
         _, lineno = ast_util.getSourceLines(f)
@@ -291,15 +307,7 @@ class PythonToNativeConverter(object):
 
         pyast = ast_util.functionDefOrLambdaAtLineNumber(pyast, lineno)
 
-        pyast = python_ast.convertPyAstToAlgebraic(pyast, fname)
-
-        freevars = dict(f.__globals__)
-
-        if f.__closure__:
-            for i in range(len(f.__closure__)):
-                freevars[f.__code__.co_freevars[i]] = f.__closure__[i].cell_contents
-
-        return pyast, freevars
+        return python_ast.convertPyAstToAlgebraic(pyast, fname)
 
     def demasqueradeCallTargetOutput(self, callTarget: TypedCallTarget):
         """Ensure we are returning the correct 'interpreterType' from callTarget.
@@ -485,15 +493,33 @@ class PythonToNativeConverter(object):
 
         return True
 
-    def convert(self, f, input_types, output_type, assertIsRoot=False, callback=None):
+    def convert(self, funcName, funcCode, funcGlobals, input_types, output_type, assertIsRoot=False, callback=None):
         """Convert a single pure python function using args of 'input_types'.
 
         It will return no more than 'output_type'. if output_type is None we produce
         the tightest output type possible.
+
+        Args:
+            funcName - the name of the function
+            funcCode - a Code object representing the code to compile
+            funcGlobals - the globals object from the relevant function
+            input_types - a type for each free variable in the function closure, and
+                then again for each input argument
+            output_type - the output type of the function, if known. if this is None,
+                then we use type inference to produce the tightest type we can.
+                If not None, then we will produce this type or throw an exception.
+            assertIsRoot - if True, then assert that no other functions are using
+                the converter right now.
+            callback - if not None, then a function that gets called back with the
+                function pointer to the compiled function when it's known.
         """
+        assert isinstance(funcName, str)
+        assert isinstance(funcCode, types.CodeType)
+        assert isinstance(funcGlobals, dict)
+
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
-        identity = ("pyfunction", f, input_types, output_type)
+        identity = ("pyfunction", funcCode, input_types, output_type)
 
         if callback is not None:
             self.installLinktimeHook(identity, callback)
@@ -501,7 +527,7 @@ class PythonToNativeConverter(object):
         if identity in self._link_name_for_identity:
             name = self._link_name_for_identity[identity]
         else:
-            name = self.new_name(f.__name__)
+            name = self.new_name(funcName)
             self._link_name_for_identity[identity] = name
 
         if name in self._targets:
@@ -518,7 +544,14 @@ class PythonToNativeConverter(object):
             self._dependencies.addRoot(identity)
 
         if identity not in self._inflight_function_conversions:
-            functionConverter = self.createConversionContext(identity, f, input_types, output_type)
+            functionConverter = self.createConversionContext(
+                identity,
+                funcName,
+                funcCode,
+                funcGlobals,
+                input_types,
+                output_type
+            )
 
             self._inflight_function_conversions[identity] = functionConverter
 

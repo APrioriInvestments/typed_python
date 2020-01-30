@@ -159,6 +159,10 @@ public:
         return m_subtypes;
     }
 
+    bool isPODConcrete() {
+        return m_all_alternatives_empty;
+    }
+
     bool all_alternatives_empty() const {
         return m_all_alternatives_empty;
     }

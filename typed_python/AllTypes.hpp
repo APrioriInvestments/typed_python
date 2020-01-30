@@ -44,5 +44,6 @@
 #include "BoundMethodType.hpp"
 #include "EmbeddedMessageType.hpp"
 #include "SetType.hpp"
-
+#include "PyCellType.hpp"
+#include "TypedCellType.hpp"
 #include "direct_types/Bytes.hpp"

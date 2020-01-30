@@ -19,6 +19,7 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.native_ast import VoidPtr
 from math import trunc, floor, ceil
 
+
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
@@ -623,7 +624,13 @@ class Wrapper(object):
             return None
 
         assert len(f.overloads) == 1
-        return context.call_py_function(f.overloads[0].functionObj, args, {})
+
+        return context.call_overload(
+            f.overloads[0],
+            None,
+            args,
+            {}
+        )
 
     def get_iteration_expressions(self, context, expr):
         """Return a fixed list of TypedExpressions iterating the object.

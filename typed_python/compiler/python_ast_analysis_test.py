@@ -46,6 +46,60 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.freeVarCheck(f, ['x'], ['x'])
 
+    def test_assigned_only_once(self):
+        def f():
+            x = 10
+            x = 20  # noqa
+            y = 30  # noqa
+
+            def f():
+                pass
+
+            def f():  # noqa
+                pass
+
+            def g():
+                pass
+
+            def h():
+                def h1():
+                    pass
+
+                def h1():  # noqa
+                    pass
+
+            def h1():
+                pass
+
+        pyast = python_ast.convertFunctionToAlgebraicPyAst(f)
+
+        assignedOnce = python_ast_analysis.computeVariablesAssignedOnlyOnce(pyast.body)
+        assignmentCount = python_ast_analysis.computeVariablesAssignmentCounts(pyast.body)
+
+        self.assertEqual(sorted(assignedOnce), ["g", "h", "h1", "y"])
+        self.assertEqual(assignmentCount, dict(x=2, y=1, f=2, g=1, h=1, h1=1))
+
+    def test_read_by_closures(self):
+        def f():
+            def f1():
+                return x  # noqa
+
+            def f2():
+                def g():
+                    return y  # noqa
+
+            print(printVar)  # noqa
+
+            class Y:
+                def y():
+                    return z  # noqa
+
+        pyast = python_ast.convertFunctionToAlgebraicPyAst(f)
+
+        readByClosures = python_ast_analysis.computeVariablesReadByClosures(pyast.body)
+
+        self.assertEqual(sorted(readByClosures), ["x", "y", "z"])
+
     def test_multi_assignment_shows_up(self):
         def f():
             x, y = (1, 2)  # noqa

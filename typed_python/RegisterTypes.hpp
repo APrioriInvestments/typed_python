@@ -38,6 +38,11 @@ public:
         return true;
     }
 
+
+    bool isPODConcrete() {
+        return true;
+    }
+
     bool _updateAfterForwardTypesChanged() { return false; }
 
     template<class visitor_type>

@@ -578,7 +578,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(dispatchUp(ChildChildClass()), ChildChildClass().f())
 
     @flaky(max_runs=3, min_passes=1)
-    def test_dispatch_with_final_is_fast(self):
+    def test_perf_of_dispatch_with_final_is_fast(self):
         class BaseClass(Class):
             def f(self) -> float:
                 return 1.0
@@ -1596,7 +1596,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         def requiresAFloat(f: float):
             return f
 
-        with self.assertRaisesRegex(TypeError, "cannot find a valid overload with arguments"):
+        with self.assertRaisesRegex(TypeError, "annot find a valid overload"):
             requiresAFloat(C())
 
         @Compiled

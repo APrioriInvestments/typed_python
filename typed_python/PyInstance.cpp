@@ -42,6 +42,8 @@
 #include "PyOneOfInstance.hpp"
 #include "PyForwardInstance.hpp"
 #include "PyEmbeddedMessageInstance.hpp"
+#include "PyPyCellInstance.hpp"
+#include "PyTypedCellInstance.hpp"
 #include "PySetInstance.hpp"
 #include "_types.hpp"
 
@@ -263,6 +265,8 @@ PyObject* PyInstance::tp_new_type(PyTypeObject *subtype, PyObject *args, PyObjec
     if (catToProduce == Type::TypeCategory::catString ) { return MakeStringType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catBytes ) { return MakeBytesType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catEmbeddedMessage ) { return MakeEmbeddedMessageType(nullptr, args); }
+    if (catToProduce == Type::TypeCategory::catPyCell ) { return MakePyCellType(nullptr, args); }
+    if (catToProduce == Type::TypeCategory::catTypedCell ) { return MakeTypedCellType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catNone ) { return MakeNoneType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catValue ) { return MakeValueType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catBoundMethod ) { return MakeBoundMethodType(nullptr, args); }
@@ -1416,6 +1420,8 @@ PyObject* PyInstance::categoryToPyString(Type::TypeCategory cat) {
     if (cat == Type::TypeCategory::catFunction) { static PyObject* res = PyUnicode_FromString("Function"); return res; }
     if (cat == Type::TypeCategory::catForward) { static PyObject* res = PyUnicode_FromString("Forward"); return res; }
     if (cat == Type::TypeCategory::catEmbeddedMessage) { static PyObject* res = PyUnicode_FromString("EmbeddedMessage"); return res; }
+    if (cat == Type::TypeCategory::catPyCell) { static PyObject* res = PyUnicode_FromString("PyCell"); return res; }
+    if (cat == Type::TypeCategory::catTypedCell) { static PyObject* res = PyUnicode_FromString("TypedCell"); return res; }
     if (cat == Type::TypeCategory::catPythonObjectOfType) { static PyObject* res = PyUnicode_FromString("PythonObjectOfType"); return res; }
 
     static PyObject* res = PyUnicode_FromString("Unknown");

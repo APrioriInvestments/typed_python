@@ -13,7 +13,9 @@
 #   limitations under the License.
 
 
-from typed_python import PointerTo
+from typed_python import PointerTo, bytecount, NamedTuple, Class
+from typed_python._types import is_default_constructible
+from typed_python.internals import CellAccess
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
@@ -27,23 +29,118 @@ typeWrapper = lambda x: typed_python.compiler.python_object_representation.typed
 
 
 class PythonTypedFunctionWrapper(Wrapper):
-    is_pod = True
-    is_empty = True
-    is_pass_by_ref = False
+    is_default_constructible = False
 
     def __init__(self, f):
         if isinstance(f, typed_python._types.Function):
             f = type(f)
 
+        self.closureWrapper = typeWrapper(f.ClosureType)
+
         super().__init__(f)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return self.closureWrapper.getNativeLayoutType()
+
+    @property
+    def is_pod(self):
+        return self.closureWrapper.is_pod
+
+    @property
+    def is_empty(self):
+        return self.closureWrapper.is_empty
+
+    @property
+    def is_pass_by_ref(self):
+        return self.closureWrapper.is_pass_by_ref
+
+    def convert_copy_initialize(self, context, expr, other):
+        expr.changeType(self.closureWrapper).convert_copy_initialize(
+            other.changeType(self.closureWrapper)
+        )
+
+    def convert_assign(self, context, expr, other):
+        expr.changeType(self.closureWrapper).convert_assign(
+            other.changeType(self.closureWrapper)
+        )
+
+    def convert_destroy(self, context, expr):
+        expr.changeType(self.closureWrapper).convert_destroy()
+
+    def convert_default_initialize(self, context, target):
+        # we are only default initializable if our closure has no data.
+        assert is_default_constructible(self.closureWrapper.typeRepresentation)
+        return target.changeType(self.closureWrapper).convert_default_initialize()
+
+    @staticmethod
+    def closurePathToCellValue(closurePath, closureExpr):
+        """Extract the argument to pass to a function based on the closure path and the closure itself."""
+        expr = closureExpr
+
+        for pathEltIx, pathElt in enumerate(closurePath):
+            if isinstance(pathElt, int):
+                expr = expr.refAs(pathElt)
+            elif isinstance(pathElt, str):
+                expr = expr.convert_attribute(pathElt, nocheck=True)
+            elif pathElt is CellAccess:
+                if pathEltIx == len(closurePath) - 1:
+                    pass
+                else:
+                    expr = expr.expr_type.refHeld(expr)
+            elif isinstance(pathElt, type):
+                expr.changeType(typeWrapper(pathElt))
+            else:
+                assert False, "invalid cell path"
+
+        return expr
+
+    @staticmethod
+    def closurePathToCellType(closurePath, closureType):
+        """Calculare a cell type from  a ClosureVariablePath and a closure type.
+
+        The closure determines how a given function stores the data in its closure.
+        The 'path' determines how a given variable in the function is stored in the
+        closure. This function determines the actual cell type.
+        """
+        t = closureType
+
+        for pathEltIx, pathElt in enumerate(closurePath):
+            if isinstance(pathElt, int):
+                t = t.ElementTypes[pathElt]
+            elif isinstance(pathElt, str):
+                if issubclass(t, NamedTuple):
+                    t = t.ElementTypes[t.ElementNames.find(pathElt)]
+                elif issubclass(t, Class):
+                    if pathElt not in t.MemberNames:
+                        # this can happen when be bind a variable to a closure
+                        # but it's never been assigned, and so we don't have a type for it.
+                        return None
+
+                    t = t.MemberTypes[t.MemberNames.index(pathElt)]
+                else:
+                    assert False
+            elif pathElt is CellAccess:
+                if pathEltIx == len(closurePath) - 1:
+                    pass
+                else:
+                    t = t.HeldType
+            elif isinstance(pathElt, type):
+                t = pathElt
+            else:
+                assert False, "invalid cell path"
+
+        return t
 
     def convert_call(self, context, left, args, kwargs):
+        if left is None:
+            assert bytecount(self.typeRepresentation) == 0
+            left = context.push(self, lambda expr: None)
+
         # check if we are marked 'nocompile' in which case we convert to 'object' and dispatch
         # to the interpreter. We do retain any typing information on the return type, however.
-        if len(self.typeRepresentation.overloads) == 1:
+
+        # todo: reenable this
+        if len(self.typeRepresentation.overloads) == 1 and False:
             overload = self.typeRepresentation.overloads[0]
             functionObj = overload.functionObj
 
@@ -87,11 +184,16 @@ class PythonTypedFunctionWrapper(Wrapper):
                 actualKwargs
             )
 
+            closureType = self.typeRepresentation.ClosureType
+
             # just one overload will do. We can just instantiate this particular function
             # with a signature that comes from the method overload signature itself.
             singleConvertedOverload = context.functionContext.converter.convert(
-                overload.functionObj,
-                [a.expr_type for a in argsToPass],
+                overload.name,
+                overload.functionCode,
+                overload.functionGlobals,
+                [typeWrapper(self.closurePathToCellType(path, closureType)) for path in overload.closureVarLookups.values()]
+                + [a.expr_type for a in argsToPass],
                 overload.returnType,
                 callback=None
             )
@@ -105,7 +207,18 @@ class PythonTypedFunctionWrapper(Wrapper):
 
                 return
 
-            res = context.call_typed_call_target(singleConvertedOverload, argsToPass)
+            closureTuple = left.changeType(self.closureWrapper)
+            closureArgs = [self.closurePathToCellValue(path, closureTuple) for path in overload.closureVarLookups.values()]
+
+            # check if any closureArgs are None, which means that converting them threw an exception.
+            for a in closureArgs:
+                if a is None:
+                    return
+
+            res = context.call_typed_call_target(
+                singleConvertedOverload,
+                closureArgs + argsToPass
+            )
 
             return res
 
@@ -116,7 +229,8 @@ class PythonTypedFunctionWrapper(Wrapper):
             None,
             argTypes,
             kwargTypes,
-            None
+            None,
+            True
         )
 
         if not callTarget:
@@ -127,7 +241,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             )
             return
 
-        return context.call_typed_call_target(callTarget, args + list(kwargs.values()))
+        return context.call_typed_call_target(callTarget, [left] + args + list(kwargs.values()))
 
     @staticmethod
     def pickSpecializationTypeFor(overloadArg, argType: Wrapper):
@@ -160,7 +274,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                 return typeWrapper(overloadArg.typeFilter)
             return argType
 
-    def compileCall(self, converter, returnType, argTypes, kwargTypes, callback):
+    def compileCall(self, converter, returnType, argTypes, kwargTypes, callback, provideClosureArgument):
         """Compile this function being called with a particular signature.
 
         Args:
@@ -172,7 +286,8 @@ class PythonTypedFunctionWrapper(Wrapper):
                 arguments we're passing.
             callback - the callback to pass to 'convert' so that we can install the compiled
                 function pointer in the class vtable at link time.
-
+            provideClosureArgument - if True, then the first argument is of our closure type.
+                If false, then our closure type must be empty, and no argument for it is provided.
         Returns:
             a TypedCallTarget, or None
         """
@@ -194,11 +309,11 @@ class PythonTypedFunctionWrapper(Wrapper):
 
         return converter.defineNativeFunction(
             f'implement_function.{self}{argTypes}.{kwargTypes}->{returnType}',
-            ('implement_function.', self, returnType, tuple(argTypes), tuple(kwargTypes.items())),
-            list(argTypes) + list(kwargTypes.values()),
+            ('implement_function.', self, returnType, self, tuple(argTypes), tuple(kwargTypes.items())),
+            ([self] if provideClosureArgument else []) + list(argTypes) + list(kwargTypes.values()),
             returnType,
             lambda context, outputVar, *args: (
-                self.generateMethodImplementation(context, returnType, args, argNames)
+                self.generateMethodImplementation(context, returnType, args, argNames, provideClosureArgument)
             ),
             callback=callback
         )
@@ -268,7 +383,14 @@ class PythonTypedFunctionWrapper(Wrapper):
                             kwargTypes
                         )
 
-                        callTarget = converter.convert(o.functionObj, actualArgTypes, None)
+                        callTarget = converter.convert(
+                            o.name,
+                            o.functionCode,
+                            o.functionGlobals,
+                            [typeWrapper(PythonTypedFunctionWrapper.closurePathToCellType(path, func.ClosureType))
+                             for path in o.closureVarLookups.values()] + actualArgTypes,
+                            None
+                        )
 
                         if callTarget is not None and callTarget.output_type is not None:
                             returnTypes.append(callTarget.output_type)
@@ -303,7 +425,7 @@ class PythonTypedFunctionWrapper(Wrapper):
 
         return None
 
-    def generateMethodImplementation(self, context, returnType, args, argNames):
+    def generateMethodImplementation(self, context, returnType, args, argNames, provideClosureArgument):
         """Generate native code that calls us with a given return type and set of arguments.
 
         We try each overload, first with 'isExplicit' as False, then with True. The first one that
@@ -314,18 +436,27 @@ class PythonTypedFunctionWrapper(Wrapper):
             returnType - the output type we are expecting to return. This will be the union
                 of the return types of all the overloads that might participate in this dispatch.
             args - the typed_expression for all of our actual arguments, which in this case
-                are the instance, and then the actual arguments we want to convert.
+                are the closure (if provideClosureArgument), the instance,
+                and then the actual arguments we want to convert.
             argNames - a list with one element per args, containing None for each positional
                 argument, or the name of the argument if passed as a keyword argument.
+            provideClosureArgument - if True, then the first argument is of our closure type.
+                If false, then our closure type must be empty, and no argument for it is provided.
         """
         func = self.typeRepresentation
+
+        if provideClosureArgument:
+            closureArg = args[0]
+            args = args[1:]
+        else:
+            closureArg = None
 
         argTypes = [a.expr_type for i, a in enumerate(args) if argNames[i] is None]
         kwargTypes = {argNames[i]: a.expr_type for i, a in enumerate(args) if argNames[i] is not None}
 
         def makeOverloadImplementor(overload, isExplicit):
             return lambda context, _, outputVar, *args: self.generateOverloadImplement(
-                context, overload, isExplicit, outputVar, args, argNames
+                context, overload, isExplicit, outputVar, args, argNames, provideClosureArgument
             )
 
         for isExplicit in [False, True]:
@@ -339,7 +470,8 @@ class PythonTypedFunctionWrapper(Wrapper):
                         f'implement_overload.{self}.{overloadIndex}.{isExplicit}.{argTypes}.{kwargTypes}->{overloadRetType}',
                         ('implement_overload', self, overloadIndex, isExplicit,
                          overloadRetType, tuple(argTypes), tuple(kwargTypes.items())),
-                        [PointerTo(overloadRetType)] + list(argTypes) + list(kwargTypes.values()),
+                        [PointerTo(overloadRetType)] + ([self] if provideClosureArgument else [])
+                        + list(argTypes) + list(kwargTypes.values()),
                         typeWrapper(bool),
                         makeOverloadImplementor(overload, isExplicit)
                     )
@@ -348,7 +480,9 @@ class PythonTypedFunctionWrapper(Wrapper):
 
                     successful = context.call_typed_call_target(
                         testSingleOverloadForm,
-                        (outputSlot.changeType(PointerTo(overloadRetType), False),) + args
+                        (outputSlot.changeType(PointerTo(overloadRetType), False),)
+                        + tuple([closureArg] if provideClosureArgument else [])
+                        + args
                     )
 
                     with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
@@ -374,7 +508,7 @@ class PythonTypedFunctionWrapper(Wrapper):
         # this should actually be hitting the interpreter instead.
         context.pushException(TypeError, f"Failed to find an overload for {self} matching {argTypes} and {kwargTypes}")
 
-    def generateOverloadImplement(self, context, overload, isExplicit, outputVar, args, argNames):
+    def generateOverloadImplement(self, context, overload, isExplicit, outputVar, args, argNames, provideClosureArgument):
         """Produce the code that implements this specific overload.
 
         The generated code returns control flow with a True if it fills out the 'outputVar'
@@ -385,8 +519,17 @@ class PythonTypedFunctionWrapper(Wrapper):
             overload - the FunctionOverload we're trying to convert.
             isExplicit - are we using explicit conversion?
             outputVar - a TypedExpression(PointerTo(returnType)) we're supposed to initialize.
-            args - the arguments to pass to the method (including the instance)
+            args - the arguments to pass to the method (including the closure if necessary and the instance)
+            argNames - a list with one element per args, containing None for each positional
+                argument, or the name of the argument if passed as a keyword argument.
+            provideClosureArgument - if True, then the first argument is of our closure type.
+                If false, then our closure type must be empty, and no argument for it is provided.
         """
+        if provideClosureArgument:
+            closureArg = args[0]
+            args = args[1:]
+        else:
+            closureArg = None
 
         assert len(args) == len(argNames)
 
@@ -428,7 +571,13 @@ class PythonTypedFunctionWrapper(Wrapper):
         if outputVar.expr_type.typeRepresentation.ElementType != retType:
             raise Exception(f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}")
 
-        res = context.call_py_function(overload.functionObj, convertedArgs, convertedKwargs, typeWrapper(retType))
+        res = context.call_overload(
+            overload,
+            closureArg,
+            convertedArgs,
+            convertedKwargs,
+            typeWrapper(retType)
+        )
 
         if res is None:
             context.pushException(Exception, "unreachable")

@@ -115,8 +115,8 @@ class TypedExpression(object):
     def convert_initialize_from_args(self, *args):
         return self.expr_type.convert_initialize_from_args(self.context, self, *args)
 
-    def convert_default_initialize(self):
-        return self.expr_type.convert_default_initialize(self.context, self)
+    def convert_default_initialize(self, **kwargs):
+        return self.expr_type.convert_default_initialize(self.context, self, **kwargs)
 
     def convert_destroy(self):
         return self.expr_type.convert_destroy(self.context, self)
@@ -124,8 +124,9 @@ class TypedExpression(object):
     def convert_copy_initialize(self, toStore):
         return self.expr_type.convert_copy_initialize(self.context, self, toStore)
 
-    def convert_attribute(self, attribute):
-        return self.expr_type.convert_attribute(self.context, self, attribute)
+    def convert_attribute(self, attribute, **kwargs):
+        # we have 'kwargs' because 'class' convert_attribute accepts some keyword args
+        return self.expr_type.convert_attribute(self.context, self, attribute, **kwargs)
 
     def convert_setitem(self, index, value):
         return self.expr_type.convert_setitem(self.context, self, index, value)
@@ -238,6 +239,9 @@ class TypedExpression(object):
 
     def toBool(self):
         return self.expr_type.convert_bool_cast(self.context, self)
+
+    def refAs(self, i):
+        return self.expr_type.refAs(self.context, self, i)
 
     @staticmethod
     def asBool(typedExpressionOrNone):

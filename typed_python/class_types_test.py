@@ -17,10 +17,10 @@ import time
 import gc
 import math
 from typed_python.test_util import currentMemUsageMb
-
+from typed_python._types import is_default_constructible
 from typed_python import (
     Int16, UInt64, Float32, ListOf, TupleOf, OneOf, NamedTuple, Class, Alternative,
-    ConstDict, PointerTo, Member, _types, Forward, Final, Function, Entrypoint
+    ConstDict, PointerTo, Member, _types, Forward, Final, Function, Entrypoint, Tuple
 )
 
 
@@ -1462,3 +1462,25 @@ class NativeClassTypesTests(unittest.TestCase):
         callAssign(aC, 2.5)
 
         self.assertEqual(aC.m, 2)
+
+    def test_class_default_constructible(self):
+        # classes without 'init' are always default constructible,
+        # and we'll initialize any non-class members that are default
+        # constructible within it
+        class C(Class):
+            m = Member(int)
+
+        self.assertTrue(is_default_constructible(C))
+
+        T = Tuple(C)
+
+        self.assertEqual(T()[0].m, 0)
+
+        # adding any __init__ at all makes a class non-default-constructible
+        class NotDC(Class):
+            m = Member(int)
+
+            def __init__(self):
+                pass
+
+        self.assertFalse(is_default_constructible(NotDC))

@@ -25,6 +25,33 @@ PyObject* PyBoundMethodInstance::tp_call_concrete(PyObject* args, PyObject* kwar
     Function* f = type()->getFunction();
     Type* c = type()->getFirstArgType();
 
+    //if we are an entrypoint, map any untyped function arguments to typed functions
+    PyObjectHolder mappedArgs;
+    PyObjectHolder mappedKwargs;
+
+    if (f->isEntrypoint()) {
+        mappedArgs.steal(PyTuple_New(PyTuple_Size(args)));
+
+        for (long k = 0; k < PyTuple_Size(args); k++) {
+            PyTuple_SetItem(mappedArgs, k, PyFunctionInstance::prepareArgumentToBePassedToCompiler(PyTuple_GetItem(args, k)));
+        }
+
+        mappedKwargs.steal(PyDict_New());
+
+        if (kwargs) {
+            PyObject *key, *value;
+            Py_ssize_t pos = 0;
+
+            while (PyDict_Next(kwargs, &pos, &key, &value)) {
+                PyObjectStealer mapped(PyFunctionInstance::prepareArgumentToBePassedToCompiler(value));
+                PyDict_SetItem(mappedKwargs, key, mapped);
+            }
+        }
+    } else {
+        mappedArgs.set(args);
+        mappedKwargs.set(kwargs);
+    }
+
     PyObjectStealer objectInstance(
         PyInstance::initializePythonRepresentation(c, [&](instance_ptr d) {
             c->copy_constructor(d, dataPtr());
@@ -35,12 +62,12 @@ PyObject* PyBoundMethodInstance::tp_call_concrete(PyObject* args, PyObject* kwar
         for (long overloadIx = 0; overloadIx < f->getOverloads().size(); overloadIx++) {
             std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(
                 f,
+                nullptr,
                 overloadIx,
                 objectInstance,
-                args,
-                kwargs,
-                convertExplicitly,
-                false /* dontActuallyCall=false because we do want to call. */
+                mappedArgs,
+                mappedKwargs,
+                convertExplicitly
             );
 
             if (res.first) {

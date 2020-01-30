@@ -57,6 +57,16 @@ public:
         return self + m_byte_offsets[ix];
     }
 
+    bool isPODConcrete() {
+        for (auto t: m_types) {
+            if (!t->isPOD()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
     /*******
@@ -219,6 +229,9 @@ public:
     }
 
     static NamedTuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names, NamedTuple* knownType = nullptr) {
+        if (names.size() != types.size()) {
+            throw std::runtime_error("Names mismatched with types!");
+        }
         return MakeSubtype<NamedTuple>(types, names, knownType);
     }
 };

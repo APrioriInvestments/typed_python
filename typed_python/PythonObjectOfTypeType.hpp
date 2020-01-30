@@ -19,64 +19,17 @@
 #include "util.hpp"
 #include "Type.hpp"
 
-//wraps an actual python instance. Note that we assume we're holding the GIL whenever
-//we interact with actual python objects. Compiled code needs to treat these objects
-//with extreme care. We hold the pointer in our own refcounted datastructure so that
-//compiled code can move python objects around without hitting the GIL (we only
-//refcount when we completely release a handle to a python object).
-class PythonObjectOfType : public Type {
+class PyObjectHandleTypeBase : public Type {
 public:
+    PyObjectHandleTypeBase(Type::TypeCategory cat) : Type(cat)
+    {
+    }
+
     class layout_type {
     public:
         std::atomic<int64_t> refcount;
         PyObject* pyObj;
     };
-
-    PythonObjectOfType(PyTypeObject* typePtr, PyObject* givenType) :
-            Type(TypeCategory::catPythonObjectOfType)
-    {
-        mPyTypePtr = (PyTypeObject*)incref((PyObject*)typePtr);
-
-        if (givenType) {
-            mGivenType = incref(givenType);
-        } else {
-            mGivenType = nullptr;
-        }
-
-        m_name = std::string("PythonObjectOfType(") + mPyTypePtr->tp_name + ")";
-
-        m_is_simple = false;
-
-        endOfConstructorInitialization(); // finish initializing the type object.
-    }
-
-    bool isBinaryCompatibleWithConcrete(Type* other) {
-        return other == this;
-    }
-
-    template<class visitor_type>
-    void _visitContainedTypes(const visitor_type& visitor) {
-    }
-
-    template<class visitor_type>
-    void _visitReferencedTypes(const visitor_type& visitor) {
-    }
-
-    bool _updateAfterForwardTypesChanged() {
-        m_size = sizeof(PyObject*);
-
-        int isinst = PyObject_IsInstance(Py_None, (PyObject*)mPyTypePtr);
-        if (isinst == -1) {
-            isinst = 0;
-            PyErr_Clear();
-        }
-
-        m_is_default_constructible = isinst != 0;
-
-        //none of these values can ever change, so we can just return
-        //because we don't need to be updated again.
-        return false;
-    }
 
     // return a new layout with a refcount of 1, but steal the reference
     // to the python object.
@@ -110,37 +63,12 @@ public:
         getPyObj(ptr) = incref(o);
     }
 
-    PyObject*& getPyObj(instance_ptr ptr) {
+    static PyObject*& getPyObj(instance_ptr ptr) {
         return ((layout_type**)ptr)[0]->pyObj;
     }
 
-    layout_type*& getHandlePtr(instance_ptr ptr) {
+    static layout_type*& getHandlePtr(instance_ptr ptr) {
         return *(layout_type**)ptr;
-    }
-
-    typed_python_hash_type hash(instance_ptr left) {
-        return PyObject_Hash(getPyObj(left));
-    }
-
-    template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
-        PyObject* p = getPyObj(self);
-        buffer.getContext().serializePythonObject(p, buffer, fieldNumber);
-    }
-
-    template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
-         initializeHandleAt(self);
-         getPyObj(self) = buffer.getContext().deserializePythonObject(buffer, wireType);
-    }
-
-    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
-
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
-
-    void constructor(instance_ptr self) {
-        initializeHandleAt(self);
-        getPyObj(self) = incref(Py_None);
     }
 
     static void destroyLayoutIfRefcountIsZero(layout_type* p) {
@@ -172,6 +100,87 @@ public:
         getHandlePtr(other)->refcount++;
         destroy(self);
         getHandlePtr(self) = getHandlePtr(other);
+    }
+};
+
+//wraps an actual python instance. Note that we assume we're holding the GIL whenever
+//we interact with actual python objects. Compiled code needs to treat these objects
+//with extreme care. We hold the pointer in our own refcounted datastructure so that
+//compiled code can move python objects around without hitting the GIL (we only
+//refcount when we completely release a handle to a python object).
+class PythonObjectOfType : public PyObjectHandleTypeBase {
+public:
+    PythonObjectOfType(PyTypeObject* typePtr, PyObject* givenType) :
+            PyObjectHandleTypeBase(TypeCategory::catPythonObjectOfType)
+    {
+        mPyTypePtr = (PyTypeObject*)incref((PyObject*)typePtr);
+
+        if (givenType) {
+            mGivenType = incref(givenType);
+        } else {
+            mGivenType = nullptr;
+        }
+
+        m_name = std::string("PythonObjectOfType(") + mPyTypePtr->tp_name + ")";
+
+        m_is_simple = false;
+
+        endOfConstructorInitialization(); // finish initializing the type object.
+    }
+
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        return other == this;
+    }
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+    }
+
+    bool _updateAfterForwardTypesChanged() {
+        m_size = sizeof(layout_type*);
+
+        int isinst = PyObject_IsInstance(Py_None, (PyObject*)mPyTypePtr);
+        if (isinst == -1) {
+            isinst = 0;
+            PyErr_Clear();
+        }
+
+        m_is_default_constructible = isinst != 0;
+
+        //none of these values can ever change, so we can just return
+        //because we don't need to be updated again.
+        return false;
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        PyObject* p = getPyObj(self);
+        buffer.getContext().serializePythonObject(p, buffer, fieldNumber);
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+         initializeHandleAt(self);
+         getPyObj(self) = buffer.getContext().deserializePythonObject(buffer, wireType);
+    }
+
+    typed_python_hash_type hash(instance_ptr left) {
+        return PyObject_Hash(getPyObj(left));
+    }
+
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
+
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
+
+    void constructor(instance_ptr self) {
+        initializeHandleAt(self);
+
+        PyEnsureGilAcquired getTheGil;
+        getPyObj(self) = incref(Py_None);
     }
 
     // construct a new Type. If 'givenType' is not NULL, then it's the type the user

@@ -30,26 +30,47 @@ public:
 
     static void copyConstructFromPythonInstanceConcrete(modeled_type* type, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
 
-    static std::pair<bool, PyObject*> tryToCall(const Function* f, PyObject* arg0=nullptr, PyObject* arg1=nullptr, PyObject* arg2=nullptr);
+    static std::pair<bool, PyObject*> tryToCall(const Function* f, instance_ptr functionClosure, PyObject* arg0=nullptr, PyObject* arg1=nullptr, PyObject* arg2=nullptr);
 
-    static std::pair<bool, PyObject*> tryToCallAnyOverload(const Function* f, PyObject* self, PyObject* args, PyObject* kwargs);
+    static std::pair<bool, PyObject*> tryToCallAnyOverload(const Function* f, instance_ptr functionClosure, PyObject* self, PyObject* args, PyObject* kwargs);
 
-    static std::pair<bool, PyObject*> tryToCallOverload(const Function* f, long overloadIx, PyObject* self, PyObject* args, PyObject* kwargs, bool convertExplicitly, bool dontActuallyCall);
+    // determine the 'compiler type' of an argument 'o'. If 'o' is already the right type, just
+    // use that. But for untyped function objects, and for Function objects with interpreter
+    // closures, we attempt to walk the closure graph and build a better type signature.
+    // returns a new reference to an object.
+    static PyObject* prepareArgumentToBePassedToCompiler(PyObject* o);
+
+    static std::pair<bool, PyObject*> tryToCallOverload(
+        const Function* f,
+        instance_ptr funcClosure,
+        long overloadIx,
+        PyObject* self,
+        PyObject* args,
+        PyObject* kwargs,
+        bool convertExplicitly
+    );
 
     //perform a linear scan of all specializations contained in overload and attempt to dispatch to each one.
     //returns <true, result or none> if we dispatched..
     //if 'isEntrypoint', then if we don't match a compiled specialization, ask the runtime to produce
     //one for us.
-    static std::pair<bool, PyObject*> dispatchFunctionCallToNative(const Function* f, long overloadIx, const FunctionCallArgMapping& mapping);
+    static std::pair<bool, PyObject*> dispatchFunctionCallToNative(
+        const Function* f,
+        instance_ptr functionClosure,
+        long overloadIx,
+        const FunctionCallArgMapping& mapping
+    );
 
     //attempt to dispatch to this one exact specialization by converting each arg to the relevant type. if
     //we can't convert, then return <false, nullptr>. If we do dispatch, return <true, result or none> and set
     //the python exception if native code returns an exception.
     static std::pair<bool, PyObject*> dispatchFunctionCallToCompiledSpecialization(
-                                                const Function::Overload& overload,
-                                                const Function::CompiledSpecialization& specialization,
-                                                const FunctionCallArgMapping& mapping
-                                                );
+        const Function::Overload& overload,
+        Type* closureType,
+        instance_ptr closureData,
+        const Function::CompiledSpecialization& specialization,
+        const FunctionCallArgMapping& mapping
+    );
 
     static PyObject* createOverloadPyRepresentation(Function* f);
 
@@ -65,10 +86,81 @@ public:
 
     static PyObject* overload(PyObject* cls, PyObject* args, PyObject* kwargs);
 
+    static PyObject* getClosure(PyObject* funcObj, PyObject* args, PyObject* kwargs);
+
+    static PyObject* extractPyFun(PyObject* funcObj, PyObject* args, PyObject* kwargs);
+
     static PyObject* withEntrypoint(PyObject* funcObj, PyObject* args, PyObject* kwargs);
 
     static PyObject* resultTypeFor(PyObject* funcObj, PyObject* args, PyObject* kwargs);
 
-    static Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj);
+    static PyObject* withClosureType(PyObject* cls, PyObject* args, PyObject* kwargs);
 
+    static PyObject* withOverloadVariableBindings(PyObject* cls, PyObject* args, PyObject* kwargs);
+
+    static Function* convertPythonObjectToFunctionType(
+        PyObject* name,
+        PyObject *funcObj,
+        bool assumeClosuresGlobal, // if true, then place closures in the function type itself
+                                   // this is appropriate if this function is a method of a class
+        bool ignoreAnnotations // if true, then the resulting function has no explicit annotations
+    );
+
+};
+
+
+class Path {
+public:
+    Path() {
+        mPathVals.reset(new std::vector<int>());
+    }
+
+    Path(int i) {
+        mPathVals.reset(new std::vector<int>());
+        mPathVals->push_back(i);
+    }
+
+    Path(const Path& parent, int i) {
+        mPathVals.reset(new std::vector<int>(*parent.mPathVals));
+        mPathVals->push_back(i);
+    }
+
+    Path(const Path& other) : mPathVals(other.mPathVals)
+    {
+    }
+
+    Path& operator=(const Path& other) {
+        mPathVals = other.mPathVals;
+        return *this;
+    }
+
+    bool operator<(const Path& other) const {
+        return *mPathVals < *other.mPathVals;
+    }
+
+    bool operator==(const Path& other) const {
+        return *mPathVals == *other.mPathVals;
+    }
+
+    Path operator+(int val) {
+        return Path(*this, val);
+    }
+
+    std::string toString() const {
+        std::ostringstream out;
+
+        out << "Path(";
+        for (long k = 0; k < mPathVals->size(); k++) {
+            if (k) {
+                out << ", ";
+            }
+            out << (*mPathVals)[k];
+        }
+        out << ")";
+
+        return out.str();
+    }
+
+private:
+    std::shared_ptr<std::vector<int> > mPathVals;
 };

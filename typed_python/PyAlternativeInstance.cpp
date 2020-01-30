@@ -151,11 +151,21 @@ PyObject* PyAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const
     Alternative* toCheck = type();
 
     auto it = toCheck->getMethods().find(attrName);
+
     if (it != toCheck->getMethods().end()) {
-        return PyMethod_New(
-            (PyObject*)it->second->getOverloads()[0].getFunctionObj(),
-            (PyObject*)this
+        return translateExceptionToPyObject([&]() {
+            PyObjectStealer funcObj(
+                it->second->getOverloads()[0].buildFunctionObj(
+                    it->second->getClosureType(),
+                    nullptr
+                )
             );
+
+            return PyMethod_New(
+                (PyObject*)funcObj,
+                (PyObject*)this
+            );
+        });
     }
 
     //see if its a member of our held type
@@ -207,10 +217,19 @@ PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrNam
 
     auto it = toCheck->getMethods().find(attrName);
     if (it != toCheck->getMethods().end()) {
-        return PyMethod_New(
-            (PyObject*)it->second->getOverloads()[0].getFunctionObj(),
-            (PyObject*)this
+        return translateExceptionToPyObject([&]() {
+            PyObjectStealer funcObj(
+                it->second->getOverloads()[0].buildFunctionObj(
+                    it->second->getClosureType(),
+                    nullptr
+                )
             );
+
+            return PyMethod_New(
+                (PyObject*)funcObj,
+                (PyObject*)this
+            );
+        });
     }
 
     //see if its a member of our held type
@@ -351,7 +370,7 @@ PyObject* PyConcreteAlternativeInstance::tp_call_concrete(PyObject* args, PyObje
     }
     // else
     Function* f = it->second;
-    auto res = PyFunctionInstance::tryToCallAnyOverload(f, (PyObject*)this, args, kwargs);
+    auto res = PyFunctionInstance::tryToCallAnyOverload(f, nullptr, (PyObject*)this, args, kwargs);
     if (res.first) {
         return res.second;
     }
@@ -404,7 +423,7 @@ std::pair<bool, PyObject*> PyConcreteAlternativeInstance::callMethod(const char*
         PyTuple_SetItem(targetArgTuple, 3, incref(arg2)); //steals a reference
     }
 
-    auto res = PyFunctionInstance::tryToCallAnyOverload(method, nullptr, targetArgTuple, nullptr);
+    auto res = PyFunctionInstance::tryToCallAnyOverload(method, nullptr, nullptr, targetArgTuple, nullptr);
     if (res.first) {
         return res;
     }

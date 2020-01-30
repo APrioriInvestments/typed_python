@@ -79,6 +79,9 @@ class TupleWrapper(Wrapper):
                 self.refAs(context, target, i).convert_default_initialize()
 
     def refAs(self, context, expr, which):
+        if not expr.isReference:
+            expr = context.pushMove(expr)
+
         return context.pushReference(
             self.subTypeWrappers[which],
             expr.expr.cast(native_ast.UInt8Ptr)

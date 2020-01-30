@@ -38,8 +38,6 @@ bool HeldClass::isBinaryCompatibleWithConcrete(Type* other) {
 }
 
 bool HeldClass::_updateAfterForwardTypesChanged() {
-    bool is_default_constructible = true;
-
     m_byte_offsets.clear();
 
     //first 8 bytes are the vtable pointer.
@@ -51,9 +49,9 @@ bool HeldClass::_updateAfterForwardTypesChanged() {
         size += std::get<1>(t)->bytecount();
     }
 
-    bool anyChanged = size != m_size || m_is_default_constructible != is_default_constructible;
+    bool anyChanged = size != m_size;
 
-    m_is_default_constructible = is_default_constructible;
+    m_is_default_constructible = m_memberFunctions.find("__init__") == m_memberFunctions.end();
     m_size = size;
 
     return anyChanged;
@@ -125,15 +123,6 @@ void HeldClass::setAttribute(instance_ptr self, int memberIndex, instance_ptr ot
             other
             );
         setInitializationFlag(self, memberIndex);
-    }
-}
-
-void HeldClass::emptyConstructor(instance_ptr self) {
-    vtableFor(self) = m_vtable;
-
-    //more efficient would be to just write over the bytes directly.
-    for (size_t k = 0; k < m_members.size(); k++) {
-        clearInitializationFlag(self, k);
     }
 }
 

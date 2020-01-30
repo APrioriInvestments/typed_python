@@ -53,6 +53,10 @@ public:
         return it->second;
     }
 
+    bool isPODConcrete() {
+        return true;
+    }
+
     bool _updateAfterForwardTypesChanged() {
         std::string name = "PointerTo(" + m_element_type->name() + ")";
 

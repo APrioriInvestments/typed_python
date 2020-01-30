@@ -30,6 +30,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
+    CAN_BE_NULL = False
 
     def __init__(self, pytype):
         super().__init__(pytype)

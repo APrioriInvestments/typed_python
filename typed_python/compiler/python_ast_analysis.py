@@ -14,6 +14,8 @@
 
 """utilities for analyzing python_ast objects."""
 
+import collections
+
 from typed_python.python_ast import (
     Module,
     Statement,
@@ -88,14 +90,34 @@ def computeAssignedVariables(astNode):
     Args:
         astNode - any python_ast object, or a list/tuple of them, or a primitive.
     """
-    variables = set()
+    return set(computeVariablesAssignmentCounts(astNode).keys())
+
+
+def computeVariablesAssignedOnlyOnce(astNode):
+    assignmentCounts = computeVariablesAssignmentCounts(astNode)
+
+    return set([varname for varname, count in assignmentCounts.items() if count == 1])
+
+
+def computeVariablesAssignmentCounts(astNode):
+    """Count how many times each variable is assigned by this astNode in the current expression.
+
+    Args:
+        astNode - a Statement, Expression, or one of the types reachable from those.
+
+    Returns:
+        a Dict(str, int) with keys being variables and values being counts of assignments.
+    """
+
+    assignmentCounts = collections.defaultdict(int)
 
     def visit(x):
         if isinstance(x, Alias):
-            variables.add(x)
+            assignmentCounts[x] += 1
+
         if isinstance(x, Expr):
             if x.matches.Name and (x.ctx.matches.Store or x.ctx.matches.Del or x.ctx.matches.AugStore):
-                variables.add(x.id)
+                assignmentCounts[x.id] += 1
 
             if x.matches.Lambda:
                 return False
@@ -106,29 +128,90 @@ def computeAssignedVariables(astNode):
             # in each place.
 
             if x.matches.FunctionDef:
-                variables.add(x.name)
+                assignmentCounts[x.name] += 1
                 # don't recurse into the body, since assignments there are not propagated
                 # here. When we handle global/nonlocal, we'll need to modify this behavior
                 return False
             if x.matches.ClassDef:
-                variables.add(x.name)
+                assignmentCounts[x.name] += 1
                 return False
-            if x.matches.Nonlocal:
-                raise NotImplementedError("Nonlocal keyword isn't supported yet.")
-            if x.matches.Global:
-                raise NotImplementedError("Global keyword isn't supported yet.")
-            if x.matches.AsyncFunctionDef:
-                raise NotImplementedError("AsyncFunctionDef isn't supported yet.")
-            if x.matches.AsyncWith:
-                raise NotImplementedError("AsyncWith isn't supported yet.")
-            if x.matches.AsyncFor:
-                raise NotImplementedError("AsyncFor isn't supported yet.")
+
+            assertValidStatement(x)
 
         return True
 
     visitPyAstChildren(astNode, visit)
 
-    return variables
+    return assignmentCounts
+
+
+def computeVariablesReadByClosures(astNode):
+    """Determine the set of variables that are read from by deffed functions and lambdas."""
+    closureVars = set()
+
+    def visit(x):
+        if isinstance(x, Statement):
+            # we don't need to worry about all the individual operations because
+            # we can catch the variable names from the Expr.Name context as they're used
+            # in each place.
+
+            if x.matches.FunctionDef:
+                closureVars.update(computeReadVariables(x))
+                return False
+
+            assertValidStatement(x)
+
+        if isinstance(x, Expr):
+            if x.matches.Lambda:
+                closureVars.update(computeReadVariables(x))
+                return False
+
+        return True
+
+    visitPyAstChildren(astNode, visit)
+
+    return closureVars
+
+
+def extractFunctionDefs(astNode):
+    """Find all the direct 'def' operations that could produce closure elements.
+
+    Returns:
+        a list of Statement.FunctionDef instances
+    """
+    functionDefs = []
+    assignedLambdas = []
+    freeLambdas = []
+
+    def visit(x):
+        if isinstance(x, Statement):
+            # we don't need to worry about all the individual operations because
+            # we can catch the variable names from the Expr.Name context as they're used
+            # in each place.
+
+            if x.matches.FunctionDef:
+                functionDefs.append(x)
+                return False
+
+            if x.matches.Assign and len(x.targets) == 1 and x.targets[0].matches.Name and x.value.matches.Lambda:
+                assignedLambdas.append((x.targets[0].id, x.value))
+                return False
+
+            if x.matches.ClassDef:
+                return False
+
+            assertValidStatement(x)
+
+        if isinstance(x, Expr):
+            if x.matches.Lambda:
+                freeLambdas.append(x)
+                return False
+
+        return True
+
+    visitPyAstChildren(astNode, visit)
+
+    return functionDefs, assignedLambdas, freeLambdas
 
 
 def computeFunctionArgVariables(args: Arguments):
@@ -152,7 +235,16 @@ def computeFunctionArgVariables(args: Arguments):
 
 
 def computeReadVariables(astNode):
-    """Return a set of variable names that are read from by this ast node or children."""
+    """Return a set of variable names that are read from by this ast node or children.
+
+    This doesn't have any masking behavior. E.g. something like
+
+        x = 10
+        return x
+
+    reads 'x' despite the fact that it is not 'free' in 'x' because it reads from the slot
+    that contains 'x'
+    """
     variables = set()
 
     def visit(x):
@@ -193,19 +285,26 @@ def computeReadVariables(astNode):
                 variables.update(computeReadVariables(x.decorator_list))
                 variables.update(computeReadVariables(x.body))
                 return False
-            if x.matches.Nonlocal:
-                raise NotImplementedError("Nonlocal keyword isn't supported yet.")
-            if x.matches.Global:
-                raise NotImplementedError("Global keyword isn't supported yet.")
-            if x.matches.AsyncFunctionDef:
-                raise NotImplementedError("AsyncFunctionDef isn't supported yet.")
-            if x.matches.AsyncWith:
-                raise NotImplementedError("AsyncWith isn't supported yet.")
-            if x.matches.AsyncFor:
-                raise NotImplementedError("AsyncFor isn't supported yet.")
+
+            assertValidStatement(x)
 
         return True
 
     visitPyAstChildren(astNode, visit)
 
     return variables
+
+
+def assertValidStatement(statement):
+    """Complain about any python_ast.Statement objects we don't support."""
+
+    if statement.matches.Nonlocal:
+        raise NotImplementedError("Nonlocal keyword isn't supported yet.")
+    if statement.matches.Global:
+        raise NotImplementedError("Global keyword isn't supported yet.")
+    if statement.matches.AsyncFunctionDef:
+        raise NotImplementedError("AsyncFunctionDef isn't supported yet.")
+    if statement.matches.AsyncWith:
+        raise NotImplementedError("AsyncWith isn't supported yet.")
+    if statement.matches.AsyncFor:
+        raise NotImplementedError("AsyncFor isn't supported yet.")

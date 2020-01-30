@@ -73,7 +73,7 @@ class SimpleAlternativeWrapper(Wrapper):
         alt = self.typeRepresentation
         if getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
             assert len(alt.__len__.overloads) == 1
-            return context.call_py_function(alt.__len__.overloads[0].functionObj, (expr,), {})
+            return context.call_overload(alt.__len__.overloads[0], None, (expr,), {})
         return context.constant(0)
 
     def convert_len(self, context, expr):

@@ -42,6 +42,8 @@ PyObject *MakeUInt64Type(PyObject* nullValue, PyObject* args);
 PyObject *MakeStringType(PyObject* nullValue, PyObject* args);
 PyObject *MakeBytesType(PyObject* nullValue, PyObject* args);
 PyObject *MakeEmbeddedMessageType(PyObject* nullValue, PyObject* args);
+PyObject *MakePyCellType(PyObject* nullValue, PyObject* args);
+PyObject *MakeTypedCellType(PyObject* nullValue, PyObject* args);
 PyObject *MakeNoneType(PyObject* nullValue, PyObject* args);
 PyObject *MakeValueType(PyObject* nullValue, PyObject* args);
 PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args);

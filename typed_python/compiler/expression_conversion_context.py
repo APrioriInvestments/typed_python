@@ -17,7 +17,7 @@ import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 import types
 
-from typed_python.internals import makeFunction, FunctionOverload
+from typed_python.internals import makeFunctionType, FunctionOverload
 from typed_python.compiler.function_stack_state import FunctionStackState
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.python_object_representation import pythonObjectRepresentation
@@ -28,6 +28,9 @@ from typed_python import NoneType, Alternative, OneOf, Int32, ListOf, String, Tu
 from typed_python._types import getTypePointer
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
+from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
+from typed_python.compiler.type_wrappers.typed_cell_wrapper import TypedCellWrapper
+from typed_python import bytecount
 
 builtinValueIdToNameAndValue = {id(v): (k, v) for k, v in __builtins__.items()}
 
@@ -273,15 +276,6 @@ class ExpressionConversionContext(object):
             val=e1,
             within=e2(native_ast.Expression.Variable(name=v))
         )
-
-    def pushReferenceCopy(self, type, expression):
-        """Given a native expression that returns a reference, duplicate the object
-        and return a handle."""
-        type = typeWrapper(type)
-
-        toCopy = self.pushReference(type, expression)
-
-        return self.push(type, lambda target: type.convert_copy_initialize(target, toCopy))
 
     def pushReference(self, type, expression):
         """Push a reference to an object that's guaranteed to be alive for the duration of the expression."""
@@ -949,7 +943,7 @@ class ExpressionConversionContext(object):
             raise Exception(f"Can't convert a py function of type {type(f)}")
 
         if f not in _pyFuncToFuncCache:
-            _pyFuncToFuncCache[f] = makeFunction(f.__name__, f)
+            _pyFuncToFuncCache[f] = makeFunctionType(f.__name__, f)
         typedFunc = _pyFuncToFuncCache[f]
 
         concreteArgs = self.buildFunctionArguments(typedFunc.overloads[0], args, kwargs)
@@ -957,13 +951,66 @@ class ExpressionConversionContext(object):
         if concreteArgs is None:
             return None
 
-        call_target = self.functionContext.converter.convert(f, [a.expr_type for a in concreteArgs], returnTypeOverload)
+        funcGlobals = dict(f.__globals__)
+
+        if f.__closure__:
+            for i in range(len(f.__closure__)):
+                funcGlobals[f.__code__.co_freevars[i]] = f.__closure__[i].cell_contents
+
+        call_target = self.functionContext.converter.convert(
+            f.__name__,
+            f.__code__,
+            funcGlobals,
+            [a.expr_type for a in concreteArgs],
+            returnTypeOverload
+        )
 
         if call_target is None:
             self.pushException(TypeError, "Function %s was not convertible." % f.__qualname__)
             return
 
         return self.call_typed_call_target(call_target, concreteArgs)
+
+    def call_overload(self, overload, funcObj, args, kwargs, returnTypeOverload=None):
+        concreteArgs = self.buildFunctionArguments(overload, args, kwargs)
+
+        if concreteArgs is None:
+            return None
+
+        if funcObj is not None:
+            closureTuple = funcObj.changeType(funcObj.expr_type.closureWrapper)
+        else:
+            # if the overload has an empty closure, then callers can just pass 'None'.
+            # check to make sure it's really an empty closure. This happens with
+            # things like class methods, which are expected to be entirely static.
+            assert bytecount(overload.functionTypeObject.ClosureType) == 0
+            closureTuple = self.push(typeWrapper(overload.functionTypeObject.ClosureType), lambda x: None)
+
+        closureArgs = [
+            PythonTypedFunctionWrapper.closurePathToCellValue(path, closureTuple)
+            for path in overload.closureVarLookups.values()
+        ]
+
+        functionGlobals = dict(overload.functionGlobals)
+        for varname, cell in overload.funcGlobalsInCells.items():
+            functionGlobals[varname] = cell.cell_contents
+
+        call_target = self.functionContext.converter.convert(
+            overload.name,
+            overload.functionCode,
+            functionGlobals,
+            [a.expr_type for a in closureArgs]
+            + [a.expr_type for a in concreteArgs],
+            returnTypeOverload if returnTypeOverload is not None else
+            typeWrapper(overload.returnType) if overload.returnType is not None else
+            None
+        )
+
+        if call_target is None:
+            self.pushException(TypeError, "Function %s was not convertible." % overload.name)
+            return
+
+        return self.call_typed_call_target(call_target, closureArgs + concreteArgs)
 
     def call_typed_call_target(self, call_target, args):
         # force arguments to a type appropriate for argpassing
@@ -981,6 +1028,11 @@ class ExpressionConversionContext(object):
             return
 
         if call_target.output_type.is_pass_by_ref:
+            assert len(call_target.named_call_target.arg_types) == len(native_args) + 1, "\n\n%s\n%s" % (
+                call_target.named_call_target.arg_types,
+                [a.expr_type for a in args]
+            )
+
             return self.push(
                 call_target.output_type,
                 lambda output_slot: call_target.call(output_slot.expr, *native_args)
@@ -1051,18 +1103,7 @@ class ExpressionConversionContext(object):
         self.pushEffect(nativeExpr)
 
     def isInitializedVarExpr(self, name):
-        if self.functionContext.variableIsAlwaysEmpty(name):
-            return self.constant(True)
-
-        return TypedExpression(
-            self,
-            native_ast.Expression.StackSlot(
-                name=name + ".isInitialized",
-                type=native_ast.Bool
-            ),
-            bool,
-            isReference=True
-        )
+        return self.functionContext.isInitializedVarExpr(self, name)
 
     def markVariableInitialized(self, varname):
         if self.functionContext.variableIsAlwaysEmpty(varname):
@@ -1095,7 +1136,12 @@ class ExpressionConversionContext(object):
             if self.functionContext.externalScopeVarExpr(self, name) is not None:
                 res = self.functionContext.externalScopeVarExpr(self, name)
 
+                if self.functionContext.isClosureVariable(name) and isinstance(res.expr_type, TypedCellWrapper):
+                    # explicitly unwrap cells
+                    return res.convert_method_call("get", (), {})
+
                 varType = self.variableStates.currentType(name)
+
                 return self.recastVariableAsRestrictedType(res, varType)
 
             if self.variableStates.couldBeUninitialized(name):
@@ -1106,14 +1152,15 @@ class ExpressionConversionContext(object):
                         self.pushException(UnboundLocalError, "local variable '%s' referenced before assignment" % name)
 
             res = self.functionContext.localVariableExpression(self, name)
+
             if res is None:
                 return None
 
             varType = self.variableStates.currentType(name)
             return self.recastVariableAsRestrictedType(res, varType)
 
-        if name in self.functionContext._free_variable_lookup:
-            return pythonObjectRepresentation(self, self.functionContext._free_variable_lookup[name])
+        if name in self.functionContext._globals:
+            return pythonObjectRepresentation(self, self.functionContext._globals[name])
 
         if name in __builtins__:
             return pythonObjectRepresentation(self, __builtins__[name])
@@ -1512,6 +1559,11 @@ class ExpressionConversionContext(object):
                 aList.convert_method_call("__setitem__", (keyVal, valVal), {})
 
             return aList
+
+        if ast.matches.Lambda:
+            return self.functionContext.localVariableExpression(self, ".closure").changeType(
+                self.functionContext.functionDefToType[ast]
+            )
 
         raise ConversionException("can't handle python expression type %s" % ast.Name)
 
