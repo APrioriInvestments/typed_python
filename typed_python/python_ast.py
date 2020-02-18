@@ -849,10 +849,16 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
 # but for which we never had the source code.
 _originalAstCache = weakref.WeakKeyDictionary()
 
+# a memo for the pyast -> algebraic ast mapping
+_algebraicAstCache = {}
+
 
 def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
     if f in _originalAstCache:
         return _originalAstCache[f]
+
+    if f.__code__ in _algebraicAstCache:
+        return _algebraicAstCache[f.__code__]
 
     try:
         pyast = ast_util.pyAstFor(f)
@@ -865,9 +871,17 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
         raise Exception("Failed to get source for function %s" % (f.__qualname__))
 
     try:
-        return convertPyAstToAlgebraic(pyast, fname, keepLineInformation)
+        algebraicAst = convertPyAstToAlgebraic(pyast, fname, keepLineInformation)
+
+        _algebraicAstCache[f.__code__] = algebraicAst
+
+        return algebraicAst
     except Exception as e:
         raise Exception("Failed to convert function at %s:%s:\n%s" % (fname, lineno, repr(e)))
+
+
+# a memo from pyAst to the 'code' object that we evaluate to def it.
+_pyAstToCodeObjectCache = {}
 
 
 def evaluateFunctionPyAst(pyAst):
@@ -895,12 +909,19 @@ def evaluateFunctionPyAst(pyAst):
     globals = {}
 
     if pyAstModule.matches.Expression:
-        codeObject = compile(convertAlgebraicToPyAst(pyAstModule), filename, 'eval')
+        if pyAst not in _pyAstToCodeObjectCache:
+            _pyAstToCodeObjectCache[pyAst] = compile(
+                convertAlgebraicToPyAst(pyAstModule), filename, 'eval'
+            )
 
-        res = eval(codeObject, globals)
+        res = eval(_pyAstToCodeObjectCache[pyAst], globals)
     else:
-        codeObject = compile(convertAlgebraicToPyAst(pyAstModule), filename, 'exec')
-        exec(codeObject, globals)
+        if pyAst not in _pyAstToCodeObjectCache:
+            _pyAstToCodeObjectCache[pyAst] = compile(
+                convertAlgebraicToPyAst(pyAstModule), filename, 'exec'
+            )
+
+        exec(_pyAstToCodeObjectCache[pyAst], globals)
 
         res = globals[pyAstModule.body[0].name]
 
