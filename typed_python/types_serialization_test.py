@@ -20,6 +20,9 @@ import threading
 import time
 import unittest
 import numpy
+import numpy.linalg
+import lz4
+import lz4.frame
 import datetime
 import pytest
 import pytz
@@ -1023,6 +1026,20 @@ class TypesSerializationTest(unittest.TestCase):
 
         pytz = dummy_test_module.pytz
         self.assertIs(pytz, sc.deserialize(sc.serialize(pytz)))
+
+    def test_serialize_submodules(self):
+        codebase = Codebase._FromModule(dummy_test_module)
+        context = codebase.serializationContext
+
+        self.assertEqual(
+            context.deserialize(context.serialize(numpy.linalg)),
+            numpy.linalg
+        )
+
+        self.assertEqual(
+            context.deserialize(context.serialize(lz4.frame)),
+            lz4.frame
+        )
 
     def test_serialize_lambdas_with_references_in_list_comprehensions(self):
         codebase = Codebase._FromModule(dummy_test_module)

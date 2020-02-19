@@ -22,6 +22,7 @@ import datetime
 import pytz
 import lz4.frame
 import logging
+import importlib
 
 try:
     from google.protobuf.message import Message as GoogleProtobufMessage
@@ -32,6 +33,10 @@ _reconstruct = numpy.array([1, 2, 3]).__reduce__()[0]
 _ndarray = numpy.ndarray
 
 
+def importSystemSubmodule(name):
+    return importlib.import_module(name)
+
+
 def createEmptyFunction(ast):
     return evaluateFunctionPyAst(ast)
 
@@ -40,6 +45,7 @@ _builtin_name_to_value = {
     ".builtin." + k: v for k, v in __builtins__.items()
     if isinstance(v, type) or 'builtin_function_or_method' in str(type(v))
 }
+_builtin_name_to_value[".builtin.importSystemSubmodule"] = importSystemSubmodule
 _builtin_name_to_value[".builtin.createEmptyFunction"] = createEmptyFunction
 _builtin_name_to_value[".builtin._reconstruct"] = _reconstruct
 _builtin_name_to_value[".builtin._ndarray"] = _ndarray
@@ -286,6 +292,11 @@ class SerializationContext(object):
 
             return (createEmptyFunction, args, representation)
 
+        if isinstance(inst, ModuleType):
+            rootModule = inst.__name__.split(".")[0]
+            if rootModule == "numpy" or (".modules." + rootModule) in self.nameToObject:
+                return (importSystemSubmodule, (inst.__name__,), ())
+
         return None
 
     def setInstanceStateFromRepresentation(self, instance, representation):
@@ -329,6 +340,9 @@ class SerializationContext(object):
             if representation is not None:
                 for k, v in representation.items():
                     setattr(instance, k, v)
+            return True
+
+        if isinstance(instance, ModuleType):
             return True
 
         return False
