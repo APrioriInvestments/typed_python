@@ -939,6 +939,12 @@ class ExpressionConversionContext(object):
         self.constant(print).convert_call(realArgs, {})
 
     def call_py_function(self, f, args, kwargs, returnTypeOverload=None):
+        """Call a 'free' python function 'f'.
+
+        The function will be memoized by its actual value. This means that
+        different functions with the same code and closures but different
+        identities will be compiled separately.
+        """
         if not isinstance(f, types.FunctionType):
             raise Exception(f"Can't convert a py function of type {type(f)}")
 
@@ -961,8 +967,10 @@ class ExpressionConversionContext(object):
             f.__name__,
             f.__code__,
             funcGlobals,
+            [],
             [a.expr_type for a in concreteArgs],
-            returnTypeOverload
+            returnTypeOverload,
+            identityOverride=f
         )
 
         if call_target is None:
@@ -991,14 +999,11 @@ class ExpressionConversionContext(object):
             for path in overload.closureVarLookups.values()
         ]
 
-        functionGlobals = dict(overload.functionGlobals)
-        for varname, cell in overload.funcGlobalsInCells.items():
-            functionGlobals[varname] = cell.cell_contents
-
         call_target = self.functionContext.converter.convert(
             overload.name,
             overload.functionCode,
-            functionGlobals,
+            overload.realizedGlobals,
+            list(overload.closureVarLookups),
             [a.expr_type for a in closureArgs]
             + [a.expr_type for a in concreteArgs],
             returnTypeOverload if returnTypeOverload is not None else

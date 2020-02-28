@@ -421,9 +421,12 @@ class FunctionConversionContext(object):
 
         if len(input_types) != self._ast_arg.totalArgCount() + len(self._closureVarnames):
             raise ConversionException(
-                "%s expected at least %s arguments but got %s. Expected argnames are %s. Input types are %s" %
+                "%s at %s:%s, with closure %s, expected at least %s arguments but got %s. Expected argnames are %s. Input types are %s" %
                 (
                     self.name,
+                    self._statements[0].filename,
+                    self._statements[0].line_number,
+                    self._closureVarnames,
                     self._ast_arg.totalArgCount() + len(self._closureVarnames),
                     len(input_types),
                     self._argnames, input_types
@@ -485,8 +488,6 @@ class FunctionConversionContext(object):
         )
 
     def upsizeVariableType(self, varname, new_type):
-        if varname is FunctionOutput and self.name == "exc1":
-            raise Exception("BOO")
         if self._varname_to_type.get(varname) is None:
             if new_type is None:
                 return

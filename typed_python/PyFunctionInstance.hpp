@@ -92,6 +92,8 @@ public:
 
     static PyObject* withEntrypoint(PyObject* funcObj, PyObject* args, PyObject* kwargs);
 
+    static PyObject* withNocompile(PyObject* funcObj, PyObject* args, PyObject* kwargs);
+
     static PyObject* resultTypeFor(PyObject* funcObj, PyObject* args, PyObject* kwargs);
 
     static PyObject* withClosureType(PyObject* cls, PyObject* args, PyObject* kwargs);

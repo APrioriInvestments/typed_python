@@ -323,6 +323,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         @NotCompiled
         def f(x: float) -> float:
+            assert not isCompiled()
             thisWouldNotBeVisible.add(x)
             return x
 

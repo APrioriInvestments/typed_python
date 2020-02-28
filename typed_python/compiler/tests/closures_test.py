@@ -15,7 +15,7 @@
 import unittest
 import time
 import pytest
-from typed_python import Function, NamedTuple, bytecount, ListOf, TypedCell, Forward, PyCell, Int64, Tuple, TupleOf
+from typed_python import Class, Final, Function, NamedTuple, bytecount, ListOf, TypedCell, Forward, PyCell, Int64, Tuple, TupleOf
 from typed_python.compiler.runtime import RuntimeEventVisitor, Entrypoint
 from typed_python._types import refcount
 
@@ -743,3 +743,24 @@ class TestCompilingClosures(unittest.TestCase):
 
         for i in range(10):
             self.assertEqual(callItE(i), callIt(i))
+
+    def test_closure_bound_in_class(self):
+        def makeClass(i):
+            def f():
+                return i
+
+            class C(Class, Final):
+                def f(self):
+                    return f()
+
+            return C
+
+        C1 = makeClass(1)
+        C2 = makeClass(2)
+
+        @Entrypoint
+        def callF(c):
+            return c.f()
+
+        self.assertEqual(callF(C1()), 1)
+        self.assertEqual(callF(C2()), 2)

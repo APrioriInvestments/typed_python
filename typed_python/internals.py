@@ -201,7 +201,9 @@ def makeFunctionType(name, f, isMethod=False, ignoreAnnotations=False, assumeClo
     if spec.varkw is not None:
         arg_types.append((spec.varkw, getAnn(spec.varkw), None, False, True))
 
-    return typed_python._types.Function(name, return_type, f, tuple(arg_types), assumeClosuresGlobal)
+    res = typed_python._types.Function(name, return_type, f, tuple(arg_types), assumeClosuresGlobal)
+
+    return res
 
 
 class ClassMetaclass(type):
@@ -264,9 +266,9 @@ class ClassMetaclass(type):
         )
 
 
-def Function(f):
+def Function(f, assumeClosuresGlobal=False):
     """Turn a normal python function into a 'typed_python.Function' which obeys type restrictions."""
-    return makeFunctionType(f.__name__, f)(f)
+    return makeFunctionType(f.__name__, f, assumeClosuresGlobal=assumeClosuresGlobal)(f)
 
 
 class FunctionOverloadArg:
@@ -332,7 +334,21 @@ class FunctionOverload:
         self.functionGlobals = funcGlobals
         self.funcGlobalsInCells = funcGlobalsInCells
         self.returnType = returnType
+        self._realizedGlobals = None
         self.args = ()
+
+    @property
+    def realizedGlobals(self):
+        """Merge the 'functionGlobals' and the set of globals in 'cells' into a single dict."""
+        if self._realizedGlobals is None:
+            res = dict(self.functionGlobals)
+
+            for varname, cell in self.funcGlobalsInCells.items():
+                res[varname] = cell.cell_contents
+
+            self._realizedGlobals = res
+
+        return self._realizedGlobals
 
     @property
     def name(self):
@@ -356,10 +372,9 @@ class FunctionOverload:
         self.args = self.args + (FunctionOverloadArg(name, defaultVal, typeFilter, isStarArg, isKwarg),)
 
     def __str__(self):
-        return "FunctionOverload(returns %s, %s, %s)" % (
+        return "FunctionOverload(returns %s, %s)" % (
             self.returnType,
-            self.args,
-            "<signature>" if self.functionObj is None else "<impl>"
+            self.args
         )
 
     def _installNativePointer(self, fp, returnType, argumentTypes):

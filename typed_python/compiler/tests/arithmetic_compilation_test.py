@@ -295,6 +295,16 @@ class TestArithmeticCompilation(unittest.TestCase):
                     # e.g. round(Float64(1), 0) returns int when interpreted,
                     # but Float64 when compiled
 
+    def test_can_call_types_with_no_args(self):
+        @Entrypoint
+        def makeEmpty(T):
+            return T()
+
+        self.assertEqual(makeEmpty(int), 0)
+        self.assertEqual(makeEmpty(float), 0.0)
+        self.assertEqual(makeEmpty(bool), False)
+        self.assertEqual(makeEmpty(str), "")
+
     def test_can_compile_register_operations(self):
         failed = False
 

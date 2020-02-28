@@ -820,6 +820,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                     NamedTuple::Make({}, {}) :
                     NamedTuple::Make(closureVarTypes, closureVarnames)
                 }),
+            false,
             false
         );
     }

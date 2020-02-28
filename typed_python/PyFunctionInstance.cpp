@@ -563,6 +563,12 @@ void PyFunctionInstance::mirrorTypeInformationIntoPyTypeConcrete(Function* inTyp
         "isEntrypoint",
         inType->isEntrypoint() ? Py_True : Py_False
     );
+
+    PyDict_SetItemString(
+        pyType->tp_dict,
+        "isNocompile",
+        inType->isNocompile() ? Py_True : Py_False
+    );
 }
 
 int PyFunctionInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
@@ -620,6 +626,22 @@ PyObject* PyFunctionInstance::withEntrypoint(PyObject* funcObj, PyObject* args, 
     Function* resType = (Function*)((PyInstance*)(funcObj))->type();
 
     resType = resType->withEntrypoint(isWithEntrypoint);
+
+    return PyInstance::extractPythonObject(((PyInstance*)funcObj)->dataPtr(), resType);
+}
+
+/* static */
+PyObject* PyFunctionInstance::withNocompile(PyObject* funcObj, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {"isNocompile", NULL};
+    int isNocompile;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "p", (char**)kwlist, &isNocompile)) {
+        return nullptr;
+    }
+
+    Function* resType = (Function*)((PyInstance*)(funcObj))->type();
+
+    resType = resType->withNocompile(isNocompile);
 
     return PyInstance::extractPythonObject(((PyInstance*)funcObj)->dataPtr(), resType);
 }
@@ -741,9 +763,10 @@ PyObject* PyFunctionInstance::resultTypeFor(PyObject* funcObj, PyObject* args, P
 
 /* static */
 PyMethodDef* PyFunctionInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef[8] {
+    return new PyMethodDef[9] {
         {"overload", (PyCFunction)PyFunctionInstance::overload, METH_VARARGS | METH_KEYWORDS, NULL},
         {"withEntrypoint", (PyCFunction)PyFunctionInstance::withEntrypoint, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"withNocompile", (PyCFunction)PyFunctionInstance::withNocompile, METH_VARARGS | METH_KEYWORDS, NULL},
         {"resultTypeFor", (PyCFunction)PyFunctionInstance::resultTypeFor, METH_VARARGS | METH_KEYWORDS, NULL},
         {"extractPyFun", (PyCFunction)PyFunctionInstance::extractPyFun, METH_VARARGS | METH_KEYWORDS, NULL},
         {"getClosure", (PyCFunction)PyFunctionInstance::getClosure, METH_VARARGS | METH_KEYWORDS, NULL},

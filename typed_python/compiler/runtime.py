@@ -225,7 +225,8 @@ class Runtime:
             callTarget = self.converter.convert(
                 overload.name,
                 overload.functionCode,
-                overload.functionGlobals,
+                overload.realizedGlobals,
+                list(overload.closureVarLookups),
                 inputWrappers,
                 overload.returnType,
                 assertIsRoot=True
@@ -304,10 +305,9 @@ def NotCompiled(pyFunc):
     The actual python object for the function gets used, so it can have references
     to global state in the program.
     """
-    assert isinstance(pyFunc, types.FunctionType), "Can't apply NotCompiled to anything but functions."
+    pyFunc = Function(pyFunc, assumeClosuresGlobal=True).withNocompile(True)
 
-    pyFunc.__typed_python_no_compile__ = True
-    return Function(pyFunc)
+    return pyFunc
 
 
 def Entrypoint(pyFunc):

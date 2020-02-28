@@ -381,7 +381,7 @@ public:
             const std::map<std::string, ClosureVariableBinding> closureBindings,
             Type* returnType,
             const std::vector<FunctionArg>& args
-            ) :
+        ) :
                 mFunctionCode(incref(pyFuncCode)),
                 mFunctionGlobals(incref(pyFuncGlobals)),
                 mFunctionDefaults(incref(pyFuncDefaults)),
@@ -422,9 +422,6 @@ public:
         }
 
         ~Overload() {
-            if (mCachedFunctionObj) {
-                decref(mCachedFunctionObj);
-            }
         }
 
         Overload withShiftedFrontClosureBindings(long shiftAmount) const {
@@ -647,9 +644,7 @@ public:
                 mFunctionGlobalsInCells[nameAndOther.first] = incref(nameAndOther.second);
             }
 
-            if (other.mCachedFunctionObj) {
-                mCachedFunctionObj = incref(other.mCachedFunctionObj);
-            }
+            mCachedFunctionObj = other.mCachedFunctionObj;
 
             return *this;
         }
@@ -674,6 +669,8 @@ public:
 
         PyObject* mFunctionAnnotations;
 
+        // note that we are deliberately leaking this value because Overloads get
+        // stashed in static std::map memos anyways.
         mutable PyObject* mCachedFunctionObj;
 
         std::map<std::string, ClosureVariableBinding> mClosureBindings;
@@ -697,11 +694,13 @@ public:
     Function(std::string inName,
             const std::vector<Overload>& overloads,
             Type* closureType,
-            bool isEntrypoint
+            bool isEntrypoint,
+            bool isNocompile
             ) :
         Type(catFunction),
         mOverloads(overloads),
         mIsEntrypoint(isEntrypoint),
+        mIsNocompile(isNocompile),
         mRootName(inName)
     {
         m_is_simple = false;
@@ -720,20 +719,20 @@ public:
         m_is_default_constructible = mClosureType->is_default_constructible();
     }
 
-    static Function* Make(std::string inName, const std::vector<Overload>& overloads, Type* closureType, bool isEntrypoint) {
+    static Function* Make(std::string inName, const std::vector<Overload>& overloads, Type* closureType, bool isEntrypoint, bool isNocompile) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        typedef std::tuple<const std::string, const std::vector<Overload>, Type*, bool> keytype;
+        typedef std::tuple<const std::string, const std::vector<Overload>, Type*, bool, bool> keytype;
 
         static std::map<keytype, Function*> *m = new std::map<keytype, Function*>();
 
-        auto it = m->find(keytype(inName, overloads, closureType, isEntrypoint));
+        auto it = m->find(keytype(inName, overloads, closureType, isEntrypoint, isNocompile));
         if (it == m->end()) {
             it = m->insert(std::pair<keytype, Function*>(
-                keytype(inName, overloads, closureType, isEntrypoint),
-                new Function(inName, overloads, closureType, isEntrypoint)
+                keytype(inName, overloads, closureType, isEntrypoint, isNocompile),
+                new Function(inName, overloads, closureType, isEntrypoint, isNocompile)
             )).first;
         }
 
@@ -770,7 +769,13 @@ public:
                 overloads.push_back(o.withShiftedFrontClosureBindings(((Tuple*)f1->getClosureType())->getTypes().size()));
             }
 
-            return Function::Make(f1->mRootName, overloads, Tuple::Make(types), f1->isEntrypoint() || f2->isEntrypoint());
+            return Function::Make(
+                f1->mRootName,
+                overloads,
+                Tuple::Make(types),
+                f1->isEntrypoint() || f2->isEntrypoint(),
+                f1->isNocompile() || f2->isNocompile()
+            );
         }
 
         // in theory, we can merge any kinds of closures if we're careful about how to do it,
@@ -871,8 +876,16 @@ public:
         return mIsEntrypoint;
     }
 
+    bool isNocompile() const {
+        return mIsNocompile;
+    }
+
     Function* withEntrypoint(bool isEntrypoint) {
-        return Function::Make(mRootName, mOverloads, mClosureType, isEntrypoint);
+        return Function::Make(mRootName, mOverloads, mClosureType, isEntrypoint, mIsNocompile);
+    }
+
+    Function* withNocompile(bool isNocompile) {
+        return Function::Make(mRootName, mOverloads, mClosureType, mIsEntrypoint, isNocompile);
     }
 
     Type* getClosureType() const {
@@ -931,11 +944,11 @@ public:
     }
 
     Function* replaceClosure(Type* closureType) {
-        return Function::Make(mRootName, mOverloads, closureType, mIsEntrypoint);
+        return Function::Make(mRootName, mOverloads, closureType, mIsEntrypoint, mIsNocompile);
     }
 
     Function* replaceOverloads(const std::vector<Overload>& overloads) {
-        return Function::Make(mRootName, overloads, mClosureType, mIsEntrypoint);
+        return Function::Make(mRootName, overloads, mClosureType, mIsEntrypoint, mIsNocompile);
     }
 
     Function* replaceOverloadVariableBindings(long index, const std::map<std::string, ClosureVariableBinding>& bindings) {
@@ -946,7 +959,7 @@ public:
 
         overloads[index] = overloads[index].withClosureBindings(bindings);
 
-        return Function::Make(mRootName, overloads, mClosureType, mIsEntrypoint);
+        return Function::Make(mRootName, overloads, mClosureType, mIsEntrypoint, mIsNocompile);
     }
 
 private:
@@ -955,6 +968,8 @@ private:
     Type* mClosureType;
 
     bool mIsEntrypoint;
+
+    bool mIsNocompile;
 
     std::string mRootName;
 };

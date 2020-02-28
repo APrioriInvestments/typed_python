@@ -187,7 +187,7 @@ class PythonToNativeConverter(object):
         self._used_names.add(res)
         return res
 
-    def createConversionContext(self, identity, funcName, funcCode, funcGlobals, input_types, output_type):
+    def createConversionContext(self, identity, funcName, funcCode, funcGlobals, closureVars, input_types, output_type):
         pyast = self._code_to_ast(funcCode)
 
         if isinstance(pyast, python_ast.Statement.FunctionDef):
@@ -208,7 +208,7 @@ class PythonToNativeConverter(object):
             body,
             input_types,
             output_type,
-            [x for x in funcCode.co_freevars if x not in funcGlobals],
+            closureVars,
             funcGlobals
         )
 
@@ -493,7 +493,18 @@ class PythonToNativeConverter(object):
 
         return True
 
-    def convert(self, funcName, funcCode, funcGlobals, input_types, output_type, assertIsRoot=False, callback=None):
+    def convert(
+        self,
+        funcName,
+        funcCode,
+        funcGlobals,
+        closureVars,
+        input_types,
+        output_type,
+        assertIsRoot=False,
+        callback=None,
+        identityOverride=None
+    ):
         """Convert a single pure python function using args of 'input_types'.
 
         It will return no more than 'output_type'. if output_type is None we produce
@@ -519,7 +530,7 @@ class PythonToNativeConverter(object):
 
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
-        identity = ("pyfunction", funcCode, input_types, output_type)
+        identity = ("pyfunction", identityOverride or funcCode, input_types, output_type)
 
         if callback is not None:
             self.installLinktimeHook(identity, callback)
@@ -549,6 +560,7 @@ class PythonToNativeConverter(object):
                 funcName,
                 funcCode,
                 funcGlobals,
+                closureVars,
                 input_types,
                 output_type
             )

@@ -1716,3 +1716,54 @@ class TestClassCompilationCompilation(unittest.TestCase):
             self.compileCheck(lambda: T().f(x=1, y='2'))
             self.compileCheck(lambda: T().f(1, y='2'))
             self.compileCheck(lambda: T().f(1, y='2'))
+
+    def test_class_with_global_closure_variables(self):
+        def makeInt():
+            return 10
+
+        class BaseClass(Class):
+            y = Member(int)
+
+            def __init__(self):
+                self.y = makeInt()
+
+        class C(BaseClass, Final):
+            x = Member(int)
+
+            def __init__(self):
+                BaseClass.__init__(self)
+                self.x = makeInt()
+
+            def g(self):
+                return makeInt()
+
+            def __len__(self):
+                return makeInt()
+
+            @Entrypoint
+            @staticmethod
+            def f():
+                return makeInt()
+
+        newC = C()
+        self.assertEqual(newC.y, 10)
+
+        self.assertEqual(C.f(), 10)
+
+        @Entrypoint
+        def makeAC():
+            return C()
+
+        self.assertEqual(makeAC().x, 10)
+
+        @Entrypoint
+        def callG():
+            return C().g()
+
+        self.assertEqual(callG(), 10)
+
+        @Entrypoint
+        def takeLen():
+            return len(C())
+
+        self.assertEqual(takeLen(), 10)

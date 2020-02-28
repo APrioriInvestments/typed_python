@@ -138,23 +138,23 @@ class PythonTypedFunctionWrapper(Wrapper):
 
         # check if we are marked 'nocompile' in which case we convert to 'object' and dispatch
         # to the interpreter. We do retain any typing information on the return type, however.
+        if self.typeRepresentation.isNocompile:
+            if len(self.typeRepresentation.overloads) != 1:
+                raise Exception("Can't mark multi-overload functions nocompile yet.")
 
-        # todo: reenable this
-        if len(self.typeRepresentation.overloads) == 1 and False:
-            overload = self.typeRepresentation.overloads[0]
-            functionObj = overload.functionObj
+            returnType = self.typeRepresentation.overloads[0].returnType or object
 
-            if hasattr(functionObj, "__typed_python_no_compile__"):
-                returnType = overload.returnType or object
+            assert bytecount(self.typeRepresentation.ClosureType) == 0, "Only empty-closure functions should be marked nocompile"
+            asObject = self.typeRepresentation()
 
-                callRes = context.constantPyObject(functionObj).convert_call(
-                    args, kwargs
-                )
+            callRes = context.constantPyObject(asObject).convert_call(
+                args, kwargs
+            )
 
-                if callRes is None:
-                    return None
+            if callRes is None:
+                return None
 
-                return callRes.convert_to_type(returnType)
+            return callRes.convert_to_type(returnType)
 
         argTypes = [a.expr_type for a in args]
         kwargTypes = {k: v.expr_type for k, v in kwargs.items()}
@@ -191,7 +191,8 @@ class PythonTypedFunctionWrapper(Wrapper):
             singleConvertedOverload = context.functionContext.converter.convert(
                 overload.name,
                 overload.functionCode,
-                overload.functionGlobals,
+                overload.realizedGlobals,
+                list(overload.closureVarLookups),
                 [typeWrapper(self.closurePathToCellType(path, closureType)) for path in overload.closureVarLookups.values()]
                 + [a.expr_type for a in argsToPass],
                 overload.returnType,
@@ -386,7 +387,8 @@ class PythonTypedFunctionWrapper(Wrapper):
                         callTarget = converter.convert(
                             o.name,
                             o.functionCode,
-                            o.functionGlobals,
+                            o.realizedGlobals,
+                            list(o.closureVarLookups),
                             [typeWrapper(PythonTypedFunctionWrapper.closurePathToCellType(path, func.ClosureType))
                              for path in o.closureVarLookups.values()] + actualArgTypes,
                             None

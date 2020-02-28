@@ -87,16 +87,17 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
 
             return res
 
-        if self.typeRepresentation.Value is bool:
-            return args[0].convert_bool_cast()
-        if self.typeRepresentation.Value is int:
-            return args[0].convert_int_cast()
-        if self.typeRepresentation.Value is float:
-            return args[0].convert_float_cast()
-        if self.typeRepresentation.Value is str:
-            return args[0].convert_str_cast()
-        if self.typeRepresentation.Value is bytes:
-            return args[0].convert_bytes_cast()
+        if len(args) == 1 and not kwargs:
+            if self.typeRepresentation.Value is bool:
+                return args[0].convert_bool_cast()
+            if self.typeRepresentation.Value is int:
+                return args[0].convert_int_cast()
+            if self.typeRepresentation.Value is float:
+                return args[0].convert_float_cast()
+            if self.typeRepresentation.Value is str:
+                return args[0].convert_str_cast()
+            if self.typeRepresentation.Value is bytes:
+                return args[0].convert_bytes_cast()
 
         if Type in self.typeRepresentation.Value.__bases__:
             # this is one of the type factories (ListOf, Dict, etc.)
