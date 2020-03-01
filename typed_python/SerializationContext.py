@@ -16,7 +16,7 @@ from typed_python._types import serialize, deserialize, Type
 from typed_python.python_ast import convertFunctionToAlgebraicPyAst, evaluateFunctionPyAst, Expr, Statement
 from typed_python.hash import sha_hash
 from typed_python.type_function import ConcreteTypeFunction, isTypeFunctionType, reconstructTypeFunctionType
-from types import FunctionType, ModuleType
+from types import FunctionType, ModuleType, CodeType
 import numpy
 import datetime
 import pytz
@@ -41,12 +41,17 @@ def createEmptyFunction(ast):
     return evaluateFunctionPyAst(ast)
 
 
+def astToCodeObject(ast):
+    return evaluateFunctionPyAst(ast).__code__
+
+
 _builtin_name_to_value = {
     ".builtin." + k: v for k, v in __builtins__.items()
     if isinstance(v, type) or 'builtin_function_or_method' in str(type(v))
 }
 _builtin_name_to_value[".builtin.importSystemSubmodule"] = importSystemSubmodule
 _builtin_name_to_value[".builtin.createEmptyFunction"] = createEmptyFunction
+_builtin_name_to_value[".builtin.astToCodeObject"] = astToCodeObject
 _builtin_name_to_value[".builtin._reconstruct"] = _reconstruct
 _builtin_name_to_value[".builtin._ndarray"] = _ndarray
 _builtin_name_to_value[".builtin.numpy.scalar"] = numpy.int64(10).__reduce__()[0]  # the 'scalar' function
@@ -266,6 +271,11 @@ class SerializationContext(object):
         if isinstance(inst, datetime.tzinfo):
             return inst.__reduce__() + (None,)
 
+        if isinstance(inst, CodeType):
+            pyast = convertFunctionToAlgebraicPyAst(inst, keepLineInformation=self.encodeLineInformationForCode)
+
+            return (astToCodeObject, (pyast,), {})
+
         if isinstance(inst, FunctionType):
             representation = {}
             representation["qualname"] = inst.__qualname__
@@ -302,6 +312,9 @@ class SerializationContext(object):
     def setInstanceStateFromRepresentation(self, instance, representation):
         if GoogleProtobufMessage is not None and isinstance(instance, GoogleProtobufMessage):
             instance.ParseFromString(representation)
+            return True
+
+        if isinstance(instance, CodeType):
             return True
 
         if isinstance(instance, datetime.datetime):

@@ -21,6 +21,7 @@ Python ast directly.
 import ast
 import typed_python.ast_util as ast_util
 import weakref
+import types
 from typed_python._types import Forward, Alternative, TupleOf, OneOf
 
 
@@ -857,23 +858,33 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
     if f in _originalAstCache:
         return _originalAstCache[f]
 
-    if f.__code__ in _algebraicAstCache:
-        return _algebraicAstCache[f.__code__, keepLineInformation]
+    # we really just care about the code itself
+    if isinstance(f, types.FunctionType):
+        fCode = f.__code__
+    elif isinstance(f, types.CodeType):
+        fCode = f
+    else:
+        raise Exception(
+            "convertFunctionToAlgebraicPyAst requires a function object, or a code object."
+        )
+
+    if fCode in _algebraicAstCache:
+        return _algebraicAstCache[fCode, keepLineInformation]
 
     try:
-        pyast = ast_util.pyAstFor(f)
+        pyast = ast_util.pyAstFor(fCode)
 
-        _, lineno = ast_util.getSourceLines(f)
-        _, fname = ast_util.getSourceFilenameAndText(f)
+        _, lineno = ast_util.getSourceLines(fCode)
+        _, fname = ast_util.getSourceFilenameAndText(fCode)
 
         pyast = ast_util.functionDefOrLambdaAtLineNumber(pyast, lineno)
     except Exception:
-        raise Exception("Failed to get source for function %s" % (f.__qualname__))
+        raise Exception("Failed to get source for function %s" % (fCode.co_name))
 
     try:
         algebraicAst = convertPyAstToAlgebraic(pyast, fname, keepLineInformation)
 
-        _algebraicAstCache[f.__code__, keepLineInformation] = algebraicAst
+        _algebraicAstCache[fCode, keepLineInformation] = algebraicAst
 
         return algebraicAst
     except Exception as e:

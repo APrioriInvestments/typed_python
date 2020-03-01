@@ -481,6 +481,7 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
 
             PyTuple_SetItem(overloadTuple, k, incref(pyOverloadInst));
         } else {
+            std::cout << "WARNING: error creating a python function out of a Function instance:\n";
             PyErr_PrintEx(0);
             PyTuple_SetItem(overloadTuple, k, incref(Py_None));
         }

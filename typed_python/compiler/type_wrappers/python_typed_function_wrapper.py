@@ -328,6 +328,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             "Maybe" if we might match
             False if we definitely don't match the arguments.
         """
+        assert overload is not None
         ExpressionConversionContext = typed_python.compiler.expression_conversion_context.ExpressionConversionContext
 
         actualArgTypes = ExpressionConversionContext.computeOverloadSignature(overload, argTypes, kwargTypes)

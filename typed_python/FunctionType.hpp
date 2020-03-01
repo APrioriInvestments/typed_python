@@ -33,22 +33,28 @@ class ClosureVariableBindingStep {
     };
 
     ClosureVariableBindingStep() :
-        mKind(BindingType::ACCESS_CELL)
+        mKind(BindingType::ACCESS_CELL),
+        mIndexedFieldToAccess(0),
+        mFunctionToBind(nullptr)
     {}
 
 public:
     ClosureVariableBindingStep(Type* bindFunction) :
         mKind(BindingType::FUNCTION),
+        mIndexedFieldToAccess(0),
         mFunctionToBind(bindFunction)
     {}
 
     ClosureVariableBindingStep(std::string fieldAccess) :
         mKind(BindingType::NAMED_FIELD),
+        mIndexedFieldToAccess(0),
+        mFunctionToBind(nullptr),
         mNamedFieldToAccess(fieldAccess)
     {}
 
     ClosureVariableBindingStep(int elementAccess) :
         mKind(BindingType::INDEXED_FIELD),
+        mFunctionToBind(nullptr),
         mIndexedFieldToAccess(elementAccess)
     {}
 
@@ -132,6 +138,65 @@ public:
         return false;
     }
 
+    template<class serialization_context_t, class buf_t>
+    void serialize(serialization_context_t& context, buf_t& buffer, int fieldNumber) const {
+        buffer.writeBeginCompound(fieldNumber);
+
+        if (mKind == BindingType::ACCESS_CELL) {
+            buffer.writeUnsignedVarintObject(0, 0);
+        }
+        else if (mKind == BindingType::FUNCTION) {
+            buffer.writeUnsignedVarintObject(0, 1);
+            context.serializeNativeTypeInCompound(mFunctionToBind, buffer, 1);
+        }
+        else if (mKind == BindingType::NAMED_FIELD) {
+            buffer.writeUnsignedVarintObject(0, 2);
+            buffer.writeStringObject(1, mNamedFieldToAccess);
+        }
+        else if (mKind == BindingType::INDEXED_FIELD) {
+            buffer.writeUnsignedVarintObject(0, 2);
+            buffer.writeUnsignedVarintObject(1, mIndexedFieldToAccess);
+        }
+
+        buffer.writeEndCompound();
+    }
+
+    template<class serialization_context_t, class buf_t>
+    static ClosureVariableBindingStep deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
+        ClosureVariableBindingStep out;
+
+        int whichBinding;
+
+        buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+            if (fieldNumber == 0) {
+                assertWireTypesEqual(wireType, WireType::VARINT);
+                whichBinding = buffer.readUnsignedVarint();
+
+                if (whichBinding == 0) {
+                    out = ClosureVariableBindingStep::AccessCell();
+                }
+            }
+            else if (fieldNumber == 1) {
+                if (whichBinding == 1) {
+                    out = ClosureVariableBindingStep(
+                        context.deserializeNativeType(buffer, wireType, -1)
+                    );
+                }
+                else if (whichBinding == 2) {
+                    assertWireTypesEqual(wireType, WireType::BYTES);
+                    out = ClosureVariableBindingStep(buffer.readStringObject());
+                }
+                else if (whichBinding == 3) {
+                    assertWireTypesEqual(wireType, WireType::VARINT);
+                    out = ClosureVariableBindingStep(buffer.readUnsignedVarint());
+                }
+            }
+        });
+
+        return out;
+    }
+
+
 private:
     BindingType mKind;
 
@@ -172,6 +237,25 @@ public:
         }
 
         return ClosureVariableBinding(std::vector<ClosureVariableBindingStep>(), step);
+    }
+
+    template<class serialization_context_t, class buf_t>
+    void serialize(serialization_context_t& context, buf_t& buffer, int fieldNumber) const {
+        buffer.writeBeginCompound(fieldNumber);
+        for (long stepIx = 0; stepIx < size(); stepIx++) {
+            (this)[stepIx].serialize(context, buffer, stepIx);
+        }
+        buffer.writeEndCompound();
+    }
+
+    template<class serialization_context_t, class buf_t>
+    static ClosureVariableBinding deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
+        std::vector<ClosureVariableBindingStep> steps;
+        buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+            steps.push_back(ClosureVariableBindingStep::deserialize(context, buffer, wireType));
+        });
+
+        return ClosureVariableBinding(steps);
     }
 
     template<class visitor_type>
@@ -331,6 +415,60 @@ public:
             return false;
         }
 
+        template<class serialization_context_t, class buf_t>
+        void serialize(serialization_context_t& context, buf_t& buffer, int fieldNumber) const {
+            buffer.writeBeginCompound(fieldNumber);
+
+            buffer.writeStringObject(0, m_name);
+            if (m_typeFilter) {
+                context.serializeNativeTypeInCompound(m_typeFilter, buffer, 1);
+            }
+            if (m_defaultValue) {
+                context.serializePythonObject(m_defaultValue, buffer, 2);
+            }
+            buffer.writeUnsignedVarintObject(3, m_isStarArg ? 1 : 0);
+            buffer.writeUnsignedVarintObject(4, m_isKwarg ? 1 : 0);
+
+            buffer.writeEndCompound();
+        }
+
+        template<class serialization_context_t, class buf_t>
+        static FunctionArg deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
+            std::string name;
+            Type* typeFilterOrNull = nullptr;
+            PyObject* defaultValue = nullptr;
+            bool isStarArg = false;
+            bool isKwarg = false;
+
+            buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+                if (fieldNumber == 0) {
+                    assertWireTypesEqual(wireType, WireType::BYTES);
+                    name = buffer.readStringObject();
+                }
+                else if (fieldNumber == 1) {
+                    typeFilterOrNull = context.deserializeNativeType(buffer, wireType, -1);
+                }
+                else if (fieldNumber == 2) {
+                    //TODO: worry about whether this leak is important. the deserialize returns
+                    //an object with a refcount that we own, which we then place in an object
+                    //that will never destroy it. this is moot because the current framework
+                    //never destroys any of these objects. But we should be aware that repeatedly
+                    //deserializing the same object will produce memory leaks.
+                    defaultValue = context.deserializePythonObject(buffer, wireType);
+                }
+                else if (fieldNumber == 3) {
+                    assertWireTypesEqual(wireType, WireType::VARINT);
+                    isStarArg = buffer.readUnsignedVarint();
+                }
+                else if (fieldNumber == 4) {
+                    assertWireTypesEqual(wireType, WireType::VARINT);
+                    isKwarg = buffer.readUnsignedVarint();
+                }
+            });
+
+            return FunctionArg(name, typeFilterOrNull, defaultValue, isStarArg, isKwarg);
+        }
+
     private:
         std::string m_name;
         Type* m_typeFilter;
@@ -384,6 +522,7 @@ public:
         ) :
                 mFunctionCode(incref(pyFuncCode)),
                 mFunctionGlobals(incref(pyFuncGlobals)),
+                mFunctionUsedGlobals(nullptr),
                 mFunctionDefaults(incref(pyFuncDefaults)),
                 mFunctionAnnotations(incref(pyFuncAnnotations)),
                 mFunctionGlobalsInCells(pyFuncGlobalsInCells),
@@ -545,6 +684,10 @@ public:
             return mReturnType;
         }
 
+        const std::vector<std::string>& getFunctionClosureVarnames() const {
+            return mFunctionClosureVarnames;
+        }
+
         const std::vector<FunctionArg>& getArgs() const {
             return mArgs;
         }
@@ -610,12 +753,53 @@ public:
             return mFunctionCode;
         }
 
+        PyObject* getFunctionDefaults() const {
+            return mFunctionDefaults;
+        }
+
+        PyObject* getFunctionAnnotations() const {
+            return mFunctionAnnotations;
+        }
+
         PyObject* getFunctionGlobals() const {
             return mFunctionGlobals;
         }
 
         const std::map<std::string, PyObject*> getFunctionGlobalsInCells() const {
             return mFunctionGlobalsInCells;
+        }
+
+        static void extractNamesFromCode(PyCodeObject* code, std::set<PyObject*>& outNames) {
+            iterate(code->co_names, [&](PyObject* o) { outNames.insert(o); });
+
+            iterate(code->co_consts, [&](PyObject* o) {
+                if (PyCode_Check(o)) {
+                    extractNamesFromCode((PyCodeObject*)o, outNames);
+                }
+            });
+        }
+
+        void populateUsedGlobals() const {
+            // restrict the globals to contain only the values it references.
+            mFunctionUsedGlobals = PyDict_New();
+
+            std::set<PyObject*> allNames;
+            extractNamesFromCode((PyCodeObject*)mFunctionCode, allNames);
+
+            iterate(mFunctionGlobals, [&](PyObject* name) {
+                if (allNames.find(name) != allNames.end()) {
+                    int res = PyDict_Contains(mFunctionGlobals, name);
+                    if (res == -1) {
+                        throw PythonExceptionSet();
+                    }
+
+                    if (res) {
+                        if (PyDict_SetItem(mFunctionUsedGlobals, name, PyDict_GetItem(mFunctionGlobals, name))) {
+                            throw PythonExceptionSet();
+                        }
+                    }
+                }
+            });
         }
 
         // create a new function object for this closure (or cache it
@@ -625,6 +809,7 @@ public:
         Overload& operator=(const Overload& other) {
             mFunctionCode = incref(other.mFunctionCode);
             mFunctionGlobals = incref(other.mFunctionGlobals);
+            mFunctionUsedGlobals = incref(other.mFunctionUsedGlobals);
             mFunctionDefaults = incref(other.mFunctionDefaults);
             mFunctionAnnotations = incref(other.mFunctionAnnotations);
             mFunctionClosureVarnames = other.mFunctionClosureVarnames;
@@ -649,10 +834,151 @@ public:
             return *this;
         }
 
+        template<class serialization_context_t, class buf_t>
+        void serialize(serialization_context_t& context, buf_t& buffer, int fieldNumber) const {
+            buffer.writeBeginCompound(fieldNumber);
+
+            context.serializePythonObject(mFunctionCode, buffer, 0);
+
+            if (!mFunctionUsedGlobals) {
+                populateUsedGlobals();
+            }
+
+            context.serializePythonObject(mFunctionUsedGlobals, buffer, 1);
+
+            if (mFunctionDefaults) {
+                context.serializePythonObject(mFunctionDefaults, buffer, 2);
+            }
+            if (mFunctionAnnotations) {
+                context.serializePythonObject(mFunctionAnnotations, buffer, 3);
+            }
+
+            buffer.writeBeginCompound(4);
+                int stringIx = 0;
+                for (auto varname: mFunctionClosureVarnames) {
+                    buffer.writeStringObject(stringIx++, varname);
+                }
+            buffer.writeEndCompound();
+
+            buffer.writeBeginCompound(5);
+                int varIx = 0;
+                for (auto nameAndCell: mFunctionGlobalsInCells) {
+                    buffer.writeStringObject(varIx++, nameAndCell.first);
+                    context.serializePythonObject(nameAndCell.second, buffer, varIx++);
+                }
+            buffer.writeEndCompound();
+
+            buffer.writeBeginCompound(6);
+                int closureBindingIx = 0;
+                for (auto nameAndBinding: mClosureBindings) {
+                    buffer.writeStringObject(closureBindingIx++, nameAndBinding.first);
+                    nameAndBinding.second.serialize(context, buffer, closureBindingIx++);
+                }
+            buffer.writeEndCompound();
+
+            if (mReturnType) {
+                context.serializeNativeTypeInCompound(mReturnType, buffer, 7);
+            }
+
+            buffer.writeBeginCompound(8);
+
+                int argIx = 0;
+                for (auto& arg: mArgs) {
+                    arg.serialize(context, buffer, argIx++);
+                }
+
+            buffer.writeEndCompound();
+
+            buffer.writeEndCompound();
+        }
+
+        template<class serialization_context_t, class buf_t>
+        static Overload deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
+            PyObject* functionCode = nullptr;
+            PyObject* functionGlobals = nullptr;
+            PyObject* functionAnnotations = nullptr;
+            PyObject* functionDefaults = nullptr;
+            std::vector<std::string> closureVarnames;
+            std::map<std::string, PyObject*> functionGlobalsInCells;
+            std::map<std::string, ClosureVariableBinding> closureBindings;
+            Type* returnType = nullptr;
+            std::vector<FunctionArg> args;
+
+            buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+                if (fieldNumber == 0) {
+                    functionCode = context.deserializePythonObject(buffer, wireType);
+                }
+                else if (fieldNumber == 1) {
+                    functionGlobals = context.deserializePythonObject(buffer, wireType);
+                }
+                else if (fieldNumber == 2) {
+                    functionDefaults = context.deserializePythonObject(buffer, wireType);
+                }
+                else if (fieldNumber == 3) {
+                    functionAnnotations = context.deserializePythonObject(buffer, wireType);
+                }
+                else if (fieldNumber == 4) {
+                    buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+                        assertWireTypesEqual(wireType, WireType::BYTES);
+                        closureVarnames.push_back(buffer.readStringObject());
+                    });
+                }
+                else if (fieldNumber == 5) {
+                    std::string last;
+                    buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+                        if (fieldNumber % 2 == 0) {
+                            assertWireTypesEqual(wireType, WireType::BYTES);
+                            last = buffer.readStringObject();
+                        } else {
+                            functionGlobalsInCells[last] = context.deserializePythonObject(buffer, wireType);
+                        }
+                    });
+                }
+                else if (fieldNumber == 6) {
+                    std::string last;
+                    buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+                        if (fieldNumber % 2 == 0) {
+                            assertWireTypesEqual(wireType, WireType::BYTES);
+                            last = buffer.readStringObject();
+                        } else {
+                            closureBindings[last] = ClosureVariableBinding::deserialize(context, buffer, wireType);
+                        }
+                    });
+                }
+                else if (fieldNumber == 7) {
+                    returnType = context.deserializeNativeType(buffer, wireType, -1);
+                }
+                else if (fieldNumber == 8) {
+                    buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+                        args.push_back(FunctionArg::deserialize(context, buffer, wireType));
+                    });
+                }
+            });
+
+            return Overload(
+                functionCode,
+                functionGlobals,
+                functionDefaults,
+                functionAnnotations,
+                functionGlobalsInCells,
+                closureVarnames,
+                closureBindings,
+                returnType,
+                args
+            );
+        }
+
     private:
         PyObject* mFunctionCode;
 
         PyObject* mFunctionGlobals;
+
+        // a cached dict containing the subset of 'globals' that we actually
+        // use. we can't calculate this when the function is first created because
+        // at that moment we can't know all the future values in the globals that
+        // the function may need. So instead, we assume that upon first use of this
+        // variable (at serialization time) all such values exist.
+        mutable PyObject* mFunctionUsedGlobals;
 
         // globals that are stored in cells. This happens when class objects
         // are defined inside of function scopes. We assume that anything in their
@@ -789,12 +1115,12 @@ public:
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
-        assertWireTypesEqual(wireType, WireType::EMPTY);
+        mClosureType->deserialize(self, buffer, wireType);
     }
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
-        buffer.writeEmpty(fieldNumber);
+        mClosureType->serialize(self, buffer, fieldNumber);
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isRepr) {

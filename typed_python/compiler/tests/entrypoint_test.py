@@ -12,7 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Class, Member, Final, TupleOf, DisableCompiledCode, Int64, isCompiled
+from typed_python import (
+    ListOf, Class, Member, Final, TupleOf, DisableCompiledCode,
+    Int64, isCompiled, SerializationContext
+)
 from typed_python._types import touchCompiledSpecializations
 from typed_python import Entrypoint, NotCompiled
 from typed_python.compiler.runtime import Runtime, RuntimeEventVisitor
@@ -497,3 +500,73 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         a = numpy.arange(100).astype('int')
 
         self.assertEqual(f(a), a.sum())
+
+    def test_can_compile_deserialized_functions(self):
+        @Entrypoint
+        def callIt(f, x):
+            return f(x)
+
+        def aFun(x):
+            return x + 1
+
+        sc = SerializationContext({})
+
+        aFun2 = sc.deserialize(sc.serialize(aFun))
+
+        self.assertEqual(callIt(aFun2, 10), aFun2(10))
+
+    def test_can_serialize_entrypoints(self):
+        @Entrypoint
+        def f(x):
+            return x + 1
+
+        sc = SerializationContext({})
+
+        f2 = sc.deserialize(sc.serialize(f))
+
+        assert f2.isEntrypoint
+
+        self.assertEqual(f(10), f2(10))
+
+    def test_can_serialize_nocompile(self):
+        @NotCompiled
+        def f(x):
+            return x + 1
+
+        sc = SerializationContext({})
+
+        f2 = sc.deserialize(sc.serialize(f))
+
+        assert f2.isNocompile
+
+        self.assertEqual(f(10), f2(10))
+
+    def test_can_serialize_functions_with_multiple_overloads(self):
+        @Entrypoint
+        def f(x):
+            return x + 1
+
+        @f.overload
+        def f(x, y):
+            return "yes"
+
+        sc = SerializationContext({})
+
+        f2 = sc.deserialize(sc.serialize(f))
+
+        self.assertEqual(f(10), f2(10))
+        self.assertEqual(f(10, 11), f2(10, 11))
+
+    def test_can_serialize_closures(self):
+        x = 10
+
+        def adder(y):
+            return x + y
+
+        self.assertEqual(adder(20), 30)
+
+        sc = SerializationContext({})
+
+        adder2 = sc.deserialize(sc.serialize(adder))
+
+        self.assertEqual(adder(10), adder2(10))

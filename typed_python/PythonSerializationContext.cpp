@@ -693,6 +693,18 @@ void PythonSerializationContext::serializeNativeType(
         PyEnsureGilReleased releaseTheGil;
         i.type()->serialize(i.data(), b, 1);
         b.writeEndCompound();
+    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catFunction) {
+        Function* ftype = (Function*)nativeType;
+
+        serializeNativeTypeInCompound(ftype->getClosureType(), b, 1);
+        b.writeStringObject(2, ftype->name());
+        b.writeUnsignedVarintObject(3, ftype->isEntrypoint() ? 1 : 0);
+        b.writeUnsignedVarintObject(4, ftype->isNocompile() ? 1 : 0);
+
+        int whichIndex = 5;
+        for (auto& overload: ftype->getOverloads()) {
+            overload.serialize(*this, b, whichIndex++);
+        }
     } else {
         throw std::runtime_error("Can't serialize native type " + nativeType->name() + " if its unnamed.");
     }
@@ -752,6 +764,11 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
     PyObjectHolder obj;
     Instance instance;
 
+    std::vector<Function::Overload> overloads;
+    Type* closureType = 0;
+    int isEntrypoint = 0;
+    int isNocompile = 0;
+
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
         if (fieldNumber == 0) {
             assertWireTypesEqual(wireType, WireType::VARINT);
@@ -760,6 +777,28 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             if (category == -1) {
                 throw std::runtime_error("Corrupt native type found.");
             }
+            if (category == Type::TypeCategory::catFunction) {
+                if (fieldNumber == 1) {
+                    closureType = deserializePythonObjectExpectingNativeType(b, wireType);
+                }
+                else if (fieldNumber == 2) {
+                    assertWireTypesEqual(wireType, WireType::BYTES);
+                    names.push_back(b.readStringObject());
+                }
+                else if (fieldNumber == 3) {
+                    assertWireTypesEqual(wireType, WireType::VARINT);
+                    isEntrypoint = b.readUnsignedVarint();
+                }
+                else if (fieldNumber == 4) {
+                    assertWireTypesEqual(wireType, WireType::VARINT);
+                    isNocompile = b.readUnsignedVarint();
+                }
+                else {
+                    overloads.push_back(
+                        Function::Overload::deserialize(*this, b, wireType)
+                    );
+                }
+            } else
             if (category == Type::TypeCategory::catOneOf ||
                 category == Type::TypeCategory::catTupleOf ||
                 category == Type::TypeCategory::catListOf ||
@@ -793,7 +832,20 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
 
     Type* resultType = nullptr;
 
-    if (category == Type::TypeCategory::catUInt8) {
+    if (category == Type::TypeCategory::catFunction) {
+        if (names.size() != 1) {
+            throw std::runtime_error("Badly structured 'Function' encountered.");
+        }
+
+        resultType = Function::Make(
+            names[0],
+            overloads,
+            closureType,
+            isEntrypoint,
+            isNocompile
+        );
+    }
+    else if (category == Type::TypeCategory::catUInt8) {
         resultType = ::UInt8::Make();
     }
     else if (category == Type::TypeCategory::catUInt16) {
