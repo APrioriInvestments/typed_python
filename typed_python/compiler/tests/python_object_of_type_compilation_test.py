@@ -811,3 +811,13 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         self.assertEqual(g([], aList), False)
         self.assertEqual(g(aList, aList), True)
+
+    def test_instantiate_python_class(self):
+        class C():
+            pass
+
+        @Entrypoint
+        def makeAC():
+            return C()
+
+        self.assertTrue(isinstance(makeAC(), C))

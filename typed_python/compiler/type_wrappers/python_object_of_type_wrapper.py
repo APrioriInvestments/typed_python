@@ -375,7 +375,8 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
-        return context.constant(self.typeRepresentation.PyType).convert_call(args, kwargs)
+        # if this is a regular python class, then we need to just convert it to an 'object' and call that.
+        return context.constant(self.typeRepresentation.PyType).convert_to_type(object).convert_call(args, kwargs)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         if self.typeRepresentation.PyType in (_thread.LockType, _thread.RLock) and methodname == "acquire" and len(args) == 0:
