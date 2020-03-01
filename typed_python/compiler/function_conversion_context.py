@@ -121,6 +121,7 @@ class FunctionConversionContext(object):
         self.identity = identity
         self._ast_arg = ast_arg
         self._argnames = None
+        self._argtypes = {}
         self._statements = statements
         self._input_types = input_types
         self._output_type = output_type
@@ -436,6 +437,8 @@ class FunctionConversionContext(object):
         self._native_args = []
         for i, argName in enumerate(self._argnames):
             self._varname_to_type[self._argnames[i]] = input_types[i]
+            self._argtypes[self._argnames[i]] = input_types[i]
+
             if not input_types[i].is_empty:
                 self._native_args.append((self._argnames[i], input_types[i].getNativePassingType()))
 
@@ -586,7 +589,12 @@ class FunctionConversionContext(object):
                         variableStates.variableAssigned(name, slot_type.typeRepresentation)
                     else:
                         # need to make a stackslot for this variable
-                        var_expr = context.inputArg(slot_type, name)
+                        var_expr = context.inputArg(self._argtypes[name], name)
+                        converted = var_expr.convert_to_type(slot_type)
+                        assert converted is not None, (
+                            "It makes no sense we can't convert an argument to its"
+                            " type representation in the function stack."
+                        )
 
                         self.assignToLocalVariable(name, var_expr, variableStates)
 

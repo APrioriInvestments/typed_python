@@ -1188,3 +1188,10 @@ class TestCompilationStructures(unittest.TestCase):
                 d.pop(x)
 
         popCheck(Dict(int, int)(), 1)
+
+    def test_assign_to_arguments_with_typechange(self):
+        @Entrypoint
+        def f(x, y: object):
+            x = x + y
+
+        f(1, 1)
