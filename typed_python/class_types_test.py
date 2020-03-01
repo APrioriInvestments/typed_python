@@ -1484,3 +1484,21 @@ class NativeClassTypesTests(unittest.TestCase):
                 pass
 
         self.assertFalse(is_default_constructible(NotDC))
+
+    def test_class_isinstance(self):
+        class BaseClass(Class):
+            pass
+
+        class Subclass(BaseClass):
+            pass
+
+        def check():
+            assert issubclass(Subclass, Subclass)
+            assert issubclass(Subclass, BaseClass)
+            assert issubclass(Subclass, Class)
+            assert isinstance(Subclass(), Subclass)
+            assert isinstance(Subclass(), BaseClass)
+            assert isinstance(Subclass(), Class)
+
+        check()
+        Entrypoint(check)()

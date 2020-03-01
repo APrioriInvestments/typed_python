@@ -265,6 +265,24 @@ class ClassMetaclass(type):
             tuple(classMembers)
         )
 
+    def __subclasscheck__(cls, subcls):
+        if getattr(subcls, "__typed_python_category__", None) != "Class":
+            return False
+
+        if cls is typed_python._types.Class:
+            return True
+
+        return cls in subcls.MRO
+
+    def __instancecheck__(cls, instance):
+        if getattr(type(instance), "__typed_python_category__", None) != "Class":
+            return False
+
+        if cls is typed_python._types.Class:
+            return True
+
+        return cls in type(instance).MRO
+
 
 def Function(f, assumeClosuresGlobal=False):
     """Turn a normal python function into a 'typed_python.Function' which obeys type restrictions."""
