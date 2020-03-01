@@ -1195,3 +1195,13 @@ class TestCompilationStructures(unittest.TestCase):
             x = x + y
 
         f(1, 1)
+
+    def test_unassigned_variable_access(self):
+        @Compiled
+        def reduce2(aList: ListOf(int)):
+            for i in aList:
+                r += i  # noqa
+            return r  # noqa
+
+        with self.assertRaisesRegex(Exception, "ame 'r' is not defined"):
+            reduce2([1, 2, 3])

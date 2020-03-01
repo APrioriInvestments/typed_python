@@ -165,6 +165,10 @@ class FunctionConversionContext(object):
                 .convert_attribute(name, nocheck=True)
             )
 
+        if name != ".closure" and self._varname_to_type.get(name) is None:
+            context.pushException(NameError, f"name '{name}' is not defined")
+            return None
+
         if name == ".closure":
             slot_type = typeWrapper(self.closureType)
         else:
