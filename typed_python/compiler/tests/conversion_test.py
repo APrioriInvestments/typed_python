@@ -1205,3 +1205,15 @@ class TestCompilationStructures(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "ame 'r' is not defined"):
             reduce2([1, 2, 3])
+
+    def test_iterate_closures(self):
+        x = ListOf(int)((1, 2, 3))
+
+        @Entrypoint
+        def f():
+            res = ListOf(int)()
+            for value in x:
+                res.append(value)
+            return res
+
+        self.assertEqual(f(), [1, 2, 3])
