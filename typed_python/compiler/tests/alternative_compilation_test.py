@@ -1553,3 +1553,29 @@ class TestAlternativeCompilation(unittest.TestCase):
         v = A.b("start")
         r2 = Compiled(inplace)(v)
         self.assertEqual(r2, expected)
+
+    def test_compile_alternative_methods(self):
+        def method(self, x):
+            return self.y + x
+
+        A = Alternative(
+            "A",
+            Y=dict(y=int),
+            method=method,
+        )
+
+        def callMethod(a: A, x):
+            return a.method(x)
+
+        self.assertEqual(
+            callMethod(A.Y(y=20), 10),
+            Entrypoint(callMethod)(A.Y(y=20), 10)
+        )
+
+        def callMethod2(a: A.Y, x):
+            return a.method(x)
+
+        self.assertEqual(
+            callMethod2(A.Y(y=20), 10),
+            Entrypoint(callMethod2)(A.Y(y=20), 10)
+        )

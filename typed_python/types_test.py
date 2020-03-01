@@ -1290,7 +1290,7 @@ class NativeTypesTests(unittest.TestCase):
         A.a().Name = "can't change Name"
         self.assertEqual(A.a().Name, "a")
         d = dir(A.a())
-        self.assertEqual(len(d), 96)  # this is the default dir
+        self.assertEqual(len(d), 97)  # this is the default dir
 
         A2_items = dict()
 

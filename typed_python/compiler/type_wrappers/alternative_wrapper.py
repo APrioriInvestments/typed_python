@@ -14,6 +14,7 @@
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python import NoneType, _types, Bool, Int32
 import typed_python.compiler.native_ast as native_ast
@@ -350,6 +351,13 @@ class AlternativeWrapper(RefcountedWrapper):
         if attribute == 'matches':
             return instance.changeType(self.matcherType)
 
+        if attribute in self.typeRepresentation.__typed_python_methods__:
+            methodType = BoundMethodWrapper(
+                _types.BoundMethod(self.typeRepresentation, attribute)
+            )
+
+            return instance.changeType(methodType)
+
         possibleTypes = set()
         validIndices = []
         for i, namedTup in enumerate(self.alternatives):
@@ -379,6 +387,15 @@ class AlternativeWrapper(RefcountedWrapper):
                         context.markUninitializedSlotInitialized(output)
 
             return output
+
+    def convert_method_call(self, context, instance, methodName, args, kwargs):
+        if methodName not in self.typeRepresentation.__typed_python_methods__:
+            context.pushException(AttributeError, "Object has no attribute %s" % methodName)
+            return
+
+        funcType = typeWrapper(self.typeRepresentation.__typed_python_methods__[methodName])
+
+        return funcType.convert_call(context, None, (instance,) + tuple(args), kwargs)
 
     def convert_getitem(self, context, instance, item):
         return self.generate_method_call(context, "__getitem__", (instance, item)) \
@@ -657,7 +674,23 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         self.refToInner(context, out).convert_initialize_from_args(*args)
 
     def convert_attribute(self, context, instance, attribute, nocheck=False):
+        if attribute in self.typeRepresentation.__typed_python_methods__:
+            methodType = BoundMethodWrapper(
+                _types.BoundMethod(self.typeRepresentation, attribute)
+            )
+
+            return instance.changeType(methodType)
+
         return self.refToInner(context, instance).convert_attribute(attribute)
+
+    def convert_method_call(self, context, instance, methodName, args, kwargs):
+        if methodName not in self.typeRepresentation.__typed_python_methods__:
+            context.pushException(AttributeError, "Object has no attribute %s" % methodName)
+            return
+
+        funcType = typeWrapper(self.typeRepresentation.__typed_python_methods__[methodName])
+
+        return funcType.convert_call(context, None, (instance,) + tuple(args), kwargs)
 
     def convert_check_matches(self, context, instance, typename):
         return context.constant(typename == self.typeRepresentation.Name)

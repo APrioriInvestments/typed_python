@@ -279,13 +279,27 @@ void PyAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Alternative*
         alternatives
         );
 
+    PyObjectStealer methodsDict(PyDict_New());
+
     for (auto method_pair: alt->getMethods()) {
+        PyDict_SetItemString(
+            methodsDict,
+            method_pair.first.c_str(),
+            (PyObject*)typeObj(method_pair.second)
+        );
+
         PyDict_SetItemString(
             pyType->tp_dict,
             method_pair.first.c_str(),
             (PyObject*)typeObj(method_pair.second)
         );
     }
+
+    PyDict_SetItemString(
+        pyType->tp_dict,
+        "__typed_python_methods__",
+        methodsDict
+    );
 }
 
 void PyConcreteAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(ConcreteAlternative* alt, PyTypeObject* pyType) {
@@ -319,12 +333,13 @@ void PyConcreteAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Conc
         while (defined && defined->ml_name && !!strcmp(defined->ml_name, method_pair.first.c_str()))
             defined++;
 
-        if (!defined || !defined->ml_name)
+        if (!defined || !defined->ml_name) {
             PyDict_SetItemString(
                 pyType->tp_dict,
                 method_pair.first.c_str(),
                 (PyObject*)typeObj(method_pair.second)
             );
+        }
     }
 }
 
