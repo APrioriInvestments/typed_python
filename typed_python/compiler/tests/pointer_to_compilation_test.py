@@ -91,3 +91,20 @@ class TestPointerToCompilation(unittest.TestCase):
 
         self.assertEqual(testfun(T([1])), True)
         self.assertEqual(compiledFun(T([1])), True)
+
+    def test_pointer_to_addition(self):
+        aList = ListOf(int)()
+        aList.resize(10)
+
+        p = aList.pointerUnsafe(0)
+
+        def add(x, y):
+            return x + y
+
+        self.assertEqual(add(p, 1), Entrypoint(add)(p, 1))
+
+        def iadd(x, y):
+            x += y
+            return x
+
+        self.assertEqual(iadd(p, 1), Entrypoint(iadd)(p, 1))
