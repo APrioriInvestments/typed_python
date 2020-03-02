@@ -784,7 +784,6 @@ class ClassWrapper(RefcountedWrapper):
         )
 
     def generateConstructor(self, context, out, *args):
-        context.logDiagnostic("Create")
         context.pushEffect(
             out.expr.store(
                 runtime_functions.malloc.call(
