@@ -458,8 +458,6 @@ However, large gaps still remain. In particular,
 
 * we don't allow try/catch yet.
 * we can't handle untyped lists, tuples, or dictionaries.
-* we can't handle passing functions or function closures as arguments yet
-* we have yet to implement calling with keyword arguments for user-defined functions
 * lots of little details have deviations from standard python behavior or are simply not implemented yet.
 * in some cases, where the compiler cannot produce compiled code it doesn't yet know how to defer to the interpreter.
 
