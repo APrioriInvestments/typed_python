@@ -511,6 +511,28 @@ class TestCompilingClosures(unittest.TestCase):
         # for each function call.
         print("took ", time.time() - t0, " to do 100k closure conversions")
 
+    def test_no_recompile_for_same_function_body(self):
+        def makeAdder(x):
+            def adder(y):
+                return x + y
+            return adder
+
+        @Entrypoint
+        def callIt(f, x):
+            return f(x)
+
+        vis = DidCompileVisitor()
+        with vis:
+            callIt(makeAdder(10), 20)
+
+        self.assertTrue(vis.didCompile)
+
+        vis = DidCompileVisitor()
+        with vis:
+            callIt(makeAdder(30), 20)
+
+        self.assertFalse(vis.didCompile)
+
     def test_pass_closures_from_compiled_code_with_no_capture(self):
         def doIt():
             def f():
