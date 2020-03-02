@@ -1767,3 +1767,29 @@ class TestClassCompilationCompilation(unittest.TestCase):
             return len(C())
 
         self.assertEqual(takeLen(), 10)
+
+    def test_pass_child_to_function_expecting_base_and_kwargs(self):
+        class X(Class):
+            def f(self, **kwargs) -> str:
+                return "kwargs"
+
+        class Child(X, Final):
+            def f(self, y) -> str:
+                return "y"
+
+        @Entrypoint
+        def f(x: X):
+            return x.f(y=10)
+
+        @Entrypoint
+        def doit():
+            res = f(Child())
+            print("done")
+            return res
+
+        @Entrypoint
+        def done():
+            doit()
+            print("done")
+
+        done()

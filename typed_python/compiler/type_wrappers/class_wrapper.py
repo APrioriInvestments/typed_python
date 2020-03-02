@@ -294,7 +294,7 @@ class ClassWrapper(RefcountedWrapper):
                             self.convert_attribute(context, instance, i, nocheck=True).convert_destroy()
                         )
 
-        context.pushEffect(runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr)))
+        context.pushEffect(runtime_functions.free.call(self.get_layout_pointer(instance.nonref_expr).cast(native_ast.UInt8Ptr)))
 
     def memberPtr(self, instance, ix):
         return (
@@ -775,6 +775,7 @@ class ClassWrapper(RefcountedWrapper):
         )
 
     def generateConstructor(self, context, out, *args):
+        context.logDiagnostic("Create")
         context.pushEffect(
             out.expr.store(
                 runtime_functions.malloc.call(
