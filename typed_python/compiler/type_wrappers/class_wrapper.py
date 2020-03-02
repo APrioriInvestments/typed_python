@@ -341,6 +341,9 @@ class ClassWrapper(RefcountedWrapper):
 
             return instance.changeType(methodType)
 
+        if attribute in self.typeRepresentation.PropertyFunctions:
+            return self.convert_method_call(context, instance, attribute, (), {})
+
         if not isinstance(attribute, int):
             ix = self.nameToIndex.get(attribute)
         else:
@@ -381,9 +384,15 @@ class ClassWrapper(RefcountedWrapper):
 
         return resultTypes
 
+    def getMethodOrPropertyBody(self, name):
+        return (
+            self.typeRepresentation.MemberFunctions.get(name)
+            or self.typeRepresentation.PropertyFunctions.get(name)
+        )
+
     def convert_method_call(self, context, instance, methodName, args, kwargs):
         # figure out which signature we'd want to use on the given args/kwargs
-        func = self.typeRepresentation.MemberFunctions[methodName]
+        func = self.getMethodOrPropertyBody(methodName)
 
         if self.typeRepresentation.IsFinal:
             # we can sidestep the vtable entirely
@@ -478,7 +487,7 @@ class ClassWrapper(RefcountedWrapper):
             argNames - for each arg, None if it was a positional argument, or the name
                 of the argument.
         """
-        func = self.typeRepresentation.MemberFunctions[methodName]
+        func = self.getMethodOrPropertyBody(methodName)
 
         argTypes = [a.expr_type for i, a in enumerate(args) if argNames[i] is None]
         kwargTypes = {argNames[i]: a.expr_type for i, a in enumerate(args) if argNames[i] is not None}
@@ -703,7 +712,7 @@ class ClassWrapper(RefcountedWrapper):
         # this is the function we're implementing. It has its own type signature
         # but we have the signature from the base class as well, which may be more precise
         # in the inputs and less precise in the outputs.
-        pyImpl = implementingClass.MemberFunctions[methodName]
+        pyImpl = typeWrapper(implementingClass).getMethodOrPropertyBody(methodName)
 
         assert bytecount(pyImpl.ClosureType) == 0, "Class methods should have empty closures."
 

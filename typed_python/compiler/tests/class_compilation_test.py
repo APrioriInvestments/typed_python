@@ -1793,3 +1793,38 @@ class TestClassCompilationCompilation(unittest.TestCase):
             print("done")
 
         done()
+
+    def test_compile_class_properties(self):
+        class X(Class, Final):
+            @property
+            def value(self):
+                return 10
+
+        self.assertEqual(X().value, 10)
+
+        @Entrypoint
+        def callIt():
+            return X().value
+
+        self.assertEqual(callIt(), 10)
+
+    def test_compile_class_properties_with_subclasses(self):
+        class X(Class):
+            @property
+            def value(self):
+                return 10
+
+        class Child(X):
+            @property
+            def value(self):
+                return 20
+
+        self.assertEqual(X().value, 10)
+        self.assertEqual(Child().value, 20)
+
+        @Entrypoint
+        def callIt(x: X):
+            return x.value
+
+        self.assertEqual(callIt(X()), 10)
+        self.assertEqual(callIt(Child()), 20)

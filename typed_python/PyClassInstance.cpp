@@ -488,6 +488,12 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
         }
     }
 
+    PyObjectStealer propertyFunctions(PyDict_New());
+
+    for (auto p: classT->getPropertyFunctions()) {
+        PyDict_SetItemString(propertyFunctions, p.first.c_str(), typePtrToPyTypeRepresentation(p.second));
+    }
+
     //expose 'ElementType' as a member of the type object
     PyDict_SetItemString(pyType->tp_dict, "HeldClass", typePtrToPyTypeRepresentation(classT->getHeldClass()));
     PyDict_SetItemString(pyType->tp_dict, "MemberTypes", types);
@@ -497,6 +503,7 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
     PyDict_SetItemString(pyType->tp_dict, "MemberNames", names);
     PyDict_SetItemString(pyType->tp_dict, "MemberDefaultValues", defaults);
 
+    PyDict_SetItemString(pyType->tp_dict, "PropertyFunctions", propertyFunctions);
     PyDict_SetItemString(pyType->tp_dict, "MemberFunctions", memberFunctions);
 
     for (auto nameAndObj: classT->getClassMembers()) {
