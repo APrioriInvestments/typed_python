@@ -16,6 +16,13 @@
 // Note: extern C identifiers are distinguished only up to 32 characters
 // nativepython_runtime_12345678901
 extern "C" {
+    double np_tanh_float64(double d) {
+        return std::tanh(d);
+    }
+
+    float np_tanh_float32(float d) {
+        return std::tanh(d);
+    }
 
     bool nativepython_runtime_string_eq(StringType::layout* lhs, StringType::layout* rhs) {
         if (lhs == rhs) {

@@ -101,6 +101,9 @@ memmove = externalCallTarget("memmove", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 log32 = externalCallTarget("llvm.log.f32", Float32, Float32, intrinsic=True)
 log64 = externalCallTarget("llvm.log.f64", Float64, Float64, intrinsic=True)
 
+tanh32 = externalCallTarget("np_tanh_float32", Float32, Float32, intrinsic=True)
+tanh64 = externalCallTarget("np_tanh_float64", Float64, Float64, intrinsic=True)
+
 exp32 = externalCallTarget("llvm.exp.f32", Float32, Float32, intrinsic=True)
 exp64 = externalCallTarget("llvm.exp.f64", Float64, Float64, intrinsic=True)
 

@@ -17,7 +17,57 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python import Float32, Float64
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from math import isnan, isfinite, isinf, cos, sin, log, exp
+from math import (
+    # acos,
+    # acosh,
+    # asin,
+    # asinh,
+    # atan,
+    # atan2,
+    # atanh,
+    # ceil,
+    # copysign,
+    cos,
+    # cosh,
+    # degrees,
+    # e,
+    # erf,
+    # erfc,
+    exp,
+    # expm1,
+    # fabs,
+    # factorial,
+    # floor,
+    # fmod,
+    # frexp,
+    # fsum,
+    # gamma,
+    # gcd,
+    # hypot,
+    # inf,
+    # isclose,
+    isfinite,
+    isinf,
+    isnan,
+    # ldexp,
+    # lgamma,
+    log,
+    # log10,
+    # log1p,
+    # log2,
+    # modf,
+    # nan,
+    # pi,
+    # pow,
+    # radians,
+    sin,
+    # sinh,
+    # sqrt,
+    # tan,
+    tanh,
+    # tau,
+    # trunc,
+)
 
 
 class MathFunctionWrapper(Wrapper):
@@ -25,7 +75,7 @@ class MathFunctionWrapper(Wrapper):
     is_empty = False
     is_pass_by_ref = False
 
-    SUPPORTED_FUNCTIONS = (isnan, isfinite, isinf, cos, sin, log, exp)
+    SUPPORTED_FUNCTIONS = (isnan, isfinite, isinf, cos, sin, log, exp, tanh)
 
     def __init__(self, mathFun):
         assert mathFun in self.SUPPORTED_FUNCTIONS
@@ -65,6 +115,9 @@ class MathFunctionWrapper(Wrapper):
                 outT = bool
             elif self.typeRepresentation is log:
                 func = runtime_functions.log32 if argType is Float32 else runtime_functions.log64
+                outT = argType
+            elif self.typeRepresentation is log:
+                func = runtime_functions.tanh32 if argType is Float32 else runtime_functions.tanh64
                 outT = argType
             elif self.typeRepresentation is cos:
                 func = runtime_functions.cos32 if argType is Float32 else runtime_functions.cos64
