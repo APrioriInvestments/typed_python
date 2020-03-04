@@ -280,7 +280,7 @@ class PythonTypedFunctionWrapper(Wrapper):
 
         Args:
             converter - the PythonToNativeConverter that needs the concrete definition.
-            returnType - the typed_python Type of what we're returning, or None if we don't know
+            returnType - the typeWrapper of what we're returning, or None if we don't know
             argTypes - (ListOf(wrapper)) a the actual concrete type wrappers for the arguments
                 we're passing.
             kwargTypes - (Dict(str, wrapper)) a the actual concrete type wrappers for the keyword
@@ -305,6 +305,8 @@ class PythonTypedFunctionWrapper(Wrapper):
 
             if returnType is None:
                 return None
+        else:
+            returnType = typeWrapper(returnType)
 
         argNames = [None for _ in argTypes] + list(kwargTypes)
 
@@ -457,9 +459,9 @@ class PythonTypedFunctionWrapper(Wrapper):
         argTypes = [a.expr_type for i, a in enumerate(args) if argNames[i] is None]
         kwargTypes = {argNames[i]: a.expr_type for i, a in enumerate(args) if argNames[i] is not None}
 
-        def makeOverloadImplementor(overload, isExplicit):
+        def makeOverloadImplementor(overload, isExplicit, returnType):
             return lambda context, _, outputVar, *args: self.generateOverloadImplement(
-                context, overload, isExplicit, outputVar, args, argNames, provideClosureArgument
+                context, overload, returnType, isExplicit, outputVar, args, argNames, provideClosureArgument
             )
 
         for isExplicit in [False, True]:
@@ -467,7 +469,9 @@ class PythonTypedFunctionWrapper(Wrapper):
                 mightMatch = self.overloadMatchesSignature(overload, argTypes, kwargTypes, isExplicit)
 
                 if mightMatch is not False:
-                    overloadRetType = overload.returnType or object
+                    overloadRetType = overload.returnType
+                    if overloadRetType is None:
+                        overloadRetType = returnType.typeRepresentation
 
                     testSingleOverloadForm = context.converter.defineNativeFunction(
                         f'implement_overload.{self}.{overloadIndex}.{isExplicit}.{argTypes}.{kwargTypes}->{overloadRetType}',
@@ -476,7 +480,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                         [PointerTo(overloadRetType)] + ([self] if provideClosureArgument else [])
                         + list(argTypes) + list(kwargTypes.values()),
                         typeWrapper(bool),
-                        makeOverloadImplementor(overload, isExplicit)
+                        makeOverloadImplementor(overload, isExplicit, overloadRetType)
                     )
 
                     outputSlot = context.allocateUninitializedSlot(overloadRetType)
@@ -511,7 +515,7 @@ class PythonTypedFunctionWrapper(Wrapper):
         # this should actually be hitting the interpreter instead.
         context.pushException(TypeError, f"Failed to find an overload for {self} matching {argTypes} and {kwargTypes}")
 
-    def generateOverloadImplement(self, context, overload, isExplicit, outputVar, args, argNames, provideClosureArgument):
+    def generateOverloadImplement(self, context, overload, retType, isExplicit, outputVar, args, argNames, provideClosureArgument):
         """Produce the code that implements this specific overload.
 
         The generated code returns control flow with a True if it fills out the 'outputVar'
@@ -520,6 +524,7 @@ class PythonTypedFunctionWrapper(Wrapper):
         Args:
             context - an ExpressionConversionContext
             overload - the FunctionOverload we're trying to convert.
+            retType - the type we're actually planning on returning here.
             isExplicit - are we using explicit conversion?
             outputVar - a TypedExpression(PointerTo(returnType)) we're supposed to initialize.
             args - the arguments to pass to the method (including the closure if necessary and the instance)
@@ -538,7 +543,6 @@ class PythonTypedFunctionWrapper(Wrapper):
 
         argTypes = [a.expr_type for i, a in enumerate(args) if argNames[i] is None]
         kwargTypes = {argNames[i]: a.expr_type for i, a in enumerate(args) if argNames[i] is not None}
-        retType = overload.returnType or typeWrapper(object).typeRepresentation
 
         argAndKwargTypes = context.computeOverloadSignature(overload, argTypes, kwargTypes)
 

@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 import psutil
 import time
+import threading
 from typed_python import Entrypoint
 
 
@@ -45,3 +46,20 @@ def compilerPerformanceComparison(f, *args, assertResultsEquivalent=True):
         assert compiledRes == uncompiledRes, (compiledRes, uncompiledRes)
 
     return (t1 - t0, t2 - t1)
+
+
+def estimateFunctionMultithreadSlowdown(f, threadcount=2):
+    t0 = time.time()
+    f()
+    t1 = time.time()
+
+    threads = [threading.Thread(target=f) for _ in range(threadcount)]
+
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    t2 = time.time()
+
+    return (t2 - t1) / (t1 - t0)

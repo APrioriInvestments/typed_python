@@ -63,6 +63,9 @@ class FunctionConversionContext(object):
             closureVarnames - names of the variables in this function's closure
             globalVars - a dict from name to the actual python object in the globals for this function
         """
+        if '_inplaceBinopCheck' in name:
+            assert 'Python' not in str(output_type)
+
         self.name = name
         self.variablesAssigned = computeAssignedVariables(statements)
         self.variablesRead = computeReadVariables(statements)

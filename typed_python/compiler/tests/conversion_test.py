@@ -17,8 +17,12 @@ import traceback
 import unittest
 from flaky import flaky
 
-from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, _types, Compiled, Dict, NoneType
-from typed_python.compiler.runtime import Runtime, Entrypoint
+from typed_python import (
+    Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class,
+    _types, Compiled, Dict, NoneType, Final, PythonObjectOfType
+)
+
+from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
 
 
 class TestCompilationStructures(unittest.TestCase):
@@ -1217,3 +1221,29 @@ class TestCompilationStructures(unittest.TestCase):
             return res
 
         self.assertEqual(f(), [1, 2, 3])
+
+    def test_function_not_returning_returns_none(self):
+        @Entrypoint
+        def f(l, i, y):
+            l[i] = y
+
+        self.assertEqual(f.resultTypeFor(ListOf(int), int, int).typeRepresentation, NoneType)
+
+    def test_method_not_returning_returns_none(self):
+        class NoPythonObjectTypes(RuntimeEventVisitor):
+            def onNewFunction(self, function, inputTypes, outputType, variableTypes):
+                assert not issubclass(outputType.typeRepresentation, PythonObjectOfType)
+
+        class C(Class, Final):
+            def f(self, l, i, y: int):
+                l[i] = y
+
+            def f(self, l, i, y: float):  # noqa
+                l[i] = y
+
+        @Entrypoint
+        def f(l: ListOf(int), i, y: OneOf(int, float)):
+            return C().f(l, i, y)
+
+        with NoPythonObjectTypes():
+            f([1, 2, 3], 0, 2)
