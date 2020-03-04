@@ -333,6 +333,9 @@ class OneOfWrapper(Wrapper):
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
+    def can_cast_to_primitive(self, context, expr, primitiveType):
+        assert False, "Clients should already have unwrapped this oneof"
+
     def convert_bool_cast(self, context, expr):
         return expr.unwrap(lambda e: e.convert_bool_cast())
 

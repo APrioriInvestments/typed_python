@@ -87,6 +87,9 @@ class ArithmeticTypeWrapper(Wrapper):
     def convert_destroy(self, context, instance):
         pass
 
+    def can_cast_to_primitive(self, context, expr, primitiveType):
+        return primitiveType in (str, float, int, bool)
+
     def convert_bool_cast(self, context, expr):
         if expr.expr_type.typeRepresentation is Bool:
             return expr

@@ -969,8 +969,8 @@ class TestClassCompilationCompilation(unittest.TestCase):
             __rxor__ = lambda self, other: "rxor" + repr(other)
             __ror__ = lambda self, other: "ror" + repr(other)
 
-        values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
-                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"}), PointerTo(int)()]
+        values = [PointerTo(int)(), 1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
+                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"})]
         for v in values:
             T = type(v)
 
@@ -1828,3 +1828,21 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(callIt(X()), 10)
         self.assertEqual(callIt(Child()), 20)
+
+    def test_overloading_operators(self):
+        class X(Class, Final):
+            def __add__(self, other: int):
+                return 1
+
+            def __add__(self, other: float):  # noqa
+                return 2
+
+        self.assertEqual(X() + 1, 1)
+        self.assertEqual(X() + 1.5, 2)
+
+        @Entrypoint
+        def add(x, y):
+            return x + y
+
+        self.assertEqual(add(X(), 1), 1)
+        self.assertEqual(add(X(), 1.5), 2)

@@ -17,7 +17,6 @@ import typed_python.compiler
 from typed_python import _types, OneOf, ListOf
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.native_ast import VoidPtr
-from math import trunc, floor, ceil
 
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
@@ -213,9 +212,21 @@ class Wrapper(object):
         """If we are masquerading as an untyped type, convert us to that type."""
         return instance
 
+    def can_cast_to_primitive(self, context, e, primitiveType):
+        """Returns true if we can call one of the 'convert_X_cast' functions.
+
+        Args:
+            primitiveType - one of bool, int, float, str, bytes
+        """
+        if primitiveType is str:
+            return True
+        if primitiveType in (int, float, bool, bytes):
+            return False
+        assert False, "Invalid primitive type argument " + str(primitiveType)
+
     def convert_call(self, context, left, args, kwargs):
         return context.pushException(TypeError, "Can't call %s with args of type (%s)" % (
-            str(self) + "( of type " + str(self.typeRepresentation) + ")",
+            str(self) + " (of type " + str(self.typeRepresentation) + ")",
             ",".join([str(a.expr_type) for a in args] + ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()])
         ))
 
@@ -533,6 +544,10 @@ class Wrapper(object):
 
         return typeInst.convert_call((argVal,), {})
 
+    def has_method(self, context, instance, methodName):
+        assert isinstance(methodName, str)
+        return False
+
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         return context.pushException(
             TypeError,
@@ -544,92 +559,6 @@ class Wrapper(object):
                     ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()]
                 )
             )
-        )
-
-    def convert_builtin_using_methodcall_or_converting_to_float(self, f, context, expr, a1=None):
-        # TODO: this should go in some common wrapper base class for alternatives and classes, along with
-        # generate method call
-        if f is format:
-            if a1 is not None:
-                return self.generate_method_call(context, "__format__", (expr, a1)) \
-                    or expr.convert_str_cast()
-            else:
-                return self.generate_method_call(context, "__format__", (expr, context.constant(''))) \
-                    or expr.convert_str_cast()
-
-        if f is round:
-            if a1 is None:
-                a1 = context.constant(0)
-
-            res = self.generate_method_call(context, "__round__", (expr, a1))
-
-            if res is not None:
-                return res
-
-            expr = expr.toFloat64()
-            if expr is None:
-                return None
-
-            return expr.convert_builtin(f, a1)
-
-        if a1 is not None:
-            return None
-
-        # handle builtins with no additional arguments here:
-        methodName = {trunc: '__trunc__', floor: '__floor__', ceil: '__ceil__', complex: '__complex__', dir: '__dir__'}
-        if f in methodName:
-            res = self.generate_method_call(context, methodName[f], (expr,))
-            if res is not None:
-                return res
-
-            if f is complex:
-                return None
-
-            if f in (floor, ceil, trunc):
-                expr = expr.toFloat64()
-                if expr is None:
-                    return expr
-                return expr.convert_builtin(f)
-
-        return Wrapper.convert_builtin(self, f, context, expr, a1)
-
-    def generate_method_call(self, context, method, args):
-        """
-        Generate code to call the named method with these arguments.
-        :param context: compilation context
-        :param method: method name, as a string
-        :param args: tuple of expressions for arguments for generated call
-        :return: intermediate compiled result, or None if method does not exist or can't be called with these args
-        """
-        t = self.typeRepresentation
-
-        f = getattr(t, method, None)
-
-        if f is None:
-            return None
-
-        f_cat = getattr(f, "__typed_python_category__", None)
-
-        if f_cat != "Function":
-            # For Alternatives, member attributes are Functions.
-            # For Classes, member attributes are method_descriptors instead of Functions,
-            # so need to access the Function itself via MemberFunctions
-            if getattr(t, "MemberFunctions", None):
-                f = t.MemberFunctions.get(method)
-                if f is None:
-                    return None
-                f_cat = getattr(f, "__typed_python_category__", None)
-
-        if f_cat is None or f_cat != "Function":
-            return None
-
-        assert len(f.overloads) == 1
-
-        return context.call_overload(
-            f.overloads[0],
-            None,
-            args,
-            {}
         )
 
     def get_iteration_expressions(self, context, expr):

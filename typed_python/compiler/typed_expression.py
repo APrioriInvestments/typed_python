@@ -158,6 +158,12 @@ class TypedExpression(object):
     def convert_bool_cast(self):
         return self.expr_type.convert_bool_cast(self.context, self)
 
+    def can_cast_to_primitive(self, primitiveType):
+        return self.expr_type.can_cast_to_primitive(self.context, self, primitiveType)
+
+    def has_method(self, methodName):
+        return self.expr_type.has_method(self.context, self, methodName)
+
     def convert_int_cast(self):
         return self.expr_type.convert_int_cast(self.context, self)
 

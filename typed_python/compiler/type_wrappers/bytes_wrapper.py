@@ -152,6 +152,9 @@ class BytesWrapper(RefcountedWrapper):
             )
         )
 
+    def can_cast_to_primitive(self, context, expr, primitiveType):
+        return primitiveType in (bytes, float, int, bool)
+
     def convert_bool_cast(self, context, expr):
         return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
 

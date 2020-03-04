@@ -16,11 +16,14 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python import NoneType, _types, Bool, Int32
-import typed_python.compiler.native_ast as native_ast
+from typed_python import NoneType, _types, Bool
 import typed_python.compiler
 from typed_python.compiler.native_ast import VoidPtr
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
+from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
+    ClassOrAlternativeWrapperMixin
+)
+import typed_python.compiler.native_ast as native_ast
 
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
@@ -38,7 +41,58 @@ def makeAlternativeWrapper(t):
         return AlternativeWrapper(t)
 
 
-class SimpleAlternativeWrapper(Wrapper):
+class AlternativeWrapperMixin(ClassOrAlternativeWrapperMixin):
+    def convert_comparison(self, context, lhs, op, rhs):
+        # TODO: provide nicer translation from op to Py_ comparison codes
+        py_code = (
+            2 if op.matches.Eq else
+            3 if op.matches.NotEq else
+            0 if op.matches.Lt else
+            4 if op.matches.Gt else
+            1 if op.matches.LtE else
+            5 if op.matches.GtE else -1
+        )
+
+        if py_code < 0:
+            return super().convert_comparison(context, lhs, op, rhs)
+
+        tp_l = context.getTypePointer(lhs.expr_type.typeRepresentation)
+        tp_r = context.getTypePointer(rhs.expr_type.typeRepresentation)
+
+        if not lhs.isReference:
+            lhs = context.pushMove(lhs)
+
+        if not rhs.isReference:
+            rhs = context.pushMove(rhs)
+
+        if tp_l and tp_l == tp_r:
+            return context.pushPod(
+                Bool,
+                runtime_functions.alternative_cmp.call(
+                    tp_l,
+                    lhs.expr.cast(VoidPtr),
+                    rhs.expr.cast(VoidPtr),
+                    py_code
+                )
+            )
+
+        return super().convert_comparison(context, lhs, op, rhs)
+
+    def has_method(self, context, instance, methodName):
+        assert isinstance(methodName, str)
+        return methodName in self.typeRepresentation.__typed_python_methods__
+
+    def convert_method_call(self, context, instance, methodName, args, kwargs):
+        if methodName not in self.typeRepresentation.__typed_python_methods__:
+            context.pushException(AttributeError, "Object has no attribute %s" % methodName)
+            return
+
+        funcType = typeWrapper(self.typeRepresentation.__typed_python_methods__[methodName])
+
+        return funcType.convert_call(context, None, (instance,) + tuple(args), kwargs)
+
+
+class SimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
     """Wrapper around alternatives with all empty arguments."""
     is_pod = True
     is_empty = False
@@ -52,162 +106,11 @@ class SimpleAlternativeWrapper(Wrapper):
     def getNativeLayoutType(self):
         return self.layoutType
 
-    def convert_hash(self, context, expr):
-        y = self.generate_method_call(context, "__hash__", (expr,))
-        if y is not None:
-            return y
-        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
-        if tp:
-            return context.pushPod(Int32, runtime_functions.hash_alternative.call(expr.nonref_expr.cast(VoidPtr), tp))
-        return None
-
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
         )
-
-    def convert_call(self, context, expr, args, kwargs):
-        return self.generate_method_call(context, "__call__", [expr] + args)
-
-    def convert_len_native(self, context, expr):
-        alt = self.typeRepresentation
-        if getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
-            assert len(alt.__len__.overloads) == 1
-            return context.call_overload(alt.__len__.overloads[0], None, (expr,), {})
-        return context.constant(0)
-
-    def convert_len(self, context, expr):
-        intermediate = self.convert_len_native(context, expr)
-        if intermediate is None:
-            return None
-        return context.pushPod(int, intermediate.convert_to_type(int).expr)
-
-    def convert_abs(self, context, expr):
-        return self.generate_method_call(context, "__abs__", (expr,))
-
-    def convert_bool_cast(self, context, e):
-        y = self.generate_method_call(context, "__bool__", (e,))
-        if y is not None:
-            return y
-        y = self.generate_method_call(context, "__len__", (e,))
-        if y is not None:
-            return context.pushPod(bool, y.nonref_expr.neq(0))
-        return context.constant(True)
-
-    def convert_int_cast(self, context, e, raiseException=True):
-        if raiseException:
-            return self.generate_method_call(context, "__int__", (e,)) \
-                or context.pushException(TypeError, f"__int__ not implemented for {self.typeRepresentation}")
-        else:
-            return self.generate_method_call(context, "__int__", (e,))
-
-    def convert_float_cast(self, context, e, raiseException=True):
-        if raiseException:
-            return self.generate_method_call(context, "__float__", (e,)) \
-                or context.pushException(TypeError, f"__float__ not implemented for {self.typeRepresentation}")
-        else:
-            return self.generate_method_call(context, "__float__", (e,))
-
-    def convert_str_cast(self, context, e):
-        return self.generate_method_call(context, "__str__", (e,)) \
-            or e.convert_repr()
-
-    def convert_bytes_cast(self, context, e):
-        return self.generate_method_call(context, "__bytes__", (e,)) \
-            or super().convert_bytes_cast(context, e)
-
-    def convert_builtin(self, f, context, expr, a1=None):
-        return self.convert_builtin_using_methodcall_or_converting_to_float(f, context, expr, a1)
-
-    def convert_unary_op(self, context, expr, op):
-        magic = "__pos__" if op.matches.UAdd else \
-            "__neg__" if op.matches.USub else \
-            "__invert__" if op.matches.Invert else \
-            "__not__" if op.matches.Not else \
-            ""
-        return self.generate_method_call(context, magic, (expr,)) or super().convert_unary_op(context, expr, op)
-
-    def convert_bin_op(self, context, l, op, r, inplace):
-        magic = "__add__" if op.matches.Add else \
-            "__sub__" if op.matches.Sub else \
-            "__mul__" if op.matches.Mult else \
-            "__truediv__" if op.matches.Div else \
-            "__floordiv__" if op.matches.FloorDiv else \
-            "__mod__" if op.matches.Mod else \
-            "__matmul__" if op.matches.MatMult else \
-            "__pow__" if op.matches.Pow else \
-            "__lshift__" if op.matches.LShift else \
-            "__rshift__" if op.matches.RShift else \
-            "__or__" if op.matches.BitOr else \
-            "__xor__" if op.matches.BitXor else \
-            "__and__" if op.matches.BitAnd else \
-            "__eq__" if op.matches.Eq else \
-            "__ne__" if op.matches.NotEq else \
-            "__lt__" if op.matches.Lt else \
-            "__gt__" if op.matches.Gt else \
-            "__le__" if op.matches.LtE else \
-            "__ge__" if op.matches.GtE else \
-            ""
-
-        magic_inplace = '__i' + magic[2:] if magic and inplace else None
-
-        return (magic_inplace and self.generate_method_call(context, magic_inplace, (l, r))) \
-            or self.generate_method_call(context, magic, (l, r)) \
-            or self.convert_comparison(context, l, op, r) \
-            or super().convert_bin_op(context, l, op, r, inplace)
-
-    def convert_comparison(self, context, left, op, right):
-        # TODO: provide nicer translation from op to Py_ comparison codes
-        py_code = 2 if op.matches.Eq else \
-            3 if op.matches.NotEq else \
-            0 if op.matches.Lt else \
-            4 if op.matches.Gt else \
-            1 if op.matches.LtE else \
-            5 if op.matches.GtE else -1
-        if py_code < 0:
-            return None
-        tp_left = context.getTypePointer(left.expr_type.typeRepresentation)
-        tp_right = context.getTypePointer(right.expr_type.typeRepresentation)
-        if tp_left and tp_left == tp_right:
-            if not left.isReference:
-                left = context.pushMove(left)
-            if not right.isReference:
-                right = context.pushMove(right)
-            return context.pushPod(
-                Bool,
-                runtime_functions.alternative_cmp.call(
-                    tp_left,
-                    left.expr.cast(VoidPtr),
-                    right.expr.cast(VoidPtr),
-                    py_code
-                )
-            )
-        return None
-
-    def convert_bin_op_reverse(self, context, r, op, l, inplace):
-        if op.matches.In:
-            ret = self.generate_method_call(context, "__contains__", (r, l))
-            return (ret and ret.toBool()) \
-                or super().convert_bin_op_reverse(context, r, op, l, inplace)
-
-        magic = "__radd__" if op.matches.Add else \
-            "__rsub__" if op.matches.Sub else \
-            "__rmul__" if op.matches.Mult else \
-            "__rtruediv__" if op.matches.Div else \
-            "__rfloordiv__" if op.matches.FloorDiv else \
-            "__rmod__" if op.matches.Mod else \
-            "__rmatmul__" if op.matches.MatMult else \
-            "__rpow__" if op.matches.Pow else \
-            "__rlshift__" if op.matches.LShift else \
-            "__rrshift__" if op.matches.RShift else \
-            "__ror__" if op.matches.BitOr else \
-            "__rxor__" if op.matches.BitXor else \
-            "__rand__" if op.matches.BitAnd else \
-            ""
-
-        return self.generate_method_call(context, magic, (r, l)) \
-            or super().convert_bin_op_reverse(context, r, op, l, inplace)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:
@@ -215,8 +118,19 @@ class SimpleAlternativeWrapper(Wrapper):
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
+    def convert_check_matches(self, context, instance, typename):
+        index = -1
+        for i in range(len(self.typeRepresentation.__typed_python_alternatives__)):
+            if self.typeRepresentation.__typed_python_alternatives__[i].Name == typename:
+                index = i
 
-class ConcreteSimpleAlternativeWrapper(Wrapper):
+        if index == -1:
+            return context.constant(False)
+
+        return context.pushPod(bool, instance.nonref_expr.cast(native_ast.Int64).eq(index))
+
+
+class ConcreteSimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
     """Wrapper around alternatives with all empty arguments, after choosing a specific alternative."""
     is_pod = True
     is_empty = False
@@ -254,35 +168,17 @@ class ConcreteSimpleAlternativeWrapper(Wrapper):
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-    def convert_builtin(self, f, context, expr, a1=None):
-        altWrapper = typeWrapper(self.alternativeType)
-        return altWrapper.convert_builtin(f, context, expr, a1)
-
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:
             return context.push(self, lambda x: x.convert_default_initialize())
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
-    def convert_bool_cast(self, context, e):
-        y = self.generate_method_call(context, "__bool__", (e,))
-        if y is not None:
-            return y
-        y = self.generate_method_call(context, "__len__", (e,))
-        if y is not None:
-            return context.pushPod(bool, y.nonref_expr.neq(0))
-        return context.constant(True)
-
-    def convert_str_cast(self, context, e):
-        return self.generate_method_call(context, "__str__", (e,)) \
-            or e.convert_repr()
-
-    def convert_bytes_cast(self, context, e):
-        return self.generate_method_call(context, "__bytes__", (e,)) \
-            or super().convert_bytes_cast(context, e)
+    def convert_check_matches(self, context, instance, typename):
+        return context.constant(typename == self.typeRepresentation.Name)
 
 
-class AlternativeWrapper(RefcountedWrapper):
+class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -309,15 +205,6 @@ class AlternativeWrapper(RefcountedWrapper):
 
     def getNativeLayoutType(self):
         return self.layoutType
-
-    def convert_hash(self, context, expr):
-        y = self.generate_method_call(context, "__hash__", (expr,))
-        if y is not None:
-            return y
-        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
-        if tp:
-            return context.pushPod(Int32, runtime_functions.hash_alternative.call(expr.nonref_expr.cast(VoidPtr), tp))
-        return None
 
     def on_refcount_zero(self, context, instance):
         return (
@@ -366,8 +253,10 @@ class AlternativeWrapper(RefcountedWrapper):
                 validIndices.append(i)
 
         if not validIndices:
-            return self.generate_method_call(context, "__getattr__", (instance, context.constant(attribute))) \
-                or super().convert_attribute(context, instance, attribute)
+            if self.has_method(context, instance, "__getattr__"):
+                return self.convert_method_call(context, instance, "__getattr__", (context.constant(attribute),), {})
+
+            return super().convert_attribute(context, instance, attribute)
         if len(validIndices) == 1:
             with context.ifelse(instance.nonref_expr.ElementPtrIntegers(0, 1).load().neq(validIndices[0])) as (then, otherwise):
                 with then:
@@ -388,30 +277,6 @@ class AlternativeWrapper(RefcountedWrapper):
 
             return output
 
-    def convert_method_call(self, context, instance, methodName, args, kwargs):
-        if methodName not in self.typeRepresentation.__typed_python_methods__:
-            context.pushException(AttributeError, "Object has no attribute %s" % methodName)
-            return
-
-        funcType = typeWrapper(self.typeRepresentation.__typed_python_methods__[methodName])
-
-        return funcType.convert_call(context, None, (instance,) + tuple(args), kwargs)
-
-    def convert_getitem(self, context, instance, item):
-        return self.generate_method_call(context, "__getitem__", (instance, item)) \
-            or super().convert_getitem(context, instance, item)
-
-    def convert_setitem(self, context, instance, item, value):
-        return self.generate_method_call(context, "__setitem__", (instance, item, value)) \
-            or super().convert_setitem(context, instance, item, value)
-
-    def convert_set_attribute(self, context, instance, attribute, value):
-        if value is None:
-            return self.generate_method_call(context, "__delattr__", (instance, context.constant(attribute))) \
-                or super().convert_set_attribute(context, instance, attribute, value)
-        return self.generate_method_call(context, "__setattr__", (instance, context.constant(attribute), value)) \
-            or super().convert_set_attribute(context, instance, attribute, value)
-
     def convert_check_matches(self, context, instance, typename):
         index = -1
         for i in range(len(self.typeRepresentation.__typed_python_alternatives__)):
@@ -422,140 +287,6 @@ class AlternativeWrapper(RefcountedWrapper):
             return context.constant(False)
         return context.pushPod(bool, instance.nonref_expr.ElementPtrIntegers(0, 1).load().eq(index))
 
-    def convert_call(self, context, expr, args, kwargs):
-        return self.generate_method_call(context, "__call__", [expr] + args)
-
-    def convert_len_native(self, context, expr):
-        return self.generate_method_call(context, "__len__", (expr,)) or context.constant(0)
-
-    def convert_len(self, context, expr):
-        intermediate = self.convert_len_native(context, expr)
-        if intermediate is None:
-            return None
-        return context.pushPod(int, intermediate.convert_to_type(int).expr)
-
-    def convert_abs(self, context, expr):
-        return self.generate_method_call(context, "__abs__", (expr,))
-
-    def convert_bool_cast(self, context, e):
-        y = self.generate_method_call(context, "__bool__", (e,))
-        if y is not None:
-            return y
-        y = self.generate_method_call(context, "__len__", (e,))
-        if y is not None:
-            return context.pushPod(bool, y.nonref_expr.neq(0))
-        return context.constant(True)
-
-    def convert_int_cast(self, context, e, raiseException=True):
-        if raiseException:
-            return self.generate_method_call(context, "__int__", (e,)) \
-                or context.pushException(TypeError, f"__int__ not implemented for {self.typeRepresentation}")
-        else:
-            return self.generate_method_call(context, "__int__", (e,))
-
-    def convert_float_cast(self, context, e, raiseException=True):
-        if raiseException:
-            return self.generate_method_call(context, "__float__", (e,)) \
-                or context.pushException(TypeError, f"__float__ not implemented for {self.typeRepresentation}")
-        else:
-            return self.generate_method_call(context, "__float__", (e,))
-
-    def convert_str_cast(self, context, e):
-        return self.generate_method_call(context, "__str__", (e,)) \
-            or e.convert_repr()
-
-    def convert_bytes_cast(self, context, e):
-        return self.generate_method_call(context, "__bytes__", (e,)) \
-            or super().convert_bytes_cast(context, e)
-
-    def convert_builtin(self, f, context, expr, a1=None):
-        return self.convert_builtin_using_methodcall_or_converting_to_float(f, context, expr, a1)
-
-    def convert_unary_op(self, context, expr, op):
-        magic = "__pos__" if op.matches.UAdd else \
-            "__neg__" if op.matches.USub else \
-            "__invert__" if op.matches.Invert else \
-            "__not__" if op.matches.Not else \
-            ""
-        return self.generate_method_call(context, magic, (expr,)) or super().convert_unary_op(context, expr, op)
-
-    def convert_bin_op(self, context, l, op, r, inplace):
-        magic = "__add__" if op.matches.Add else \
-            "__sub__" if op.matches.Sub else \
-            "__mul__" if op.matches.Mult else \
-            "__truediv__" if op.matches.Div else \
-            "__floordiv__" if op.matches.FloorDiv else \
-            "__mod__" if op.matches.Mod else \
-            "__matmul__" if op.matches.MatMult else \
-            "__pow__" if op.matches.Pow else \
-            "__lshift__" if op.matches.LShift else \
-            "__rshift__" if op.matches.RShift else \
-            "__or__" if op.matches.BitOr else \
-            "__xor__" if op.matches.BitXor else \
-            "__and__" if op.matches.BitAnd else \
-            "__eq__" if op.matches.Eq else \
-            "__ne__" if op.matches.NotEq else \
-            "__lt__" if op.matches.Lt else \
-            "__gt__" if op.matches.Gt else \
-            "__le__" if op.matches.LtE else \
-            "__ge__" if op.matches.GtE else \
-            ""
-
-        magic_inplace = '__i' + magic[2:] if magic and inplace else None
-
-        return (magic_inplace and self.generate_method_call(context, magic_inplace, (l, r))) \
-            or self.generate_method_call(context, magic, (l, r)) \
-            or self.convert_comparison(context, l, op, r) \
-            or super().convert_bin_op(context, l, op, r, inplace)
-
-    def convert_comparison(self, context, l, op, r):
-        # TODO: provide nicer translation from op to Py_ comparison codes
-        py_code = 2 if op.matches.Eq else \
-            3 if op.matches.NotEq else \
-            0 if op.matches.Lt else \
-            4 if op.matches.Gt else \
-            1 if op.matches.LtE else \
-            5 if op.matches.GtE else -1
-        if py_code < 0:
-            return None
-        tp_l = context.getTypePointer(l.expr_type.typeRepresentation)
-        tp_r = context.getTypePointer(r.expr_type.typeRepresentation)
-        if tp_l and tp_l == tp_r:
-            return context.pushPod(
-                Bool,
-                runtime_functions.alternative_cmp.call(
-                    tp_l,
-                    l.expr.cast(VoidPtr),
-                    r.expr.cast(VoidPtr),
-                    py_code
-                )
-            )
-        return None
-
-    def convert_bin_op_reverse(self, context, r, op, l, inplace):
-        if op.matches.In:
-            ret = self.generate_method_call(context, "__contains__", (r, l))
-            return (ret and ret.toBool()) \
-                or super().convert_bin_op_reverse(context, r, op, l, inplace)
-
-        magic = "__radd__" if op.matches.Add else \
-            "__rsub__" if op.matches.Sub else \
-            "__rmul__" if op.matches.Mult else \
-            "__rtruediv__" if op.matches.Div else \
-            "__rfloordiv__" if op.matches.FloorDiv else \
-            "__rmod__" if op.matches.Mod else \
-            "__rmatmul__" if op.matches.MatMult else \
-            "__rpow__" if op.matches.Pow else \
-            "__rlshift__" if op.matches.LShift else \
-            "__rrshift__" if op.matches.RShift else \
-            "__ror__" if op.matches.BitOr else \
-            "__rxor__" if op.matches.BitXor else \
-            "__rand__" if op.matches.BitAnd else \
-            ""
-
-        return self.generate_method_call(context, magic, (r, l)) \
-            or super().convert_bin_op_reverse(context, r, op, l, inplace)
-
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:
             return context.push(self, lambda x: x.convert_default_initialize())
@@ -563,7 +294,7 @@ class AlternativeWrapper(RefcountedWrapper):
         return super().convert_type_call(context, typeInst, args, kwargs)
 
 
-class ConcreteAlternativeWrapper(RefcountedWrapper):
+class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -683,38 +414,8 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
 
         return self.refToInner(context, instance).convert_attribute(attribute)
 
-    def convert_method_call(self, context, instance, methodName, args, kwargs):
-        if methodName not in self.typeRepresentation.__typed_python_methods__:
-            context.pushException(AttributeError, "Object has no attribute %s" % methodName)
-            return
-
-        funcType = typeWrapper(self.typeRepresentation.__typed_python_methods__[methodName])
-
-        return funcType.convert_call(context, None, (instance,) + tuple(args), kwargs)
-
     def convert_check_matches(self, context, instance, typename):
         return context.constant(typename == self.typeRepresentation.Name)
-
-    def convert_builtin(self, f, context, expr, a1=None):
-        altWrapper = typeWrapper(self.alternativeType)
-        return altWrapper.convert_builtin(f, context, expr, a1)
-
-    def convert_bool_cast(self, context, e):
-        y = self.generate_method_call(context, "__bool__", (e,))
-        if y is not None:
-            return y
-        y = self.generate_method_call(context, "__len__", (e,))
-        if y is not None:
-            return context.pushPod(bool, y.nonref_expr.neq(0))
-        return context.constant(True)
-
-    def convert_str_cast(self, context, e):
-        return self.generate_method_call(context, "__str__", (e,)) \
-            or e.convert_repr()
-
-    def convert_bytes_cast(self, context, e):
-        return self.generate_method_call(context, "__bytes__", (e,)) \
-            or super().convert_bytes_cast(context, e)
 
 
 class AlternativeMatchingWrapper(Wrapper):

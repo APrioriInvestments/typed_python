@@ -59,6 +59,9 @@ class PointerToWrapper(Wrapper):
     def convert_destroy(self, context, instance):
         pass
 
+    def can_convert_to_primitive(self, context, instance, primitiveType):
+        return primitiveType in (int, str)
+
     def convert_int_cast(self, context, e, raiseException=True):
         return e.nonref_expr.cast(native_ast.Int64)
 
@@ -75,20 +78,21 @@ class PointerToWrapper(Wrapper):
 
     def convert_bin_op(self, context, left, op, right, inplace):
         if op.matches.Add:
+            if right.expr_type.can_cast_to_primitive(context, right, int):
+                right_int = right.expr_type.convert_int_cast(context, right, False)
+                if right_int is None:
+                    return None
+
+                return context.pushPod(self, left.nonref_expr.elemPtr(right_int.nonref_expr))
+
+        if op.matches.Sub and right.expr_type == left.expr_type:
             right_int = right.expr_type.convert_int_cast(context, right, False)
             if right_int is None:
-                return super().convert_bin_op(context, left, op, right, inplace)
-
-            return context.pushPod(self, left.nonref_expr.elemPtr(right_int.nonref_expr))
-
-        if op.matches.Sub:
-            right_int = right.expr_type.convert_int_cast(context, right, False)
-            if right_int is None:
-                return super().convert_bin_op(context, left, op, right, inplace)
+                return None
 
             left_int = left.expr_type.convert_int_cast(context, left, False)
             if left_int is None:
-                return super().convert_bin_op(context, left, op, right, inplace)
+                return None
 
             return context.pushPod(
                 int,

@@ -19,6 +19,9 @@ from typed_python.compiler.type_wrappers.python_typed_function_wrapper import Py
 from typed_python.compiler.type_wrappers.arithmetic_wrapper import FloatWrapper, IntWrapper
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
+from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
+    ClassOrAlternativeWrapperMixin
+)
 
 from typed_python import NoneType, _types, PointerTo, Bool, Int32, Tuple, NamedTuple, bytecount
 
@@ -64,7 +67,7 @@ vtable_type = native_ast.Type.Struct(
 )
 
 
-class ClassWrapper(RefcountedWrapper):
+class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -142,37 +145,6 @@ class ClassWrapper(RefcountedWrapper):
                 raise Exception("Downcast in compiled code not implemented yet")
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
-
-    def convert_bool_cast(self, context, e):
-        y = self.generate_method_call(context, "__bool__", (e,))
-        if y is not None:
-            return y
-        y = self.generate_method_call(context, "__len__", (e,))
-        if y is not None:
-            return context.pushPod(bool, y.nonref_expr.neq(0))
-        return context.constant(True)
-
-    def convert_int_cast(self, context, e, raiseException=True):
-        if raiseException:
-            return self.generate_method_call(context, "__int__", (e,)) \
-                or context.pushException(TypeError, f"__int__ not implemented for {self.typeRepresentation}")
-        else:
-            return self.generate_method_call(context, "__int__", (e,))
-
-    def convert_float_cast(self, context, e, raiseException=True):
-        if raiseException:
-            return self.generate_method_call(context, "__float__", (e,)) \
-                or context.pushException(TypeError, f"__float__ not implemented for {self.typeRepresentation}")
-        else:
-            return self.generate_method_call(context, "__float__", (e,))
-
-    def convert_str_cast(self, context, e):
-        return self.generate_method_call(context, "__str__", (e,)) \
-            or e.convert_repr()
-
-    def convert_bytes_cast(self, context, e):
-        return self.generate_method_call(context, "__bytes__", (e,)) \
-            or context.pushException(TypeError, f"__bytes__ not implemented for {self.typeRepresentation}")
 
     def get_layout_pointer(self, nonref_expr):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.
@@ -350,8 +322,9 @@ class ClassWrapper(RefcountedWrapper):
             ix = attribute
 
         if ix is None:
-            return self.generate_method_call(context, "__getattr__", (instance, context.constant(attribute))) \
-                or super().convert_attribute(context, instance, attribute)
+            if self.has_method(context, instance, "__getattr__"):
+                return self.convert_method_call(context, instance, "__getattr__", (context.constant(attribute),), {})
+            return super().convert_attribute(context, instance, attribute)
 
         if not nocheck:
             with context.ifelse(self.isInitializedNativeExpr(instance, ix)) as (ifTrue, ifFalse):
@@ -389,6 +362,10 @@ class ClassWrapper(RefcountedWrapper):
             self.typeRepresentation.MemberFunctions.get(name)
             or self.typeRepresentation.PropertyFunctions.get(name)
         )
+
+    def has_method(self, context, instance, methodName):
+        assert isinstance(methodName, str)
+        return self.getMethodOrPropertyBody(methodName) is not None
 
     def convert_method_call(self, context, instance, methodName, args, kwargs):
         # figure out which signature we'd want to use on the given args/kwargs
@@ -720,14 +697,6 @@ class ClassWrapper(RefcountedWrapper):
 
         return True
 
-    def convert_getitem(self, context, instance, item):
-        return self.generate_method_call(context, "__getitem__", (instance, item)) \
-            or super().convert_getitem(context, instance, item)
-
-    def convert_setitem(self, context, instance, item, value):
-        return self.generate_method_call(context, "__setitem__", (instance, item, value)) \
-            or super().convert_setitem(context, instance, item, value)
-
     def convert_set_attribute(self, context, instance, attribute, value):
         if not isinstance(attribute, int):
             ix = self.nameToIndex.get(attribute)
@@ -736,10 +705,15 @@ class ClassWrapper(RefcountedWrapper):
 
         if ix is None:
             if value is None:
-                return self.generate_method_call(context, "__delattr__", (instance, context.constant(attribute))) \
-                    or super().convert_set_attribute(context, instance, attribute, value)
-            return self.generate_method_call(context, "__setattr__", (instance, context.constant(attribute), value)) \
-                or super().convert_set_attribute(context, instance, attribute, value)
+                if self.has_method(context, instance, "__delattr__"):
+                    return self.convert_method_call(context, instance, "__delattr__", (context.constant(attribute),), {})
+
+                return RefcountedWrapper.convert_set_attribute(self, context, instance, attribute, value)
+
+            if self.has_method(context, instance, "__setattr__"):
+                return self.convert_method_call(context, instance, "__setattr__", (context.constant(attribute), value), {})
+
+            return RefcountedWrapper.convert_set_attribute(self, context, instance, attribute, value)
 
         attr_type = typeWrapper(self.typeRepresentation.MemberTypes[ix])
 
@@ -831,55 +805,6 @@ class ClassWrapper(RefcountedWrapper):
                     " with positional arguments because it doesn't have an __init__"
                 )
 
-    def convert_call(self, context, expr, args, kwargs):
-        return self.generate_method_call(context, "__call__", [expr] + args)
-
-    def convert_len(self, context, expr):
-        return self.generate_method_call(context, "__len__", (expr,))
-
-    def convert_abs(self, context, expr):
-        return self.generate_method_call(context, "__abs__", (expr,))
-
-    def convert_builtin(self, f, context, expr, a1=None):
-        return self.convert_builtin_using_methodcall_or_converting_to_float(f, context, expr, a1)
-
-    def convert_unary_op(self, context, expr, op):
-        magic = "__pos__" if op.matches.UAdd else \
-            "__neg__" if op.matches.USub else \
-            "__invert__" if op.matches.Invert else \
-            "__not__" if op.matches.Not else \
-            ""
-        return self.generate_method_call(context, magic, (expr,)) or super().convert_unary_op(context, expr, op)
-
-    def convert_bin_op(self, context, l, op, r, inplace):
-        magic = "__add__" if op.matches.Add else \
-            "__sub__" if op.matches.Sub else \
-            "__mul__" if op.matches.Mult else \
-            "__truediv__" if op.matches.Div else \
-            "__floordiv__" if op.matches.FloorDiv else \
-            "__mod__" if op.matches.Mod else \
-            "__matmul__" if op.matches.MatMult else \
-            "__pow__" if op.matches.Pow else \
-            "__lshift__" if op.matches.LShift else \
-            "__rshift__" if op.matches.RShift else \
-            "__or__" if op.matches.BitOr else \
-            "__xor__" if op.matches.BitXor else \
-            "__and__" if op.matches.BitAnd else \
-            "__eq__" if op.matches.Eq else \
-            "__ne__" if op.matches.NotEq else \
-            "__lt__" if op.matches.Lt else \
-            "__gt__" if op.matches.Gt else \
-            "__le__" if op.matches.LtE else \
-            "__ge__" if op.matches.GtE else \
-            ""
-
-        magic_inplace = '__i' + magic[2:] if magic and inplace else None
-
-        return (magic_inplace and self.generate_method_call(context, magic_inplace, (l, r))) \
-            or self.generate_method_call(context, magic, (l, r)) \
-            or self.convert_comparison(context, l, op, r) \
-            or super().convert_bin_op(context, l, op, r, inplace)
-
     def convert_comparison(self, context, left, op, right):
         if op.matches.Eq:
             native_expr = left.nonref_expr.cast(native_ast.UInt64).eq(right.nonref_expr.cast(native_ast.UInt64))
@@ -891,34 +816,9 @@ class ClassWrapper(RefcountedWrapper):
         return context.pushException(TypeError, f"Can't compare instances of {left.expr_type.typeRepresentation}"
                                                 f" and {right.expr_type.typeRepresentation} with {op}")
 
-    def convert_bin_op_reverse(self, context, r, op, l, inplace):
-        if op.matches.In:
-            ret = self.generate_method_call(context, "__contains__", (r, l))
-            return (ret and ret.toBool()) \
-                or super().convert_bin_op_reverse(context, r, op, l, inplace)
-
-        magic = "__radd__" if op.matches.Add else \
-            "__rsub__" if op.matches.Sub else \
-            "__rmul__" if op.matches.Mult else \
-            "__rtruediv__" if op.matches.Div else \
-            "__rfloordiv__" if op.matches.FloorDiv else \
-            "__rmod__" if op.matches.Mod else \
-            "__rmatmul__" if op.matches.MatMult else \
-            "__rpow__" if op.matches.Pow else \
-            "__rlshift__" if op.matches.LShift else \
-            "__rrshift__" if op.matches.RShift else \
-            "__ror__" if op.matches.BitOr else \
-            "__rxor__" if op.matches.BitXor else \
-            "__rand__" if op.matches.BitAnd else \
-            ""
-
-        return self.generate_method_call(context, magic, (r, l)) \
-            or super().convert_bin_op_reverse(context, r, op, l, inplace)
-
     def convert_hash(self, context, expr):
-        y = self.generate_method_call(context, "__hash__", (expr,))
-        if y is not None:
-            return y
+        if self.has_method(context, expr, "__hash__"):
+            return self.convert_method_call(context, expr, "__hash__", (), {})
 
         # default hash for Class types:
         HELD_CLASS_CAT_NO = 29
