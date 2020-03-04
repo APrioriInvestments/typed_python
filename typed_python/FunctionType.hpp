@@ -1269,6 +1269,12 @@ public:
         return true;
     }
 
+    //Function types can be instantiated even if forwards are not resolved
+    //in their annotations.
+    void assertForwardsResolvedSufficientlyToInstantiateConcrete() const {
+        mClosureType->assertForwardsResolved();
+    }
+
     Function* replaceClosure(Type* closureType) {
         return Function::Make(mRootName, mOverloads, closureType, mIsEntrypoint, mIsNocompile);
     }

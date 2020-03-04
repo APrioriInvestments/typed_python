@@ -483,6 +483,9 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
             if (p.second->getClosureType()->bytecount()) {
                 std::cout << "WARNING: invalid class member " << classT->name() << p.first << " had a nonempty closure.\n";
             } else {
+                if (p.second->bytecount()) {
+                    throw std::runtime_error("Somehow, a Class got a function with a closure type.");
+                }
                 PyDict_SetItemString(pyType->tp_dict, p.first.c_str(), PyInstance::initialize(p.second, [&](instance_ptr) {}));
             }
         }

@@ -381,8 +381,19 @@ public:
 
     void assertForwardsResolved() const {
         if (!m_resolved) {
+            asm ("int3");
             throw std::logic_error("Type " + m_name + " has unresolved forwards.");
         }
+    }
+
+    void assertForwardsResolvedSufficientlyToInstantiate() {
+        this->check([&](auto& subtype) {
+            subtype.assertForwardsResolvedSufficientlyToInstantiateConcrete();
+        });
+    }
+
+    void assertForwardsResolvedSufficientlyToInstantiateConcrete() const {
+        assertForwardsResolved();
     }
 
     template<class visitor_type>

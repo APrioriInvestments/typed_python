@@ -63,7 +63,7 @@ public:
 
     template<class initializer_type>
     Instance(Type* t, const initializer_type& initFun) : mLayout(nullptr) {
-        t->assertForwardsResolved();
+    t->assertForwardsResolvedSufficientlyToInstantiate();
 
         layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
 

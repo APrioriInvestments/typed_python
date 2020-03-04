@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Class, Alternative, Member, SerializationContext, Forward, ListOf
+from typed_python import TypeFunction, Class, Alternative, Member, SerializationContext, Forward, ListOf, Final
 import unittest
 
 
@@ -112,3 +112,15 @@ class TypeFunctionTest(unittest.TestCase):
         )
 
         self.assertEqual(SumThem(ListOf(int)([1, 2, 3])).X, 6)
+
+    def test_type_functions_with_recursive_annotations(self):
+        @TypeFunction
+        def Boo(T):
+            class Boo_(Class, Final):
+                def f(self) -> Boo(T):
+                    return self
+            return Boo_
+
+        boo = Boo(int)()
+
+        self.assertEqual(boo, boo.f())

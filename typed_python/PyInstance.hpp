@@ -282,7 +282,7 @@ public:
     //rather than the standard python representation.
     template<class init_func>
     static PyObject* initialize(Type* eltType, const init_func& f) {
-        eltType->assertForwardsResolved();
+        eltType->assertForwardsResolvedSufficientlyToInstantiate();
 
         PyInstance* self =
             (PyInstance*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
@@ -303,7 +303,7 @@ public:
     template<class init_func>
     void initialize(const init_func& i, Type* typeIfKnown = nullptr) {
         Type* type = typeIfKnown ? typeIfKnown : extractTypeFrom(((PyObject*)this)->ob_type);
-        type->assertForwardsResolved();
+        type->assertForwardsResolvedSufficientlyToInstantiate();
 
         mIsInitialized = false;
         new (&mContainingInstance) Instance( type, i );
