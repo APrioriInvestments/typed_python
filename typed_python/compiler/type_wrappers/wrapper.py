@@ -168,7 +168,7 @@ class Wrapper(object):
     def convert_getslice(self, context, instance, lower, upper, step):
         return context.pushException(
             AttributeError,
-            "%s is not subscriptable" % str(self)
+            "%s is not sliceable" % str(self)
         )
 
     def convert_setitem(self, context, instance, index, value):

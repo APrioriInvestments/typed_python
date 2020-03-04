@@ -480,3 +480,32 @@ class TestListOfCompilation(unittest.TestCase):
 
         self.assertEqual(f(ListOf(int)((0,))), [0])
         self.assertEqual(f(ListOf(int)((-1,))), [])
+
+    def test_list_slice(self):
+        def slice(aList: ListOf(int), a, b, c):
+            return aList[a:b:c]
+
+        sliceCompiled = Entrypoint(slice)
+
+        self.assertEqual(sliceCompiled([], None, None, 1), [])
+
+        for l in [
+            ListOf(int)([]),
+            ListOf(int)([1]),
+            ListOf(int)([1, 2]),
+            ListOf(int)([1, 2, 3]),
+            ListOf(int)([1, 2, 3, 4])
+        ]:
+            for a in [None] + list(range(-5, 5)):
+                for b in [None] + list(range(-5, 5)):
+                    for c in [None] + list(range(-5, 5)):
+                        if c != 0:
+                            l0 = list(list(l)[a:b:c])
+                            l1 = slice(l, a, b, c)
+                            l2 = sliceCompiled(l, a, b, c)
+
+                            self.assertTrue(len(l1) >= 0, len(l1))
+                            self.assertTrue(len(l2) >= 0, len(l2))
+
+                            self.assertEqual(l0, l1, (l, a, b, c))
+                            self.assertEqual(l0, l2, (l, a, b, c))
