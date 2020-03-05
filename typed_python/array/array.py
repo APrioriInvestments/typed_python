@@ -62,6 +62,9 @@ def Array(T):
         def __len__(self):
             return self._shape
 
+        def isCanonical(self):
+            return self._offset == 0 and self._stride == 1 and self._shape == len(self._vals)
+
         ##################################################################
         # Operators
         # these are repeated below for 'matrix' because we don't have a
@@ -702,6 +705,10 @@ def Matrix(T):
                         break
 
                 rows.append("[" + " ".join(items) + "]")
+
+                if rowIx > 20:
+                    rows.append("...")
+                    break
 
             return f"Matrix({T.__name__})(\n    " + "\n    ".join(rows) + "\n])"
 
