@@ -268,3 +268,11 @@ def test_matrix_cos_and_sin():
     m = Matrix(float).make(10, 10, lambda x, y: x**2 - y**2)
 
     assert l1norm(m.cos() ** 2 + m.sin() ** 2 - 1) < 1e-10
+
+
+def test_increment_matrix_diagonal():
+    m = Matrix(float).zeros(10, 10)
+    d = m.diagonal()
+    d += 1.0
+
+    assert m.get(2, 2) == 1

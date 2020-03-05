@@ -79,7 +79,7 @@ def Array(T):
         def __iadd__(self, other):
             self._inplaceBinopCheck(other)
 
-            if T in (float, Float32) and isinstance(other, Array(T)):
+            if (T is float or T is Float32) and isinstance(other, Array(T)):
                 p = self._vals.pointerUnsafe(self._offset)
                 p2 = other._vals.pointerUnsafe(other._offset)
                 axpy(self._shape, 1.0, p2, self._stride, p, other._stride)
@@ -203,7 +203,7 @@ def Array(T):
             p = self._vals.pointerUnsafe(self._offset)
 
             for i in range(self._shape):
-                (p + i).set(binaryFunc((p + i).get(), other))
+                (p + i * self._stride).set(binaryFunc((p + i * self._stride).get(), other))
 
             return self
 
