@@ -566,6 +566,12 @@ def Matrix(T):
                 min(self._shape[0], self._shape[1])
             )
 
+        def get(self, i, j):
+            return self._vals[i * self._stride[0] + j * self._stride[1] + self._offset]
+
+        def set(self, i, j, value):
+            self._vals[i * self._stride[0] + j * self._stride[1] + self._offset] = value
+
         def __matmul__(self, other: Matrix(T)):
             if self._shape[1] != other._shape[0]:
                 raise Exception("Size mismatch")
@@ -651,9 +657,9 @@ def Matrix(T):
             )
 
             if info != 0:
-                raise Exception("Failed to invert the matrix")
-
-            print(selfT)
+                # return an array of nan instead of throwing an exception,
+                # as it's a data error (not a structural error)
+                return selfT * math.nan
 
             return selfT.transpose()
 
