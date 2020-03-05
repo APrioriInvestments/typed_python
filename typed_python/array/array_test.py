@@ -47,6 +47,28 @@ def test_float_array_addition():
     assert y[0] == 8
 
 
+def test_clone():
+    """ Clone does not make an exact replica. It just makes the values the same."""
+    stride = 2
+    offset = 0
+    x = Array(float)([1, 2, 3, 4, 5, 6], offset, stride, 3)
+    y = x.clone()
+
+    assert x._stride == 2
+    assert y._stride == 1
+
+    assert y[0] == 1.0
+    assert y[1] == 3.0
+    assert y[2] == 5.0
+
+    assert x[0] == 1.0
+    assert x[1] == 3.0
+    assert x[2] == 5.0
+
+    assert len(x) == 3
+    assert len(y) == 3
+
+
 def test_stride_and_offset():
     stride = 2
     offset = 0

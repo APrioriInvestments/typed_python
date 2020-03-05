@@ -71,12 +71,15 @@ def Array(T):
 
         @property
         def shape(self):
+            """ Returns a one-element tuple indicating the length of the array."""
             return Tuple(int)((self._shape,))
 
         def __len__(self):
             return self._shape
 
         def isCanonical(self):
+            """ Returns true if the array starts at index 0 and iterates by 1 index through the
+            length of the values."""
             return self._offset == 0 and self._stride == 1 and self._shape == len(self._vals)
 
         ##################################################################
