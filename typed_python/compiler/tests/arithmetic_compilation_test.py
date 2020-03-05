@@ -305,6 +305,16 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(makeEmpty(bool), False)
         self.assertEqual(makeEmpty(str), "")
 
+    def test_not_on_float(self):
+        @Entrypoint
+        def doit(f):
+            if not f:
+                return "its false"
+            return "its true"
+
+        self.assertEqual(doit(1.0), "its true")
+        self.assertEqual(doit(0.0), "its false")
+
     def test_can_compile_register_operations(self):
         failed = False
 
