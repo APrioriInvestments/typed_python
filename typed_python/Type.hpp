@@ -55,6 +55,7 @@ class OneOfType;
 class Value;
 class TupleOfType;
 class PointerTo;
+class RefTo;
 class ListOfType;
 class NamedTuple;
 class Tuple;
@@ -128,7 +129,8 @@ public:
         catEmbeddedMessage = 32,
         catSet = 33,
         catTypedCell = 34,
-        catPyCell = 35
+        catPyCell = 35,
+        catRefTo = 36,
     };
 
     bool isTuple() const {
@@ -137,6 +139,10 @@ public:
 
     bool isNamedTuple() const {
         return m_typeCategory == catNamedTuple;
+    }
+
+    bool isRefTo() const {
+        return m_typeCategory == catRefTo;
     }
 
     virtual ~Type() {
@@ -242,6 +248,7 @@ public:
         if (category == Type::TypeCategory::catOneOf) { return "OneOf"; }
         if (category == Type::TypeCategory::catTupleOf) { return "TupleOf"; }
         if (category == Type::TypeCategory::catPointerTo) { return "PointerTo"; }
+        if (category == Type::TypeCategory::catRefTo) { return "RefTo"; }
         if (category == Type::TypeCategory::catListOf) { return "ListOf"; }
         if (category == Type::TypeCategory::catNamedTuple) { return "NamedTuple"; }
         if (category == Type::TypeCategory::catTuple) { return "Tuple"; }
@@ -303,6 +310,8 @@ public:
                 return f(*(TupleOfType*)this);
             case catPointerTo:
                 return f(*(PointerTo*)this);
+            case catRefTo:
+                return f(*(RefTo*)this);
             case catListOf:
                 return f(*(ListOfType*)this);
             case catNamedTuple:

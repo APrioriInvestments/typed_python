@@ -17,10 +17,11 @@ import time
 import gc
 import math
 from typed_python.test_util import currentMemUsageMb
-from typed_python._types import is_default_constructible, pointerTo
+from typed_python._types import is_default_constructible
 from typed_python import (
     Int16, UInt64, Float32, ListOf, TupleOf, OneOf, NamedTuple, Class, Alternative,
-    ConstDict, PointerTo, Member, _types, Forward, Final, Function, Entrypoint, Tuple
+    ConstDict, PointerTo, Member, _types, Forward, Final, Function, Entrypoint, Tuple,
+    Held, RefTo, refTo, pointerTo, copy
 )
 
 
@@ -1519,3 +1520,73 @@ class NativeClassTypesTests(unittest.TestCase):
 
         self.assertEqual(cPtr.x.get(), 15)
         self.assertEqual(aC.x, 15)
+
+    def test_held_class_instances(self):
+        class H(Class, Final):
+            y = Member(int)
+
+            def f(self, x):
+                return self.y + x
+
+        class C(Class):
+            x = Member(Held(H))
+
+        self.assertEqual(_types.bytecount(C), 8)
+
+        # 8 bytes for the float, 1 for 'C''s initialize field, and 1 for H's
+        # eventually we should be able to build classes where we know the
+        # values are always initialized.
+        self.assertEqual(_types.bytecount(Held(C)), 10)
+
+        c = C()
+        self.assertTrue(isinstance(c.x, RefTo(Held(H))))
+
+        self.assertEqual(c.x.y, 0)
+        c.x.y = 20
+        self.assertEqual(c.x.y, 20)
+
+        self.assertEqual(c.x.f(30), 50)
+
+        c2 = C()
+        c2.x.y = 10
+
+        # we should be able to copy from one C's x to another
+        c.x = c2.x
+
+        # and then change c2.x, which is held inside of 'c'.
+        c2.x.y = 30
+
+        self.assertEqual(c.x.y, 10)
+        self.assertEqual(c2.x.y, 30)
+
+        refTo(c).x = refTo(c2).x
+        self.assertEqual(c.x.y, 30)
+
+    def test_list_of_held(self):
+        class H(Class, Final):
+            x = Member(int)
+            y = Member(int)
+
+        t = ListOf(Held(H))()
+
+        t.resize(10)
+
+        self.assertTrue(isinstance(t[2], RefTo(Held(H))))
+
+        t[2].x = 20
+        self.assertEqual(t[2].x, 20)
+
+        # copy the reference out to the heap - it's now a
+        # separate object with its own refcount
+        elt2Copy = copy(t[2])
+        self.assertEqual(elt2Copy.x, 20)
+
+        # and changing it doesn't change the list's value
+        elt2Copy.x = 30
+        self.assertEqual(elt2Copy.x, 30)
+        self.assertEqual(t[2].x, 20)
+
+        # copying held classes around makes sense, and doesn't
+        # duplicate their internals.
+        t[3] = t[2]
+        self.assertEqual(t[3].x, 20)

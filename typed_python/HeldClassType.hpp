@@ -23,6 +23,7 @@
 #include <unordered_map>
 
 class HeldClass;
+class RefTo;
 class Function;
 class Class;
 
@@ -299,7 +300,8 @@ public:
             m_own_propertyFunctions(propertyFunctions),
             m_own_classMembers(classMembers),
             m_hasComparisonOperators(false),
-            m_hasGetAttributeMagicMethod(false)
+            m_hasGetAttributeMagicMethod(false),
+            m_refToType(nullptr)
     {
         m_name = inName;
     }
@@ -333,68 +335,15 @@ public:
     bool _updateAfterForwardTypesChanged();
 
     static HeldClass* Make(
-            std::string inName,
-            const std::vector<HeldClass*>& bases,
-            bool isFinal,
-            const std::vector<std::tuple<std::string, Type*, Instance> >& members,
-            const std::map<std::string, Function*>& memberFunctions,
-            const std::map<std::string, Function*>& staticFunctions,
-            const std::map<std::string, Function*>& propertyFunctions,
-            const std::map<std::string, PyObject*>& classMembers
-            )
-    {
-        //we only allow one base class to have members because we want native code to be
-        //able to just find those values in subclasses without hitting the vtable.
-        long countWithMembers = 0;
-
-        for (auto base: bases) {
-            if (base->m_members.size()) {
-                countWithMembers++;
-            }
-
-            if (base->isFinal()) {
-                throw std::runtime_error("Can't subclass " + base->name() + " because it's marked 'final'.");
-            }
-        }
-
-        if (countWithMembers > 1) {
-            throw std::runtime_error("Can't inherit from multiple base classes that both have members.");
-        }
-
-        if (!isFinal) {
-            for (auto nameAndMemberFunc: memberFunctions) {
-                for (auto overload: nameAndMemberFunc.second->getOverloads()) {
-                    if (!overload.getReturnType()) {
-                        throw std::runtime_error("Overload of " + inName + "." + nameAndMemberFunc.first
-                            + " has no return type, but the class is not marked final, so the compiler"
-                            + " won't have a return type defined for this method. Either add an '-> object' annotation"
-                            + " to the method, or mark the class Final (so that the compiler can apply type inference directly)"
-                        );
-                    }
-                }
-            }
-        }
-
-        HeldClass* result = new HeldClass(
-            inName,
-            bases,
-            isFinal,
-            members,
-            memberFunctions,
-            staticFunctions,
-            propertyFunctions,
-            classMembers
-        );
-
-        // we do these outside of the constructor so that if they throw we
-        // don't destroy the HeldClass type object (and just leak it instead) because
-        // we need to ensure we never delete Type objects.
-        result->initializeMRO();
-
-        result->endOfConstructorInitialization();
-
-        return result;
-    }
+        std::string inName,
+        const std::vector<HeldClass*>& bases,
+        bool isFinal,
+        const std::vector<std::tuple<std::string, Type*, Instance> >& members,
+        const std::map<std::string, Function*>& memberFunctions,
+        const std::map<std::string, Function*>& staticFunctions,
+        const std::map<std::string, Function*>& propertyFunctions,
+        const std::map<std::string, PyObject*>& classMembers
+    );
 
     // this gets called by Class. These types are always produced in pairs.
     void setClassType(Class* inClass) {
@@ -407,6 +356,8 @@ public:
     Class* getClassType() const {
         return m_classType;
     }
+
+    RefTo* getRefToType();
 
     HeldClass* renamed(std::string newName) {
         return Make(
@@ -459,7 +410,7 @@ public:
         buffer.writeEndCompound();
     }
 
-    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
+    void repr(instance_ptr self, ReprAccumulator& stream, bool isStr, bool isClassNotHeldClass=false);
 
     typed_python_hash_type hash(instance_ptr left);
 
@@ -757,7 +708,10 @@ public:
         return &mClassDispatchTables[offset];
     }
 
-    BoundMethod* getMemberFunctionMethodType(const char* attr);
+    // get a BoundMethod type object representing this method on instances
+    // of this class. If 'forHeld', then 'self' will be bound as a RefTo(Held(T))
+    // instead of a T
+    BoundMethod* getMemberFunctionMethodType(const char* attr, bool forHeld);
 
 private:
     std::vector<size_t> m_byte_offsets;
@@ -780,6 +734,8 @@ private:
     VTable* m_vtable;
 
     Class* m_classType; //the non-held version of this class
+
+    RefTo* m_refToType; //a cache for the ref-to-type
 
     std::vector<ClassDispatchTable> mClassDispatchTables;
 
@@ -807,7 +763,7 @@ private:
 
     std::unordered_map<const char*, size_t, HashConstCharPtr, ConstCharPtrsAreEqual> m_membersByName;
 
-    std::unordered_map<const char*, BoundMethod*, HashConstCharPtr, ConstCharPtrsAreEqual> m_memberFunctionMethodTypes;
+    std::unordered_map<const char*, BoundMethod*, HashConstCharPtr, ConstCharPtrsAreEqual> m_memberFunctionMethodTypes[2];
 
     bool m_hasComparisonOperators;
     bool m_hasGetAttributeMagicMethod;

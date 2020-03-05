@@ -74,6 +74,26 @@ PyObject *MakePointerToType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(PointerTo::Make(t)));
 }
 
+PyObject *MakeRefToType(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "RefTo takes 1 positional argument.");
+        return NULL;
+    }
+
+    PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
+
+    Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "RefTo needs a type.");
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]{
+        return incref((PyObject*)PyInstance::typeObj(RefTo::Make(t)));
+    });
+}
+
 PyObject *MakeTypedCellType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "TypedCell takes 1 positional argument.");
@@ -1005,7 +1025,7 @@ PyObject *pointerTo(PyObject* nullValue, PyObject* args) {
     if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catClass) {
         PyErr_Format(
             PyExc_TypeError,
-            "first argument to refcount '%S' must be a Class",
+            "first argument to pointerTo '%S' must be a Class",
             (PyObject*)a1
             );
         return NULL;
@@ -1018,6 +1038,66 @@ PyObject *pointerTo(PyObject* nullValue, PyObject* args) {
     void* ptrValue = layout->data;
 
     return PyInstance::extractPythonObject((instance_ptr)&ptrValue, ptrType);
+}
+
+PyObject *refTo(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "refTo takes a single class instance as an argument");
+        return NULL;
+    }
+
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* actualType = PyInstance::extractTypeFrom(a1->ob_type);
+
+    if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catClass) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "first argument to refTo '%S' must be a Class",
+            (PyObject*)a1
+            );
+        return NULL;
+    }
+
+    Class* clsType = (Class*)actualType;
+    Class::layout* layout = clsType->instanceToLayout(((PyInstance*)(PyObject*)a1)->dataPtr());
+
+    RefTo* refType = RefTo::Make(clsType->getHeldClass());
+    void* ptrValue = layout->data;
+
+    return PyInstance::extractPythonObject((instance_ptr)&ptrValue, refType);
+}
+
+PyObject *copyRefTo(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "copy takes a single RefTo instance as an argument");
+        return NULL;
+    }
+
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* actualType = PyInstance::extractTypeFrom(a1->ob_type);
+
+    if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catRefTo) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "first argument to copy '%S' must be a RefTo",
+            (PyObject*)a1
+            );
+        return NULL;
+    }
+
+    instance_ptr reffedHeldClassData = *(instance_ptr*)((PyInstance*)(PyObject*)a1)->dataPtr();
+
+    RefTo* refTo = (RefTo*)actualType;
+    HeldClass* heldCls = (HeldClass*)refTo->getEltType();
+    Class* cls = heldCls->getClassType();
+
+    return PyInstance::initialize(cls, [&](instance_ptr data) {
+        cls->constructorInitializingHeld(data, [&](instance_ptr heldClsData) {
+            heldCls->copy_constructor(heldClsData, reffedHeldClassData);
+        });
+    });
 }
 
 PyObject *refcount(PyObject* nullValue, PyObject* args) {
@@ -1899,6 +1979,8 @@ static PyMethodDef module_methods[] = {
     {"refcount", (PyCFunction)refcount, METH_VARARGS, NULL},
     {"getOrSetTypeResolver", (PyCFunction)getOrSetTypeResolver, METH_VARARGS, NULL},
     {"pointerTo", (PyCFunction)pointerTo, METH_VARARGS, NULL},
+    {"copy", (PyCFunction)copyRefTo, METH_VARARGS, NULL},
+    {"refTo", (PyCFunction)refTo, METH_VARARGS, NULL},
     {"getTypePointer", (PyCFunction)getTypePointer, METH_VARARGS, NULL},
     {"_vtablePointer", (PyCFunction)getVTablePointer, METH_VARARGS, NULL},
     {"allocateClassMethodDispatch", (PyCFunction)allocateClassMethodDispatch, METH_VARARGS | METH_KEYWORDS, NULL},
@@ -1962,6 +2044,7 @@ PyInit__types(void)
     PyModule_AddObject(module, "Bytes", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catBytes)));
     PyModule_AddObject(module, "TupleOf", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catTupleOf)));
     PyModule_AddObject(module, "PointerTo", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPointerTo)));
+    PyModule_AddObject(module, "RefTo", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catRefTo)));
     PyModule_AddObject(module, "Tuple", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catTuple)));
     PyModule_AddObject(module, "NamedTuple", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catNamedTuple)));
     PyModule_AddObject(module, "OneOf", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catOneOf)));

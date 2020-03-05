@@ -23,15 +23,17 @@ public:
     typedef PythonSubclass modeled_type;
 
     static void copyConstructFromPythonInstanceConcrete(PythonSubclass* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-        Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+        std::pair<Type*, instance_ptr> typeAndPtr = extractTypeAndPtrFrom(pyRepresentation);
+        Type* argType = typeAndPtr.first;
+        instance_ptr argDataPtr = typeAndPtr.second;
 
         if (argType && argType == eltType) {
-            eltType->getBaseType()->copy_constructor(tgt, ((PyInstance*)pyRepresentation)->dataPtr());
+            eltType->getBaseType()->copy_constructor(tgt, argDataPtr);
             return;
         }
 
         if (argType && argType == eltType->getBaseType()) {
-            eltType->getBaseType()->copy_constructor(tgt, ((PyInstance*)pyRepresentation)->dataPtr());
+            eltType->getBaseType()->copy_constructor(tgt, argDataPtr);
             return;
         }
 

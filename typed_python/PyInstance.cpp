@@ -25,6 +25,7 @@
 #include "PyConstDictInstance.hpp"
 #include "PyTupleOrListOfInstance.hpp"
 #include "PyPointerToInstance.hpp"
+#include "PyRefToInstance.hpp"
 #include "PyCompositeTypeInstance.hpp"
 #include "PyClassInstance.hpp"
 #include "PyHeldClassInstance.hpp"
@@ -49,6 +50,18 @@
 
 Type* PyInstance::type() {
     return extractTypeFrom(((PyObject*)this)->ob_type);
+}
+
+std::pair<Type*, instance_ptr> PyInstance::derefAnyRefTo() {
+    Type* t = type();
+    instance_ptr p = dataPtr();
+
+    if (t->isRefTo()) {
+        t = ((RefTo*)t)->getEltType();
+        p = *(instance_ptr*)p;
+    }
+
+    return std::make_pair(t, p);
 }
 
 instance_ptr PyInstance::dataPtr() {
@@ -124,14 +137,24 @@ void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt
 
     Type::TypeCategory cat = eltType->getTypeCategory();
 
-    if (argType && (eltType == argType || (argType->isSubclassOf(eltType) && cat != Type::TypeCategory::catClass))) {
-        // it's already the right kind of instance. Note that we disallow classes in this
-        // case because when child class C masquerades as class B, it needs to have a different
-        // class dispatch offset encoded in it and we don't want to accidentally allow the wrong
-        // dispatch table to come through here. PyClassInstance is supposed to handle this in the concrete
-        // function below.
-        eltType->copy_constructor(tgt, ((PyInstance*)pyRepresentation)->dataPtr());
-        return;
+    if (argType) {
+        Type* argTypeToUse = argType;
+        instance_ptr dataPtr = ((PyInstance*)pyRepresentation)->dataPtr();
+
+        if (argTypeToUse && argTypeToUse->isRefTo()) {
+            dataPtr = *(instance_ptr*)dataPtr;
+            argTypeToUse = ((RefTo*)argTypeToUse)->getEltType();
+        }
+
+        if (argTypeToUse && (eltType == argTypeToUse || (argTypeToUse->isSubclassOf(eltType) && cat != Type::TypeCategory::catClass))) {
+            // it's already the right kind of instance. Note that we disallow classes in this
+            // case because when child class C masquerades as class B, it needs to have a different
+            // class dispatch offset encoded in it and we don't want to accidentally allow the wrong
+            // dispatch table to come through here. PyClassInstance is supposed to handle this in the concrete
+            // function below.
+            eltType->copy_constructor(tgt, dataPtr);
+            return;
+        }
     }
 
     //dispatch to the appropriate Py[]Instance type
@@ -196,6 +219,12 @@ void PyInstance::constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, Py
 // static
 PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType) {
     return translateExceptionToPyObject([&]() {
+        if (eltType->getTypeCategory() == Type::TypeCategory::catHeldClass) {
+            // we never return 'held class' instances directly. Instead, we
+            // return a RefTo them.
+            return extractPythonObject((instance_ptr)&data, ((HeldClass*)eltType)->getRefToType());
+        }
+
         //dispatch to the appropriate Py[]Instance type
         PyObject* result = specializeStatic(eltType->getTypeCategory(), [&](auto* concrete_null_ptr) {
             typedef typename std::remove_reference<decltype(*concrete_null_ptr)>::type py_instance_type;
@@ -245,6 +274,7 @@ PyObject* PyInstance::tp_new_type(PyTypeObject *subtype, PyObject *args, PyObjec
     if (catToProduce == Type::TypeCategory::catListOf) { return MakeListOfType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catTupleOf) { return MakeTupleOfType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catPointerTo ) { return MakePointerToType(nullptr, args); }
+    if (catToProduce == Type::TypeCategory::catRefTo ) { return MakeRefToType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catTuple ) { return MakeTupleType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catConstDict ) { return MakeConstDictType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catSet ) { return MakeSetType(nullptr, args); }
@@ -832,8 +862,18 @@ Type* PyInstance::extractTypeFrom(PyTypeObject* typeObj) {
     } else {
         return nullptr;
     }
-
 }
+
+std::pair<Type*, instance_ptr> PyInstance::extractTypeAndPtrFrom(PyObject* obj) {
+    Type* t = extractTypeFrom(obj->ob_type);
+
+    if (!t) {
+        return std::make_pair(t, (instance_ptr)nullptr);
+    }
+
+    return ((PyInstance*)obj)->derefAnyRefTo();
+}
+
 
 PyObject* PyInstance::getInternalModuleMember(const char* name) {
     static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");

@@ -15,7 +15,7 @@
 __version__ = "0.1.1"
 
 from typed_python.internals import (
-    Member, Final, Function, UndefinedBehaviorException, makeNamedTuple, DisableCompiledCode, isCompiled
+    Member, Final, Function, UndefinedBehaviorException, makeNamedTuple, DisableCompiledCode, isCompiled, Held
 )
 from typed_python._types import bytecount, refcount
 from typed_python.module import Module
@@ -26,9 +26,9 @@ from typed_python.type_filter import TypeFilter
 from typed_python._types import (
     Forward, TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict,
     Alternative, Value, serialize, deserialize, serializeStream, deserializeStream,
-    PointerTo, Dict, validateSerializedObject, validateSerializedObjectStream, decodeSerializedObject,
+    PointerTo, RefTo, Dict, validateSerializedObject, validateSerializedObjectStream, decodeSerializedObject,
     getOrSetTypeResolver, Set, Class, Type, PythonObjectOfType, BoundMethod,
-    TypedCell
+    TypedCell, pointerTo, refTo, copy
 )
 import typed_python._types as _types
 

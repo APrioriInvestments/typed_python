@@ -71,15 +71,17 @@ bool HeldClass::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, b
     return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
 }
 
-void HeldClass::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
+void HeldClass::repr(instance_ptr self, ReprAccumulator& stream, bool isStr, bool isClassNotHeldClass) {
     PushReprState isNew(stream, self);
 
+    std::string name = isClassNotHeldClass ? getClassType()->name() : m_name;
+
     if (!isNew) {
-        stream << m_name << "(" << (void*)self << ")";
+        stream << name << "(" << (void*)self << ")";
         return;
     }
 
-    stream << m_name << "(";
+    stream << name << "(";
 
     for (long k = 0; k < m_members.size();k++) {
         if (k > 0) {
@@ -108,6 +110,14 @@ typed_python_hash_type HeldClass::hash(instance_ptr left) {
     acc.addRegister((uint64_t)left);
 
     return acc.get();
+}
+
+RefTo* HeldClass::getRefToType() {
+    if (!m_refToType) {
+        m_refToType = RefTo::Make(this);
+    }
+
+    return m_refToType;
 }
 
 void HeldClass::setAttribute(instance_ptr self, int memberIndex, instance_ptr other) const {
@@ -204,18 +214,24 @@ int HeldClass::memberNamed(const char* c) const {
     return -1;
 }
 
-BoundMethod* HeldClass::getMemberFunctionMethodType(const char* attr) {
-    if (m_memberFunctionMethodTypes.size() != m_memberFunctions.size()) {
+BoundMethod* HeldClass::getMemberFunctionMethodType(const char* attr, bool forHeld) {
+    auto& methodTypeDict = m_memberFunctionMethodTypes[forHeld ? 1 : 0];
+
+    if (methodTypeDict.size() != m_memberFunctions.size()) {
         for (auto name: m_memberFunctions) {
             // note that we explicitly leak the string so that the refcount on c_str
             // stays active. I'm sure there's a better way to do this, but types are
             // permanent, so we would never have cleaned this up anyways.
-            m_memberFunctionMethodTypes[(new std::string(name.first))->c_str()] = BoundMethod::Make(getClassType(), name.first);
+            methodTypeDict[(new std::string(name.first))->c_str()] =
+                BoundMethod::Make(
+                    forHeld ? (Type*)getRefToType() : (Type*)getClassType(),
+                    name.first
+                );
         }
     }
 
-    auto it = m_memberFunctionMethodTypes.find(attr);
-    if (it != m_memberFunctionMethodTypes.end()) {
+    auto it = methodTypeDict.find(attr);
+    if (it != methodTypeDict.end()) {
         return it->second;
     }
 
@@ -228,4 +244,68 @@ void ClassDispatchTable::allocateUpcastDispatchTables() {
     for (long castToIx = 0; castToIx < mInterfaceClass->getMro().size(); castToIx++) {
         mUpcastDispatches[castToIx] = mImplementingClass->getMroIndex(mInterfaceClass->getMro()[castToIx]);
     }
+}
+
+
+HeldClass* HeldClass::Make(
+    std::string inName,
+    const std::vector<HeldClass*>& bases,
+    bool isFinal,
+    const std::vector<std::tuple<std::string, Type*, Instance> >& members,
+    const std::map<std::string, Function*>& memberFunctions,
+    const std::map<std::string, Function*>& staticFunctions,
+    const std::map<std::string, Function*>& propertyFunctions,
+    const std::map<std::string, PyObject*>& classMembers
+) {
+    //we only allow one base class to have members because we want native code to be
+    //able to just find those values in subclasses without hitting the vtable.
+    long countWithMembers = 0;
+
+    for (auto base: bases) {
+        if (base->m_members.size()) {
+            countWithMembers++;
+        }
+
+        if (base->isFinal()) {
+            throw std::runtime_error("Can't subclass " + base->getClassType()->name() + " because it's marked 'final'.");
+        }
+    }
+
+    if (countWithMembers > 1) {
+        throw std::runtime_error("Can't inherit from multiple base classes that both have members.");
+    }
+
+    if (!isFinal) {
+        for (auto nameAndMemberFunc: memberFunctions) {
+            for (auto overload: nameAndMemberFunc.second->getOverloads()) {
+                if (!overload.getReturnType()) {
+                    throw std::runtime_error("Overload of " + inName + "." + nameAndMemberFunc.first
+                        + " has no return type, but the class is not marked final, so the compiler"
+                        + " won't have a return type defined for this method. Either add an '-> object' annotation"
+                        + " to the method, or mark the class Final (so that the compiler can apply type inference directly)"
+                    );
+                }
+            }
+        }
+    }
+
+    HeldClass* result = new HeldClass(
+        "Held(" + inName + ")",
+        bases,
+        isFinal,
+        members,
+        memberFunctions,
+        staticFunctions,
+        propertyFunctions,
+        classMembers
+    );
+
+    // we do these outside of the constructor so that if they throw we
+    // don't destroy the HeldClass type object (and just leak it instead) because
+    // we need to ensure we never delete Type objects.
+    result->initializeMRO();
+
+    result->endOfConstructorInitialization();
+
+    return result;
 }

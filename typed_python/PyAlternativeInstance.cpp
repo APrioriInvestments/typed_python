@@ -118,11 +118,11 @@ void PyConcreteAlternativeInstance::constructFromPythonArgumentsConcrete(Concret
 }
 
 void PyAlternativeInstance::copyConstructFromPythonInstanceConcrete(Alternative* altType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-    Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+    std::pair<Type*, instance_ptr> typeAndPtr = extractTypeAndPtrFrom(pyRepresentation);
 
-    if (argType && argType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative &&
-            ((ConcreteAlternative*)argType)->getAlternative() == altType) {
-        altType->copy_constructor(tgt, ((PyInstance*)pyRepresentation)->dataPtr());
+    if (typeAndPtr.first && typeAndPtr.first->getTypeCategory() == Type::TypeCategory::catConcreteAlternative &&
+            ((ConcreteAlternative*)typeAndPtr.first)->getAlternative() == altType) {
+        altType->copy_constructor(tgt, typeAndPtr.second);
         return;
     }
 

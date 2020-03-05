@@ -28,11 +28,9 @@ bool Class::isBinaryCompatibleWithConcrete(Type* other) {
 
 bool Class::_updateAfterForwardTypesChanged() {
     bool is_default_constructible = m_heldClass->is_default_constructible();
-    std::string name = m_heldClass->name();
 
-    bool anyChanged = (m_name != name || m_is_default_constructible != is_default_constructible);
+    bool anyChanged = m_is_default_constructible != is_default_constructible;
 
-    m_name = name;
     m_is_default_constructible = is_default_constructible;
 
     return anyChanged;
@@ -156,7 +154,7 @@ void Class::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
 
 
     layout& l = *instanceToLayout(self);
-    m_heldClass->repr(l.data, stream, isStr);
+    m_heldClass->repr(l.data, stream, isStr, true /* isClassNotHeldClass */);
 }
 
 typed_python_hash_type Class::hash(instance_ptr left) {

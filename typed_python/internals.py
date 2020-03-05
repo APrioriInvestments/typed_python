@@ -427,3 +427,10 @@ def makeNamedTuple(**kwargs):
 def isCompiled():
     """Returns True if we're in compiled code, False otherwise."""
     return False
+
+
+def Held(T):
+    if not issubclass(T, typed_python._types.Class):
+        raise Exception(f"{T} is not a Class")
+
+    return T.HeldClass

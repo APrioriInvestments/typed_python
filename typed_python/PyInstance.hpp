@@ -38,6 +38,7 @@ class PyTupleOfInstance;
 class PyDictInstance;
 class PyConstDictInstance;
 class PyPointerToInstance;
+class PyRefToInstance;
 class PyCompositeTypeInstance;
 class PyTupleInstance;
 class PyNamedTupleInstance;
@@ -103,6 +104,8 @@ public:
                 return f(*(PyTupleOfInstance*)obj);
             case Type::TypeCategory::catPointerTo:
                  return f(*(PyPointerToInstance*)obj);
+            case Type::TypeCategory::catRefTo:
+                 return f(*(PyRefToInstance*)obj);
             case Type::TypeCategory::catListOf:
                 return f(*(PyListOfInstance*)obj);
             case Type::TypeCategory::catNamedTuple:
@@ -182,6 +185,8 @@ public:
                 return f((PyTupleOfInstance*)nullptr);
             case Type::TypeCategory::catPointerTo:
                  return f((PyPointerToInstance*)nullptr);
+            case Type::TypeCategory::catRefTo:
+                 return f((PyRefToInstance*)nullptr);
             case Type::TypeCategory::catListOf:
                 return f((PyListOfInstance*)nullptr);
             case Type::TypeCategory::catNamedTuple:
@@ -335,6 +340,8 @@ public:
     instance_ptr dataPtr();
 
     Type* type();
+
+    std::pair<Type*, instance_ptr> derefAnyRefTo();
 
     static PyMethodDef* typeMethods(Type* t);
 
@@ -506,6 +513,11 @@ public:
     static bool isNativeType(PyTypeObject* typeObj);
 
     static Type* extractTypeFrom(PyTypeObject* typeObj);
+
+    // if 'obj' is a PyInstance, return its type and data ptrs, after unwrapping
+    // any 'RefTo' classes, which is the standard behavior for most classes,
+    // which don't specifically know anything about 'RefTo'
+    static std::pair<Type*, instance_ptr> extractTypeAndPtrFrom(PyObject* obj);
 
     static int tp_setattro(PyObject *o, PyObject* attrName, PyObject* attrVal);
 

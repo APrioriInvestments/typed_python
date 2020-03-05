@@ -38,13 +38,13 @@ public:
         unsigned char data[];
     };
 
-    Class(HeldClass* inClass) :
+    Class(std::string name, HeldClass* inClass) :
             Type(catClass),
             m_heldClass(inClass)
     {
         m_size = sizeof(layout*);
         m_is_default_constructible = inClass->is_default_constructible();
-        m_name = m_heldClass->name();
+        m_name = name;
         m_is_simple = false;
 
         endOfConstructorInitialization(); // finish initializing the type object.
@@ -123,6 +123,7 @@ public:
         }
 
         return new Class(
+            inName,
             HeldClass::Make(
                 inName,
                 heldClassBases,
@@ -154,7 +155,7 @@ public:
     }
 
     Class* renamed(std::string newName) {
-        return new Class(m_heldClass->renamed(newName));
+        return new Class(newName, m_heldClass->renamed("Held(" + newName + ")"));
     }
 
     instance_ptr eltPtr(instance_ptr self, int64_t ix) const;
@@ -235,6 +236,8 @@ public:
 
     typed_python_hash_type hash(instance_ptr left);
 
+    // create a new Class instance by initializing the held class using
+    // 'initializer(instance_ptr memberData, int memberIx)' for each member
     template<class sub_constructor>
     void constructor(instance_ptr self, const sub_constructor& initializer) const {
         initializeInstance(self, (layout*)malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
@@ -245,6 +248,23 @@ public:
 
         try {
             m_heldClass->constructor(l.data, initializer);
+        } catch (...) {
+            free(instanceToLayout(self));
+        }
+    }
+
+    // create a new Class instance by initializing the held class using
+    // 'initializer(instance_ptr data)'
+    template<class sub_constructor>
+    void constructorInitializingHeld(instance_ptr self, const sub_constructor& initializer) const {
+        initializeInstance(self, (layout*)malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
+
+        layout& l = *instanceToLayout(self);
+        l.refcount = 1;
+        l.vtable = m_heldClass->getVTable();
+
+        try {
+            initializer(l.data);
         } catch (...) {
             free(instanceToLayout(self));
         }
@@ -277,7 +297,7 @@ public:
     }
 
     BoundMethod* getMemberFunctionMethodType(const char* name) const {
-        return m_heldClass->getMemberFunctionMethodType(name);
+        return m_heldClass->getMemberFunctionMethodType(name, false);
     }
 
     const std::map<std::string, Function*>& getMemberFunctions() const {

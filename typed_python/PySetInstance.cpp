@@ -584,19 +584,20 @@ void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, in
                                                             bool isExplicit) {
     bool setIsInitialized = false;
 
-    try {
-        Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+    std::pair<Type*, instance_ptr> typeAndPtr = extractTypeAndPtrFrom(pyRepresentation);
+    Type* argType = typeAndPtr.first;
+    instance_ptr argDataPtr = typeAndPtr.second;
 
+    try {
         if (argType && argType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
             TupleOfType* tupType = (TupleOfType*)argType;
-            instance_ptr tupSelf = ((PyInstance*)pyRepresentation)->dataPtr();
 
             if (tupType->getEltType() == setType->keyType()) {
                 setType->constructor(tgt);
                 setIsInitialized = true;
 
-                for (long k = 0; k < tupType->count(tupSelf); k++) {
-                    setType->insertKey(tgt, tupType->eltPtr(tupSelf, k));
+                for (long k = 0; k < tupType->count(argDataPtr); k++) {
+                    setType->insertKey(tgt, tupType->eltPtr(argDataPtr, k));
                 }
 
                 return;
@@ -605,14 +606,13 @@ void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, in
 
         if (argType && argType->getTypeCategory() == Type::TypeCategory::catListOf) {
             ListOfType* listType = (ListOfType*)argType;
-            instance_ptr listSelf = ((PyInstance*)pyRepresentation)->dataPtr();
 
             if (listType->getEltType() == setType->keyType()) {
                 setType->constructor(tgt);
                 setIsInitialized = true;
 
-                for (long k = 0; k < listType->count(listSelf); k++) {
-                    setType->insertKey(tgt, listType->eltPtr(listSelf, k));
+                for (long k = 0; k < listType->count(argDataPtr); k++) {
+                    setType->insertKey(tgt, listType->eltPtr(argDataPtr, k));
                 }
 
                 return;

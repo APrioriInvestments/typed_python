@@ -70,6 +70,18 @@ public:
     static BoundMethod* Make(Type* c, std::string funcName, BoundMethod* knownType=nullptr) {
         static std::mutex guard;
 
+        if (
+            c->getTypeCategory() != Type::TypeCategory::catClass &&
+            c->getTypeCategory() != Type::TypeCategory::catHeldClass &&
+            c->getTypeCategory() != Type::TypeCategory::catRefTo &&
+            c->getTypeCategory() != Type::TypeCategory::catAlternative &&
+            c->getTypeCategory() != Type::TypeCategory::catConcreteAlternative
+        ) {
+            throw std::runtime_error(
+                "BoundMethods only work on Class/HeldClass/RefTo/Alternative/ConcreteAlternative"
+            );
+        }
+
         std::lock_guard<std::mutex> lock(guard);
 
         typedef std::pair<Type*, std::string> keytype;
@@ -136,6 +148,30 @@ public:
     Function* getFunction() const {
         if (m_first_arg->getTypeCategory() == Type::TypeCategory::catClass) {
             Class* c = (Class*)m_first_arg;
+
+            auto it = c->getMemberFunctions().find(m_funcName);
+
+            if (it != c->getMemberFunctions().end()) {
+                return it->second;
+            }
+
+            return nullptr;
+        }
+
+        if (m_first_arg->getTypeCategory() == Type::TypeCategory::catHeldClass) {
+            HeldClass* c = (HeldClass*)m_first_arg;
+
+            auto it = c->getMemberFunctions().find(m_funcName);
+
+            if (it != c->getMemberFunctions().end()) {
+                return it->second;
+            }
+
+            return nullptr;
+        }
+
+        if (m_first_arg->getTypeCategory() == Type::TypeCategory::catRefTo) {
+            HeldClass* c = (HeldClass*)((RefTo*)m_first_arg)->getEltType();
 
             auto it = c->getMemberFunctions().find(m_funcName);
 

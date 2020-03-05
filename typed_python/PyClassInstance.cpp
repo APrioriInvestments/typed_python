@@ -40,10 +40,11 @@ PyObject* PyClassInstance::extractPythonObjectConcrete(Type* eltType, instance_p
 }
 
 void PyClassInstance::copyConstructFromPythonInstanceConcrete(Class* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-    Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+    std::pair<Type*, instance_ptr> typeAndPtr = extractTypeAndPtrFrom(pyRepresentation);
+    Type* argType = typeAndPtr.first;
+    instance_ptr argDataPtr = typeAndPtr.second;
 
     if (argType && argType->isSubclassOf(eltType)) {
-        instance_ptr argDataPtr = ((PyInstance*)pyRepresentation)->dataPtr();
 
         // arg data ptrs here should _always_ have the 0 classDispatchOffset, because
         // we never allow the python representation of a class to be a subclass.
@@ -123,6 +124,14 @@ int PyClassInstance::classInstanceSetAttributeFromPyObject(Class* cls, instance_
         PyInstance* item_w = (PyInstance*)attrVal;
 
         cls->setAttribute(data, i, item_w->dataPtr());
+
+        return 0;
+    }
+    else if (attrType && attrType->isRefTo() &&
+            ((RefTo*)attrType)->getEltType() == eltType) {
+        PyInstance* item_w = (PyInstance*)attrVal;
+
+        cls->setAttribute(data, i, *(instance_ptr*)item_w->dataPtr());
 
         return 0;
     } else {
@@ -414,6 +423,7 @@ PyObject* PyClassInstance::tp_getattr_concrete(PyObject* pyAttrName, const char*
             PyErr_Format(PyExc_AttributeError, "no attribute %s for instance of type %s", attrName, type()->name().c_str());
         }
     }
+
     return ret;
 }
 

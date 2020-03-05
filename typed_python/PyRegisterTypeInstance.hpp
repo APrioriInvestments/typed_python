@@ -408,55 +408,57 @@ public:
 
     static void copyConstructFromPythonInstanceConcrete(RegisterType<T>* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         Type::TypeCategory cat = eltType->getTypeCategory();
-        Type* other = extractTypeFrom(pyRepresentation->ob_type);
-        Type::TypeCategory otherCat = other ? other->getTypeCategory() : Type::TypeCategory::catNone;
+
+        std::pair<Type*, instance_ptr> typeAndPtr = extractTypeAndPtrFrom(pyRepresentation);
+        Type* other = typeAndPtr.first;
+        instance_ptr otherDataPtr = typeAndPtr.second;
 
         if (other) {
             Type::TypeCategory otherCat = other->getTypeCategory();
 
             if (otherCat == cat || isExplicit) {
                 if (otherCat == Type::TypeCategory::catUInt64) {
-                    ((T*)tgt)[0] = ((PyRegisterTypeInstance<uint64_t>*)pyRepresentation)->get();
+                    ((T*)tgt)[0] = *(uint64_t*)otherDataPtr;
                     return;
                 }
                 if (otherCat == Type::TypeCategory::catUInt32) {
-                    ((T*)tgt)[0] = ((PyRegisterTypeInstance<uint32_t>*)pyRepresentation)->get();
+                    ((T*)tgt)[0] = *(uint32_t*)otherDataPtr;
                     return;
                 }
                 if (otherCat == Type::TypeCategory::catUInt16) {
-                    ((T*)tgt)[0] = ((PyRegisterTypeInstance<uint16_t>*)pyRepresentation)->get();
+                    ((T*)tgt)[0] = *(uint16_t*)otherDataPtr;
                     return;
                 }
                 if (otherCat == Type::TypeCategory::catUInt8) {
-                    ((T*)tgt)[0] = ((PyRegisterTypeInstance<uint8_t>*)pyRepresentation)->get();
+                    ((T*)tgt)[0] = *(uint8_t*)otherDataPtr;
                     return;
                 }
                 if (otherCat == Type::TypeCategory::catInt64) {
-                    ((T*)tgt)[0] = ((PyRegisterTypeInstance<int64_t>*)pyRepresentation)->get();
+                    ((T*)tgt)[0] = *(int64_t*)otherDataPtr;
                     return;
                 }
                 if (otherCat == Type::TypeCategory::catInt32) {
-                    ((T*)tgt)[0] = ((PyRegisterTypeInstance<int32_t>*)pyRepresentation)->get();
+                    ((T*)tgt)[0] = *(int32_t*)otherDataPtr;
                     return;
                 }
                 if (otherCat == Type::TypeCategory::catInt16) {
-                    ((T*)tgt)[0] = ((PyRegisterTypeInstance<int16_t>*)pyRepresentation)->get();
+                    ((T*)tgt)[0] = *(int16_t*)otherDataPtr;
                     return;
                 }
                 if (otherCat == Type::TypeCategory::catInt8) {
-                    ((T*)tgt)[0] = ((PyRegisterTypeInstance<int8_t>*)pyRepresentation)->get();
+                    ((T*)tgt)[0] = *(int8_t*)otherDataPtr;
                     return;
                 }
                 if (otherCat == Type::TypeCategory::catBool) {
-                    ((T*)tgt)[0] = ((PyRegisterTypeInstance<bool>*)pyRepresentation)->get();
+                    ((T*)tgt)[0] = *(bool*)otherDataPtr;
                     return;
                 }
                 if (otherCat == Type::TypeCategory::catFloat64) {
-                    ((T*)tgt)[0] = ((PyRegisterTypeInstance<double>*)pyRepresentation)->get();
+                    ((T*)tgt)[0] = *(double*)otherDataPtr;
                     return;
                 }
                 if (otherCat == Type::TypeCategory::catFloat32) {
-                    ((T*)tgt)[0] = ((PyRegisterTypeInstance<float>*)pyRepresentation)->get();
+                    ((T*)tgt)[0] = *(float*)otherDataPtr;
                     return;
                 }
             }
@@ -476,8 +478,10 @@ public:
                 return;
             }
 
-            bool otherIsAlternativeOrClass = otherCat == Type::TypeCategory::catConcreteAlternative
-                    || otherCat == Type::TypeCategory::catClass;
+            bool otherIsAlternativeOrClass = other && (
+                other->getTypeCategory() == Type::TypeCategory::catConcreteAlternative
+                || other->getTypeCategory() == Type::TypeCategory::catClass
+            );
 
             if (isInteger(cat) && !otherIsAlternativeOrClass) {
                 int64_t l = PyLong_AsLongLong(pyRepresentation);

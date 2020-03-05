@@ -26,6 +26,7 @@
 #include "OneOfType.hpp"
 #include "CompositeType.hpp"
 #include "PointerToType.hpp"
+#include "RefToType.hpp"
 #include "TupleOrListOfType.hpp"
 #include "ConstDictType.hpp"
 #include "DictType.hpp"
