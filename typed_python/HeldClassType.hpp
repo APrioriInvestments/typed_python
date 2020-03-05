@@ -276,8 +276,6 @@ public:
     int64_t mInitializationBitByteCount;
 };
 
-typedef VTable* vtable_ptr;
-
 //a class held directly inside of another object
 class HeldClass : public Type {
 public:
@@ -423,12 +421,8 @@ public:
         );
     }
 
-    // HeldClass is laid out as a VTable ptr, a set of member initialization fields, and then
+    // HeldClass is laid out as a set of member initialization fields, and then
     // the actual members.
-    static vtable_ptr& vtableFor(instance_ptr self) {
-        return *(vtable_ptr*)self;
-    }
-
     instance_ptr eltPtr(instance_ptr self, int64_t ix) const {
         return self + m_byte_offsets[ix];
     }
@@ -437,8 +431,6 @@ public:
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
-        vtableFor(self) = m_vtable;
-
         for (long k = 0; k < m_members.size();k++) {
             clearInitializationFlag(self, k);
         }
@@ -473,8 +465,6 @@ public:
 
     template<class sub_constructor>
     void constructor(instance_ptr self, const sub_constructor& initializer) const {
-        vtableFor(self) = m_vtable;
-
         for (int64_t k = 0; k < m_members.size(); k++) {
             try {
                 initializer(eltPtr(self, k), k);
@@ -504,7 +494,7 @@ public:
     void assign(instance_ptr self, instance_ptr other);
 
     bool checkInitializationFlag(instance_ptr self, int memberIndex) const {
-        int byte = memberIndex / 8 + sizeof(vtable_ptr);
+        int byte = memberIndex / 8;
         int bit = memberIndex % 8;
         return bool( ((uint8_t*)self)[byte] & (1 << bit) );
     }

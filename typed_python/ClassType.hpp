@@ -22,6 +22,11 @@ class Instance;
 
 void destroyClassInstance(instance_ptr self);
 
+class VTable;
+
+typedef VTable* vtable_ptr;
+
+
 #define BOTTOM_48_BITS 0xFFFFFFFFFFFF
 
 class Class : public Type {
@@ -29,6 +34,7 @@ public:
     class layout {
     public:
         std::atomic<int64_t> refcount;
+        vtable_ptr vtable;
         unsigned char data[];
     };
 
@@ -45,6 +51,7 @@ public:
 
         inClass->setClassType(this);
     }
+
 
     // convert an instance of the class to an actual layout pointer. Because
     // we encode the offset of the dispatch table we're supposed to use for
@@ -72,7 +79,11 @@ public:
 
     // get the actual realized class contained in the instance of 'data'
     static Class* actualTypeForLayout(instance_ptr data) {
-        return HeldClass::vtableFor(instanceToLayout(data)->data)->mType->getClassType();
+        return vtableFor(data)->mType->getClassType();
+    }
+
+    static vtable_ptr& vtableFor(instance_ptr self) {
+        return instanceToLayout(self)->vtable;
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -187,6 +198,7 @@ public:
 
                 layout& record = *instanceToLayout(self);
                 record.refcount = 2;
+                record.vtable = m_heldClass->getVTable();
 
                 buffer.addCachedPointer(id, instanceToLayout(self), this);
 
@@ -229,6 +241,7 @@ public:
 
         layout& l = *instanceToLayout(self);
         l.refcount = 1;
+        l.vtable = m_heldClass->getVTable();
 
         try {
             m_heldClass->constructor(l.data, initializer);

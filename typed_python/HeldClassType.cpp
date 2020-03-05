@@ -42,7 +42,7 @@ bool HeldClass::_updateAfterForwardTypesChanged() {
 
     //first 8 bytes are the vtable pointer.
     //the next m_members.size() bits (rounded up to nearest byte) contain the initialization flags.
-    size_t size = sizeof(vtable_ptr) + int((m_members.size() + 7) / 8); //round up to nearest byte
+    size_t size = int((m_members.size() + 7) / 8); //round up to nearest byte
 
     for (auto t: m_members) {
         m_byte_offsets.push_back(size);
@@ -104,8 +104,8 @@ void HeldClass::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
 typed_python_hash_type HeldClass::hash(instance_ptr left) {
     HashAccumulator acc((int)getTypeCategory());
 
-    //hash the class pointer, since the values within the class can change.
-    acc.addRegister(*(uint64_t*)left);
+    //hash our address
+    acc.addRegister((uint64_t)left);
 
     return acc.get();
 }
@@ -127,8 +127,6 @@ void HeldClass::setAttribute(instance_ptr self, int memberIndex, instance_ptr ot
 }
 
 void HeldClass::constructor(instance_ptr self) {
-    vtableFor(self) = m_vtable;
-
     for (size_t k = 0; k < m_members.size(); k++) {
         Type* member_t = std::get<1>(m_members[k]);
 
@@ -146,13 +144,6 @@ void HeldClass::constructor(instance_ptr self) {
 }
 
 void HeldClass::destroy(instance_ptr self) {
-    VTable* vtable = vtableFor(self);
-
-    if (vtable->mType != this) {
-        vtable->mType->destroy(self);
-        return;
-    }
-
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
         Type* member_t = std::get<1>(m_members[k]);
         if (checkInitializationFlag(self, k)) {
@@ -162,8 +153,6 @@ void HeldClass::destroy(instance_ptr self) {
 }
 
 void HeldClass::copy_constructor(instance_ptr self, instance_ptr other) {
-    vtableFor(self) = vtableFor(other);
-
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
         Type* member_t = std::get<1>(m_members[k]);
         if (checkInitializationFlag(other, k)) {
@@ -174,8 +163,6 @@ void HeldClass::copy_constructor(instance_ptr self, instance_ptr other) {
 }
 
 void HeldClass::assign(instance_ptr self, instance_ptr other) {
-    vtableFor(self) = vtableFor(other);
-
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
         bool selfInit = checkInitializationFlag(self,k);
         bool otherInit = checkInitializationFlag(other,k);
@@ -194,14 +181,14 @@ void HeldClass::assign(instance_ptr self, instance_ptr other) {
 }
 
 void HeldClass::setInitializationFlag(instance_ptr self, int memberIndex) const {
-    int byte = memberIndex / 8 + sizeof(vtable_ptr);
+    int byte = memberIndex / 8;
     int bit = memberIndex % 8;
     uint8_t mask = (1 << bit);
     ((uint8_t*)self)[byte] |= mask;
 }
 
 void HeldClass::clearInitializationFlag(instance_ptr self, int memberIndex) const {
-    int byte = memberIndex / 8 + sizeof(vtable_ptr);
+    int byte = memberIndex / 8;
     int bit = memberIndex % 8;
     uint8_t mask = (1 << bit);
     ((uint8_t*)self)[byte] &= ~mask;

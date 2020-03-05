@@ -160,6 +160,8 @@ void Class::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
 }
 
 typed_python_hash_type Class::hash(instance_ptr left) {
+    layout& l = *instanceToLayout(left);
+
     auto it = m_heldClass->getMemberFunctions().find("__hash__");
 
     if (it != m_heldClass->getMemberFunctions().end()) {
@@ -193,7 +195,6 @@ typed_python_hash_type Class::hash(instance_ptr left) {
         throw std::runtime_error("Found a __hash__ method but failed to call it with 'self'");
     }
 
-    layout& l = *instanceToLayout(left);
     return m_heldClass->hash(l.data);
 }
 
@@ -206,6 +207,7 @@ void Class::constructor(instance_ptr self, bool allowEmpty) {
 
     layout& l = *instanceToLayout(self);
     l.refcount = 1;
+    l.vtable = m_heldClass->getVTable();
 
     m_heldClass->constructor(l.data);
 }
@@ -218,7 +220,7 @@ void Class::destroy(instance_ptr self) {
     layout& l = *instanceToLayout(self);
 
     if (l.refcount.fetch_sub(1) == 1) {
-        m_heldClass->destroy(l.data);
+        l.vtable->mType->destroy(l.data);
         free(instanceToLayout(self));
     }
 }
@@ -238,7 +240,7 @@ void Class::assign(instance_ptr self, instance_ptr other) {
     instanceToLayout(self)->refcount++;
 
     if (old->refcount.fetch_sub(1) == 1) {
-        m_heldClass->destroy(old->data);
+        old->vtable->mType->destroy(old->data);
         free(old);
     }
 }
@@ -247,5 +249,5 @@ void Class::assign(instance_ptr self, instance_ptr other) {
 void destroyClassInstance(instance_ptr self) {
     Class::layout& layout = *Class::instanceToLayout(self);
 
-    HeldClass::vtableFor(layout.data)->mType->destroy((instance_ptr)layout.data);
+    layout.vtable->mType->destroy((instance_ptr)layout.data);
 }

@@ -820,9 +820,12 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         if self.has_method(context, expr, "__hash__"):
             return self.convert_method_call(context, expr, "__hash__", (), {})
 
-        # default hash for Class types:
-        HELD_CLASS_CAT_NO = 29
-        PRIME_NO = 1000003
+        layoutPtr = self.get_layout_pointer(expr.nonref_expr).cast(native_ast.UInt64)
 
-        vtp = _types._vtablePointer(self.typeRepresentation)
-        return context.constant(Int32(((((HELD_CLASS_CAT_NO * PRIME_NO) ^ (vtp >> 32)) * PRIME_NO) ^ vtp) & 0xFFFFFFFF))
+        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
+        assert tp
+
+        return context.pushPod(
+            Int32,
+            runtime_functions.hash_class.call(layoutPtr.cast(native_ast.VoidPtr), tp)
+        )
