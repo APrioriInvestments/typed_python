@@ -41,7 +41,7 @@ def Array(T):
             _shape: The number of array elements
         Ex:
             Array(float)([1,2,3, 4, 5, 6], 1, 2, 3)
-            gives [2, 4, 6]
+            gives [2.0, 4.0, 6.0]
         """
         _vals = Member(ListOf(T))
         _offset = Member(int)
@@ -327,6 +327,17 @@ def Array(T):
 @TypeFunction
 def Matrix(T):
     class Matrix_(Class, Final):
+        """ Models a matrix.
+        Args:
+            _vals:  a list corresponding to the elements M_{ij} of a matrix M.
+            _shape:  a tuple giving the dimensions of the matrix, eg. (2,1) for a 2-d column
+                vector
+            _offset:  an int indicating which index to begin at in _vals
+            _stride:  a tuple indicating how to find matrix elements M_{ij} within the flat
+                Array _vals. The index in _vals corresponding to M_{ij} is given by
+                '_offset + i * _stride[0] + j * _stride[1])
+        """
+
         _vals = Member(ListOf(T))
 
         # rows, then columns
