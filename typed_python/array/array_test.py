@@ -47,6 +47,18 @@ def test_float_array_addition():
     assert y[0] == 8
 
 
+def test_stride_and_offset():
+    stride = 2
+    offset = 0
+    x = Array(float)([1, 2, 3, 4, 5, 6], offset, stride, 3)
+    assert x.toList() == [1.0, 3.0, 5.0]
+
+    stride = 2
+    offset = 1
+    x = Array(float)([1, 2, 3, 4, 5, 6], offset, stride, 3)
+    assert x.toList() == [2.0, 4.0, 6.0]
+
+
 def test_float_array_subtraction():
     x = Array(float)([1, 2, 3])
 

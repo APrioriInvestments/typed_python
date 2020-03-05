@@ -33,6 +33,16 @@ def Array(T):
         T - is a type, eg., float, int, str
     """
     class Array_(Class, Final):
+        """
+        Args:
+            _vals: The values of the array
+            _offset: Which index to begin at
+            _stride: How many indices to move in constructing the array
+            _shape: The number of array elements
+        Ex:
+            Array(float)([1,2,3, 4, 5, 6], 1, 2, 3)
+            gives [2, 4, 6]
+        """
         _vals = Member(ListOf(T))
         _offset = Member(int)
         _stride = Member(int)
@@ -41,7 +51,6 @@ def Array(T):
         dimensions = 1
         ElementType = T
 
-        # The following indicate three different input signatures
         def __init__(self, vals: ListOf(T)):
             self._vals = vals
             self._offset = 0
