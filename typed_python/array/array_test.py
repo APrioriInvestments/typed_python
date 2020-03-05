@@ -53,18 +53,26 @@ def test_float_array_subtraction():
     y = x - x
 
     assert y[0] == 0
+    assert y[1] == 0
+    assert y[2] == 0
 
     y -= x
 
     assert y[0] == -1
+    assert y[1] == -2
+    assert y[2] == -3
 
     y = y - 1
 
     assert y[0] == -2
+    assert y[1] == -3
+    assert y[2] == -4
 
     y -= 2
 
     assert y[0] == -4
+    assert y[1] == -5
+    assert y[2] == -6
 
 
 def test_float_array_multiplication():
