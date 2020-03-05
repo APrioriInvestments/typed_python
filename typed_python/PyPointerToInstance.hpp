@@ -42,6 +42,9 @@ public:
         return true;
     }
 
+    PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
+
     int pyInquiryConcrete(const char* op, const char* opErrRep);
+
     static PyMethodDef* typeMethodsConcrete(Type* t);
 };

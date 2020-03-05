@@ -992,6 +992,34 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     });
 }
 
+PyObject *pointerTo(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "pointerTo takes a single class instance as an argument");
+        return NULL;
+    }
+
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* actualType = PyInstance::extractTypeFrom(a1->ob_type);
+
+    if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catClass) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "first argument to refcount '%S' must be a Class",
+            (PyObject*)a1
+            );
+        return NULL;
+    }
+
+    Class* clsType = (Class*)actualType;
+    Class::layout* layout = clsType->instanceToLayout(((PyInstance*)(PyObject*)a1)->dataPtr());
+
+    PointerTo* ptrType = PointerTo::Make(clsType->getHeldClass());
+    void* ptrValue = layout->data;
+
+    return PyInstance::extractPythonObject((instance_ptr)&ptrValue, ptrType);
+}
+
 PyObject *refcount(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "refcount takes 1 positional argument");
@@ -1870,6 +1898,7 @@ static PyMethodDef module_methods[] = {
     {"isDispatchEnabled", (PyCFunction)isDispatchEnabled, METH_VARARGS, NULL},
     {"refcount", (PyCFunction)refcount, METH_VARARGS, NULL},
     {"getOrSetTypeResolver", (PyCFunction)getOrSetTypeResolver, METH_VARARGS, NULL},
+    {"pointerTo", (PyCFunction)pointerTo, METH_VARARGS, NULL},
     {"getTypePointer", (PyCFunction)getTypePointer, METH_VARARGS, NULL},
     {"_vtablePointer", (PyCFunction)getVTablePointer, METH_VARARGS, NULL},
     {"allocateClassMethodDispatch", (PyCFunction)allocateClassMethodDispatch, METH_VARARGS | METH_KEYWORDS, NULL},

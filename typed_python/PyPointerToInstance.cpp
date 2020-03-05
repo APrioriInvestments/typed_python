@@ -188,3 +188,22 @@ int PyPointerToInstance::pyInquiryConcrete(const char* op, const char* opErrRep)
     // op == '__bool__'
     return *(void**)dataPtr() != nullptr;
 }
+
+PyObject* PyPointerToInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
+    if (type()->getEltType()->getTypeCategory() == Type::TypeCategory::catHeldClass) {
+        HeldClass* clsType = (HeldClass*)type()->getEltType();
+
+        int index = clsType->getMemberIndex(attrName);
+
+        // we're accessing a member 'm' of a pointer to a held class.
+        // we figure out the pointer to the instance and get that pointer.
+        if (index >= 0) {
+            Type* memberType = clsType->getMemberType(index);
+            void* ptr = clsType->eltPtr(*(instance_ptr*)dataPtr(), index);
+
+            return PyInstance::extractPythonObject((instance_ptr)&ptr, PointerTo::Make(memberType));
+        }
+    }
+
+    return PyInstance::tp_getattr_concrete(pyAttrName, attrName);
+}

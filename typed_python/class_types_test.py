@@ -17,7 +17,7 @@ import time
 import gc
 import math
 from typed_python.test_util import currentMemUsageMb
-from typed_python._types import is_default_constructible
+from typed_python._types import is_default_constructible, pointerTo
 from typed_python import (
     Int16, UInt64, Float32, ListOf, TupleOf, OneOf, NamedTuple, Class, Alternative,
     ConstDict, PointerTo, Member, _types, Forward, Final, Function, Entrypoint, Tuple
@@ -1502,3 +1502,20 @@ class NativeClassTypesTests(unittest.TestCase):
 
         check()
         Entrypoint(check)()
+
+    def test_class_held_pointers(self):
+        class C(Class):
+            x = Member(int)
+            y = Member(float)
+
+        aC = C(x=10, y=20.5)
+
+        cPtr = pointerTo(aC)
+
+        self.assertEqual(cPtr.x.get(), 10)
+        self.assertEqual(cPtr.y.get(), 20.5)
+
+        cPtr.x.set(15)
+
+        self.assertEqual(cPtr.x.get(), 15)
+        self.assertEqual(aC.x, 15)
