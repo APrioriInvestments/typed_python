@@ -16,24 +16,40 @@ import typed_python.compiler.native_ast as native_ast
 # get the path to '.libs' which is where numpy 1.18 stores its .so files
 if sys.platform == "darwin":
     libdirPath = os.path.dirname(numpy.__file__)
+
+    # search for lapack_lite or 'blas' in the numpy installation
+    def searchForLapackLib():
+        for subdir in os.listdir(libdirPath):
+            dpath = os.path.join(libdirPath, subdir)
+            if 'lapack_lite' in subdir or 'blas' in subdir:
+                return dpath
+
+            if os.path.isdir(dpath):
+                for possibleLib in os.listdir(dpath):
+                    if 'lapack_lite' in possibleLib or 'blas' in possibleLib:
+                        return os.path.join(dpath, possibleLib)
+
+    blasLibPath = searchForLapackLib()
+
+    if blasLibPath is None:
+        raise Exception("Couldn't find a valid implementation of lapack.")
 else:
     libdirPath = os.path.join(os.path.dirname(numpy.__file__), ".libs")
-
-blasLib = os.path.join(libdirPath, [x for x in os.listdir(libdirPath) if 'blas' in x][0])
+    blasLibPath = os.path.join(libdirPath, [x for x in os.listdir(libdirPath) if 'blas' in x][0])
 
 # this loads the blas shared library as a 'global' library, which allows our llvm instructions
 # to find the functions they bind to. If we don't do this, then when we compile things like
 # 'daxpy_', when we go to link the library it will just blow up. Maybe at some point
 # we can figure out how to make a library dependency on the blas library at linktime instead
 # of loading global symbols like this...
-blas = ctypes.CDLL(blasLib, mode=ctypes.RTLD_GLOBAL)
+blas = ctypes.CDLL(blasLibPath, mode=ctypes.RTLD_GLOBAL)
 
 # verify we can get 'daxpy_', which means we found a real blas.
 try:
     blas.daxpy_
     blas.dgemm_
 except Exception:
-    raise Exception("We don't have a BLAS defined!")
+    raise Exception("Couldn't find a valid implementation of lapack.")
 
 
 def makePointer(e, viableOutputTypes):
