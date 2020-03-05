@@ -27,7 +27,11 @@ def min(a, b):
 
 @TypeFunction
 def Array(T):
-    """Implements a simple, strongly typed array."""
+    """Implements a simple, strongly typed array.
+
+    Args:
+        T - is a type, eg., float, int, str
+    """
     class Array_(Class, Final):
         _vals = Member(ListOf(T))
         _offset = Member(int)
@@ -37,6 +41,7 @@ def Array(T):
         dimensions = 1
         ElementType = T
 
+        # The following indicate three different input signatures
         def __init__(self, vals: ListOf(T)):
             self._vals = vals
             self._offset = 0

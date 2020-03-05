@@ -79,24 +79,31 @@ def test_float_array_multiplication():
     x = Array(float)([1, 2, 3])
 
     y = x * x
-
+    assert y[0] == 1
     assert y[1] == 4
+    assert y[2] == 9
 
     y *= y
-
+    assert y[0] == 1
     assert y[1] == 16
+    assert y[2] == 81
 
     y *= x
-
+    assert y[0] == 1
     assert y[1] == 32
+    assert y[2] == 243
 
     y = y * 2
-
+    assert y[0] == 2
     assert y[1] == 64
+    assert y[2] == 486
 
     y *= 2
-
+    assert y[0] == 4
     assert y[1] == 128
+    assert y[2] == 972
+
+    assert len(y) == 3
 
 
 def test_float_array_addition_wrong_size():
