@@ -1386,6 +1386,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                     r1 = f(v1, v2)
                     r2 = compiled_f(v1, v2)
                     self.assertEqual(r1, r2)
+
         test_cases = [f_hash]
         for f in test_cases:
             for v in values:
