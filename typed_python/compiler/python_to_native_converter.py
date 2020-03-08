@@ -330,7 +330,7 @@ class PythonToNativeConverter(object):
 
             res = context.call_typed_call_target(callTarget, args)
 
-            out.convert_copy_initialize(res.convert_mutable_masquerade_to_untyped())
+            out.convert_copy_initialize(res.convert_masquerade_to_untyped())
 
         res = self.defineNativeFunction(
             "demasquerade_" + callTarget.name,

@@ -49,8 +49,8 @@ class MasqueradeWrapper(Wrapper):
         return instance.changeType(self.typeRepresentation)
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        # Allow the typed form of the object to perform the conversion
-        return e.convert_masquerade_to_typed().convert_to_type_with_target(targetVal, explicit)
+        # this is a generic operation, so we need the interpreter form to do the work
+        return e.convert_masquerade_to_untyped().convert_to_type_with_target(targetVal, explicit)
 
     def get_iteration_expressions(self, context, instance):
         return instance.convert_masquerade_to_typed().get_iteration_expressions()
