@@ -583,6 +583,17 @@ class FloatWrapper(ArithmeticTypeWrapper):
     def getNativeLayoutType(self):
         return native_ast.Type.Float(bits=self.typeRepresentation.Bits)
 
+    def convert_int_cast(self, context, expr, raiseException=True):
+        if self.typeRepresentation == Float64:
+            func = runtime_functions.float64_to_int
+        else:
+            func = runtime_functions.float32_to_int
+
+        return context.pushPod(
+            int,
+            func.call(expr.nonref_expr)
+        )
+
     def convert_hash(self, context, expr):
         if self.typeRepresentation == Float32:
             return context.pushPod(Int32, runtime_functions.hash_float32.call(expr.nonref_expr))

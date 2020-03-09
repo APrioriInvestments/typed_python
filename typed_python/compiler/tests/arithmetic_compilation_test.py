@@ -14,7 +14,7 @@
 
 import operator
 import sys
-from math import isfinite, trunc, floor, ceil
+from math import isfinite, trunc, floor, ceil, nan, inf
 from typed_python import (
     OneOf,
     Bool,
@@ -593,3 +593,14 @@ class TestArithmeticCompilation(unittest.TestCase):
                                     failed = True
 
         self.assertFalse(failed)
+
+    def test_int_of_nan(self):
+        @Entrypoint
+        def f(x):
+            return int(x)
+
+        with self.assertRaisesRegex(Exception, "NaN"):
+            f(nan)
+
+        with self.assertRaisesRegex(Exception, "infinity"):
+            f(inf)

@@ -539,6 +539,18 @@ float32_to_string = externalCallTarget(
     Float32
 )
 
+float64_to_int = externalCallTarget(
+    "nativepython_float64_to_int",
+    Int64,
+    Float64
+)
+
+float32_to_int = externalCallTarget(
+    "nativepython_float32_to_int",
+    Int64,
+    Float32
+)
+
 bool_to_string = externalCallTarget(
     "nativepython_bool_to_string",
     Void.pointer(),

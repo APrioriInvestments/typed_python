@@ -607,6 +607,44 @@ extern "C" {
         std::cout << StringType::Make()->toUtf8String((instance_ptr)&layout) << std::flush;
     }
 
+    int64_t nativepython_float32_to_int(float f) {
+        if (!std::isfinite(f)) {
+            if (std::isnan(f)) {
+                PyEnsureGilAcquired acquireTheGil;
+
+                PyErr_Format(PyExc_ValueError, "Cannot convert float NaN to integer");
+                throw PythonExceptionSet();
+            }
+            if (std::isinf(f)) {
+                PyEnsureGilAcquired acquireTheGil;
+
+                PyErr_Format(PyExc_ValueError, "Cannot convert float infinity to integer");
+                throw PythonExceptionSet();
+            }
+        }
+
+        return int64_t(f);
+    }
+
+    int64_t nativepython_float64_to_int(double f) {
+        if (!std::isfinite(f)) {
+            if (std::isnan(f)) {
+                PyEnsureGilAcquired acquireTheGil;
+
+                PyErr_Format(PyExc_ValueError, "Cannot convert float NaN to integer");
+                throw PythonExceptionSet();
+            }
+            if (std::isinf(f)) {
+                PyEnsureGilAcquired acquireTheGil;
+
+                PyErr_Format(PyExc_ValueError, "Cannot convert float infinity to integer");
+                throw PythonExceptionSet();
+            }
+        }
+
+        return int64_t(f);
+    }
+
     StringType::layout* nativepython_int64_to_string(int64_t i) {
         char data[21];
 
