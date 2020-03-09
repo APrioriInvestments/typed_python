@@ -15,7 +15,7 @@
 import unittest
 import time
 
-from typed_python import Tuple, NamedTuple, Entrypoint, makeNamedTuple, ListOf
+from typed_python import Tuple, NamedTuple, Entrypoint, makeNamedTuple, ListOf, Function, OneOf
 from typed_python import map
 
 
@@ -24,6 +24,9 @@ class TestMap(unittest.TestCase):
         def f(x):
             return x + 1
 
+        def toStr(x):
+            return str(x)
+
         @Entrypoint
         def compiledMap(f, tup):
             return map(f, tup)
@@ -31,9 +34,9 @@ class TestMap(unittest.TestCase):
         aTup = Tuple(int, int, float)((1, 2, 3.0))
 
         self.assertEqual(type(map(f, aTup)), Tuple(int, int, float))
-        self.assertEqual(type(map(str, aTup)), Tuple(str, str, str))
+        self.assertEqual(type(map(toStr, aTup)), Tuple(str, str, str))
         self.assertEqual(type(compiledMap(f, aTup)), Tuple(int, int, float))
-        self.assertEqual(type(compiledMap(str, aTup)), Tuple(str, str, str))
+        self.assertEqual(type(compiledMap(toStr, aTup)), Tuple(str, str, str))
 
         aNamedTup = NamedTuple(x=int, y=float)((1, 2.5))
 
@@ -41,10 +44,14 @@ class TestMap(unittest.TestCase):
         self.assertEqual(type(compiledMap(f, aNamedTup)), NamedTuple(x=int, y=float))
 
     def test_map_perf(self):
+        @Function
+        def addOne(x):
+            return x + 1
+
         def doit(tup, times):
             res = 0.0
             for i in range(times):
-                res += map(lambda x: x + 1, tup)[2]
+                res += map(addOne, tup)[2]
             return res
 
         compiledDoit = Entrypoint(doit)
@@ -87,3 +94,14 @@ class TestMap(unittest.TestCase):
         print(time.time() - t0, " to transpose.")
 
         self.assertEqual(res[0], makeNamedTuple(x=0, y=0.0))
+
+    def test_map_with_multiple_outputs(self):
+        @Entrypoint
+        def f(x) -> OneOf(int, float):
+            if x % 2:
+                return int(x)
+            return float(x)
+
+        aTup = Tuple(int, int, float)((1, 2, 3.0))
+
+        self.assertEqual(type(map(f, aTup)), Tuple(OneOf(int, float), OneOf(int, float), OneOf(int, float)))

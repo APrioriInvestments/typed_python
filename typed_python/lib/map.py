@@ -12,11 +12,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python._types import Tuple, NamedTuple, OneOf
+from typed_python._types import Tuple, NamedTuple
+from typed_python._types import Function as FunctionType
+from typed_python import Function
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 import typed_python.compiler
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+_typeCache = {}
 
 
 class Map(CompilableBuiltin):
@@ -33,17 +38,29 @@ class Map(CompilableBuiltin):
         raise TypeError("Currently, 'map' only works on typed python Tuple or NamedTuple objects")
 
     def mapTuple(self, f, tup):
+        if not isinstance(f, FunctionType):
+            f = Function(f)
+
+        if (type(f), type(tup)) not in _typeCache:
+            outTypes = []
+            for elt in tup:
+                outTypes.append(f.resultTypeFor(type(elt)).interpreterTypeRepresentation)
+
+            if isinstance(tup, NamedTuple):
+                resT = NamedTuple(**{tup.ElementNames[i]: outTypes[i] for i in range(len(outTypes))})
+            else:
+                resT = Tuple(*outTypes)
+
+            _typeCache[type(f), type(tup)] = resT
+        else:
+            resT = _typeCache[type(f), type(tup)]
+
         outElts = []
 
         for elt in tup:
             outElts.append(f(elt))
 
-        outTypes = [type(elt) for elt in outElts]
-
-        if isinstance(tup, NamedTuple):
-            return NamedTuple(**{tup.ElementNames[i]: outTypes[i] for i in range(len(outTypes))})(outElts)
-        else:
-            return Tuple(*outTypes)(outElts)
+        return resT(outElts)
 
     def convert_call(self, context, expr, args, kwargs):
         if len(args) != 2 or len(kwargs):
@@ -70,8 +87,6 @@ class Map(CompilableBuiltin):
                 return None
 
             resTypes.append(resArgs[-1].expr_type.interpreterTypeRepresentation)
-
-            assert not issubclass(resTypes[-1], OneOf), "OneOf types not supported in compiled 'map'"
 
         if issubclass(argT, NamedTuple):
             outTupType = NamedTuple(**{argT.ElementNames[i]: resTypes[i] for i in range(len(resTypes))})
