@@ -96,7 +96,7 @@ class PointerToWrapper(Wrapper):
 
             return context.pushPod(
                 int,
-                left_int.sub(right_int).div(typeWrapper(self.typeRepresentation.ElementType).getBytecount())
+                left_int.nonref_expr.sub(right_int).div(typeWrapper(self.typeRepresentation.ElementType).getBytecount())
             )
 
         if op.matches.Lt and right.expr_type == left.expr_type:
