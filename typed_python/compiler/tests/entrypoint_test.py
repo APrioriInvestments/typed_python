@@ -83,6 +83,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(Runtime.singleton().timesCompiled - compileCount, 2)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_specialized_entrypoint_dispatch_perf(self):
         def add(x, y):
             return x + y

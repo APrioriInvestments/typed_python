@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import pytest
+from flaky import flaky
 import time
 import numpy
 import os
@@ -113,6 +114,7 @@ def test_basic_matrix_ops():
     assert m[4][1] == -99
 
 
+@flaky(max_runs=3, min_passes=1)
 def test_matrix_speed():
     t0 = time.time()
     sz = 10
