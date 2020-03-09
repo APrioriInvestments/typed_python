@@ -281,7 +281,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
         return super()._can_convert_from_type(otherType, explicit)
 
-    def can_convert_to_primitive(self, context, e, primitiveType):
+    def can_cast_to_primitive(self, context, e, primitiveType):
         # TODO: we should be checking this
         return True
 

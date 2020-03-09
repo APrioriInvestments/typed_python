@@ -1058,6 +1058,13 @@ class ExpressionConversionContext(object):
     def pushComment(self, c):
         self.pushEffect(native_ast.nullExpr.with_comment(c))
 
+    def pushAttributeError(self, attribute):
+        self.pushEffect(
+            runtime_functions.raiseAttributeError.call(
+                native_ast.const_utf8_cstr(attribute)
+            )
+        )
+
     def pushException(self, excType, *args, **kwargs):
         """Push a side-effect that throws an exception of type 'excType'.
 

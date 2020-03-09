@@ -398,7 +398,7 @@ class StringWrapper(RefcountedWrapper):
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
-    def can_convert_to_primitive(self, context, e, primitiveType):
+    def can_cast_to_primitive(self, context, e, primitiveType):
         return primitiveType in (bool, int, float, str)
 
     def convert_bool_cast(self, context, expr):

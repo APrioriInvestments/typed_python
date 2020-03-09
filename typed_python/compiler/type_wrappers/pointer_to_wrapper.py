@@ -59,18 +59,18 @@ class PointerToWrapper(Wrapper):
     def convert_destroy(self, context, instance):
         pass
 
-    def can_convert_to_primitive(self, context, instance, primitiveType):
+    def can_cast_to_primitive(self, context, instance, primitiveType):
         return primitiveType in (int, str)
 
     def convert_int_cast(self, context, e, raiseException=True):
-        return e.nonref_expr.cast(native_ast.Int64)
+        return context.pushPod(int, e.nonref_expr.cast(native_ast.Int64))
 
     def convert_str_cast(self, context, e):
-        asInt = e.convert_to_type(int)
+        asInt = e.convert_int_cast()
         if asInt is None:
             return None
 
-        asStr = asInt.convert_to_type(str)
+        asStr = asInt.convert_str_cast()
         if asStr is None:
             return None
 

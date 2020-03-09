@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, Int64, UInt64, Int16, \
-    Float32, Float64, String, Final, PointerTo, makeNamedTuple, Compiled, Function
+    Float32, Float64, String, Final, PointerTo, makeNamedTuple, Compiled, Function, Held
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint
 from flaky import flaky
@@ -1846,3 +1846,91 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(add(X(), 1), 1)
         self.assertEqual(add(X(), 1.5), 2)
+
+    def test_compile_held_class(self):
+        class H(Class, Final):
+            x = Member(int)
+            y = Member(float)
+
+            def f(self):
+                return self.x + self.y
+
+            def typeOfSelf(self):
+                return type(self)
+
+        class C(Class, Final):
+            h1 = Member(Held(H))
+            h2 = Member(Held(H))
+
+        c = C()
+
+        def check(x):
+            self.assertEqual(Entrypoint(x)(c), x(c))
+
+        check(lambda c: type(c.h1))
+        check(lambda c: c.h1)
+        check(lambda c: type(c.h1.x))
+        check(lambda c: c.h1.x)
+
+        c.h1.x = 20
+        check(lambda c: c.h1.x)
+
+        def move(c):
+            c.h2 = c.h1
+            return c.h2.x
+
+        check(move)
+
+        check(lambda c: c.h1.f())
+        check(lambda c: c.h1.typeOfSelf())
+
+    def test_compile_list_of_held_class(self):
+        class H(Class, Final):
+            x = Member(int)
+            y = Member(float)
+
+            def f(self):
+                return self.x + self.y
+
+            def increment(self):
+                self.x += 1
+                self.y += 1
+
+        aList = ListOf(Held(H))()
+
+        @Entrypoint
+        def resizeList(l):
+            l.resize(10)
+
+        resizeList(aList)
+
+        self.assertEqual(len(aList), 10)
+        self.assertEqual(aList[0].x, 0)
+        self.assertEqual(aList[0].y, 0.0)
+
+        @Entrypoint
+        def getitem(l, x):
+            return l[x]
+
+        self.assertEqual(aList[0], getitem(aList, 0))
+
+        @Entrypoint
+        def incrementAllRange(l):
+            for i in range(len(l)):
+                ref = l[i]
+                ref.increment()
+
+        incrementAllRange(aList)
+
+        self.assertEqual(getitem(aList, 0).x, 1)
+        self.assertEqual(getitem(aList, 5).x, 1)
+
+        @Entrypoint
+        def incrementViaIterator(l):
+            for i in l:
+                i.increment()
+
+        incrementViaIterator(aList)
+
+        self.assertEqual(getitem(aList, 0).x, 2)
+        self.assertEqual(getitem(aList, 5).x, 2)

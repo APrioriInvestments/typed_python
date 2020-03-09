@@ -745,3 +745,9 @@ bytes_to_float64 = externalCallTarget(
     Float64,
     Void.pointer()
 )
+
+raiseAttributeError = externalCallTarget(
+    "np_raiseAttributeErr",
+    Void,
+    UInt8Ptr
+)

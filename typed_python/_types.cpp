@@ -629,6 +629,8 @@ PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
     Type* t0 = PyInstance::unwrapTypeArgToTypePtr(a0);
 
     if (!t0 || (t0->getTypeCategory() != Type::TypeCategory::catClass
+                && t0->getTypeCategory() != Type::TypeCategory::catHeldClass
+                && t0->getTypeCategory() != Type::TypeCategory::catRefTo
                 && t0->getTypeCategory() != Type::TypeCategory::catAlternative
                 && t0->getTypeCategory() != Type::TypeCategory::catConcreteAlternative
                 )) {

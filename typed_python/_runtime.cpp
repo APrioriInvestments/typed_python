@@ -16,6 +16,17 @@
 // Note: extern C identifiers are distinguished only up to 32 characters
 // nativepython_runtime_12345678901
 extern "C" {
+    void np_raiseAttributeErr(uint8_t* attributeName) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyErr_Format(
+            PyExc_AttributeError,
+            "Attribute '%s' is not initialized",
+            attributeName
+        );
+        throw PythonExceptionSet();
+    }
+
     double np_tanh_float64(double d) {
         return std::tanh(d);
     }

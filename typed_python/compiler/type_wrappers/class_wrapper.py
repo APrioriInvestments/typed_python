@@ -329,12 +329,12 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         if not nocheck:
             with context.ifelse(self.isInitializedNativeExpr(instance, ix)) as (ifTrue, ifFalse):
                 with ifFalse:
-                    context.pushException(AttributeError, "Attribute %s is not initialized" % attribute)
+                    context.pushAttributeError(attribute)
 
         return context.pushReference(
             self.typeRepresentation.MemberTypes[ix],
             self.memberPtr(instance, ix)
-        )
+        ).heldToRef()
 
     def resultTypesForCall(self, func, argTypes, kwargTypes):
         resultTypes = set()
@@ -698,6 +698,9 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         return True
 
     def convert_set_attribute(self, context, instance, attribute, value):
+        if value is not None:
+            value = value.refToHeld()
+
         if not isinstance(attribute, int):
             ix = self.nameToIndex.get(attribute)
         else:

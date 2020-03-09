@@ -30,10 +30,12 @@ from typed_python.compiler.type_wrappers.python_typed_function_wrapper import Py
 from typed_python.compiler.type_wrappers.value_wrapper import ValueWrapper
 from typed_python.compiler.type_wrappers.tuple_of_wrapper import TupleOfWrapper
 from typed_python.compiler.type_wrappers.pointer_to_wrapper import PointerToWrapper
+from typed_python.compiler.type_wrappers.ref_to_wrapper import RefToWrapper
 from typed_python.compiler.type_wrappers.list_of_wrapper import ListOfWrapper
 from typed_python.compiler.type_wrappers.isinstance_wrapper import IsinstanceWrapper
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
+from typed_python.compiler.type_wrappers.held_class_wrapper import HeldClassWrapper
 from typed_python.compiler.type_wrappers.const_dict_wrapper import ConstDictWrapper
 from typed_python.compiler.type_wrappers.dict_wrapper import DictWrapper
 from typed_python.compiler.type_wrappers.set_wrapper import SetWrapper
@@ -112,6 +114,9 @@ def _typedPythonTypeToTypeWrapper(t):
     if t.__typed_python_category__ == "Class":
         return ClassWrapper(t)
 
+    if t.__typed_python_category__ == "HeldClass":
+        return HeldClassWrapper(t)
+
     if t.__typed_python_category__ == "Alternative":
         return makeAlternativeWrapper(t)
 
@@ -135,6 +140,9 @@ def _typedPythonTypeToTypeWrapper(t):
 
     if t.__typed_python_category__ == "PointerTo":
         return PointerToWrapper(t)
+
+    if t.__typed_python_category__ == "RefTo":
+        return RefToWrapper(t)
 
     if t.__typed_python_category__ == "Function":
         return PythonTypedFunctionWrapper(t)

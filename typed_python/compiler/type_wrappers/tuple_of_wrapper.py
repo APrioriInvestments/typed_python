@@ -317,7 +317,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             expr.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
                 self.underlyingWrapperType.getNativeLayoutType().pointer()
             ).elemPtr(actualItem.toInt64().nonref_expr)
-        )
+        ).heldToRef()
 
     def convert_getitem_unsafe(self, context, expr, item):
         return context.pushReference(
@@ -494,7 +494,6 @@ class TupleOrListOfIteratorWrapper(Wrapper):
         )
 
         nextIx = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
-
         return self.iteratedItemForReference(context, expr, nextIx), canContinue
 
     def refAs(self, context, expr, which):
@@ -516,7 +515,7 @@ class TupleOrListOfIteratorWrapper(Wrapper):
             context,
             self.refAs(context, expr, 1),
             ixExpr
-        )
+        ).heldToRef()
 
     def convert_assign(self, context, expr, other):
         assert expr.isReference

@@ -25,4 +25,9 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
         return true;
     }
+
+    static void mirrorTypeInformationIntoPyTypeConcrete(HeldClass* classT, PyTypeObject* pyType) {
+        //expose 'ElementType' as a member of the type object
+        PyDict_SetItemString(pyType->tp_dict, "Class", typePtrToPyTypeRepresentation(classT->getClassType()));
+    }
 };

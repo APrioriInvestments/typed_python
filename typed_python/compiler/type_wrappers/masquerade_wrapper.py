@@ -117,8 +117,8 @@ class MasqueradeWrapper(Wrapper):
     def convert_abs(self, context, instance):
         return instance.convert_masquerade_to_untyped().convert_abs()
 
-    def can_convert_to_primitive(self, context, instance, primitiveType):
-        return typeWrapper(self.interpreterTypeRepresentation).can_convert_to_primitive(context, instance, primitiveType)
+    def can_cast_to_primitive(self, context, instance, primitiveType):
+        return typeWrapper(self.interpreterTypeRepresentation).can_cast_to_primitive(context, instance, primitiveType)
 
     def convert_bool_cast(self, context, instance):
         return instance.convert_masquerade_to_untyped().convert_bool_cast()
