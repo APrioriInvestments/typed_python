@@ -35,6 +35,99 @@ CompositeType* PyCompositeTypeInstance::type() {
     return (CompositeType*)t;
 }
 
+void PyCompositeTypeInstance::copyConstructFromPythonInstanceConcrete(CompositeType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    if (PyTuple_Check(pyRepresentation)) {
+        if (eltType->getTypes().size() != PyTuple_Size(pyRepresentation)) {
+            throw std::runtime_error("Wrong number of arguments to construct " + eltType->name());
+        }
+
+        eltType->constructor(tgt,
+            [&](uint8_t* eltPtr, int64_t k) {
+                PyObjectHolder arg(PyTuple_GetItem(pyRepresentation, k));
+                copyConstructFromPythonInstance(eltType->getTypes()[k], eltPtr, arg, isExplicit);
+                }
+            );
+        return;
+    }
+    if (PyList_Check(pyRepresentation)) {
+        if (eltType->getTypes().size() != PyList_Size(pyRepresentation)) {
+            throw std::runtime_error("Wrong number of arguments to construct " + eltType->name());
+        }
+
+        eltType->constructor(tgt,
+            [&](uint8_t* eltPtr, int64_t k) {
+                PyObjectHolder listItem(PyList_GetItem(pyRepresentation,k));
+                copyConstructFromPythonInstance(eltType->getTypes()[k], eltPtr, listItem, isExplicit);
+                }
+            );
+        return;
+    }
+
+    PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, isExplicit);
+}
+
+bool PyCompositeTypeInstance::compare_to_python_concrete(CompositeType* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+    auto convert = [&](char cmpValue) { return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpValue); };
+
+    Type* otherType = extractTypeFrom(other->ob_type);
+
+    if (PyTuple_Check(other) || (otherType && (otherType->getTypeCategory() == Type::TypeCategory::catTupleOf || otherType->isComposite()))) {
+        int lenS = tupT->getTypes().size();
+        int indexInOwn = 0;
+
+        int result = 0;
+
+        iterateWithEarlyExit(other, [&](PyObject* tupleItem) {
+            if (indexInOwn >= lenS) {
+                // we ran out of items in our list
+                result = -1;
+                return false;
+            }
+
+            if (!compare_to_python(tupT->getTypes()[indexInOwn], tupT->eltPtr(self, indexInOwn), tupleItem, exact, Py_EQ)) {
+                if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE) {
+                    result = 1;
+                    return false;
+                }
+                if (compare_to_python(tupT->getTypes()[indexInOwn], tupT->eltPtr(self, indexInOwn), tupleItem, exact, Py_LT)) {
+                    result = -1;
+                    return false;
+                }
+
+                result = 1;
+                return false;
+            }
+
+            indexInOwn += 1;
+
+            return true;
+        });
+
+        if (result) {
+            return convert(result);
+        }
+
+        if (indexInOwn == lenS) {
+            return convert(0);
+        }
+
+        return convert(1);
+    }
+
+    if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE) {
+        return convert(1);
+    }
+
+    PyErr_Format(
+        PyExc_TypeError,
+        "Comparison not supported between instances of '%s' and '%s'.",
+        tupT->name().c_str(),
+        other->ob_type->tp_name
+    );
+
+    throw PythonExceptionSet();
+}
+
 Tuple* PyTupleInstance::type() {
     Type* t = extractTypeFrom(((PyObject*)this)->ob_type);
 

@@ -281,6 +281,45 @@ void iterate(PyObject* o, func_type f) {
     }
 }
 
+/********
+Iterate over 'o' calling 'f' with each PyObject encountered.
+
+if 'f' return false, exit eraly.
+
+May throw, so use in conjunction with 'translateExceptionToPyObject'
+********/
+template<class func_type>
+void iterateWithEarlyExit(PyObject* o, func_type f) {
+    PyObject *iterator = PyObject_GetIter(o);
+    PyObject *item;
+
+    if (iterator == NULL) {
+        throw PythonExceptionSet();
+    }
+
+    bool exitEarly = false;
+
+    while ((item = PyIter_Next(iterator)) && !exitEarly) {
+        try {
+            if (!f(item)) {
+                exitEarly = true;
+            }
+
+            Py_DECREF(item);
+        } catch(...) {
+            Py_DECREF(item);
+            Py_DECREF(iterator);
+            throw;
+        }
+    }
+
+    Py_DECREF(iterator);
+
+    if (PyErr_Occurred()) {
+        throw PythonExceptionSet();
+    }
+}
+
 
 // Removes trailing zeros from char* representation of a floating-point number
 // in the style of the python str representation.

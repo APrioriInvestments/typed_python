@@ -32,66 +32,9 @@ public:
 
     Py_ssize_t mp_and_sq_length_concrete();
 
-    static void copyConstructFromPythonInstanceConcrete(CompositeType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-        if (PyTuple_Check(pyRepresentation)) {
-            if (eltType->getTypes().size() != PyTuple_Size(pyRepresentation)) {
-                throw std::runtime_error("Wrong number of arguments to construct " + eltType->name());
-            }
+    static void copyConstructFromPythonInstanceConcrete(CompositeType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
 
-            eltType->constructor(tgt,
-                [&](uint8_t* eltPtr, int64_t k) {
-                    PyObjectHolder arg(PyTuple_GetItem(pyRepresentation, k));
-                    copyConstructFromPythonInstance(eltType->getTypes()[k], eltPtr, arg);
-                    }
-                );
-            return;
-        }
-        if (PyList_Check(pyRepresentation)) {
-            if (eltType->getTypes().size() != PyList_Size(pyRepresentation)) {
-                throw std::runtime_error("Wrong number of arguments to construct " + eltType->name());
-            }
-
-            eltType->constructor(tgt,
-                [&](uint8_t* eltPtr, int64_t k) {
-                    PyObjectHolder listItem(PyList_GetItem(pyRepresentation,k));
-                    copyConstructFromPythonInstance(eltType->getTypes()[k], eltPtr, listItem);
-                    }
-                );
-            return;
-        }
-
-        PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, isExplicit);
-    }
-
-    static bool compare_to_python_concrete(CompositeType* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
-        auto convert = [&](char cmpValue) { return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpValue); };
-
-        if (!PyTuple_Check(other)) {
-            return convert(-1);
-        }
-
-        int lenO = PyTuple_Size(other);
-        int lenS = tupT->getTypes().size();
-
-        for (long k = 0; k < lenO && k < lenS; k++) {
-            PyObjectHolder arg(PyTuple_GetItem(other, k));
-
-            if (!compare_to_python(tupT->getTypes()[k], tupT->eltPtr(self, k), arg, exact, Py_EQ)) {
-                if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE)
-                    return convert(1);  // for EQ, NE, don't compare further
-                if (compare_to_python(tupT->getTypes()[k], tupT->eltPtr(self, k), arg, exact, Py_LT)) {
-                    return convert(-1);
-                }
-                return convert(1);
-            }
-        }
-
-        if (lenS < lenO) { return convert(-1); }
-        if (lenS > lenO) { return convert(1); }
-
-        return convert(0);
-    }
-
+    static bool compare_to_python_concrete(CompositeType* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
         return PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation) || PyDict_Check(pyRepresentation);

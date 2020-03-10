@@ -896,3 +896,127 @@ int PyTupleOrListOfInstance::pyInquiryConcrete(const char* op, const char* opErr
     // op == '__bool__'
     return type()->count(dataPtr()) != 0;
 }
+
+bool PyListOfInstance::compare_to_python_concrete(ListOfType* listT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+    auto convert = [&](char cmpValue) { return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpValue); };
+
+    Type* otherType = extractTypeFrom(other->ob_type);
+
+    if (PyList_Check(other) || (otherType && otherType->getTypeCategory() == Type::TypeCategory::catListOf)) {
+        int lenS = listT->count(self);
+        int indexInOwn = 0;
+
+        int result = 0;
+
+        iterateWithEarlyExit(other, [&](PyObject* listItem) {
+            if (indexInOwn >= lenS) {
+                // we ran out of items in our list
+                result = -1;
+                return false;
+            }
+
+            if (!compare_to_python(listT->getEltType(), listT->eltPtr(self, indexInOwn), listItem, exact, Py_EQ)) {
+                if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE) {
+                    result = 1;
+                    return false;
+                }
+                if (compare_to_python(listT->getEltType(), listT->eltPtr(self, indexInOwn), listItem, exact, Py_LT)) {
+                    result = -1;
+                    return false;
+                }
+
+                result = 1;
+                return false;
+            }
+
+            indexInOwn += 1;
+
+            return true;
+        });
+
+        if (result) {
+            return convert(result);
+        }
+
+        if (indexInOwn == lenS) {
+            return convert(0);
+        }
+
+        return convert(1);
+    }
+
+    if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE) {
+        return convert(1);
+    }
+
+    PyErr_Format(
+        PyExc_TypeError,
+        "Comparison not supported between instances of '%s' and '%s'.",
+        listT->name().c_str(),
+        other->ob_type->tp_name
+    );
+
+    throw PythonExceptionSet();
+}
+
+bool PyTupleOfInstance::compare_to_python_concrete(TupleOfType* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+    auto convert = [&](char cmpValue) { return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpValue); };
+
+    Type* otherType = extractTypeFrom(other->ob_type);
+
+    if (PyTuple_Check(other) || (otherType && (otherType->getTypeCategory() == Type::TypeCategory::catTupleOf || otherType->isComposite()))) {
+        int lenS = tupT->count(self);
+        int indexInOwn = 0;
+
+        int result = 0;
+
+        iterateWithEarlyExit(other, [&](PyObject* tupleItem) {
+            if (indexInOwn >= lenS) {
+                // we ran out of items in our list
+                result = -1;
+                return false;
+            }
+
+            if (!compare_to_python(tupT->getEltType(), tupT->eltPtr(self, indexInOwn), tupleItem, exact, Py_EQ)) {
+                if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE) {
+                    result = 1;
+                    return false;
+                }
+                if (compare_to_python(tupT->getEltType(), tupT->eltPtr(self, indexInOwn), tupleItem, exact, Py_LT)) {
+                    result = -1;
+                    return false;
+                }
+
+                result = 1;
+                return false;
+            }
+
+            indexInOwn += 1;
+
+            return true;
+        });
+
+        if (result) {
+            return convert(result);
+        }
+
+        if (indexInOwn == lenS) {
+            return convert(0);
+        }
+
+        return convert(1);
+    }
+
+    if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE) {
+        return convert(1);
+    }
+
+    PyErr_Format(
+        PyExc_TypeError,
+        "Comparison not supported between instances of '%s' and '%s'.",
+        tupT->name().c_str(),
+        other->ob_type->tp_name
+    );
+
+    throw PythonExceptionSet();
+}

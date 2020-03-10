@@ -79,32 +79,7 @@ public:
 
     static void constructFromPythonArgumentsConcrete(ListOfType* t, uint8_t* data, PyObject* args, PyObject* kwargs);
 
-    static bool compare_to_python_concrete(ListOfType* listT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
-        auto convert = [&](char cmpValue) { return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpValue); };
-
-        if (!PyList_Check(other)) {
-            return convert(-1);
-        }
-
-        int lenO = PyList_Size(other);
-        int lenS = listT->count(self);
-        for (long k = 0; k < lenO && k < lenS; k++) {
-            PyObjectHolder listItem(PyList_GetItem(other,k));
-
-            if (!compare_to_python(listT->getEltType(), listT->eltPtr(self, k), listItem, exact, Py_EQ)) {
-                if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE)
-                    return convert(1);  // for EQ, NE, don't compare further
-                if (compare_to_python(listT->getEltType(), listT->eltPtr(self, k), listItem, exact, Py_LT)) {
-                    return convert(-1);
-                }
-                return convert(1);
-            }
-        }
-
-        if (lenS < lenO) { return convert(-1); }
-        if (lenS > lenO) { return convert(1); }
-        return convert(0);
-    }
+    static bool compare_to_python_concrete(ListOfType* listT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 };
 
 class PyTupleOfInstance : public PyTupleOrListOfInstance {
@@ -115,32 +90,5 @@ public:
 
     static PyMethodDef* typeMethodsConcrete(Type* t);
 
-    static bool compare_to_python_concrete(TupleOfType* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
-        auto convert = [&](char cmpValue) { return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpValue); };
-
-        if (!PyTuple_Check(other)) {
-            return convert(-1);
-        }
-
-        int lenO = PyTuple_Size(other);
-        int lenS = tupT->count(self);
-
-        for (long k = 0; k < lenO && k < lenS; k++) {
-            PyObjectHolder arg(PyTuple_GetItem(other,k));
-
-            if (!compare_to_python(tupT->getEltType(), tupT->eltPtr(self, k), arg, exact, Py_EQ)) {
-                if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE)
-                    return convert(1);  // for EQ, NE, don't compare further
-                if (compare_to_python(tupT->getEltType(), tupT->eltPtr(self, k), arg, exact, Py_LT)) {
-                    return convert(-1);
-                }
-                return convert(1);
-            }
-        }
-
-        if (lenS < lenO) { return convert(-1); }
-        if (lenS > lenO) { return convert(1); }
-        return convert(0);
-    }
-
+    static bool compare_to_python_concrete(TupleOfType* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 };

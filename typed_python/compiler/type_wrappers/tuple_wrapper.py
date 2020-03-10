@@ -14,14 +14,156 @@
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
-from typed_python import _types, Int32
+from typed_python import _types, Int32, Tuple, NamedTuple, Function
 
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 import typed_python.compiler.native_ast as native_ast
+import typed_python.python_ast as python_ast
 import typed_python.compiler
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+class _TupleLt(CompilableBuiltin):
+    """A builtin for loop-unrolling tuple comparison"""
+    IS_LTE = False
+
+    def __eq__(self, other):
+        return isinstance(other, _TupleLt)
+
+    def __hash__(self):
+        return hash("_TupleLt")
+
+    def convert_call(self, context, expr, args, kwargs):
+        assert len(args) == 2
+        lhsT = args[0].expr_type.typeRepresentation
+        rhsT = args[1].expr_type.typeRepresentation
+
+        assert isinstance(lhsT, type) and issubclass(lhsT, (NamedTuple, Tuple))
+        assert isinstance(rhsT, type) and issubclass(rhsT, (NamedTuple, Tuple))
+
+        for i in range(min(len(lhsT.ElementTypes), len(rhsT.ElementTypes))):
+            res = args[0].refAs(i) < args[1].refAs(i)
+            if res is None:
+                return None
+
+            res = res.convert_bool_cast()
+            if res is None:
+                return None
+
+            with context.ifelse(res.nonref_expr) as (ifTrue, ifFalse):
+                with ifTrue:
+                    context.pushReturnValue(context.constant(True))
+
+            resReverse = args[1].refAs(i) < args[0].refAs(i)
+            if resReverse is None:
+                return None
+
+            resReverse = resReverse.convert_bool_cast()
+            if resReverse is None:
+                return None
+
+            with context.ifelse(resReverse.nonref_expr) as (ifTrue, ifFalse):
+                with ifTrue:
+                    context.pushReturnValue(context.constant(False))
+
+        if self.IS_LTE:
+            return context.constant(len(lhsT.ElementTypes) <= len(rhsT.ElementTypes))
+        else:
+            return context.constant(len(lhsT.ElementTypes) < len(rhsT.ElementTypes))
+
+
+class _TupleLtE(_TupleLt):
+    """A builtin for loop-unrolling tuple comparison"""
+    IS_LTE = True
+
+    def __eq__(self, other):
+        return isinstance(other, _TupleLtE)
+
+    def __hash__(self):
+        return hash("_TupleLtE")
+
+
+class _TupleEq(CompilableBuiltin):
+    """A builtin for loop-unrolling tuple comparison"""
+    def __eq__(self, other):
+        return isinstance(other, _TupleEq)
+
+    def __hash__(self):
+        return hash("_TupleEq")
+
+    def convert_call(self, context, expr, args, kwargs):
+        assert len(args) == 2
+        lhsT = args[0].expr_type.typeRepresentation
+        rhsT = args[1].expr_type.typeRepresentation
+
+        assert isinstance(lhsT, type) and issubclass(lhsT, (NamedTuple, Tuple))
+        assert isinstance(rhsT, type) and issubclass(rhsT, (NamedTuple, Tuple))
+
+        if len(lhsT.ElementTypes) != len(rhsT.ElementTypes):
+            return context.constant(False)
+
+        for i in range(len(lhsT.ElementTypes)):
+            res = args[0].refAs(i) == args[1].refAs(i)
+            if res is None:
+                return None
+
+            res = res.convert_bool_cast()
+            if res is None:
+                return None
+
+            with context.ifelse(res.nonref_expr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushReturnValue(context.constant(False))
+
+        return context.constant(True)
+
+# define these operations directly in terms of the builtins we
+# defined up above.
+@Function
+def _tupleLt(lhs, rhs) -> bool:
+    return _TupleLt()(lhs, rhs)
+
+
+@Function
+def _tupleLtE(lhs, rhs) -> bool:
+    return _TupleLtE()(lhs, rhs)
+
+
+@Function
+def _tupleEq(lhs, rhs) -> bool:
+    return _TupleEq()(lhs, rhs)
+
+
+# define these operations in terms of the functions we just
+# defined, not the CompilableBuiltins, because they push
+# return statements directly onto the stack of the caller,
+# which means we can't use 'not' on the return value.
+@Function
+def _tupleGt(lhs, rhs) -> bool:
+    return not _tupleLtE(lhs, rhs)
+
+
+@Function
+def _tupleGtE(lhs, rhs) -> bool:
+    return not _tupleLt(lhs, rhs)
+
+
+@Function
+def _tupleNe(lhs, rhs) -> bool:
+    return not _tupleEq(lhs, rhs)
+
+
+pyCompOpToTupleFun = {
+    python_ast.ComparisonOp.Eq(): _tupleEq,
+    python_ast.ComparisonOp.NotEq(): _tupleNe,
+    python_ast.ComparisonOp.Lt(): _tupleLt,
+    python_ast.ComparisonOp.LtE(): _tupleLtE,
+    python_ast.ComparisonOp.Gt(): _tupleGt,
+    python_ast.ComparisonOp.GtE(): _tupleGtE
+}
 
 
 class TupleWrapper(Wrapper):
@@ -94,6 +236,17 @@ class TupleWrapper(Wrapper):
 
     def convert_bool_cast(self, context, e):
         return context.constant(len(self.subTypeWrappers) != 0)
+
+    def convert_bin_op(self, context, left, op, right, inplace):
+        rhsT = right.expr_type.typeRepresentation
+        if isinstance(rhsT, type) and issubclass(rhsT, (NamedTuple, Tuple)) and op in pyCompOpToTupleFun:
+            # this is the wrapper for the type, which we can call because it
+            # has an empty closure.
+            funcTypeWrapper = typeWrapper(type(pyCompOpToTupleFun[op]))
+
+            return funcTypeWrapper.convert_call(context, None, (left, right), {})
+
+        return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_getitem(self, context, expr, index):
         index = index.convert_to_type(int)

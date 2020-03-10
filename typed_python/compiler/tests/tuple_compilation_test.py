@@ -12,7 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Tuple, NamedTuple, Class, Member, ListOf, Compiled
+from typed_python import (
+    Tuple, NamedTuple, Class, Member, ListOf, Compiled,
+    Final, Forward
+)
 import typed_python._types as _types
 import unittest
 from typed_python import Entrypoint, makeNamedTuple
@@ -211,3 +214,64 @@ class TestTupleCompilation(unittest.TestCase):
         check(makeNamed, 1, "2")
         check(makeUnnamed, 1, 2)
         check(makeUnnamed, 1, "2")
+
+    def test_compare_tuples(self):
+        ClassWithCompare = Forward("ClassWithCompare")
+
+        @ClassWithCompare.define
+        class ClassWithCompare(Class, Final):
+            x = Member(int)
+            y = Member(int)
+
+            def __eq__(self, other: ClassWithCompare):
+                return self.x == other.x and self.y == other.y
+
+            def __lt__(self, other: ClassWithCompare):
+                if self.x < other.x:
+                    return True
+                if self.x > other.x:
+                    return True
+                return self.y < other.y
+
+        aTuple1 = Tuple(int, int, int)((1, 2, 3))
+        aTuple2 = Tuple(int, int, int)((1, 2, 4))
+        aTuple3 = Tuple(int, ClassWithCompare)((1, ClassWithCompare(x=2, y=3)))
+        aTuple4 = Tuple(int, ClassWithCompare)((1, ClassWithCompare(x=2, y=4)))
+        aTuple5 = NamedTuple(x=int, y=int, z=int)((1, 2, 3))
+        aTuple6 = NamedTuple(x=int, y=int, z=int)((1, 2, 4))
+        aTuple7 = NamedTuple(x=int, y=ClassWithCompare)((1, ClassWithCompare(x=2, y=3)))
+        aTuple8 = NamedTuple(x=int, y=ClassWithCompare)((1, ClassWithCompare(x=2, y=4)))
+
+        def check(l, expected=None):
+            if expected is not None:
+                self.assertEqual(l(), expected)
+            self.assertEqual(l(), Entrypoint(l)())
+
+        for tup1, tup2 in [
+            (aTuple1, aTuple2), (aTuple3, aTuple4),
+            (aTuple5, aTuple6), (aTuple7, aTuple8)
+        ]:
+            check(lambda: tup1 == tup1, True)
+            check(lambda: tup2 == tup2, True)
+            check(lambda: tup1 != tup2, True)
+            check(lambda: tup2 != tup1, True)
+
+        someTuples = [
+            Tuple(int, int)((1, 2)),
+            Tuple(int, int)((1, 3)),
+            Tuple(int, int)((2, 2)),
+            Tuple(int, int)((2, 3)),
+            Tuple(int, int, int)((2, 3, 4)),
+            Tuple(int, int, int)((1, 2, 3)),
+            NamedTuple(x=int, y=int, z=int)((2, 3, 4)),
+            NamedTuple(x=int, y=int, z=int)((1, 2, 3)),
+        ]
+
+        for t1 in someTuples:
+            for t2 in someTuples:
+                check(lambda: t1 < t2)
+                check(lambda: t1 > t2)
+                check(lambda: t1 <= t2)
+                check(lambda: t1 >= t2)
+                check(lambda: t1 == t2)
+                check(lambda: t1 != t2)

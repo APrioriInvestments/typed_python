@@ -2989,3 +2989,73 @@ class NativeTypesTests(unittest.TestCase):
         v = A.a()
         v ^= 10
         self.assertEqual(v, "worked")
+
+    def test_list_and_tuple_of_compare(self):
+        things = [
+            ListOf(int)([1, 2]),
+            ListOf(int)([2, 2]),
+            ListOf(int)([1, 3]),
+            ListOf(int)([1, 2, 3]),
+            ListOf(int)([2, 2, 3]),
+            ListOf(int)([1, 3, 3]),
+            ListOf(float)([1, 2]),
+            ListOf(float)([2, 2]),
+            ListOf(float)([1, 3]),
+            ListOf(float)([1, 2, 3]),
+            ListOf(float)([2, 2, 3]),
+            ListOf(float)([1, 3, 3]),
+            ListOf(float)([1.0, 2.0]),
+            TupleOf(int)([1, 2]),
+            TupleOf(int)([2, 2]),
+            TupleOf(int)([1, 3]),
+            TupleOf(int)([1, 2, 3]),
+            TupleOf(int)([2, 2, 3]),
+            TupleOf(int)([1, 3, 3]),
+            TupleOf(float)([1, 2]),
+            TupleOf(float)([2, 2]),
+            TupleOf(float)([1, 3]),
+            TupleOf(float)([1, 2, 3]),
+            TupleOf(float)([2, 2, 3]),
+            TupleOf(float)([1, 3, 3]),
+            TupleOf(float)([1.0, 2.0]),
+            Tuple(int, float)((1, 2)),
+            Tuple(int, float, int)((1, 2, 3)),
+            Tuple(int, float)((2, 2)),
+            Tuple(int, float, int)((2, 2, 3)),
+            NamedTuple(x=int, y=float)((1, 2)),
+            NamedTuple(x=int, y=float, z=float)((1, 2, 3)),
+            NamedTuple(x=int, y=float)((2, 2)),
+            NamedTuple(x=int, y=float, z=int)((2, 2, 3))
+        ]
+
+        for t1 in things:
+            for t2 in things:
+                print(t1, t2)
+                # lists and tuples are not themselves comparable
+                if ("List" in str(type(t1))) != ("List" in str(type(t2))):
+                    with self.assertRaises(TypeError):
+                        t1 < t2
+
+                    with self.assertRaises(TypeError):
+                        t1 > t2
+
+                    with self.assertRaises(TypeError):
+                        t1 <= t2
+
+                    with self.assertRaises(TypeError):
+                        t1 >= t2
+
+                    self.assertTrue(t1 != t2)
+                    self.assertFalse(t1 == t2)
+                else:
+                    typ = list if "List" in str(type(t1)) else tuple
+
+                    t1Untyped = typ(t1)
+                    t2Untyped = typ(t2)
+
+                    self.assertEqual(t1 < t2, t1Untyped < t2Untyped)
+                    self.assertEqual(t1 <= t2, t1Untyped <= t2Untyped)
+                    self.assertEqual(t1 > t2, t1Untyped > t2Untyped)
+                    self.assertEqual(t1 >= t2, t1Untyped >= t2Untyped)
+                    self.assertEqual(t1 != t2, t1Untyped != t2Untyped)
+                    self.assertEqual(t1 == t2, t1Untyped == t2Untyped)
