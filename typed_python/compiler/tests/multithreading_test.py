@@ -268,4 +268,4 @@ class TestMultithreading(unittest.TestCase):
         # but on Travis, because we don't get a dedicated box, we can get more than 1. If the lock
         # is held as 'object', you'd see 2.0 or higher, so this still verifies that we are
         # getting c-level parallelism at this threshold.
-        self.assertLess(twoThreads / oneThread, 1.6, (oneThread, twoThreads))
+        self.assertLess(twoThreads / oneThread, 1.65, (oneThread, twoThreads))
