@@ -173,6 +173,27 @@ def Array(T):
         # operators
         #########################################
 
+        def __matmul__(self, other: Array(T)) -> T:  # noqa
+            if other.shape != self.shape:
+                raise Exception(f"Mismatched array sizes: {self.shape} != {other.shape}")
+
+            res = T()
+
+            ownStride = self._stride
+            otherStride = other._stride
+            ownP = self._vals.pointerUnsafe(self._offset)
+            otherP = other._vals.pointerUnsafe(other._offset)
+
+            for i in range(self._shape):
+                res += ownP.get() * otherP.get()
+                ownP += ownStride
+                otherP += otherStride
+
+            return res
+
+        def __matmul__(self, other: Matrix(T)) -> Array(T):  # noqa
+            return other.__rmatmul__(self)
+
         def _inplaceBinopCheck(self, other: T):
             pass
 
@@ -251,6 +272,12 @@ def Array(T):
         @staticmethod
         def zeros(count):
             return Array_.full(count, 0.0)
+
+        def get(self, i):
+            return self._vals[i * self._stride + self._offset]
+
+        def set(self, i, value):
+            self._vals[i * self._stride + self._offset] = value
 
         def __getitem__(self, i):
             if i < 0 or i >= self._shape:
@@ -487,7 +514,7 @@ def Matrix(T):
 
         def clone(self):
             newVals = self.toList()
-            return Matrix(T)(newVals, 0, (self._shape[1], 1), self._shape)
+            return Matrix(T)(newVals, 0, Tuple(int, int)((self._shape[1], 1)), self._shape)
 
         @staticmethod
         def full(rows: int, columns: int, value: T):
@@ -549,6 +576,27 @@ def Matrix(T):
                 self._stride[1],
                 self._shape[1]
             )
+
+        def __setitem__(self, i: int, val: Array(T)):
+            # set a row of the matrix
+            if i < 0 or i >= self._shape[0]:
+                raise IndexError(f"Index {i} is out of bounds [0, {self._shape[0]})")
+
+            if len(val) != self._shape[1]:
+                raise ValueError(
+                    f"Target array is the wrong size: {len(val)} != {self._shape[1]}"
+                )
+
+            sourcePtr = val._vals.pointerUnsafe(val._offset)
+            sourceStride = val._stride
+
+            destPtr = self._vals.pointerUnsafe(self._offset + self._stride[0] * i)
+            destStride = self._stride[1]
+
+            for i in range(self._shape[1]):
+                destPtr.set(sourcePtr.get())
+                sourcePtr += sourceStride
+                destPtr += destStride
 
         def transpose(self):
             return Matrix(T)(
@@ -665,7 +713,9 @@ def Matrix(T):
 
         def __matmul__(self, other: Array(T)):  # noqa
             # ensures that this is a simply-strided (row-major) matrix
-            self = self.clone()
+            if self._stride[1] != 1:
+                self = self.clone()
+
             result = ListOf(T)()
             result.resize(self._shape[0])
 
@@ -689,7 +739,30 @@ def Matrix(T):
             return Array(T)(result)
 
         def __rmatmul__(self, other: Array(T)):
-            return self.transpose() @ other
+            if self._stride[1] != 1:
+                self = self.clone()
+
+            result = ListOf(T)()
+            result.resize(self._shape[1])
+
+            if self._shape[0] != other._shape:
+                raise Exception(f"Size mismatch: {self._shape[1]} != {other._shape}")
+
+            gemv(
+                'N',
+                self._shape[1],
+                self._shape[0],
+                1.0,
+                self._vals,
+                self._stride[0],
+                other._vals.pointerUnsafe(other._offset),
+                other._stride,
+                1.0,
+                result,
+                1
+            )
+
+            return Array(T)(result)
 
         def __repr__(self):
             rows = ListOf(str)()

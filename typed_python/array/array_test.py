@@ -283,3 +283,14 @@ def test_increment_matrix_diagonal():
     d += 1.0
 
     assert m.get(2, 2) == 1
+
+
+def test_assign_matrix_row():
+    m = Matrix(float).identity(10)
+
+    m[4] = m[3]
+
+    assert m.get(4, 3) == m.get(3, 3)
+
+    m.transpose()[4] = m.transpose()[3]
+    assert m.get(4, 4) == m.get(3, 4)
