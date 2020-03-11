@@ -15,7 +15,7 @@
 import math
 
 from typed_python import (
-    Class, Member, ListOf, Final, TypeFunction, Tuple, Float32, Int32
+    Class, Member, ListOf, Final, TypeFunction, Tuple, Float32, Int32, NotCompiled
 )
 
 from typed_python.array.fortran import axpy, gemv, gemm, getri, getrf
@@ -764,6 +764,7 @@ def Matrix(T):
 
             return Array(T)(result)
 
+        @NotCompiled
         def __repr__(self):
             rows = ListOf(str)()
 
