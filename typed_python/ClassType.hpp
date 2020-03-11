@@ -154,6 +154,10 @@ public:
         return m_heldClass->isFinal();
     }
 
+    const std::vector<HeldClass*> getBases() const {
+        return m_heldClass->getBases();
+    }
+
     Class* renamed(std::string newName) {
         return new Class(newName, m_heldClass->renamed("Held(" + newName + ")"));
     }
@@ -288,16 +292,16 @@ public:
         return m_heldClass->getMemberName(index);
     }
 
-    const std::vector<std::tuple<std::string, Type*, Instance> >& getMembers() const {
-        return m_heldClass->getMembers();
-    }
-
     int getMemberIndex(const char* name) const {
         return m_heldClass->getMemberIndex(name);
     }
 
     BoundMethod* getMemberFunctionMethodType(const char* name) const {
         return m_heldClass->getMemberFunctionMethodType(name, false);
+    }
+
+    const std::vector<std::tuple<std::string, Type*, Instance> >& getMembers() const {
+        return m_heldClass->getMembers();
     }
 
     const std::map<std::string, Function*>& getMemberFunctions() const {
@@ -314,6 +318,26 @@ public:
 
     const std::map<std::string, Function*>& getPropertyFunctions() const {
         return m_heldClass->getPropertyFunctions();
+    }
+
+    const std::vector<std::tuple<std::string, Type*, Instance> >& getOwnMembers() const {
+        return m_heldClass->getOwnMembers();
+    }
+
+    const std::map<std::string, Function*>& getOwnMemberFunctions() const {
+        return m_heldClass->getOwnMemberFunctions();
+    }
+
+    const std::map<std::string, Function*>& getOwnStaticFunctions() const {
+        return m_heldClass->getOwnStaticFunctions();
+    }
+
+    const std::map<std::string, PyObject*>& getOwnClassMembers() const {
+        return m_heldClass->getOwnClassMembers();
+    }
+
+    const std::map<std::string, Function*>& getOwnPropertyFunctions() const {
+        return m_heldClass->getOwnPropertyFunctions();
     }
 
     int memberNamed(const char* c) const {

@@ -1216,7 +1216,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(bytes(AClass()), b"bytes")
         self.assertEqual(format(AClass()), "format")
         d = dir(AClass())
-        self.assertEqual(len(d), 99)  # this is the default dir
+        self.assertEqual(len(d), 100)  # this is the default dir
 
     def test_class_magic_methods_attr(self):
 

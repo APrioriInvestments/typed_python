@@ -364,11 +364,11 @@ public:
             newName,
             m_bases,
             m_is_final,
-            m_members,
-            m_memberFunctions,
-            m_staticFunctions,
-            m_propertyFunctions,
-            m_classMembers
+            m_own_members,
+            m_own_memberFunctions,
+            m_own_staticFunctions,
+            m_own_propertyFunctions,
+            m_own_classMembers
         );
     }
 
@@ -482,6 +482,10 @@ public:
         return m_members;
     }
 
+    const std::vector<std::tuple<std::string, Type*, Instance> >& getOwnMembers() const {
+        return m_own_members;
+    }
+
     int getMemberIndex(const char* attrName) const {
         auto it = m_membersByName.find(attrName);
 
@@ -506,6 +510,22 @@ public:
 
     const std::map<std::string, Function*>& getPropertyFunctions() const {
         return m_propertyFunctions;
+    }
+
+    const std::map<std::string, Function*>& getOwnMemberFunctions() const {
+        return m_own_memberFunctions;
+    }
+
+    const std::map<std::string, Function*>& getOwnStaticFunctions() const {
+        return m_own_staticFunctions;
+    }
+
+    const std::map<std::string, PyObject*>& getOwnClassMembers() const {
+        return m_own_classMembers;
+    }
+
+    const std::map<std::string, Function*>& getOwnPropertyFunctions() const {
+        return m_own_propertyFunctions;
     }
 
     const std::vector<size_t>& getOffsets() const {

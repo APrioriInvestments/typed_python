@@ -61,6 +61,7 @@ _builtin_name_to_value[".builtin.datetime.datetime"] = datetime.datetime
 _builtin_name_to_value[".builtin.datetime.date"] = datetime.date
 _builtin_name_to_value[".builtin.datetime.time"] = datetime.time
 _builtin_name_to_value[".builtin.datetime.timedelta"] = datetime.timedelta
+_builtin_name_to_value[".builtin.property"] = property
 _builtin_name_to_value[".builtin.pytz"] = pytz
 _builtin_name_to_value[".ast.Expr.Lambda"] = Expr.Lambda
 _builtin_name_to_value[".ast.Statement.FunctionDef"] = Statement.FunctionDef
@@ -247,6 +248,9 @@ class SerializationContext(object):
 
                 return (type, (inst.__name__, inst.__bases__, {}), classMembers)
 
+        if isinstance(inst, property):
+            return (property, (inst.fget, inst.fset, inst.fdel), None)
+
         if isinstance(inst, numpy.ndarray):
             return inst.__reduce__()
 
@@ -312,6 +316,9 @@ class SerializationContext(object):
     def setInstanceStateFromRepresentation(self, instance, representation):
         if GoogleProtobufMessage is not None and isinstance(instance, GoogleProtobufMessage):
             instance.ParseFromString(representation)
+            return True
+
+        if isinstance(instance, property):
             return True
 
         if isinstance(instance, CodeType):

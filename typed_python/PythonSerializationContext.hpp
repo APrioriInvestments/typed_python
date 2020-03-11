@@ -143,6 +143,18 @@ public:
 
     void serializeNativeTypeInCompound(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const;
 
+    void serializeClassMembers(const std::vector<std::tuple<std::string, Type*, Instance> >& members, SerializationBuffer& b, int fieldNumber) const;
+
+    void serializeClassFunDict(const std::map<std::string, Function*>& dict, SerializationBuffer& b, int fieldNumber) const;
+
+    void serializeClassClassMemberDict(const std::map<std::string, PyObject*>& dict, SerializationBuffer& b, int fieldNumber) const;
+
+    void deserializeClassMembers(std::vector<std::tuple<std::string, Type*, Instance> >& members, DeserializationBuffer& b, int wireType) const;
+
+    void deserializeClassFunDict(std::map<std::string, Function*>& dict, DeserializationBuffer& b, int wireType) const;
+
+    void deserializeClassClassMemberDict(std::map<std::string, PyObject*>& dict, DeserializationBuffer& b, int wireType) const;
+
     Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
 
     Instance deserializeNativeInstance(DeserializationBuffer& b, size_t wireType) const;
@@ -190,4 +202,3 @@ private:
 
     bool mCompressionEnabled;
 };
-

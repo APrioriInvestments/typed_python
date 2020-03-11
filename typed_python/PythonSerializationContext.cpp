@@ -705,11 +705,203 @@ void PythonSerializationContext::serializeNativeType(
         for (auto& overload: ftype->getOverloads()) {
             overload.serialize(*this, b, whichIndex++);
         }
+    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catHeldClass) {
+        serializeNativeTypeInCompound(((HeldClass*)nativeType)->getClassType(), b, 1);
+    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catForward) {
+        b.writeStringObject(1, nativeType->name());
+        if (((Forward*)nativeType)->getTarget()) {
+            serializeNativeTypeInCompound(((Forward*)nativeType)->getTarget(), b, 2);
+        }
+    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catClass) {
+        Class* cls = (Class*)nativeType;
+
+        b.writeStringObject(1, cls->name());
+
+        //members
+        serializeClassMembers(cls->getOwnMembers(), b, 2);
+
+        //methods
+        serializeClassFunDict(cls->getOwnMemberFunctions(), b, 3);
+        serializeClassFunDict(cls->getOwnStaticFunctions(), b, 4);
+        serializeClassFunDict(cls->getOwnPropertyFunctions(), b, 5);
+        serializeClassClassMemberDict(cls->getOwnClassMembers(), b, 6);
+
+        b.writeBeginCompound(7);
+
+        {
+            int which = 0;
+            for (auto t: cls->getBases()) {
+                serializeNativeTypeInCompound(t->getClassType(), b, which++);
+            }
+        }
+
+        b.writeEndCompound();
+
+        b.writeUnsignedVarintObject(8, cls->isFinal() ? 1 : 0);
     } else {
-        throw std::runtime_error("Can't serialize native type " + nativeType->name() + " if its unnamed.");
+        throw std::runtime_error(
+            "Can't serialize native type " + nativeType->name()
+            + " of category " + Type::categoryToString(nativeType->getTypeCategory())
+            + " if its unnamed."
+        );
     }
 
     b.writeEndCompound();
+}
+
+void PythonSerializationContext::serializeClassMembers(
+    const std::vector<std::tuple<std::string, Type*, Instance> >& members,
+    SerializationBuffer& b,
+    int fieldNumber
+) const {
+    b.writeBeginCompound(fieldNumber);
+    for (long k = 0; k < members.size(); k++) {
+        b.writeBeginCompound(k);
+            b.writeStringObject(0, std::get<0>(members[k]));
+
+            serializeNativeTypeInCompound(std::get<1>(members[k]), b, 1);
+
+            Instance defaultValue = std::get<2>(members[k]);
+
+            if (defaultValue.type()->getTypeCategory() != Type::TypeCategory::catNone) {
+                b.writeBeginCompound(2);
+
+                serializeNativeTypeInCompound(defaultValue.type(), b, 0);
+
+                PyEnsureGilReleased releaseTheGil;
+                defaultValue.type()->serialize(defaultValue.data(), b, 1);
+
+                b.writeEndCompound();
+            }
+        b.writeEndCompound();
+    }
+    b.writeEndCompound();
+}
+
+void PythonSerializationContext::serializeClassFunDict(
+    const std::map<std::string, Function*>& dict,
+    SerializationBuffer& b,
+    int fieldNumber
+) const {
+    b.writeBeginCompound(fieldNumber);
+
+    int which = 0;
+
+    for (auto& nameAndFunType: dict) {
+        b.writeBeginCompound(which++);
+
+        b.writeStringObject(0, nameAndFunType.first);
+        serializeNativeTypeInCompound(nameAndFunType.second, b, 1);
+
+        b.writeEndCompound();
+    }
+
+    b.writeEndCompound();
+}
+
+void PythonSerializationContext::serializeClassClassMemberDict(
+    const std::map<std::string, PyObject*>& dict,
+    SerializationBuffer& b,
+    int fieldNumber
+) const {
+    b.writeBeginCompound(fieldNumber);
+
+    int which = 0;
+
+    for (auto& nameAndObj: dict) {
+        b.writeBeginCompound(which++);
+
+        b.writeStringObject(0, nameAndObj.first);
+        serializePythonObject(nameAndObj.second, b, 1);
+
+        b.writeEndCompound();
+    }
+
+    b.writeEndCompound();
+}
+
+void PythonSerializationContext::deserializeClassMembers(
+    std::vector<std::tuple<std::string, Type*, Instance> >& members,
+    DeserializationBuffer& b,
+    int inWireType
+) const {
+    b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
+        std::string name;
+        Type* t;
+        Instance i;
+
+        b.consumeCompoundMessage(wireType, [&](size_t fieldNumber2, size_t wireType2) {
+            if (fieldNumber2 == 0) {
+                name = b.readStringObject();
+            } else if (fieldNumber2 == 1) {
+                t = deserializePythonObjectExpectingNativeType(b, wireType2);
+            } else if (fieldNumber2 == 2) {
+                i = deserializeNativeInstance(b, wireType2);
+            } else {
+                throw std::runtime_error("Corrupt ClassMember definition when deserializing class.");
+            }
+        });
+
+        if (!t || name.size() == 0) {
+            throw std::runtime_error("Corrupt ClassMember definition when deserializing class.");
+        }
+
+        members.push_back(std::tuple<std::string, Type*, Instance>(name, t, i));
+    });
+}
+
+void PythonSerializationContext::deserializeClassFunDict(
+    std::map<std::string, Function*>& dict,
+    DeserializationBuffer& b,
+    int inWireType
+) const {
+    b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
+        std::string name;
+        Type* fun = nullptr;
+
+        b.consumeCompoundMessage(wireType, [&](size_t fieldNumber2, size_t wireType2) {
+            if (fieldNumber2 == 0) {
+                name = b.readStringObject();
+            } else if (fieldNumber2 == 1) {
+                fun = deserializePythonObjectExpectingNativeType(b, wireType2);
+            } else {
+                throw std::runtime_error("Corrupt function definition when deserializing class.");
+            }
+        });
+
+        if (!fun || name.size() == 0 || fun->getTypeCategory() != Type::TypeCategory::catFunction) {
+            throw std::runtime_error("Corrupt function definition when deserializing class.");
+        }
+
+        dict[name] = (Function*)fun;
+    });
+}
+
+void PythonSerializationContext::deserializeClassClassMemberDict(
+    std::map<std::string, PyObject*>& dict,
+    DeserializationBuffer& b,
+    int inWireType
+) const {
+    b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
+        std::string name;
+        PyObject* o = nullptr;
+
+        b.consumeCompoundMessage(wireType, [&](size_t fieldNumber2, size_t wireType2) {
+            if (fieldNumber2 == 0) {
+                name = b.readStringObject();
+            } else if (fieldNumber2 == 1) {
+                o = deserializePythonObject(b, wireType2);
+            } else {
+                throw std::runtime_error("Corrupt ClassMember definition when deserializing class.");
+            }
+        });
+
+        if (!o || name.size() == 0) {
+            throw std::runtime_error("Corrupt ClassMember definition when deserializing class.");
+        }
+
+        dict[name] = o;
+    });
 }
 
 Type* PythonSerializationContext::deserializePythonObjectExpectingNativeType(DeserializationBuffer& b, size_t wireType) const {
@@ -769,6 +961,12 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
     int isEntrypoint = 0;
     int isNocompile = 0;
 
+    std::vector<Class*> classBases;
+    bool classIsFinal = false;
+    std::map<std::string, Function*> classMethods, classStatics, classPropertyFunctions;
+    std::map<std::string, PyObject*> classClassMembers;
+    std::vector<std::tuple<std::string, Type*, Instance> > classMembers;
+
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
         if (fieldNumber == 0) {
             assertWireTypesEqual(wireType, WireType::VARINT);
@@ -777,6 +975,42 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             if (category == -1) {
                 throw std::runtime_error("Corrupt native type found.");
             }
+            if (category == Type::TypeCategory::catForward) {
+                if (fieldNumber == 1) {
+                    names.push_back(b.readStringObject());
+                } else if (fieldNumber == 2) {
+                    types.push_back(deserializePythonObjectExpectingNativeType(b, wireType));
+                }
+            } else
+            if (category == Type::TypeCategory::catHeldClass) {
+                types.push_back(deserializePythonObjectExpectingNativeType(b, wireType));
+            } else
+            if (category == Type::TypeCategory::catClass) {
+                if (fieldNumber == 1) {
+                    names.push_back(b.readStringObject());
+                } else if (fieldNumber == 2) {
+                    deserializeClassMembers(classMembers, b, wireType);
+                } else if (fieldNumber == 3) {
+                    deserializeClassFunDict(classMethods, b, wireType);
+                } else if (fieldNumber == 4) {
+                    deserializeClassFunDict(classStatics, b, wireType);
+                } else if (fieldNumber == 5) {
+                    deserializeClassFunDict(classPropertyFunctions, b, wireType);
+                } else if (fieldNumber == 6) {
+                    deserializeClassClassMemberDict(classClassMembers, b, wireType);
+                } else if (fieldNumber == 7) {
+                    b.consumeCompoundMessage(wireType, [&](int which, size_t wireType2) {
+                        Type* t = deserializePythonObjectExpectingNativeType(b, wireType2);
+                        if (!t || t->getTypeCategory() != Type::TypeCategory::catClass) {
+                            throw std::runtime_error("Corrupt class base found.");
+                        }
+                        classBases.push_back((Class*)t);
+                    });
+                } else if (fieldNumber == 8) {
+                    assertWireTypesEqual(wireType, WireType::VARINT);
+                    classIsFinal = b.readUnsignedVarint();
+                }
+            } else
             if (category == Type::TypeCategory::catFunction) {
                 if (fieldNumber == 1) {
                     closureType = deserializePythonObjectExpectingNativeType(b, wireType);
@@ -832,7 +1066,38 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
 
     Type* resultType = nullptr;
 
-    if (category == Type::TypeCategory::catFunction) {
+    if (category == Type::TypeCategory::catHeldClass) {
+        if (types.size() != 1 || types[0]->getTypeCategory() != Type::TypeCategory::catClass) {
+            throw std::runtime_error("Corrupt 'HeldClass' encountered.");
+        }
+        resultType = ((Class*)types[0])->getHeldClass();
+    }
+    else if (category == Type::TypeCategory::catForward) {
+        if (names.size() != 1 || types.size() > 1) {
+            throw std::runtime_error("Corrupt 'Forward' encountered.");
+        }
+        resultType = Forward::Make(names[0]);
+        if (types.size()) {
+            ((Forward*)resultType)->define(types[0]);
+        }
+    }
+    else if (category == Type::TypeCategory::catClass) {
+        if (names.size() != 1) {
+            throw std::runtime_error("Corrupt 'Class' encountered.");
+        }
+
+        resultType = Class::Make(
+            names[0],
+            classBases,
+            classIsFinal,
+            classMembers,
+            classMethods,
+            classStatics,
+            classPropertyFunctions,
+            classClassMembers
+        );
+    }
+    else if (category == Type::TypeCategory::catFunction) {
         if (names.size() != 1) {
             throw std::runtime_error("Badly structured 'Function' encountered.");
         }

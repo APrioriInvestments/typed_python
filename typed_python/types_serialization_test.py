@@ -39,7 +39,7 @@ from typed_python import (
     Member, String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
     Dict, Set, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject,
-    Forward
+    Forward, Final, Function
 )
 
 from typed_python._types import refcount
@@ -1227,3 +1227,68 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(C2(20).f(), 30)
         self.assertEqual(C2(20).g(), 20)
+
+    def test_serialize_functions_with_return_types(self):
+        sc = SerializationContext({})
+
+        @Function
+        def f(x) -> int:
+            return x
+
+        f2 = sc.deserialize(sc.serialize(f))
+        self.assertEqual(f2(10.5), 10)
+
+    def test_serialize_typed_classes(self):
+        sc = SerializationContext({})
+
+        class B(Class):
+            x = Member(int)
+
+            def f(self, y) -> int:
+                return self.x + y
+
+        class C(B, Final):
+            y = Member(int)
+
+            def g(self):
+                return self.x + self.y
+
+        B2 = sc.deserialize(sc.serialize(B))
+        C2 = sc.deserialize(sc.serialize(C))
+
+        self.assertEqual(
+            B2(x=10).f(20),
+            B(x=10).f(20)
+        )
+
+        self.assertEqual(
+            C2(x=10, y=30).f(20),
+            C(x=10, y=30).f(20)
+        )
+
+        self.assertEqual(
+            C2(x=10, y=30).g(),
+            C(x=10, y=30).g()
+        )
+
+    # this isn't working yet
+    # def test_serialize_recursive_typed_classes(self):
+    #     sc = SerializationContext({})
+
+    #     B = Forward("B")
+
+    #     @B.define
+    #     class B(Class, Final):
+    #         x = Member(int)
+
+    #         def f(self, y) -> int:
+    #             return self.x + y
+
+    #         def getSelf(self) -> B:
+    #             return self
+
+    #     B2 = sc.deserialize(sc.serialize(B))
+
+    #     instance = B2()
+
+    #     self.assertTrue(isinstance(instance.getSelf(), B2))

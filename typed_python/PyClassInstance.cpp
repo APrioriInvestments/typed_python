@@ -519,13 +519,21 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
     PyDict_SetItemString(pyType->tp_dict, "PropertyFunctions", propertyFunctions);
     PyDict_SetItemString(pyType->tp_dict, "MemberFunctions", memberFunctions);
 
+    PyObjectStealer classMembers(PyDict_New());
     for (auto nameAndObj: classT->getClassMembers()) {
         PyDict_SetItemString(
             pyType->tp_dict,
             nameAndObj.first.c_str(),
             nameAndObj.second
-            );
+        );
+        PyDict_SetItemString(
+            classMembers,
+            nameAndObj.first.c_str(),
+            nameAndObj.second
+        );
     }
+
+    PyDict_SetItemString(pyType->tp_dict, "ClassMembers", classMembers);
 
     for (auto nameAndObj: classT->getStaticFunctions()) {
         PyDict_SetItemString(
