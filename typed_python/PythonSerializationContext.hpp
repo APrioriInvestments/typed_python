@@ -136,11 +136,9 @@ public:
 
     void serializePythonObjectRepresentation(PyObject* o, SerializationBuffer& b) const;
 
-    //serialize a native type in the format we'd expect for a python object
-    //which means we write a compound message which is either a NATIVE_TYPE, or an OBJECT_NAME
-    void serializeNativeType(Type* nativeType, SerializationBuffer& b) const;
+    void serializeNativeType(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const;
 
-    void serializeNativeTypeInCompound(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const;
+    void serializeNativeTypeInner(Type* nativeType, SerializationBuffer& b) const;
 
     void serializeClassMembers(const std::vector<std::tuple<std::string, Type*, Instance> >& members, SerializationBuffer& b, int fieldNumber) const;
 

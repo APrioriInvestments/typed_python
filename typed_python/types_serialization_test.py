@@ -1176,7 +1176,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(refcount(deserialize(T, serialize(T, aPopulatedList))), 1)
 
     def test_serialize_classes(self):
-        class AClass(Class):
+        class AClass(Class, Final):
             x = Member(int)
             y = Member(float)
 
@@ -1271,12 +1271,13 @@ class TypesSerializationTest(unittest.TestCase):
                 return self.x + self.y
 
         B2 = sc.deserialize(sc.serialize(B))
-        C2 = sc.deserialize(sc.serialize(C))
 
         self.assertEqual(
             B2(x=10).f(20),
             B(x=10).f(20)
         )
+
+        C2 = sc.deserialize(sc.serialize(C))
 
         self.assertEqual(
             C2(x=10, y=30).f(20),
@@ -1308,3 +1309,63 @@ class TypesSerializationTest(unittest.TestCase):
         instance = B2()
 
         self.assertTrue(isinstance(instance.getSelf(), B2))
+
+    def test_serialize_subclasses(self):
+        sc = SerializationContext({})
+
+        class B(Class):
+            x = Member(int)
+
+        class C1(B, Final):
+            f = Member(float)
+
+        class C2(B, Final):
+            b = Member(B)
+
+        aList = ListOf(B)()
+
+        aList.append(B(x=10))
+        aList.append(C1(x=20, f=30.5))
+        aList.append(C2(x=30, b=aList[0]))
+
+        aList2 = sc.deserialize(sc.serialize(aList))
+
+        B2 = type(aList2[0])
+        C12 = type(aList2[1])
+        C22 = type(aList2[2])
+
+        self.assertTrue(issubclass(C12, B2))
+        self.assertTrue(issubclass(C22, B2))
+
+        self.assertEqual(aList2[0].x, 10)
+        self.assertEqual(aList2[1].x, 20)
+        self.assertEqual(aList2[2].x, 30)
+        self.assertEqual(aList2[2].b.x, 10)
+
+        # verify that the reference in aList2[2].b points at aList2[0]
+        aList2[2].b.x = 100
+        self.assertEqual(aList2[0].x, 100)
+
+    def test_serialize_subclasses_multiple_views(self):
+        sc = SerializationContext({})
+
+        class B(Class):
+            x = Member(int)
+
+        class C1(B):
+            x2 = Member(int)
+
+        class C2(C1):
+            x3 = Member(int)
+
+        class C3(C2):
+            x4 = Member(int)
+
+        c = C3()
+        t = Tuple(C3, C1, C2, B)((c, c, c, c))
+
+        t = sc.deserialize(sc.serialize(t))
+
+        t[0].x4 = 2
+        for e in t:
+            self.assertEqual(e.x4, 2)

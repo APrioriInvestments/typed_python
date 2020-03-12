@@ -172,68 +172,121 @@ public:
     static bool cmpStatic(Class* T, instance_ptr left, instance_ptr right, int64_t pyComparisonOp);
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer, size_t inWireType) {
-        int64_t id = -1;
-        bool hasMemo = false;
+    void deserialize(instance_ptr self, buf_t& buffer, size_t inWireType, bool asIfFinal=false) {
+        if (isFinal() || asIfFinal) {
+            int64_t id = -1;
+            bool hasMemo = false;
 
-        buffer.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
-            if (fieldNumber == 0) {
-                assertWireTypesEqual(wireType, WireType::VARINT);
-                id = buffer.readUnsignedVarint();
+            buffer.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
+                if (fieldNumber == 0) {
+                    assertWireTypesEqual(wireType, WireType::VARINT);
+                    id = buffer.readUnsignedVarint();
 
-                void* ptr = buffer.lookupCachedPointer(id);
+                    void* ptr = buffer.lookupCachedPointer(id);
 
-                if (ptr) {
-                    hasMemo = true;
-                    copy_constructor(self, (instance_ptr)&ptr);
+                    if (ptr) {
+                        hasMemo = true;
+                        copy_constructor(self, (instance_ptr)&ptr);
+                    }
                 }
-            }
-            if (fieldNumber == 1) {
-                if (id == -1 || hasMemo) {
-                    throw std::runtime_error("Corrupt Class instance");
+                if (fieldNumber == 1) {
+                    if (id == -1 || hasMemo) {
+                        throw std::runtime_error("Corrupt Class instance");
+                    }
+
+                    initializeInstance(
+                        self,
+                        (layout*)malloc(
+                            sizeof(layout) + m_heldClass->bytecount()
+                        ),
+                        0
+                    );
+
+                    layout& record = *instanceToLayout(self);
+                    record.refcount = 2;
+                    record.vtable = m_heldClass->getVTable();
+
+                    buffer.addCachedPointer(id, instanceToLayout(self), this);
+
+                    m_heldClass->deserialize(record.data, buffer, wireType);
                 }
+            });
+        } else {
+            Type* actualType = nullptr;
+            bool hasBody = false;
 
-                initializeInstance(
-                    self,
-                    (layout*)malloc(
-                        sizeof(layout) + m_heldClass->bytecount()
-                    ),
-                    0
-                );
+            buffer.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t subWireType) {
+                if (fieldNumber == 0) {
+                    if (actualType) {
+                        throw std::runtime_error("Corrupt non-final class instance: multiple type definitions");
+                    }
 
-                layout& record = *instanceToLayout(self);
-                record.refcount = 2;
-                record.vtable = m_heldClass->getVTable();
+                    actualType = buffer.getContext().deserializeNativeType(buffer, subWireType);
+                    if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catClass) {
+                        throw std::runtime_error("Deserialized class type was not a class!");
+                    }
+                } else if (fieldNumber == 1) {
+                    if (hasBody) {
+                        throw std::runtime_error("Corrupt non-final class instance: multiple bodies");
+                    }
+                    if (!actualType) {
+                        throw std::runtime_error("Corrupt non-final class instance: body before type");
+                    }
 
-                buffer.addCachedPointer(id, instanceToLayout(self), this);
+                    ((Class*)actualType)->deserialize(self, buffer, subWireType, true);
+                    hasBody = true;
 
-                m_heldClass->deserialize(record.data, buffer, wireType);
+                    // set the dispatch index of the new object
+                    int index = ((Class*)actualType)->getHeldClass()->getMroIndex(this->getHeldClass());
+                    if (index < 0) {
+                        throw std::runtime_error("Corrupt non-final class instance: realized class is not a subclass");
+                    }
+
+                    initializeInstance(self, instanceToLayout(self), index);
+
+                    if (instanceToDispatchTableIndex(self) != index) {
+                        throw std::runtime_error("failed to set instance index");
+                    }
+                } else {
+                    throw std::runtime_error("Corrupt non-final class instance: invalid field number");
+                }
+            });
+
+            if (!hasBody) {
+                throw std::runtime_error("Corrupt non-final class instance: body not initialized");
             }
-        });
+        }
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
-        if (instanceToDispatchTableIndex(self) != 0) {
-            throw std::runtime_error("Serializing subclasses isn't implemented yet");
-        }
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber, bool asIfFinal=false) {
+        if (isFinal() || asIfFinal) {
+            layout& l = *instanceToLayout(self);
 
-        layout& l = *instanceToLayout(self);
+            uint32_t id;
+            bool isNew;
+            std::tie(id, isNew) = buffer.cachePointer(&l, this);
 
-        uint32_t id;
-        bool isNew;
-        std::tie(id, isNew) = buffer.cachePointer(&l, this);
+            if (!isNew) {
+                buffer.writeBeginSingle(fieldNumber);
+                buffer.writeUnsignedVarintObject(0, id);
+                return;
+            }
 
-        if (!isNew) {
-            buffer.writeBeginSingle(fieldNumber);
+            buffer.writeBeginCompound(fieldNumber);
             buffer.writeUnsignedVarintObject(0, id);
-            return;
-        }
+            m_heldClass->serialize(l.data, buffer, 1);
+            buffer.writeEndCompound();
+        } else {
+            Class* actualType = actualTypeForLayout(self);
 
-        buffer.writeBeginCompound(fieldNumber);
-        buffer.writeUnsignedVarintObject(0, id);
-        m_heldClass->serialize(l.data, buffer, 1);
-        buffer.writeEndCompound();
+            buffer.writeBeginCompound(fieldNumber);
+
+            buffer.getContext().serializeNativeType(actualType, buffer, 0);
+            actualType->serialize(self, buffer, 1, true);
+
+            buffer.writeEndCompound();
+        }
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);

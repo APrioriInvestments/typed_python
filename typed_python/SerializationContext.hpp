@@ -21,6 +21,7 @@
 
 class SerializationBuffer;
 class DeserializationBuffer;
+class Type;
 
 //models a contiguous range of bytes. Underlying could be python data
 //or c++ data.
@@ -61,6 +62,9 @@ public:
 
     virtual void serializePythonObject(PyObject* o, SerializationBuffer& b, size_t fieldNumber) const = 0;
     virtual PyObject* deserializePythonObject(DeserializationBuffer& b, size_t wireType) const = 0;
+
+    virtual void serializeNativeType(Type* o, SerializationBuffer& b, size_t fieldNumber) const = 0;
+    virtual Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType) const = 0;
 
     virtual bool isCompressionEnabled() const = 0;
     virtual std::shared_ptr<ByteBuffer> compress(uint8_t* begin, uint8_t* end) const = 0;

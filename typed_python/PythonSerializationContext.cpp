@@ -41,7 +41,7 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
     if (t) {
         b.writeBeginCompound(FieldNumbers::NATIVE_INSTANCE);
 
-        serializeNativeTypeInCompound(t, b, 0);
+        serializeNativeType(t, b, 0);
 
         PyEnsureGilReleased releaseTheGil;
         t->serialize(((PyInstance*)o)->dataPtr(), b, 1);
@@ -98,9 +98,7 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
             Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)o);
 
             if (nativeType) {
-                b.writeBeginCompound(FieldNumbers::NATIVE_TYPE);
-                serializeNativeType(nativeType, b);
-                b.writeEndCompound();
+                serializeNativeType(nativeType, b, FieldNumbers::NATIVE_TYPE);
             } else {
                 serializePythonObjectNamedOrAsObj(o, b);
             }
@@ -655,13 +653,13 @@ void PythonSerializationContext::serializePythonObjectRepresentation(PyObject* r
     b.writeEndCompound();
 }
 
-void PythonSerializationContext::serializeNativeTypeInCompound(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const {
+void PythonSerializationContext::serializeNativeType(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const {
     b.writeBeginCompound(fieldNumber);
-    serializeNativeType(nativeType, b);
+    serializeNativeTypeInner(nativeType, b);
     b.writeEndCompound();
 }
 
-void PythonSerializationContext::serializeNativeType(
+void PythonSerializationContext::serializeNativeTypeInner(
             Type* nativeType,
             SerializationBuffer& b
             ) const {
@@ -736,35 +734,35 @@ void PythonSerializationContext::serializeNativeType(
             ) {
         //do nothing
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
-        serializeNativeTypeInCompound(nativeType->getBaseType(), b, 1);
+        serializeNativeType(nativeType->getBaseType(), b, 1);
         b.writeUnsignedVarintObject(2, ((ConcreteAlternative*)nativeType)->which());
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catSet) {
-        serializeNativeTypeInCompound(((SetType*)nativeType)->keyType(), b, 1);
+        serializeNativeType(((SetType*)nativeType)->keyType(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catConstDict) {
-        serializeNativeTypeInCompound(((ConstDictType*)nativeType)->keyType(), b, 1);
-        serializeNativeTypeInCompound(((ConstDictType*)nativeType)->valueType(), b, 2);
+        serializeNativeType(((ConstDictType*)nativeType)->keyType(), b, 1);
+        serializeNativeType(((ConstDictType*)nativeType)->valueType(), b, 2);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catDict) {
-        serializeNativeTypeInCompound(((DictType*)nativeType)->keyType(), b, 1);
-        serializeNativeTypeInCompound(((DictType*)nativeType)->valueType(), b, 2);
+        serializeNativeType(((DictType*)nativeType)->keyType(), b, 1);
+        serializeNativeType(((DictType*)nativeType)->valueType(), b, 2);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-        serializeNativeTypeInCompound(((TupleOfType*)nativeType)->getEltType(), b, 1);
+        serializeNativeType(((TupleOfType*)nativeType)->getEltType(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catListOf) {
-        serializeNativeTypeInCompound(((ListOfType*)nativeType)->getEltType(), b, 2);
+        serializeNativeType(((ListOfType*)nativeType)->getEltType(), b, 2);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catTuple) {
         size_t index = 1;
         for (auto t: ((CompositeType*)nativeType)->getTypes()) {
-            serializeNativeTypeInCompound(t, b, index++);
+            serializeNativeType(t, b, index++);
         }
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catNamedTuple) {
         size_t index = 1;
         for (long k = 0; k < ((CompositeType*)nativeType)->getTypes().size(); k++) {
             b.writeStringObject(index++, ((CompositeType*)nativeType)->getNames()[k]);
-            serializeNativeTypeInCompound(((CompositeType*)nativeType)->getTypes()[k], b, index++);
+            serializeNativeType(((CompositeType*)nativeType)->getTypes()[k], b, index++);
         }
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catOneOf) {
         size_t index = 1;
         for (auto t: ((OneOfType*)nativeType)->getTypes()) {
-            serializeNativeTypeInCompound(t, b, index++);
+            serializeNativeType(t, b, index++);
         }
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
         serializePythonObject((PyObject*)((PythonObjectOfType*)nativeType)->pyType(), b, 1);
@@ -772,7 +770,7 @@ void PythonSerializationContext::serializeNativeType(
         b.writeBeginCompound(1);
 
         Instance i = ((Value*)nativeType)->value();
-        serializeNativeTypeInCompound(i.type(), b, 0);
+        serializeNativeType(i.type(), b, 0);
 
         PyEnsureGilReleased releaseTheGil;
         i.type()->serialize(i.data(), b, 1);
@@ -780,7 +778,7 @@ void PythonSerializationContext::serializeNativeType(
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catFunction) {
         Function* ftype = (Function*)nativeType;
 
-        serializeNativeTypeInCompound(ftype->getClosureType(), b, 1);
+        serializeNativeType(ftype->getClosureType(), b, 1);
         b.writeStringObject(2, ftype->name());
         b.writeUnsignedVarintObject(3, ftype->isEntrypoint() ? 1 : 0);
         b.writeUnsignedVarintObject(4, ftype->isNocompile() ? 1 : 0);
@@ -790,11 +788,11 @@ void PythonSerializationContext::serializeNativeType(
             overload.serialize(*this, b, whichIndex++);
         }
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catHeldClass) {
-        serializeNativeTypeInCompound(((HeldClass*)nativeType)->getClassType(), b, 1);
+        serializeNativeType(((HeldClass*)nativeType)->getClassType(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catForward) {
         b.writeStringObject(1, nativeType->name());
         if (((Forward*)nativeType)->getTarget()) {
-            serializeNativeTypeInCompound(((Forward*)nativeType)->getTarget(), b, 2);
+            serializeNativeType(((Forward*)nativeType)->getTarget(), b, 2);
         }
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catClass) {
         Class* cls = (Class*)nativeType;
@@ -815,7 +813,7 @@ void PythonSerializationContext::serializeNativeType(
         {
             int which = 0;
             for (auto t: cls->getBases()) {
-                serializeNativeTypeInCompound(t->getClassType(), b, which++);
+                serializeNativeType(t->getClassType(), b, which++);
             }
         }
 
@@ -848,14 +846,14 @@ void PythonSerializationContext::serializeClassMembers(
         b.writeBeginCompound(k);
             b.writeStringObject(0, std::get<0>(members[k]));
 
-            serializeNativeTypeInCompound(std::get<1>(members[k]), b, 1);
+            serializeNativeType(std::get<1>(members[k]), b, 1);
 
             Instance defaultValue = std::get<2>(members[k]);
 
             if (defaultValue.type()->getTypeCategory() != Type::TypeCategory::catNone) {
                 b.writeBeginCompound(2);
 
-                serializeNativeTypeInCompound(defaultValue.type(), b, 0);
+                serializeNativeType(defaultValue.type(), b, 0);
 
                 PyEnsureGilReleased releaseTheGil;
                 defaultValue.type()->serialize(defaultValue.data(), b, 1);
@@ -880,7 +878,7 @@ void PythonSerializationContext::serializeClassFunDict(
         b.writeBeginCompound(which++);
 
         b.writeStringObject(0, nameAndFunType.first);
-        serializeNativeTypeInCompound(nameAndFunType.second, b, 1);
+        serializeNativeType(nameAndFunType.second, b, 1);
 
         b.writeEndCompound();
     }

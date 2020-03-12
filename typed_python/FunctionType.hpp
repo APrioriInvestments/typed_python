@@ -147,7 +147,7 @@ public:
         }
         else if (mKind == BindingType::FUNCTION) {
             buffer.writeUnsignedVarintObject(0, 1);
-            context.serializeNativeTypeInCompound(mFunctionToBind, buffer, 1);
+            context.serializeNativeType(mFunctionToBind, buffer, 1);
         }
         else if (mKind == BindingType::NAMED_FIELD) {
             buffer.writeUnsignedVarintObject(0, 2);
@@ -421,7 +421,7 @@ public:
 
             buffer.writeStringObject(0, m_name);
             if (m_typeFilter) {
-                context.serializeNativeTypeInCompound(m_typeFilter, buffer, 1);
+                context.serializeNativeType(m_typeFilter, buffer, 1);
             }
             if (m_defaultValue) {
                 context.serializePythonObject(m_defaultValue, buffer, 2);
@@ -877,7 +877,7 @@ public:
             buffer.writeEndCompound();
 
             if (mReturnType) {
-                context.serializeNativeTypeInCompound(mReturnType, buffer, 7);
+                context.serializeNativeType(mReturnType, buffer, 7);
             }
 
             buffer.writeBeginCompound(8);
