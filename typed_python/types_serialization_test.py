@@ -1238,6 +1238,24 @@ class TypesSerializationTest(unittest.TestCase):
         f2 = sc.deserialize(sc.serialize(f))
         self.assertEqual(f2(10.5), 10)
 
+    def test_serialize_functions_with_annotations(self):
+        sc = SerializationContext({})
+
+        B = int
+        C = 10
+
+        @Function
+        def f(x: B = C) -> B:
+            return x
+
+        f2 = sc.deserialize(sc.serialize(f))
+        self.assertEqual(f2(10.5), 10)
+
+        with self.assertRaises(TypeError):
+            f2("hi")
+
+        self.assertEqual(f(), f2())
+
     def test_serialize_typed_classes(self):
         sc = SerializationContext({})
 

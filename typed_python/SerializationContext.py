@@ -42,7 +42,7 @@ def createEmptyFunction(ast):
 
 
 def astToCodeObject(ast):
-    return evaluateFunctionPyAst(ast).__code__
+    return evaluateFunctionPyAst(ast, stripAnnotations=True).__code__
 
 
 _builtin_name_to_value = {

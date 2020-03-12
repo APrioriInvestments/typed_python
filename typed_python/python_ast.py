@@ -895,7 +895,28 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
 _pyAstToCodeObjectCache = {}
 
 
-def evaluateFunctionPyAst(pyAst, globals=None):
+def stripAstArgAnnotations(arg: Arg):
+    return Arg.Item(
+        arg=arg.arg,
+        annotation=None,
+        line_number=arg.line_number,
+        col_offset=arg.col_offset,
+        filename=arg.filename
+    )
+
+
+def stripAstArgsAnnotations(args: Arguments):
+    return Arguments.Item(
+        args=[stripAstArgAnnotations(x) for x in args.args],
+        vararg=stripAstArgAnnotations(args.vararg) if args.vararg is not None else None,
+        kwonlyargs=[stripAstArgAnnotations(x) for x in args.kwonlyargs],
+        kw_defaults=args.kw_defaults,
+        kwarg=stripAstArgAnnotations(args.kwarg) if args.kwarg is not None else None,
+        defaults=(),
+    )
+
+
+def evaluateFunctionPyAst(pyAst, globals=None, stripAnnotations=False):
     assert isinstance(pyAst, (Expr.Lambda, Statement.FunctionDef))
 
     filename = pyAst.filename
@@ -905,10 +926,10 @@ def evaluateFunctionPyAst(pyAst, globals=None):
         # object itself.
         pyAstModule = Statement.FunctionDef(
             name=pyAst.name,
-            args=pyAst.args,
+            args=stripAstArgsAnnotations(pyAst.args) if stripAnnotations else pyAst.args,
             body=pyAst.body,
             decorator_list=(),
-            returns=pyAst.returns,
+            returns=pyAst.returns if not stripAnnotations else None,
             line_number=pyAst.line_number,
             col_offset=pyAst.col_offset,
             filename=pyAst.filename,
