@@ -179,7 +179,7 @@ public:
             else if (fieldNumber == 1) {
                 if (whichBinding == 1) {
                     out = ClosureVariableBindingStep(
-                        context.deserializePythonObjectExpectingNativeType(buffer, wireType)
+                        context.deserializeNativeType(buffer, wireType)
                     );
                 }
                 else if (whichBinding == 2) {
@@ -446,7 +446,7 @@ public:
                     name = buffer.readStringObject();
                 }
                 else if (fieldNumber == 1) {
-                    typeFilterOrNull = context.deserializePythonObjectExpectingNativeType(buffer, wireType);
+                    typeFilterOrNull = context.deserializeNativeType(buffer, wireType);
                 }
                 else if (fieldNumber == 2) {
                     //TODO: worry about whether this leak is important. the deserialize returns
@@ -946,7 +946,7 @@ public:
                     });
                 }
                 else if (fieldNumber == 7) {
-                    returnType = context.deserializePythonObjectExpectingNativeType(buffer, wireType);
+                    returnType = context.deserializeNativeType(buffer, wireType);
                 }
                 else if (fieldNumber == 8) {
                     buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {

@@ -27,7 +27,7 @@ bool ConstDictType::_updateAfterForwardTypesChanged() {
 
     std::string name = "ConstDict(" + m_key->name() + "->" + m_value->name() + ")";
 
-    if (m_is_recursive) {
+    if (m_is_recursive_forward) {
         name = m_recursive_name;
     }
 

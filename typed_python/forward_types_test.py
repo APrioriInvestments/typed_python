@@ -46,17 +46,6 @@ class ForwardTypesTests(unittest.TestCase):
             ConstDict(str, Value)
         ))
 
-    def test_cannot_create_cyclic_forwards(self):
-        F0 = Forward("F0")
-        F1 = Forward("F1")
-
-        with self.assertRaisesRegex(Exception, "resolve forwards to concrete types only"):
-            F1.define(F0)
-
-        F0.define(int)
-
-        F1.define(int)
-
     def test_forward_type_resolution_sequential(self):
         F0 = Forward("f0")
         T0 = TupleOf(F0)
@@ -229,3 +218,29 @@ class ForwardTypesTests(unittest.TestCase):
         self.assertEqual(
             module.RecursiveThing.Types[2].ValueType, TupleOf(module.RecursiveThing)
         )
+
+    def test_forwards_resolve_to_forward_in_cycle(self):
+        Fs = [Forward(f"f{i}") for i in range(4)]
+
+        Fs[0].define(Fs[1])
+        Fs[2].define(Fs[3])
+        Fs[1].define(Fs[2])
+
+        with self.assertRaisesRegex(TypeError, "Can't resolve a forward to itself!"):
+            Fs[3].define(Fs[0])
+
+    def test_forwards_resolve_to_forward(self):
+        Intermediate1 = Forward("Intermediate1")
+        Intermediate2 = Forward("Intermediate2")
+
+        Intermediate1.define(Intermediate2)
+
+        T0 = Tuple(Intermediate1, Intermediate1)
+        T1 = Tuple(Intermediate1, int)
+
+        Intermediate2.define(Tuple(float, float))
+
+        self.assertEqual(T0, Tuple(Tuple(float, float), Tuple(float, float)))
+        self.assertEqual(T1, Tuple(Tuple(float, float), int))
+
+        T0(((1, 2), (3, 4)))

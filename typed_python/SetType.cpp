@@ -72,7 +72,7 @@ bool SetType::_updateAfterForwardTypesChanged() {
     m_is_default_constructible = true;
     m_bytes_per_el = m_key_type->bytecount();
 
-    if (m_is_recursive) {
+    if (m_is_recursive_forward) {
         name = m_recursive_name;
     }
 

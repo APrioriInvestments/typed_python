@@ -98,7 +98,9 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
             Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)o);
 
             if (nativeType) {
+                b.writeBeginCompound(FieldNumbers::NATIVE_TYPE);
                 serializeNativeType(nativeType, b);
+                b.writeEndCompound();
             } else {
                 serializePythonObjectNamedOrAsObj(o, b);
             }
@@ -185,7 +187,7 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
             } else if (fieldNumber == FieldNumbers::NATIVE_INSTANCE) {
                 result = PyInstance::fromInstance(deserializeNativeInstance(b, wireType));
             } else if (fieldNumber == FieldNumbers::NATIVE_TYPE) {
-                result = incref((PyObject*)PyInstance::typeObj(deserializeNativeType(b, wireType, memo)));
+                result = incref((PyObject*)PyInstance::typeObj(deserializeNativeType(b, wireType)));
             } else if (fieldNumber == FieldNumbers::OBJECT_NAME) {
                 result = deserializePythonObjectFromName(b, wireType, memo);
             } else if (fieldNumber == FieldNumbers::OBJECT_REPRESENTATION) {
@@ -443,6 +445,81 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromName(Deserializ
     return result;
 }
 
+Type* PythonSerializationContext::deserializeNativeTypeFromRepresentation(DeserializationBuffer& b, size_t inWireType, int64_t memo) const {
+    PyEnsureGilAcquired acquireTheGil;
+
+    PyObjectHolder factory, factoryArgs;
+    PyObjectHolder value;
+    PyObjectHolder state;
+
+    b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
+        if (fieldNumber == 0) {
+            factory.steal(deserializePythonObject(b, wireType));
+        }
+        else if (fieldNumber == 1) {
+            if (!factory) {
+                throw std::runtime_error("Corrupt stream: no factory defined for python object representation");
+            }
+
+            factoryArgs.steal(deserializePythonObject(b, wireType));
+
+            if (!factoryArgs) {
+                throw PythonExceptionSet();
+            }
+
+            value.steal(PyObject_Call((PyObject*)factory, (PyObject*)factoryArgs, NULL));
+
+            if (!value) {
+                throw PythonExceptionSet();
+            }
+        }
+        else if (fieldNumber == 2) {
+            if (!value) {
+                throw std::runtime_error("Invalid representation.");
+            }
+
+            state.steal(deserializePythonObject(b, wireType));
+
+            if (!state) {
+                throw PythonExceptionSet();
+            }
+
+            PyObjectStealer res(
+                PyObject_CallMethod(mContextObj, "setInstanceStateFromRepresentation", "OO", (PyObject*)value, (PyObject*)state)
+            );
+
+            if (!res) {
+                throw PythonExceptionSet();
+            }
+            if (res != Py_True) {
+                throw std::runtime_error("setInstanceStateFromRepresentation didn't return True.");
+            }
+        } else {
+            throw std::runtime_error("corrupt python object representation");
+        }
+    });
+
+    if (!value) {
+        throw std::runtime_error("Invalid representation.");
+    }
+
+    if (!PyType_Check(value)) {
+        throw std::runtime_error("Expected value from representation to be a type.");
+    }
+
+    Type* resultType = PyInstance::extractTypeFrom((PyTypeObject*)(PyObject*)value);
+
+    if (!resultType) {
+        throw std::runtime_error("Expected value from representation to be a type.");
+    }
+
+    if (memo != -1) {
+        b.addCachedPointer(memo, resultType);
+    }
+
+    return resultType;
+}
+
 PyObject* PythonSerializationContext::deserializePythonObjectFromRepresentation(DeserializationBuffer& b, size_t inWireType, int64_t memo) const {
     PyEnsureGilAcquired acquireTheGil;
 
@@ -632,7 +709,14 @@ void PythonSerializationContext::serializeNativeType(
 
     MarkTypeBeingSerialized marker(nativeType, b);
 
-    b.writeBeginCompound(FieldNumbers::NATIVE_TYPE);
+    if (nativeType->isRecursiveForward()) {
+        b.writeBeginCompound(FieldNumbers::RECURSIVE_NATIVE_TYPE);
+        b.writeStringObject(0, nativeType->name());
+        b.writeBeginCompound(1);
+    } else {
+        b.writeBeginCompound(FieldNumbers::NATIVE_TYPE);
+    }
+
     b.writeUnsignedVarintObject(0, nativeType->getTypeCategory());
 
     if (nativeType->getTypeCategory() == Type::TypeCategory::catInt8 ||
@@ -746,7 +830,12 @@ void PythonSerializationContext::serializeNativeType(
         );
     }
 
-    b.writeEndCompound();
+    if (nativeType->isRecursiveForward()) {
+        b.writeEndCompound();
+        b.writeEndCompound();
+    } else {
+        b.writeEndCompound();
+    }
 }
 
 void PythonSerializationContext::serializeClassMembers(
@@ -834,7 +923,7 @@ void PythonSerializationContext::deserializeClassMembers(
             if (fieldNumber2 == 0) {
                 name = b.readStringObject();
             } else if (fieldNumber2 == 1) {
-                t = deserializePythonObjectExpectingNativeType(b, wireType2);
+                t = deserializeNativeType(b, wireType2);
             } else if (fieldNumber2 == 2) {
                 i = deserializeNativeInstance(b, wireType2);
             } else {
@@ -863,7 +952,7 @@ void PythonSerializationContext::deserializeClassFunDict(
             if (fieldNumber2 == 0) {
                 name = b.readStringObject();
             } else if (fieldNumber2 == 1) {
-                fun = deserializePythonObjectExpectingNativeType(b, wireType2);
+                fun = deserializeNativeType(b, wireType2);
             } else {
                 throw std::runtime_error("Corrupt function definition when deserializing class.");
             }
@@ -904,21 +993,94 @@ void PythonSerializationContext::deserializeClassClassMemberDict(
     });
 }
 
-Type* PythonSerializationContext::deserializePythonObjectExpectingNativeType(DeserializationBuffer& b, size_t wireType) const {
+Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b, size_t inWireType) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    PyObject* res = deserializePythonObject(b, wireType);
+    Type* resultType = nullptr;
+    int32_t memo = -1;
 
-    Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)res);
+    b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
+        if (fieldNumber == FieldNumbers::MEMO) {
+            assertWireTypesEqual(wireType, WireType::VARINT);
 
-    if (!nativeType) {
-        throw std::runtime_error("Expected a native type but didn't get one.");
+            if (memo != -1) {
+                throw std::runtime_error("Corrupt stream: multiple memos found.");
+            }
+
+            memo = b.readUnsignedVarint();
+
+            if (resultType) {
+                throw std::runtime_error("Corrupt stream: memo found after type definition.");
+            }
+
+            resultType = (Type*)b.lookupCachedPointer(memo);
+        }
+        else if (fieldNumber == FieldNumbers::OBJECT_NAME) {
+            assertWireTypesEqual(wireType, WireType::BYTES);
+
+            std::string name = b.readStringObject();
+
+            PyObjectStealer result(PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str()));
+
+            if (!result) {
+                throw PythonExceptionSet();
+            }
+
+            if (!PyType_Check(result)) {
+                throw std::runtime_error("Expected value named " + name + " to be a type.");
+            }
+
+            resultType = PyInstance::extractTypeFrom((PyTypeObject*)result);
+
+            if (!resultType) {
+                throw std::runtime_error("Expected value named " + name + " to be a type.");
+            }
+
+            if (memo != -1) {
+                b.addCachedPointer(memo, resultType);
+            }
+        } else if (fieldNumber == FieldNumbers::OBJECT_REPRESENTATION) {
+            resultType = deserializeNativeTypeFromRepresentation(b, wireType, memo);
+        } else if (fieldNumber == FieldNumbers::NATIVE_TYPE) {
+            resultType = deserializeNativeTypeInner(b, wireType);
+            b.addCachedPointer(memo, resultType);
+        } else if (fieldNumber == FieldNumbers::RECURSIVE_NATIVE_TYPE) {
+            Forward* fwd = nullptr;
+
+            if (memo == -1) {
+                throw std::runtime_error("Corrupt Recursive Forward");
+            }
+
+            b.consumeCompoundMessage(wireType, [&](size_t subFieldNumber, size_t subWireType) {
+                if (subFieldNumber == 0) {
+                    assertWireTypesEqual(subWireType, WireType::BYTES);
+
+                    std::string name = b.readStringObject();
+
+                    fwd = Forward::Make(name);
+
+                    b.addCachedPointer(memo, fwd);
+                } else if (subFieldNumber == 1) {
+                    if (!fwd) {
+                        throw std::runtime_error("Corrupt Recursive Forward");
+                    }
+                    resultType = deserializeNativeTypeInner(b, subWireType);
+
+                    fwd->define(resultType);
+
+                    b.updateCachedPointer(memo, resultType);
+                } else {
+                    throw std::runtime_error("Corrupt Recursive Forward");
+                }
+            });
+        }
+    });
+
+    if (!resultType) {
+        throw std::runtime_error("Corrupt Recursive Forward");
     }
 
-    if (!nativeType->resolved()) {
-        throw std::runtime_error("Can't deserialize into an unresolved type " + nativeType->name());
-    }
-    return nativeType;
+    return resultType;
 }
 
 Instance PythonSerializationContext::deserializeNativeInstance(DeserializationBuffer& b, size_t inWireType) const {
@@ -929,7 +1091,7 @@ Instance PythonSerializationContext::deserializeNativeInstance(DeserializationBu
 
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
         if (fieldNumber == 0) {
-            type = deserializePythonObjectExpectingNativeType(b, wireType);
+            type = deserializeNativeType(b, wireType);
         }
         if (fieldNumber == 1) {
             if (!type) {
@@ -945,7 +1107,7 @@ Instance PythonSerializationContext::deserializeNativeInstance(DeserializationBu
     return result;
 }
 
-Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b, size_t inWireType, int64_t memo) const {
+Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuffer& b, size_t inWireType) const {
     PyEnsureGilAcquired acquireTheGil;
 
     int category = -1;
@@ -979,11 +1141,11 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
                 if (fieldNumber == 1) {
                     names.push_back(b.readStringObject());
                 } else if (fieldNumber == 2) {
-                    types.push_back(deserializePythonObjectExpectingNativeType(b, wireType));
+                    types.push_back(deserializeNativeType(b, wireType));
                 }
             } else
             if (category == Type::TypeCategory::catHeldClass) {
-                types.push_back(deserializePythonObjectExpectingNativeType(b, wireType));
+                types.push_back(deserializeNativeType(b, wireType));
             } else
             if (category == Type::TypeCategory::catClass) {
                 if (fieldNumber == 1) {
@@ -1000,7 +1162,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
                     deserializeClassClassMemberDict(classClassMembers, b, wireType);
                 } else if (fieldNumber == 7) {
                     b.consumeCompoundMessage(wireType, [&](int which, size_t wireType2) {
-                        Type* t = deserializePythonObjectExpectingNativeType(b, wireType2);
+                        Type* t = deserializeNativeType(b, wireType2);
                         if (!t || t->getTypeCategory() != Type::TypeCategory::catClass) {
                             throw std::runtime_error("Corrupt class base found.");
                         }
@@ -1013,7 +1175,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             } else
             if (category == Type::TypeCategory::catFunction) {
                 if (fieldNumber == 1) {
-                    closureType = deserializePythonObjectExpectingNativeType(b, wireType);
+                    closureType = deserializeNativeType(b, wireType);
                 }
                 else if (fieldNumber == 2) {
                     assertWireTypesEqual(wireType, WireType::BYTES);
@@ -1046,7 +1208,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
                 //alternatives encode one type exactly
                 (category == Type::TypeCategory::catConcreteAlternative && fieldNumber == 1)
             ) {
-                types.push_back(deserializePythonObjectExpectingNativeType(b, wireType));
+                types.push_back(deserializeNativeType(b, wireType));
             }
             else if (category == Type::TypeCategory::catNamedTuple) {
                 assertWireTypesEqual(wireType, WireType::BYTES);
@@ -1232,10 +1394,6 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
 
     if (!resultType) {
         throw std::runtime_error("Corrupt nativeType.");
-    }
-
-    if (memo != -1) {
-        b.addCachedPyObj(memo, incref((PyObject*)PyInstance::typeObj(resultType)));
     }
 
     return resultType;

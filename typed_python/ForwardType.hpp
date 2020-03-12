@@ -23,9 +23,10 @@
 // any types that contain them can be used.
 class Forward : public Type {
 public:
-    Forward(std::string name = "unnamed") :
+    Forward(std::string name, int index) :
         Type(TypeCategory::catForward),
-        mTarget(nullptr)
+        mTarget(nullptr),
+        mIndex(index)
 
     {
         m_name = name;
@@ -34,11 +35,15 @@ public:
     }
 
     static Forward* Make() {
-        return new Forward();
+        return Make("unnamed");
     }
 
     static Forward* Make(std::string name) {
-        return new Forward(name);
+        static std::atomic<int64_t> index;
+
+        int64_t indexVal = index++;
+
+        return new Forward(name, indexVal);
     }
 
     Type* define(Type* target) {
@@ -50,37 +55,45 @@ public:
             if (((Forward*)target)->getTarget()) {
                 target = ((Forward*)target)->getTarget();
             } else {
-                throw std::runtime_error("Please resolve forwards to concrete types only.");
+                break;
             }
+        }
+
+        if (target == this) {
+            throw std::runtime_error("Can't resolve a forward to itself!");
         }
 
         if (target == mTarget) {
             return mTarget;
         }
 
-        // check the containment graph. If we are a forward that's
-        // directly contained by the target, then we shouldn't allow this
-        // definition because we'd be infinitely large.
-        auto& containedForwards = target->getContainedForwards();
+        bool tgtIsForward = target->getTypeCategory() == TypeCategory::catForward;
 
-        if (containedForwards.find(this) != containedForwards.end()) {
-            throw std::runtime_error("Can't resolve forward " + m_name + " to " +
-                target->name() + " because it would create a type-containment cycle" +
-                " (specifically, the type would have an infinite bytecount because it 'contains' itself)."
-            );
+        if (!tgtIsForward) {
+            // check the containment graph. If we are a forward that's
+            // directly contained by the target, then we shouldn't allow this
+            // definition because we'd be infinitely large.
+            auto& containedForwards = target->getContainedForwards();
+
+            if (containedForwards.find(this) != containedForwards.end()) {
+                throw std::runtime_error("Can't resolve forward " + m_name + " to " +
+                    target->name() + " because it would create a type-containment cycle" +
+                    " (specifically, the type would have an infinite bytecount because it 'contains' itself)."
+                );
+            }
+
+            bool thisIsRecursive = target->getReferencedForwards().find(this) != target->getReferencedForwards().end();
+
+            if (thisIsRecursive) {
+                target->setNameAndIndexForRecursiveType(m_name, mIndex);
+                target->_updateAfterForwardTypesChanged();
+            }
         }
-
-        bool thisIsRecursive = target->getReferencedForwards().find(this) != target->getReferencedForwards().end();
 
         mTarget = target;
         m_resolved = true;
 
-        if (thisIsRecursive) {
-            target->setNameForRecursiveType(m_name);
-            target->_updateAfterForwardTypesChanged();
-        }
-
-        // we are not yet resolved
+        // forward everyone looking at us to the new target
         for (auto typePtr: m_referencing_us_indirectly) {
             typePtr->forwardResolvedTo(this, target);
         }
@@ -96,7 +109,6 @@ public:
                 }
             }
         }
-
 
         for (auto typePtr: m_referencing_us_indirectly) {
             if (typePtr->getReferencedForwards().size() == 0) {
@@ -130,6 +142,11 @@ public:
         if (m_resolved) {
             throw std::runtime_error("already resolved forward type " + name() + " can't be used like this.");
         }
+
+        if (user->getTypeCategory() == Type::TypeCategory::catForward) {
+            throw std::runtime_error("Makes no sense for a forward to be used by another forward");
+        }
+
         m_referencing_us_indirectly.insert(user);
     }
 
@@ -164,6 +181,11 @@ public:
     }
 private:
     Type* mTarget;
+
+    // when we're trying to determine how to hash a type graph,
+    // it's helpful when recursive types know that they were
+    // defined by a forward and the index of that forward
+    int64_t mIndex;
 
     std::set<Type*> m_referencing_us_indirectly;
 };

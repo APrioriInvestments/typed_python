@@ -24,7 +24,7 @@ bool DictType::_updateAfterForwardTypesChanged() {
 
     std::string name = "Dict(" + m_key->name() + "->" + m_value->name() + ")";
 
-    if (m_is_recursive) {
+    if (m_is_recursive_forward) {
         name = m_recursive_name;
     }
 

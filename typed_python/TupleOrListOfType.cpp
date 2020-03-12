@@ -29,7 +29,7 @@ bool TupleOrListOfType::isBinaryCompatibleWithConcrete(Type* other) {
 bool TupleOrListOfType::_updateAfterForwardTypesChanged() {
     std::string name = (m_is_tuple ? "TupleOf(" : "ListOf(") + m_element_type->name() + ")";
 
-    if (m_is_recursive) {
+    if (m_is_recursive_forward) {
         name = m_recursive_name;
     }
 

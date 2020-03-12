@@ -250,10 +250,6 @@ void Type::forwardTypesAreResolved() {
 }
 
 void Type::forwardResolvedTo(Forward* forward, Type* resolvedTo) {
-    if (resolvedTo->getTypeCategory() == TypeCategory::catForward) {
-        throw std::runtime_error("Forwards must not resolve to other forwards.");
-    }
-
     // make sure we reference this forward properly
     if (m_referenced_forwards.find(forward) == m_referenced_forwards.end()) {
         throw std::runtime_error(
@@ -281,15 +277,25 @@ void Type::forwardResolvedTo(Forward* forward, Type* resolvedTo) {
 
     m_referenced_forwards.erase(forward);
 
-    for (auto referenced: resolvedTo->getReferencedForwards()) {
-        if (referenced != forward) {
-            referenced->markIndirectForwardUse(this);
-            m_referenced_forwards.insert(referenced);
-        }
-    }
+    if (resolvedTo->getTypeCategory() == TypeCategory::catForward) {
+        Forward* tgtForward = (Forward*)resolvedTo;
 
-    if (m_referenced_forwards.size() == 0) {
-        forwardTypesAreResolved();
+        if (tgtForward->getTarget()) {
+            throw std::runtime_error("Forwards must not resolve to other forwards that are already resolved!");
+        }
+
+        m_referenced_forwards.insert(tgtForward);
+    } else {
+        for (auto referenced: resolvedTo->getReferencedForwards()) {
+            if (referenced != forward) {
+                referenced->markIndirectForwardUse(this);
+                m_referenced_forwards.insert(referenced);
+            }
+        }
+
+        if (m_referenced_forwards.size() == 0) {
+            forwardTypesAreResolved();
+        }
     }
 
     this->check([&](auto& subtype) {

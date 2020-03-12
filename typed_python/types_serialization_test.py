@@ -584,13 +584,12 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serializing_anonymous_recursive_types(self):
         NT = Forward("NT")
-        NT = NT.define(TupleOf(NT))
+        NT = NT.define(TupleOf(OneOf(int, NT)))
+        NT2 = ping_pong(NT)
 
-        # right now we don't allow this. When we move to a more proper model for declarint
-        # forward types, this should work better.
-
-        with self.assertRaises(Exception):
-            ping_pong(NT)
+        # verify we can construct these objects
+        nt2 = NT2((1, 2, 3))
+        NT2((nt2, 2))
 
     def test_serializing_named_tuples_in_loop(self):
         NT = Forward("NT")
@@ -1289,24 +1288,23 @@ class TypesSerializationTest(unittest.TestCase):
             C(x=10, y=30).g()
         )
 
-    # this isn't working yet
-    # def test_serialize_recursive_typed_classes(self):
-    #     sc = SerializationContext({})
+    def test_serialize_recursive_typed_classes(self):
+        sc = SerializationContext({})
 
-    #     B = Forward("B")
+        B = Forward("B")
 
-    #     @B.define
-    #     class B(Class, Final):
-    #         x = Member(int)
+        @B.define
+        class B(Class, Final):
+            x = Member(int)
 
-    #         def f(self, y) -> int:
-    #             return self.x + y
+            def f(self, y) -> int:
+                return self.x + y
 
-    #         def getSelf(self) -> B:
-    #             return self
+            def getSelf(self) -> B:
+                return self
 
-    #     B2 = sc.deserialize(sc.serialize(B))
+        B2 = sc.deserialize(sc.serialize(B))
 
-    #     instance = B2()
+        instance = B2()
 
-    #     self.assertTrue(isinstance(instance.getSelf(), B2))
+        self.assertTrue(isinstance(instance.getSelf(), B2))

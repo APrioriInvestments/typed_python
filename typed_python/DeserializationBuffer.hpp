@@ -361,6 +361,12 @@ public:
         if (!ptr) {
             throw std::runtime_error("Corrupt data: can't write a null cache pointer.");
         }
+        if (which < 0) {
+            throw std::runtime_error("Invalid memo. Shouldn't be negative.");
+        }
+        if (which > m_cachedPointers.size() + 1000000) {
+            throw std::runtime_error("Suspicious memo is out of bounds.");
+        }
         while (which >= m_cachedPointers.size()) {
             m_cachedPointers.push_back(nullptr);
         }
@@ -379,6 +385,12 @@ public:
     PyObject* addCachedPyObj(int32_t which, PyObject* ptr) {
         if (!ptr) {
             throw std::runtime_error("Corrupt data: can't write a null cache pointer.");
+        }
+        if (which < 0) {
+            throw std::runtime_error("Invalid memo. Shouldn't be negative.");
+        }
+        if (which > m_cachedPointers.size() + 1000000) {
+            throw std::runtime_error("Suspicious memo is out of bounds.");
         }
         while (which >= m_cachedPointers.size()) {
             m_cachedPointers.push_back(nullptr);

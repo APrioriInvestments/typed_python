@@ -60,7 +60,7 @@ public:
     bool _updateAfterForwardTypesChanged() {
         std::string name = "PointerTo(" + m_element_type->name() + ")";
 
-        if (m_is_recursive) {
+        if (m_is_recursive_forward) {
             name = m_recursive_name;
         }
 

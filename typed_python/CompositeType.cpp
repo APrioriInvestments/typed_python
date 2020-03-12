@@ -163,7 +163,7 @@ bool NamedTuple::_updateAfterForwardTypesChanged() {
 
     std::string oldName = m_name;
 
-    if (m_is_recursive) {
+    if (m_is_recursive_forward) {
         m_name = m_recursive_name;
     } else {
         m_name = "NamedTuple(";
@@ -189,7 +189,7 @@ bool Tuple::_updateAfterForwardTypesChanged() {
 
     std::string oldName = m_name;
 
-    if (m_is_recursive) {
+    if (m_is_recursive_forward) {
         m_name = m_recursive_name;
     } else {
         m_name = "Tuple(";

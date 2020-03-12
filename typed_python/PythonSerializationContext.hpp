@@ -91,8 +91,7 @@ public:
                       //if this memo has been defined already in the stream, no other
                       //fields should be present in the stream.
             NATIVE_TYPE = 1, //an encoded native type.
-                             //field 0 is the type category. Fields above that encode
-                             //type-detail arguments
+            RECURSIVE_NATIVE_TYPE = 17, //a recursive encoded native type.
             NATIVE_INSTANCE = 2, //field 0 is the type, field 1 is the data.
             OBJECT_NAME = 3, //a string encoding the name of the object in the current codebase
             OBJECT_TYPEANDDICT = 4, //an object where the object's python type is encoded as
@@ -155,13 +154,15 @@ public:
 
     void deserializeClassClassMemberDict(std::map<std::string, PyObject*>& dict, DeserializationBuffer& b, int wireType) const;
 
-    Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
+    Type* deserializeNativeTypeInner(DeserializationBuffer& b, size_t wireType) const;
 
     Instance deserializeNativeInstance(DeserializationBuffer& b, size_t wireType) const;
 
     virtual PyObject* deserializePythonObject(DeserializationBuffer& b, size_t wireType) const;
 
-    Type* deserializePythonObjectExpectingNativeType(DeserializationBuffer& b, size_t wireType) const;
+    Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType) const;
+
+    Type* deserializeNativeTypeFromRepresentation(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
 
     PyObject* deserializePythonObjectFromName(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
 

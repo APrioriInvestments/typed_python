@@ -141,6 +141,10 @@ public:
         return m_typeCategory == catNamedTuple;
     }
 
+    bool isRecursiveForward() const {
+        return m_is_recursive_forward;
+    }
+
     bool isRefTo() const {
         return m_typeCategory == catRefTo;
     }
@@ -527,9 +531,10 @@ public:
 
     void forwardResolvedTo(Forward* forward, Type* resolvedTo);
 
-    void setNameForRecursiveType(std::string nameOverride) {
+    void setNameAndIndexForRecursiveType(std::string nameOverride, int index) {
         m_recursive_name = nameOverride;
-        m_is_recursive = true;
+        m_is_recursive_forward = true;
+        m_recursive_forward_index = index;
     }
 
     // can we construct an instance of 'this' from an instance of 'otherType'
@@ -551,7 +556,8 @@ protected:
             m_base(nullptr),
             m_is_simple(true),
             m_resolved(false),
-            m_is_recursive(false)
+            m_is_recursive_forward(false),
+            m_recursive_forward_index(-1)
         {}
 
     TypeCategory m_typeCategory;
@@ -573,7 +579,13 @@ protected:
 
     bool m_resolved;
 
-    bool m_is_recursive;
+    // were we defined as a recursive Forward type?
+    bool m_is_recursive_forward;
+
+    // if we are recursive, then an integer indicating the order in
+    // which we were resolved, which is useful when trying to
+    // order the type graph
+    int64_t m_recursive_forward_index;
 
     enum BinaryCompatibilityCategory { Incompatible, Checking, Compatible };
 

@@ -40,7 +40,7 @@ bool OneOfType::_updateAfterForwardTypesChanged() {
     size_t size = computeBytecount();
     std::string name = computeName();
 
-    if (m_is_recursive) {
+    if (m_is_recursive_forward) {
         name = m_recursive_name;
     }
 
