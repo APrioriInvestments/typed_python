@@ -390,7 +390,6 @@ public:
 
     void assertForwardsResolved() const {
         if (!m_resolved) {
-            asm ("int3");
             throw std::logic_error("Type " + m_name + " has unresolved forwards.");
         }
     }
