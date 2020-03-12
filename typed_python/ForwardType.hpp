@@ -110,10 +110,17 @@ public:
             }
         }
 
+        std::set<Type*> resolvedThisPass;
+
         for (auto typePtr: m_referencing_us_indirectly) {
             if (typePtr->getReferencedForwards().size() == 0) {
                 typePtr->forwardTypesAreResolved();
+                resolvedThisPass.insert(typePtr);
             }
+        }
+
+        for (auto t: resolvedThisPass) {
+            t->buildMutuallyRecursiveTypeCycle();
         }
 
         m_name = mTarget->name();

@@ -475,6 +475,8 @@ public:
     // below us.
     void forwardTypesAreResolved();
 
+    void buildMutuallyRecursiveTypeCycle();
+
     // called after each type has initialized its internals
     void endOfConstructorInitialization();
 
@@ -546,6 +548,17 @@ public:
         return Maybe::Maybe;
     }
 
+    Type* getRecursiveTypeGroupHead() const {
+        return mMutuallyRecursiveTypeGroupHead;
+    }
+
+    const std::map<int32_t, Type*> getRecursiveTypeGroup() const {
+        if (!mMutuallyRecursiveTypeGroupHead) {
+            throw std::runtime_error("Type " + name() + " is not resolved yet.");
+        }
+        return mMutuallyRecursiveTypeGroupHead->mMutuallyRecursiveTypeGroup;
+    }
+
 protected:
     Type(TypeCategory in_typeCategory) :
             m_typeCategory(in_typeCategory),
@@ -557,7 +570,8 @@ protected:
             m_is_simple(true),
             m_resolved(false),
             m_is_recursive_forward(false),
-            m_recursive_forward_index(-1)
+            m_recursive_forward_index(-1),
+            mMutuallyRecursiveTypeGroupHead(nullptr)
         {}
 
     TypeCategory m_typeCategory;
@@ -601,4 +615,16 @@ protected:
 
     // a subset of m_referenced_forwards that we directly contain
     std::set<Forward*> m_contained_forwards;
+
+    // once we are well defined, the type that's the head of our group
+    // of mutually recursive types, which is defined by the earliest-
+    // to-be-created Forward in the cycle.
+    Type* mMutuallyRecursiveTypeGroupHead;
+
+    // our index in the mutually recursive type group
+    int32_t mMutuallyRecursiveTypeGroupIndex;
+
+    // the set of types in our mutually recursive type group. This is
+    // only populated if we're the head of the group
+    std::map<int32_t, Type*> mMutuallyRecursiveTypeGroup;
 };

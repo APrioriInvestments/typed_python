@@ -18,6 +18,8 @@ from typed_python import (
     Forward, Int64, NamedTuple, Tuple, Dict, ListOf, ConstDict, Module
 )
 
+from typed_python._types import mutuallyRecursiveGroup
+
 
 class ForwardTypesTests(unittest.TestCase):
     def test_basic_forward_type_resolution(self):
@@ -244,3 +246,19 @@ class ForwardTypesTests(unittest.TestCase):
         self.assertEqual(T1, Tuple(Tuple(float, float), int))
 
         T0(((1, 2), (3, 4)))
+
+    def test_check_recursive_group(self):
+        module = Module("M")
+
+        @module.define
+        class A(Class):
+            b = Member(OneOf(None, module.B))
+
+        @module.define
+        class B(Class):
+            a = Member(OneOf(None, module.A))
+
+        self.assertEqual(mutuallyRecursiveGroup(A), mutuallyRecursiveGroup(B))
+
+        self.assertTrue(A in mutuallyRecursiveGroup(A))
+        self.assertTrue(B in mutuallyRecursiveGroup(A))

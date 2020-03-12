@@ -1842,6 +1842,62 @@ PyObject *touchCompiledSpecializations(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
+PyObject *mutuallyRecursiveGroup(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "mutuallyRecursiveGroup takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t1) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'mutuallyRecursiveGroup' must be a native type object");
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        PyObjectStealer res(PyList_New(0));
+
+        for (auto ixAndType: t1->getRecursiveTypeGroup()) {
+            PyList_Append(
+                res,
+                (PyObject*)PyInstance::typeObj(ixAndType.second)
+            );
+        }
+
+        return incref(res);
+    });
+}
+
+PyObject *referencedTypes(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "referencedTypes takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t1) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'referencedTypes' must be a native type object");
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        PyObjectStealer res(PyList_New(0));
+
+        t1->visitReferencedTypes([&](Type* refType) {
+            PyList_Append(
+                res,
+                (PyObject*)PyInstance::typeObj(refType)
+            );
+        });
+
+        return incref(res);
+    });
+}
+
 PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "isBinaryCompatible takes 2 positional arguments");
@@ -1971,6 +2027,8 @@ static PyMethodDef module_methods[] = {
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
+    {"mutuallyRecursiveGroup", (PyCFunction)mutuallyRecursiveGroup, METH_VARARGS, NULL},
+    {"referencedTypes", (PyCFunction)referencedTypes, METH_VARARGS, NULL},
     {"wantsToDefaultConstruct", (PyCFunction)wantsToDefaultConstruct, METH_VARARGS, NULL},
     {"all_alternatives_empty", (PyCFunction)all_alternatives_empty, METH_VARARGS, NULL},
     {"installNativeFunctionPointer", (PyCFunction)installNativeFunctionPointer, METH_VARARGS, NULL},

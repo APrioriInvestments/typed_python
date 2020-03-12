@@ -180,6 +180,104 @@ Maybe Type::canConstructFrom(Type* otherType, bool isExplicit) {
     return mCanConvert[otherType];
 }
 
+void Type::buildMutuallyRecursiveTypeCycle() {
+    if (mMutuallyRecursiveTypeGroupHead) {
+        return;
+    }
+
+    std::map<Type*, int> index;
+    std::vector<Type*> stack;
+    std::set<Type*> stackContents;
+    std::map<Type*, int> link;
+
+    long curIndex = 0;
+
+    std::function<void (Type*)> visit = [&](Type* cur) {
+        index[cur] = curIndex;
+        link[cur] = curIndex;
+        curIndex += 1;
+
+        stack.push_back(cur);
+        stackContents.insert(cur);
+
+        cur->visitReferencedTypes([&](Type* child) {
+            if (cur->mMutuallyRecursiveTypeGroupHead) {
+                // don't consider this node at all
+                return;
+            }
+
+            if (index.find(child) == index.end()) {
+                visit(child);
+                link[cur] = std::min(link[cur], link[child]);
+            }
+            else if (stackContents.find(child) != stackContents.end()) {
+                link[cur] = std::min(link[cur], index[child]);
+            }
+        });
+
+        if (link[cur] == index[cur]) {
+            // we're the top of a connected component
+            std::vector<Type*> curComponent;
+
+            while (stackContents.find(cur) != stackContents.end()) {
+                curComponent.push_back(stack.back());
+                stackContents.erase(stack.back());
+                stack.pop_back();
+            }
+
+            Type* lowest = nullptr;
+
+            for (auto t: curComponent) {
+                if (t->m_is_recursive_forward && (!lowest || m_recursive_forward_index < lowest->m_recursive_forward_index)) {
+                    lowest = t;
+                }
+            }
+
+            if (!lowest) {
+                // pick the one with the lowest name
+                for (auto t: curComponent) {
+                    if (!lowest || t->name() < lowest->name()) {
+                        lowest = t;
+                    }
+                }
+            }
+
+            for (auto t: curComponent) {
+                t->mMutuallyRecursiveTypeGroupHead = lowest;
+                t->mMutuallyRecursiveTypeGroupIndex = -1;
+            }
+
+            std::set<Type*> curComponentSet;
+            curComponentSet.insert(curComponent.begin(), curComponent.end());
+
+            // order the nodes in the group in the order in which we traverse them
+            // in the graph, filling out 'mMutuallyRecursiveTypeGroupIndex'
+            long curIndex = 0;
+            std::function<void (Type*)> visitForIndex = [&](Type* cur) {
+                // if the node isn't in this connected component, do nothing
+                if (curComponentSet.find(cur) == curComponentSet.end()) {
+                    return;
+                }
+
+                // if the node already has an index, do nothing.
+                if (cur->mMutuallyRecursiveTypeGroupIndex >= 0) {
+                    return;
+                }
+
+                cur->mMutuallyRecursiveTypeGroupIndex = curIndex;
+                lowest->mMutuallyRecursiveTypeGroup[curIndex] = cur;
+                curIndex++;
+
+                cur->visitReferencedTypes(visitForIndex);
+            };
+
+            visitForIndex(lowest);
+        }
+    };
+
+    visit(this);
+}
+
 void Type::endOfConstructorInitialization() {
     visitReferencedTypes([&](Type* &t) {
         while (t->getTypeCategory() == TypeCategory::catForward && ((Forward*)t)->getTarget()) {
@@ -213,6 +311,8 @@ void Type::endOfConstructorInitialization() {
 
     if (!m_referenced_forwards.size()) {
         forwardTypesAreResolved();
+        mMutuallyRecursiveTypeGroup[0] = this;
+        mMutuallyRecursiveTypeGroupHead = this;
     } else {
         this->check([&](auto& subtype) {
             subtype._updateAfterForwardTypesChanged();
