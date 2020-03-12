@@ -855,9 +855,6 @@ _algebraicAstCache = {}
 
 
 def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
-    if f in _originalAstCache:
-        return _originalAstCache[f]
-
     # we really just care about the code itself
     if isinstance(f, types.FunctionType):
         fCode = f.__code__
@@ -867,6 +864,9 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
         raise Exception(
             "convertFunctionToAlgebraicPyAst requires a function object, or a code object."
         )
+
+    if fCode in _originalAstCache:
+        return _originalAstCache[fCode]
 
     if fCode in _algebraicAstCache:
         return _algebraicAstCache[fCode, keepLineInformation]
@@ -957,7 +957,22 @@ def evaluateFunctionPyAst(pyAst, globals=None, stripAnnotations=False):
 
         res = globals[pyAstModule.body[0].name]
 
-    _originalAstCache[res] = pyAst
+    _originalAstCache[res.__code__] = pyAst
+
+    from typed_python.compiler.python_ast_analysis import extractFunctionDefsInOrder
+
+    # extract any inline code constants from the resulting closure and ensure
+    # that we know their definitions as well.
+    codeConstants = [c for c in res.__code__.co_consts if isinstance(c, types.CodeType)]
+    funcDefs = extractFunctionDefsInOrder(pyAst.body)
+
+    assert len(funcDefs) == len(codeConstants), (
+        f"Expected {len(funcDefs)} func defs to cover the "
+        f"{len(codeConstants)} code constants we found."
+    )
+
+    for i in range(len(funcDefs)):
+        _originalAstCache[codeConstants[i]] = funcDefs[i]
 
     return res
 

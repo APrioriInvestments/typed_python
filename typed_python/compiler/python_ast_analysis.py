@@ -173,6 +173,33 @@ def computeVariablesReadByClosures(astNode):
     return closureVars
 
 
+def extractFunctionDefsInOrder(astNode):
+    res = []
+
+    def visit(x):
+        if isinstance(x, Statement):
+            if x.matches.FunctionDef or x.matches.ClassDef or x.matches.AsyncFunctionDef:
+                res.append(x)
+                return False
+
+        if isinstance(x, Expr):
+            if (
+                x.matches.Lambda
+                or x.matches.ListComp
+                or x.matches.SetComp
+                or x.matches.DictComp
+                or x.matches.GeneratorExp
+            ):
+                res.append(x)
+                return False
+
+        return True
+
+    visitPyAstChildren(astNode, visit)
+
+    return res
+
+
 def extractFunctionDefs(astNode):
     """Find all the direct 'def' operations that could produce closure elements.
 

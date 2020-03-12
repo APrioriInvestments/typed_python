@@ -58,12 +58,65 @@ public:
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
-        throw std::runtime_error("Cells are not serializable.");
+        PyEnsureGilAcquired acquireTheGil;
+
+        buffer.writeBeginCompound(fieldNumber);
+
+        PyObject* cell = getPyObj(self);
+
+        uint32_t id;
+        bool isNew;
+        std::tie(id, isNew) = buffer.cachePointer(cell);
+
+        buffer.writeUnsignedVarintObject(0, id);
+
+        if (isNew && PyCell_GET(cell)) {
+            buffer.getContext().serializePythonObject(PyCell_GET(cell), buffer, 1);
+        }
+
+        buffer.writeEndCompound();
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
-        throw std::runtime_error("Cells are not serializable.");
+    void deserialize(instance_ptr self, buf_t& buffer, size_t inWireType) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        int64_t memo = -1;
+
+        // if populated, this will have a +1 refcount
+        PyObject* cell = nullptr;
+
+        buffer.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
+            if (fieldNumber == 0) {
+                assertWireTypesEqual(wireType, WireType::VARINT);
+                memo = buffer.readUnsignedVarint();
+
+                PyObject* memoObj = (PyObject*)buffer.lookupCachedPointer(memo);
+                if (memoObj) {
+                    cell = incref(memoObj);
+                } else {
+                    cell = PyCell_New(nullptr);
+                    buffer.addCachedPyObj(memo, incref(cell));
+                }
+            } else if (fieldNumber == 1) {
+                if (!cell) {
+                    throw std::runtime_error("Corrupt PyCell found");
+                }
+
+                PyObject* cellContents = buffer.getContext().deserializePythonObject(buffer, wireType);
+
+                PyCell_Set(cell, cellContents);
+
+                decref(cellContents);
+            }
+        });
+
+        if (!cell) {
+            throw std::runtime_error("Corrupt PyCell found");
+        }
+
+        initializeHandleAt(self);
+        getPyObj(self) = cell;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {

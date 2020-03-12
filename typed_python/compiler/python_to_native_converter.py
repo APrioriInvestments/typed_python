@@ -15,7 +15,6 @@
 import types
 
 import typed_python.python_ast as python_ast
-import typed_python.ast_util as ast_util
 import typed_python._types as _types
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
@@ -135,7 +134,6 @@ class PythonToNativeConverter(object):
         self._targets = {}
         self._inflight_definitions = {}
         self._inflight_function_conversions = {}
-        self._code_to_ast_cache = {}
         self._times_calculated = {}
         self._new_native_functions = set()
         self._used_names = set()
@@ -297,17 +295,7 @@ class PythonToNativeConverter(object):
         )
 
     def _code_to_ast(self, f):
-        if f in self._code_to_ast_cache:
-            return self._code_to_ast_cache[f]
-
-        pyast = ast_util.pyAstFor(f)
-
-        _, lineno = ast_util.getSourceLines(f)
-        _, fname = ast_util.getSourceFilenameAndText(f)
-
-        pyast = ast_util.functionDefOrLambdaAtLineNumber(pyast, lineno)
-
-        return python_ast.convertPyAstToAlgebraic(pyast, fname)
+        return python_ast.convertFunctionToAlgebraicPyAst(f)
 
     def demasqueradeCallTargetOutput(self, callTarget: TypedCallTarget):
         """Ensure we are returning the correct 'interpreterType' from callTarget.

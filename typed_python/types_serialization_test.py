@@ -17,6 +17,7 @@ import os
 import importlib
 import typed_python.ast_util as ast_util
 import threading
+import textwrap
 import time
 import unittest
 import numpy
@@ -39,7 +40,7 @@ from typed_python import (
     Member, String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
     Dict, Set, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject,
-    Forward, Final, Function
+    Forward, Final, Function, Entrypoint
 )
 
 from typed_python._types import refcount
@@ -1309,6 +1310,87 @@ class TypesSerializationTest(unittest.TestCase):
         instance = B2()
 
         self.assertTrue(isinstance(instance.getSelf(), B2))
+
+        B3 = sc.deserialize(sc.serialize(B2))
+
+        instance2 = B3()
+
+        self.assertTrue(isinstance(instance2.getSelf(), B3))
+
+    def test_serialize_functions_with_cells(self):
+        def fMaker():
+            @Entrypoint
+            def g(x):
+                return x + 1
+
+            @Entrypoint
+            def f(x):
+                return g(x)
+
+            return f
+
+        sc = SerializationContext({})
+
+        f = fMaker()
+
+        f2 = sc.deserialize(sc.serialize(f))
+
+        self.assertEqual(f2(10), 11)
+
+    def test_reserialize_functions(self):
+        sc = SerializationContext({'Entrypoint': Entrypoint})
+
+        with tempfile.TemporaryDirectory() as tf:
+            fpath = os.path.join(tf, "module.py")
+
+            with open(fpath, "w") as f:
+                someText = textwrap.dedent("""
+                from typed_python import Forward, Class, Final, Member, Entrypoint
+
+                @Entrypoint
+                def g(x):
+                    return x + 1
+
+                @Entrypoint
+                def f(x):
+                    return g(x)
+
+                def getH():
+                    y = (lambda x: x + 3, lambda x: x + 4)
+
+                    @Entrypoint
+                    def h(x):
+                        return (y[0](x), y[1](x))
+
+                    return h
+                """)
+
+                f.write(someText)
+
+            code = compile(someText, fpath, "exec")
+
+            moduleVals = {}
+
+            exec(code, moduleVals)
+
+            f = moduleVals['f']
+            getH = moduleVals['getH']
+
+            f2 = sc.deserialize(sc.serialize(f))
+            getH2 = sc.deserialize(sc.serialize(getH))
+
+            self.assertEqual(f2(10), 11)
+
+        ast_util.clearAllCaches()
+
+        # now the directory is deleted. When we reserialize it we shouldn't
+        # need it because it should be stashed in the ast cache.
+        h = getH2()
+        f3 = sc.deserialize(sc.serialize(f2))
+        h2 = sc.deserialize(sc.serialize(h))
+
+        self.assertEqual(f3(10), 11)
+        self.assertEqual(h2(10), (13, 14))
 
     def test_serialize_subclasses(self):
         sc = SerializationContext({})

@@ -730,7 +730,8 @@ void PythonSerializationContext::serializeNativeTypeInner(
             nativeType->getTypeCategory() == Type::TypeCategory::catNone ||
             nativeType->getTypeCategory() == Type::TypeCategory::catBytes ||
             nativeType->getTypeCategory() == Type::TypeCategory::catString ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catBool
+            nativeType->getTypeCategory() == Type::TypeCategory::catBool ||
+            nativeType->getTypeCategory() == Type::TypeCategory::catPyCell
             ) {
         //do nothing
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
@@ -1308,6 +1309,9 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
     }
     else if (category == Type::TypeCategory::catString) {
         resultType = ::StringType::Make();
+    }
+    else if (category == Type::TypeCategory::catPyCell) {
+        resultType = ::PyCellType::Make();
     }
     else if (category == Type::TypeCategory::catBool) {
         resultType = ::Bool::Make();

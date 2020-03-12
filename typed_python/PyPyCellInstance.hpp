@@ -26,4 +26,16 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
         return false;
     }
+
+    PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
+        if (strcmp(attrName, "contents") == 0) {
+            PyObject* res = ((PyCellType*)type())->getPyObj(dataPtr());
+            if (!res) {
+                throw std::runtime_error("PyCell is empty");
+            }
+            return incref(res);
+        }
+
+        return PyInstance::tp_getattr_concrete(pyAttrName, attrName);
+    }
 };

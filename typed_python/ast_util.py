@@ -42,6 +42,7 @@ def clearAllCaches():
     inspect.pathExistsOnDiskCache_.clear()
     for a in _all_caches:
         a.clear()
+    sourceFileCache_.clear()
 
 
 def CachedByArgs(f):

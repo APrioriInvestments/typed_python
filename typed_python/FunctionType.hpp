@@ -154,7 +154,7 @@ public:
             buffer.writeStringObject(1, mNamedFieldToAccess);
         }
         else if (mKind == BindingType::INDEXED_FIELD) {
-            buffer.writeUnsignedVarintObject(0, 2);
+            buffer.writeUnsignedVarintObject(0, 3);
             buffer.writeUnsignedVarintObject(1, mIndexedFieldToAccess);
         }
 
@@ -165,7 +165,7 @@ public:
     static ClosureVariableBindingStep deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
         ClosureVariableBindingStep out;
 
-        int whichBinding;
+        int whichBinding = -1;
 
         buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
             if (fieldNumber == 0) {
@@ -177,6 +177,9 @@ public:
                 }
             }
             else if (fieldNumber == 1) {
+                if (whichBinding == -1) {
+                    throw std::runtime_error("Corrupt ClosureVariableBindingStep");
+                }
                 if (whichBinding == 1) {
                     out = ClosureVariableBindingStep(
                         context.deserializeNativeType(buffer, wireType)
@@ -190,6 +193,8 @@ public:
                     assertWireTypesEqual(wireType, WireType::VARINT);
                     out = ClosureVariableBindingStep(buffer.readUnsignedVarint());
                 }
+            } else {
+                throw std::runtime_error("Corrupt ClosureVariableBindingStep");
             }
         });
 
@@ -243,7 +248,7 @@ public:
     void serialize(serialization_context_t& context, buf_t& buffer, int fieldNumber) const {
         buffer.writeBeginCompound(fieldNumber);
         for (long stepIx = 0; stepIx < size(); stepIx++) {
-            (this)[stepIx].serialize(context, buffer, stepIx);
+            (*this)[stepIx].serialize(context, buffer, stepIx);
         }
         buffer.writeEndCompound();
     }
@@ -930,7 +935,11 @@ public:
                             assertWireTypesEqual(wireType, WireType::BYTES);
                             last = buffer.readStringObject();
                         } else {
+                            if (last == "") {
+                                throw std::runtime_error("Corrupt Function closure encountered");
+                            }
                             functionGlobalsInCells[last] = context.deserializePythonObject(buffer, wireType);
+                            last = "";
                         }
                     });
                 }
