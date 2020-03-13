@@ -524,7 +524,7 @@ def Matrix(T):
             res = ListOf(T)()
             res.resize(rows * columns, value)
 
-            return Matrix(T)(res, 0, (columns, 1), (rows, columns))
+            return Matrix(T)(res, 0, Tuple(int, int)((columns, 1)), Tuple(int, int)((rows, columns)))
 
         @staticmethod
         def make(rows: int, columns: int, f):
@@ -542,7 +542,7 @@ def Matrix(T):
 
             res.setSizeUnsafe(rows * columns)
 
-            return Matrix(T)(res, 0, (columns, 1), (rows, columns))
+            return Matrix(T)(res, 0, Tuple(int, int)((columns, 1)), Tuple(int, int)((rows, columns)))
 
         @staticmethod
         def ones(rows: int, columns: int):
