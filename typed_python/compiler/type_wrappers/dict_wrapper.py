@@ -30,6 +30,30 @@ EMPTY = -1
 DELETED = -2
 
 
+class NativeHash(CompilableBuiltin):
+    """A function for directly hashing a typed python value.
+
+    Note that this is not the same as calling 'hash' from compiled code,
+    which will produce different answers from python right now, and which
+    is attempting at some level to mimic python's standard hash functionality.
+
+    That functionality is not used internally to our datastructures (we
+    allow things to hash to -1) so you can't just use 'hash' when implementing
+    wrappers for tp internals.
+    """
+    def __eq__(self, other):
+        return isinstance(other, NativeHash)
+
+    def __hash__(self):
+        return hash("NativeHash")
+
+    def convert_call(self, context, instance, args, kwargs):
+        if len(args) == 1:
+            return args[0].convert_hash()
+
+        return super().convert_call(context, instance, args, kwargs)
+
+
 class CPlusPlusStyleMod(CompilableBuiltin):
     def __eq__(self, other):
         return isinstance(other, CPlusPlusStyleMod)
@@ -193,13 +217,13 @@ def dict_update(instance, other):
 
 
 def dict_delitem(instance, item):
-    itemHash = hash(item)
+    itemHash = NativeHash()(item)
 
     dict_remove_key(instance, item, itemHash)
 
 
 def dict_getitem(instance, item):
-    itemHash = hash(item)
+    itemHash = NativeHash()(item)
 
     slot = dict_slot_for_key(instance, itemHash, item)
 
@@ -210,7 +234,7 @@ def dict_getitem(instance, item):
 
 
 def dict_get(instance, item, default):
-    itemHash = hash(item)
+    itemHash = NativeHash()(item)
 
     slot = dict_slot_for_key(instance, itemHash, item)
 
@@ -221,7 +245,7 @@ def dict_get(instance, item, default):
 
 
 def dict_contains(instance, item):
-    itemHash = hash(item)
+    itemHash = NativeHash()(item)
 
     slot = dict_slot_for_key(instance, itemHash, item)
 
@@ -229,7 +253,7 @@ def dict_contains(instance, item):
 
 
 def dict_contains_not(instance, item):
-    itemHash = hash(item)
+    itemHash = NativeHash()(item)
 
     slot = dict_slot_for_key(instance, itemHash, item)
 
@@ -237,7 +261,7 @@ def dict_contains_not(instance, item):
 
 
 def dict_setitem(instance, key, value):
-    itemHash = hash(key)
+    itemHash = NativeHash()(key)
 
     slot = dict_slot_for_key(instance, itemHash, key)
 

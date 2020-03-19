@@ -587,3 +587,45 @@ class TestDictCompilation(unittest.TestCase):
                 except Exception:
                     print(actions)
                     raise
+
+    def test_dict_of_int_with_neg_one(self):
+        # negative one is special because it hashes to -1. Python
+        # treats a -1 as an error code (indicating there was
+        # an exception). We don't do the same thing, so lets make
+        # sure we handle things that hash to -1 correctly
+        d = Dict(int, int)()
+
+        @Entrypoint
+        def set(d, x, y):
+            d[x] = y
+
+        @Entrypoint
+        def get(d, x):
+            return d[x]
+
+        d[-1] = 2
+
+        set(d, -1, 2)
+
+        self.assertEqual(get(d, -1), 2)
+
+    def test_dict_of_float_with_neg_one(self):
+        # negative one is special because it hashes to -1. Python
+        # treats a -1 as an error code (indicating there was
+        # an exception). We don't do the same thing, so lets make
+        # sure we handle things that hash to -1 correctly
+        d = Dict(float, int)()
+
+        @Entrypoint
+        def set(d, x, y):
+            d[x] = y
+
+        @Entrypoint
+        def get(d, x):
+            return d[x]
+
+        d[-1.0] = 2
+
+        set(d, -1.0, 2)
+
+        self.assertEqual(get(d, -1.0), 2)

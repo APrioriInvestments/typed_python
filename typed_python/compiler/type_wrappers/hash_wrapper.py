@@ -36,7 +36,7 @@ class HashWrapper(Wrapper):
     is_pass_by_ref = False
 
     def __init__(self):
-        super().__init__(len)
+        super().__init__(hash)
 
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
