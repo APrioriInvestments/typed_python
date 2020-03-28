@@ -12,7 +12,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Class, Alternative, Member, SerializationContext, Forward, ListOf, Final
+from typed_python import (
+    TypeFunction, Class, Alternative, Member, SerializationContext,
+    Forward, ListOf, Final, isCompiled, Entrypoint
+)
+
 import unittest
 
 
@@ -124,3 +128,34 @@ class TypeFunctionTest(unittest.TestCase):
         boo = Boo(int)()
 
         self.assertEqual(boo, boo.f())
+
+    def test_compile_typefunc_staticmethod(self):
+        @TypeFunction
+        def A(T):
+            class MyClass(Class):
+                @Entrypoint
+                @staticmethod
+                def aFunc(x: ListOf(T)) -> ListOf(T):
+                    # accessing 'T' means that this is now a
+                    # closure, holding 'T' in a 'global cell'
+                    T
+
+                    assert isCompiled()
+
+                    return x
+
+            return MyClass
+
+        @Entrypoint
+        def callAFunc():
+            return A(float).aFunc(ListOf(float)([1, 2]))
+
+        # we should be able to dispatch to this from the compiler
+        self.assertEqual(callAFunc(), [1, 2])
+
+        # we should also know that this is an entrypoint
+        self.assertTrue(A(float).aFunc.isEntrypoint)
+
+        # we should be able to dispatch to this from the interpreter and not
+        # trip the assertion on isCompiled
+        self.assertEqual(A(float).aFunc(ListOf(float)([1, 2])), [1, 2])

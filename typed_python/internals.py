@@ -133,7 +133,16 @@ def makeFunctionType(name, f, isMethod=False, ignoreAnnotations=False, assumeClo
             if typed_python.bytecount(type(f).ClosureType):
                 # we need to build the equivalent function with global closures
                 assert len(f.overloads) == 1, "Can't do this for multiple overloads yet"
-                return makeFunctionType(name, f.extractPyFun(0), isMethod, ignoreAnnotations, assumeClosuresGlobal)
+
+                res = makeFunctionType(name, f.extractPyFun(0), isMethod, ignoreAnnotations, assumeClosuresGlobal)
+
+                assert typed_python.bytecount(res.ClosureType) == 0
+
+                if f.isEntrypoint:
+                    # reapply the entrypoint flag
+                    res = type(res().withEntrypoint(True))
+
+                return res
 
         return type(f)
 
