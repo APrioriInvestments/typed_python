@@ -22,6 +22,9 @@ typeWrapper = lambda t: typed_python.compiler.python_object_representation.typed
 
 
 class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
+    def __init__(self, f):
+        super().__init__(f, hasSideEffects=False)
+
     def __repr__(self):
         return "Wrapper(TypeObject(%s))" % self.typeRepresentation.Value.__qualname__
 

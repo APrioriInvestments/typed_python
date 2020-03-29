@@ -16,6 +16,7 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 from typed_python import String, Value
+from types import FunctionType
 
 
 class PythonFreeObjectWrapper(Wrapper):
@@ -29,8 +30,9 @@ class PythonFreeObjectWrapper(Wrapper):
     is_pass_by_ref = False
     is_compile_time_constant = True
 
-    def __init__(self, f):
+    def __init__(self, f, hasSideEffects=True):
         super().__init__(Value(f))
+        self.hasSideEffects = hasSideEffects
 
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
@@ -48,23 +50,29 @@ class PythonFreeObjectWrapper(Wrapper):
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_call(self, context, left, args, kwargs):
-        if all([x.expr_type.is_compile_time_constant for x in list(args) + list(kwargs.values())]):
-            try:
-                res = typed_python.compiler.python_object_representation.pythonObjectRepresentation(
-                    context,
-                    self.typeRepresentation.Value(
+        if not self.hasSideEffects:
+            if all([x.expr_type.is_compile_time_constant for x in list(args) + list(kwargs.values())]):
+                try:
+                    value = self.typeRepresentation.Value(
                         *[a.expr_type.getCompileTimeConstant() for a in args],
                         **{k: v.expr_type.getCompileTimeConstant() for k, v in kwargs.items()}
                     )
-                )
 
-                return res
+                    res = typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+                        context,
+                        value
+                    )
 
-            except Exception as e:
-                context.pushException(type(e), str(e))
-                return
+                    return res
 
-        return context.call_py_function(self.typeRepresentation.Value, args, kwargs)
+                except Exception as e:
+                    context.pushException(type(e), str(e))
+                    return
+
+        if isinstance(self.typeRepresentation.Value, FunctionType):
+            return context.call_py_function(self.typeRepresentation.Value, args, kwargs)
+
+        return context.constantPyObject(self.typeRepresentation.Value).convert_call(args, kwargs)
 
     def convert_attribute(self, context, instance, attribute):
         try:

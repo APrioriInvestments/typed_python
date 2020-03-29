@@ -17,7 +17,7 @@ import threading
 import time
 import queue
 from typed_python.typed_queue import TypedQueue
-from typed_python import ListOf, Entrypoint
+from typed_python import ListOf, Entrypoint, Tuple
 
 
 class TypedQueueTests(unittest.TestCase):
@@ -27,7 +27,7 @@ class TypedQueueTests(unittest.TestCase):
         queue.put(1.0)
 
         self.assertEqual(queue.get(), 1.0)
-        self.assertEqual(queue.get(block=False), None)
+        self.assertEqual(queue.getNonblocking(), None)
 
         queue.put(2.0)
         queue.put(3.0)
@@ -35,7 +35,7 @@ class TypedQueueTests(unittest.TestCase):
         queue.put(4.0)
         self.assertEqual(queue.get(), 3.0)
         self.assertEqual(queue.get(), 4.0)
-        self.assertEqual(queue.get(block=False), None)
+        self.assertEqual(queue.getNonblocking(), None)
 
         self.assertEqual(len(queue), 0)
 
@@ -52,7 +52,7 @@ class TypedQueueTests(unittest.TestCase):
 
         self.assertEqual(len(queue), 0)
         self.assertEqual(queue.peek(), None)
-        self.assertEqual(queue.get(block=False), None)
+        self.assertEqual(queue.getNonblocking(), None)
 
     def test_threading(self):
         queue1 = TypedQueue(float)()
@@ -150,3 +150,48 @@ class TypedQueueTests(unittest.TestCase):
         shouldExit[0] = True
         queue1.put(1.0)
         thread1.join()
+
+    def test_create_in_compiler(self):
+        def f():
+            q = TypedQueue(float)()
+            q.put(10)
+            q.get()
+            q.put(10)
+            return q.get()
+
+        self.assertEqual(f(), 10)
+        self.assertEqual(Entrypoint(f)(), 10)
+
+    def test_create_in_compiler_and_use_in_other_thread(self):
+        @Entrypoint
+        def f():
+            return TypedQueue(float)()
+
+        q = f()
+
+        @Entrypoint
+        def otherThread(q):
+            q.put(10.0)
+
+        otherThread(q)
+
+        t = threading.Thread(target=otherThread, args=(q,), daemon=True)
+        t.start()
+
+        self.assertEqual(q.get(), 10)
+
+        t.join()
+
+    def test_many_append(self):
+        @Entrypoint
+        def f():
+            return TypedQueue(Tuple(int, int))()
+
+        q = f()
+
+        @Entrypoint
+        def otherThread(q):
+            for i in range(1000000):
+                q.put(Tuple(int, int)((i, i)))
+
+        otherThread(q)

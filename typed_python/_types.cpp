@@ -613,7 +613,7 @@ PyObject *MakeValueType(PyObject* nullValue, PyObject* args) {
         return incref((PyObject*)PyInstance::typeObj(type));
     }
 
-    PyErr_SetString(PyExc_TypeError, "Couldn't convert this to a value");
+    PyErr_Format(PyExc_TypeError, "Couldn't convert %S to a value", (PyObject*)arg);
     return NULL;
 }
 

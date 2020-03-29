@@ -42,6 +42,8 @@ public:
         return true;
     }
 
+    PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
+
     int mp_ass_subscript_concrete(PyObject* item, PyObject* value);
 
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);

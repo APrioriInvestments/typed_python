@@ -17,6 +17,7 @@ import _thread
 
 from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.native_ast as native_ast
+from typed_python.type_function import ConcreteTypeFunction
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
@@ -280,7 +281,7 @@ def pythonObjectRepresentation(context, f):
             False
         )
 
-    if hasattr(f, '__typed_python_category__'):
+    if hasattr(f, '__typed_python_category__') and not isinstance(f, type):
         if f.__typed_python_category__ == "Function":
             f = prepareArgumentToBePassedToCompiler(f)
 
@@ -294,11 +295,18 @@ def pythonObjectRepresentation(context, f):
                 False
             )
 
+        if f.__typed_python_category__ == "Class":
+            # global class instances get held as constants
+            return context.constantClassInstance(f)
+
     if isinstance(f, type):
         return TypedExpression(context, native_ast.nullExpr, PythonTypeObjectWrapper(f), False)
 
     if isinstance(f, ModuleType):
         return TypedExpression(context, native_ast.nullExpr, ModuleWrapper(f), False)
+
+    if isinstance(f, ConcreteTypeFunction):
+        return TypedExpression(context, native_ast.nullExpr, PythonFreeObjectWrapper(f, False), False)
 
     return TypedExpression(context, native_ast.nullExpr, PythonFreeObjectWrapper(f), False)
 

@@ -1265,13 +1265,25 @@ extern "C" {
             0
         );
 
+        ((np_lockobject_equivalent*)(lockPtr->pyObj))->locked = true;
+
         return true;
     }
 
     bool np_pyobj_locktype_unlock(PythonObjectOfType::layout_type* lockPtr) {
+        // if (!((np_lockobject_equivalent*)(lockPtr->pyObj))->locked) {
+        //     PyEnsureGilAcquired getTheGil;
+        //     PyErr_SetString(PyExc_RuntimeError, "release unlocked lock");
+        //     throw PythonExceptionSet();
+        // }
+
+        // reset the sanity check
+        ((np_lockobject_equivalent*)(lockPtr->pyObj))->locked = false;
+
         PyThread_release_lock(
             ((np_lockobject_equivalent*)(lockPtr->pyObj))->lock_lock
         );
+
         return false; // __exit__ returning false means don't suppress exceptions
     }
 

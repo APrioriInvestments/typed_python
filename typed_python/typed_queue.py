@@ -25,35 +25,55 @@ def TypedQueue(T):
             self._isEmptyLock = Lock()
             self._isEmptyLock.acquire()
 
-        def get(self, block=True) -> OneOf(None, T):
+        def getNonblocking(self) -> OneOf(None, T):
             """Return a value from the Queue, or None if no value exists."""
-            try:
+            self._lock.acquire()
+
+            if not self._poppable and self._pushable:
+                for i in range(len(self._pushable)):
+                    self._poppable.append(self._pushable[-1 - i])
+                self._pushable.clear()
+
+            if self._poppable:
+                result = self._poppable.pop()
+
+                if self._len == 0:
+                    # leave the lock locked if we're out of elements.
+                    self._isEmptyLock.acquire()
+
+                self._lock.release()
+                return result
+
+            self._lock.release()
+            return None
+
+        def get(self) -> T:
+            """Return a value from the Queue"""
+            self._lock.acquire()
+
+            while not self._len:
+                # we need to wait until the queue is nonempty
+                self._lock.release()
+                self._isEmptyLock.acquire()
+                self._isEmptyLock.release()
                 self._lock.acquire()
 
-                if block:
-                    while not self._len:
-                        # we need to wait until the queue is nonempty
-                        self._lock.release()
-                        self._isEmptyLock.acquire()
-                        self._isEmptyLock.release()
-                        self._lock.acquire()
+            if not self._poppable and self._pushable:
+                for i in range(len(self._pushable)):
+                    self._poppable.append(self._pushable[-1 - i])
+                self._pushable.clear()
 
-                if not self._poppable and self._pushable:
-                    for i in range(len(self._pushable)):
-                        self._poppable.append(self._pushable[-1 - i])
-                    self._pushable.clear()
+            if self._poppable:
+                result = self._poppable.pop()
 
-                if self._poppable:
-                    result = self._poppable.pop()
-                    if self._len == 0:
-                        # leave the lock locked if we're out of elements.
-                        self._isEmptyLock.acquire()
+                if self._len == 0:
+                    # leave the lock locked if we're out of elements.
+                    self._isEmptyLock.acquire()
 
-                    return result
-
-                return None
-            finally:
                 self._lock.release()
+                return result
+
+            raise Exception("impossible")
 
         def getMany(self, minCount: int, maxCount: int) -> ListOf(T):
             """Return a list of values from the Queue.
@@ -71,10 +91,14 @@ def TypedQueue(T):
 
                     while not self._len:
                         # we need to wait until the queue is nonempty
-                        self._lock.release()
-                        self._isEmptyLock.acquire()
-                        self._isEmptyLock.release()
-                        self._lock.acquire()
+                        try:
+                            self._lock.release()
+                            try:
+                                self._isEmptyLock.acquire()
+                            finally:
+                                self._isEmptyLock.release()
+                        finally:
+                            self._lock.acquire()
 
                     if not self._poppable and self._pushable:
                         for i in range(len(self._pushable)):
@@ -94,6 +118,7 @@ def TypedQueue(T):
 
         def put(self, element: T) -> None:
             self._lock.acquire()
+
             self._pushable.append(element)
 
             if self._len == 1:

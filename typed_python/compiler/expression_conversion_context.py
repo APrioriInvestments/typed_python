@@ -44,6 +44,7 @@ ExpressionIntermediate = Alternative(
     StackSlot={"name": str, "expr": native_ast.Expression}
 )
 
+_memoizedKeepalives = []
 _memoizedThingsById = {}
 _pyFuncToFuncCache = {}
 
@@ -111,6 +112,24 @@ class ExpressionConversionContext(object):
                     native_ast.const_uint64_expr(id(x)).cast(native_ast.Void.pointer())
                 ).cast(oExpr.expr_type.getNativeLayoutType())
             )
+        )
+
+    def constantClassInstance(self, x):
+        aList = ListOf(type(x))([x])
+
+        # this is a terrible way of keeping this alive. we should be memoizing
+        # constants by their names so we can load them from binaries later
+        _memoizedKeepalives.append(aList)
+
+        classPtr = int(aList.pointerUnsafe(0))
+
+        wrapper = typeWrapper(type(x))
+
+        return TypedExpression(
+            self,
+            native_ast.const_uint64_expr(classPtr).cast(wrapper.getNativeLayoutType().pointer()),
+            wrapper,
+            True
         )
 
     @staticmethod
