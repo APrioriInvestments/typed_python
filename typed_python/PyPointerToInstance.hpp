@@ -24,7 +24,7 @@ public:
 
     PointerTo* type();
 
-    PyObject* sq_item_concrete(Py_ssize_t ix);
+    PyObject* mp_subscript_concrete(PyObject* ix);
 
     static PyObject* pointerInitialize(PyObject* o, PyObject* args);
 
@@ -41,6 +41,8 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
         return true;
     }
+
+    int mp_ass_subscript_concrete(PyObject* item, PyObject* value);
 
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
 

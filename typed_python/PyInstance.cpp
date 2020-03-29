@@ -670,14 +670,6 @@ PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
 
         return res;
     }
-    if (    t->getTypeCategory() == Type::TypeCategory::catPointerTo) {
-        PySequenceMethods* res =
-            new PySequenceMethods {0,0,0,0,0,0,0,0};
-
-        res->sq_item = (ssizeargfunc)PyInstance::sq_item;
-
-        return res;
-    }
 
     return 0;
 }
@@ -778,7 +770,7 @@ PyObject* PyInstance::mp_subscript_concrete(PyObject* item) {
 
 // static
 PyMappingMethods* PyInstance::mappingMethods(Type* t) {
-    static PyMappingMethods* res =
+    static PyMappingMethods* mapMethods =
         new PyMappingMethods {
             PyInstance::mp_and_sq_length, //mp_length
             PyInstance::mp_subscript, //mp_subscript
@@ -793,7 +785,19 @@ PyMappingMethods* PyInstance::mappingMethods(Type* t) {
         t->getTypeCategory() == Type::TypeCategory::catAlternative ||
         t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative ||
         t->getTypeCategory() == Type::TypeCategory::catClass) {
-        return res;
+        return mapMethods;
+    }
+
+
+    static PyMappingMethods* mapMethodsLite =
+        new PyMappingMethods {
+            nullptr,
+            PyInstance::mp_subscript, //mp_subscript
+            PyInstance::mp_ass_subscript //mp_ass_subscript
+        };
+
+    if (t->getTypeCategory() == Type::TypeCategory::catPointerTo) {
+        return mapMethodsLite;
     }
 
     return 0;

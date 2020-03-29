@@ -74,6 +74,7 @@ public:
     Py_ssize_t mp_and_sq_length_concrete();
 
     PyObject* mp_subscript_concrete(PyObject* item);
+
     int mp_ass_subscript_concrete(PyObject* item, PyObject* v);
 
     PyObject* tp_iter_concrete();

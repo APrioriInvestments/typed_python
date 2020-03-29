@@ -88,13 +88,44 @@ PyObject* PyPointerToInstance::pointerSet(PyObject* o, PyObject* args) {
     return incref(Py_None);
 }
 
-PyObject* PyPointerToInstance::sq_item_concrete(Py_ssize_t ix) {
-    instance_ptr output;
+PyObject* PyPointerToInstance::mp_subscript_concrete(PyObject* key) {
+    return translateExceptionToPyObject([&]() {
+        int64_t offset;
 
-    type()->offsetBy((instance_ptr)&output, dataPtr(), ix);
+        copyConstructFromPythonInstance(Int64::Make(), (instance_ptr)&offset, key);
 
-    return extractPythonObject(output, type()->getEltType());
+        instance_ptr output;
+
+        type()->offsetBy((instance_ptr)&output, dataPtr(), offset);
+
+        return extractPythonObject(output, type()->getEltType());
+    });
 }
+
+int PyPointerToInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
+    return translateExceptionToPyObjectReturningInt([&]() {
+        int64_t offset;
+
+        copyConstructFromPythonInstance(Int64::Make(), (instance_ptr)&offset, item);
+
+        Instance val = Instance::createAndInitialize(
+            type()->getEltType(),
+            [&](instance_ptr i) {
+                copyConstructFromPythonInstance(type()->getEltType(), i, value);
+            }
+        );
+
+        void* output;
+
+        type()->offsetBy((instance_ptr)&output, dataPtr(), offset);
+
+        type()->getEltType()->assign((instance_ptr)output, val.data());
+
+        return 0;
+    });
+}
+
+
 
 //static
 PyObject* PyPointerToInstance::pointerGet(PyObject* o, PyObject* args) {

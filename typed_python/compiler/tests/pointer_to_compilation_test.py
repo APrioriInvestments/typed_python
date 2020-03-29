@@ -108,3 +108,14 @@ class TestPointerToCompilation(unittest.TestCase):
             return x
 
         self.assertEqual(iadd(p, 1), Entrypoint(iadd)(p, 1))
+
+    def test_pointer_setitem_works(self):
+        def f():
+            x = ListOf(int)([1, 2, 3])
+            p = x.pointerUnsafe(0)
+            p[1] += p[0]
+
+            return x[1]
+
+        self.assertEqual(f(), 3)
+        self.assertEqual(Entrypoint(f)(), 3)
