@@ -454,11 +454,10 @@ The compiler is still very much a work in progress. Much of Python3 can be compi
 including much of the core string functionality, most of the typed_python datastructures
 including ListOf, Dict, Alternative, etc, and Class instances (with inheritance).
 
-However, large gaps still remain. In particular,
+However, some gaps still remain. In particular,
 
-* we don't allow try/catch yet.
-* we can't handle untyped lists, tuples, or dictionaries.
-* lots of little details have deviations from standard python behavior or are simply not implemented yet.
+* we don't have type inference for untyped lists, tuples, or dictionaries, so these are slow
+* there are still deviations from standard python behavior
 * in some cases, where the compiler cannot produce compiled code it doesn't yet know how to defer to the interpreter.
 
 Nevertheless, for the code that it can compile it gives correct results, and
