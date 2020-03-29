@@ -348,9 +348,9 @@ def expr_str(self):
     if self.matches.Sequence:
         return "\n".join(str(x) for x in self.vals)
     if self.matches.Finally:
-        label = " [" + self.name + "]" if self.name else ""
+        label = " [label=" + self.name + "]" if self.name else ""
         return (
-            "try:\n" + indent(str(self.expr)) + "\nfinally:" + label + "\n"
+            "try:\n" + indent(str(self.expr)) + "\nfinally " + label + ":\n"
             + indent("\n".join(str(x) for x in self.teardowns))
         )
     if self.matches.TryCatch:
@@ -480,7 +480,17 @@ Expression = Expression.define(Alternative(
         'false': Expression
     },
     Throw={'expr': Expression },  # throw a pointer.
+    # evaluate 'expr', which must have type 'void' if it returns. if it throws an exception,
+    # evaluate 'handler', which must also have type 'void' if it returns, with the exception
+    # bound to 'varname'
     TryCatch={
+        'expr': Expression,
+        'varname': str,  # varname is bound to a int8*
+        'handler': Expression
+    },
+    # evaluate 'expr', which can have any type. If it throws, evaluate
+    # 'handler', which must propagate the exception upward.
+    ExceptionPropagator={
         'expr': Expression,
         'varname': str,  # varname is bound to a int8*
         'handler': Expression

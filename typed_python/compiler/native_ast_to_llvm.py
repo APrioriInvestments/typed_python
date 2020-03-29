@@ -671,6 +671,23 @@ class FunctionConverter:
         self.builder.unreachable()
 
     def convert(self, expr):
+        """Convert 'expr' into underlying llvm instructions.
+
+        Also, verify that if we return a value, our control flow
+        block is not terminated, and that if we don't return a value,
+        we don't have a dangling block.
+        """
+        res = self._convert(expr)
+
+        if res is not None:
+            assert not self.builder.block.is_terminated, expr
+        else:
+            assert self.builder.block.is_terminated, expr
+
+        return res
+
+    def _convert(self, expr):
+        """Actually convert 'expr' into underlying llvm instructions."""
         if expr.matches.Let:
             lhs = self.convert(expr.val)
 
@@ -842,7 +859,7 @@ class FunctionConverter:
                 )
 
                 self.builder.branch(block)
-                return TypedLLVMValue(None, native_ast.Type.Void())
+                return
             else:
                 # this is a naked 'return'
                 if expr.arg is not None:
@@ -1214,7 +1231,7 @@ class FunctionConverter:
 
             return
 
-        if expr.matches.TryCatch:
+        if expr.matches.TryCatch or expr.matches.ExceptionPropagator:
             self.teardown_handler = TeardownHandler(
                 self,
                 self.teardown_handler
@@ -1246,18 +1263,22 @@ class FunctionConverter:
                     if handler_res is not None:
                         self.builder.branch(resume_normal_block)
 
-            target_resume_block = self.builder.append_basic_block()
+            target_resume_block = self.builder.append_basic_block("try_catch_resume")
 
             if result is not None:
-                # TODO: revert this - it just lets me do some testing, but it's not correct in general
-                if not self.builder.block.is_terminated:
-                    self.builder.branch(target_resume_block)
+                self.builder.branch(target_resume_block)
 
             new_handler.generate_trycatch_unwind(target_resume_block, generator)
 
             self.builder.position_at_start(target_resume_block)
 
-            if result is None:
+            # if we returned 'none', and we're a TryCatch, then by definition we return
+            # 'void', which means we might return void ourselves. If we are an unwind
+            # handler, we don't need to do this because we're just going to propgate
+            # the exception anyways
+            if result is None and expr.matches.TryCatch:
+                result = TypedLLVMValue(None, native_ast.Type.Void())
+            elif result is None and not self.builder.block.is_terminated:
                 self.builder.unreachable()
 
             return result
@@ -1295,13 +1316,14 @@ class FunctionConverter:
             if expr.name is not None:
                 finalBlock = self.builder.append_basic_block(self.teardown_handler.blockName() + "_resume")
 
-                if finally_result is not None and not self.builder.block.is_terminated:
+                if finally_result is None:
+                    # someone might be jumping here. just because we don't have
+                    # a value doesn't mean this particular expression doesn't have
+                    # a result, because we might be a 'finally' catching a result.
+                    finally_result = TypedLLVMValue(None, native_ast.Type.Void())
+
+                if not self.builder.block.is_terminated:
                     self.builder.branch(finalBlock)
-                else:
-                    # we didn't have a result, so the block we're on is already
-                    # terminated (either because it returned or threw an exception)
-                    # and so it can't jump.
-                    pass
 
                 self.builder.position_at_start(finalBlock)
             else:

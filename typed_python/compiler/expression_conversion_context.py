@@ -631,7 +631,7 @@ class ExpressionConversionContext(object):
             expr = native_ast.Expression.Finally(expr=expr, teardowns=self.teardowns)
 
         if exceptionsTakeFrom and expr.couldThrow():
-            expr = native_ast.Expression.TryCatch(
+            expr = native_ast.Expression.ExceptionPropagator(
                 expr=expr,
                 varname=self.functionContext.allocateLetVarname(),
                 handler=runtime_functions.add_traceback.call(

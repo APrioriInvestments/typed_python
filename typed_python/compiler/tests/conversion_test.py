@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import time
+import sys
 import traceback
 import unittest
 from flaky import flaky
@@ -58,6 +59,9 @@ def repeat_test(f, *a):
             f(*a)
         except Exception:
             pass
+
+
+repeat_test_compiled = Entrypoint(repeat_test)
 
 
 class TestCompilationStructures(unittest.TestCase):
@@ -1821,15 +1825,18 @@ class TestCompilationStructures(unittest.TestCase):
         ]
 
         for f, a, limit in perf_test_cases:
-            c_f = Compiled(f)
             m0 = psutil.Process().memory_info().rss / 1024
             t0 = time.time()
             repeat_test(f, *a)
             t1 = time.time()
             m1 = psutil.Process().memory_info().rss / 1024
-            m2 = m1
+
+            # burn in the compiler
+            repeat_test_compiled(f, *a)
+
+            m2 = psutil.Process().memory_info().rss / 1024
             t2 = time.time()
-            repeat_test(c_f, *a)
+            repeat_test_compiled(f, *a)
             t3 = time.time()
             m3 = psutil.Process().memory_info().rss / 1024
 
@@ -1840,7 +1847,8 @@ class TestCompilationStructures(unittest.TestCase):
             # self.assertLessEqual(ratio, limit, (f.__name__, a))
 
             # osx memory usage rises, but not others
-            self.assertLessEqual(m3 - m2, m1 - m0 + 512, (f.__name__, a))
+            if sys.platform != "darwin":
+                self.assertLessEqual(m3 - m2, m1 - m0 + 512, (f.__name__, a))
 
         for f in [g1]:
             c_f = Compiled(f)
@@ -2403,12 +2411,12 @@ class TestCompilationStructures(unittest.TestCase):
             return 2
 
         perf_test_cases = [
-            (with_cm_simple1, Compiled(with_cm_simple2), (0, 0, 0, 0), 1.0),
-            (with_cm_simple1, Compiled(with_cm_simple2), (0, 0, 0, 1), 1.0),
-            (with_cm_simple1, Compiled(with_cm_simple2), (0, 0, 1, 0), 1.0),
-            (with_cm_simple1, Compiled(with_cm_simple2), (0, 0, 1, 1), 1.0),
-            (with_cm_simple1, Compiled(with_cm_simple2), (0, 1, 0, 0), 1.0),
-            (with_cm_simple1, Compiled(with_cm_simple2), (1, 0, 0, 0), 1.0),
+            (with_cm_simple1, with_cm_simple2, (0, 0, 0, 0), 1.0),
+            (with_cm_simple1, with_cm_simple2, (0, 0, 0, 1), 1.0),
+            (with_cm_simple1, with_cm_simple2, (0, 0, 1, 0), 1.0),
+            (with_cm_simple1, with_cm_simple2, (0, 0, 1, 1), 1.0),
+            (with_cm_simple1, with_cm_simple2, (0, 1, 0, 0), 1.0),
+            (with_cm_simple1, with_cm_simple2, (1, 0, 0, 0), 1.0),
         ]
 
         for f1, f2, a, limit in perf_test_cases:
@@ -2417,9 +2425,13 @@ class TestCompilationStructures(unittest.TestCase):
             repeat_test(f1, *a)
             t1 = time.time()
             m1 = psutil.Process().memory_info().rss / 1024
-            m2 = m1
+
+            # burn in the compiler
+            repeat_test_compiled(f2, *a)
+
+            m2 = psutil.Process().memory_info().rss / 1024
             t2 = time.time()
-            repeat_test(f2, *a)
+            repeat_test_compiled(f2, *a)
             t3 = time.time()
             m3 = psutil.Process().memory_info().rss / 1024
 
@@ -2560,3 +2572,66 @@ class TestCompilationStructures(unittest.TestCase):
         #                                 r2 = result_or_exception(Compiled(with_cm_multiple2), a, b, c, d, e, f, g, h, t2)
         #                                 self.assertEqual(r1, r2, (a, b, c, d, e, f, g, h))
         #                                 self.assertEqual(t1, t2, (a, b, c, d, e, f, g, h))
+
+    def test_catch_definite_exception(self):
+        @Entrypoint
+        def g():
+            raise Exception("boo")
+
+        @Entrypoint
+        def f(x):
+            try:
+                g()
+            except Exception:
+                pass
+
+        self.assertEqual(f(1), None)
+
+    def test_catch_definite_exception_propagate_but_catch(self):
+        @Entrypoint
+        def g():
+            raise Exception("boo")
+
+        @Entrypoint
+        def f(x):
+            try:
+                try:
+                    g()
+                except Exception:
+                    raise Exception("Boo again!")
+            except Exception:
+                pass
+
+        self.assertEqual(f(1), None)
+
+    def test_catch_definite_exception_propagate(self):
+        @Entrypoint
+        def g():
+            raise Exception("boo")
+
+        @Entrypoint
+        def f(x):
+            try:
+                g()
+            except Exception:
+                raise Exception("Boo again!")
+
+        with self.assertRaisesRegex(Exception, "Boo again"):
+            f(1)
+
+    def test_catch_possible_exception(self):
+        @Entrypoint
+        def g():
+            raise Exception("boo")
+
+        @Entrypoint
+        def f(x):
+            try:
+                if x < 0:
+                    return 0
+                g()
+            except Exception:
+                pass
+
+        self.assertEqual(f(1), None)
+        self.assertEqual(f(-1), 0)
