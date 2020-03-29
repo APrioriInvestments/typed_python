@@ -306,7 +306,8 @@ class ListOfWrapper(TupleOrListOfWrapper):
         # we are just moving this - we assume no layouts have selfpointers throughout typed_python
         result = context.push(
             self.underlyingWrapperType,
-            lambda result: result.expr.store(inst.convert_getitem_unsafe(ix).nonref_expr)
+            lambda result: result.expr.store(inst.convert_getitem_unsafe(ix).nonref_expr),
+            wantsTeardown=False
         )
 
         context.pushEffect(

@@ -509,3 +509,21 @@ class TestListOfCompilation(unittest.TestCase):
 
                             self.assertEqual(l0, l1, (l, a, b, c))
                             self.assertEqual(l0, l2, (l, a, b, c))
+
+    def test_list_pop_refcounts(self):
+        lst = ListOf(ListOf(int))()
+        aTup = ListOf(int)()
+
+        for i in range(100):
+            lst.append(aTup)
+
+        @Entrypoint
+        def popTen(lst):
+            for _ in range(10):
+                lst.pop()
+
+        rc1 = _types.refcount(aTup)
+        popTen(lst)
+        rc2 = _types.refcount(aTup)
+
+        self.assertEqual(rc2, rc1 - 10)
