@@ -13,8 +13,11 @@
 #   limitations under the License.
 
 import unittest
-
+import threading
+import time
+import queue
 from typed_python.typed_queue import TypedQueue
+from typed_python import ListOf, Entrypoint
 
 
 class TypedQueueTests(unittest.TestCase):
@@ -24,7 +27,7 @@ class TypedQueueTests(unittest.TestCase):
         queue.put(1.0)
 
         self.assertEqual(queue.get(), 1.0)
-        self.assertEqual(queue.get(), None)
+        self.assertEqual(queue.get(block=False), None)
 
         queue.put(2.0)
         queue.put(3.0)
@@ -32,7 +35,7 @@ class TypedQueueTests(unittest.TestCase):
         queue.put(4.0)
         self.assertEqual(queue.get(), 3.0)
         self.assertEqual(queue.get(), 4.0)
-        self.assertEqual(queue.get(), None)
+        self.assertEqual(queue.get(block=False), None)
 
         self.assertEqual(len(queue), 0)
 
@@ -49,4 +52,101 @@ class TypedQueueTests(unittest.TestCase):
 
         self.assertEqual(len(queue), 0)
         self.assertEqual(queue.peek(), None)
-        self.assertEqual(queue.get(), None)
+        self.assertEqual(queue.get(block=False), None)
+
+    def test_threading(self):
+        queue1 = TypedQueue(float)()
+        queue2 = TypedQueue(float)()
+
+        def pong():
+            queue2.put(queue1.get())
+
+        thread1 = threading.Thread(target=pong)
+        thread1.start()
+
+        queue1.put(10)
+        self.assertEqual(queue2.get(), 10)
+
+        thread1.join()
+
+    def test_queue_perf(self):
+        untypedQueue1 = queue.Queue()
+        untypedQueue2 = queue.Queue()
+        shouldExitUntyped = [False]
+
+        def pongUntyped():
+            while not shouldExitUntyped[0]:
+                untypedQueue2.put(untypedQueue1.get())
+
+        threadUntyped = threading.Thread(target=pongUntyped)
+        threadUntyped.start()
+
+        def putFloatsUntyped(q, count):
+            for i in range(count):
+                q.put(i)
+
+        def getFloatsUntyped(q, count):
+            res = 0.0
+
+            for i in range(count):
+                res += q.get()
+
+            return res
+
+        t0 = time.time()
+        putFloatsUntyped(untypedQueue1, 10000)
+        getFloatsUntyped(untypedQueue2, 10000)
+        print("took ", time.time() - t0, " to do 10k untyped")
+        timeForUntyped1mm = (time.time() - t0) * 100
+
+        shouldExitUntyped[0] = True
+        untypedQueue1.put(10)
+        threadUntyped.join()
+
+        shouldExit = ListOf(bool)([False])
+        queue1 = TypedQueue(float)()
+        queue2 = TypedQueue(float)()
+
+        @Entrypoint
+        def pong():
+            while not shouldExit[0]:
+                queue2.putMany(queue1.getMany(1, 1000))
+
+        thread1 = threading.Thread(target=pong)
+        thread1.start()
+
+        @Entrypoint
+        def putFloats(q, count):
+            floats = ListOf(float)()
+
+            for i in range(count):
+                floats.append(i)
+
+            q.putMany(floats)
+
+        @Entrypoint
+        def getFloats(q, count):
+            res = 0.0
+            i = 0
+
+            while i < count:
+                elts = q.getMany(1, 1000)
+                for elt in elts:
+                    res += elt
+                    i += 1
+
+            return res
+
+        # prime the compiler
+        putFloats(queue1, 1000)
+        getFloats(queue2, 1000)
+
+        t0 = time.time()
+        putFloats(queue1, 1000000)
+        getFloats(queue2, 1000000)
+        speedup = timeForUntyped1mm / (time.time() - t0)
+        print("took ", time.time() - t0, " to do 1mm typed, which is ", speedup, " times faster")
+
+        shouldExit[0] = True
+        queue1.put(1.0)
+        thread1.join()

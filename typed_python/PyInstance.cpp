@@ -1596,6 +1596,18 @@ Type* PyInstance::tryUnwrapPyInstanceToType(PyObject* arg) {
         return possibleType;
     }
 
+    if (PyDict_Contains(nonTypesAcceptedAsTypes(), arg)) {
+        PyObject* nonType = PyDict_GetItem(nonTypesAcceptedAsTypes(), arg);
+        if (!nonType) {
+            return nullptr;
+        }
+
+        return PythonObjectOfType::Make(
+            (PyTypeObject*)nonType,
+            arg
+        );
+    }
+
     if (arg == Py_None) {
         return NoneType::Make();
     }

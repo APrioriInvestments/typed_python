@@ -96,7 +96,10 @@ class ConcreteTypeFunction(object):
             key = (args, kwargs)
 
             if key in self._memoForKey:
-                return self._memoForKey[key]
+                res = self._memoForKey[key]
+                if isinstance(res, Exception):
+                    raise res
+                return res
 
             forward = Forward(self.nameFor(args, kwargs))
 
