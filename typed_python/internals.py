@@ -18,7 +18,7 @@ import _thread
 import threading
 
 import typed_python
-import typed_python.inspect_override as inspect
+import inspect
 
 
 # some 'types' (threading.Lock, threading.RLock) aren't really types, they're

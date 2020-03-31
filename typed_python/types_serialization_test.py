@@ -15,7 +15,7 @@
 import sys
 import os
 import importlib
-import typed_python.ast_util as ast_util
+import typed_python.compiler.python_ast_util as python_ast_util
 import threading
 import textwrap
 import time
@@ -993,7 +993,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert not os.path.exists(fpath)
 
-        ast_util.clearAllCaches()
+        python_ast_util.clearAllCaches()
 
         # at this point, the backing data for serialization is not there
         # and also, the cache is cleared.
@@ -1381,7 +1381,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             self.assertEqual(f2(10), 11)
 
-        ast_util.clearAllCaches()
+        python_ast_util.clearAllCaches()
 
         # now the directory is deleted. When we reserialize it we shouldn't
         # need it because it should be stashed in the ast cache.

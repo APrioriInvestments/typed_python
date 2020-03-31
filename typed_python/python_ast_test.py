@@ -19,6 +19,9 @@ import unittest
 
 ownName = os.path.abspath(__file__)
 
+# needed as a module-level variable by a test below
+someVarname = 10
+
 
 class TestPythonAst(unittest.TestCase):
     def test_basic_parsing(self):
@@ -37,6 +40,8 @@ class TestPythonAst(unittest.TestCase):
 
         self.assertEqual(pyast, pyast2)
         self.assertEqual(pyast, pyast3)
+
+        return f2
 
     def test_reverse_parse(self):
         self.reverseParseCheck(lambda: X)  # noqa: F821
@@ -198,3 +203,48 @@ class TestPythonAst(unittest.TestCase):
             return b"aaa"
 
         self.reverseParseCheck(f)
+
+    def test_converting_lambdas_in_expressions(self):
+        def identity(x):
+            return x
+        someLambdas = (
+            identity(lambda x: x + 1),
+            identity(lambda x: x + 2),
+            identity(lambda x: x + 3),
+            identity(lambda x: x + 4),
+            identity(lambda x: x + 5),
+            identity(lambda x: x + 6),
+            identity(lambda x: x + 7)
+        )
+
+        for l in someLambdas:
+            self.assertEqual(self.reverseParseCheck(l)(10), l(10))
+
+    def test_converting_two_lambdas_on_same_line(self):
+        someLambdas = (lambda x: x + 1, lambda x: x + 2)
+
+        for l in someLambdas:
+            self.assertEqual(self.reverseParseCheck(l)(10), l(10))
+
+    def test_converting_two_lambdas_with_similar_bodies_but_different_args_on_same_line(self):
+        # shouldn't matter which one we pick
+        someLambdas = (lambda x, y: x + 1, lambda x, z: x + 1)
+
+        for l in someLambdas:
+            self.assertEqual(self.reverseParseCheck(l)(10, 11), l(10, 11))
+
+    def test_converting_two_identical_lambdas_on_same_line(self):
+        # shouldn't matter which one we pick
+        someLambdas = (lambda x: x + 1, lambda x: x + 1)
+
+        for l in someLambdas:
+            self.assertEqual(self.reverseParseCheck(l)(10), l(10))
+
+    def test_converting_lambdas_pulled_out_of_binding(self):
+        # shouldn't matter which one we pick
+        aLambda = (lambda x: (lambda y: x + y))(10)
+
+        pyast = python_ast.convertFunctionToAlgebraicPyAst(aLambda)
+        aLambda2 = python_ast.evaluateFunctionPyAst(pyast, globals={'x': 10})
+
+        self.assertEqual(aLambda(11), aLambda2(11))

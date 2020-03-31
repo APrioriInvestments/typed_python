@@ -261,6 +261,42 @@ def computeFunctionArgVariables(args: Arguments):
     return names
 
 
+def computeMentionedConstants(astNode):
+    """Return a set of inline constants that are mentioned by this code directly.
+
+    These include inline strings, integers, floating point numbers, None, True, False,
+    etc. This doesn't include constants within interior code objects.
+    """
+    constants = set()
+
+    def visit(x):
+        if isinstance(x, Expr):
+            if x.matches.Str:
+                constants.add(x.s)
+
+            if x.matches.Bytes:
+                constants.add(x.b)
+
+            if x.matches.Constant:
+                constants.add(x.value)
+
+            if x.matches.Num:
+                constants.add(x.n.value)
+
+        if isinstance(x, Statement):
+            if x.matches.FunctionDef:
+                return False
+
+            if x.matches.ClassDef:
+                return False
+
+        return True
+
+    visitPyAstChildren(astNode, visit)
+
+    return constants
+
+
 def computeReadVariables(astNode):
     """Return a set of variable names that are read from by this ast node or children.
 

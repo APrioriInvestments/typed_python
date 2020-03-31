@@ -19,7 +19,7 @@ Python ast directly.
 """
 
 import ast
-import typed_python.ast_util as ast_util
+import typed_python.compiler.python_ast_util as python_ast_util
 import weakref
 import types
 from typed_python._types import Forward, Alternative, TupleOf, OneOf
@@ -872,23 +872,21 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
         return _algebraicAstCache[fCode, keepLineInformation]
 
     try:
-        pyast = ast_util.pyAstFor(fCode)
-
-        _, lineno = ast_util.getSourceLines(fCode)
-        _, fname = ast_util.getSourceFilenameAndText(fCode)
-
-        pyast = ast_util.functionDefOrLambdaAtLineNumber(pyast, lineno)
+        pyast = python_ast_util.pyAstForCode(fCode)
     except Exception:
         raise Exception("Failed to get source for function %s" % (fCode.co_name))
 
     try:
-        algebraicAst = convertPyAstToAlgebraic(pyast, fname, keepLineInformation)
+        algebraicAst = convertPyAstToAlgebraic(pyast, fCode.co_filename, keepLineInformation)
 
         _algebraicAstCache[fCode, keepLineInformation] = algebraicAst
 
         return algebraicAst
     except Exception as e:
-        raise Exception("Failed to convert function at %s:%s:\n%s" % (fname, lineno, repr(e)))
+        raise Exception(
+            "Failed to convert function at %s:%s:\n%s"
+            % (fCode.co_filename, fCode.co_firstlineno, repr(e))
+        )
 
 
 # a memo from pyAst to the 'code' object that we evaluate to def it.
@@ -917,14 +915,28 @@ def stripAstArgsAnnotations(args: Arguments):
 
 
 def evaluateFunctionPyAst(pyAst, globals=None, stripAnnotations=False):
-    assert isinstance(pyAst, (Expr.Lambda, Statement.FunctionDef))
+    assert isinstance(pyAst, (Expr.Lambda, Statement.FunctionDef, Statement.AsyncFunctionDef))
 
     filename = pyAst.filename
 
-    if isinstance(pyAst, Statement):
+    if isinstance(pyAst, Statement.FunctionDef):
         # strip out the decorator definitions. We just want the underlying function
         # object itself.
         pyAstModule = Statement.FunctionDef(
+            name=pyAst.name,
+            args=stripAstArgsAnnotations(pyAst.args) if stripAnnotations else pyAst.args,
+            body=pyAst.body,
+            decorator_list=(),
+            returns=pyAst.returns if not stripAnnotations else None,
+            line_number=pyAst.line_number,
+            col_offset=pyAst.col_offset,
+            filename=pyAst.filename,
+        )
+        pyAstModule = Module.Module(body=(pyAstModule,))
+    elif isinstance(pyAst, Statement.AsyncFunctionDef):
+        # strip out the decorator definitions. We just want the underlying function
+        # object itself.
+        pyAstModule = Statement.AsyncFunctionDef(
             name=pyAst.name,
             args=stripAstArgsAnnotations(pyAst.args) if stripAnnotations else pyAst.args,
             body=pyAst.body,
@@ -978,7 +990,7 @@ def evaluateFunctionPyAst(pyAst, globals=None, stripAnnotations=False):
 
 
 def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals):
-    assert isinstance(pyAst, Statement.FunctionDef) or isinstance(pyAst, Expr.Lambda)
+    assert isinstance(pyAst, (Statement.FunctionDef, Statement.AsyncFunctionDef, Expr.Lambda))
 
     # make a new FunctionDef that defines a function
     # def f(l1, l2, ...):  #l1 ... lN in locals
@@ -993,6 +1005,20 @@ def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals):
     if pyAst.matches.FunctionDef:
         statements = [
             Statement.FunctionDef(
+                name=pyAst.name,
+                args=pyAst.args,
+                body=pyAst.body,
+                decorator_list=(),
+                returns=pyAst.returns,
+                line_number=pyAst.line_number,
+                col_offset=pyAst.col_offset,
+                filename=pyAst.filename,
+            ),
+            Statement.Return(value=Expr.Name(id=pyAst.name, ctx=ExprContext.Load()))
+        ]
+    elif pyAst.matches.AsyncFunctionDef:
+        statements = [
+            Statement.AsyncFunctionDef(
                 name=pyAst.name,
                 args=pyAst.args,
                 body=pyAst.body,
