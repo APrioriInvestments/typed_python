@@ -991,6 +991,7 @@ class TestCompilationStructures(unittest.TestCase):
         # check that the extra call to 'g' doesn't introduce any overhead
         self.assertTrue(.75 <= elapsedF / elapsedG <= 1.25, elapsedF / elapsedG)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_perf_of_star_arg_intermediate_is_fast(self):
         def f(x, y):
             return x + y
@@ -1030,7 +1031,7 @@ class TestCompilationStructures(unittest.TestCase):
         print("Compiled is ", elapsedGPy / elapsedG, " times faster")
 
         # check that the extra call to 'g' doesn't introduce any overhead
-        self.assertTrue(.75 <= elapsedF / elapsedG <= 1.25, elapsedF / elapsedG)
+        self.assertTrue(.65 <= elapsedF / elapsedG <= 1.35, elapsedF / elapsedG)
 
     def test_star_args_of_masquerade(self):
         def f(*args):

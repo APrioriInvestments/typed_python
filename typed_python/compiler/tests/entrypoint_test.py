@@ -96,7 +96,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
             compiledAdd(i, 1)
 
         # I get about .5 seconds on my laptop
-        self.assertTrue(time.time() - t0 < 3.0, time.time() - t0)
+        self.assertTrue(time.time() - t0 < 5.0, time.time() - t0)
 
     def test_specialized_entrypoint_perf_difference(self):
         compiledAdd = Entrypoint(add)
