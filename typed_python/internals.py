@@ -263,6 +263,9 @@ class ClassMetaclass(type):
             else:
                 classMembers.append((eltName, elt))
 
+        if "__name__" in kwds:
+            name = kwds["__name__"]
+
         return typed_python._types.Class(
             name,
             tuple(bases),
