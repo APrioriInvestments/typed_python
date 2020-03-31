@@ -252,14 +252,6 @@ def dict_contains(instance, item):
     return slot != -1
 
 
-def dict_contains_not(instance, item):
-    itemHash = NativeHash()(item)
-
-    slot = dict_slot_for_key(instance, itemHash, item)
-
-    return slot == -1
-
-
 def dict_setitem(instance, key, value):
     itemHash = NativeHash()(key)
 
@@ -678,18 +670,18 @@ class DictWrapper(DictWrapperBase):
         return context.pushPod(int, self.convert_len_native(expr))
 
     def convert_bin_op_reverse(self, context, left, op, right, inplace):
-        if op.matches.In or op.matches.NotIn:
+        if op.matches.In:
             right = right.convert_to_type(self.keyType)
             if right is None:
                 return None
 
             return context.call_py_function(
-                dict_contains if op.matches.In else dict_contains_not,
+                dict_contains,
                 (left, right),
                 {}
             )
 
-        return super().convert_bin_op(context, left, op, right, inplace)
+        return super().convert_bin_op_reverse(context, left, op, right, inplace)
 
     def convert_getkey_by_index_unsafe(self, context, expr, item):
         return context.pushReference(

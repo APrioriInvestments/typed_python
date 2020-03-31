@@ -243,6 +243,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         self.generateAppend
                     ).call(instance, val)
                 )
+
         if methodname == "copy":
             if len(args) == 0:
                 return context.push(

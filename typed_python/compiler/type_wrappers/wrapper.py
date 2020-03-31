@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 import typed_python.compiler
-
+from typed_python.python_ast import ComparisonOp, UnaryOp
 from typed_python import _types, OneOf, ListOf
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.native_ast import VoidPtr
@@ -484,6 +484,15 @@ class Wrapper(object):
 
         if op.matches.NotEq and l.expr_type != r.expr_type:
             return context.constant(True)
+
+        if op.matches.NotIn:
+            res = l.convert_bin_op(ComparisonOp.In(), r, False)
+            if not res:
+                return
+            res = res.convert_bool_cast()
+            if not res:
+                return
+            return res.convert_unary_op(UnaryOp.Not())
 
         return context.pushException(
             TypeError,

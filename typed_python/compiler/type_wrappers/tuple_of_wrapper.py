@@ -28,6 +28,13 @@ import typed_python.compiler
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
+def tuple_or_list_contains(tup, elt):
+    for x in tup:
+        if x == elt:
+            return True
+    return False
+
+
 def tuple_compare_eq(left, right):
     """Compare two 'TupleOf' instances by comparing their individual elements."""
     if len(left) != len(right):
@@ -263,6 +270,12 @@ class TupleOrListOfWrapper(RefcountedWrapper):
                 return context.call_py_function(tuple_compare_gte, (left, right), {})
 
         return super().convert_bin_op(context, left, op, right, inplace)
+
+    def convert_bin_op_reverse(self, context, right, op, left, inplace):
+        if op.matches.In:
+            return context.call_py_function(tuple_or_list_contains, (right, left), {})
+
+        return super().convert_bin_op_reverse(context, right, op, left, inplace)
 
     def convert_attribute(self, context, expr, attr):
         if attr in ("_getItemUnsafe", "_initializeItemUnsafe", "setSizeUnsafe"):

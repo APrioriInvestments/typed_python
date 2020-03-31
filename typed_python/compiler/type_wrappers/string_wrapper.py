@@ -142,6 +142,9 @@ class StringWrapper(RefcountedWrapper):
                         cmp_res.nonref_expr.gte(0)
                     )
 
+            if op.matches.In:
+                return right.convert_method_call("find", (left,), {}) >= 0
+
             if op.matches.Add:
                 return context.push(
                     str,

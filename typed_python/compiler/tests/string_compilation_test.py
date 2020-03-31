@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import _types, ListOf, TupleOf, Dict, ConstDict, Compiled
+from typed_python import _types, ListOf, TupleOf, Dict, ConstDict, Compiled, Entrypoint
 from typed_python.test_util import currentMemUsageMb, compilerPerformanceComparison
 import unittest
 import time
@@ -633,3 +633,22 @@ class TestStringCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "not_valid"):
             f()
+
+    def test_string_contains_string(self):
+        @Entrypoint
+        def f(x, y):
+            return x in y
+
+        @Entrypoint
+        def fNot(x, y):
+            return x not in y
+
+        self.assertTrue(f("a", "asfd"))
+        self.assertFalse(f("b", "asfd"))
+        self.assertFalse(f("b", ListOf(str)(["asfd"])))
+        self.assertTrue(f("asdf", ListOf(str)(["asdf"])))
+
+        self.assertFalse(fNot("a", "asfd"))
+        self.assertTrue(fNot("b", "asfd"))
+        self.assertTrue(fNot("b", ListOf(str)(["asfd"])))
+        self.assertFalse(fNot("asdf", ListOf(str)(["asdf"])))
