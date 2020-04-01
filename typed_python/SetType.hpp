@@ -149,4 +149,5 @@ class SetType : public Type {
   private:
     Type* m_key_type;
     size_t m_bytes_per_el;
+    bool subset(instance_ptr left, instance_ptr right);
 };

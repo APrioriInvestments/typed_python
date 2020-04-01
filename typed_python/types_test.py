@@ -2793,61 +2793,162 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(s.union(Set(int)([1]), s, Set(int)([2])), Set(int)([1, 2]))
 
     def test_set_ops_with_other_containers(self):
-        # union
-        for C in set, list, tuple, ListOf(str), TupleOf(str), Set(str):
-            self.assertEqual(Set(str)('abcba').union(C('cdc')), Set(str)('abcd'))
-            self.assertEqual(Set(str)('abcba').union(C('ef'), C('fg')), Set(str)('abcefg'))
+        S = Set(str)
+        # operators require type matching; but methods accept iterables
+        # methods accept any number of arguments, except symmetric_difference, which requires exactly one argument
+
+        self.assertEqual(S('abcba').union(), S('abc'))
+        self.assertEqual(S('abc').union(S('bcd')), S('abc') | S('bcd'))
+        for C in set, list, tuple, ListOf(str), TupleOf(str), S:
+            self.assertEqual(S('abcba').union(C('cdc')), S('abcd'))
+            self.assertEqual(S('abcba').union(C('ef'), C('fg')), S('abcefg'))
+            with self.assertRaises(TypeError):
+                S('abc').union(C([1, 2, 3]))
+            if C is not S:
+                with self.assertRaises(TypeError):
+                    S('abc') | C('bcd')
 
         # intersection
-        for C in set, list, tuple, ListOf(str), TupleOf(str), Set(str):
-            self.assertEqual(Set(str)('abcba').intersection(C('cdc')), Set(str)('cc'))
-            self.assertEqual(Set(str)('abcba').intersection(C('efgfe')), Set(str)(''))
-            self.assertEqual(Set(str)('abcba').intersection(C('ccb')), Set(str)('bc'))
-            self.assertEqual(Set(str)('abcba').intersection(C('ef')), Set(str)(''))
-            self.assertEqual(Set(str)('abcba').intersection(C('cbcf'), C('bag')), Set(str)('b'))
+        self.assertEqual(S('abcba').intersection(), S('abc'))
+        self.assertEqual(S('abc').intersection(S('bcd')), S('abc') & S('bcd'))
+        for C in set, list, tuple, ListOf(str), TupleOf(str), S:
+            self.assertEqual(S('abcba').intersection(C('cdc')), S('cc'))
+            self.assertEqual(S('abcba').intersection(C('efgfe')), S(''))
+            self.assertEqual(S('abcba').intersection(C('ccb')), S('bc'))
+            self.assertEqual(S('abcba').intersection(C('ef')), S(''))
+            self.assertEqual(S('abcba').intersection(C('cbcf'), C('bag')), S('b'))
+            with self.assertRaises(TypeError):
+                S('abc').intersection(C([1, 2, 3]))
+            if C is not S:
+                with self.assertRaises(TypeError):
+                    S('abc') & C('bcd')
 
         # difference
-        for C in set, list, tuple, ListOf(str), TupleOf(str), Set(str):
-            self.assertEqual(Set(str)('abcba').difference(C('cdc')), Set(str)('ab'))
-            self.assertEqual(Set(str)('abcba').difference(C('efgfe')), Set(str)('abc'))
-            self.assertEqual(Set(str)('abcba').difference(C('ccb')), Set(str)('a'))
-            self.assertEqual(Set(str)('abcba').difference(C('ef')), Set(str)('abc'))
-            self.assertEqual(Set(str)('abcba').difference(), Set(str)('abc'))
+        self.assertEqual(S('abcba').difference(), S('abc'))
+        self.assertEqual(S('abc').difference(S('bcd')), S('abc') - S('bcd'))
+        for C in set, list, tuple, ListOf(str), TupleOf(str), S:
+            self.assertEqual(S('abcba').difference(C('cdc')), S('ab'))
+            self.assertEqual(S('abcba').difference(C('efgfe')), S('abc'))
+            self.assertEqual(S('abcba').difference(C('ccb')), S('a'))
+            self.assertEqual(S('abcba').difference(C('ef')), S('abc'))
+            self.assertEqual(S('abcba').difference(C('ef'), C('ag'), C('a')), S('bc'))
+            with self.assertRaises(TypeError):
+                S('abc').difference(C([1, 2, 3]))
+            if C is not S:
+                with self.assertRaises(TypeError):
+                    S('abc') - C('bcd')
+
+        # symmetric difference
+        with self.assertRaises(TypeError):
+            S('abcba').symmetric_difference()
+        self.assertEqual(S('abc').symmetric_difference(S('bcd')), S('abc') ^ S('bcd'))
+        for C in set, list, tuple, ListOf(str), TupleOf(str), S:
+            self.assertEqual(S('abcba').symmetric_difference(C('cdc')), S('abd'), C)
+            self.assertEqual(S('abcba').symmetric_difference(C('efgfe')), S('abcefg'), C)
+            self.assertEqual(S('abcba').symmetric_difference(C('ccb')), S('a'), C)
+            self.assertEqual(S('abcba').symmetric_difference(C('ef')), S('abcef'), C)
+            with self.assertRaises(TypeError):
+                S('abc').symmetric_difference(C([1, 2, 3]))
+            if C is not S:
+                with self.assertRaises(TypeError):
+                    S('abc') ^ C('bcd')
+        with self.assertRaises(TypeError):
+            S('abcba').symmetric_difference(set("cd"), set("ef"))
+
+        # subset
+        for C in set, list, tuple, ListOf(str), TupleOf(str), S:
+            self.assertFalse(S('abcba').issubset(C('cdc')), C)
+            self.assertFalse(S('abcba').issubset(C('efgfe')), C)
+            self.assertTrue(S('abcba').issubset(C('abcdecad')), C)
+            self.assertFalse(S('abcba').issubset(C('ccb')), C)
+
+        self.assertFalse(S('abcba') <= S('cdc'))
+        self.assertFalse(S('abcba') <= S('efgfe'))
+        self.assertTrue(S('abcba') <= S('abcdecad'))
+        self.assertFalse(S('abcba') <= S('ccb'))
+        self.assertTrue(S('abcba') <= S('abcc'))
+
+        self.assertFalse(S('abcba') < S('cdc'))
+        self.assertFalse(S('abcba') < S('efgfe'))
+        self.assertTrue(S('abcba') < S('abcdecad'))
+        self.assertFalse(S('abcba') < S('ccb'))
+        self.assertFalse(S('abcba') < S('abcc'))
+
+        # superset
+        for C in set, list, tuple, ListOf(str), TupleOf(str), S:
+            self.assertFalse(S('abcba').issuperset(C('cdc')), C)
+            self.assertFalse(S('abcba').issuperset(C('efgfe')), C)
+            self.assertFalse(S('abcba').issuperset(C('abcdecad')), C)
+            self.assertTrue(S('abcba').issuperset(C('ccb')), C)
+
+        self.assertFalse(S('abcba') >= S('cdc'))
+        self.assertFalse(S('abcba') >= S('efgfe'))
+        self.assertFalse(S('abcba') >= S('abcdecad'))
+        self.assertTrue(S('abcba') >= S('ccb'))
+        self.assertTrue(S('abcba') >= S('abcc'))
+
+        self.assertFalse(S('abcba') > S('cdc'))
+        self.assertFalse(S('abcba') > S('efgfe'))
+        self.assertFalse(S('abcba') > S('abcdecad'))
+        self.assertTrue(S('abcba') > S('ccb'))
+        self.assertFalse(S('abcba') > S('abcc'))
+
+        # disjoint
+        for C in set, list, tuple, ListOf(str), TupleOf(str), S:
+            self.assertFalse(S('abcba').isdisjoint(C('cdc')), C)
+            self.assertTrue(S('abcba').isdisjoint(C('efgfe')), C)
+            self.assertFalse(S('abcba').isdisjoint(C('abcdecad')), C)
+            self.assertFalse(S('abcba').isdisjoint(C('ccb')), C)
 
     def test_set_intersection(self):
-        word = 'symbolic'
+        word1 = 'symbolic'
         word2 = 'words'
         alphabet = 'abcdefghijklmnopqrstuvwxyz'
 
-        s = Set(str)(word)
-        s1 = Set(str)(word2)
-        d = dict.fromkeys(word)
-        i = s.intersection(s1)
-        self.assertEqual(_types.refcount(s), 1)
+        s1 = Set(str)(word1)
+        s2 = Set(str)(word2)
+        i = s1.intersection(s2)
         self.assertEqual(_types.refcount(s1), 1)
+        self.assertEqual(_types.refcount(s2), 1)
         for c in alphabet:
-            self.assertEqual(c in i, c in d and c in word2)
+            self.assertEqual(c in i, c in word1 and c in word2)
 
-        self.assertEqual(s, Set(str)(word))
+        self.assertEqual(s1, Set(str)(word1))
         self.assertEqual(type(i), Set(str))
 
-        z = s.intersection()
-        self.assertNotEqual(id(s), id(z))
-        self.assertEqual(z, s)
-        self.assertEqual(_types.refcount(s), 1)
+        z = s1.intersection()
+        self.assertNotEqual(id(s1), id(z))
+        self.assertEqual(z, s1)
+        self.assertEqual(_types.refcount(s1), 1)
 
     def test_set_difference(self):
-        word = 'symbolic'
+        word1 = 'symbolic'
         word2 = 'symbolism'
         alphabet = 'abcdefghijklmnopqrstuvwxyz'
-        d = dict.fromkeys(word)
-        s = Set(str)(word)
-        s1 = Set(str)(word2)
-        i = s.difference(s1)
+        s1 = Set(str)(word1)
+        s2 = Set(str)(word2)
+        i = s1.difference(s2)
+        i_operator = s1 - s2
+        self.assertEqual(i, i_operator)
         for c in alphabet:
-            self.assertEqual(c in i, c in d and c not in word2)
+            self.assertEqual(c in i, c in word1 and c not in word2)
 
-        self.assertEqual(s, Set(str)(word))
+        self.assertEqual(s1, Set(str)(word1))
+        self.assertEqual(type(i), Set(str))
+
+    def test_set_symmetric_difference(self):
+        word1 = 'symbolic'
+        word2 = 'symbolism'
+        alphabet = 'abcdefghijklmnopqrstuvwxyz'
+        s1 = Set(str)(word1)
+        s2 = Set(str)(word2)
+        i = s1.symmetric_difference(s2)
+        i_operator = s1 ^ s2
+        self.assertEqual(i, i_operator)
+        for c in alphabet:
+            self.assertEqual(c in i, (c in word1 and c not in word2) or (c not in word1 and c in word2))
+
+        self.assertEqual(s1, Set(str)(word1))
         self.assertEqual(type(i), Set(str))
 
     def test_list_of_tuples_transpose(self):

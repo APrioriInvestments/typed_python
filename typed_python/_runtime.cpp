@@ -900,7 +900,7 @@ extern "C" {
             return StringType::createFromUtf8("False", 5);
     }
 
-    hash_table_layout* nativepython_dict_create() {
+    hash_table_layout* nativepython_tableCreate() {
         hash_table_layout* result;
 
         result = (hash_table_layout*)malloc(sizeof(hash_table_layout));
@@ -912,15 +912,25 @@ extern "C" {
         return result;
     }
 
-    int32_t nativepython_dict_allocateNewSlot(hash_table_layout* layout, size_t kvPairSize) {
+    int32_t nativepython_tableAllocateNewSlot(hash_table_layout* layout, size_t kvPairSize) {
         return layout->allocateNewSlot(kvPairSize);
     }
 
-    void nativepython_dict_resizeTable(hash_table_layout* layout) {
+    hash_table_layout* nativepython_tableCopy(hash_table_layout* layout, Type* tp) {
+        SetType* setT = (SetType*)tp;
+
+        return layout->copyTable(
+            setT->keyType()->bytecount(),
+            setT->keyType()->isPOD(),
+            [&](instance_ptr self, instance_ptr other) {setT->copy_constructor(self, other);}
+        );
+    }
+
+    void nativepython_tableResize(hash_table_layout* layout) {
         layout->resizeTable();
     }
 
-    void nativepython_dict_compressItemTable(hash_table_layout* layout, size_t kvPairSize) {
+    void nativepython_tableCompress(hash_table_layout* layout, size_t kvPairSize) {
         layout->compressItemTable(kvPairSize);
     }
 

@@ -18,6 +18,8 @@
 
 #include <cstring>
 
+// for Dict, items would be key, value pairs
+// for Set, items would be keys
 class hash_table_layout {
   public:
     hash_table_layout()
@@ -42,7 +44,7 @@ class hash_table_layout {
 
     // return the index of the object indexed by 'hash', or -1
     template <class eq_func>
-    int32_t find(int32_t kv_pair_size, typed_python_hash_type hash, const eq_func& compare) {
+    int32_t find(int32_t item_size, typed_python_hash_type hash, const eq_func& compare) {
         if (!hash_table_slots) {
             return -1;
         }
@@ -65,7 +67,7 @@ class hash_table_layout {
             }
 
             if (slot != DELETED && hash_table_hashes[offset] == hash
-                && compare(items + kv_pair_size * slot)) {
+                && compare(items + item_size * slot)) {
                 return slot;
             }
 
@@ -118,13 +120,13 @@ class hash_table_layout {
     // lived.
     //-1 if not found
     template <class eq_func>
-    int32_t remove(int32_t kv_pair_size, typed_python_hash_type hash, const eq_func& compare) {
+    int32_t remove(int32_t item_size, typed_python_hash_type hash, const eq_func& compare) {
         if (!hash_table_slots) {
             return -1;
         }
 
         if (items_reserved > (hash_table_count + 2) * 4) {
-            compressItemTable(kv_pair_size);
+            compressItemTable(item_size);
         }
 
         // compress the hashtable if it's really empty
@@ -149,7 +151,7 @@ class hash_table_layout {
                 return -1;
             }
 
-            if (slot != DELETED && compare(items + kv_pair_size * slot)) {
+            if (slot != DELETED && compare(items + item_size * slot)) {
                 items_populated[slot] = 0;
 
                 hash_table_slots[offset] = DELETED;
@@ -163,7 +165,7 @@ class hash_table_layout {
         }
     }
 
-    void compressItemTable(size_t kv_pair_size) {
+    void compressItemTable(size_t item_size) {
         std::vector<int32_t> newItemPositions;
         int32_t count_so_far = 0;
 
@@ -175,8 +177,8 @@ class hash_table_layout {
                     items_populated[count_so_far] = 1;
                     items_populated[k] = 0;
 
-                    memcpy(items + kv_pair_size * count_so_far, items + kv_pair_size * k,
-                           kv_pair_size);
+                    memcpy(items + item_size * count_so_far, items + item_size * k,
+                           item_size);
                 }
 
                 count_so_far++;
@@ -187,7 +189,7 @@ class hash_table_layout {
 
         items_reserved = count_so_far;
         items_populated = (uint8_t*)realloc(items_populated, count_so_far);
-        items = (uint8_t*)realloc(items, count_so_far * kv_pair_size);
+        items = (uint8_t*)realloc(items, count_so_far * item_size);
         top_item_slot = items_reserved;
 
         for (long k = 0; k < hash_table_size; k++) {
@@ -213,13 +215,13 @@ class hash_table_layout {
         }
     }
 
-    int32_t allocateNewSlot(size_t kv_pair_size) {
+    int32_t allocateNewSlot(size_t item_size) {
         if (!items) {
-            items = (uint8_t*)malloc(4 * kv_pair_size);
-            std::memset(items, 0, 4 * kv_pair_size);
-            items_populated = (uint8_t*)malloc(4);
-            std::memset(items_populated, 0, 4);
             items_reserved = 4;
+            items = (uint8_t*)malloc(items_reserved * item_size);
+            std::memset(items, 0, items_reserved * item_size);
+            items_populated = (uint8_t*)malloc(items_reserved);
+            std::memset(items_populated, 0, items_reserved);
             top_item_slot = 0;
             for (long k = 0; k < items_reserved; k++) {
                 items_populated[k] = 0;
@@ -229,7 +231,7 @@ class hash_table_layout {
         while (top_item_slot >= items_reserved) {
             size_t old_reserved = items_reserved;
             items_reserved = items_reserved * 1.25 + 1;
-            items = (uint8_t*)realloc(items, kv_pair_size * items_reserved);
+            items = (uint8_t*)realloc(items, item_size * items_reserved);
             items_populated = (uint8_t*)realloc(items_populated, items_reserved);
 
             for (long k = old_reserved; k < items_reserved; k++) {
@@ -290,13 +292,57 @@ class hash_table_layout {
         setTo(hash_table_hashes, EMPTY, hash_table_size);
     }
 
+    // Only for Sets, sorry!  This won't copy Dicts.
+    template <class copy_constructor_type>
+    hash_table_layout* copyTable(size_t item_size, bool isPOD, const copy_constructor_type& copy_constructor) {
+        hash_table_layout* result = (hash_table_layout*)malloc(sizeof(hash_table_layout));
+        new (result) hash_table_layout;
+
+        result->refcount = 1;
+        if (!items) {
+            return result;
+        }
+        result->items_reserved = items_reserved;
+        result->top_item_slot = top_item_slot;
+        result->hash_table_size = hash_table_size;
+        result->hash_table_count = hash_table_count;
+        result->hash_table_empty_slots = hash_table_empty_slots;
+
+        result->items = (uint8_t*)malloc(item_size * items_reserved);
+        if (isPOD) {
+            memcpy(result->items, items, item_size * items_reserved);
+        }
+        else {
+            for (int i=0; i<items_reserved; i++) {
+                if (items_populated[i]) {
+                    copy_constructor(result->items + item_size * i, items + item_size * i);
+                }
+             }
+        }
+
+        result->items_populated = (uint8_t*)malloc(items_reserved);
+        memcpy(result->items_populated, items_populated, items_reserved);
+
+        result->hash_table_slots = (int32_t*)malloc(hash_table_size * sizeof(int32_t));
+        memcpy(result->hash_table_slots, hash_table_slots, hash_table_size * sizeof(int32_t));
+
+        result->hash_table_hashes = (typed_python_hash_type*)malloc(hash_table_size * sizeof(typed_python_hash_type));
+        memcpy(result->hash_table_hashes, hash_table_hashes, hash_table_size * sizeof(typed_python_hash_type));
+        return result;
+    }
+
     void resizeTable() {
         if (!hash_table_slots) {
-            hash_table_slots = (int32_t*)malloc(7 * sizeof(int32_t));
-            setTo(hash_table_slots, EMPTY, 7);
-            hash_table_hashes = (typed_python_hash_type*)malloc(7 * sizeof(typed_python_hash_type));
-            setTo(hash_table_hashes, EMPTY, 7);
-            hash_table_size = 7;
+            // experiment with pre-allocation, but didn't detect performance improvement
+            if (!hash_table_count) {
+                hash_table_size = computeNextPrime(hash_table_count * 4 + 7);
+            }
+            else
+                hash_table_size = 7;
+            hash_table_slots = (int32_t*)malloc(hash_table_size * sizeof(int32_t));
+            setTo(hash_table_slots, EMPTY, hash_table_size);
+            hash_table_hashes = (typed_python_hash_type*)malloc(hash_table_size * sizeof(typed_python_hash_type));
+            setTo(hash_table_hashes, EMPTY, hash_table_size);
             hash_table_count = 0;
             hash_table_empty_slots = hash_table_size;
 
@@ -327,7 +373,7 @@ class hash_table_layout {
         }
     }
 
-    void prepareForDeserialization(uint32_t slotCount, size_t kv_pair_size) {
+    void prepareForDeserialization(uint32_t slotCount, size_t item_size) {
         if (hash_table_size) {
             throw std::runtime_error("deserialization prepare should only be called on "
                                      "empty tables");
@@ -335,7 +381,7 @@ class hash_table_layout {
 
         items_reserved = slotCount;
         items_populated = (uint8_t*)malloc(slotCount);
-        items = (uint8_t*)malloc(slotCount * kv_pair_size);
+        items = (uint8_t*)malloc(slotCount * item_size);
 
         for (long k = 0; k < items_reserved; k++) {
             items_populated[k] = true;
@@ -345,7 +391,7 @@ class hash_table_layout {
     }
 
     template <class hash_fun_type>
-    void buildHashTableAfterDeserialization(size_t kv_pair_size, const hash_fun_type& hash_fun) {
+    void buildHashTableAfterDeserialization(size_t item_size, const hash_fun_type& hash_fun) {
         hash_table_size = computeNextPrime(items_reserved * 2.5 + 7);
         hash_table_slots = (int32_t*)malloc(hash_table_size * sizeof(int32_t));
         hash_table_hashes =
@@ -359,7 +405,7 @@ class hash_table_layout {
         }
 
         for (long k = 0; k < items_reserved; k++) {
-            add(hash_fun(items + kv_pair_size * k), k);
+            add(hash_fun(items + item_size * k), k);
         }
     }
 
