@@ -8,3 +8,5 @@ coverage:
         base: auto
         threshold: 0.5
         informational: true
+ignore:
+  - "typed_python/compiler/type_wrappers/native_hash.py"
