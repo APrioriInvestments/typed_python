@@ -123,13 +123,21 @@ void SetType::assign(instance_ptr self, instance_ptr other) {
     destroy((instance_ptr)&old);
 }
 
-bool SetType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp,
-                  bool suppressExceptions) {
-    if (pyComparisonOp != Py_NE && pyComparisonOp != Py_EQ) {
-        throw std::runtime_error("Ordered comparison not supported between objects of type "
-                                 + name());
+bool SetType::subset(instance_ptr left, instance_ptr right) {
+    hash_table_layout& l = **(hash_table_layout**)left;
+    for (long k = 0; k < l.items_reserved; k++) {
+        if (l.items_populated[k]) {
+            instance_ptr key = l.items + m_bytes_per_el * k;
+            instance_ptr otherKey = lookupKey(right, key);
+            if (!otherKey) {
+                return false;
+            }
+        }
     }
+    return true;
+}
 
+bool SetType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     hash_table_layout& l = **(hash_table_layout**)left;
     hash_table_layout& r = **(hash_table_layout**)right;
 
@@ -137,22 +145,34 @@ bool SetType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp,
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
-    if (l.hash_table_count != r.hash_table_count) {
-        return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
+    if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE) {
+        if (l.hash_table_count != r.hash_table_count)
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, subset(left, right) ? 0 : 1);
+    }
+    else if (pyComparisonOp == Py_LE) {
+        if (l.hash_table_count > r.hash_table_count)
+            return false;
+        return subset(left, right);
+    }
+    else if (pyComparisonOp == Py_LT) {
+        if (l.hash_table_count >= r.hash_table_count)
+            return false;
+        return subset(left, right);
+    }
+    else if (pyComparisonOp == Py_GE) {
+        if (r.hash_table_count > l.hash_table_count)
+            return false;
+        return subset(right, left);
+    }
+    else if (pyComparisonOp == Py_GT) {
+        if (r.hash_table_count >= l.hash_table_count)
+            return false;
+        return subset(right, left);
     }
 
-    // check each item on the left to see if its in the right and has the same value
-    for (long k = 0; k < l.items_reserved; k++) {
-        if (l.items_populated[k]) {
-            instance_ptr key = l.items + m_bytes_per_el * k;
-            instance_ptr otherKey = lookupKey(right, key);
-            if (!otherKey) {
-                return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
-            }
-        }
-    }
-
-    return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
+    assert(false);
+    return false;
 }
 
 void SetType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {

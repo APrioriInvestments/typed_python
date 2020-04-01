@@ -1856,6 +1856,8 @@ class TestCompilationStructures(unittest.TestCase):
             # osx memory usage rises, but not others
             if sys.platform != "darwin":
                 self.assertLessEqual(m3 - m2, m1 - m0 + 512, (f.__name__, a))
+            else:
+                self.assertLessEqual(m3 - m2, m1 - m0 + 1024, (f.__name__, a))
 
         for f in [g1]:
             c_f = Compiled(f)
@@ -2448,7 +2450,7 @@ class TestCompilationStructures(unittest.TestCase):
             # performance is poor, so don't compare yet
             # self.assertLessEqual(ratio, limit, (f1.__name__, a))
 
-            self.assertLessEqual(m3 - m2, m1 - m0 + 512, (f1.__name__, a))
+            self.assertLessEqual(m3 - m2, m1 - m0 + 1024, (f1.__name__, a))
 
     def test_context_manager_assignment(self):
 

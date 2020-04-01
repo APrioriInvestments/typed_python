@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -610,25 +610,32 @@ bool_to_string = externalCallTarget(
     Bool
 )
 
-dict_create = externalCallTarget(
-    "nativepython_dict_create",
+table_create = externalCallTarget(
+    "nativepython_tableCreate",
     Void.pointer()
 )
 
-dict_allocateNewSlot = externalCallTarget(
-    "nativepython_dict_allocateNewSlot",
+table_allocate_new_slot = externalCallTarget(
+    "nativepython_tableAllocateNewSlot",
     Int32,
     Void.pointer(), Int64
 )
 
-dict_resizeTable = externalCallTarget(
-    "nativepython_dict_resizeTable",
+table_copy = externalCallTarget(
+    "nativepython_tableCopy",
+    Void.pointer(),
+    Void.pointer(),
+    UInt64
+)
+
+table_resize = externalCallTarget(
+    "nativepython_tableResize",
     Void,
     Void.pointer()
 )
 
-dict_compressItemTable = externalCallTarget(
-    "nativepython_dict_compressItemTable",
+table_compress = externalCallTarget(
+    "nativepython_tableCompress",
     Void,
     Void.pointer(), Int64
 )

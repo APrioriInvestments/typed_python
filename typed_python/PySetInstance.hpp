@@ -35,6 +35,10 @@ class PySetInstance : public PyInstance {
     static PyObject* setUnion(PyObject* o, PyObject* args);
     static PyObject* setIntersection(PyObject* o, PyObject* args);
     static PyObject* setDifference(PyObject* o, PyObject* args);
+    static PyObject* setSymmetricDifference(PyObject* o, PyObject* args);
+    static PyObject* setIsSubset(PyObject* o, PyObject* args);
+    static PyObject* setIsSuperset(PyObject* o, PyObject* args);
+    static PyObject* setIsDisjoint(PyObject* o, PyObject* args);
     Py_ssize_t mp_and_sq_length_concrete();
     int sq_contains_concrete(PyObject* item);
     PyObject* tp_iter_concrete();
@@ -48,17 +52,32 @@ class PySetInstance : public PyInstance {
                                            bool isExplicit) {
         return true;
     }
+    static bool compare_to_python_concrete(SetType* setT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
     int pyInquiryConcrete(const char* op, const char* opErrRep);
+    PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
+    PyObject* pyOperatorDifference(PyObject* rhs, const char* op, const char* opErr, bool reversed);
+    PyObject* pyOperatorSymmetricDifference(PyObject* rhs, const char* op, const char* opErr, bool reversed);
+    PyObject* pyOperatorUnion(PyObject* rhs, const char* op, const char* opErr, bool reversed);
+    PyObject* pyOperatorIntersection(PyObject* rhs, const char* op, const char* opErr, bool reversed);
 
   private:
     static void insertKey(PySetInstance* self, PyObject* pyKey, instance_ptr key);
     static PyObject* try_remove(PyObject* o, PyObject* item, bool assertKeyError = false);
+    static PyObject* try_add_if_not_found(PyObject* o, PySetInstance* to_be_added, PyObject* item);
     static void copy_elements(PyObject* dst, PyObject* src);
-    static PyObject* set_intersection(PyObject* o, PyObject* other);
     static PyObject* set_difference(PyObject* o, PyObject* other);
     static int set_difference_update(PyObject* o, PyObject* other);
+    static PyObject* set_symmetric_difference(PyObject* o, PyObject* other);
+    static int set_symmetric_difference_update(PyObject* o, PyObject* other);
+    static PyObject* set_union(PyObject* o, PyObject* other);
+    static PyObject* set_intersection(PyObject* o, PyObject* other);
+    static bool set_is_subset(PyObject* o, PyObject* other);
+    static bool set_is_superset(PyObject* o, PyObject* other);
+    static bool set_is_disjoint(PyObject* o, PyObject* other);
     SetType* type();
     static void getDataFromNative(PySetInstance* src, std::function<void(instance_ptr)> func);
     static void getDataFromNative(PyTupleOrListOfInstance* src,
                                   std::function<void(instance_ptr)> func);
+    static bool subset(SetType* setT, instance_ptr left, PyObject* right);
+    static bool superset(SetType* setT, instance_ptr left, PyObject* right);
 };

@@ -17,7 +17,8 @@ from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
+from typed_python.compiler.type_wrappers.native_hash import NativeHash, table_add_slot, table_slot_for_key, \
+    table_next_slot, table_remove_key, table_clear, table_contains, table_contains_not
 from typed_python import NoneType, Tuple, PointerTo, Int32, Int64, UInt8
 
 import typed_python.compiler.native_ast as native_ast
@@ -25,190 +26,6 @@ import typed_python.compiler
 
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
-
-EMPTY = -1
-DELETED = -2
-
-
-class NativeHash(CompilableBuiltin):
-    """A function for directly hashing a typed python value.
-
-    Note that this is not the same as calling 'hash' from compiled code,
-    which will produce different answers from python right now, and which
-    is attempting at some level to mimic python's standard hash functionality.
-
-    That functionality is not used internally to our datastructures (we
-    allow things to hash to -1) so you can't just use 'hash' when implementing
-    wrappers for tp internals.
-    """
-    def __eq__(self, other):
-        return isinstance(other, NativeHash)
-
-    def __hash__(self):
-        return hash("NativeHash")
-
-    def convert_call(self, context, instance, args, kwargs):
-        if len(args) == 1:
-            return args[0].convert_hash()
-
-        return super().convert_call(context, instance, args, kwargs)
-
-
-class CPlusPlusStyleMod(CompilableBuiltin):
-    def __eq__(self, other):
-        return isinstance(other, CPlusPlusStyleMod)
-
-    def __hash__(self):
-        return hash("CPlusPlusStyleMod")
-
-    def convert_call(self, context, instance, args, kwargs):
-        if len(args) == 2 and args[0].expr_type.typeRepresentation == Int32 and args[1].expr_type.typeRepresentation == Int64:
-            return context.pushPod(
-                int,
-                args[0].nonref_expr.cast(native_ast.Int64).mod(args[1].nonref_expr)
-            )
-
-        if len(args) == 2 and args[0].expr_type.typeRepresentation == Int64 and args[1].expr_type.typeRepresentation == Int64:
-            return context.pushPod(
-                int,
-                args[0].nonref_expr.mod(args[1].nonref_expr)
-            )
-
-        return super().convert_call(context, instance, args, kwargs)
-
-
-def dict_add_slot(instance, itemHash, slot):
-    if (instance._hash_table_count * 2 + 1 > instance._hash_table_size or
-            instance._hash_table_empty_slots < (instance._hash_table_size >> 2) + 1):
-        instance._resizeTableUnsafe()
-
-    if itemHash < 0:
-        itemHash = -itemHash
-
-    offset = CPlusPlusStyleMod()(itemHash, instance._hash_table_size)
-
-    while True:
-        if instance._hash_table_slots[offset] == EMPTY or instance._hash_table_slots[offset] == DELETED:
-            if instance._hash_table_slots[offset] == EMPTY:
-                instance._hash_table_empty_slots -= 1
-
-            instance._hash_table_slots[offset] = slot
-            instance._hash_table_hashes[offset] = itemHash
-            instance._items_populated[slot] = 1
-            instance._hash_table_count += 1
-
-            return
-
-        offset += 1
-
-        if offset >= instance._hash_table_size:
-            offset = 0
-
-
-def dict_slot_for_key(instance, itemHash, item):
-    slots = instance._hash_table_slots
-
-    if not slots:
-        return -1
-
-    if itemHash < 0:
-        itemHash = -itemHash
-
-    modFun = CPlusPlusStyleMod()
-
-    offset = modFun(itemHash, instance._hash_table_size)
-
-    assert instance._hash_table_empty_slots > 0
-
-    while True:
-        slotIndex = int((slots + offset).get())
-
-        if slotIndex == EMPTY:
-            return -1
-
-        if slotIndex != DELETED and (instance._hash_table_hashes + offset).get() == itemHash:
-            if instance.getKeyByIndexUnsafe(slotIndex) == item:
-                return slotIndex
-
-        offset += 1
-        if offset >= instance._hash_table_size:
-            offset = 0
-
-    # not necessary, but currently we don't realize that the while loop
-    # never exits, and so we think there's a possibility we return None
-    return 0
-
-
-def dict_next_slot(instance, slotIx):
-    slotIx += 1
-
-    while slotIx < instance._items_reserved:
-        if instance._items_populated[slotIx]:
-            return slotIx
-        slotIx += 1
-
-    return -1
-
-
-def dict_remove_key(instance, item, itemHash):
-    if instance._items_reserved > (instance._hash_table_count + 2) * 4:
-        instance._compressItemTableUnsafe()
-
-    if instance._hash_table_count < instance._hash_table_size >> 3:
-        instance._resizeTableUnsafe()
-
-    slots = instance._hash_table_slots
-
-    if not slots:
-        raise KeyError(item)
-
-    if itemHash < 0:
-        itemHash = -itemHash
-
-    offset = CPlusPlusStyleMod()(itemHash, instance._hash_table_size)
-
-    while True:
-        slotIndex = int((slots + offset).get())
-
-        if slotIndex == EMPTY:
-            raise KeyError(item)
-
-        if slotIndex != DELETED and (instance._hash_table_hashes + offset).get() == itemHash:
-            if instance.getKeyByIndexUnsafe(slotIndex) == item:
-                instance._hash_table_hashes[offset] = -1
-                instance._hash_table_slots[offset] = DELETED
-                instance._hash_table_count -= 1
-                instance._items_populated[slotIndex] = 0
-
-                instance.deleteItemByIndexUnsafe(slotIndex)
-                return
-
-        offset += 1
-        if offset >= instance._hash_table_size:
-            offset = 0
-
-    # not necessary, but currently we don't currently realize that the while loop
-    # never exits, and so we think there's a possibility we return None
-    return 0
-
-
-def dict_clear(instance):
-    slotIx = 0
-
-    while slotIx < instance._items_reserved:
-        if instance._items_populated[slotIx]:
-            instance.deleteItemByIndexUnsafe(slotIx)
-            instance._items_populated[slotIx] = 0
-
-        slotIx += 1
-
-    for i in range(instance._hash_table_size):
-        instance._hash_table_hashes[i] = EMPTY
-        instance._hash_table_slots[i] = -1
-
-    instance._hash_table_count = 0
-    instance._hash_table_empty_slots = instance._hash_table_size
-    instance._top_item_slot = 0
 
 
 def dict_update(instance, other):
@@ -219,13 +36,13 @@ def dict_update(instance, other):
 def dict_delitem(instance, item):
     itemHash = NativeHash()(item)
 
-    dict_remove_key(instance, item, itemHash)
+    table_remove_key(instance, item, itemHash, True)
 
 
 def dict_getitem(instance, item):
     itemHash = NativeHash()(item)
 
-    slot = dict_slot_for_key(instance, itemHash, item)
+    slot = table_slot_for_key(instance, itemHash, item)
 
     if slot == -1:
         raise KeyError(item)
@@ -236,7 +53,7 @@ def dict_getitem(instance, item):
 def dict_get(instance, item, default):
     itemHash = NativeHash()(item)
 
-    slot = dict_slot_for_key(instance, itemHash, item)
+    slot = table_slot_for_key(instance, itemHash, item)
 
     if slot == -1:
         return default
@@ -244,22 +61,14 @@ def dict_get(instance, item, default):
     return instance.getValueByIndexUnsafe(slot)
 
 
-def dict_contains(instance, item):
-    itemHash = NativeHash()(item)
-
-    slot = dict_slot_for_key(instance, itemHash, item)
-
-    return slot != -1
-
-
 def dict_setitem(instance, key, value):
     itemHash = NativeHash()(key)
 
-    slot = dict_slot_for_key(instance, itemHash, key)
+    slot = table_slot_for_key(instance, itemHash, key)
 
     if slot == -1:
         newSlot = instance._allocateNewSlotUnsafe()
-        dict_add_slot(instance, itemHash, newSlot)
+        table_add_slot(instance, itemHash, newSlot)
         instance.initializeKeyByIndexUnsafe(newSlot, key)
         instance.initializeValueByIndexUnsafe(newSlot, value)
     else:
@@ -355,7 +164,7 @@ class DictWrapper(DictWrapperBase):
     def convert_default_initialize(self, context, instance):
         context.pushEffect(
             instance.expr.store(
-                runtime_functions.dict_create.call().cast(self.layoutType)
+                runtime_functions.table_create.call().cast(self.layoutType)
             )
         )
 
@@ -365,7 +174,7 @@ class DictWrapper(DictWrapperBase):
                 "initializeValueByIndexUnsafe", "assignValueByIndexUnsafe",
                 "initializeKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
                 "_top_item_slot", "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault",
-                "pop", "clear", "update"):
+                "pop", "clear", "copy", "update"):
             return expr.changeType(BoundMethodWrapper.Make(self, attr))
 
         if attr == '_items_populated':
@@ -482,9 +291,21 @@ class DictWrapper(DictWrapperBase):
             return instance.changeType(DictItemsWrapper(self.dictType))
 
         if len(args) == 0:
+            if methodname == "copy":
+                tp = context.getTypePointer(self.dictType)
+                if tp:
+                    return context.push(
+                        typeWrapper(self.dictType),
+                        lambda ref: ref.expr.store(
+                            runtime_functions.table_copy.call(
+                                instance.nonref_expr.cast(native_ast.VoidPtr),
+                                tp
+                            ).cast(self.layoutType)
+                        )
+                    )
             if methodname == "_compressItemTableUnsafe":
                 context.pushEffect(
-                    runtime_functions.dict_compressItemTable.call(
+                    runtime_functions.table_compress.call(
                         instance.nonref_expr.cast(native_ast.VoidPtr),
                         context.constant(self.kvBytecount)
                     )
@@ -493,7 +314,7 @@ class DictWrapper(DictWrapperBase):
 
             if methodname == "_resizeTableUnsafe":
                 context.pushEffect(
-                    runtime_functions.dict_resizeTable.call(
+                    runtime_functions.table_resize.call(
                         instance.nonref_expr.cast(native_ast.VoidPtr)
                     )
                 )
@@ -502,7 +323,7 @@ class DictWrapper(DictWrapperBase):
             if methodname == "_allocateNewSlotUnsafe":
                 return context.pushPod(
                     Int32,
-                    runtime_functions.dict_allocateNewSlot.call(
+                    runtime_functions.table_allocate_new_slot.call(
                         instance.nonref_expr.cast(native_ast.VoidPtr),
                         context.constant(self.kvBytecount)
                     )
@@ -522,7 +343,7 @@ class DictWrapper(DictWrapperBase):
 
         if methodname == "clear":
             if len(args) == 0:
-                return context.call_py_function(dict_clear, (instance,), {})
+                return context.call_py_function(table_clear, (instance,), {})
 
         if methodname == "update":
             if len(args) == 1:
@@ -670,13 +491,13 @@ class DictWrapper(DictWrapperBase):
         return context.pushPod(int, self.convert_len_native(expr))
 
     def convert_bin_op_reverse(self, context, left, op, right, inplace):
-        if op.matches.In:
+        if op.matches.In or op.matches.NotIn:
             right = right.convert_to_type(self.keyType)
             if right is None:
                 return None
 
             return context.call_py_function(
-                dict_contains,
+                table_contains if op.matches.In else table_contains_not,
                 (left, right),
                 {}
             )
@@ -734,7 +555,7 @@ class DictMakeIteratorWrapper(DictWrapperBase):
         if methodname == "__iter__" and not args and not kwargs:
             res = context.push(
                 # self.iteratorType is inherited from our specialized children
-                # who pick whether we're an interator over keys, values, items, etc.
+                # who pick whether we're an iterator over keys, values, items, etc.
                 self.iteratorType,
                 lambda instance:
                     instance.expr.ElementPtrIntegers(0, 0).store(-1)
@@ -785,7 +606,7 @@ class DictIteratorWrapper(Wrapper):
         )
 
     def convert_next(self, context, expr):
-        nextSlotIx = context.call_py_function(dict_next_slot, (self.refAs(context, expr, 1), self.refAs(context, expr, 0)), {})
+        nextSlotIx = context.call_py_function(table_next_slot, (self.refAs(context, expr, 1), self.refAs(context, expr, 0)), {})
 
         if nextSlotIx is None:
             return None, None

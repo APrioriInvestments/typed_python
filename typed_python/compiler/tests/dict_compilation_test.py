@@ -651,3 +651,24 @@ class TestDictCompilation(unittest.TestCase):
         set(d, -1.0, 2)
 
         self.assertEqual(get(d, -1.0), 2)
+
+    def test_dict_assign_and_copy(self):
+
+        @Entrypoint
+        def dict_assign_and_modify_original(d, x, y):
+            d2 = d
+            d[x] = 7
+            del d[y]
+            return d2
+
+        @Entrypoint
+        def dict_copy_and_modify_original(d, x, y):
+            d2 = d.copy()
+            d[x] = 7
+            del d[y]
+            return d2
+
+        d = Dict(str, int)({'a': 1, 'b': 3, 'c': 5})
+        self.assertEqual(dict_assign_and_modify_original(d, 'q', 'b'), {'a': 1, 'c': 5, 'q': 7})
+        d = Dict(str, int)({'a': 1, 'b': 3, 'c': 5})
+        self.assertEqual(dict_copy_and_modify_original(d, 'q', 'b'), {'a': 1, 'b': 3, 'c': 5})
