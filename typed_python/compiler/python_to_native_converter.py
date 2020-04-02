@@ -529,9 +529,6 @@ class PythonToNativeConverter(object):
             name = self.new_name(funcName)
             self._link_name_for_identity[identity] = name
 
-        if name in self._targets:
-            return self._targets[name]
-
         isRoot = len(self._inflight_function_conversions) == 0
 
         if assertIsRoot:
@@ -541,6 +538,9 @@ class PythonToNativeConverter(object):
             self._dependencies.addEdge(self._currentlyConverting, identity)
         else:
             self._dependencies.addRoot(identity)
+
+        if name in self._targets:
+            return self._targets[name]
 
         if identity not in self._inflight_function_conversions:
             functionConverter = self.createConversionContext(

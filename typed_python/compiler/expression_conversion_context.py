@@ -1106,7 +1106,7 @@ class ExpressionConversionContext(object):
 
             # if you get this spuriously, perhaps one of your code-conversion functions
             # returned None when it meant to return context.pushVoid(), which actually returns Void.
-            self.pushException(TypeError, "Unreachable code.")
+            self.pushException(TypeError, "Unreachable code")
             return
 
         if call_target.output_type.is_pass_by_ref:

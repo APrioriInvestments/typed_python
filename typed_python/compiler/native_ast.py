@@ -373,8 +373,13 @@ def expr_str(self):
         return "mark slot %s initialized" % self.name
     if self.matches.StackSlot:
         return "slot(name=%s,t=%s)" % (self.name, str(self.type))
+    if self.matches.ExceptionPropagator:
+        return (
+            "try:\n" + indent(str(self.expr)) + "\n" +
+            "rethrow with %s:\n" % self.varname + indent(str(self.handler)).rstrip()
+        )
 
-    assert False
+    assert False, type(self)
 
 
 def expr_is_simple(expr):

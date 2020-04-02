@@ -55,6 +55,28 @@ class TestDictCompilation(unittest.TestCase):
 
             self.assertEqual(refcounts, refcounts2)
 
+    def test_dict_contains(self):
+        @Entrypoint
+        def isIn(x, d):
+            if x in d:
+                return True
+            return False
+
+        @Entrypoint
+        def isNotIn(x, d):
+            if x not in d:
+                return True
+            return False
+
+        d = Dict(str, TupleOf(int))()
+        d['hi'] = (1, 2, 3)
+
+        self.assertTrue(isIn("hi", d))
+        self.assertFalse(isNotIn("hi", d))
+
+        self.assertFalse(isIn("boo", d))
+        self.assertTrue(isNotIn("boo", d))
+
     def test_dict_length(self):
         @Entrypoint
         def dict_len(x):

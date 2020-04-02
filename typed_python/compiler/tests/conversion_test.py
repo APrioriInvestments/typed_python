@@ -2636,3 +2636,38 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f(1), None)
         self.assertEqual(f(-1), 0)
+
+    def test_many_mutually_interesting_functions(self):
+        def f0(x):
+            pass
+
+        def f1(x):
+            f0(x)
+
+        def f2(x):
+            f1(x)
+
+        def f3(x):
+            f2(x)
+
+        # f4 takes many passes to get a type assignment
+        # because it has to see each child get processed
+        def f4(x):
+            f0(x)
+            f1(x)
+            f2(x)
+            f3(x)
+
+        # f5 will see f4 as existing, and needs to be
+        # recalculated when f4 gets its type completed
+        def f5(x):
+            f4(x)
+
+        # f6 depends on both functions simultaneously
+        def f6(x):
+            if x > 0:
+                f5(x)
+            if x > 0:
+                f4(x)
+
+        Entrypoint(f6)(10)
