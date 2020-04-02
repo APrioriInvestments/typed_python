@@ -537,6 +537,13 @@ string_isupper = externalCallTarget(
     Void.pointer()
 )
 
+bytes_getslice_int64 = externalCallTarget(
+    "nativepython_runtime_bytes_getslice_int64",
+    Void.pointer(),
+    Void.pointer(),
+    Int64, Int64
+)
+
 bytes_cmp = externalCallTarget(
     "nativepython_runtime_bytes_cmp",
     Int64,

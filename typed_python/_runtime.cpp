@@ -216,6 +216,37 @@ extern "C" {
         return StringType::createFromUtf8(utf8_str, len);
     }
 
+    BytesType::layout* nativepython_runtime_bytes_getslice_int64(BytesType::layout* lhs, int64_t start, int64_t stop) {
+        if (!lhs) {
+            return nullptr;
+        }
+        int32_t len = lhs->bytecount;
+
+        if (start < 0) {
+            start += len;
+        }
+        if (stop < 0) {
+            stop += len;
+        }
+        if (start < 0) {
+            start = 0;
+        }
+        if (stop < 0) {
+            stop = 0;
+        }
+        if (start > len) {
+            start = len;
+        }
+        if (stop > len) {
+            stop = len;
+        }
+        if (start >= stop) {
+            return nullptr;
+        }
+
+        return BytesType::createFromPtr((char*)lhs->data + start, stop - start);
+    }
+
     int64_t nativepython_runtime_bytes_cmp(BytesType::layout* lhs, BytesType::layout* rhs) {
         return BytesType::cmpStatic(lhs, rhs);
     }

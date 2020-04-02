@@ -151,3 +151,14 @@ class TestBytesCompilation(unittest.TestCase):
         #
         # for v in ['123', 'abcdefgh', 'a\u00CAb', 'XyZ\U0001D471']:
         #     self.assertEqual(g(v), cg(v))
+
+    def test_bytes_slice(self):
+        def f(x: bytes, l: int, r: int):
+            return x[l:r]
+
+        fComp = Compiled(f)
+
+        for l in range(-10, 10):
+            for r in range(-10, 10):
+                for b in [b"", b"a", b"as", b"asdf"]:
+                    self.assertEqual(fComp(b, l, r), f(b, l, r))
