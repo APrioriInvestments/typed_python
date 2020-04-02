@@ -17,7 +17,7 @@
 #include "AllTypes.hpp"
 
 void Type::repr(instance_ptr self, ReprAccumulator& out, bool isStr) {
-    assertForwardsResolved();
+    assertForwardsResolvedSufficientlyToInstantiate();
 
     this->check([&](auto& subtype) {
         subtype.repr(self, out, isStr);
@@ -25,7 +25,7 @@ void Type::repr(instance_ptr self, ReprAccumulator& out, bool isStr) {
 }
 
 bool Type::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
-    assertForwardsResolved();
+    assertForwardsResolvedSufficientlyToInstantiate();
 
     return this->check([&](auto& subtype) {
         return subtype.cmp(left, right, pyComparisonOp, suppressExceptions);
@@ -33,7 +33,7 @@ bool Type::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool s
 }
 
 typed_python_hash_type Type::hash(instance_ptr left) {
-    assertForwardsResolved();
+    assertForwardsResolvedSufficientlyToInstantiate();
 
     return this->check([&](auto& subtype) {
         return subtype.hash(left);
@@ -46,7 +46,7 @@ void Type::move(instance_ptr dest, instance_ptr src) {
 }
 
 void Type::swap(instance_ptr left, instance_ptr right) {
-    assertForwardsResolved();
+    assertForwardsResolvedSufficientlyToInstantiate();
 
     if (left == right) {
         return;
@@ -94,26 +94,22 @@ char Type::byteCompare(uint8_t* l, uint8_t* r, size_t count) {
 }
 
 void Type::constructor(instance_ptr self) {
-    assertForwardsResolved();
+    assertForwardsResolvedSufficientlyToInstantiate();
 
     this->check([&](auto& subtype) { subtype.constructor(self); } );
 }
 
 void Type::destroy(instance_ptr self) {
-    assertForwardsResolved();
-
     this->check([&](auto& subtype) { subtype.destroy(self); } );
 }
 
 void Type::copy_constructor(instance_ptr self, instance_ptr other) {
-    assertForwardsResolved();
+    assertForwardsResolvedSufficientlyToInstantiate();
 
     this->check([&](auto& subtype) { subtype.copy_constructor(self, other); } );
 }
 
 void Type::assign(instance_ptr self, instance_ptr other) {
-    assertForwardsResolved();
-
     this->check([&](auto& subtype) { subtype.assign(self, other); } );
 }
 

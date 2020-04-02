@@ -536,12 +536,19 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
     PyDict_SetItemString(pyType->tp_dict, "ClassMembers", classMembers);
 
     for (auto nameAndObj: classT->getStaticFunctions()) {
+        if (nameAndObj.second->getClosureType()->bytecount()) {
+            throw std::runtime_error(
+                "Somehow, " + classT->name() + "."
+                + nameAndObj.first + " has a populated closure."
+            );
+        }
+
         PyDict_SetItemString(
             pyType->tp_dict,
             nameAndObj.first.c_str(),
             PyStaticMethod_New(
-                PyInstance::initializePythonRepresentation(nameAndObj.second, [&](instance_ptr data){
-                //nothing to do - functions like this are just types.
+                PyInstance::initialize(nameAndObj.second, [&](instance_ptr data){
+                    //nothing to do - functions like this are just types.
                 })
             )
         );

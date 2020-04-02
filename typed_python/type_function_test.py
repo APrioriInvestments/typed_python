@@ -159,3 +159,14 @@ class TypeFunctionTest(unittest.TestCase):
         # we should be able to dispatch to this from the interpreter and not
         # trip the assertion on isCompiled
         self.assertEqual(A(float).aFunc(ListOf(float)([1, 2])), [1, 2])
+
+    def test_typefunc_in_staticmethod_annotation(self):
+        @TypeFunction
+        def makeClass(T):
+            class A(Class):
+                @staticmethod
+                def f() -> makeClass(T):
+                    return makeClass(T)()
+            return A
+
+        makeClass(int)()

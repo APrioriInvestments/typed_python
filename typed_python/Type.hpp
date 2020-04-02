@@ -433,8 +433,6 @@ public:
 
     template<class ptr_func>
     void destroy(int64_t count, const ptr_func& ptrToChild) {
-        assertForwardsResolved();
-
         this->check([&](auto& subtype) {
             for (long k = 0; k < count; k++) {
                 subtype.destroy(ptrToChild(k));
