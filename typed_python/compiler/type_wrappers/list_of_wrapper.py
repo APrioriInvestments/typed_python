@@ -259,7 +259,16 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 )
         if methodname == "clear":
             if len(args) == 0:
-                return self.convert_method_call(context, instance, "resize", (context.constant(0),), {})
+                return context.pushPod(
+                    None,
+                    context.converter.defineNativeFunction(
+                        'clear(' + self.typeRepresentation.__name__ + ")",
+                        ('util', self, 'clear'),
+                        [self],
+                        None,
+                        self.generateClear
+                    ).call(instance)
+                )
 
         if methodname == "reserve":
             if len(args) == 1:
@@ -361,6 +370,14 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
         context.pushEffect(
             listInst.nonref_expr.ElementPtrIntegers(0, 2).store(countInst.nonref_expr.cast(native_ast.Int32))
+        )
+
+    def generateClear(self, context, out, listInst, arg=None):
+        with context.loop(listInst.convert_len()) as i:
+            listInst.convert_getitem_unsafe(i).convert_destroy()
+
+        context.pushEffect(
+            listInst.nonref_expr.ElementPtrIntegers(0, 2).store(native_ast.Int32.zero())
         )
 
     def generateAppend(self, context, out, listInst, arg):

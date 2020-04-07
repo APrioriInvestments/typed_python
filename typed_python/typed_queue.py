@@ -1,4 +1,4 @@
-from typed_python import Class, Final, Member, TypeFunction, ListOf, OneOf
+from typed_python import Class, Final, Member, TypeFunction, ListOf, OneOf, Entrypoint
 
 from threading import Lock
 
@@ -25,6 +25,7 @@ def TypedQueue(T):
             self._isEmptyLock = Lock()
             self._isEmptyLock.acquire()
 
+        @Entrypoint
         def getNonblocking(self) -> OneOf(None, T):
             """Return a value from the Queue, or None if no value exists."""
             self._lock.acquire()
@@ -47,6 +48,7 @@ def TypedQueue(T):
             self._lock.release()
             return None
 
+        @Entrypoint
         def get(self) -> T:
             """Return a value from the Queue"""
             self._lock.acquire()
@@ -75,6 +77,7 @@ def TypedQueue(T):
 
             raise Exception("impossible")
 
+        @Entrypoint
         def getMany(self, minCount: int, maxCount: int) -> ListOf(T):
             """Return a list of values from the Queue.
 
@@ -116,6 +119,7 @@ def TypedQueue(T):
             finally:
                 self._lock.release()
 
+        @Entrypoint
         def put(self, element: T) -> None:
             self._lock.acquire()
 
@@ -127,6 +131,7 @@ def TypedQueue(T):
 
             self._lock.release()
 
+        @Entrypoint
         def putMany(self, elementSeq: ListOf(T)) -> None:
             with self._lock:
                 curLen = self._len
@@ -140,6 +145,7 @@ def TypedQueue(T):
                         # wake listeners up
                         self._isEmptyLock.release()
 
+        @Entrypoint
         def peek(self) -> OneOf(None, T):
             with self._lock:
                 if self._poppable:
@@ -147,6 +153,7 @@ def TypedQueue(T):
                 if self._pushable:
                     return self._pushable[0]
 
+        @Entrypoint
         def __len__(self) -> int:
             with self._lock:
                 return self._len
