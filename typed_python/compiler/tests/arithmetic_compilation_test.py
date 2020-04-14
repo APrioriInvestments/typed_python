@@ -20,7 +20,7 @@ from typed_python import (
     Bool,
     Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
-    Float32, Float64, Compiled
+    Float32, Float64, Compiled, makeNamedTuple
 )
 from typed_python.type_promotion import computeArithmeticBinaryResultType
 from typed_python import Entrypoint
@@ -604,3 +604,10 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "infinity"):
             f(inf)
+
+    def test_mod_constant_in_tuple(self):
+        @Entrypoint
+        def rf(row):
+            return row.x % 1.0
+
+        self.assertEqual(rf(makeNamedTuple(x=1.0)), 0.0)

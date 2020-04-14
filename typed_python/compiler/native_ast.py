@@ -84,6 +84,8 @@ Type = Type.define(Alternative(
 def const_truth_value(c):
     if c.matches.Int:
         return c.val != 0
+    if c.matches.Float:
+        return c.val != 0
     return False
 
 
