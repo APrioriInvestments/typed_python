@@ -169,6 +169,23 @@ class TestStringCompilation(unittest.TestCase):
         for i in range(0, 0x10ffff + 1):
             self.assertEqual(ord(callChr(i)), i)
 
+    def test_string_start_and_endswith(self):
+        def startswith(x: str, y: str):
+            return x.startswith(y)
+
+        def endswith(x: str, y: str):
+            return x.endswith(y)
+
+        compiledSW = Compiled(startswith)
+        compiledEW = Compiled(endswith)
+
+        strings = ["", "a", "ab", "b", "abc", "bc", "ac", "ab", "bc", "bca"]
+
+        for s1 in strings:
+            for s2 in strings:
+                self.assertEqual(startswith(s1, s2), compiledSW(s1, s2))
+                self.assertEqual(endswith(s1, s2), compiledEW(s1, s2))
+
     def test_string_getitem_slice(self):
         def getitem1(x: str, y: int):
             return x[:y]

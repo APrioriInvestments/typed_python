@@ -48,6 +48,17 @@ def strJoinIterable(sep, iterable):
     return sep.join(items)
 
 
+def strStartswith(s, prefix):
+    return s[:len(prefix)] == prefix
+
+
+def strEndswith(s, suffix):
+    if not suffix:
+        return True
+
+    return s[-len(suffix):] == suffix
+
+
 class StringWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -275,13 +286,17 @@ class StringWrapper(RefcountedWrapper):
     )
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("find", "split", "join", 'strip', 'rstrip', 'lstrip') or attr in self._str_methods or attr in self._bool_methods:
+        if (
+            attr in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith")
+            or attr in self._str_methods
+            or attr in self._bool_methods
+        ):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        if not (methodname in ("find", "split", "join", 'strip', 'rstrip', 'lstrip')
+        if not (methodname in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith")
                 or methodname in self._str_methods or methodname in self._bool_methods):
             return context.pushException(AttributeError, methodname)
 
@@ -323,6 +338,28 @@ class StringWrapper(RefcountedWrapper):
                         )
                     )
                 )
+        elif methodname == "startswith":
+            if len(args) == 1:
+                if args[0].expr_type != self:
+                    context.pushException(
+                        TypeError,
+                        "startswith first arg must be str (tuple of str not supported yet)"
+                    )
+                    return
+
+                return context.call_py_function(strStartswith, (instance, args[0]), {})
+
+        elif methodname == "endswith":
+            if len(args) == 1:
+                if args[0].expr_type != self:
+                    context.pushException(
+                        TypeError,
+                        "startswith first arg must be str (tuple of str not supported yet)"
+                    )
+                    return
+
+                return context.call_py_function(strEndswith, (instance, args[0]), {})
+
         elif methodname == "find":
             if len(args) == 1:
                 return context.push(
