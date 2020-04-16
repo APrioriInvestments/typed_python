@@ -170,14 +170,26 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(ord(callChr(i)), i)
 
     def test_string_getitem_slice(self):
-        def getitem(x: str, y: int):
+        def getitem1(x: str, y: int):
             return x[:y]
 
-        getitemCompiled = Compiled(getitem)
+        def getitem2(x: str, y: int):
+            return x[y:]
+
+        def getitem3(x: str, y: int, y2: int):
+            return x[y:y2]
+
+        getitem1Compiled = Compiled(getitem1)
+        getitem2Compiled = Compiled(getitem2)
+        getitem3Compiled = Compiled(getitem3)
 
         for s in ["", "asdf", "a", "asdfasdf"]:
             for i in range(-5, 10):
-                self.assertEqual(getitem(s, i), getitemCompiled(s, i), (s, i))
+                self.assertEqual(getitem1(s, i), getitem1Compiled(s, i), (s, i))
+                self.assertEqual(getitem2(s, i), getitem2Compiled(s, i), (s, i))
+
+                for j in range(-5, 10):
+                    self.assertEqual(getitem3(s, i, j), getitem3Compiled(s, i, j), (s, i, j))
 
     def test_string_lower_upper(self):
 

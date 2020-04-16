@@ -191,6 +191,9 @@ class StringWrapper(RefcountedWrapper):
         if lower is None and upper is not None:
             lower = context.constant(0)
 
+        if lower is not None and upper is None:
+            upper = expr.convert_len()
+
         lower = lower.toInt64()
         if lower is None:
             return
