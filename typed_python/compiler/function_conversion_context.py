@@ -54,66 +54,53 @@ class FunctionOutput:
     pass
 
 
-class FunctionConversionContext(object):
+class ConversionContextBase(object):
     """Helper function for converting a single python function given some input and output types"""
 
-    def __init__(self, converter, name, identity, ast_arg, statements, input_types, output_type, closureVarnames, globalVars):
+    def __init__(self, converter, name, identity, input_types, output_type, funcArgNames, closureVarnames, globalVars):
         """Initialize a FunctionConverter
 
         Args:
             converter - a PythonToNativeConverter
             name - the function name
             identity - an object to uniquely identify this instance of the function
-            ast_arg - a python_ast.Arguments object
-            statements - a list of python_ast.Statement objects making up the body of the function
-            input_types - a list of the input types actually passed to us
+            input_types - a list of the input types actually passed to us. There must be a type
+                for each closure varname, and then again for each function argument.
             output_type - the output type (if proscribed), or None
-            closureVarnames - names of the variables in this function's closure
+            funcArgNames - the stated list of argument names to this function.
+            closureVarnames - names of the variables in this function's closure. These will be passed
+                before the actual func args.
             globalVars - a dict from name to the actual python object in the globals for this function
         """
-        if '_inplaceBinopCheck' in name:
-            assert 'Python' not in str(output_type)
-
         self.name = name
-        self.variablesAssigned = computeAssignedVariables(statements)
-        self.variablesRead = computeReadVariables(statements)
-        self.variablesBound = computeFunctionArgVariables(ast_arg) | set(closureVarnames)
+        self.funcArgNames = funcArgNames
+
+        self.variablesAssigned = set()
+        self.variablesBound = set()
 
         # the set of variables that are captured in closures in this function.
         # this includes recursive functions, which will not be in the closure itself
         # since they get bound in the closure varnames.
-        self.variablesReadByClosures = computeVariablesReadByClosures(statements)
+        self.variablesReadByClosures = set()
 
         # the set of variables that have exactly one definition. If these are 'deffed'
         # functions, we don't have to worry about them changing type and so they can be
         # bound to the closure directly (in which case we don't even assign them to slots)
-        self.variablesAssignedOnlyOnce = computeVariablesAssignedOnlyOnce(statements)
-
-        functionDefs, assignedLambdas, freeLambdas = extractFunctionDefs(statements)
+        self.variablesAssignedOnlyOnce = set()
 
         # the list of 'def' statements and 'Lambda' expressions. each one engenders a function type.
-        self.functionDefs = functionDefs + freeLambdas
+        self.functionDefs = []
 
         # all 'def' operations that are assigned exactly once. These defs are special
         # because we just assume that the binding is active without even evaluating the
         # def. Other bindings (lambdas, etc), require us to track slots for the closure itself
-        self.functionDefsAssignedOnce = {
-            fd.name: fd for fd in functionDefs if fd.name in self.variablesAssignedOnlyOnce
-        }
-
-        # add any lambdas that get assigned exactly once.
-        for name, lambdaFunc in assignedLambdas:
-            if name in self.variablesAssignedOnlyOnce:
-                self.functionDefsAssignedOnce[name] = lambdaFunc
+        self.functionDefsAssignedOnce = {}
 
         # the current _type_ that we're using for this def,
         self.functionDefToType = {}
 
         # variables in closure slots that are not single-assignment function defs need slots
-        self.variablesNeedingClosureSlots = set([
-            c for c in self.variablesReadByClosures
-            if c not in self.functionDefsAssignedOnce
-        ])
+        self.variablesNeedingClosureSlots = set()
 
         # for all typed functions we have ever defined, the original untyped function.
         # This grows with each pass and is there to help us when we're walking types
@@ -130,10 +117,8 @@ class FunctionConversionContext(object):
 
         self.converter = converter
         self.identity = identity
-        self._ast_arg = ast_arg
         self._argnames = None
         self._argtypes = {}
-        self._statements = statements
         self._input_types = input_types
         self._output_type = output_type
         self._argumentsWithoutStackslots = set()  # arguments that we don't bother to copy into the stack
@@ -149,7 +134,12 @@ class FunctionConversionContext(object):
         self._functionOutputTypeKnown = False
         self._native_args = None
 
-        self._constructInitialVarnameToType()
+    def getInputTypes(self):
+        return self._input_types
+
+    def knownOutputType(self):
+        """If the output type is known ahead, then that type (as a wrapper). Else, None"""
+        return self._output_type
 
     def currentReturnType(self):
         return self._varname_to_type.get(FunctionOutput)
@@ -381,7 +371,7 @@ class FunctionConversionContext(object):
 
         initializer_expr = self.initializeVariableStates(self._argnames, variableStates)
 
-        body_native_expr, controlFlowReturns = self.convert_function_body(self._statements, variableStates)
+        body_native_expr, controlFlowReturns = self.convert_function_body(variableStates)
 
         # destroy our variables if they are in scope
         destructors = self.generateDestructors(variableStates)
@@ -433,9 +423,9 @@ class FunctionConversionContext(object):
     def _constructInitialVarnameToType(self):
         input_types = self._input_types
 
-        self._argnames = list(self._closureVarnames) + list(self._ast_arg.argumentNames())
+        self._argnames = list(self._closureVarnames) + list(self.funcArgNames)
 
-        if len(input_types) != self._ast_arg.totalArgCount() + len(self._closureVarnames):
+        if len(input_types) != len(self._argnames):
             raise ConversionException(
                 "%s at %s:%s, with closure %s, expected at least %s arguments but got %s. Expected argnames are %s. Input types are %s" %
                 (
@@ -443,7 +433,7 @@ class FunctionConversionContext(object):
                     self._statements[0].filename,
                     self._statements[0].line_number,
                     self._closureVarnames,
-                    self._ast_arg.totalArgCount() + len(self._closureVarnames),
+                    len(self._argnames),
                     len(input_types),
                     self._argnames, input_types
                 )
@@ -723,6 +713,188 @@ class FunctionConversionContext(object):
                         subcontext.markVariableInitialized(varname)
 
         variableStates.variableAssigned(varname, assignedType)
+
+    def functionDefToClosurelessFunction(self, ast):
+        # parse the code into a function object with no closure.
+        if ast not in self.functionDefToClosurelessFunctionTypeCache:
+            untypedFunction = python_ast.evaluateFunctionDefWithLocalsInCells(
+                ast,
+                globals=self._globals,
+                locals={name: None for name in (self.variablesBound | self.variablesAssigned)}
+            )
+
+            tpFunction = Function(untypedFunction)
+
+            self.functionDefToClosurelessFunctionTypeCache[ast] = type(tpFunction)
+            self.closurelessFunctionTypeToDef[type(tpFunction)] = ast
+
+            for varname in tpFunction.overloads[0].closureVarLookups:
+                assert varname in self.variablesReadByClosures
+
+            python_ast._originalAstCache[untypedFunction.__code__] = ast
+
+        # this function object has a totally bogus closure - it will just have 'None'
+        # for each variable it references. We'll need to replace the closure variable binding
+        # rules and have it extract its closure
+        return self.functionDefToClosurelessFunctionTypeCache[ast]
+
+    def freeVariableLookup(self, name):
+        if self.isLocalVariable(name):
+            return None
+
+        if name in self._globals:
+            return self._globals[name]
+
+        if name in __builtins__:
+            return __builtins__[name]
+
+        return None
+
+    def restrictByCondition(self, variableStates, condition, result):
+        if condition.matches.Call and condition.func.matches.Name and len(condition.args) == 2 and condition.args[0].matches.Name:
+            if self.freeVariableLookup(condition.func.id) is isinstance:
+                context = ExpressionConversionContext(self, variableStates)
+                typeExpr = context.convert_expression_ast(condition.args[1])
+
+                if typeExpr is not None and isinstance(typeExpr.expr_type, PythonTypeObjectWrapper):
+                    variableStates.restrictTypeFor(condition.args[0].id, typeExpr.expr_type.typeRepresentation.Value, result)
+
+        # check if we are a 'var.matches.Y' expression
+        if (condition.matches.Attribute and
+                condition.value.matches.Attribute and
+                condition.value.attr == "matches" and
+                condition.value.value.matches.Name):
+            curType = variableStates.currentType(condition.value.value.id)
+            if curType is not None and getattr(curType, '__typed_python_category__', None) == "Alternative":
+                if result:
+                    subType = [x for x in curType.__typed_python_alternatives__ if x.Name == condition.attr]
+                    if subType:
+                        variableStates.restrictTypeFor(
+                            condition.value.value.id,
+                            subType[0],
+                            result
+                        )
+
+
+class ExpressionFunctionConversionContext(ConversionContextBase):
+    """Helper function for converting a single python function given some input and output types"""
+
+    def __init__(self, converter, name, identity, input_types, generator):
+        super().__init__(converter, name, identity, input_types, None, [f'a{i}' for i in range(len(input_types))], [], {})
+
+        self._generator = generator
+        self.variablesBound = set(self.funcArgNames)
+
+        self._constructInitialVarnameToType()
+
+    def convert_function_body(self, variableStates: FunctionStackState):
+        subcontext = ExpressionConversionContext(self, variableStates)
+
+        expr = self._generator(*[subcontext.namedVariableLookup(a) for a in self.funcArgNames])
+
+        if expr is not None:
+            if not self._functionOutputTypeKnown:
+                if self._varname_to_type.get(FunctionOutput) is None:
+                    self.markTypesAreUnstable()
+                    self._varname_to_type[FunctionOutput] = expr.expr_type
+                else:
+                    self.upsizeVariableType(FunctionOutput, expr.expr_type)
+
+            subcontext.pushReturnValue(expr)
+
+        return subcontext.finalize(None), False
+
+
+class FunctionConversionContext(ConversionContextBase):
+    """Helper function for converting a single python function given some input and output types"""
+
+    def __init__(self, converter, name, identity, input_types, output_type, closureVarnames, globalVars, ast_arg, statements):
+        super().__init__(converter, name, identity, input_types, output_type, ast_arg.argumentNames(), closureVarnames, globalVars)
+
+        self._statements = statements
+
+        self.variablesAssigned = computeAssignedVariables(statements)
+        self.variablesBound = computeFunctionArgVariables(ast_arg) | set(closureVarnames)
+
+        # the set of variables that are captured in closures in this function.
+        # this includes recursive functions, which will not be in the closure itself
+        # since they get bound in the closure varnames.
+        self.variablesReadByClosures = computeVariablesReadByClosures(statements)
+
+        # the set of variables that have exactly one definition. If these are 'deffed'
+        # functions, we don't have to worry about them changing type and so they can be
+        # bound to the closure directly (in which case we don't even assign them to slots)
+        self.variablesAssignedOnlyOnce = computeVariablesAssignedOnlyOnce(statements)
+
+        functionDefs, assignedLambdas, freeLambdas = extractFunctionDefs(statements)
+
+        # the list of 'def' statements and 'Lambda' expressions. each one engenders a function type.
+        self.functionDefs = functionDefs + freeLambdas
+
+        # all 'def' operations that are assigned exactly once. These defs are special
+        # because we just assume that the binding is active without even evaluating the
+        # def. Other bindings (lambdas, etc), require us to track slots for the closure itself
+        self.functionDefsAssignedOnce = {
+            fd.name: fd for fd in functionDefs if fd.name in self.variablesAssignedOnlyOnce
+        }
+
+        # add any lambdas that get assigned exactly once.
+        for name, lambdaFunc in assignedLambdas:
+            if name in self.variablesAssignedOnlyOnce:
+                self.functionDefsAssignedOnce[name] = lambdaFunc
+
+        # the current _type_ that we're using for this def,
+        self.functionDefToType = {}
+
+        # variables in closure slots that are not single-assignment function defs need slots
+        self.variablesNeedingClosureSlots = set([
+            c for c in self.variablesReadByClosures
+            if c not in self.functionDefsAssignedOnce
+        ])
+
+        self._constructInitialVarnameToType()
+
+    def convert_function_body(self, variableStates: FunctionStackState):
+        return self.convert_statement_list_ast(self._statements, variableStates, toplevel=True)
+
+    def convert_delete(self, expression, variableStates):
+        """Convert the target of a 'del' statement.
+
+        Args:
+            expression - a python_ast Expression
+
+        Returns:
+            a pair of native_ast.Expression and a bool indicating whether control flow
+            returns to the caller.
+        """
+        expr_context = ExpressionConversionContext(self, variableStates)
+
+        if expression.matches.Subscript:
+            slicing = expr_context.convert_expression_ast(expression.value)
+            if slicing is None:
+                return expr_context.finalize(None), False
+
+            # we are assuming this is an index. We ought to be checking this
+            # and doing something else if it's a Slice or an Ellipsis or whatnot
+            index = expr_context.convert_expression_ast(expression.slice.value)
+
+            if slicing is None:
+                return expr_context.finalize(None), False
+
+            res = slicing.convert_delitem(index)
+
+            return expr_context.finalize(None), res is not None
+        elif expression.matches.Attribute:
+            slicing = expr_context.convert_expression_ast(expression.value)
+            attr = expression.attr
+            if attr is None:
+                return expr_context.finalize(None), False
+
+            res = slicing.convert_set_attribute(attr, None)
+            return expr_context.finalize(None), res is not None
+        else:
+            expr_context.pushException(Exception, "Can't delete this")
+            return expr_context.finalize(None), False
 
     def convert_assignment(self, target, op, val_to_store):
         subcontext = val_to_store.context
@@ -1641,109 +1813,6 @@ class FunctionConversionContext(object):
             return context.finalize(None, exceptionsTakeFrom=ast), True
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast.Name)
-
-    def functionDefToClosurelessFunction(self, ast):
-        # parse the code into a function object with no closure.
-        if ast not in self.functionDefToClosurelessFunctionTypeCache:
-            untypedFunction = python_ast.evaluateFunctionDefWithLocalsInCells(
-                ast,
-                globals=self._globals,
-                locals={name: None for name in (self.variablesBound | self.variablesAssigned)}
-            )
-
-            tpFunction = Function(untypedFunction)
-
-            self.functionDefToClosurelessFunctionTypeCache[ast] = type(tpFunction)
-            self.closurelessFunctionTypeToDef[type(tpFunction)] = ast
-
-            for varname in tpFunction.overloads[0].closureVarLookups:
-                assert varname in self.variablesReadByClosures
-
-            python_ast._originalAstCache[untypedFunction.__code__] = ast
-
-        # this function object has a totally bogus closure - it will just have 'None'
-        # for each variable it references. We'll need to replace the closure variable binding
-        # rules and have it extract its closure
-        return self.functionDefToClosurelessFunctionTypeCache[ast]
-
-    def freeVariableLookup(self, name):
-        if self.isLocalVariable(name):
-            return None
-
-        if name in self._globals:
-            return self._globals[name]
-
-        if name in __builtins__:
-            return __builtins__[name]
-
-        return None
-
-    def restrictByCondition(self, variableStates, condition, result):
-        if condition.matches.Call and condition.func.matches.Name and len(condition.args) == 2 and condition.args[0].matches.Name:
-            if self.freeVariableLookup(condition.func.id) is isinstance:
-                context = ExpressionConversionContext(self, variableStates)
-                typeExpr = context.convert_expression_ast(condition.args[1])
-
-                if typeExpr is not None and isinstance(typeExpr.expr_type, PythonTypeObjectWrapper):
-                    variableStates.restrictTypeFor(condition.args[0].id, typeExpr.expr_type.typeRepresentation.Value, result)
-
-        # check if we are a 'var.matches.Y' expression
-        if (condition.matches.Attribute and
-                condition.value.matches.Attribute and
-                condition.value.attr == "matches" and
-                condition.value.value.matches.Name):
-            curType = variableStates.currentType(condition.value.value.id)
-            if curType is not None and getattr(curType, '__typed_python_category__', None) == "Alternative":
-                if result:
-                    subType = [x for x in curType.__typed_python_alternatives__ if x.Name == condition.attr]
-                    if subType:
-                        variableStates.restrictTypeFor(
-                            condition.value.value.id,
-                            subType[0],
-                            result
-                        )
-
-    def convert_delete(self, expression, variableStates):
-        """Convert the target of a 'del' statement.
-
-        Args:
-            expression - a python_ast Expression
-
-        Returns:
-            a pair of native_ast.Expression and a bool indicating whether control flow
-            returns to the caller.
-        """
-        expr_context = ExpressionConversionContext(self, variableStates)
-
-        if expression.matches.Subscript:
-            slicing = expr_context.convert_expression_ast(expression.value)
-            if slicing is None:
-                return expr_context.finalize(None), False
-
-            # we are assuming this is an index. We ought to be checking this
-            # and doing something else if it's a Slice or an Ellipsis or whatnot
-            index = expr_context.convert_expression_ast(expression.slice.value)
-
-            if slicing is None:
-                return expr_context.finalize(None), False
-
-            res = slicing.convert_delitem(index)
-
-            return expr_context.finalize(None), res is not None
-        elif expression.matches.Attribute:
-            slicing = expr_context.convert_expression_ast(expression.value)
-            attr = expression.attr
-            if attr is None:
-                return expr_context.finalize(None), False
-
-            res = slicing.convert_set_attribute(attr, None)
-            return expr_context.finalize(None), res is not None
-        else:
-            expr_context.pushException(Exception, "Can't delete this")
-            return expr_context.finalize(None), False
-
-    def convert_function_body(self, statements, variableStates: FunctionStackState):
-        return self.convert_statement_list_ast(statements, variableStates, toplevel=True)
 
     def convert_statement_list_ast(
             self, statements, variableStates: FunctionStackState, toplevel=False, return_to=None, in_loop=False, try_flow=None

@@ -30,6 +30,13 @@ class NativeFunctionConversionContext:
         self._generatingFunction = generatingFunction
         self._identity = identity
 
+    def getInputTypes(self):
+        return self._input_types
+
+    def knownOutputType(self):
+        """If the output type is known ahead, then that type (as a wrapper). Else, None"""
+        return self._output_type
+
     @property
     def identity(self):
         return self._identity

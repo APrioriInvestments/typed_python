@@ -81,6 +81,8 @@ class OneOfWrapper(Wrapper):
         return typeWrapper(OneOf(*sorted(allTypes, key=str)))
 
     def unwrap(self, context, expr, generator):
+        """Call 'generator' on 'expr' cast down to each subtype and combine the results.
+        """
         types = []
         exprs = []
         typesSeen = set()
@@ -121,31 +123,72 @@ class OneOfWrapper(Wrapper):
         return out_slot
 
     def convert_attribute(self, context, instance, attribute):
-        # just unwrap us
-        return self.unwrap(context, instance, lambda realInstance: realInstance.convert_attribute(attribute))
+        return context.expressionAsFunctionCall(
+            "oneof_attribute",
+            (instance,),
+            lambda instance: self.unwrap(
+                instance.context,
+                instance,
+                lambda realInstance: realInstance.convert_attribute(attribute)
+            ),
+            ("oneof", self, "attribute", attribute)
+        )
 
     def convert_call(self, context, left, args, kwargs):
         # just unwrap us
-        return self.unwrap(context, left, lambda realInstance: realInstance.convert_call(args, kwargs))
+        kwargNames = list(kwargs)
+        kwargVals = tuple(kwargs.values())
+
+        return context.expressionAsFunctionCall(
+            "oneof_call",
+            (left,) + tuple(args) + kwargVals,
+            lambda instance, *packedArgs: self.unwrap(
+                instance.context,
+                instance,
+                lambda realInstance: realInstance.convert_call(
+                    packedArgs[:len(args)],
+                    {kwargNames[i]: packedArgs[len(args) + i] for i in range(len(kwargs))}
+                )
+            ),
+            (
+                "oneof",
+                self,
+                "call",
+                tuple(x.expr_type for x in args),
+                tuple((name, kwargs[name].expr_type) for name in kwargs)
+            )
+        )
 
     def convert_getitem(self, context, expr, index):
         # just unwrap us
         return self.unwrap(context, expr, lambda realInstance: realInstance.convert_getitem(index))
 
     def convert_bin_op(self, context, left, op, right, inplace):
-        def generator(leftUnwrapped):
-            return leftUnwrapped.convert_bin_op(op, right)
-
-        return self.unwrap(context, left, generator)
+        return context.expressionAsFunctionCall(
+            "oneof_binop",
+            (left, right),
+            lambda left, right: self.unwrap(
+                left.context,
+                left,
+                lambda leftUnwrapped: leftUnwrapped.convert_bin_op(op, right, inplace)
+            ),
+            ("oneof", self, "binop", right.expr_type, op, inplace)
+        )
 
     def convert_bin_op_reverse(self, context, r, op, l, inplace):
         assert r.expr_type == self
         assert r.isReference
 
-        def generator(rightUnwrapped):
-            return l.convert_bin_op(op, rightUnwrapped)
-
-        return self.unwrap(context, r, generator)
+        return context.expressionAsFunctionCall(
+            "oneof_binop_reverse",
+            (l, r),
+            lambda l, r: self.unwrap(
+                r.context,
+                r,
+                lambda rightUnwrapped: l.convert_bin_op(op, rightUnwrapped, inplace)
+            ),
+            ("oneof", self, "binop_reverse", l.expr_type, op, inplace)
+        )
 
     def convert_default_initialize(self, context, target):
         for i, t in enumerate(self.typeRepresentation.Types):
@@ -340,19 +383,77 @@ class OneOfWrapper(Wrapper):
         assert False, "Clients should already have unwrapped this oneof"
 
     def convert_bool_cast(self, context, expr):
-        return expr.unwrap(lambda e: e.convert_bool_cast())
+        return context.expressionAsFunctionCall(
+            "oneof_convert_bool",
+            (expr,),
+            lambda expr: self.unwrap(
+                expr.context,
+                expr,
+                lambda exprUnwrapped: exprUnwrapped.convert_bool_cast()
+            ),
+            ("oneof", self, "bool_cast")
+        )
 
     def convert_int_cast(self, context, expr):
+        return context.expressionAsFunctionCall(
+            "oneof_convert_int",
+            (expr,),
+            lambda expr: self.unwrap(
+                expr.context,
+                expr,
+                lambda exprUnwrapped: exprUnwrapped.convert_int_cast()
+            ),
+            ("oneof", self, "int_cast")
+        )
+
         return expr.unwrap(lambda e: e.convert_int_cast())
 
     def convert_float_cast(self, context, expr):
-        return expr.unwrap(lambda e: e.convert_float_cast())
+        return context.expressionAsFunctionCall(
+            "oneof_convert_float",
+            (expr,),
+            lambda expr: self.unwrap(
+                expr.context,
+                expr,
+                lambda exprUnwrapped: exprUnwrapped.convert_float_cast()
+            ),
+            ("oneof", self, "float_cast")
+        )
 
     def convert_builtin(self, f, context, expr, a1=None):
+        return context.expressionAsFunctionCall(
+            "oneof_convert_builtin",
+            (expr,) + ((a1,) if a1 is not None else ()),
+            lambda expr, *args: self.unwrap(
+                expr.context,
+                expr,
+                lambda exprUnwrapped: exprUnwrapped.convert_builtin(f, *args)
+            ),
+            ("oneof", self, "convert_builtin", f, None if a1 is None else a1.expr_type)
+        )
+
         return expr.unwrap(lambda e: e.convert_builtin(f, a1))
 
     def convert_bytes_cast(self, context, expr):
-        return expr.unwrap(lambda e: e.convert_bytes_cast())
+        return context.expressionAsFunctionCall(
+            "oneof_convert_bytes",
+            (expr,),
+            lambda expr: self.unwrap(
+                expr.context,
+                expr,
+                lambda exprUnwrapped: exprUnwrapped.convert_bytes_cast()
+            ),
+            ("oneof", self, "bytes_cast")
+        )
 
     def convert_str_cast(self, context, expr):
-        return expr.unwrap(lambda e: e.convert_str_cast())
+        return context.expressionAsFunctionCall(
+            "oneof_convert_str",
+            (expr,),
+            lambda expr: self.unwrap(
+                expr.context,
+                expr,
+                lambda exprUnwrapped: exprUnwrapped.convert_str_cast()
+            ),
+            ("oneof", self, "str_cast")
+        )

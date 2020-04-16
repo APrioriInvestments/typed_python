@@ -318,3 +318,16 @@ class TestOneOfOfCompilation(unittest.TestCase):
             return res
 
         self.assertEqual(iterate(ListOf(int)([1, 2, 3])), [1, 2, 3])
+
+    def test_oneof_call(self):
+        @Compiled
+        def f(i: int):
+            if i % 2:
+                T = str
+            else:
+                T = float
+
+            return T(i)
+
+        self.assertEqual(f(1), "1")
+        self.assertEqual(f(2), 2.0)

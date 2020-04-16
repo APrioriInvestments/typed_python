@@ -1290,6 +1290,25 @@ class ExpressionConversionContext(object):
         self.pushException(NameError, "name '%s' is not defined" % name)
         return None
 
+    def expressionAsFunctionCall(self, name, args, generatingFunction, identity):
+        callTarget = self.converter.defineNonPythonFunction(
+            name,
+            ("expression", identity),
+            typed_python.compiler.function_conversion_context.ExpressionFunctionConversionContext(
+                self.functionContext.converter,
+                name,
+                ("expression", identity),
+                [x.expr_type for x in args],
+                generatingFunction,
+            )
+        )
+
+        if callTarget is None:
+            self.pushException(TypeError, "Expression %s was not convertible." % name)
+            return
+
+        return self.call_typed_call_target(callTarget, args)
+
     def convert_expression_ast(self, ast):
         """Convert a python_ast.Expression node to a TypedExpression.
 

@@ -202,12 +202,12 @@ class PythonToNativeConverter(object):
             self,
             funcName,
             identity,
-            pyast.args,
-            body,
             input_types,
             output_type,
             closureVars,
-            funcGlobals
+            funcGlobals,
+            pyast.args,
+            body,
         )
 
     def installLinktimeHook(self, identity, callback):
@@ -219,6 +219,44 @@ class PythonToNativeConverter(object):
             return self._linktimeHooks.pop()
         else:
             return None
+
+    def defineNonPythonFunction(self, name, identity, context, callback=None):
+        """Define a non-python generating function (if we haven't defined it before already)
+
+            name - the name to actually give the function.
+            identity - a unique identifier for this function to allow us to cache it.
+            context - a FunctionConvertsionContext lookalike
+            callback - a function taking a function pointer that gets called after codegen
+                to allow us to install this function pointer.
+
+        returns a TypedCallTarget, or None if it's not known yet
+        """
+        if self._currentlyConverting is not None:
+            self._dependencies.addEdge(self._currentlyConverting, identity)
+        else:
+            self._dependencies.addRoot(identity)
+
+        if callback is not None:
+            self.installLinktimeHook(identity, callback)
+
+        if identity in self._link_name_for_identity:
+            return self._targets.get(self._link_name_for_identity[identity])
+
+        new_name = self.new_name(name, "runtime.")
+
+        self._link_name_for_identity[identity] = new_name
+        self._inflight_function_conversions[identity] = context
+
+        if context.knownOutputType() is not None:
+            self._targets[new_name] = self.getTypedCallTarget(name, context.getInputTypes(), context.knownOutputType())
+
+        if self._currentlyConverting is None:
+            # force the function to resolve immediately
+            self._resolveAllInflightFunctions()
+            self._installInflightFunctions(name)
+            self._inflight_function_conversions.clear()
+
+        return self._targets.get(new_name)
 
     def defineNativeFunction(self, name, identity, input_types, output_type, generatingFunction, callback=None):
         """Define a native function if we haven't defined it before already.
@@ -242,33 +280,14 @@ class PythonToNativeConverter(object):
 
         identity = ("native", identity, output_type, tuple(input_types))
 
-        if self._currentlyConverting is not None:
-            self._dependencies.addEdge(self._currentlyConverting, identity)
-        else:
-            self._dependencies.addRoot(identity)
-
-        if callback is not None:
-            self.installLinktimeHook(identity, callback)
-
-        if identity in self._link_name_for_identity:
-            return self._targets[self._link_name_for_identity[identity]]
-
-        new_name = self.new_name(name, "runtime.")
-
-        self._link_name_for_identity[identity] = new_name
-        self._inflight_function_conversions[identity] = NativeFunctionConversionContext(
-            self, input_types, output_type, generatingFunction, identity
+        return self.defineNonPythonFunction(
+            name,
+            identity,
+            NativeFunctionConversionContext(
+                self, input_types, output_type, generatingFunction, identity
+            ),
+            callback
         )
-
-        self._targets[new_name] = self.getTypedCallTarget(new_name, input_types, output_type)
-
-        if self._currentlyConverting is None:
-            # force the function to resolve immediately
-            self._resolveAllInflightFunctions()
-            self._installInflightFunctions(name)
-            self._inflight_function_conversions.clear()
-
-        return self._targets[new_name]
 
     def getTypedCallTarget(self, name, input_types, output_type):
         native_input_types = [a.getNativePassingType() for a in input_types if not a.is_empty]
