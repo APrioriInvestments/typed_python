@@ -61,7 +61,9 @@ class IsinstanceWrapper(Wrapper):
                 # either because it's something like OneOf(Value(str), Value(float)), or its 'object'
                 # and dispatch accordingly
                 raise Exception(
-                    "We don't yet know how to handle 'isinstance' unless the right-hand-side is known at compile time."
+                    f"We don't yet know how to handle 'isinstance' unless the right-hand-side "
+                    f"is known at compile time. We got "
+                    f"{args[1].expr_type}"
                 )
 
         return super().convert_call(context, expr, args, kwargs)

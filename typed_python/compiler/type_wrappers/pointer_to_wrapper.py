@@ -14,7 +14,7 @@
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 
 from typed_python import PointerTo
 
@@ -127,7 +127,7 @@ class PointerToWrapper(Wrapper):
 
     def convert_attribute(self, context, instance, attr):
         if attr in ("set", "get", "initialize", "cast", "destroy"):
-            return instance.changeType(BoundCompiledMethodWrapper(self, attr))
+            return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
 

@@ -14,7 +14,7 @@
 
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.type_wrappers.tuple_of_wrapper import TupleOrListOfWrapper
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
 from typed_python import PointerTo, ListOf
@@ -138,7 +138,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
     def convert_attribute(self, context, instance, attr):
         if attr in ("copy", "resize", "reserve", "reserved", "extend", "append",
                     "clear", "pop", "setSizeUnsafe", "pointerUnsafe"):
-            return instance.changeType(BoundCompiledMethodWrapper(self, attr))
+            return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
 

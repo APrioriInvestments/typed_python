@@ -17,7 +17,7 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python import _types, Int32, Tuple, NamedTuple, Function
 
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 import typed_python.compiler.native_ast as native_ast
 import typed_python.python_ast as python_ast
@@ -366,7 +366,7 @@ class NamedTupleWrapper(TupleWrapper):
 
     def convert_attribute(self, context, instance, attribute):
         if attribute in ["replacing"]:
-            return instance.changeType(BoundCompiledMethodWrapper(self, attribute))
+            return instance.changeType(BoundMethodWrapper.Make(self, attribute))
 
         ix = self.namesToIndices.get(attribute)
         if ix is None:

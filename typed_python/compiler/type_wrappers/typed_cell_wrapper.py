@@ -14,7 +14,7 @@
 
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
 from typed_python import NoneType
@@ -145,6 +145,6 @@ class TypedCellWrapper(RefcountedWrapper):
 
     def convert_attribute(self, context, expr, attr):
         if attr in ("get", "isSet", "clear", "set", "getUnsafe", "initializeUnsafe", "destroyUnsafe"):
-            return expr.changeType(BoundCompiledMethodWrapper(self, attr))
+            return expr.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, expr, attr)

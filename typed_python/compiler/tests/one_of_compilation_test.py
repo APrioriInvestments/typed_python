@@ -215,6 +215,14 @@ class TestOneOfOfCompilation(unittest.TestCase):
         self.assertEqual(f(False), False)
         self.assertEqual(f(True), True)
 
+    def test_value_get_method(self):
+        @Compiled
+        def getHi(x: Value) -> Value:
+            return x.get("hi")
+
+        self.assertEqual(getHi({}), None)
+        self.assertEqual(getHi({'hi': 20}), 20)
+
     def test_convert_ordering(self):
         # we should always pick the int if we can
         @Compiled

@@ -15,7 +15,7 @@
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.util import min
 from typed_python.compiler.typed_expression import TypedExpression
 
@@ -215,7 +215,7 @@ class ConstDictWrapper(ConstDictWrapperBase):
 
     def convert_attribute(self, context, instance, attr):
         if attr in ("get_key_by_index_unsafe", "get_value_by_index_unsafe", "keys", "values", "items", "get"):
-            return instance.changeType(BoundCompiledMethodWrapper(self, attr))
+            return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
 

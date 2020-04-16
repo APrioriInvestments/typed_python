@@ -15,7 +15,7 @@
 import _thread
 
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python import OneOf
 import typed_python.compiler.native_ast as native_ast
@@ -89,7 +89,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
     def convert_attribute(self, context, instance, attr):
         if self.typeRepresentation.PyType in (_thread.LockType, _thread.RLock) and attr in ('acquire', 'release'):
-            return instance.changeType(BoundCompiledMethodWrapper(self, attr))
+            return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         assert isinstance(attr, str)
 

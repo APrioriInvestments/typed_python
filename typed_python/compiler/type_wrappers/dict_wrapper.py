@@ -15,7 +15,7 @@
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python import NoneType, Tuple, PointerTo, Int32, Int64, UInt8
@@ -366,7 +366,7 @@ class DictWrapper(DictWrapperBase):
                 "initializeKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
                 "_top_item_slot", "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault",
                 "pop", "clear", "update"):
-            return expr.changeType(BoundCompiledMethodWrapper(self, attr))
+            return expr.changeType(BoundMethodWrapper.Make(self, attr))
 
         if attr == '_items_populated':
             return context.pushPod(

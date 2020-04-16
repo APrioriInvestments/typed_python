@@ -628,15 +628,6 @@ PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
 
     Type* t0 = PyInstance::unwrapTypeArgToTypePtr(a0);
 
-    if (!t0 || (t0->getTypeCategory() != Type::TypeCategory::catClass
-                && t0->getTypeCategory() != Type::TypeCategory::catHeldClass
-                && t0->getTypeCategory() != Type::TypeCategory::catRefTo
-                && t0->getTypeCategory() != Type::TypeCategory::catAlternative
-                && t0->getTypeCategory() != Type::TypeCategory::catConcreteAlternative
-                )) {
-        PyErr_SetString(PyExc_TypeError, "Expected first argument to be a Class or Alternative");
-        return NULL;
-    }
     if (!PyUnicode_Check(a1)) {
         PyErr_SetString(PyExc_TypeError, "Expected second argument to be a string");
         return NULL;

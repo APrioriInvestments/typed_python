@@ -65,6 +65,8 @@ class OneOfWrapper(Wrapper):
             if isinstance(t, Wrapper):
                 t = t.interpreterTypeRepresentation
 
+            assert not isinstance(t, Wrapper)
+
             if isinstance(t, OneOf):
                 allTypes.update(t.Types)
             else:
@@ -95,6 +97,7 @@ class OneOfWrapper(Wrapper):
 
                     if t not in typesSeen:
                         typesSeen.add(t)
+                        assert isinstance(t, Wrapper)
                         types.append(t)
 
             output_type = OneOfWrapper.mergeTypes(types)

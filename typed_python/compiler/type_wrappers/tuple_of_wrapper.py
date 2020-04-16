@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -279,7 +279,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
     def convert_attribute(self, context, expr, attr):
         if attr in ("_getItemUnsafe", "_initializeItemUnsafe", "setSizeUnsafe"):
-            return expr.changeType(BoundCompiledMethodWrapper(self, attr))
+            return expr.changeType(BoundMethodWrapper.Make(self, attr))
 
         if attr == '_hash_cache':
             return context.pushPod(

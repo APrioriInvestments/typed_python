@@ -17,7 +17,7 @@ from typed_python import Int64, Bool, String, Int32
 
 from typed_python.compiler.type_wrappers.list_of_wrapper import MasqueradingListOfWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python.compiler.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -320,7 +320,7 @@ class StringWrapper(RefcountedWrapper):
             or attr in self._str_methods
             or attr in self._bool_methods
         ):
-            return instance.changeType(BoundCompiledMethodWrapper(self, attr))
+            return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
 

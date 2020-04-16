@@ -25,6 +25,17 @@ PyObject* PyBoundMethodInstance::tp_call_concrete(PyObject* args, PyObject* kwar
     Function* f = type()->getFunction();
     Type* c = type()->getFirstArgType();
 
+    if (!f) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "'%s' can be held in a bound method, but actually calling "
+            "it isn't supported yet.",
+            type()->name().c_str()
+            );
+
+        return NULL;
+    }
+
     //if we are an entrypoint, map any untyped function arguments to typed functions
     PyObjectHolder mappedArgs;
     PyObjectHolder mappedKwargs;

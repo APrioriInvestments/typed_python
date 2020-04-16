@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python import _types
 import typed_python.compiler
 
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
@@ -23,6 +24,10 @@ class BoundMethodWrapper(Wrapper):
         super().__init__(t)
 
         self.firstArgType = typeWrapper(self.typeRepresentation.FirstArgType)
+
+    @staticmethod
+    def Make(wrapperType, attr):
+        return BoundMethodWrapper(_types.BoundMethod(wrapperType.typeRepresentation, attr))
 
     def getNativeLayoutType(self):
         return self.firstArgType.getNativeLayoutType()
