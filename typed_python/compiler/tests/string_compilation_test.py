@@ -186,6 +186,31 @@ class TestStringCompilation(unittest.TestCase):
                 self.assertEqual(startswith(s1, s2), compiledSW(s1, s2))
                 self.assertEqual(endswith(s1, s2), compiledEW(s1, s2))
 
+    def test_string_replace(self):
+        def replace(x: str, y: str, z: str):
+            return x.replace(y, z)
+
+        replaceCompiled = Compiled(replace)
+
+        def replace2(x: str, y: str, z: str, i: int):
+            return x.replace(y, z, i)
+
+        replaceCompiled = Compiled(replace)
+        replace2Compiled = Compiled(replace2)
+
+        strings = [""]
+        for _ in range(6):
+            for s in ["ab"]:
+                strings = [x + s for x in strings]
+
+        for s1 in strings:
+            for s2 in strings:
+                for s3 in strings:
+                    self.assertEqual(replace(s1, s2, s3), replaceCompiled(s1, s2, s3))
+
+                    for i in [-1, 0, 1, 2]:
+                        self.assertEqual(replace2(s1, s2, s3, i), replace2Compiled(s1, s2, s3, i))
+
     def test_string_getitem_slice(self):
         def getitem1(x: str, y: int):
             return x[:y]

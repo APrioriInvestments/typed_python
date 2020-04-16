@@ -59,6 +59,35 @@ def strEndswith(s, suffix):
     return s[-len(suffix):] == suffix
 
 
+def strReplace(s, old, new, maxCount):
+    if maxCount == 0:
+        return s
+
+    accumulator = ListOf(str)()
+
+    pos = 0
+    seen = 0
+
+    while True:
+        if maxCount >= 0 and seen >= maxCount:
+            nextLoc = -1
+        else:
+            nextLoc = s.find(old, pos)
+
+        if nextLoc >= 0:
+            accumulator.append(s[pos:nextLoc])
+
+            if len(old):
+                pos = nextLoc + len(old)
+            else:
+                pos += 1
+
+            seen += 1
+        else:
+            accumulator.append(s[pos:])
+            return new.join(accumulator)
+
+
 class StringWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -287,7 +316,7 @@ class StringWrapper(RefcountedWrapper):
 
     def convert_attribute(self, context, instance, attr):
         if (
-            attr in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith")
+            attr in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace")
             or attr in self._str_methods
             or attr in self._bool_methods
         ):
@@ -296,7 +325,7 @@ class StringWrapper(RefcountedWrapper):
         return super().convert_attribute(context, instance, attr)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        if not (methodname in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith")
+        if not (methodname in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace")
                 or methodname in self._str_methods or methodname in self._bool_methods):
             return context.pushException(AttributeError, methodname)
 
@@ -354,11 +383,33 @@ class StringWrapper(RefcountedWrapper):
                 if args[0].expr_type != self:
                     context.pushException(
                         TypeError,
-                        "startswith first arg must be str (tuple of str not supported yet)"
+                        "endswith first arg must be str (tuple of str not supported yet)"
                     )
                     return
 
                 return context.call_py_function(strEndswith, (instance, args[0]), {})
+
+        elif methodname == "replace":
+            if len(args) in [2, 3]:
+                for i in [0, 1]:
+                    if args[i].expr_type != self:
+                        context.pushException(
+                            TypeError,
+                            f"replace() argument {i + 1} must be str"
+                        )
+                        return
+
+                if len(args) == 3 and args[2].expr_type.typeRepresentation != Int64:
+                    context.pushException(
+                        TypeError,
+                        f"replace() argument 3 must be int, not {args[2].expr_type.typeRepresentation}"
+                    )
+                    return
+
+                if len(args) == 2:
+                    return context.call_py_function(strReplace, (instance, args[0], args[1], context.constant(-1)), {})
+                else:
+                    return context.call_py_function(strReplace, (instance, args[0], args[1], args[2]), {})
 
         elif methodname == "find":
             if len(args) == 1:
