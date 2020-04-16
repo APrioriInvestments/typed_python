@@ -34,10 +34,13 @@ VALIDATE_FUNCTION_DEFINITIONS_STABLE = False
 
 
 class TypedCallTarget(object):
-    def __init__(self, named_call_target, input_types, output_type):
+    def __init__(self, named_call_target, input_types, output_type, alwaysRaises=False):
         super().__init__()
 
         assert isinstance(output_type, Wrapper) or output_type is None
+
+        # if we know _ahead of time_ that this will always throw an exception
+        self.alwaysRaises = alwaysRaises
 
         self.named_call_target = named_call_target
         self.input_types = input_types
@@ -247,8 +250,13 @@ class PythonToNativeConverter(object):
         self._link_name_for_identity[identity] = new_name
         self._inflight_function_conversions[identity] = context
 
-        if context.knownOutputType() is not None:
-            self._targets[new_name] = self.getTypedCallTarget(name, context.getInputTypes(), context.knownOutputType())
+        if context.knownOutputType() is not None or context.alwaysRaises():
+            self._targets[new_name] = self.getTypedCallTarget(
+                name,
+                context.getInputTypes(),
+                context.knownOutputType(),
+                alwaysRaises=context.alwaysRaises()
+            )
 
         if self._currentlyConverting is None:
             # force the function to resolve immediately
@@ -289,7 +297,7 @@ class PythonToNativeConverter(object):
             callback
         )
 
-    def getTypedCallTarget(self, name, input_types, output_type):
+    def getTypedCallTarget(self, name, input_types, output_type, alwaysRaises=False):
         native_input_types = [a.getNativePassingType() for a in input_types if not a.is_empty]
         if output_type is None:
             native_output_type = native_ast.Type.Void()
@@ -299,7 +307,7 @@ class PythonToNativeConverter(object):
         else:
             native_output_type = output_type.getNativeLayoutType()
 
-        return TypedCallTarget(
+        res = TypedCallTarget(
             native_ast.NamedCallTarget(
                 name=name,
                 arg_types=native_input_types,
@@ -310,8 +318,11 @@ class PythonToNativeConverter(object):
                 can_throw=True
             ),
             input_types,
-            output_type
+            output_type,
+            alwaysRaises=alwaysRaises
         )
+
+        return res
 
     def _code_to_ast(self, f):
         return python_ast.convertFunctionToAlgebraicPyAst(f)
@@ -454,7 +465,12 @@ class PythonToNativeConverter(object):
 
                 name = self._link_name_for_identity[identity]
 
-                self._targets[name] = self.getTypedCallTarget(name, functionConverter._input_types, actual_output_type)
+                self._targets[name] = self.getTypedCallTarget(
+                    name,
+                    functionConverter._input_types,
+                    actual_output_type,
+                    functionConverter.alwaysRaises()
+                )
 
             if dirtyUpstream:
                 self._dependencies.functionReturnSignatureChanged(identity)

@@ -1533,4 +1533,17 @@ extern "C" {
 
         return PythonObjectOfType::stealToCreateLayout(res);
     }
+
+    void np_raise_exception_fastpath(const char* message, const char* exceptionTypeName) {
+        PyEnsureGilAcquired getTheGil;
+
+        static PyObject* module = PyImport_ImportModule("builtins");
+
+        PyObject* excType = PyObject_GetAttrString(module, exceptionTypeName);
+        if (!excType) {
+            throw PythonExceptionSet();
+        }
+
+        PyErr_SetString(excType, message);
+    }
 }

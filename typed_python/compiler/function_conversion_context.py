@@ -134,6 +134,9 @@ class ConversionContextBase(object):
         self._functionOutputTypeKnown = False
         self._native_args = None
 
+    def alwaysRaises(self):
+        return False
+
     def getInputTypes(self):
         return self._input_types
 
@@ -779,13 +782,16 @@ class ConversionContextBase(object):
 class ExpressionFunctionConversionContext(ConversionContextBase):
     """Helper function for converting a single python function given some input and output types"""
 
-    def __init__(self, converter, name, identity, input_types, generator):
-        super().__init__(converter, name, identity, input_types, None, [f'a{i}' for i in range(len(input_types))], [], {})
+    def __init__(self, converter, name, identity, input_types, generator, outputType=None, alwaysRaises=False):
+        super().__init__(converter, name, identity, input_types, outputType, [f'a{i}' for i in range(len(input_types))], [], {})
 
         self._generator = generator
         self.variablesBound = set(self.funcArgNames)
-
+        self._alwaysRaises = alwaysRaises
         self._constructInitialVarnameToType()
+
+    def alwaysRaises(self):
+        return self._alwaysRaises
 
     def convert_function_body(self, variableStates: FunctionStackState):
         subcontext = ExpressionConversionContext(self, variableStates)

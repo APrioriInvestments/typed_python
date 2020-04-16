@@ -811,6 +811,13 @@ bytes_to_float64 = externalCallTarget(
     Void.pointer()
 )
 
+raise_exception_fastpath = externalCallTarget(
+    "np_raise_exception_fastpath",
+    Void,
+    UInt8Ptr,
+    UInt8Ptr
+)
+
 raiseAttributeError = externalCallTarget(
     "np_raiseAttributeErr",
     Void,

@@ -48,6 +48,9 @@ class NativeFunctionConversionContext:
     def allocateStackVarname(self):
         return self.allocateLetVarname()
 
+    def alwaysRaises(self):
+        return False
+
     def typesAreUnstable(self):
         return False
 

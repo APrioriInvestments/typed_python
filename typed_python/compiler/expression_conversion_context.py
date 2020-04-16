@@ -1104,9 +1104,11 @@ class ExpressionConversionContext(object):
 
             self.pushTerminal(call_target.call(*native_args))
 
-            # if you get this spuriously, perhaps one of your code-conversion functions
-            # returned None when it meant to return context.pushVoid(), which actually returns Void.
-            self.pushException(TypeError, "Unreachable code")
+            if not call_target.alwaysRaises:
+                # if you get this spuriously, perhaps one of your code-conversion functions
+                # returned None when it meant to return context.pushVoid(), which actually returns Void.
+                self.pushException(TypeError, "Unreachable code")
+
             return
 
         if call_target.output_type.is_pass_by_ref:
@@ -1156,6 +1158,23 @@ class ExpressionConversionContext(object):
         Returns:
             None
         """
+        if len(args) == 1 and isinstance(args[0], str) and isinstance(excType, type):
+            # this is the most common pathway
+            if id(excType) in builtinValueIdToNameAndValue:
+                self.pushEffect(
+                    runtime_functions.raise_exception_fastpath.call(
+                        native_ast.const_utf8_cstr(args[0]),
+                        native_ast.const_utf8_cstr(builtinValueIdToNameAndValue[id(excType)][0])
+                    )
+                )
+                self.pushEffect(
+                    native_ast.Expression.Throw(
+                        expr=native_ast.Expression.Constant(
+                            val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())
+                        )
+                    )
+                )
+                return None
 
         def toTyped(x):
             if isinstance(x, TypedExpression):
@@ -1290,7 +1309,7 @@ class ExpressionConversionContext(object):
         self.pushException(NameError, "name '%s' is not defined" % name)
         return None
 
-    def expressionAsFunctionCall(self, name, args, generatingFunction, identity):
+    def expressionAsFunctionCall(self, name, args, generatingFunction, identity, outputType=None, alwaysRaises=False):
         callTarget = self.converter.defineNonPythonFunction(
             name,
             ("expression", identity),
@@ -1300,6 +1319,8 @@ class ExpressionConversionContext(object):
                 ("expression", identity),
                 [x.expr_type for x in args],
                 generatingFunction,
+                outputType=outputType,
+                alwaysRaises=alwaysRaises
             )
         )
 
