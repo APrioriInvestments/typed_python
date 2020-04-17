@@ -1461,9 +1461,9 @@ class TestCompilationStructures(unittest.TestCase):
                 ret += str(1/x) + " "
                 if x == 1:
                     ret += x
-            except SyntaxError:
+            except (TypeError, FileNotFoundError):
                 ret += "catch1 "
-            except (TypeError, ArithmeticError):
+            except (SyntaxError, ArithmeticError):
                 ret += "catch2 "
             except Exception:
                 ret += "catchdefault "
@@ -1504,7 +1504,7 @@ class TestCompilationStructures(unittest.TestCase):
             except Exception:
                 ret += "except "
                 ret += str(1/x) + " "
-                return "Exception " + ret
+                return "Not Reached"
             finally:
                 ret += "finally "
                 return ret
@@ -1631,9 +1631,11 @@ class TestCompilationStructures(unittest.TestCase):
             return 3
 
         # failure: [f14] Tuples of exceptions not supported yet.
-        # failures: [f15, f16, f17, f19, f20, f21, f22, f23, f24]
+        # failure: [f15] segfaults
+        # failure: [f17] segfaults
 
-        for f in [f0, f1, f2, f3, f4, f5, f6, f7, f7a, f8, f9, f10, f11, f12, f13, f18, f25]:
+        for f in [f0, f1, f2, f3, f4, f5, f6, f7, f7a, f8, f9, f10, f11, f12, f13,
+                  f16, f18, f19, f20, f21, f22, f23, f24, f25]:
             c_f = Compiled(f)
             for v in [0, 1]:
                 r1 = result_or_exception_tb(f, v)

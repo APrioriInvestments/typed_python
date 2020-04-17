@@ -33,8 +33,10 @@ jobs:
       python: 3.6
       install:
         - pip install pipenv
+        - pip install safety
       script:
-        - pipenv check --ignore 37752 || (sleep 60; pipenv check --ignore 37752) || (sleep 60; pipenv check --ignore 37752)
+        - (pipenv lock --requirements | safety check --stdin) || (sleep 60; pipenv lock --requirements | safety check --stdin) || (sleep 60; pipenv lock --requirements | safety check --stdin)
+
 
     - name: "Unit Tests (3.6)"
       python: 3.6
