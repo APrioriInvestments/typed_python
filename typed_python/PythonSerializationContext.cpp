@@ -102,6 +102,9 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
             } else {
                 serializePythonObjectNamedOrAsObj(o, b);
             }
+        } else
+        if (PyCell_Check(o)) {
+            serializePyCell(o, b);
         } else {
             serializePythonObjectNamedOrAsObj(o, b);
         }
@@ -203,6 +206,48 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
     }
 
     return result;
+}
+
+void PythonSerializationContext::serializePyCell(PyObject* o, SerializationBuffer& b) const {
+    PyEnsureGilAcquired acquireTheGil;
+
+    uint32_t id;
+    bool isNew;
+    std::tie(id, isNew) = b.cachePointer(o);
+
+    b.writeUnsignedVarintObject(FieldNumbers::MEMO, id);
+
+    if (!isNew) {
+        return;
+    }
+
+    b.writeBeginCompound(FieldNumbers::CELL);
+
+    PyObject* cellContents = PyCell_GET(o);
+    if (cellContents) {
+        serializePythonObject(cellContents, b, 0);
+    }
+
+    b.writeEndCompound();
+}
+
+PyObject* PythonSerializationContext::deserializePyCell(DeserializationBuffer& b, size_t inWireType, int64_t memo) const {
+    PyEnsureGilAcquired acquireTheGil;
+
+    PyObjectStealer cell(PyCell_New(nullptr));
+
+    if (memo != -1) {
+        b.addCachedPyObj(memo, incref(cell));
+    }
+
+    b.consumeCompoundMessageWithImpliedFieldNumbers(inWireType, [&](size_t fieldNumber, size_t wiretype) {
+        PyObjectHolder cellContents;
+        cellContents.steal(deserializePythonObject(b, wiretype));
+
+        PyCell_Set((PyObject*)cell, (PyObject*)cellContents);
+    });
+
+    return cell.extract();
 }
 
 void PythonSerializationContext::serializePyDict(PyObject* o, SerializationBuffer& b) const {

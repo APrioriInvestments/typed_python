@@ -108,6 +108,7 @@ public:
             UNICODE = 14, //the object is a BYTES encoding a utf8-encoded string
             BYTES = 15, //the object is a BYTES encoding actual the actual bytes
             FROZENSET = 16, //the object is a frozenset with items encoded by index
+            CELL = 18, //the object is a cell object
         };
     };
 
@@ -192,6 +193,10 @@ private:
     void serializePyDict(PyObject* o, SerializationBuffer& b) const;
 
     PyObject* deserializePyDict(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
+
+    void serializePyCell(PyObject* o, SerializationBuffer& b) const;
+
+    PyObject* deserializePyCell(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
 
     void serializePyFrozenSet(PyObject* o, SerializationBuffer& b) const;
 
