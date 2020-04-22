@@ -92,7 +92,14 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
             serializePyFrozenSet(o, b);
         } else
         if (PyDict_CheckExact(o)) {
-            serializePyDict(o, b);
+            static PyObject* builtinsModule = PyImport_ImportModule("builtins");
+            static PyObject* builtinsModuleDict = PyObject_GetAttrString(builtinsModule, "__dict__");
+
+            if (builtinsModuleDict == o) {
+                serializePythonObjectNamedOrAsObj(o, b);
+            } else {
+                serializePyDict(o, b);
+            }
         } else
         if (PyType_Check(o)) {
             Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)o);

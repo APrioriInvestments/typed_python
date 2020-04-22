@@ -23,6 +23,7 @@ from typed_python.python_ast import (
 from typed_python.hash import sha_hash
 from typed_python.type_function import ConcreteTypeFunction, isTypeFunctionType, reconstructTypeFunctionType
 from types import FunctionType, ModuleType, CodeType
+import builtins
 import numpy
 import datetime
 import pytz
@@ -58,7 +59,6 @@ def astToCodeObject(ast, freevars):
 
 _builtin_name_to_value = {
     ".builtin." + k: v for k, v in __builtins__.items()
-    if isinstance(v, type) or 'builtin_function_or_method' in str(type(v))
 }
 _builtin_name_to_value[".builtin.importSystemSubmodule"] = importSystemSubmodule
 _builtin_name_to_value[".builtin.createEmptyFunction"] = createEmptyFunction
@@ -74,6 +74,8 @@ _builtin_name_to_value[".builtin.datetime.time"] = datetime.time
 _builtin_name_to_value[".builtin.datetime.timedelta"] = datetime.timedelta
 _builtin_name_to_value[".builtin.property"] = property
 _builtin_name_to_value[".builtin.pytz"] = pytz
+_builtin_name_to_value[".builtins.module"] = builtins
+_builtin_name_to_value[".builtins.dict"] = builtins.__dict__
 _builtin_name_to_value[".ast.Expr.Lambda"] = Expr.Lambda
 _builtin_name_to_value[".ast.Statement.FunctionDef"] = Statement.FunctionDef
 
@@ -188,10 +190,10 @@ class SerializationContext(object):
         tid = id(t)
         res = self.objToName.get(tid)
 
-        if res is not None:
-            return res
+        if res is None:
+            res = _builtin_value_to_name.get(tid)
 
-        return _builtin_value_to_name.get(tid)
+        return res
 
     def objectFromName(self, name):
         ''' Return an object for an input name(string), or None if not found. '''

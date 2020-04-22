@@ -1482,7 +1482,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         @Function
         def f():
-            return moduleLevelIdentityFunction(F(1))
+            return float(moduleLevelIdentityFunction(F(1)))
 
         sc = SerializationContext({})
         f2 = sc.deserialize(sc.serialize(f))

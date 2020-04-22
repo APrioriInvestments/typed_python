@@ -804,6 +804,11 @@ public:
                     }
                 }
             }
+
+            PyObject* builtins = PyDict_GetItemString(mFunctionGlobals, "__builtins__");
+            if (builtins) {
+                PyDict_SetItemString(mFunctionUsedGlobals, "__builtins__", builtins);
+            }
         }
 
         // create a new function object for this closure (or cache it
