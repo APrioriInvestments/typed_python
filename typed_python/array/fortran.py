@@ -1,7 +1,6 @@
 import os
 import numpy
 import ctypes
-import sys
 
 from typed_python import Int32, Float64, Float32, Entrypoint, PointerTo, ListOf, TupleOf, UInt8
 
@@ -10,32 +9,27 @@ from typed_python.compiler.type_wrappers.runtime_functions import externalCallTa
 import typed_python.compiler.native_ast as native_ast
 
 
-# TODO: check that this way of searching for a blas library works across different
-# versions of numpy.
+libdirPath = os.path.dirname(numpy.__file__)
 
-# get the path to '.libs' which is where numpy 1.18 stores its .so files
-if sys.platform == "darwin":
-    libdirPath = os.path.dirname(numpy.__file__)
 
-    # search for lapack_lite or 'blas' in the numpy installation
-    def searchForLapackLib():
-        for subdir in os.listdir(libdirPath):
-            dpath = os.path.join(libdirPath, subdir)
-            if 'lapack_lite' in subdir or 'blas' in subdir:
-                return dpath
+# search for lapack_lite or 'blas' in the numpy installation
+def searchForLapackLib():
+    for subdir in os.listdir(libdirPath):
+        dpath = os.path.join(libdirPath, subdir)
+        if 'lapack_lite' in subdir or 'blas' in subdir:
+            return dpath
 
-            if os.path.isdir(dpath):
-                for possibleLib in os.listdir(dpath):
-                    if 'lapack_lite' in possibleLib or 'blas' in possibleLib:
-                        return os.path.join(dpath, possibleLib)
+        if os.path.isdir(dpath):
+            for possibleLib in os.listdir(dpath):
+                if 'lapack_lite' in possibleLib or 'blas' in possibleLib:
+                    return os.path.join(dpath, possibleLib)
 
-    blasLibPath = searchForLapackLib()
 
-    if blasLibPath is None:
-        raise Exception("Couldn't find a valid implementation of lapack.")
-else:
-    libdirPath = os.path.join(os.path.dirname(numpy.__file__), ".libs")
-    blasLibPath = os.path.join(libdirPath, [x for x in os.listdir(libdirPath) if 'blas' in x][0])
+blasLibPath = searchForLapackLib()
+
+
+if blasLibPath is None:
+    raise Exception("Couldn't find a valid implementation of lapack.")
 
 # this loads the blas shared library as a 'global' library, which allows our llvm instructions
 # to find the functions they bind to. If we don't do this, then when we compile things like
