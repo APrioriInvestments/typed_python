@@ -38,11 +38,11 @@ def importSystemSubmodule(name):
 
 
 def createEmptyFunction(ast):
-    return evaluateFunctionPyAst(ast)
+    return evaluateFunctionPyAst(ast, stripAnnotations=True)
 
 
 def astToCodeObject(ast):
-    return evaluateFunctionPyAst(ast, stripAnnotations=True).__code__
+    return createEmptyFunction(ast).__code__
 
 
 _builtin_name_to_value = {
@@ -285,6 +285,7 @@ class SerializationContext(object):
             representation["qualname"] = inst.__qualname__
             representation["name"] = inst.__name__
             representation["module"] = inst.__module__
+            representation["annotations"] = inst.__annotations__
 
             all_names = set()
 
@@ -353,6 +354,7 @@ class SerializationContext(object):
             instance.__globals__.update(representation['freevars'])
             instance.__name__ = representation['name']
             instance.__qualname__ = representation['qualname']
+            instance.__annotations__ = representation['annotations']
 
             return True
 

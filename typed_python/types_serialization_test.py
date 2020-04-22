@@ -1451,3 +1451,17 @@ class TypesSerializationTest(unittest.TestCase):
         t[0].x4 = 2
         for e in t:
             self.assertEqual(e.x4, 2)
+
+    def test_roundtrip_serialization_of_functions(self):
+        T = int
+
+        def f() -> T:
+            return 1
+
+        sc = SerializationContext({})
+        sc.serialize(f)
+        f2 = sc.deserialize(sc.serialize(f))
+        self.assertEqual(f2(), 1)
+
+        f2Typed = Function(f2)
+        self.assertEqual(f2Typed.overloads[0].returnType, Int64)

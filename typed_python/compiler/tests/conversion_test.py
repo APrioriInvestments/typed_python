@@ -20,8 +20,8 @@ from flaky import flaky
 import psutil
 
 from typed_python import (
-    Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class,
-    _types, Compiled, Dict, NoneType, Member, Final, PythonObjectOfType
+    Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled,
+    _types, Compiled, Dict, NoneType, Member, Final, PythonObjectOfType, isCompiled
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
@@ -2671,3 +2671,16 @@ class TestCompilationStructures(unittest.TestCase):
                 f4(x)
 
         Entrypoint(f6)(10)
+
+    def test_not_compiled_called_from_compiled(self):
+        @NotCompiled
+        def f():
+            assert not isCompiled()
+            return "OK"
+
+        @Entrypoint
+        def g():
+            assert isCompiled()
+            return f()
+
+        self.assertEqual(g(), "OK")
