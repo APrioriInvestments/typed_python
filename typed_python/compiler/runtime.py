@@ -294,7 +294,7 @@ class Runtime:
         return OneOfWrapper.mergeTypes(possibleTypes)
 
 
-def NotCompiled(pyFunc):
+def NotCompiled(pyFunc, returnTypeOverride=None):
     """Decorate 'pyFunc' to prevent it from being compiled.
 
     Any type annotations on this function will apply, but the function's body itself
@@ -305,7 +305,11 @@ def NotCompiled(pyFunc):
     The actual python object for the function gets used, so it can have references
     to global state in the program.
     """
-    pyFunc = Function(pyFunc, assumeClosuresGlobal=True).withNocompile(True)
+    pyFunc = Function(
+        pyFunc,
+        returnTypeOverride=returnTypeOverride,
+        assumeClosuresGlobal=True
+    ).withNocompile(True)
 
     return pyFunc
 

@@ -13,7 +13,13 @@
 #   limitations under the License.
 
 from typed_python._types import serialize, deserialize, Type
-from typed_python.python_ast import convertFunctionToAlgebraicPyAst, evaluateFunctionPyAst, Expr, Statement
+from typed_python.python_ast import (
+    convertFunctionToAlgebraicPyAst,
+    evaluateFunctionPyAst,
+    evaluateFunctionDefWithLocalsInCells,
+    Expr,
+    Statement
+)
 from typed_python.hash import sha_hash
 from typed_python.type_function import ConcreteTypeFunction, isTypeFunctionType, reconstructTypeFunctionType
 from types import FunctionType, ModuleType, CodeType
@@ -41,8 +47,13 @@ def createEmptyFunction(ast):
     return evaluateFunctionPyAst(ast, stripAnnotations=True)
 
 
-def astToCodeObject(ast):
-    return createEmptyFunction(ast).__code__
+def astToCodeObject(ast, freevars):
+    return evaluateFunctionDefWithLocalsInCells(
+        ast,
+        globals={},
+        locals={l: None for l in freevars},
+        stripAnnotations=True
+    ).__code__
 
 
 _builtin_name_to_value = {
@@ -278,7 +289,7 @@ class SerializationContext(object):
         if isinstance(inst, CodeType):
             pyast = convertFunctionToAlgebraicPyAst(inst, keepLineInformation=self.encodeLineInformationForCode)
 
-            return (astToCodeObject, (pyast,), {})
+            return (astToCodeObject, (pyast, inst.co_freevars), {})
 
         if isinstance(inst, FunctionType):
             representation = {}
@@ -286,6 +297,8 @@ class SerializationContext(object):
             representation["name"] = inst.__name__
             representation["module"] = inst.__module__
             representation["annotations"] = inst.__annotations__
+            representation["defaults"] = inst.__defaults__
+            representation["kwdefaults"] = inst.__kwdefaults__
 
             all_names = set()
 
@@ -355,6 +368,8 @@ class SerializationContext(object):
             instance.__name__ = representation['name']
             instance.__qualname__ = representation['qualname']
             instance.__annotations__ = representation['annotations']
+            instance.__kwdefaults__ = representation['kwdefaults']
+            instance.__defaults__ = representation['defaults']
 
             return True
 

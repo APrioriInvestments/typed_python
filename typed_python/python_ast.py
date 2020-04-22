@@ -989,7 +989,7 @@ def evaluateFunctionPyAst(pyAst, globals=None, stripAnnotations=False):
     return res
 
 
-def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals):
+def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals, stripAnnotations=False):
     assert isinstance(pyAst, (Statement.FunctionDef, Statement.AsyncFunctionDef, Expr.Lambda))
 
     # make a new FunctionDef that defines a function
@@ -1006,10 +1006,10 @@ def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals):
         statements = [
             Statement.FunctionDef(
                 name=pyAst.name,
-                args=pyAst.args,
+                args=stripAstArgsAnnotations(pyAst.args) if stripAnnotations else pyAst.args,
                 body=pyAst.body,
                 decorator_list=(),
-                returns=pyAst.returns,
+                returns=pyAst.returns if not stripAnnotations else None,
                 line_number=pyAst.line_number,
                 col_offset=pyAst.col_offset,
                 filename=pyAst.filename,
@@ -1020,10 +1020,10 @@ def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals):
         statements = [
             Statement.AsyncFunctionDef(
                 name=pyAst.name,
-                args=pyAst.args,
+                args=stripAstArgsAnnotations(pyAst.args) if stripAnnotations else pyAst.args,
                 body=pyAst.body,
                 decorator_list=(),
-                returns=pyAst.returns,
+                returns=pyAst.returns if not stripAnnotations else None,
                 line_number=pyAst.line_number,
                 col_offset=pyAst.col_offset,
                 filename=pyAst.filename,

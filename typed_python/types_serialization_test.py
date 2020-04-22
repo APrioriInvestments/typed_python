@@ -48,6 +48,10 @@ from typed_python._types import refcount
 module_level_testfun = dummy_test_module.testfunction
 
 
+def moduleLevelIdentityFunction(x):
+    return x
+
+
 class C:
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
@@ -1452,16 +1456,35 @@ class TypesSerializationTest(unittest.TestCase):
         for e in t:
             self.assertEqual(e.x4, 2)
 
-    def test_roundtrip_serialization_of_functions(self):
+    def test_roundtrip_serialization_of_functions_with_annotations(self):
         T = int
 
         def f() -> T:
             return 1
 
         sc = SerializationContext({})
-        sc.serialize(f)
         f2 = sc.deserialize(sc.serialize(f))
         self.assertEqual(f2(), 1)
 
         f2Typed = Function(f2)
         self.assertEqual(f2Typed.overloads[0].returnType, Int64)
+
+    def test_roundtrip_serialization_of_functions_with_defaults(self):
+        def f(x=10, *, y=20):
+            return x + y
+
+        sc = SerializationContext({})
+        f2 = sc.deserialize(sc.serialize(f))
+        self.assertEqual(f2(), 30)
+
+    def test_roundtrip_serialization_of_functions_with_closures(self):
+        F = int
+
+        @Function
+        def f():
+            return moduleLevelIdentityFunction(F(1))
+
+        sc = SerializationContext({})
+        f2 = sc.deserialize(sc.serialize(f))
+
+        self.assertEqual(f2(), 1)

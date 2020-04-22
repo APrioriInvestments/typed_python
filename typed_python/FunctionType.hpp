@@ -776,6 +776,7 @@ public:
 
         static void extractNamesFromCode(PyCodeObject* code, std::set<PyObject*>& outNames) {
             iterate(code->co_names, [&](PyObject* o) { outNames.insert(o); });
+            iterate(code->co_freevars, [&](PyObject* o) { outNames.insert(o); });
 
             iterate(code->co_consts, [&](PyObject* o) {
                 if (PyCode_Check(o)) {
@@ -791,20 +792,18 @@ public:
             std::set<PyObject*> allNames;
             extractNamesFromCode((PyCodeObject*)mFunctionCode, allNames);
 
-            iterate(mFunctionGlobals, [&](PyObject* name) {
-                if (allNames.find(name) != allNames.end()) {
-                    int res = PyDict_Contains(mFunctionGlobals, name);
-                    if (res == -1) {
+            for (auto name: allNames) {
+                int res = PyDict_Contains(mFunctionGlobals, name);
+                if (res == -1) {
+                    throw PythonExceptionSet();
+                }
+
+                if (res) {
+                    if (PyDict_SetItem(mFunctionUsedGlobals, name, PyDict_GetItem(mFunctionGlobals, name))) {
                         throw PythonExceptionSet();
                     }
-
-                    if (res) {
-                        if (PyDict_SetItem(mFunctionUsedGlobals, name, PyDict_GetItem(mFunctionGlobals, name))) {
-                            throw PythonExceptionSet();
-                        }
-                    }
                 }
-            });
+            }
         }
 
         // create a new function object for this closure (or cache it

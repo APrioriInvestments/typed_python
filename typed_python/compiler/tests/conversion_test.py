@@ -2684,3 +2684,10 @@ class TestCompilationStructures(unittest.TestCase):
             return f()
 
         self.assertEqual(g(), "OK")
+
+    def test_not_compiled_lambdas(self):
+        @Entrypoint
+        def callIt(f):
+            return f(1)
+
+        self.assertEqual(callIt(NotCompiled(lambda x: x + 1, int)), 2)

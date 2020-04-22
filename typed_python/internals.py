@@ -127,7 +127,7 @@ magicMethodTypes = {
 }
 
 
-def makeFunctionType(name, f, isMethod=False, ignoreAnnotations=False, assumeClosuresGlobal=False):
+def makeFunctionType(name, f, isMethod=False, ignoreAnnotations=False, assumeClosuresGlobal=False, returnTypeOverride=None):
     if isinstance(f, typed_python._types.Function):
         if assumeClosuresGlobal:
             if typed_python.bytecount(type(f).ClosureType):
@@ -198,6 +198,9 @@ def makeFunctionType(name, f, isMethod=False, ignoreAnnotations=False, assumeClo
             return_type = tgtType
         elif return_type != tgtType:
             raise Exception(f"{name} must return {tgtType.__name__}")
+
+    if returnTypeOverride is not None:
+        return_type = returnTypeOverride
 
     if spec.varargs is not None:
         arg_types.append((spec.varargs, getAnn(spec.varargs), None, True, False))
@@ -296,9 +299,14 @@ class ClassMetaclass(type):
         return cls in type(instance).MRO
 
 
-def Function(f, assumeClosuresGlobal=False):
+def Function(f, assumeClosuresGlobal=False, returnTypeOverride=None):
     """Turn a normal python function into a 'typed_python.Function' which obeys type restrictions."""
-    return makeFunctionType(f.__name__, f, assumeClosuresGlobal=assumeClosuresGlobal)(f)
+    return makeFunctionType(
+        f.__name__,
+        f,
+        assumeClosuresGlobal=assumeClosuresGlobal,
+        returnTypeOverride=returnTypeOverride
+    )(f)
 
 
 class FunctionOverloadArg:

@@ -111,7 +111,12 @@ PyObject* Function::Overload::buildFunctionObj(Type* closureType, instance_ptr c
     int closureVarCount = PyCode_GetNumFree((PyCodeObject*)mFunctionCode);
 
     if (mFunctionClosureVarnames.size() != closureVarCount) {
-        throw std::runtime_error("Invalid closure: wrong number of cells.");
+        throw std::runtime_error(
+            "Invalid closure: wrong number of cells: wanted " +
+            format(closureVarCount) +
+            " but got " +
+            format(mFunctionClosureVarnames.size())
+        );
     }
 
     if (closureVarCount) {
