@@ -14,7 +14,7 @@
 
 from typed_python import (
     Function, OneOf, Int64, Float64, Alternative,
-    Value, String, ListOf
+    Value, String, ListOf, NotCompiled
 )
 from typed_python.compiler.runtime import Entrypoint
 import unittest
@@ -195,3 +195,18 @@ class TestTypeInference(unittest.TestCase):
         self.assertEqual(f.resultTypeFor(int).typeRepresentation, Int64)
         self.assertEqual(f.resultTypeFor(None).typeRepresentation, Int64)
         self.assertEqual(f.resultTypeFor(float).typeRepresentation, Int64)
+
+    def test_infer_type_of_nocompile(self):
+        @NotCompiled
+        def f() -> int:
+            # currently, we can't compile this
+            return [x for x in range(10)][0]
+
+        self.assertEqual(f.resultTypeFor().typeRepresentation, Int64)
+
+        @NotCompiled
+        def f2():
+            # currently, we can't compile this
+            return [x for x in range(10)][0]
+
+        self.assertEqual(f2.resultTypeFor().typeRepresentation.PyType, object)

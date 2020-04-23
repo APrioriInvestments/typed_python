@@ -286,10 +286,16 @@ class Runtime:
             argumentSignature = ExpressionConversionContext.computeFunctionArgumentTypeSignature(overload, argTypes, kwargTypes)
 
             if argumentSignature is not None:
-                callTarget = self.compileFunctionOverload(funcObj, overloadIx, argumentSignature, argumentsAreTypes=True)
+                if funcObj.isNocompile:
+                    if overload.returnType is not None:
+                        possibleTypes.append(typeWrapper(overload.returnType))
+                    else:
+                        possibleTypes.append(typeWrapper(object))
+                else:
+                    callTarget = self.compileFunctionOverload(funcObj, overloadIx, argumentSignature, argumentsAreTypes=True)
 
-                if callTarget is not None and callTarget.output_type is not None:
-                    possibleTypes.append(callTarget.output_type)
+                    if callTarget is not None and callTarget.output_type is not None:
+                        possibleTypes.append(callTarget.output_type)
 
         return OneOfWrapper.mergeTypes(possibleTypes)
 
