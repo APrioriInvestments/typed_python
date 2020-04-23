@@ -268,6 +268,7 @@ class Wrapper(object):
 
     def convert_str_cast(self, context, instance):
         t = instance.expr_type.typeRepresentation
+        print(t, type(t), type(instance.expr_type))
         tp = context.getTypePointer(t)
         if tp:
             if not instance.isReference:

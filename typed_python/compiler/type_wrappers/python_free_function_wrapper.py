@@ -29,3 +29,9 @@ class PythonFreeFunctionWrapper(Wrapper):
 
     def convert_call(self, context, left, args, kwargs):
         return context.call_py_function(self.typeRepresentation, args, kwargs)
+
+    def convert_str_cast(self, context, instance):
+        return context.constant(str(self.typeRepresentation))
+
+    def convert_repr(self, context, instance):
+        return context.constant(repr(self.typeRepresentation))

@@ -706,3 +706,13 @@ class TestStringCompilation(unittest.TestCase):
         self.assertTrue(fNot("b", "asfd"))
         self.assertTrue(fNot("b", ListOf(str)(["asfd"])))
         self.assertFalse(fNot("asdf", ListOf(str)(["asdf"])))
+
+    def test_string_of_global_function(self):
+        def f():
+            return str(callOrExcept)
+
+        @Entrypoint
+        def callit(f):
+            return f()
+
+        self.assertEqual(callit(f), str(callOrExcept))
