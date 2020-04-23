@@ -27,6 +27,12 @@ from typed_python import (
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
 
 
+from typed_python.python_ast import (
+    convertFunctionToAlgebraicPyAst,
+    evaluateFunctionDefWithLocalsInCells,
+)
+
+
 def result_or_exception(f, *p):
     try:
         return f(*p)
@@ -2691,3 +2697,19 @@ class TestCompilationStructures(unittest.TestCase):
             return f(1)
 
         self.assertEqual(callIt(NotCompiled(lambda x: x + 1, int)), 2)
+
+    def test_same_code_with_different_globals(self):
+        def call(x):
+            return f(x)  # noqa
+
+        ast = convertFunctionToAlgebraicPyAst(call)
+
+        f1 = evaluateFunctionDefWithLocalsInCells(ast, {'f': str}, {})
+        f2 = evaluateFunctionDefWithLocalsInCells(ast, {'f': int}, {})
+
+        @Entrypoint
+        def callFunc(f, x):
+            return f(x)
+
+        self.assertEqual(callFunc(f1, 10.5), "10.5")
+        self.assertEqual(callFunc(f2, 10.5), 10)

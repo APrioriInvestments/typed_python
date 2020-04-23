@@ -553,7 +553,13 @@ class PythonToNativeConverter(object):
 
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
-        identity = ("pyfunction", identityOverride or funcCode, input_types, output_type)
+        identity = (
+            "pyfunction",
+            identityOverride or funcCode,
+            input_types,
+            output_type,
+            tuple(sorted([(k, id(v)) for k, v in funcGlobals.items()]))
+        )
 
         if callback is not None:
             self.installLinktimeHook(identity, callback)

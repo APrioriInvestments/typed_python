@@ -1484,7 +1484,13 @@ class TypesSerializationTest(unittest.TestCase):
         def f():
             return float(moduleLevelIdentityFunction(F(1)))
 
+        def fWrapper():
+            return f()
+
         sc = SerializationContext({})
         f2 = sc.deserialize(sc.serialize(f))
 
         self.assertEqual(f2(), 1)
+
+        fWrapper2 = sc.deserialize(sc.serialize(fWrapper))
+        self.assertEqual(fWrapper2(), 1)
