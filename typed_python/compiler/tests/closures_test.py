@@ -15,6 +15,7 @@
 import unittest
 import time
 import pytest
+from flaky import flaky
 from typed_python import Class, Final, Function, NamedTuple, bytecount, ListOf, TypedCell, Forward, PyCell, Int64, Tuple, TupleOf
 from typed_python.compiler.runtime import RuntimeEventVisitor, Entrypoint
 from typed_python._types import refcount
@@ -617,6 +618,7 @@ class TestCompilingClosures(unittest.TestCase):
         self.assertEqual(res, doIt(aTup))
         self.assertEqual(refcount(aTup), 1)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_closure_var_lookup_speed(self):
         def sum(count, f):
             res = 0.0
