@@ -118,8 +118,9 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(callIt(f, 20), 30)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_calling_closures_perf(self):
-        ct = 100000
+        ct = 1000000
 
         aList1 = ListOf(int)([])
 
@@ -163,8 +164,12 @@ class TestCompilingClosures(unittest.TestCase):
 
         print(elapsedNontyped / elapsedCompiled, " times faster")
         # for me, the compiled form is about 280 times faster than the uncompiled form
-        self.assertTrue(elapsedCompiled * 50 < elapsedNontyped)
+        # AlexT: I got from ~83x to ~240x on 2020/04/23, so I increased the count
+        # which caused the variance to drop drastically (the elapsedCompiled is now
+        # in the order of 10ms on my AWS cloud worker.
+        self.assertLess(elapsedCompiled * 120, elapsedNontyped)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_assigning_closures_as_values(self):
         ct = 100000
 
@@ -657,6 +662,7 @@ class TestCompilingClosures(unittest.TestCase):
         print(f"in closure, took: {closureTime}. in simple loop took {directTime}")
         self.assertTrue(.8 <= closureTime / directTime <= 1.2, closureTime / directTime)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_if_statement_def(self):
         def callIt(x):
             if x % 2:
@@ -685,8 +691,9 @@ class TestCompilingClosures(unittest.TestCase):
 
         speedup = (t2 - t1) / (t1 - t0)
         print("speedup is ", speedup)  # I get about 80
-        self.assertGreater(speedup, 30)
+        self.assertGreater(speedup, 60)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_assign_functions_with_closure(self):
         def callIt(x):
             y = 10.0
@@ -717,7 +724,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         speedup = (t2 - t1) / (t1 - t0)
         print("speedup is ", speedup)  # I get about 8
-        self.assertGreater(speedup, 4)
+        self.assertGreater(speedup, 6)
 
     def test_two_closure_vars(self):
         @Entrypoint
