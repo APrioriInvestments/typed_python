@@ -931,7 +931,7 @@ extern "C" {
             PyErr_Format(
                 PyExc_TypeError,
                 "tableCopy of type '%s' not supported",
-                tp->name()
+                tp->name().c_str()
             );
         }
 
