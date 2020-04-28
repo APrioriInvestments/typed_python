@@ -17,8 +17,8 @@ from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler.type_wrappers.native_hash import NativeHash, table_add_slot, table_slot_for_key, \
-    table_next_slot, table_remove_key, table_clear, table_contains, table_contains_not
+from typed_python.compiler.type_wrappers.native_hash import table_next_slot, table_clear, \
+    table_contains, table_contains_not, set_add, set_add_or_remove, set_remove, set_discard, set_pop
 from typed_python import NoneType, PointerTo, Int32, Int64, UInt8
 
 import typed_python.compiler.native_ast as native_ast
@@ -26,55 +26,6 @@ import typed_python.compiler
 
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
-
-
-def set_add(instance, key):
-    itemHash = NativeHash()(key)
-
-    slot = table_slot_for_key(instance, itemHash, key)
-
-    if slot == -1:
-        newSlot = instance._allocateNewSlotUnsafe()
-        table_add_slot(instance, itemHash, newSlot)
-        instance.initializeKeyByIndexUnsafe(newSlot, key)
-
-
-def set_add_or_remove(instance, key):
-    itemHash = NativeHash()(key)
-
-    slot = table_slot_for_key(instance, itemHash, key)
-
-    if slot == -1:
-        newSlot = instance._allocateNewSlotUnsafe()
-        table_add_slot(instance, itemHash, newSlot)
-        instance.initializeKeyByIndexUnsafe(newSlot, key)
-    else:
-        table_remove_key(instance, key, itemHash, False)
-
-
-def set_remove(instance, key):
-    itemHash = NativeHash()(key)
-
-    table_remove_key(instance, key, itemHash, True)
-
-
-def set_discard(instance, key):
-    itemHash = NativeHash()(key)
-
-    table_remove_key(instance, key, itemHash, False)
-
-
-def set_pop(instance):
-    slotIx = 0
-
-    while slotIx < instance._items_reserved:
-        if instance._items_populated[slotIx]:
-            res = instance.getKeyByIndexUnsafe(slotIx)
-            set_remove(instance, res)
-            return res
-
-        slotIx += 1
-    raise KeyError(instance)
 
 
 def set_union(left, right):

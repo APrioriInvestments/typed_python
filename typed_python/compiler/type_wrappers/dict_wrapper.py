@@ -17,8 +17,8 @@ from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler.type_wrappers.native_hash import NativeHash, table_add_slot, table_slot_for_key, \
-    table_next_slot, table_remove_key, table_clear, table_contains, table_contains_not
+from typed_python.compiler.type_wrappers.native_hash import table_next_slot, table_clear, table_contains, \
+    table_contains_not, dict_delitem, dict_getitem, dict_get, dict_setitem
 from typed_python import NoneType, Tuple, PointerTo, Int32, Int64, UInt8
 
 import typed_python.compiler.native_ast as native_ast
@@ -31,48 +31,6 @@ typeWrapper = lambda t: typed_python.compiler.python_object_representation.typed
 def dict_update(instance, other):
     for key in other:
         instance[key] = other[key]
-
-
-def dict_delitem(instance, item):
-    itemHash = NativeHash()(item)
-
-    table_remove_key(instance, item, itemHash, True)
-
-
-def dict_getitem(instance, item):
-    itemHash = NativeHash()(item)
-
-    slot = table_slot_for_key(instance, itemHash, item)
-
-    if slot == -1:
-        raise KeyError(item)
-
-    return instance.getValueByIndexUnsafe(slot)
-
-
-def dict_get(instance, item, default):
-    itemHash = NativeHash()(item)
-
-    slot = table_slot_for_key(instance, itemHash, item)
-
-    if slot == -1:
-        return default
-
-    return instance.getValueByIndexUnsafe(slot)
-
-
-def dict_setitem(instance, key, value):
-    itemHash = NativeHash()(key)
-
-    slot = table_slot_for_key(instance, itemHash, key)
-
-    if slot == -1:
-        newSlot = instance._allocateNewSlotUnsafe()
-        table_add_slot(instance, itemHash, newSlot)
-        instance.initializeKeyByIndexUnsafe(newSlot, key)
-        instance.initializeValueByIndexUnsafe(newSlot, value)
-    else:
-        instance.assignValueByIndexUnsafe(slot, value)
 
 
 def dict_setdefault_nodefault(dict, item):

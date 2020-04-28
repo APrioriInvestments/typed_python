@@ -221,3 +221,100 @@ def table_contains_not(instance, item):
     slot = table_slot_for_key(instance, itemHash, item)
 
     return slot == -1
+
+
+# Operations specific to dicts that manipulate the fields directly:
+
+
+def dict_delitem(instance, item):
+    itemHash = NativeHash()(item)
+
+    table_remove_key(instance, item, itemHash, True)
+
+
+def dict_getitem(instance, item):
+    itemHash = NativeHash()(item)
+
+    slot = table_slot_for_key(instance, itemHash, item)
+
+    if slot == -1:
+        raise KeyError(item)
+
+    return instance.getValueByIndexUnsafe(slot)
+
+
+def dict_get(instance, item, default):
+    itemHash = NativeHash()(item)
+
+    slot = table_slot_for_key(instance, itemHash, item)
+
+    if slot == -1:
+        return default
+
+    return instance.getValueByIndexUnsafe(slot)
+
+
+def dict_setitem(instance, key, value):
+    itemHash = NativeHash()(key)
+
+    slot = table_slot_for_key(instance, itemHash, key)
+
+    if slot == -1:
+        newSlot = instance._allocateNewSlotUnsafe()
+        table_add_slot(instance, itemHash, newSlot)
+        instance.initializeKeyByIndexUnsafe(newSlot, key)
+        instance.initializeValueByIndexUnsafe(newSlot, value)
+    else:
+        instance.assignValueByIndexUnsafe(slot, value)
+
+
+# Operations specific to sets that manipulate the fields directly:
+
+
+def set_add(instance, key):
+    itemHash = NativeHash()(key)
+
+    slot = table_slot_for_key(instance, itemHash, key)
+
+    if slot == -1:
+        newSlot = instance._allocateNewSlotUnsafe()
+        table_add_slot(instance, itemHash, newSlot)
+        instance.initializeKeyByIndexUnsafe(newSlot, key)
+
+
+def set_add_or_remove(instance, key):
+    itemHash = NativeHash()(key)
+
+    slot = table_slot_for_key(instance, itemHash, key)
+
+    if slot == -1:
+        newSlot = instance._allocateNewSlotUnsafe()
+        table_add_slot(instance, itemHash, newSlot)
+        instance.initializeKeyByIndexUnsafe(newSlot, key)
+    else:
+        table_remove_key(instance, key, itemHash, False)
+
+
+def set_remove(instance, key):
+    itemHash = NativeHash()(key)
+
+    table_remove_key(instance, key, itemHash, True)
+
+
+def set_discard(instance, key):
+    itemHash = NativeHash()(key)
+
+    table_remove_key(instance, key, itemHash, False)
+
+
+def set_pop(instance):
+    slotIx = 0
+
+    while slotIx < instance._items_reserved:
+        if instance._items_populated[slotIx]:
+            res = instance.getKeyByIndexUnsafe(slotIx)
+            set_remove(instance, res)
+            return res
+
+        slotIx += 1
+    raise KeyError(instance)
