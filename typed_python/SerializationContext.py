@@ -369,9 +369,9 @@ class SerializationContext(object):
             instance.__globals__.update(representation['freevars'])
             instance.__name__ = representation['name']
             instance.__qualname__ = representation['qualname']
-            instance.__annotations__ = representation['annotations']
-            instance.__kwdefaults__ = representation['kwdefaults']
-            instance.__defaults__ = representation['defaults']
+            instance.__annotations__ = representation.get('annotations', {})
+            instance.__kwdefaults__ = representation.get('kwdefaults', {})
+            instance.__defaults__ = representation.get('defaults', ())
 
             return True
 
