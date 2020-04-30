@@ -933,6 +933,7 @@ extern "C" {
                 "tableCopy of type '%s' not supported",
                 tp->name().c_str()
             );
+            return 0;
         }
 
         return layout->copyTable(

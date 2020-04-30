@@ -15,7 +15,8 @@
 from typed_python import Set, ListOf, Entrypoint, Compiled, String, Tuple, TupleOf
 from typed_python.compiler.type_wrappers.set_wrapper import set_union, set_intersection, set_difference, \
     set_symmetric_difference, set_union_multiple, set_intersection_multiple, set_difference_multiple, \
-    set_disjoint, set_subset, set_proper_subset, set_equal, set_not_equal
+    set_disjoint, set_subset, set_proper_subset, set_equal, set_not_equal, \
+    set_update, set_intersection_update, set_difference_update
 import typed_python._types as _types
 import time
 import numpy
@@ -347,7 +348,6 @@ class TestSetCompilation(unittest.TestCase):
 
     def test_set_binop(self):
         S = Set(int)
-
         sets = []
         bits = 4
         for s in range(1<<bits):
@@ -466,8 +466,60 @@ class TestSetCompilation(unittest.TestCase):
                         r3 = Compiled(f)(S(x), S(y), S(z))  # testing method with 2 arguments
                         self.assertEqual(r1, r2)
                         self.assertEqual(r2, r3)
+
                     with self.assertRaises(TypeError):
                         Compiled(symmetric_difference2)(S(x), S(y), S(z))
+
+        def update(x: S, y: S):
+            x.update(y)
+
+        def intersection_update(x: S, y: S):
+            x.intersection_update(y)
+
+        def difference_update(x: S, y: S):
+            x.difference_update(y)
+
+        def symmetric_difference_update(x: S, y: S):
+            return x.symmetric_difference_update(y)
+
+        for x in sets:
+            for y in sets:
+                for f in [update, intersection_update, difference_update, symmetric_difference_update]:
+                    x1 = x.copy()
+                    x2 = S(x.copy())
+                    x3 = S(x.copy())
+                    f(x1, y)
+                    f(x2, S(y))
+                    Compiled(f)(x3, S(y))
+                    self.assertEqual(x1, x2)
+                    self.assertEqual(x1, x3)
+
+        def update2(x: S, y: S, z: S):
+            x.update(y, z)
+
+        def intersection_update2(x: S, y: S, z: S):
+            x.intersection_update(y, z)
+
+        def difference_update2(x: S, y: S, z: S):
+            x.difference_update(y, z)
+
+        def symmetric_difference_update2(x: S, y: S, z: S):
+            return x.symmetric_difference_update(y, z)
+
+        for x in sets:
+            for y in sets:
+                for z in sets:
+                    for f in [update2, intersection_update2, difference_update2]:
+                        x1 = x.copy()
+                        x2 = S(x.copy())
+                        x3 = S(x.copy())
+                        f(x1, y, z)
+                        f(x2, S(y), S(z))
+                        Compiled(f)(x3, S(y), S(z))
+                        self.assertEqual(x1, x2)
+                        self.assertEqual(x1, x3)
+                    with self.assertRaises(TypeError):
+                        Compiled(symmetric_difference_update2)(S(x), S(y), S(z))
 
     def test_set_binop_perf(self):
         for T in [int, str]:
@@ -714,3 +766,7 @@ class TestSetCompilation(unittest.TestCase):
         self.assertEqual(set_proper_subset(s3, s4), s3 < s4)
         self.assertEqual(set_equal(s3, s4), s3 == s4)
         self.assertEqual(set_not_equal(s3, s4), s3 != s4)
+
+        set_update(s1, s2)
+        set_intersection_update(s1, s1)
+        set_difference_update(s1, [9, 11])

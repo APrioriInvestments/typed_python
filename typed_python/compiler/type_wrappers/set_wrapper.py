@@ -87,11 +87,22 @@ def set_symmetric_difference(left, right):
     return result
 
 
+def set_symmetric_difference_update(left, right):
+    for i in right:
+        set_add_or_remove(left, i)
+
+
 def set_union_multiple(left, *others):
     result = left
     for o in others:
         result |= o
     return result
+
+
+def set_update(left, *others):
+    for o in others:
+        for i in o:
+            left.add(i)
 
 
 def set_intersection_multiple(left, *others):
@@ -101,11 +112,25 @@ def set_intersection_multiple(left, *others):
     return result
 
 
+def set_intersection_update(left, *others):
+    for i in left:
+        for o in others:
+            if i not in o:
+                left.discard(i)
+
+
 def set_difference_multiple(left, *others):
     result = left
     for o in others:
         result -= o
     return result
+
+
+def set_difference_update(left, *others):
+    for i in left:
+        for o in others:
+            if i in o:
+                left.discard(i)
 
 
 def set_disjoint(left, right):
@@ -200,6 +225,7 @@ class SetWrapper(SetWrapperBase):
                 "_compressItemTableUnsafe",
                 "add", "remove", "discard", "pop", "clear", "copy", "log",
                 "union", "intersection", "difference", "symmetric_difference",
+                "update", "intersection_update", "difference_update", "symmetric_difference_update",
                 "issubset", "issuperset", "isdisjoint"):
             return expr.changeType(BoundMethodWrapper.Make(self, attr))
 
@@ -335,16 +361,30 @@ class SetWrapper(SetWrapperBase):
         if methodname == 'union':
             return context.call_py_function(set_union_multiple, (instance, *args), {})
 
+        if methodname == 'update':
+            return context.call_py_function(set_update, (instance, *args), {})
+
         if methodname == 'intersection':
             return context.call_py_function(set_intersection_multiple, (instance, *args), {})
 
+        if methodname == 'intersection_update':
+            return context.call_py_function(set_intersection_update, (instance, *args), {})
+
         if methodname == 'difference':
             return context.call_py_function(set_difference_multiple, (instance, *args), {})
+
+        if methodname == 'difference_update':
+            return context.call_py_function(set_difference_update, (instance, *args), {})
 
         if methodname == 'symmetric_difference':
             if len(args) != 1:
                 return context.pushException(TypeError, f"symmetric_difference() takes exactly one argument ({len(args)} given)")
             return context.call_py_function(set_symmetric_difference, (instance, args[0]), {})
+
+        if methodname == 'symmetric_difference_update':
+            if len(args) != 1:
+                return context.pushException(TypeError, f"symmetric_difference_update() takes exactly one argument ({len(args)} given)")
+            return context.call_py_function(set_symmetric_difference_update, (instance, args[0]), {})
 
         if len(args) == 0:
             if methodname == "pop":
