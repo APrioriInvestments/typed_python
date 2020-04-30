@@ -1456,6 +1456,23 @@ class TypesSerializationTest(unittest.TestCase):
         for e in t:
             self.assertEqual(e.x4, 2)
 
+    def test_serialize_classes_with_staticmethods_and_properties(self):
+        sc = SerializationContext({})
+
+        class B:
+            @staticmethod
+            def f(x):
+                return x + 1
+
+            @property
+            def p(self):
+                return 11
+
+        B2 = sc.deserialize(sc.serialize(B))
+
+        self.assertEqual(B2.f(10), 11)
+        self.assertEqual(B().p, 11)
+
     def test_roundtrip_serialization_of_functions_with_annotations(self):
         T = int
 
