@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -839,6 +839,7 @@ PyObject* PySetInstance::setUpdate(PyObject* o, PyObject* args) {
 
 int PySetInstance::sq_contains_concrete(PyObject* item) {
     Type* item_type = extractTypeFrom(Py_TYPE(item));
+
     if (item_type == type()->keyType()) {
         PyInstance* item_w = (PyInstance*)item;
         instance_ptr i = type()->lookupKey(dataPtr(), item_w->dataPtr());
@@ -920,52 +921,6 @@ PyObject* PySetInstance::setAdd(PyObject* o, PyObject* args) {
 
     Py_RETURN_NONE;
 }
-
-
-/*
-PyObject* PySetInstance::setUpdate(PyObject* o, PyObject* args) {
-    PySetInstance* self_w = (PySetInstance*)o;
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "Set.update takes one argument");
-        return NULL;
-    }
-
-    PyObjectHolder item(PyTuple_GetItem(args, 0));
-
-    Type* item_type = extractTypeFrom(item->ob_type);
-    SetType* self_type = (SetType*)extractTypeFrom(o->ob_type);
-
-    if (item_type == self_w->type()) {
-        instance_ptr selfPtr = self_w->dataPtr();
-
-        PyInstance* item_w = (PyInstance*)(PyObject*)item;
-
-        self_type->visitSetElements(item_w->dataPtr(), [&](instance_ptr key) {
-            if (!self_type->lookupKey(selfPtr, key)) {
-                self_type->insertKey(selfPtr, key);
-            }
-            return true;
-        });
-    } else {
-        try {
-            iterate(item, [&](PyObject* toInsert) {
-                Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(self_w->type()->keyType(), data, toInsert);
-                });
-
-                insertKey(self_w, item, key.data());
-            });
-        } catch (PythonExceptionSet& e) {
-            return NULL;
-        } catch (std::exception& e) {
-            PyErr_SetString(PyExc_TypeError, e.what());
-            return NULL;
-        }
-    }
-
-    Py_RETURN_NONE;
-}
-*/
 
 Py_ssize_t PySetInstance::mp_and_sq_length_concrete() {
     return type()->size(dataPtr());
@@ -1176,6 +1131,7 @@ PyObject* PySetInstance::pyOperatorSymmetricDifference(PyObject* rhs, const char
 
 bool PySetInstance::subset(SetType *setT, instance_ptr left, PyObject* right) {
     int found = 1;
+
     setT->visitSetElements(left, [&](instance_ptr key) {
         PyObject* keyObject = extractPythonObject(key, setT->keyType());
         found = PySequence_Contains(right, keyObject);
@@ -1189,8 +1145,9 @@ bool PySetInstance::superset(SetType *setT, instance_ptr left, PyObject* right) 
     long found_count = 0;
     long right_count = PyObject_Length(right);
 
-    if (right_count == 0)
+    if (right_count == 0) {
         return true;
+    }
     setT->visitSetElements(left, [&](instance_ptr key) {
         PyObject* keyObject = extractPythonObject(key, setT->keyType());
         found = PySequence_Contains(right, keyObject);
@@ -1206,8 +1163,6 @@ bool PySetInstance::superset(SetType *setT, instance_ptr left, PyObject* right) 
 }
 
 bool PySetInstance::compare_to_python_concrete(SetType* setT, instance_ptr left, PyObject* right, bool exact, int pyComparisonOp) {
-//    auto convert = [&](char cmpValue) { return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpValue); };
-
     Type* rightType = extractTypeFrom(right->ob_type);
 
     if (!PySet_Check(right) && (!rightType || rightType->getTypeCategory() != Type::TypeCategory::catSet)) {
@@ -1227,28 +1182,33 @@ bool PySetInstance::compare_to_python_concrete(SetType* setT, instance_ptr left,
     long right_count = PyObject_Length(right);
 
     if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE) {
-        if (left_count != right_count)
+        if (left_count != right_count) {
             return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
+        }
         return cmpResultToBoolForPyOrdering(pyComparisonOp, subset(setT, left, right) ? 0 : 1);
     }
     else if (pyComparisonOp == Py_LE) {
-        if (left_count > right_count)
+        if (left_count > right_count) {
             return false;
+        }
         return subset(setT, left, right);
     }
     else if (pyComparisonOp == Py_LT) {
-        if (left_count >= right_count)
+        if (left_count >= right_count) {
             return false;
+        }
         return subset(setT, left, right);
     }
     else if (pyComparisonOp == Py_GE) {
-        if (left_count < right_count)
+        if (left_count < right_count) {
             return false;
+        }
         return superset(setT, left, right);
     }
     else if (pyComparisonOp == Py_GT) {
-        if (left_count <= right_count)
+        if (left_count <= right_count) {
             return false;
+        }
         return superset(setT, left, right);
     }
 
