@@ -64,9 +64,21 @@ class ValueWrapper(Wrapper):
     def convert_destroy(self, context, instance):
         pass
 
+    def convert_unary_op(self, context, left, op):
+        return context.constant(self.typeRepresentation.Value).convert_unary_op(op)
+
     def convert_bin_op(self, context, left, op, right, inplace):
         """Apply a binary operator to a Value and something else."""
         return context.constant(self.typeRepresentation.Value).convert_bin_op(op, right)
 
     def convert_bin_op_reverse(self, context, left, op, right, inplace):
         return right.convert_bin_op(op, context.constant(self.typeRepresentation.Value))
+
+    def convert_getitem(self, context, expr, item):
+        return context.constant(self.typeRepresentation.Value).convert_getitem(item)
+
+    def convert_attribute(self, context, instance, attribute):
+        return context.constant(self.typeRepresentation.Value).convert_attribute(attribute)
+
+    def convert_abs(self, context, expr):
+        return context.constant(self.typeRepresentation.Value).convert_abs()

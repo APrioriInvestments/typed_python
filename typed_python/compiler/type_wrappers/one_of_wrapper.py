@@ -163,6 +163,30 @@ class OneOfWrapper(Wrapper):
         # just unwrap us
         return self.unwrap(context, expr, lambda realInstance: realInstance.convert_getitem(index))
 
+    def convert_abs(self, context, expr):
+        return context.expressionAsFunctionCall(
+            "oneof_abs",
+            (expr,),
+            lambda expr: self.unwrap(
+                expr.context,
+                expr,
+                lambda exprUnwrapped: exprUnwrapped.convert_abs()
+            ),
+            ("oneof", self, "abs")
+        )
+
+    def convert_unary_op(self, context, left, op):
+        return context.expressionAsFunctionCall(
+            "oneof_unaryop",
+            (left,),
+            lambda left: self.unwrap(
+                left.context,
+                left,
+                lambda leftUnwrapped: leftUnwrapped.convert_unary_op(op)
+            ),
+            ("oneof", self, "unaryop", op)
+        )
+
     def convert_bin_op(self, context, left, op, right, inplace):
         return context.expressionAsFunctionCall(
             "oneof_binop",

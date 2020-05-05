@@ -301,7 +301,7 @@ class IntWrapper(ArithmeticTypeWrapper):
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:
-            return context.pushPod(self, left.nonref_expr.logical_not())
+            return context.pushPod(bool, left.nonref_expr.eq(self.getNativeLayoutType().zero()))
         if op.matches.Invert:
             return context.pushPod(self, left.nonref_expr.bitwise_not())
         if op.matches.USub:
