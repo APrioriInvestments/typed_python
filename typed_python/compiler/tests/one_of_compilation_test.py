@@ -66,7 +66,7 @@ class ClassB(Class, Final):
         return self.x - y
 
 
-class TestOneOfOfCompilation(unittest.TestCase):
+class TestOneOfCompilation(unittest.TestCase):
     def test_one_of_basic(self):
         @Compiled
         def f(x: OneOf(int, float)) -> OneOf(int, float):
@@ -362,3 +362,44 @@ class TestOneOfOfCompilation(unittest.TestCase):
             return OneOf("A", "B")(x)
 
         assert f("A") == "A"
+
+    def test_operations_on_oneof_values(self):
+        @Entrypoint
+        def oneof_concat(x: OneOf('A', 'B')):
+            return x + x
+
+        @Entrypoint
+        def oneof_getitem(x: OneOf('AB', 'CD'), i: int):
+            return x[i]
+
+        @Entrypoint
+        def oneof_ord(x: OneOf('A', 'B')):
+            return ord(x[0])
+
+        @Entrypoint
+        def oneof_isalpha(x: OneOf('A', '1')):
+            return x.isalpha()
+
+        @Entrypoint
+        def oneof_abs(x: OneOf(123.4, -234.5)):
+            return abs(x)
+
+        @Entrypoint
+        def oneof_not(x: OneOf(0, 1)):
+            return not x
+
+        self.assertEqual(oneof_concat('A'), 'AA')
+        self.assertEqual(oneof_concat('B'), 'BB')
+        self.assertEqual(oneof_getitem('AB', 0), 'A')
+        self.assertEqual(oneof_getitem('AB', 1), 'B')
+        self.assertEqual(oneof_getitem('CD', 0), 'C')
+        self.assertEqual(oneof_getitem('CD', 1), 'D')
+        self.assertEqual(oneof_ord('A'), 65)
+        self.assertEqual(oneof_ord('B'), 66)
+        self.assertEqual(oneof_isalpha('A'), True)
+        self.assertEqual(oneof_isalpha('1'), False)
+        self.assertEqual(oneof_abs(123.4), 123.4)
+        self.assertEqual(oneof_abs(-234.5), 234.5)
+        self.assertEqual(oneof_not(0), True)
+        self.assertEqual(oneof_not(1), False)
+
