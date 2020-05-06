@@ -93,6 +93,13 @@ class ArithmeticTypeWrapper(Wrapper):
     def convert_bool_cast(self, context, expr):
         if expr.expr_type.typeRepresentation is Bool:
             return expr
+
+        if expr.isConstant:
+            try:
+                return context.constant(bool(expr.constantValue))
+            except Exception as e:
+                return context.pushException(type(e), *e.args)
+
         return context.pushPod(
             bool,
             native_ast.Expression.Branch(
@@ -105,6 +112,13 @@ class ArithmeticTypeWrapper(Wrapper):
     def convert_int_cast(self, context, expr, raiseException=True):
         if expr.expr_type.typeRepresentation is Int64:
             return expr
+
+        if expr.isConstant:
+            try:
+                return context.constant(int(expr.constantValue))
+            except Exception as e:
+                return context.pushException(type(e), *e.args)
+
         return context.pushPod(
             int,
             native_ast.Expression.Cast(
@@ -116,6 +130,13 @@ class ArithmeticTypeWrapper(Wrapper):
     def convert_float_cast(self, context, expr, raiseException=True):
         if expr.expr_type.typeRepresentation is Float64:
             return expr
+
+        if expr.isConstant:
+            try:
+                return context.constant(float(expr.constantValue))
+            except Exception as e:
+                return context.pushException(type(e), *e.args)
+
         return context.pushPod(
             float,
             native_ast.Expression.Cast(
@@ -231,19 +252,25 @@ class IntWrapper(ArithmeticTypeWrapper):
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-    def convert_str_cast(self, context, instance):
+    def convert_str_cast(self, context, expr):
+        if expr.isConstant:
+            try:
+                return context.constant(str(expr.constantValue))
+            except Exception as e:
+                return context.pushException(type(e), *e.args)
+
         if self.typeRepresentation == Int64:
             return context.push(
                 str,
                 lambda strRef: strRef.expr.store(
-                    runtime_functions.int64_to_string.call(instance.nonref_expr).cast(strRef.expr_type.layoutType)
+                    runtime_functions.int64_to_string.call(expr.nonref_expr).cast(strRef.expr_type.layoutType)
                 )
             )
         elif self.typeRepresentation == UInt64:
             return context.push(
                 str,
                 lambda strRef: strRef.expr.store(
-                    runtime_functions.uint64_to_string.call(instance.nonref_expr).cast(strRef.expr_type.layoutType)
+                    runtime_functions.uint64_to_string.call(expr.nonref_expr).cast(strRef.expr_type.layoutType)
                 )
             )
         else:
@@ -256,7 +283,7 @@ class IntWrapper(ArithmeticTypeWrapper):
                 UInt8: 'u8'
             }[self.typeRepresentation]
 
-            return instance.convert_to_type(int).convert_str_cast() + context.constant(suffix)
+            return expr.convert_to_type(int).convert_str_cast() + context.constant(suffix)
 
     def convert_abs(self, context, expr):
         if self.typeRepresentation.IsSignedInt:
@@ -488,11 +515,17 @@ class BoolWrapper(ArithmeticTypeWrapper):
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-    def convert_str_cast(self, context, instance):
+    def convert_str_cast(self, context, expr):
+        if expr.isConstant:
+            try:
+                return context.constant(str(expr.constantValue))
+            except Exception as e:
+                return context.pushException(type(e), *e.args)
+
         return context.push(
             str,
             lambda strRef: strRef.expr.store(
-                runtime_functions.bool_to_string.call(instance.nonref_expr).cast(strRef.expr_type.layoutType)
+                runtime_functions.bool_to_string.call(expr.nonref_expr).cast(strRef.expr_type.layoutType)
             )
         )
 
@@ -584,6 +617,12 @@ class FloatWrapper(ArithmeticTypeWrapper):
         return native_ast.Type.Float(bits=self.typeRepresentation.Bits)
 
     def convert_int_cast(self, context, expr, raiseException=True):
+        if expr.isConstant:
+            try:
+                return context.constant(int(expr.constantValue))
+            except Exception as e:
+                return context.pushException(type(e), *e.args)
+
         if self.typeRepresentation == Float64:
             func = runtime_functions.float64_to_int
         else:

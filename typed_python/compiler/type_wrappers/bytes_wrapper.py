@@ -59,6 +59,20 @@ class BytesWrapper(RefcountedWrapper):
     def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type == left.expr_type:
             if op.matches.Eq or op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.GtE or op.matches.Gt:
+                if left.isConstant and right.isConstant:
+                    if op.matches.Eq:
+                        return context.constant(left.constantValue == right.constantValue)
+                    if op.matches.NotEq:
+                        return context.constant(left.constantValue != right.constantValue)
+                    if op.matches.Lt:
+                        return context.constant(left.constantValue < right.constantValue)
+                    if op.matches.LtE:
+                        return context.constant(left.constantValue <= right.constantValue)
+                    if op.matches.Gt:
+                        return context.constant(left.constantValue > right.constantValue)
+                    if op.matches.GtE:
+                        return context.constant(left.constantValue >= right.constantValue)
+
                 cmp_res = context.pushPod(
                     int,
                     runtime_functions.bytes_cmp.call(
@@ -98,6 +112,9 @@ class BytesWrapper(RefcountedWrapper):
                     )
 
             if op.matches.Add:
+                if left.isConstant and right.isConstant:
+                    return context.constant(left.constantValue + right.constantValue)
+
                 return context.push(
                     bytes,
                     lambda bytesRef: bytesRef.expr.store(
@@ -128,6 +145,9 @@ class BytesWrapper(RefcountedWrapper):
         if upper is None:
             return
 
+        if expr.isConstant and lower.isConstant and upper.isConstant:
+            return context.constant(expr.constantValue[lower.constantValue:upper.constantValue])
+
         return context.push(
             bytes,
             lambda bytesRef: bytesRef.expr.store(
@@ -141,6 +161,9 @@ class BytesWrapper(RefcountedWrapper):
 
     def convert_getitem(self, context, expr, item):
         item = item.toInt64()
+
+        if expr.isConstant and item.isConstant:
+            return context.constant(expr.constantValue[item.constantValue])
 
         len_expr = self.convert_len(context, expr)
 
@@ -171,6 +194,9 @@ class BytesWrapper(RefcountedWrapper):
         )
 
     def convert_len(self, context, expr):
+        if expr.isConstant:
+            return context.constant(len(expr.constantValue))
+
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
     def constant(self, context, s):
@@ -183,19 +209,35 @@ class BytesWrapper(RefcountedWrapper):
             context,
             native_ast.const_uint64_expr(pointerVal).cast(self.layoutType.pointer()),
             self,
-            True
+            True,
+            constantValue=s
         )
 
     def can_cast_to_primitive(self, context, expr, primitiveType):
         return primitiveType in (bytes, float, int, bool)
 
     def convert_bool_cast(self, context, expr):
+        if expr.isConstant:
+            return context.constant(bool(expr.constantValue))
+
         return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
 
     def convert_int_cast(self, context, expr):
+        if expr.isConstant:
+            try:
+                return context.constant(int(expr.constantValue))
+            except Exception as e:
+                return context.pushException(type(e), *e.args)
+
         return context.pushPod(int, runtime_functions.bytes_to_int64.call(expr.nonref_expr.cast(VoidPtr)))
 
     def convert_float_cast(self, context, expr):
+        if expr.isConstant:
+            try:
+                return context.constant(float(expr.constantValue))
+            except Exception as e:
+                return context.pushException(type(e), *e.args)
+
         return context.pushPod(float, runtime_functions.bytes_to_float64.call(expr.nonref_expr.cast(VoidPtr)))
 
     def convert_bytes_cast(self, context, expr):

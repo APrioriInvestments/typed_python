@@ -219,13 +219,13 @@ class ExpressionConversionContext(object):
         if isinstance(x, bytes):
             return typed_python.compiler.type_wrappers.bytes_wrapper.BytesWrapper().constant(self, x)
         if isinstance(x, bool):
-            return TypedExpression(self, native_ast.const_bool_expr(x), bool, False)
+            return TypedExpression(self, native_ast.const_bool_expr(x), bool, False, constantValue=x)
         if isinstance(x, int):
-            return TypedExpression(self, native_ast.const_int_expr(x), int, False)
+            return TypedExpression(self, native_ast.const_int_expr(x), int, False, constantValue=x)
         if isinstance(x, Int32):
-            return TypedExpression(self, native_ast.const_int32_expr(int(x)), Int32, False)
+            return TypedExpression(self, native_ast.const_int32_expr(int(x)), Int32, False, constantValue=x)
         if isinstance(x, float):
-            return TypedExpression(self, native_ast.const_float_expr(x), float, False)
+            return TypedExpression(self, native_ast.const_float_expr(x), float, False, constantValue=x)
         if x is None:
             return TypedExpression(self, native_ast.nullExpr, type(None), False)
 

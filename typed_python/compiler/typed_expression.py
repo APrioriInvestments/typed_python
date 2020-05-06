@@ -23,7 +23,7 @@ typeWrapper = lambda t: typed_python.compiler.python_object_representation.typed
 
 
 class TypedExpression(object):
-    def __init__(self, context, expr, t, isReference):
+    def __init__(self, context, expr, t, isReference, constantValue=None):
         """Initialize a TypedExpression
 
         context - an ExpressionConversionContext
@@ -34,6 +34,7 @@ class TypedExpression(object):
             if it's a reference, the reference is guaranteed to be valid for the lifetime of the
             expression. if its the value, then the value contains an implicit incref which must
             either be transferred or decreffed.
+        constantValue - if this is a simple inline constant, what is it? otherwise, None.
         """
         super().__init__()
         if isinstance(t, type) or hasattr(t, "__typed_python_category__"):
@@ -46,6 +47,11 @@ class TypedExpression(object):
         self.expr = expr
         self.expr_type = t
         self.isReference = isReference
+        self.constantValue = constantValue
+
+    @property
+    def isConstant(self):
+        return self.constantValue is not None
 
     def changeContext(self, newContext):
         return TypedExpression(newContext, self.expr, self.expr_type, self.isReference)

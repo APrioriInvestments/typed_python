@@ -184,3 +184,19 @@ class TestBytesCompilation(unittest.TestCase):
         # I get about .044
         self.assertLess(elapsed, .15)
         print("elapsed = ", elapsed)
+
+    def test_add_constants(self):
+        @Entrypoint
+        def addConstants(count):
+            res = 0
+            for i in range(count):
+                if b"a" + b"b" == b"ab":
+                    res += 1
+            return res
+
+        self.assertEqual(addConstants(1000), 1000)
+
+        t0 = time.time()
+        addConstants(1000000)
+        # llvm should recognize that this is just 'N' and so it should take no time.
+        self.assertLess(time.time() - t0, 1e-4)

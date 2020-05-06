@@ -236,7 +236,8 @@ def pythonObjectRepresentation(context, f):
                 val=native_ast.Constant.Int(val=f, bits=1, signed=False)
             ),
             BoolWrapper(),
-            False
+            False,
+            constantValue=f
         )
 
     if isinstance(f, int):
@@ -246,7 +247,8 @@ def pythonObjectRepresentation(context, f):
                 val=native_ast.Constant.Int(val=f, bits=64, signed=True)
             ),
             IntWrapper(Int64),
-            False
+            False,
+            constantValue=f
         )
 
     if isinstance(f, float):
@@ -256,7 +258,8 @@ def pythonObjectRepresentation(context, f):
                 val=native_ast.Constant.Float(val=f, bits=64)
             ),
             FloatWrapper(Float64),
-            False
+            False,
+            constantValue=f
         )
 
     if isinstance(f, str):

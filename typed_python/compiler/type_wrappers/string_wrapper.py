@@ -140,6 +140,9 @@ class StringWrapper(RefcountedWrapper):
         if right.expr_type == left.expr_type:
             if op.matches.Eq or op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.GtE or op.matches.Gt:
                 if op.matches.Eq:
+                    if left.isConstant and right.isConstant:
+                        return context.constant(left.constantValue == right.constantValue)
+
                     return context.pushPod(
                         bool,
                         runtime_functions.string_eq.call(
@@ -148,6 +151,9 @@ class StringWrapper(RefcountedWrapper):
                         )
                     )
                 if op.matches.NotEq:
+                    if left.isConstant and right.isConstant:
+                        return context.constant(left.constantValue != right.constantValue)
+
                     return context.pushPod(
                         bool,
                         runtime_functions.string_eq.call(
@@ -165,30 +171,48 @@ class StringWrapper(RefcountedWrapper):
                 )
 
                 if op.matches.Lt:
+                    if left.isConstant and right.isConstant:
+                        return context.constant(left.constantValue < right.constantValue)
+
                     return context.pushPod(
                         bool,
                         cmp_res.nonref_expr.lt(0)
                     )
                 if op.matches.LtE:
+                    if left.isConstant and right.isConstant:
+                        return context.constant(left.constantValue <= right.constantValue)
+
                     return context.pushPod(
                         bool,
                         cmp_res.nonref_expr.lte(0)
                     )
                 if op.matches.Gt:
+                    if left.isConstant and right.isConstant:
+                        return context.constant(left.constantValue > right.constantValue)
+
                     return context.pushPod(
                         bool,
                         cmp_res.nonref_expr.gt(0)
                     )
                 if op.matches.GtE:
+                    if left.isConstant and right.isConstant:
+                        return context.constant(left.constantValue >= right.constantValue)
+
                     return context.pushPod(
                         bool,
                         cmp_res.nonref_expr.gte(0)
                     )
 
             if op.matches.In:
+                if left.isConstant and right.isConstant:
+                    return context.constant(left.constantValue in right.constantValue)
+
                 return right.convert_method_call("find", (left,), {}) >= 0
 
             if op.matches.Add:
+                if left.isConstant and right.isConstant:
+                    return context.constant(left.constantValue + right.constantValue)
+
                 return context.push(
                     str,
                     lambda strRef: strRef.expr.store(
@@ -245,6 +269,13 @@ class StringWrapper(RefcountedWrapper):
         if upper is None:
             return
 
+        if expr.isConstant and lower.isConstant:
+            return context.constant(
+                expr.constantValue[
+                    lower.constantValue:upper.constantValue
+                ]
+            )
+
         return context.push(
             str,
             lambda strRef: strRef.expr.store(
@@ -258,6 +289,9 @@ class StringWrapper(RefcountedWrapper):
 
     def convert_getitem(self, context, expr, item):
         item = item.toInt64()
+
+        if expr.isConstant and item.isConstant:
+            return context.constant(expr.constantValue[item.constantValue])
 
         len_expr = self.convert_len(context, expr)
 
@@ -286,6 +320,9 @@ class StringWrapper(RefcountedWrapper):
         )
 
     def convert_len(self, context, expr):
+        if expr.constantValue is not None:
+            return context.constant(len(expr.constantValue))
+
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
     def constant(self, context, s):
@@ -298,7 +335,8 @@ class StringWrapper(RefcountedWrapper):
             context,
             native_ast.const_uint64_expr(pointerVal).cast(self.layoutType.pointer()),
             self,
-            True
+            True,
+            constantValue=s
         )
 
     _bool_methods = dict(
@@ -515,10 +553,31 @@ class StringWrapper(RefcountedWrapper):
         return primitiveType in (bool, int, float, str)
 
     def convert_bool_cast(self, context, expr):
+        if expr.isConstant:
+            try:
+                return context.constant(bool(expr.constantValue))
+            except Exception as e:
+                return context.pushException(type(e), *e.args)
+
         return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
 
     def convert_int_cast(self, context, expr):
+        if expr.isConstant:
+            try:
+                return context.constant(int(expr.constantValue))
+            except Exception as e:
+                return context.pushException(type(e), *e.args)
+
         return context.pushPod(int, runtime_functions.str_to_int64.call(expr.nonref_expr.cast(VoidPtr)))
 
+    def convert_str_cast(self, context, expr):
+        return expr
+
     def convert_float_cast(self, context, expr):
+        if expr.isConstant:
+            try:
+                return context.constant(float(expr.constantValue))
+            except Exception as e:
+                return context.pushException(type(e), *e.args)
+
         return context.pushPod(float, runtime_functions.str_to_float64.call(expr.nonref_expr.cast(VoidPtr)))
