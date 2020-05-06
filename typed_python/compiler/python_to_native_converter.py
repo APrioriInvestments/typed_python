@@ -77,6 +77,12 @@ class FunctionDependencyGraph:
         # (priority, node) pairs that need to recompute
         self._dirty_inflight_functions_with_order = SortedSet(key=lambda pair: pair[0])
 
+    def dropNode(self, node):
+        self._dependencies.dropNode(node, False)
+        if node in self._identity_levels:
+            del self._identity_levels[node]
+        self._dirty_inflight_functions.discard(node)
+
     def getNextDirtyNode(self):
         while self._dirty_inflight_functions_with_order:
             priority, identity = self._dirty_inflight_functions_with_order.pop()
@@ -445,7 +451,19 @@ class PythonToNativeConverter(object):
 
                 if nativeFunction is not None:
                     self._inflight_definitions[identity] = (nativeFunction, actual_output_type)
+            except Exception:
+                for i in self._inflight_function_conversions:
+                    if i in self._link_name_for_identity:
+                        name = self._link_name_for_identity[i]
+                        if name in self._targets:
+                            self._targets.pop(name)
+                        self._link_name_for_identity.pop(i)
 
+                    self._dependencies.dropNode(i)
+
+                self._inflight_function_conversions.clear()
+                self._inflight_definitions.clear()
+                raise
             finally:
                 self._currentlyConverting = None
 
@@ -641,7 +659,7 @@ class PythonToNativeConverter(object):
             if identifier not in self._inflight_definitions:
                 raise Exception(
                     f"Expected a definition for {identifier} depended on by:\n"
-                    + "\n".join("    " + str(i) for i in self._dependencies.incoming(identifier))
+                    + "\n".join("    " + str(i) for i in self._dependencies._dependencies.incoming(identifier))
                 )
 
             nativeFunction, actual_output_type = self._inflight_definitions.get(identifier)

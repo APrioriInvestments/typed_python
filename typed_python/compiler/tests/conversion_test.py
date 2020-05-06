@@ -19,6 +19,8 @@ import unittest
 from flaky import flaky
 import psutil
 
+from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
+
 from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
     _types, Compiled, NoneType, Member, Final, PythonObjectOfType, isCompiled, ConstDict,
@@ -976,6 +978,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callIt(1, 2), 3)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_perf_of_star_kwarg_intermediate_is_fast(self):
         def f(x, y):
             return x + y
@@ -1015,7 +1018,7 @@ class TestCompilationStructures(unittest.TestCase):
         print("Compiled is ", elapsedGPy / elapsedG, " times faster")
 
         # check that the extra call to 'g' doesn't introduce any overhead
-        self.assertTrue(.75 <= elapsedF / elapsedG <= 1.25, elapsedF / elapsedG)
+        self.assertTrue(.7 <= elapsedF / elapsedG <= 1.3, elapsedF / elapsedG)
 
     @flaky(max_runs=3, min_passes=1)
     def test_perf_of_star_arg_intermediate_is_fast(self):
@@ -2795,3 +2798,30 @@ class TestCompilationStructures(unittest.TestCase):
         callIt(countIt, arg)
         print("took ", time.time() - t0)
         self.assertLess(time.time() - t0, .1)
+
+    def test_can_compile_after_compilation_failure(self):
+        class ThrowsCompilerExceptions(CompilableBuiltin):
+            def __eq__(self, other):
+                return isinstance(other, ThrowsCompilerExceptions)
+
+            def __hash__(self):
+                return hash("ThrowsCompilerExceptions")
+
+            def convert_call(self, context, instance, args, kwargs):
+                raise Exception("This always throws")
+
+        def h():
+            return 2
+
+        @Entrypoint
+        def f():
+            return h() + ThrowsCompilerExceptions()()
+
+        with self.assertRaisesRegex(Exception, "This always throws"):
+            f()
+
+        @Entrypoint
+        def g():
+            return h() + 1
+
+        self.assertEqual(g(), 3)
