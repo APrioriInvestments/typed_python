@@ -242,7 +242,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             )
             return
 
-        return context.call_typed_call_target(callTarget, [left] + args + list(kwargs.values()))
+        return context.call_typed_call_target(callTarget, [left] + list(args) + list(kwargs.values()))
 
     @staticmethod
     def pickSpecializationTypeFor(overloadArg, argType: Wrapper):
