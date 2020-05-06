@@ -90,18 +90,18 @@ class SerializationContext(object):
         self.nameToObject = nameToObject or {}
         self.objToName = objToName
 
-        for k in self.nameToObject:
-            assert isinstance(k, str), (
-                "nameToObject keys must be strings (This one was not: {})"
-                .format(k)
-            )
-
         assert '' not in self.nameToObject, (
             "Empty object/type name not allowed: {}"
             .format(self.nameToObject[''])
         )
 
         if self.objToName is None:
+            for k in self.nameToObject:
+                assert isinstance(k, str), (
+                    "nameToObject keys must be strings (This one was not: {})"
+                    .format(k)
+                )
+
             # take the lexically lowest name, so that we're not dependent on ordering.
             self.objToName = {}
             for k, v in self.nameToObject.items():
