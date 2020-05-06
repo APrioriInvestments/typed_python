@@ -1005,6 +1005,28 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     });
 }
 
+PyObject *pyInstanceHeldObjectAddress(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "pyInstanceHeldObjectAddress takes a PyInstance");
+        return NULL;
+    }
+
+    PyObject* a1(PyTuple_GetItem(args, 0));
+
+    Type* actualType = PyInstance::extractTypeFrom(a1->ob_type);
+
+    if (!actualType) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "pyInstanceHeldObjectAddress takes a PyInstance",
+            (PyObject*)a1
+            );
+        return NULL;
+    }
+
+    return PyLong_FromLong((size_t)((PyInstance*)a1)->dataPtr());
+}
+
 PyObject *pointerTo(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "pointerTo takes a single class instance as an argument");
@@ -2030,6 +2052,7 @@ static PyMethodDef module_methods[] = {
     {"refcount", (PyCFunction)refcount, METH_VARARGS, NULL},
     {"getOrSetTypeResolver", (PyCFunction)getOrSetTypeResolver, METH_VARARGS, NULL},
     {"pointerTo", (PyCFunction)pointerTo, METH_VARARGS, NULL},
+    {"pyInstanceHeldObjectAddress", (PyCFunction)pyInstanceHeldObjectAddress, METH_VARARGS, NULL},
     {"copy", (PyCFunction)copyRefTo, METH_VARARGS, NULL},
     {"refTo", (PyCFunction)refTo, METH_VARARGS, NULL},
     {"getTypePointer", (PyCFunction)getTypePointer, METH_VARARGS, NULL},

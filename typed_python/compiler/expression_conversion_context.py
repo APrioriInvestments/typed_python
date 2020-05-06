@@ -25,7 +25,7 @@ from typed_python.compiler.python_object_representation import pythonObjectRepre
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
 from typed_python import NoneType, Alternative, OneOf, Bool, Int32, ListOf, String, Tuple, NamedTuple, TupleOf
-from typed_python._types import getTypePointer, TypeFor
+from typed_python._types import getTypePointer, TypeFor, pyInstanceHeldObjectAddress
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
@@ -92,6 +92,20 @@ class ExpressionConversionContext(object):
         T = typeWrapper(T)
 
         return TypedExpression(self, T.getNativeLayoutType().zero(), T, False)
+
+    def constantTypedPythonObject(self, x):
+        _memoizedThingsById[id(x)] = x
+
+        wrapper = typeWrapper(type(x))
+
+        return TypedExpression(
+            self,
+            native_ast.const_uint64_expr(
+                pyInstanceHeldObjectAddress(x)
+            ).cast(wrapper.getNativeLayoutType().pointer()),
+            wrapper,
+            True
+        )
 
     def constantPyObject(self, x):
         """Get a TypedExpression that represents a specific python object as 'object'.

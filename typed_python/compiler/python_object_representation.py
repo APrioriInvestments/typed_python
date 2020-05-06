@@ -61,7 +61,7 @@ from typed_python.compiler.type_wrappers.repr_wrapper import ReprWrapper
 from types import ModuleType
 from typed_python._types import TypeFor, bytecount, prepareArgumentToBePassedToCompiler
 from typed_python import (
-    Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16,
+    Type, Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16,
     UInt8, Float64, Float32, Bool, String, Bytes, NoneType, makeNamedTuple,
     ListOf, isCompiled
 )
@@ -307,6 +307,10 @@ def pythonObjectRepresentation(context, f):
 
     if isinstance(f, ConcreteTypeFunction):
         return TypedExpression(context, native_ast.nullExpr, PythonFreeObjectWrapper(f, False), False)
+
+    if isinstance(f, Type):
+        # it's a typed python object at module level scope
+        return context.constantTypedPythonObject(f)
 
     return TypedExpression(context, native_ast.nullExpr, PythonFreeObjectWrapper(f), False)
 

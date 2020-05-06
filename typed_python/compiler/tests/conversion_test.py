@@ -20,8 +20,9 @@ from flaky import flaky
 import psutil
 
 from typed_python import (
-    Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled,
-    _types, Compiled, Dict, NoneType, Member, Final, PythonObjectOfType, isCompiled
+    Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
+    _types, Compiled, NoneType, Member, Final, PythonObjectOfType, isCompiled, ConstDict,
+    makeNamedTuple, Int64
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
@@ -65,6 +66,25 @@ def repeat_test(f, *a):
             f(*a)
         except Exception:
             pass
+
+
+class GetCompiledTypes(RuntimeEventVisitor):
+    def __init__(self):
+        self.types = {}
+
+    def onNewFunction(self, f, inputTypes, outputType, variables):
+        self.types[f] = makeNamedTuple(
+            inputTypes=inputTypes,
+            outputType=outputType,
+            varTypes=variables
+        )
+
+
+# used in tests that need module-level objects, which are handled
+# internally in a different way than objects created at function
+# scope.
+aModuleLevelDict = Dict(str, int)({'hi': 1})
+aModuleLevelConstDict = ConstDict(str, int)({'hi': 1})
 
 
 repeat_test_compiled = Entrypoint(repeat_test)
@@ -2713,3 +2733,65 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callFunc(f1, 10.5), "10.5")
         self.assertEqual(callFunc(f2, 10.5), 10)
+
+    def test_closure_grabs_global_typed_object(self):
+        def countIt(x):
+            res = 0
+            for a in x:
+                res += aModuleLevelConstDict.get(a, 0)
+            return res
+
+        @Entrypoint
+        def callIt(f, x):
+            return f(x)
+
+        arg = ListOf(str)(["hi", "bye"] * 100000)
+
+        t0 = time.time()
+        v = GetCompiledTypes()
+        with v:
+            self.assertEqual(
+                callIt(countIt, arg),
+                100000
+            )
+
+        # our code should know the type of the const dict!
+        self.assertEqual(v.types[countIt.__code__].varTypes['res'], Int64)
+
+        t0 = time.time()
+        callIt(countIt, arg)
+        print("took ", time.time() - t0)
+        self.assertLess(time.time() - t0, .1)
+
+    def test_closure_can_grab_and_modify_global_typed_object(self):
+        aModuleLevelDict['modify_count'] = 0
+
+        def countIt(x):
+            res = 0
+            for a in x:
+                res += aModuleLevelDict.get(a, 0)
+                aModuleLevelDict["modify_count"] += 1
+            return res
+
+        @Entrypoint
+        def callIt(f, x):
+            return f(x)
+
+        arg = ListOf(str)(["hi", "bye"] * 100000)
+
+        t0 = time.time()
+        v = GetCompiledTypes()
+        with v:
+            self.assertEqual(
+                callIt(countIt, arg),
+                100000
+            )
+
+        # our code should know the type of the const dict!
+        self.assertEqual(v.types[countIt.__code__].varTypes['res'], Int64)
+        self.assertEqual(aModuleLevelDict['modify_count'], 200000)
+
+        t0 = time.time()
+        callIt(countIt, arg)
+        print("took ", time.time() - t0)
+        self.assertLess(time.time() - t0, .1)
