@@ -15,7 +15,7 @@
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import Bytes, Int32
+from typed_python import Bytes, Int32, Dict, ListOf
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -23,6 +23,9 @@ import typed_python.compiler
 from typed_python.compiler.native_ast import VoidPtr
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+_memoizedBytesTable = Dict(bytes, ListOf(bytes))()
 
 
 class BytesWrapper(RefcountedWrapper):
@@ -171,14 +174,16 @@ class BytesWrapper(RefcountedWrapper):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
     def constant(self, context, s):
-        return context.push(
-            bytes,
-            lambda bytesRef: bytesRef.expr.store(
-                runtime_functions.bytes_from_ptr_and_len.call(
-                    native_ast.const_bytes_cstr(s),
-                    native_ast.const_int_expr(len(s))
-                ).cast(self.layoutType)
-            )
+        if s not in _memoizedBytesTable:
+            _memoizedBytesTable[s] = ListOf(bytes)([s])
+
+        pointerVal = int(_memoizedBytesTable[s].pointerUnsafe(0))
+
+        return typed_python.compiler.typed_expression.TypedExpression(
+            context,
+            native_ast.const_uint64_expr(pointerVal).cast(self.layoutType.pointer()),
+            self,
+            True
         )
 
     def can_cast_to_primitive(self, context, expr, primitiveType):

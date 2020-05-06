@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Bytes, Compiled
+from typed_python import Bytes, Compiled, Entrypoint, ListOf
 import unittest
 import time
 
@@ -162,3 +162,25 @@ class TestBytesCompilation(unittest.TestCase):
             for r in range(-10, 10):
                 for b in [b"", b"a", b"as", b"asdf"]:
                     self.assertEqual(fComp(b, l, r), f(b, l, r))
+
+    def test_compare_bytes_to_constant(self):
+        @Entrypoint
+        def countEqualTo(z):
+            res = 0
+            for s in z:
+                if s == b"this are some bytes":
+                    res += 1
+            return res
+
+        someBytes = ListOf(bytes)([b"this are some bytes", b"boo"] * 1000000)
+
+        # burn in the compiler
+        countEqualTo(someBytes)
+
+        t0 = time.time()
+        countEqualTo(someBytes)
+        elapsed = time.time() - t0
+
+        # I get about .044
+        self.assertLess(elapsed, .15)
+        print("elapsed = ", elapsed)

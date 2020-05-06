@@ -128,24 +128,6 @@ class ExpressionConversionContext(object):
             )
         )
 
-    def constantClassInstance(self, x):
-        aList = ListOf(type(x))([x])
-
-        # this is a terrible way of keeping this alive. we should be memoizing
-        # constants by their names so we can load them from binaries later
-        _memoizedKeepalives.append(aList)
-
-        classPtr = int(aList.pointerUnsafe(0))
-
-        wrapper = typeWrapper(type(x))
-
-        return TypedExpression(
-            self,
-            native_ast.const_uint64_expr(classPtr).cast(wrapper.getNativeLayoutType().pointer()),
-            wrapper,
-            True
-        )
-
     @staticmethod
     def constantType(x, allowArbitrary=False):
         """Return the Wrapper for the type we'd get if we called self.constant(x)
@@ -234,6 +216,8 @@ class ExpressionConversionContext(object):
 
         if isinstance(x, str):
             return typed_python.compiler.type_wrappers.string_wrapper.StringWrapper().constant(self, x)
+        if isinstance(x, bytes):
+            return typed_python.compiler.type_wrappers.bytes_wrapper.BytesWrapper().constant(self, x)
         if isinstance(x, bool):
             return TypedExpression(self, native_ast.const_bool_expr(x), bool, False)
         if isinstance(x, int):

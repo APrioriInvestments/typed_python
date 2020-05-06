@@ -716,3 +716,24 @@ class TestStringCompilation(unittest.TestCase):
             return f()
 
         self.assertEqual(callit(f), str(callOrExcept))
+
+    def test_compare_strings_to_constant(self):
+        @Entrypoint
+        def countEqualTo(z):
+            res = 0
+            for s in z:
+                if s == "this is a string":
+                    res += 1
+            return res
+
+        someStrings = ListOf(str)(["this is a string", "boo"] * 1000000)
+
+        # burn in the compiler
+        countEqualTo(someStrings)
+
+        t0 = time.time()
+        countEqualTo(someStrings)
+        elapsed = time.time() - t0
+
+        # I get about .03
+        self.assertLess(elapsed, .1)

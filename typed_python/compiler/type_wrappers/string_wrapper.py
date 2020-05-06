@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python import Int64, Bool, String, Int32
+from typed_python import Int64, Bool, String, Int32, Dict
 
 from typed_python.compiler.type_wrappers.list_of_wrapper import MasqueradingListOfWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -27,6 +27,9 @@ from typed_python import ListOf
 from typed_python.compiler.native_ast import VoidPtr
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+_memoizedStringTable = Dict(str, ListOf(str))()
 
 
 def strJoinIterable(sep, iterable):
@@ -286,14 +289,16 @@ class StringWrapper(RefcountedWrapper):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
     def constant(self, context, s):
-        return context.push(
-            str,
-            lambda strRef: strRef.expr.store(
-                runtime_functions.string_from_utf8_and_len.call(
-                    native_ast.const_utf8_cstr(s),
-                    native_ast.const_int_expr(len(s))
-                ).cast(self.layoutType)
-            )
+        if s not in _memoizedStringTable:
+            _memoizedStringTable[s] = ListOf(str)([s])
+
+        pointerVal = int(_memoizedStringTable[s].pointerUnsafe(0))
+
+        return typed_python.compiler.typed_expression.TypedExpression(
+            context,
+            native_ast.const_uint64_expr(pointerVal).cast(self.layoutType.pointer()),
+            self,
+            True
         )
 
     _bool_methods = dict(

@@ -297,7 +297,7 @@ def pythonObjectRepresentation(context, f):
 
         if f.__typed_python_category__ == "Class":
             # global class instances get held as constants
-            return context.constantClassInstance(f)
+            return context.constantTypedPythonObject(f)
 
     if isinstance(f, type):
         return TypedExpression(context, native_ast.nullExpr, PythonTypeObjectWrapper(f), False)
