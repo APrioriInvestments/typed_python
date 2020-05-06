@@ -1511,3 +1511,18 @@ class TypesSerializationTest(unittest.TestCase):
 
         fWrapper2 = sc.deserialize(sc.serialize(fWrapper))
         self.assertEqual(fWrapper2(), 1)
+
+    def test_serialize_many_large_equivalent_strings(self):
+        sc = SerializationContext({})
+
+        def f(x):
+            return " " * x + "hi" * x
+
+        someStrings = [f(1000) for _ in range(100)]
+        someStrings2 = [f(1000) for _ in range(101)]
+
+        # we memoize strings, so this should be cheap
+        self.assertLess(
+            len(sc.serialize(someStrings2)) - len(sc.serialize(someStrings)),
+            20
+        )
