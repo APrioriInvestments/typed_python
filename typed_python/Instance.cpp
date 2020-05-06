@@ -49,14 +49,14 @@ Instance Instance::create(double val) {
 }
 
 Instance Instance::create(Type*t, instance_ptr data) {
-    t->assertForwardsResolved();
+    t->assertForwardsResolvedSufficientlyToInstantiate();
 
     return createAndInitialize(t, [&](instance_ptr tgt) {
         t->copy_constructor(tgt, data);
     });
 }
 Instance Instance::create(Type*t) {
-    t->assertForwardsResolved();
+    t->assertForwardsResolvedSufficientlyToInstantiate();
 
     return createAndInitialize(t, [&](instance_ptr tgt) {
         t->constructor(tgt);
@@ -74,7 +74,7 @@ Instance::Instance(const Instance& other) : mLayout(other.mLayout) {
 }
 
 Instance::Instance(instance_ptr p, Type* t) : mLayout(nullptr) {
-    t->assertForwardsResolved();
+    t->assertForwardsResolvedSufficientlyToInstantiate();
 
     layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
 

@@ -14,7 +14,7 @@
 
 from typed_python import (
     TypeFunction, Class, Alternative, Member, SerializationContext,
-    Forward, ListOf, Final, isCompiled, Entrypoint
+    Forward, ListOf, Final, isCompiled, Entrypoint, NotCompiled
 )
 
 import unittest
@@ -165,6 +165,18 @@ class TypeFunctionTest(unittest.TestCase):
         def makeClass(T):
             class A(Class):
                 @staticmethod
+                def f() -> makeClass(T):
+                    return makeClass(T)()
+            return A
+
+        makeClass(int)()
+
+    def test_typefunc_in_staticmethod_annotation_notcompiled(self):
+        @TypeFunction
+        def makeClass(T):
+            class A(Class):
+                @staticmethod
+                @NotCompiled
                 def f() -> makeClass(T):
                     return makeClass(T)()
             return A

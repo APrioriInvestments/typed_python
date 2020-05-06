@@ -344,7 +344,8 @@ instance_ptr DictType::insertKey(instance_ptr self, instance_ptr key) const {
 }
 
 void DictType::constructor(instance_ptr self) {
-    assertForwardsResolved();
+    assertForwardsResolvedSufficientlyToInstantiate();
+
     (*(hash_table_layout**)self) = (hash_table_layout*)malloc(sizeof(hash_table_layout));
 
     hash_table_layout& record = **(hash_table_layout**)self;

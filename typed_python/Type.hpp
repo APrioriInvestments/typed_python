@@ -173,7 +173,7 @@ public:
     }
 
     Type* pickConcreteSubclass(instance_ptr data) {
-        assertForwardsResolved();
+        assertForwardsResolvedSufficientlyToInstantiate();
 
         return this->check([&](auto& subtype) {
             return subtype.pickConcreteSubclassConcrete(data);
@@ -209,7 +209,7 @@ public:
 
     template<class buf_t>
     void serialize(instance_ptr left, buf_t& buffer, size_t fieldNumber) {
-        assertForwardsResolved();
+        assertForwardsResolvedSufficientlyToInstantiate();
 
         return this->check([&](auto& subtype) {
             return subtype.serialize(left, buffer, fieldNumber);
@@ -218,7 +218,7 @@ public:
 
     template<class buf_t>
     void deserialize(instance_ptr left, buf_t& buffer, size_t wireType) {
-        assertForwardsResolved();
+        assertForwardsResolvedSufficientlyToInstantiate();
 
         return this->check([&](auto& subtype) {
             return subtype.deserialize(left, buffer, wireType);
@@ -419,7 +419,7 @@ public:
 
     template<class ptr_func>
     void constructor(int64_t count, const ptr_func& ptrToChild) {
-        assertForwardsResolved();
+        assertForwardsResolvedSufficientlyToInstantiate();
 
         this->check([&](auto& subtype) {
             for (long k = 0; k < count; k++) {

@@ -61,7 +61,8 @@ bool ConcreteAlternative::_updateAfterForwardTypesChanged() {
 }
 
 void ConcreteAlternative::constructor(instance_ptr self) {
-    assertForwardsResolved();
+    assertForwardsResolvedSufficientlyToInstantiate();
+
     if (m_alternative->all_alternatives_empty()) {
         *(uint8_t*)self = m_which;
     } else {

@@ -1285,7 +1285,7 @@ public:
     //Function types can be instantiated even if forwards are not resolved
     //in their annotations.
     void assertForwardsResolvedSufficientlyToInstantiateConcrete() const {
-        mClosureType->assertForwardsResolved();
+        mClosureType->assertForwardsResolvedSufficientlyToInstantiate();
     }
 
     Function* replaceClosure(Type* closureType) {

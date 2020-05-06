@@ -120,7 +120,7 @@ size_t OneOfType::computeBytecount() const {
 }
 
 void OneOfType::constructor(instance_ptr self) {
-    assertForwardsResolved();
+    assertForwardsResolvedSufficientlyToInstantiate();
     if (!m_is_default_constructible) {
         throw std::runtime_error(m_name + " is not default-constructible");
     }

@@ -14,7 +14,7 @@
 import unittest
 
 from typed_python import (
-    TupleOf, OneOf, Alternative, Class, Member,
+    TupleOf, OneOf, Alternative, Class, Member, Function,
     Forward, Int64, NamedTuple, Tuple, Dict, ListOf, ConstDict, Module
 )
 
@@ -262,3 +262,17 @@ class ForwardTypesTests(unittest.TestCase):
 
         self.assertTrue(A in mutuallyRecursiveGroup(A))
         self.assertTrue(B in mutuallyRecursiveGroup(A))
+
+    def test_call_function_with_unresolved_forward_fails(self):
+        X = Forward("X")
+
+        @Function
+        def f() -> X:
+            return 0
+
+        with self.assertRaisesRegex(Exception, "unresolved forwards"):
+            f()
+
+        X.define(int)
+
+        f()

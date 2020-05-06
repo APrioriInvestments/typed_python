@@ -211,7 +211,7 @@ int64_t TupleOrListOfType::refcount(instance_ptr self) const {
 }
 
 void TupleOrListOfType::constructor(instance_ptr self) {
-    assertForwardsResolved();
+    assertForwardsResolvedSufficientlyToInstantiate();
     constructor(self, 0, [](instance_ptr i, int64_t k) {});
 }
 

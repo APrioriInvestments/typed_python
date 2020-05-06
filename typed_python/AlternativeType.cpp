@@ -298,7 +298,7 @@ Type* Alternative::pickConcreteSubclassConcrete(instance_ptr data) {
 }
 
 void Alternative::constructor(instance_ptr self) {
-    assertForwardsResolved();
+    assertForwardsResolvedSufficientlyToInstantiate();
 
     if (!m_default_construction_type) {
         m_default_construction_type = ConcreteAlternative::Make(this, m_default_construction_ix);

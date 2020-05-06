@@ -110,7 +110,7 @@ void PyInstance::tp_dealloc(PyObject* self) {
 
 // static
 bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, bool isExplicit) {
-    t->assertForwardsResolved();
+    t->assertForwardsResolvedSufficientlyToInstantiate();
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
@@ -131,7 +131,7 @@ bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, bool is
 
 // static
 void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-    eltType->assertForwardsResolved();
+    eltType->assertForwardsResolvedSufficientlyToInstantiate();
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
@@ -177,7 +177,7 @@ void PyInstance::copyConstructFromPythonInstanceConcrete(Type* eltType, instance
 
 // static
 void PyInstance::constructFromPythonArguments(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs) {
-    t->assertForwardsResolved();
+    t->assertForwardsResolvedSufficientlyToInstantiate();
 
     //dispatch to the appropriate PyInstance subclass
     specializeStatic(t->getTypeCategory(), [&](auto* concrete_null_ptr) {
@@ -317,7 +317,7 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
             throw std::runtime_error("Can't find a TypedPython type for " + std::string(subtype->tp_name));
         }
 
-        eltType->assertForwardsResolved();
+        eltType->assertForwardsResolvedSufficientlyToInstantiate();
 
         if (isSubclassOfNativeType(subtype)) {
             PyInstance* self = (PyInstance*)subtype->tp_alloc(subtype, 0);
