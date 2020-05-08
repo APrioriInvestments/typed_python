@@ -290,10 +290,16 @@ class StringWrapper(RefcountedWrapper):
     def convert_getitem(self, context, expr, item):
         item = item.toInt64()
 
+        if item is None:
+            return None
+
         if expr.isConstant and item.isConstant:
             return context.constant(expr.constantValue[item.constantValue])
 
         len_expr = self.convert_len(context, expr)
+
+        if len_expr is None:
+            return None
 
         with context.ifelse((item.nonref_expr.lt(len_expr.nonref_expr.negate()))
                             .bitor(item.nonref_expr.gte(len_expr.nonref_expr))) as (true, false):

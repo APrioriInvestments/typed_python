@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import _types, ListOf, TupleOf, Dict, ConstDict, Compiled, Entrypoint
+from typed_python import _types, ListOf, TupleOf, Dict, ConstDict, Compiled, Entrypoint, OneOf
 from typed_python.test_util import currentMemUsageMb, compilerPerformanceComparison
 import unittest
 import time
@@ -753,3 +753,10 @@ class TestStringCompilation(unittest.TestCase):
         addConstants(100000000)
         # llvm should recognize that this is just 'N' and so it should take no time.
         self.assertLess(time.time() - t0, 1e-4)
+
+    def test_bad_string_index(self):
+        @Entrypoint
+        def doIt(x: OneOf(str, ConstDict(str, str))):
+            return x["bd"]
+
+        doIt({'bd': 'yes'})

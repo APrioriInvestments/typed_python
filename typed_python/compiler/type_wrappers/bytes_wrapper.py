@@ -162,6 +162,9 @@ class BytesWrapper(RefcountedWrapper):
     def convert_getitem(self, context, expr, item):
         item = item.toInt64()
 
+        if item is None:
+            return None
+
         if expr.isConstant and item.isConstant:
             return context.constant(expr.constantValue[item.constantValue])
 
