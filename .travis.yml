@@ -82,6 +82,26 @@ jobs:
               gdb -c "$COREFILE" $PYTHON_EXECUTABLE -ex "thread apply all bt" -ex "set pagination 0" -batch;
           fi
 
+    - name: "Unit Tests (3.8.2)"
+      python: 3.8.2
+      before_script:
+        - ulimit -c unlimited -S       # enable core dumps
+      install:
+        - pip install pipenv
+        - pipenv lock --requirements > reqs.txt
+        - pip install --requirement reqs.txt
+        - pipenv lock --dev --requirements > dev-reqs.txt
+        - pip install --requirement dev-reqs.txt
+        - sudo apt-get install --assume-yes gdb  # install gdb
+      script:
+        - pytest
+      after_failure:
+        - PYTHON_EXECUTABLE=$(python3 -c "import sys; print(sys.executable)")
+        - COREFILE=$(find . -maxdepth 1 -name "core*" | head -n 1) # find core file
+        - if [[ -f "$COREFILE" ]]; then
+          gdb -c "$COREFILE" $PYTHON_EXECUTABLE -ex "thread apply all bt" -ex "set pagination 0" -batch;
+          fi
+
     - name: "Unit Tests (>=3.7) (osx)"
       os: osx
       osx_image: xcode11    # Python 3.7.4 running on macOS 10.14.4

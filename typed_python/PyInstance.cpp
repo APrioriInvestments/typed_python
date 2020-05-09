@@ -906,7 +906,7 @@ PyTypeObject* PyInstance::allTypesBaseType() {
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
             .tp_dealloc = PyInstance::tp_dealloc,       // destructor
-            .tp_print = 0,                              // printfunc
+            .tp_vectorcall_offset = 0,                              // printfunc
             .tp_getattr = 0,                            // getattrfunc
             .tp_setattr = 0,                            // setattrfunc
             .tp_as_async = 0,                           // PyAsyncMethods*
@@ -973,7 +973,7 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
             .tp_dealloc = PyInstance::tp_dealloc,       // destructor
-            .tp_print = 0,                              // printfunc
+            .tp_vectorcall_offset = 0,                              // printfunc
             .tp_getattr = 0,                            // getattrfunc
             .tp_setattr = 0,                            // setattrfunc
             .tp_as_async = 0,                           // PyAsyncMethods*
@@ -1053,7 +1053,7 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
             .tp_dealloc = PyInstance::tp_dealloc,       // destructor
-            .tp_print = 0,                              // printfunc
+            .tp_vectorcall_offset = 0,                              // printfunc
             .tp_getattr = 0,                            // getattrfunc
             .tp_setattr = 0,                            // setattrfunc
             .tp_as_async = 0,                           // PyAsyncMethods*

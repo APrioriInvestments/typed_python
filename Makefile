@@ -14,8 +14,8 @@ NODE_ENV ?= .nodeenv
 
 TP_SRC_PATH ?= typed_python
 
-TP_BUILD_PATH ?= build/temp.linux-x86_64-3.6/typed_python
-TP_LIB_PATH ?= build/lib.linux-x86_64-3.6/typed_python
+TP_BUILD_PATH ?= build/temp.linux-x86_64-3.8/typed_python
+TP_LIB_PATH ?= build/lib.linux-x86_64-3.8/typed_python
 
 CPP_FLAGS = -std=c++14  -O2  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
             -fstack-protector-strong  -D_FORTIFY_SOURCE=2  -fPIC            \
@@ -23,10 +23,10 @@ CPP_FLAGS = -std=c++14  -O2  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
             -Wno-cpp \
             -Wformat  -Werror=format-security  -Wdate-time -Wno-reorder     \
             -Wno-sign-compare  -Wno-narrowing  -Wno-int-in-bool-context     \
-            -I$(VIRTUAL_ENV)/include/python3.6m                             \
-            -I$(VIRTUAL_ENV)/lib/python3.6/site-packages/numpy/core/include \
-            -I/usr/include/python3.6m                                       \
-            -I/usr/local/lib/python3.6/dist-packages/numpy/core/include
+            -I$(VIRTUAL_ENV)/include/python3.8                             \
+            -I$(VIRTUAL_ENV)/lib/python3.8/site-packages/numpy/core/include \
+            -I/usr/include/python3.8                                       \
+            -I/usr/local/lib/python3.8/dist-packages/numpy/core/include
 
 LINKER_FLAGS = -Wl,-O1 \
                -Wl,-Bsymbolic-functions \
