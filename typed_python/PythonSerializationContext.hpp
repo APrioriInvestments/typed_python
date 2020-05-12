@@ -153,7 +153,7 @@ public:
 
     void deserializeClassClassMemberDict(std::map<std::string, PyObject*>& dict, DeserializationBuffer& b, int wireType) const;
 
-    Type* deserializeNativeTypeInner(DeserializationBuffer& b, size_t wireType) const;
+    Type* deserializeNativeTypeInner(DeserializationBuffer& b, size_t wireType, int32_t memo) const;
 
     Instance deserializeNativeInstance(DeserializationBuffer& b, size_t wireType) const;
 

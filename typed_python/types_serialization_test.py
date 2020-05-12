@@ -1526,3 +1526,18 @@ class TypesSerializationTest(unittest.TestCase):
             len(sc.serialize(someStrings2)) - len(sc.serialize(someStrings)),
             20
         )
+
+    def test_serialize_class_with_recursive_statics(self):
+        class ClassWithSelfStatic(Class, Final):
+            @staticmethod
+            def ownName():
+                return str(ClassWithSelfStatic)
+
+        sc = SerializationContext({})
+
+        ClassWithSelfStatic2 = sc.deserialize(sc.serialize(ClassWithSelfStatic))
+
+        self.assertEqual(
+            ClassWithSelfStatic2.ownName(),
+            ClassWithSelfStatic.ownName(),
+        )

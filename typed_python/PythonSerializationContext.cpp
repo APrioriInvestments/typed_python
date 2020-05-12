@@ -200,10 +200,12 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
                 result = deserializePythonObjectFromName(b, wireType, memo);
             } else if (fieldNumber == FieldNumbers::OBJECT_REPRESENTATION) {
                 result = deserializePythonObjectFromRepresentation(b, wireType, memo);
+            } else if (fieldNumber == FieldNumbers::CELL) {
+                result = deserializePyCell(b, wireType, memo);
             } else if (fieldNumber == FieldNumbers::OBJECT_TYPEANDDICT) {
                 result = deserializePythonObjectFromTypeAndDict(b, wireType, memo);
             } else {
-                throw std::runtime_error("Unknown field number deserializing python object.");
+                throw std::runtime_error("Unknown field number " + format(fieldNumber) + " deserializing python object.");
             }
         }
     });
@@ -1093,8 +1095,11 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
         } else if (fieldNumber == FieldNumbers::OBJECT_REPRESENTATION) {
             resultType = deserializeNativeTypeFromRepresentation(b, wireType, memo);
         } else if (fieldNumber == FieldNumbers::NATIVE_TYPE) {
-            resultType = deserializeNativeTypeInner(b, wireType);
-            b.addCachedPointer(memo, resultType);
+            resultType = deserializeNativeTypeInner(b, wireType, memo);
+
+            if (!resultType) {
+                throw std::runtime_error("Corrupt native type: deserializeNativeTypeInner returned Null");
+            }
         } else if (fieldNumber == FieldNumbers::RECURSIVE_NATIVE_TYPE) {
             Forward* fwd = nullptr;
 
@@ -1115,7 +1120,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
                     if (!fwd) {
                         throw std::runtime_error("Corrupt Recursive Forward");
                     }
-                    resultType = deserializeNativeTypeInner(b, subWireType);
+                    resultType = deserializeNativeTypeInner(b, subWireType, -1);
 
                     fwd->define(resultType);
 
@@ -1128,7 +1133,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
     });
 
     if (!resultType) {
-        throw std::runtime_error("Corrupt Recursive Forward");
+        throw std::runtime_error("Corrupt native type");
     }
 
     return resultType;
@@ -1158,8 +1163,16 @@ Instance PythonSerializationContext::deserializeNativeInstance(DeserializationBu
     return result;
 }
 
-Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuffer& b, size_t inWireType) const {
+// deserialize a type. if memo is != -1, then we are intended to stash a forward in the global memo
+// before continuing deserialization, and then to resolve the forward to the appropriate type
+// once it's known. this is necessary for things like Class objects, which may not be recursive
+// forwards as defined in a normal codebase, but which need recursion to deserialize properly because
+// we have detached their function bodies from the standard global scope, and therefore they are now
+// able to find themselves without a global 'dict'  (which is memoized) standing in between.
+Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuffer& b, size_t inWireType, int32_t memo) const {
     PyEnsureGilAcquired acquireTheGil;
+
+    Forward* addedToMemoEarly = nullptr;
 
     int category = -1;
 
@@ -1201,6 +1214,14 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             if (category == Type::TypeCategory::catClass) {
                 if (fieldNumber == 1) {
                     names.push_back(b.readStringObject());
+
+                    if (memo != -1) {
+                        // Class objects can refer to themselves implicitly,
+                        // and therefore may require us to create a temporary
+                        // forward to hold them.
+                        addedToMemoEarly = Forward::Make(names[0]);
+                        b.addCachedPointer(memo, addedToMemoEarly);
+                    }
                 } else if (fieldNumber == 2) {
                     deserializeClassMembers(classMembers, b, wireType);
                 } else if (fieldNumber == 3) {
@@ -1448,6 +1469,19 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
 
     if (!resultType) {
         throw std::runtime_error("Corrupt nativeType.");
+    }
+
+    if (memo != -1) {
+        // if we had to add this to the memo early, it's because it was a
+        // class type that might be able to find itself through its function
+        // definitions. In this case, we create a Forward to represent it, and then
+        // define the forward.
+        if (addedToMemoEarly) {
+            addedToMemoEarly->define(resultType);
+            b.updateCachedPointer(memo, resultType);
+        } else {
+            b.addCachedPointer(memo, resultType);
+        }
     }
 
     return resultType;
