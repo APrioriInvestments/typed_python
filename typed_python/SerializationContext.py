@@ -267,6 +267,9 @@ class SerializationContext(object):
         if isinstance(inst, staticmethod):
             return (staticmethod, (inst.__func__,), None)
 
+        if isinstance(inst, classmethod):
+            return (classmethod, (inst.__func__,), None)
+
         if isinstance(inst, numpy.ndarray):
             return inst.__reduce__()
 
@@ -341,6 +344,9 @@ class SerializationContext(object):
             return True
 
         if isinstance(instance, staticmethod):
+            return True
+
+        if isinstance(instance, classmethod):
             return True
 
         if isinstance(instance, CodeType):

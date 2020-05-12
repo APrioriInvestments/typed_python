@@ -1541,3 +1541,18 @@ class TypesSerializationTest(unittest.TestCase):
             ClassWithSelfStatic2.ownName(),
             ClassWithSelfStatic.ownName(),
         )
+
+    def test_serialize_class_with_classmethod(self):
+        class ClassWithClassmethod(Class, Final):
+            @classmethod
+            def ownName(cls):
+                return str(cls)
+
+        sc = SerializationContext({})
+
+        ClassWithClassmethod2 = sc.deserialize(sc.serialize(ClassWithClassmethod))
+
+        self.assertEqual(
+            ClassWithClassmethod2.ownName(),
+            ClassWithClassmethod.ownName(),
+        )
