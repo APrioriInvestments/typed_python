@@ -120,6 +120,7 @@ class _TupleEq(CompilableBuiltin):
 
         return context.constant(True)
 
+
 # define these operations directly in terms of the builtins we
 # defined up above.
 @Function
@@ -254,7 +255,7 @@ class TupleWrapper(Wrapper):
             return None
 
         if not len(self.subTypeWrappers):
-            context.pushException(IndexError, f"tuple index out of range")
+            context.pushException(IndexError, "tuple index out of range")
             return None
 
         # if the argument is a constant, we can be very precise about what type

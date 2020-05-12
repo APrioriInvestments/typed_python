@@ -52,7 +52,7 @@ def astToCodeObject(ast, freevars):
     return evaluateFunctionDefWithLocalsInCells(
         ast,
         globals={},
-        locals={l: None for l in freevars},
+        locals={var: None for var in freevars},
         stripAnnotations=True
     ).__code__
 

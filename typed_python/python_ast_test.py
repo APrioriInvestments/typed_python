@@ -68,6 +68,7 @@ class TestPythonAst(unittest.TestCase):
         def f():
             class A:
                 z = 20
+
                 @staticmethod
                 def y(self, z: int):
                     pass
@@ -217,28 +218,28 @@ class TestPythonAst(unittest.TestCase):
             identity(lambda x: x + 7)
         )
 
-        for l in someLambdas:
-            self.assertEqual(self.reverseParseCheck(l)(10), l(10))
+        for lam in someLambdas:
+            self.assertEqual(self.reverseParseCheck(lam)(10), lam(10))
 
     def test_converting_two_lambdas_on_same_line(self):
         someLambdas = (lambda x: x + 1, lambda x: x + 2)
 
-        for l in someLambdas:
-            self.assertEqual(self.reverseParseCheck(l)(10), l(10))
+        for lam in someLambdas:
+            self.assertEqual(self.reverseParseCheck(lam)(10), lam(10))
 
     def test_converting_two_lambdas_with_similar_bodies_but_different_args_on_same_line(self):
         # shouldn't matter which one we pick
         someLambdas = (lambda x, y: x + 1, lambda x, z: x + 1)
 
-        for l in someLambdas:
-            self.assertEqual(self.reverseParseCheck(l)(10, 11), l(10, 11))
+        for lam in someLambdas:
+            self.assertEqual(self.reverseParseCheck(lam)(10, 11), lam(10, 11))
 
     def test_converting_two_identical_lambdas_on_same_line(self):
         # shouldn't matter which one we pick
         someLambdas = (lambda x: x + 1, lambda x: x + 1)
 
-        for l in someLambdas:
-            self.assertEqual(self.reverseParseCheck(l)(10), l(10))
+        for lam in someLambdas:
+            self.assertEqual(self.reverseParseCheck(lam)(10), lam(10))
 
     def test_converting_lambdas_pulled_out_of_binding(self):
         # shouldn't matter which one we pick

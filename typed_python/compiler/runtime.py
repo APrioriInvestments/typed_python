@@ -362,7 +362,7 @@ def Compiled(pyFunc):
         if a.typeFilter is None:
             raise Exception(f"@Compiled requires that {pyFunc} has an explicit type annotation for every argument.")
         if a.isStarArg or a.isKwarg:
-            raise Exception(f"@Compiled is not compatible with *args or **kwargs because the signature is not fully known.")
+            raise Exception("@Compiled is not compatible with *args or **kwargs because the signature is not fully known.")
         types.append(a.typeFilter)
 
     f.resultTypeFor(*types)

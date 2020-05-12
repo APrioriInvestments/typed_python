@@ -40,7 +40,7 @@ print("#define Uprops_NUMERIC 0x{:04x}".format(Uprops_NUMERIC))
 print("#define Uprops_SPACE 0x{:04x}".format(Uprops_SPACE))
 print("#define Uprops_PRINTABLE 0x{:04x}".format(Uprops_PRINTABLE))
 print("#define Uprops_TITLE 0x{:04x}".format(Uprops_TITLE))
-print("static uint16_t uprops_runlength[] = {{".format(last+1))
+print("static uint16_t uprops_runlength[] = {")
 
 prev = None
 count = 0

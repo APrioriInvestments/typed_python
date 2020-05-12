@@ -12,7 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import OneOf, TupleOf, Forward, ConstDict, Class, Final, Member, ListOf, Compiled, Entrypoint
+from typed_python import (
+    OneOf, TupleOf, Forward, ConstDict, Class, Final, Member,
+    ListOf, Compiled, Entrypoint, NamedTuple
+)
 from typed_python import Value as ValueType
 import typed_python._types as _types
 import unittest
@@ -331,3 +334,10 @@ class TestOneOfOfCompilation(unittest.TestCase):
 
         self.assertEqual(f(1), "1")
         self.assertEqual(f(2), 2.0)
+
+    def test_named_tuple_with_oneof(self):
+        @Entrypoint
+        def makeNT(x: NamedTuple(x=OneOf("A", "B"))):  # noqa
+            return NamedTuple(x=OneOf("A", "B"))(x=x.x)
+
+        self.assertEqual(makeNT(NamedTuple(x=OneOf("A", "B"))(x="A")).x, "A")

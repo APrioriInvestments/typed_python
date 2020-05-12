@@ -241,6 +241,7 @@ class TestListOfCompilation(unittest.TestCase):
         T = ListOf(TupleOf(int))
 
         aTup = TupleOf(int)((1, 2, 3))
+
         @Compiled
         def f(x: T, y: TupleOf(int)):
             x.resize(len(x) + 10, y)
@@ -254,6 +255,7 @@ class TestListOfCompilation(unittest.TestCase):
 
     def test_list_extend(self):
         T = ListOf(int)
+
         @Compiled
         def f(x: T, y: T):
             x.extend(y)
@@ -311,6 +313,7 @@ class TestListOfCompilation(unittest.TestCase):
 
     def test_list_of_oneOf(self):
         T = ListOf(OneOf(None, float))
+
         @Compiled
         def f():
             x = T()

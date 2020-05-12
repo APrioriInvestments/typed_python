@@ -108,6 +108,7 @@ class TestCompilingClosures(unittest.TestCase):
 
     def test_passing_closures_as_arguments(self):
         x = 10
+
         @Function
         def f(y):
             return y + x

@@ -30,6 +30,6 @@ class IsCompiledWrapper(Wrapper):
 
     def convert_call(self, context, expr, args, kwargs):
         if args or kwargs:
-            context.pushException(TypeError, f"isCompiled() accepts no arguments")
+            context.pushException(TypeError, "isCompiled() accepts no arguments")
 
         return context.constant(True)

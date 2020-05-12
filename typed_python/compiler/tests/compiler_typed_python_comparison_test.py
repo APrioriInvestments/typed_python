@@ -280,7 +280,7 @@ class RegisterTypeModel(TypeModel):
 
 class FloatTypeModel(RegisterTypeModel):
     def __str__(self):
-        return f"FloatTypeModel()"
+        return "FloatTypeModel()"
 
     def pytype(self):
         return float
@@ -318,7 +318,7 @@ class Float32TypeModel(RegisterTypeModel):
         return Float32
 
     def __str__(self):
-        return f"Float32TypeModel()"
+        return "Float32TypeModel()"
 
     def isOutOfBounds(self, instance):
         if isfinite(instance) and Float32(instance + 1) == instance:
@@ -343,7 +343,7 @@ class IntTypeModel(RegisterTypeModel):
         return int
 
     def __str__(self):
-        return f"IntTypeModel()"
+        return "IntTypeModel()"
 
     def instances(self):
         return [
@@ -388,7 +388,7 @@ class SmallIntTypeModel(RegisterTypeModel):
 
 class BoolTypeModel(RegisterTypeModel):
     def __str__(self):
-        return f"BoolTypeModel()"
+        return "BoolTypeModel()"
 
     def pytype(self):
         return bool

@@ -335,7 +335,7 @@ class Wrapper(object):
             "Can't apply unary op %s to type '%s'" % (op, expr.expr_type)
         )
 
-    def can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):
+    def can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
         """Can we convert to another type? This should match what typed_python does.
 
         Subclasses may not override this! If either of (self, otherType) knows what to do here,
@@ -366,7 +366,7 @@ class Wrapper(object):
 
         return "Maybe"
 
-    def _can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):
+    def _can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
         """Does this wrapper know how to convert to 'otherType'?
 
         Return True if we can convert to this type in all cases. Return False if we
@@ -377,7 +377,7 @@ class Wrapper(object):
 
         return "Maybe"
 
-    def _can_convert_from_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):
+    def _can_convert_from_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
         """Analagous to _can_convert_to_type.
         """
         if otherType == self:
