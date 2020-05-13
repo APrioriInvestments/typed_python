@@ -341,3 +341,17 @@ class TestOneOfOfCompilation(unittest.TestCase):
             return NamedTuple(x=OneOf("A", "B"))(x=x.x)
 
         self.assertEqual(makeNT(NamedTuple(x=OneOf("A", "B"))(x="A")).x, "A")
+
+    def test_oneof_in_return_types(self):
+        class A(Class, Final):
+            @staticmethod
+            @Entrypoint
+            def g(s: float) -> OneOf(None, float):
+                return 0.0
+
+        @Entrypoint
+        def do():
+            abc = OneOf(None, float)(90.0)
+            A.g(abc)
+
+        do()

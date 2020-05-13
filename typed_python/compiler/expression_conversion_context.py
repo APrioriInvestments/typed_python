@@ -1093,7 +1093,13 @@ class ExpressionConversionContext(object):
         return self.call_typed_call_target(call_target, closureArgs + concreteArgs)
 
     def call_typed_call_target(self, call_target, args):
-        # force arguments to a type appropriate for argpassing
+        # make sure that any non-reference objects that need to be passed by reference
+        # get stackslots
+        args = list(args)
+        for i in range(len(args)):
+            if args[i].expr_type.is_pass_by_ref and not args[i].isReference:
+                args[i] = self.pushMove(args[i])
+
         native_args = [a.as_native_call_arg() for a in args if not a.expr_type.is_empty]
 
         if call_target.output_type is None:
