@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Dict, ListOf, Tuple, TupleOf, Entrypoint
+from typed_python import Dict, ListOf, Tuple, TupleOf, Entrypoint, OneOf
 import typed_python._types as _types
 import unittest
 import time
@@ -177,6 +177,24 @@ class TestDictCompilation(unittest.TestCase):
         dict_setmany(x, 1000)
 
         self.assertEqual(x, {i: str(i*i) for i in range(1000)})
+
+    def test_dict_with_oneof_keys(self):
+        d = Dict(OneOf(None, int), int)()
+
+        d[None] = 10
+        d[20] = 20
+
+        @Entrypoint
+        def lookup(d, v):
+            return d.get(v)
+
+        self.assertEqual(lookup(d, None), 10)
+        self.assertEqual(lookup(d, 30), None)
+        self.assertEqual(lookup(d, 20), 20)
+
+        self.assertEqual(d.get(None), 10)
+        self.assertEqual(d.get(30), None)
+        self.assertEqual(d.get(20), 20)
 
     def test_adding_to_dicts(self):
         @Entrypoint

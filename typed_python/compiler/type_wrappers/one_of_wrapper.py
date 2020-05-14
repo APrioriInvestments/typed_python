@@ -159,6 +159,10 @@ class OneOfWrapper(Wrapper):
             )
         )
 
+    def convert_hash(self, context, expr):
+        # just unwrap us
+        return self.unwrap(context, expr, lambda realInstance: realInstance.convert_hash())
+
     def convert_getitem(self, context, expr, index):
         # just unwrap us
         return self.unwrap(context, expr, lambda realInstance: realInstance.convert_getitem(index))

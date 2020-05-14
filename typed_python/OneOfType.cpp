@@ -91,12 +91,7 @@ void OneOfType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
 }
 
 typed_python_hash_type OneOfType::hash(instance_ptr left) {
-    HashAccumulator acc((int)getTypeCategory());
-
-    acc.add(*(uint8_t*)left);
-    acc.add(m_types[*((uint8_t*)left)]->hash(left+1));
-
-    return acc.get();
+    return m_types[*((uint8_t*)left)]->hash(left+1);
 }
 
 bool OneOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
