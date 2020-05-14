@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Set, ListOf, Entrypoint, Compiled, Tuple, TupleOf
+from typed_python import Set, ListOf, Entrypoint, Compiled, Tuple, TupleOf, NamedTuple
 from typed_python.compiler.type_wrappers.set_wrapper import set_union, set_intersection, set_difference, \
     set_symmetric_difference, set_union_multiple, set_intersection_multiple, set_difference_multiple, \
     set_disjoint, set_subset, set_proper_subset, set_equal, set_not_equal, \
@@ -714,6 +714,23 @@ class TestSetCompilation(unittest.TestCase):
                 except Exception:
                     print(actions)
                     raise
+
+    def test_set_destructor_complex(self):
+        NT = NamedTuple(x=TupleOf(str), y=TupleOf(str))
+        aTup = TupleOf(str)(['a'])
+
+        tupRefcount = _types.refcount(aTup)
+
+        x = ListOf(Set(NT))()
+        x.append(Set(NT)([NT(x=aTup, y=aTup)]))
+
+        @Entrypoint
+        def resizeZero(x):
+            x.resize(0)
+
+        resizeZero(x)
+
+        self.assertEqual(tupRefcount, _types.refcount(aTup))
 
     def test_set_with_neg_one(self):
         # negative one is special because it hashes to -1. Python

@@ -483,20 +483,20 @@ class SetWrapper(SetWrapperBase):
                 if index is None:
                     return None
 
-            key = args[1].convert_to_type(self.keyType)
-            if key is None:
-                return None
+                key = args[1].convert_to_type(self.keyType)
+                if key is None:
+                    return None
 
-            item = context.pushReference(
-                self.keyType,
-                instance.nonref_expr.ElementPtrIntegers(0, 1).load().cast(
-                    self.keyType.getNativeLayoutType().pointer()
-                ).elemPtr(index.toInt64().nonref_expr)
-            )
+                item = context.pushReference(
+                    self.keyType,
+                    instance.nonref_expr.ElementPtrIntegers(0, 1).load().cast(
+                        self.keyType.getNativeLayoutType().pointer()
+                    ).elemPtr(index.toInt64().nonref_expr)
+                )
 
-            item.convert_copy_initialize(key)
+                item.convert_copy_initialize(key)
 
-            return context.pushVoid()
+                return context.pushVoid()
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
@@ -563,9 +563,9 @@ class SetWrapper(SetWrapperBase):
     def convert_getkey_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
             self.keyType,
-            expr.nonref_expr.ElementPtrIntegers(0, 1)
-            .elemPtr(item.nonref_expr.mul(native_ast.const_int_expr(self.keyBytecount)))
-            .cast(self.keyType.getNativeLayoutType())
+            expr.nonref_expr.ElementPtrIntegers(0, 1).load()
+                .elemPtr(item.nonref_expr.mul(native_ast.const_int_expr(self.keyBytecount)))
+                .cast(self.keyType.getNativeLayoutType().pointer())
         )
 
     def generateNativeDestructorFunction(self, context, out, inst):
