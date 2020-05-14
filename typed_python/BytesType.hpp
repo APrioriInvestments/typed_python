@@ -31,7 +31,7 @@ public:
 
     BytesType() : Type(TypeCategory::catBytes)
     {
-        m_name = "Bytes";
+        m_name = "bytes";
         m_is_default_constructible = true;
         m_size = sizeof(layout*);
 

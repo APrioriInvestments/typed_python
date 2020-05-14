@@ -24,15 +24,17 @@ import typed_python._types as _types
 
 from flaky import flaky
 from typed_python import (
-    Bool, Value,
-    Int8, Int16, Int32, Int64,
+    Value,
+    Int8, Int16, Int32,
     UInt8, UInt16, UInt32, UInt64,
-    Float32, Float64,
-    NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
+    Float32,
+    TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
     ConstDict, Alternative, serialize, deserialize, Class,
-    TypeFilter, Function, Forward, Set, PointerTo
+    TypeFilter, Function, Forward, Set, PointerTo, Entrypoint
 )
-from typed_python.type_promotion import computeArithmeticBinaryResultType
+from typed_python.type_promotion import (
+    computeArithmeticBinaryResultType, floatness, bitness, isSignedInt
+)
 from typed_python.test_util import currentMemUsageMb
 
 
@@ -192,14 +194,10 @@ class NativeTypesTests(unittest.TestCase):
             .format(expected=expected, elapsed=elapsed)
         )
 
-    def test_objects_are_singletons(self):
-        self.assertTrue(Int8 is Int8)
-        self.assertTrue(NoneType is NoneType)
-
     def test_object_binary_compatibility(self):
         ibc = _types.isBinaryCompatible
 
-        self.assertTrue(ibc(NoneType, NoneType))
+        self.assertTrue(ibc(type(None), type(None)))
         self.assertTrue(ibc(Int8, Int8))
 
         NT = NamedTuple(a=int, b=int)
@@ -275,13 +273,13 @@ class NativeTypesTests(unittest.TestCase):
             two()
 
     def test_object_bytecounts(self):
-        self.assertEqual(_types.bytecount(NoneType), 0)
+        self.assertEqual(_types.bytecount(type(None)), 0)
         self.assertEqual(_types.bytecount(Int8), 1)
-        self.assertEqual(_types.bytecount(Int64), 8)
+        self.assertEqual(_types.bytecount(int), 8)
 
     def test_type_stringification(self):
-        for t in ['Int8', 'NoneType']:
-            self.assertEqual(str(getattr(_types, t)()), "<class '%s'>" % t)
+        self.assertEqual(str(_types.Int8), "<class 'Int8'>")
+        self.assertEqual(str(Tuple(int)), "<class 'Tuple(int)'>")
 
     def test_tuple_of(self):
         tupleOfInt = TupleOf(int)
@@ -483,7 +481,7 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_list_of(self):
         L = ListOf(int)
-        self.assertEqual(L.__qualname__, "ListOf(Int64)")
+        self.assertEqual(L.__qualname__, "ListOf(int)")
 
         l1 = L([1, 2, 3, 4])
 
@@ -1836,7 +1834,7 @@ class NativeTypesTests(unittest.TestCase):
             x[i] = i
 
         aPointer = x.pointerUnsafe(0)
-        self.assertTrue(str(aPointer).startswith("(Int64*)0x"))
+        self.assertTrue(str(aPointer).startswith("(int*)0x"))
 
         self.assertEqual(aPointer.get(), x[0])
         aPointer.set(100)
@@ -1948,7 +1946,7 @@ class NativeTypesTests(unittest.TestCase):
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), arr.tolist())
 
-        self.assertEqual(str(ListOf(Int64)([1, 2, 3, 4]).toArray().dtype), 'int64')
+        self.assertEqual(str(ListOf(int)([1, 2, 3, 4]).toArray().dtype), 'int64')
         self.assertEqual(str(ListOf(Int32)([1, 2, 3, 4]).toArray().dtype), 'int32')
         self.assertEqual(str(ListOf(Int16)([1, 2, 3, 4]).toArray().dtype), 'int16')
         self.assertEqual(str(ListOf(Int8)([1, 2, 3, 4]).toArray().dtype), 'int8')
@@ -1958,7 +1956,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(str(ListOf(UInt16)([1, 2, 3, 4]).toArray().dtype), 'uint16')
         self.assertEqual(str(ListOf(UInt8)([1, 2, 3, 4]).toArray().dtype), 'uint8')
 
-        self.assertEqual(str(ListOf(Float64)([1, 2, 3, 4]).toArray().dtype), 'float64')
+        self.assertEqual(str(ListOf(float)([1, 2, 3, 4]).toArray().dtype), 'float64')
         self.assertEqual(str(ListOf(Float32)([1, 2, 3, 4]).toArray().dtype), 'float32')
 
     def test_list_of_equality(self):
@@ -1994,17 +1992,16 @@ class NativeTypesTests(unittest.TestCase):
     def test_other_bitness_types(self):
         # verify we can cast around non-64-bit values in a way that matches numpy
         typeAndNumpyType = [
-            (Bool, numpy.bool),
+            (bool, numpy.bool),
             (Int8, numpy.int8),
             (Int16, numpy.int16),
             (Int32, numpy.int32),
-            (Int64, numpy.int64),
             (UInt8, numpy.uint8),
             (UInt16, numpy.uint16),
             (UInt32, numpy.uint32),
             (UInt64, numpy.uint64),
             (Float32, numpy.float32),
-            (Float64, numpy.float64)
+            (float, numpy.float64)
         ]
 
         for ourType, numpyType in typeAndNumpyType:
@@ -2081,7 +2078,7 @@ class NativeTypesTests(unittest.TestCase):
         def neq(x, y):
             return x != y
 
-        otherTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
+        otherTypes = [bool, Int8, Int16, Int32, UInt8, UInt16, UInt32, UInt64, Float32, float]
 
         for T1 in otherTypes:
             for T2 in otherTypes:
@@ -2090,15 +2087,25 @@ class NativeTypesTests(unittest.TestCase):
                         for i2 in [-1, 0, 1, 2]:
                             res = op(T1(i1), T2(i2))
                             promotedType = computeArithmeticBinaryResultType(T1, T2)
+
+                            if promotedType is int:
+                                # in the compiler (and in our internals, ints are 64 bits)
+                                # but in python they are of arbitrary bitness. For this test
+                                # to make sense, we need to compare the results to the promoted
+                                # type we would use internally, which is an int64.
+                                @Entrypoint
+                                def promotedType(i: int):
+                                    return i
+
                             proI1 = promotedType(T1(i1))
                             proI2 = promotedType(T2(i2))
-                            self.assertEqual(res, op(proI1, proI2))
+                            self.assertEqual(res, op(proI1, proI2), (res, op, T1, T2, promotedType, proI1, proI2))
 
                 for op in [add, mul, div, sub, mod]:
                     for i1 in [-1, 0, 1, 2, 10]:
                         for i2 in [-1, 0, 1, 2, 10]:
                             validOp = True
-                            if op is div and (T1 is Bool or T2 is Bool):
+                            if op is div and (T1 is bool or T2 is bool):
                                 validOp = False
                             if op in (div, mod) and i2 == 0:
                                 validOp = False
@@ -2110,26 +2117,36 @@ class NativeTypesTests(unittest.TestCase):
                                 promotedType = computeArithmeticBinaryResultType(T1, T2)
                                 if op in [div]:
                                     promotedType = computeArithmeticBinaryResultType(promotedType, Float32)
+
+                                if promotedType is int:
+                                    # in the compiler (and in our internals, ints are 64 bits)
+                                    # but in python they are of arbitrary bitness. For this test
+                                    # to make sense, we need to compare the results to the promoted
+                                    # type we would use internally, which is an int64.
+                                    @Entrypoint
+                                    def promotedType(i: int):
+                                        return i
+
                                 proI1 = promotedType(T1(i1))
                                 proI2 = promotedType(T2(i2))
                                 self.assertEqual(type(res), type(op(proI1, proI2)))
                                 self.assertEqual(res, op(proI1, proI2), (op.__name__, T1, T2, i1, i2, proI1, proI2))
 
-                if not T1.IsFloat and not T2.IsFloat:
+                if not floatness(T1) and not floatness(T2):
                     for op in [bitand, bitor, bitxor]:
                         res = op(T1(10), T2(10))
                         resType = type(res)
-                        resType = {bool: Bool, int: Int64, float: Float64}.get(resType, resType)
+                        resType = {bool: bool, int: int, float: float}.get(resType, resType)
 
-                        if T1 is Bool and T2 is Bool:
-                            self.assertEqual(resType, Bool if op in (bitor, bitand, bitxor) else Int64 if op is not div else Float64)
+                        if T1 is bool and T2 is bool:
+                            self.assertEqual(resType, bool if op in (bitor, bitand, bitxor) else int if op is not div else float)
                         else:
-                            self.assertEqual(resType.Bits, max(T1.Bits, T2.Bits))
+                            self.assertEqual(bitness(resType), max(bitness(T1), bitness(T2)))
 
                             if op is not div:
-                                self.assertEqual(resType.IsSignedInt, T1.IsSignedInt or T2.IsSignedInt)
+                                self.assertEqual(isSignedInt(resType), isSignedInt(T1) or isSignedInt(T2))
 
-                            if T1.Bits > 1 and T2.Bits > 1:
+                            if bitness(T1) > 1 and bitness(T2) > 1:
                                 self.assertEqual(res, op(10, 10))
 
     def test_comparing_arbitrary_objects(self):
@@ -2306,7 +2323,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(v2, "b")
         self.assertEqual(d[2], "b")
 
-        with self.assertRaisesRegex(TypeError, "Can't initialize a StringType from an instance of NoneType"):
+        with self.assertRaisesRegex(TypeError, "Can't initialize a string from an instance of NoneType"):
             d.setdefault(3, None)
 
         self.assertEqual(d.setdefault(3), "")
@@ -2321,7 +2338,7 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(KeyError, "10"):
             d.pop(10)
 
-        with self.assertRaisesRegex(TypeError, "Couldn't initialize type Int64 from str"):
+        with self.assertRaisesRegex(TypeError, "Couldn't initialize type int from str"):
             d.pop("hihi")
 
     def test_mutable_dict_pop_with_conversion(self):
@@ -2463,11 +2480,11 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_set_constructor_identity(self):
         s = Set(int)
-        self.assertEqual(s.__qualname__, "Set(Int64)")
+        self.assertEqual(s.__qualname__, "Set(int)")
         s = Set(float)
-        self.assertEqual(s.__qualname__, "Set(Float64)")
+        self.assertEqual(s.__qualname__, "Set(float)")
         s = Set(str)
-        self.assertEqual(s.__qualname__, "Set(String)")
+        self.assertEqual(s.__qualname__, "Set(str)")
 
         s1 = Set(int)([1])
         s2 = Set(int)([1])

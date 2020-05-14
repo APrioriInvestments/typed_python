@@ -243,11 +243,11 @@ public:
         if (category == Type::TypeCategory::catInt8) { return "Int8"; }
         if (category == Type::TypeCategory::catInt16) { return "Int16"; }
         if (category == Type::TypeCategory::catInt32) { return "Int32"; }
-        if (category == Type::TypeCategory::catInt64) { return "Int64"; }
-        if (category == Type::TypeCategory::catString) { return "String"; }
-        if (category == Type::TypeCategory::catBytes) { return "Bytes"; }
+        if (category == Type::TypeCategory::catInt64) { return "int"; }
+        if (category == Type::TypeCategory::catString) { return "str"; }
+        if (category == Type::TypeCategory::catBytes) { return "bytes"; }
         if (category == Type::TypeCategory::catFloat32) { return "Float32"; }
-        if (category == Type::TypeCategory::catFloat64) { return "Float64"; }
+        if (category == Type::TypeCategory::catFloat64) { return "float"; }
         if (category == Type::TypeCategory::catValue) { return "Value"; }
         if (category == Type::TypeCategory::catOneOf) { return "OneOf"; }
         if (category == Type::TypeCategory::catTupleOf) { return "TupleOf"; }

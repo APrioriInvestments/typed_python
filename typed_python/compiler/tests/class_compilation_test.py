@@ -17,8 +17,8 @@ import psutil
 from math import trunc, floor, ceil
 import unittest
 from flaky import flaky
-from typed_python import Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, Int64, UInt64, Int16, \
-    Float32, Float64, String, Final, PointerTo, makeNamedTuple, Compiled, Function, Held
+from typed_python import Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, UInt64, Int16, \
+    Float32, Final, PointerTo, makeNamedTuple, Compiled, Function, Held
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime
 
@@ -251,7 +251,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(
             AClass.loop.resultTypeFor(AClass, int).typeRepresentation,
-            Float64
+            float
         )
 
         t0 = time.time()
@@ -410,8 +410,8 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def f(self, y: str) -> str:  # noqa
                 return y + "hi"
 
-        self.assertEqual(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, int).typeRepresentation, Int64)
-        self.assertEqual(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, str).typeRepresentation, String)
+        self.assertEqual(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, int).typeRepresentation, int)
+        self.assertEqual(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, str).typeRepresentation, str)
         self.assertEqual(
             set(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, OneOf(str, int)).typeRepresentation.Types),
             set(OneOf(str, int).Types)
@@ -649,8 +649,8 @@ class TestClassCompilationCompilation(unittest.TestCase):
         def f(x):
             return BaseClass().f(x)
 
-        self.assertEqual(f.resultTypeFor(int).typeRepresentation, Int64)
-        self.assertEqual(f.resultTypeFor(float).typeRepresentation, Float64)
+        self.assertEqual(f.resultTypeFor(int).typeRepresentation, int)
+        self.assertEqual(f.resultTypeFor(float).typeRepresentation, float)
         self.assertEqual(f.resultTypeFor(OneOf(int, float)).typeRepresentation, OneOf(float, int))
         self.assertEqual(f.resultTypeFor(object).typeRepresentation, OneOf(float, int))
 
@@ -1592,7 +1592,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def __float__(self):
                 return 1.0
 
-        with self.assertRaisesRegex(TypeError, "Couldn't initialize type Float64 from C"):
+        with self.assertRaisesRegex(TypeError, "Couldn't initialize type float from C"):
             aList.append(C())
 
         @Function
@@ -1606,7 +1606,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         def tryToAppend(aList: ListOf(float)):
             aList.append(C())
 
-        with self.assertRaisesRegex(TypeError, "Can't convert from type C to type Float64"):
+        with self.assertRaisesRegex(TypeError, "Can't convert from type C to type float"):
             tryToAppend(aList)
 
         @Compiled

@@ -14,7 +14,7 @@
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
-from typed_python import Float32, Float64
+from typed_python import Float32
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
 from math import (
@@ -93,7 +93,7 @@ class MathFunctionWrapper(Wrapper):
 
             argType = arg.expr_type.typeRepresentation
 
-            if argType not in (Float32, Float64):
+            if argType not in (Float32, float):
                 if self.typeRepresentation in (isnan, isinf):
                     return context.constant(False)
                 elif self.typeRepresentation in (isfinite,):
@@ -102,7 +102,7 @@ class MathFunctionWrapper(Wrapper):
                     arg = arg.convert_to_type(float)
                     if arg is None:
                         return None
-                    argType = Float64
+                    argType = float
 
             if self.typeRepresentation is isnan:
                 func = runtime_functions.isnan_float32 if argType is Float32 else runtime_functions.isnan_float64

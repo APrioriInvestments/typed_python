@@ -22,8 +22,8 @@ from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBui
 
 from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
-    _types, Compiled, NoneType, Member, Final, PythonObjectOfType, isCompiled, ConstDict,
-    makeNamedTuple, Int64
+    _types, Compiled, Member, Final, PythonObjectOfType, isCompiled, ConstDict,
+    makeNamedTuple
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
@@ -363,7 +363,7 @@ class TestCompilationStructures(unittest.TestCase):
         def g():
             return None + None
 
-        with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
+        with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type None"):
             g()
 
     def test_exception_before_return_propagated(self):
@@ -372,7 +372,7 @@ class TestCompilationStructures(unittest.TestCase):
             None+None
             return None
 
-        with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
+        with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type None"):
             g()
 
     def test_call_function_with_none(self):
@@ -406,7 +406,7 @@ class TestCompilationStructures(unittest.TestCase):
             return f(None, None, x)
 
         self.assertEqual(works(1), None)
-        with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
+        with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type None"):
             throws(1)
 
     def test_return_none(self):
@@ -417,7 +417,7 @@ class TestCompilationStructures(unittest.TestCase):
         def g():
             return f(None)
 
-        self.assertEqual(g.resultTypeFor().typeRepresentation, NoneType)
+        self.assertEqual(g.resultTypeFor().typeRepresentation, type(None))
         self.assertEqual(g(), None)
 
     def test_assign_with_none(self):
@@ -1295,7 +1295,7 @@ class TestCompilationStructures(unittest.TestCase):
         def f(l, i, y):
             l[i] = y
 
-        self.assertEqual(f.resultTypeFor(ListOf(int), int, int).typeRepresentation, NoneType)
+        self.assertEqual(f.resultTypeFor(ListOf(int), int, int).typeRepresentation, type(None))
 
     def test_method_not_returning_returns_none(self):
         class NoPythonObjectTypes(RuntimeEventVisitor):
@@ -2762,7 +2762,7 @@ class TestCompilationStructures(unittest.TestCase):
             )
 
         # our code should know the type of the const dict!
-        self.assertEqual(v.types[countIt.__code__].varTypes['res'], Int64)
+        self.assertEqual(v.types[countIt.__code__].varTypes['res'], int)
 
         t0 = time.time()
         callIt(countIt, arg)
@@ -2794,7 +2794,7 @@ class TestCompilationStructures(unittest.TestCase):
             )
 
         # our code should know the type of the const dict!
-        self.assertEqual(v.types[countIt.__code__].varTypes['res'], Int64)
+        self.assertEqual(v.types[countIt.__code__].varTypes['res'], int)
         self.assertEqual(aModuleLevelDict['modify_count'], 200000)
 
         t0 = time.time()

@@ -13,12 +13,12 @@
 #   limitations under the License.
 
 from typed_python import (
-    Bool, Float64, Float32, Int8, Int16, Int32, Int64, UInt8,
+    Float32, Int8, Int16, Int32, UInt8,
     UInt16, UInt32, UInt64
 )
 
 arithmetic_types = (
-    Bool, Float64, Float32, Int8, Int16, Int32, Int64, UInt8,
+    Float32, Int8, Int16, Int32, UInt8, int, float, bool,
     UInt16, UInt32, UInt64
 )
 
@@ -26,12 +26,46 @@ _intsBySignednessAndBitness = {
     (True, 8): Int8,
     (True, 16): Int16,
     (True, 32): Int32,
-    (True, 64): Int64,
+    (True, 64): int,
     (False, 8): UInt8,
     (False, 16): UInt16,
     (False, 32): UInt32,
     (False, 64): UInt64
 }
+
+
+def floatness(T):
+    if T in (float, Float32):
+        return True
+    return False
+
+
+def bitness(T):
+    if T in (float, int):
+        return 64
+    if T is bool:
+        return 1
+    return T.Bits
+
+
+def signedness(T):
+    if T in (int, Int8, Int16, Int32):
+        return True
+    if T in (bool, UInt8, UInt16, UInt32, UInt64):
+        return False
+    assert False
+
+
+def isSignedInt(T):
+    return T in (int, Int8, Int16, Int32)
+
+
+def isUnsignedInt(T):
+    return T in (bool, UInt8, UInt16, UInt32, UInt64)
+
+
+def isInteger(T):
+    return isSignedInt(T) or isUnsignedInt(T)
 
 
 def computeArithmeticBinaryResultType(T1, T2):
@@ -51,8 +85,8 @@ def computeArithmeticBinaryResultType(T1, T2):
     by casting the boolean to 0 or 1.
 
     Args:
-        T1 - a typed_python arithmetic type. Python types (float, int) don't work here.
-        T2 - also a typed_python arithmetic type
+        T1 - an arithmetic type
+        T2 - an arithmetic type
 
     Result:
         The typed_python arithmetic type that results from arithmetic operations
@@ -61,15 +95,15 @@ def computeArithmeticBinaryResultType(T1, T2):
     assert T1 in arithmetic_types, T1
     assert T2 in arithmetic_types, T2
 
-    if T1 is Bool and T2 is Bool:
-        return Bool
+    if T1 is bool and T2 is bool:
+        return bool
 
-    floatness = T1.IsFloat or T2.IsFloat
-    bitness = max(T1.Bits, T2.Bits)
+    outFloatness = floatness(T1) or floatness(T2)
+    outBitness = max(bitness(T1), bitness(T2))
 
-    if floatness:
-        return Float32 if bitness == 32 else Float64
+    if outFloatness:
+        return Float32 if outBitness == 32 else float
 
-    signedness = T1.IsSignedInt or T2.IsSignedInt
+    outSignedness = signedness(T1) or signedness(T2)
 
-    return _intsBySignednessAndBitness[signedness, bitness]
+    return _intsBySignednessAndBitness[outSignedness, outBitness]

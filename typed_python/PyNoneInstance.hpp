@@ -26,7 +26,7 @@ public:
         if (pyRepresentation == Py_None) {
             return;
         }
-        throw std::logic_error("Can't initialize a None from an instance of " +
+        throw std::logic_error("Can't initialize None from an instance of " +
             std::string(pyRepresentation->ob_type->tp_name));
     }
 
@@ -45,4 +45,3 @@ public:
             );
     }
 };
-

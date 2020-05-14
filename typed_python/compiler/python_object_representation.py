@@ -61,8 +61,8 @@ from typed_python.compiler.type_wrappers.repr_wrapper import ReprWrapper
 from types import ModuleType
 from typed_python._types import TypeFor, bytecount, prepareArgumentToBePassedToCompiler
 from typed_python import (
-    Type, Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16,
-    UInt8, Float64, Float32, Bool, String, Bytes, NoneType, makeNamedTuple,
+    Type, Int32, Int16, Int8, UInt64, UInt32, UInt16,
+    UInt8, Float32, makeNamedTuple,
     ListOf, isCompiled
 )
 
@@ -85,17 +85,18 @@ _concreteWrappers = {
     Int8: IntWrapper(Int8),
     Int16: IntWrapper(Int16),
     Int32: IntWrapper(Int32),
-    Int64: IntWrapper(Int64),
+    int: IntWrapper(int),
     UInt8: IntWrapper(UInt8),
     UInt16: IntWrapper(UInt16),
     UInt32: IntWrapper(UInt32),
     UInt64: IntWrapper(UInt64),
     Float32: FloatWrapper(Float32),
-    Float64: FloatWrapper(Float64),
-    Bool: BoolWrapper(),
-    NoneType: NoneWrapper(),
-    String: StringWrapper(),
-    Bytes: BytesWrapper()
+    float: FloatWrapper(float),
+    bool: BoolWrapper(),
+    None: NoneWrapper(),
+    type(None): NoneWrapper(),
+    str: StringWrapper(),
+    bytes: BytesWrapper()
 }
 
 
@@ -103,14 +104,14 @@ def _typedPythonTypeToTypeWrapper(t):
     if isinstance(t, Wrapper):
         return t
 
+    if t in _concreteWrappers:
+        return _concreteWrappers[t]
+
     if not hasattr(t, '__typed_python_category__'):
         t = TypeFor(t)
         assert hasattr(t, '__typed_python_category__'), t
 
     assert isinstance(t, type), t
-
-    if t in _concreteWrappers:
-        return _concreteWrappers[t]
 
     if t.__typed_python_category__ == "Class":
         return ClassWrapper(t)
@@ -246,7 +247,7 @@ def pythonObjectRepresentation(context, f):
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Int(val=f, bits=64, signed=True)
             ),
-            IntWrapper(Int64),
+            IntWrapper(int),
             False,
             constantValue=f
         )
@@ -257,7 +258,7 @@ def pythonObjectRepresentation(context, f):
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Float(val=f, bits=64)
             ),
-            FloatWrapper(Float64),
+            FloatWrapper(float),
             False,
             constantValue=f
         )

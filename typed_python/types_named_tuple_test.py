@@ -39,7 +39,7 @@ class NamedTupleTests(unittest.TestCase):
         class A(T):
             pass
 
-        with self.assertRaisesRegex(AttributeError, "'NamedTuple\\(a=Int64\\)' object has no attribute 'z'"):
+        with self.assertRaisesRegex(AttributeError, "'NamedTuple\\(a=int\\)' object has no attribute 'z'"):
             T().z = 20
 
         with self.assertRaisesRegex(AttributeError, "'A' object has no attribute 'z'"):
@@ -47,7 +47,7 @@ class NamedTupleTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             AttributeError,
-            "Cannot set attributes on instance of type 'NamedTuple\\(a=Int64\\)' because it is immutable"
+            "Cannot set attributes on instance of type 'NamedTuple\\(a=int\\)' because it is immutable"
         ):
             T().a = 20
 

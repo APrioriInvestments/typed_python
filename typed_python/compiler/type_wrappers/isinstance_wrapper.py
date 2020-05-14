@@ -12,7 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Int64, Float64, Bool, String, NoneType
 from typed_python.compiler import native_ast
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
@@ -35,17 +34,6 @@ class IsinstanceWrapper(Wrapper):
             if isinstance(args[1].expr_type, PythonFreeObjectWrapper):
                 # this is the compile-time path
                 argType = args[0].expr_type.typeRepresentation
-
-                if argType == Int64:
-                    argType = int
-                elif argType == Float64:
-                    argType = float
-                elif argType == Bool:
-                    argType = bool
-                elif argType == String:
-                    argType = str
-                elif argType == NoneType:
-                    argType = type(None)
 
                 if not isinstance(argType, type):
                     return context.constant(False)

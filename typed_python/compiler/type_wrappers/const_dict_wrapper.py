@@ -19,7 +19,7 @@ from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethod
 from typed_python.compiler.type_wrappers.util import min
 from typed_python.compiler.typed_expression import TypedExpression
 
-from typed_python import NoneType, Tuple
+from typed_python import Tuple
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -193,7 +193,7 @@ class ConstDictWrapperBase(RefcountedWrapper):
                     "destructor_" + str(self.constDictType),
                     ('destructor', self),
                     [self],
-                    typeWrapper(NoneType),
+                    typeWrapper(type(None)),
                     self.generateNativeDestructorFunction
                 )
                 .call(instance)

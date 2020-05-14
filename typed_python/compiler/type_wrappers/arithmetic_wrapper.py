@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 import typed_python.python_ast as python_ast
-from typed_python.type_promotion import computeArithmeticBinaryResultType
+from typed_python.type_promotion import computeArithmeticBinaryResultType, bitness, signedness, floatness, isSignedInt
 
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
@@ -22,7 +22,7 @@ import typed_python.compiler
 from math import trunc, floor, ceil
 
 from typed_python import (
-    Float32, Float64, Int64, Bool, Int8, UInt8, Int16, UInt16, Int32, UInt32, UInt64
+    Float32, Int8, UInt8, Int16, UInt16, Int32, UInt32, UInt64
 )
 
 pyOpToNative = {
@@ -91,7 +91,7 @@ class ArithmeticTypeWrapper(Wrapper):
         return primitiveType in (str, float, int, bool)
 
     def convert_bool_cast(self, context, expr):
-        if expr.expr_type.typeRepresentation is Bool:
+        if expr.expr_type.typeRepresentation is bool:
             return expr
 
         if expr.isConstant:
@@ -110,7 +110,7 @@ class ArithmeticTypeWrapper(Wrapper):
         )
 
     def convert_int_cast(self, context, expr, raiseException=True):
-        if expr.expr_type.typeRepresentation is Int64:
+        if expr.expr_type.typeRepresentation is int:
             return expr
 
         if expr.isConstant:
@@ -128,7 +128,7 @@ class ArithmeticTypeWrapper(Wrapper):
         )
 
     def convert_float_cast(self, context, expr, raiseException=True):
-        if expr.expr_type.typeRepresentation is Float64:
+        if expr.expr_type.typeRepresentation is float:
             return expr
 
         if expr.isConstant:
@@ -174,9 +174,9 @@ class ArithmeticTypeWrapper(Wrapper):
 
 
 def toWrapper(T):
-    if T is Bool:
+    if T is bool:
         return BoolWrapper()
-    if T.IsInteger:
+    if not floatness(T):
         return IntWrapper(T)
     return FloatWrapper(T)
 
@@ -184,10 +184,10 @@ def toWrapper(T):
 def toFloatType(T1):
     """Convert an int or float type to the enclosing float type."""
     if not T1.IsFloat:
-        if T1.Bits <= 32:
+        if bitness(T1) <= 32:
             return Float32
         else:
-            return Float64
+            return float
     return T1
 
 
@@ -198,10 +198,10 @@ class IntWrapper(ArithmeticTypeWrapper):
     def getNativeLayoutType(self):
         T = self.typeRepresentation
 
-        return native_ast.Type.Int(bits=T.Bits, signed=T.IsSignedInt)
+        return native_ast.Type.Int(bits=bitness(T), signed=signedness(T))
 
     def convert_hash(self, context, expr):
-        if self.typeRepresentation == Int64:
+        if self.typeRepresentation == int:
             return context.pushPod(Int32, runtime_functions.hash_int64.call(expr.nonref_expr))
 
         if self.typeRepresentation == UInt64:
@@ -222,7 +222,7 @@ class IntWrapper(ArithmeticTypeWrapper):
                 targetVal.expr.store(
                     native_ast.Expression.Cast(
                         left=e.nonref_expr,
-                        to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
+                        to_type=native_ast.Type.Float(bits=bitness(target_type.typeRepresentation))
                     )
                 )
             )
@@ -234,8 +234,8 @@ class IntWrapper(ArithmeticTypeWrapper):
                     native_ast.Expression.Cast(
                         left=e.nonref_expr,
                         to_type=native_ast.Type.Int(
-                            bits=target_type.typeRepresentation.Bits,
-                            signed=target_type.typeRepresentation.IsSignedInt
+                            bits=bitness(target_type.typeRepresentation),
+                            signed=signedness(target_type.typeRepresentation)
                         )
                     )
                 )
@@ -259,7 +259,7 @@ class IntWrapper(ArithmeticTypeWrapper):
             except Exception as e:
                 return context.pushException(type(e), *e.args)
 
-        if self.typeRepresentation == Int64:
+        if self.typeRepresentation == int:
             return context.push(
                 str,
                 lambda strRef: strRef.expr.store(
@@ -286,7 +286,7 @@ class IntWrapper(ArithmeticTypeWrapper):
             return expr.convert_to_type(int).convert_str_cast() + context.constant(suffix)
 
     def convert_abs(self, context, expr):
-        if self.typeRepresentation.IsSignedInt:
+        if isSignedInt(self.typeRepresentation):
             return context.pushPod(
                 self,
                 native_ast.Expression.Branch(
@@ -380,7 +380,7 @@ class IntWrapper(ArithmeticTypeWrapper):
                 with ifFalse:
                     context.pushException(ZeroDivisionError, "division by zero")
 
-            if left.expr_type.typeRepresentation.IsSignedInt:
+            if isSignedInt(left.expr_type.typeRepresentation):
                 return context.pushPod(
                     int,
                     runtime_functions.mod_int64_int64.call(
@@ -398,7 +398,7 @@ class IntWrapper(ArithmeticTypeWrapper):
                 )
             ).convert_to_type(self)
         if op.matches.Pow:
-            if left.expr_type.typeRepresentation.IsSignedInt:
+            if isSignedInt(left.expr_type.typeRepresentation):
                 return context.pushPod(
                     float,
                     runtime_functions.pow_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
@@ -409,7 +409,7 @@ class IntWrapper(ArithmeticTypeWrapper):
                 runtime_functions.pow_uint64_uint64.call(left.toUInt64().nonref_expr, right.toUInt64().nonref_expr)
             ).toFloat64()
         if op.matches.LShift:
-            if left.expr_type.typeRepresentation.IsSignedInt:
+            if isSignedInt(left.expr_type.typeRepresentation):
                 return context.pushPod(
                     int,
                     runtime_functions.lshift_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
@@ -420,7 +420,7 @@ class IntWrapper(ArithmeticTypeWrapper):
                 runtime_functions.lshift_uint64_uint64.call(left.toUInt64().nonref_expr, right.toUInt64().nonref_expr)
             ).convert_to_type(self)
         if op.matches.RShift:
-            if left.expr_type.typeRepresentation.IsSignedInt:
+            if isSignedInt(left.expr_type.typeRepresentation):
                 return context.pushPod(
                     int,
                     runtime_functions.rshift_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
@@ -431,7 +431,7 @@ class IntWrapper(ArithmeticTypeWrapper):
                 runtime_functions.rshift_uint64_uint64.call(left.toUInt64().nonref_expr, right.toUInt64().nonref_expr)
             ).convert_to_type(self)
         if op.matches.FloorDiv:
-            if right.expr_type.typeRepresentation.IsSignedInt:
+            if isSignedInt(right.expr_type.typeRepresentation):
                 return context.pushPod(
                     int,
                     runtime_functions.floordiv_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
@@ -474,7 +474,7 @@ class IntWrapper(ArithmeticTypeWrapper):
 
 class BoolWrapper(ArithmeticTypeWrapper):
     def __init__(self):
-        super().__init__(Bool)
+        super().__init__(bool)
 
     def getNativeLayoutType(self):
         return native_ast.Type.Int(bits=1, signed=False)
@@ -493,7 +493,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
                 targetVal.expr.store(
                     native_ast.Expression.Cast(
                         left=e.nonref_expr,
-                        to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
+                        to_type=native_ast.Type.Float(bits=bitness(target_type.typeRepresentation))
                     )
                 )
             )
@@ -505,8 +505,8 @@ class BoolWrapper(ArithmeticTypeWrapper):
                     native_ast.Expression.Cast(
                         left=e.nonref_expr,
                         to_type=native_ast.Type.Int(
-                            bits=target_type.typeRepresentation.Bits,
-                            signed=target_type.typeRepresentation.IsSignedInt
+                            bits=bitness(target_type.typeRepresentation),
+                            signed=signedness(target_type.typeRepresentation)
                         )
                     )
                 )
@@ -614,7 +614,7 @@ class FloatWrapper(ArithmeticTypeWrapper):
         super().__init__(T)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Float(bits=self.typeRepresentation.Bits)
+        return native_ast.Type.Float(bits=bitness(self.typeRepresentation))
 
     def convert_int_cast(self, context, expr, raiseException=True):
         if expr.isConstant:
@@ -623,7 +623,7 @@ class FloatWrapper(ArithmeticTypeWrapper):
             except Exception as e:
                 return context.pushException(type(e), *e.args)
 
-        if self.typeRepresentation == Float64:
+        if self.typeRepresentation == float:
             func = runtime_functions.float64_to_int
         else:
             func = runtime_functions.float32_to_int
@@ -636,7 +636,7 @@ class FloatWrapper(ArithmeticTypeWrapper):
     def convert_hash(self, context, expr):
         if self.typeRepresentation == Float32:
             return context.pushPod(Int32, runtime_functions.hash_float32.call(expr.nonref_expr))
-        if self.typeRepresentation == Float64:
+        if self.typeRepresentation == float:
             return context.pushPod(Int32, runtime_functions.hash_float64.call(expr.nonref_expr))
 
         assert False
@@ -652,7 +652,7 @@ class FloatWrapper(ArithmeticTypeWrapper):
                 targetVal.expr.store(
                     native_ast.Expression.Cast(
                         left=e.nonref_expr,
-                        to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
+                        to_type=native_ast.Type.Float(bits=bitness(target_type.typeRepresentation))
                     )
                 )
             )
@@ -672,8 +672,8 @@ class FloatWrapper(ArithmeticTypeWrapper):
                     native_ast.Expression.Cast(
                         left=e.nonref_expr,
                         to_type=native_ast.Type.Int(
-                            bits=target_type.typeRepresentation.Bits,
-                            signed=target_type.typeRepresentation.IsSignedInt
+                            bits=bitness(target_type.typeRepresentation),
+                            signed=signedness(target_type.typeRepresentation)
                         )
                     )
                 )
@@ -683,7 +683,7 @@ class FloatWrapper(ArithmeticTypeWrapper):
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_str_cast(self, context, instance):
-        if self.typeRepresentation == Float64:
+        if self.typeRepresentation == float:
             func = runtime_functions.float64_to_string
         else:
             func = runtime_functions.float32_to_string
@@ -739,7 +739,7 @@ class FloatWrapper(ArithmeticTypeWrapper):
         if right.expr_type != self:
             if isinstance(right.expr_type, ArithmeticTypeWrapper):
                 if op.matches.Pow:
-                    promoteType = toWrapper(Float64)
+                    promoteType = toWrapper(float)
                 else:
                     promoteType = toWrapper(
                         computeArithmeticBinaryResultType(

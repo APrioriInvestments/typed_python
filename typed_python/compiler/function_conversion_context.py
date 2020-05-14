@@ -257,7 +257,10 @@ class ConversionContextBase(object):
 
     def replaceClosureTypeWith(self, nativeType, wantsCurrentClosure):
         """Return 'nativeType' stripped of any references to our closure, or None if unchanged."""
-        assert isinstance(nativeType, type) and issubclass(nativeType, Type), (nativeType, type(nativeType))
+        assert isinstance(nativeType, type) and (
+            issubclass(nativeType, Type), (nativeType, type(nativeType))
+            or nativeType in (int, float, bool, str, bytes, type(None))
+        )
 
         if nativeType in self.typedFunctionTypeToClosurelessFunctionType:
             untypedFuncType = self.typedFunctionTypeToClosurelessFunctionType[nativeType]

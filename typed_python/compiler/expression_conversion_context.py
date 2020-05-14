@@ -24,7 +24,7 @@ from typed_python.compiler.python_object_representation import pythonObjectRepre
 from typed_python.compiler.python_object_representation import pythonObjectRepresentationType
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
-from typed_python import NoneType, Alternative, OneOf, Bool, Int32, ListOf, String, Tuple, NamedTuple, TupleOf
+from typed_python import Alternative, OneOf, Int32, ListOf, Tuple, NamedTuple, TupleOf
 from typed_python._types import getTypePointer, TypeFor, pyInstanceHeldObjectAddress
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
@@ -155,7 +155,7 @@ class ExpressionConversionContext(object):
         """Return expression that tests whether current exception is an instance of exception class exc
         """
         return self.push(
-            Bool,
+            bool,
             lambda oExpr:
             oExpr.expr.store(
                 runtime_functions.match_exception.call(
@@ -168,7 +168,7 @@ class ExpressionConversionContext(object):
         """Return expression that tests whether current exception is an instance of exception class exc
         """
         return self.push(
-            Bool,
+            bool,
             lambda oExpr:
             oExpr.expr.store(
                 runtime_functions.match_given_exception.call(
@@ -421,7 +421,7 @@ class ExpressionConversionContext(object):
             expr = native_ast.nullExpr
 
         if isinstance(expr, TypedExpression):
-            assert expr.expr_type.typeRepresentation is NoneType, expr.expr_type
+            assert expr.expr_type.typeRepresentation is type(None), expr.expr_type  # noqa
             expr = expr.expr
         else:
             assert isinstance(expr, native_ast.Expression)
@@ -1227,7 +1227,7 @@ class ExpressionConversionContext(object):
     def pushExceptionObjectWithCause(self, exceptionObject, causeObject, deferred=False):
         if exceptionObject is None:
             exceptionObject = self.zero(object)
-        if causeObject.expr_type.typeRepresentation is NoneType:
+        if causeObject.expr_type.typeRepresentation is type(None):  # noqa
             causeObject = self.zero(object)
 
         nativeExpr = (
@@ -1655,7 +1655,7 @@ class ExpressionConversionContext(object):
             if result is None:
                 return
 
-            if result.expr_type.typeRepresentation is not String:
+            if result.expr_type.typeRepresentation is not str:
                 self.pushException(TypeError, "Expected string, but got %s" % result.expr_type.typeRepresentation)
                 return None
 
@@ -1737,6 +1737,6 @@ class ExpressionConversionContext(object):
         """Return a raw type pointer for type t
 
         Args:
-            t - python representation of Type, e.g. int, UInt64, ListOf(String), ...
+            t - python representation of Type, e.g. int, UInt64, ListOf(str), ...
         """
         return getTypePointer(t)

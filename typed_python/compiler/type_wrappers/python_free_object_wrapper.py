@@ -15,7 +15,7 @@
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
-from typed_python import String, Value
+from typed_python import Value
 from types import FunctionType
 
 
@@ -91,7 +91,7 @@ class PythonFreeObjectWrapper(Wrapper):
         if not explicit:
             return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-        if target_type.typeRepresentation == String:
+        if target_type.typeRepresentation == str:
             targetVal.convert_copy_initialize(context.constant(str(self.typeRepresentation.Value)))
             return context.constant(True)
 

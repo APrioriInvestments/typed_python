@@ -18,7 +18,7 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
-from typed_python import NoneType, Tuple, PointerTo, Int32, Int64, UInt8
+from typed_python import Tuple, PointerTo, Int32, UInt8
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -62,13 +62,13 @@ class CPlusPlusStyleMod(CompilableBuiltin):
         return hash("CPlusPlusStyleMod")
 
     def convert_call(self, context, instance, args, kwargs):
-        if len(args) == 2 and args[0].expr_type.typeRepresentation == Int32 and args[1].expr_type.typeRepresentation == Int64:
+        if len(args) == 2 and args[0].expr_type.typeRepresentation == Int32 and args[1].expr_type.typeRepresentation == int:
             return context.pushPod(
                 int,
                 args[0].nonref_expr.cast(native_ast.Int64).mod(args[1].nonref_expr)
             )
 
-        if len(args) == 2 and args[0].expr_type.typeRepresentation == Int64 and args[1].expr_type.typeRepresentation == Int64:
+        if len(args) == 2 and args[0].expr_type.typeRepresentation == int and args[1].expr_type.typeRepresentation == int:
             return context.pushPod(
                 int,
                 args[0].nonref_expr.mod(args[1].nonref_expr)
@@ -339,7 +339,7 @@ class DictWrapperBase(RefcountedWrapper):
                 "destructor_" + str(self.typeRepresentation),
                 ('destructor', self),
                 [self],
-                typeWrapper(NoneType),
+                typeWrapper(type(None)),
                 self.generateNativeDestructorFunction
             ).call(instance)
         )
@@ -376,13 +376,13 @@ class DictWrapper(DictWrapperBase):
 
         if attr == '_items_reserved':
             return context.pushPod(
-                Int64,
+                int,
                 expr.nonref_expr.ElementPtrIntegers(0, 3).load()
             )
 
         if attr == '_top_item_slot':
             return context.pushPod(
-                Int64,
+                int,
                 expr.nonref_expr.ElementPtrIntegers(0, 4).load()
             )
 

@@ -16,7 +16,7 @@ import unittest
 import time
 import pytest
 from flaky import flaky
-from typed_python import Class, Final, Function, NamedTuple, bytecount, ListOf, TypedCell, Forward, PyCell, Int64, Tuple, TupleOf
+from typed_python import Class, Final, Function, NamedTuple, bytecount, ListOf, TypedCell, Forward, PyCell, Tuple, TupleOf
 from typed_python.compiler.runtime import RuntimeEventVisitor, Entrypoint
 from typed_python._types import refcount
 
@@ -445,7 +445,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         print(fRes.ClosureType)
 
-        self.assertEqual(fRes.ClosureType, Tuple(Int64))
+        self.assertEqual(fRes.ClosureType, Tuple(int))
 
         x = 11
 

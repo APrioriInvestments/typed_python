@@ -17,12 +17,13 @@ import sys
 from math import isfinite, trunc, floor, ceil, nan, inf
 from typed_python import (
     OneOf,
-    Bool,
-    Int8, Int16, Int32, Int64,
+    Int8, Int16, Int32,
     UInt8, UInt16, UInt32, UInt64,
-    Float32, Float64, Compiled, makeNamedTuple
+    Float32, Compiled, makeNamedTuple
 )
-from typed_python.type_promotion import computeArithmeticBinaryResultType
+from typed_python.type_promotion import (
+    computeArithmeticBinaryResultType, isSignedInt, isUnsignedInt, bitness
+)
 from typed_python import Entrypoint
 import unittest
 
@@ -234,16 +235,16 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(toString(UInt8(10)), "10u8")
 
     def test_can_compile_register_builtins(self):
-        registerTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
+        registerTypes = [bool, Int8, Int16, Int32, int, UInt8, UInt16, UInt32, UInt64, Float32, float]
 
         def suitable_range(t):
-            if t in [Bool]:
+            if t in [bool]:
                 return [0, 1]
-            elif t.IsUnsignedInt:
+            elif isUnsignedInt(t):
                 return [0, 5, 10, 15, 50, 100, 150]
-            elif t.IsSignedInt:
+            elif isSignedInt(t):
                 return [0, 5, 10, 15, 50, 100, -5, -10, -15, -50, -100]
-            elif t in [Float32, Float64]:
+            elif t in [Float32, float]:
                 return [x / 2.0 for x in range(-100, 100)]
 
         for T in registerTypes:
@@ -292,8 +293,8 @@ class TestArithmeticCompilation(unittest.TestCase):
                     r2 = c_op(T(v))
                     self.assertEqual(r1, r2)
                     # note that types are necessarily different sometimes,
-                    # e.g. round(Float64(1), 0) returns int when interpreted,
-                    # but Float64 when compiled
+                    # e.g. round(float(1), 0) returns int when interpreted,
+                    # but float when compiled
 
     def test_can_call_types_with_no_args(self):
         @Entrypoint
@@ -318,7 +319,7 @@ class TestArithmeticCompilation(unittest.TestCase):
     def test_can_compile_register_operations(self):
         failed = False
 
-        registerTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
+        registerTypes = [bool, Int8, Int16, Int32, int, UInt8, UInt16, UInt32, UInt64, Float32, float]
 
         def result_or_exception(f, *p):
             try:
@@ -327,7 +328,7 @@ class TestArithmeticCompilation(unittest.TestCase):
                 return "exception"
 
         def equal_result(a, b):
-            if (type(a) is float or (hasattr(a, "IsFloat") and a.IsFloat)):
+            if type(a) in (float, Float32):
                 epsilon = float(1e-6)
                 if a < 1e-32:  # these results happen to be from calculations that magnify errors
                     epsilon = float(1e-5)
@@ -338,20 +339,20 @@ class TestArithmeticCompilation(unittest.TestCase):
             return a == b
 
         def signed_overflow(T, v):
-            return T.IsUnsignedInt and (v >= 2**(T.Bits - 1) or v < -2**(T.Bits - 1))
+            return isUnsignedInt(T) and (v >= 2**(bitness(T) - 1) or v < -2**(bitness(T) - 1))
 
         def suitable_range(t):
-            if t in [Bool]:
+            if t in [bool]:
                 return [0, 1]
-            elif t.IsUnsignedInt:
-                return [0, 1, 2, (1 << (t.Bits // 4)) - 1, (1 << (t.Bits // 2)) - 1, (1 << t.Bits) - 1]
-            elif t.IsSignedInt:
-                return [0, 1, 2, (1 << (t.Bits // 2 - 1)) - 1, (1 << (t.Bits - 1)) - 1,
-                        -1, -2, -(1 << (t.Bits // 2 - 1)), -(1 << (t.Bits - 1))]
+            elif isUnsignedInt(t):
+                return [0, 1, 2, (1 << (bitness(t) // 4)) - 1, (1 << (bitness(t) // 2)) - 1, (1 << bitness(t)) - 1]
+            elif isSignedInt(t):
+                return [0, 1, 2, (1 << (bitness(t) // 2 - 1)) - 1, (1 << (bitness(t) - 1)) - 1,
+                        -1, -2, -(1 << (bitness(t) // 2 - 1)), -(1 << (bitness(t) - 1))]
             elif t in [Float32]:
                 return [0.0, 1.0/3.0, 0.5, 1.0, 1.5, 2.0, (2 - 1 / (2**23)) * 2**127,
                         -1.0/3.0, -0.5, -1.0, -1.5, -2.0, -(2 - 1 / (2**23)) * 2**127]
-            elif t in [Float64]:
+            elif t in [float]:
                 return [0.0, 1e-16, 9.876e-16, 1.0/3.0, 0.5, 1.0, 1.5, 10.0/7.0, 2.0, 3.0, 10.0/3.0, 100.0/3.0, sys.float_info.max,
                         -1e-16, -9.876e-16, -1.0/3.0, -0.5, -1.0, -10.0/7.0, -1.5, -2.0, -3.0, -10.0/3.0, -100.0/3.0, -sys.float_info.max]
 
@@ -371,9 +372,9 @@ class TestArithmeticCompilation(unittest.TestCase):
             def abs_(x: T):
                 return abs(x)
 
-            if T is not Bool:
+            if T is not bool:
                 self.assertEqual(T(1) + T(2), T(3))
-            if T in [Bool]:
+            if T in [bool]:
                 suitable_ops = [not_]
             else:
                 suitable_ops = [invert, neg, pos, abs_]
@@ -392,11 +393,11 @@ class TestArithmeticCompilation(unittest.TestCase):
                 for v in suitable_range(T):
                     comparable = True
                     interpreterResult = result_or_exception(native_op, v)
-                    if T.IsSignedInt:
-                        if interpreterResult >= 2**(T.Bits - 1) or interpreterResult < -2**(T.Bits - 1):
+                    if isSignedInt(T):
+                        if interpreterResult >= 2**(bitness(T) - 1) or interpreterResult < -2**(bitness(T) - 1):
                             comparable = False
-                    elif T.IsUnsignedInt:
-                        if interpreterResult >= 2**T.Bits or interpreterResult < 0:
+                    elif isUnsignedInt(T):
+                        if interpreterResult >= 2**bitness(T) or interpreterResult < 0:
                             comparable = False
                     typedPythonResult = result_or_exception(op, T(v))
                     if typedPythonResult == NotImplemented:
@@ -466,7 +467,7 @@ class TestArithmeticCompilation(unittest.TestCase):
                 def pow(x: T1, y: T2):
                     return x ** y
 
-                if T1 in [Bool] or T2 in [Bool]:
+                if T1 in [bool] or T2 in [bool]:
                     suitable_ops = [bitand, bitor, bitxor]
                 else:
                     suitable_ops = [
@@ -505,7 +506,7 @@ class TestArithmeticCompilation(unittest.TestCase):
                         for v2 in suitable_range(T2):
                             comparable = True
                             T_result = computeArithmeticBinaryResultType(T1, T2)
-                            if T_result.IsSignedInt:
+                            if isSignedInt(T_result):
                                 if signed_overflow(T1, v1) or signed_overflow(T2, v2):
                                     comparable = False
 
@@ -521,13 +522,13 @@ class TestArithmeticCompilation(unittest.TestCase):
                                     pass
                                 elif type(interpreterResult) is complex:
                                     interpreterResult = "expected to disagree"
-                                elif T_result.IsSignedInt:
-                                    if interpreterResult >= 2**(T_result.Bits - 1) or interpreterResult < -2**(T_result.Bits - 1):
+                                elif isSignedInt(T_result):
+                                    if interpreterResult >= 2**(bitness(T_result) - 1) or interpreterResult < -2**(bitness(T_result) - 1):
                                         comparable = False
-                                elif T_result.IsUnsignedInt:
-                                    if interpreterResult >= 2**T_result.Bits or interpreterResult < 0:
+                                elif isUnsignedInt(T_result):
+                                    if interpreterResult >= 2**bitness(T_result) or interpreterResult < 0:
                                         comparable = False
-                                elif T_result.IsFloat:
+                                elif T_result in (float, Float32):
                                     if interpreterResult >= 2**128 or interpreterResult <= -2**128:
                                         comparable = False
 
@@ -536,17 +537,17 @@ class TestArithmeticCompilation(unittest.TestCase):
                                 # can't expect Float32 mod and floordiv to match native calculations
                                 # typed should still match compiled
                                 native_comparable = False
-                            if ((T1 is Float32 and T2 is Float64) or (T1 is Float64 and T2 is Float32)) \
+                            if ((T1 is Float32 and T2 is float) or (T1 is float and T2 is Float32)) \
                                     and op in [less, greater, lessEq, greaterEq, neq]:
                                 native_comparable = False
 
-                            if T1 is Int64 and T2 is Int64 and \
+                            if T1 is int and T2 is int and \
                                     ((op is lshift and v1 != 0 and v2 > 1024) or
                                      (op is pow and (v1 > 1 or v1 < -1) and v2 > 1024)):
                                 typedPythonResult = "expected to disagree"
                             else:
                                 typedPythonResult = result_or_exception(op, T1(v1), T2(v2))
-                                if type(typedPythonResult) in [float, Float32, Float64] and not isfinite(typedPythonResult):
+                                if type(typedPythonResult) in [float, Float32, float] and not isfinite(typedPythonResult):
                                     typedPythonResult = "expected to disagree"
                                 if type(typedPythonResult) is complex:
                                     typedPythonResult = "expected to disagree"
@@ -555,7 +556,7 @@ class TestArithmeticCompilation(unittest.TestCase):
 
                             compilerResult = result_or_exception(compiled_op, T1(v1), T2(v2))
 
-                            if type(compilerResult) in [float, Float32, Float64] and not isfinite(compilerResult):
+                            if type(compilerResult) in [float, Float32, float] and not isfinite(compilerResult):
                                 compilerResult = "expected to disagree"
 
                             # for debugging

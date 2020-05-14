@@ -17,8 +17,6 @@ from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWra
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType
-
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
@@ -77,7 +75,7 @@ class TypedCellWrapper(RefcountedWrapper):
                 "destructor_" + str(self.typeRepresentation),
                 ('destructor', self),
                 [self],
-                typeWrapper(NoneType),
+                typeWrapper(type(None)),
                 self.generateNativeDestructorFunction
             )
             .call(instance)

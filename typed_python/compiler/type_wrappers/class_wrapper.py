@@ -23,7 +23,7 @@ from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin impo
     ClassOrAlternativeWrapperMixin
 )
 
-from typed_python import NoneType, _types, PointerTo, Bool, Int32, Tuple, NamedTuple, bytecount
+from typed_python import _types, PointerTo, Int32, Tuple, NamedTuple, bytecount
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -107,7 +107,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         ).cast(vtable_type.pointer())
 
     def _can_convert_to_type(self, otherType, explicit):
-        if otherType.typeRepresentation is Bool:
+        if otherType.typeRepresentation is bool:
             return True
         if isinstance(otherType, ClassWrapper):
             if otherType.typeRepresentation in self.typeRepresentation.MRO:
@@ -248,7 +248,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             "destructor_" + str(self.typeRepresentation),
             ('destructor', self),
             [self],
-            typeWrapper(NoneType),
+            typeWrapper(type(None)),
             self.generateNativeDestructorFunction,
             callback=installDestructorFun
         )
@@ -814,10 +814,10 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
     def convert_comparison(self, context, left, op, right):
         if op.matches.Eq:
             native_expr = left.nonref_expr.cast(native_ast.UInt64).eq(right.nonref_expr.cast(native_ast.UInt64))
-            return TypedExpression(context, native_expr, Bool, False)
+            return TypedExpression(context, native_expr, bool, False)
         if op.matches.NotEq:
             native_expr = left.nonref_expr.cast(native_ast.UInt64).neq(right.nonref_expr.cast(native_ast.UInt64))
-            return TypedExpression(context, native_expr, Bool, False)
+            return TypedExpression(context, native_expr, bool, False)
 
         return context.pushException(TypeError, f"Can't compare instances of {left.expr_type.typeRepresentation}"
                                                 f" and {right.expr_type.typeRepresentation} with {op}")

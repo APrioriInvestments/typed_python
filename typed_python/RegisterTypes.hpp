@@ -99,7 +99,7 @@ class Bool : public RegisterType<bool> {
 public:
     Bool() : RegisterType(TypeCategory::catBool)
     {
-        m_name = "Bool";
+        m_name = "bool";
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -218,7 +218,7 @@ class Int64 : public RegisterType<int64_t> {
 public:
     Int64() : RegisterType(TypeCategory::catInt64)
     {
-        m_name = "Int64";
+        m_name = "int";
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -246,7 +246,7 @@ class Float64 : public RegisterType<double> {
 public:
     Float64() : RegisterType(TypeCategory::catFloat64)
     {
-        m_name = "Float64";
+        m_name = "float";
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {

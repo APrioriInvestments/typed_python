@@ -22,7 +22,7 @@ class NoneType : public Type {
 public:
     NoneType() : Type(TypeCategory::catNone)
     {
-        m_name = "NoneType";
+        m_name = "None";
         m_size = 0;
         m_is_default_constructible = true;
 

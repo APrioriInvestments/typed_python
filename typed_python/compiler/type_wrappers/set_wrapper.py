@@ -15,7 +15,6 @@
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python import NoneType
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -60,7 +59,7 @@ class SetWrapperBase(RefcountedWrapper):
                 "destructor_" + str(self.typeRepresentation),
                 ('destructor', self),
                 [self],
-                typeWrapper(NoneType),
+                typeWrapper(type(None)),
                 self.generateNativeDestructorFunction
             ).call(instance)
         )

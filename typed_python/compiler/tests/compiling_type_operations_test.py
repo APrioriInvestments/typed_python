@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import OneOf, ListOf, Int32, Int64, Float64
+from typed_python import OneOf, ListOf, Int32
 from typed_python.compiler.runtime import Entrypoint
 import unittest
 
@@ -39,7 +39,7 @@ class TestCompilingTypeOperations(unittest.TestCase):
             self.assertEqual(f(T), str(T))
 
         for typ in [
-            str, int, Int32, Int64, Float64, bool, float,
+            str, int, Int32, int, float, bool, float,
             type(None), ListOf(int), ListOf(OneOf(int, float))
         ]:
             check(typ)
@@ -55,7 +55,7 @@ class TestCompilingTypeOperations(unittest.TestCase):
 
     def test_type_of_list_of_int(self):
         def f(x):
-            return type(x).ElementType is Int64
+            return type(x).ElementType is int
 
         self.assertTrue(f(ListOf(int)()))
         self.assertTrue(Entrypoint(f)(ListOf(int)()))

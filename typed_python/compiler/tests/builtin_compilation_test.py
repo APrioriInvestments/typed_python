@@ -16,8 +16,8 @@ import unittest
 from math import isnan
 
 from typed_python import ListOf, TupleOf, NamedTuple, Dict, ConstDict, \
-    Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Bool, Float64, Float32, \
-    String, Bytes, Alternative, Set, OneOf, Compiled
+    Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Float32, \
+    Alternative, Set, OneOf, Compiled
 
 
 def result_or_exception(f, *p):
@@ -30,52 +30,52 @@ def result_or_exception(f, *p):
 class TestBuiltinCompilation(unittest.TestCase):
     def test_builtins_on_various_types(self):
         NT1 = NamedTuple(a=int, b=float, c=str, d=str)
-        NT2 = NamedTuple(s=String, t=TupleOf(int))
+        NT2 = NamedTuple(s=str, t=TupleOf(int))
         Alt1 = Alternative("Alt1", X={'a': int}, Y={'b': str})
         cases = [
-            # (Float64, 1.23456789), # fails with compiled str=1.2345678899999999
-            # (Float64, 12.3456789), # fails with compiled str=12.345678899999999
-            # (Float64, -1.23456789), # fails with compiled str=-1.2345678899999999
-            # (Float64, -12.3456789), # fails with compiled str=-12.345678899999999
-            (Bool, True),
-            (Float64, 1.0/7.0),  # verify number of digits after decimal in string representation
-            (Float64, 8.0/7.0),  # verify number of digits after decimal in string representation
-            (Float64, 71.0/7.0),  # verify number of digits after decimal in string representation
-            (Float64, 701.0/7.0),  # verify number of digits after decimal in string representation
-            (Float64, 1.0/70.0),  # verify exp transition for small numbers
-            (Float64, 1.0/700.0),  # verify exp transition for small numbers
-            (Float64, 1.0/7000.0),  # verify exp transition for small numbers
-            (Float64, 1.0/70000.0),  # verify exp transition for small numbers
-            (Float64, 1.0),  # verify trailing zeros in string representation of float
-            (Float64, 0.123456789),
-            (Float64, 2**32),  # verify trailing zeros in string representation of float
-            (Float64, 2**64),  # verify trailing zeros in string representation of float
-            (Float64, 1.8e19),  # verify trailing zeros in string representation of float
-            (Float64, 1e16),  # verify exp transition for large numbers
-            (Float64, 1e16-2),  # verify exp transition for large numbers
-            (Float64, 1e16+2),  # verify exp transition for large numbers
-            (Float64, -1.0/7.0),  # verify number of digits after decimal in string representation
-            (Float64, -8.0/7.0),  # verify number of digits after decimal in string representation
-            (Float64, -71.0/7.0),  # verify number of digits after decimal in string representation
-            (Float64, -701.0/7.0),  # verify number of digits after decimal in string representation
-            (Float64, -1.0/70.0),  # verify exp transition for small numbers
-            (Float64, -1.0/700.0),  # verify exp transition for small numbers
-            (Float64, -1.0/7000.0),  # verify exp transition for small numbers
-            (Float64, -1.0/70000.0),  # verify exp transition for small numbers
-            (Float64, -0.123456789),
-            (Float64, -1.0),  # verify trailing zeros in string representation of float
-            (Float64, -2**32),  # verify trailing zeros in string representation of float
-            (Float64, -2**64),  # verify trailing zeros in string representation of float
-            (Float64, -1.8e19),  # verify trailing zeros in string representation of float
-            (Float64, -1e16),  # verify exp transition in string representation of float
-            (Float64, -1e16-2),  # verify exp transition in string representation of float
-            (Float64, -1e16+2),  # verify exp transition in string representation of float
+            # (float, 1.23456789), # fails with compiled str=1.2345678899999999
+            # (float, 12.3456789), # fails with compiled str=12.345678899999999
+            # (float, -1.23456789), # fails with compiled str=-1.2345678899999999
+            # (float, -12.3456789), # fails with compiled str=-12.345678899999999
+            (bool, True),
+            (float, 1.0/7.0),  # verify number of digits after decimal in string representation
+            (float, 8.0/7.0),  # verify number of digits after decimal in string representation
+            (float, 71.0/7.0),  # verify number of digits after decimal in string representation
+            (float, 701.0/7.0),  # verify number of digits after decimal in string representation
+            (float, 1.0/70.0),  # verify exp transition for small numbers
+            (float, 1.0/700.0),  # verify exp transition for small numbers
+            (float, 1.0/7000.0),  # verify exp transition for small numbers
+            (float, 1.0/70000.0),  # verify exp transition for small numbers
+            (float, 1.0),  # verify trailing zeros in string representation of float
+            (float, 0.123456789),
+            (float, 2**32),  # verify trailing zeros in string representation of float
+            (float, 2**64),  # verify trailing zeros in string representation of float
+            (float, 1.8e19),  # verify trailing zeros in string representation of float
+            (float, 1e16),  # verify exp transition for large numbers
+            (float, 1e16-2),  # verify exp transition for large numbers
+            (float, 1e16+2),  # verify exp transition for large numbers
+            (float, -1.0/7.0),  # verify number of digits after decimal in string representation
+            (float, -8.0/7.0),  # verify number of digits after decimal in string representation
+            (float, -71.0/7.0),  # verify number of digits after decimal in string representation
+            (float, -701.0/7.0),  # verify number of digits after decimal in string representation
+            (float, -1.0/70.0),  # verify exp transition for small numbers
+            (float, -1.0/700.0),  # verify exp transition for small numbers
+            (float, -1.0/7000.0),  # verify exp transition for small numbers
+            (float, -1.0/70000.0),  # verify exp transition for small numbers
+            (float, -0.123456789),
+            (float, -1.0),  # verify trailing zeros in string representation of float
+            (float, -2**32),  # verify trailing zeros in string representation of float
+            (float, -2**64),  # verify trailing zeros in string representation of float
+            (float, -1.8e19),  # verify trailing zeros in string representation of float
+            (float, -1e16),  # verify exp transition in string representation of float
+            (float, -1e16-2),  # verify exp transition in string representation of float
+            (float, -1e16+2),  # verify exp transition in string representation of float
             (Alt1, Alt1.X(a=-1)),
             (Alt1, Alt1.Y(b='yes')),
             (Float32, 1.234),
             (int, 3),
             (int, -2**63),
-            (Bool, True),
+            (bool, True),
             (Int8, -128),
             (Int16, -32768),
             (Int32, -2**31),
@@ -85,32 +85,32 @@ class TestBuiltinCompilation(unittest.TestCase):
             (UInt64, 2**64-1),
             (Float32, 1.234567),
             (Float32, 1.234),
-            (String, "abcd"),
-            (String, "1234567890"),
-            (String, "\n\r +1234"),
-            (String, "-1234 \t "),
-            (String, "-123_4 \t "),
-            (String, "-_1234"),
-            (String, "-1234_"),
-            (String, "12__34"),
-            (String, "-_1234"),
-            (String, "-1234 _"),
-            (String, "x1234"),
-            (String, "1234L"),
-            (String, " -1.23e-5"),
-            (String, "-1.23e+5 "),
-            (String, "+1.23e+5_0 "),
-            (String, " +1.2_3e5_00 "),
-            (String, "+1.23e-500 "),
-            (String, "-0.0"),
-            (String, "1."),
-            (String, ".1"),
-            (String, "Nan"),
-            (String, " -inf"),
-            (String, " +InFiNiTy "),
-            (Bytes, b"\01\00\02\03"),
+            (str, "abcd"),
+            (str, "1234567890"),
+            (str, "\n\r +1234"),
+            (str, "-1234 \t "),
+            (str, "-123_4 \t "),
+            (str, "-_1234"),
+            (str, "-1234_"),
+            (str, "12__34"),
+            (str, "-_1234"),
+            (str, "-1234 _"),
+            (str, "x1234"),
+            (str, "1234L"),
+            (str, " -1.23e-5"),
+            (str, "-1.23e+5 "),
+            (str, "+1.23e+5_0 "),
+            (str, " +1.2_3e5_00 "),
+            (str, "+1.23e-500 "),
+            (str, "-0.0"),
+            (str, "1."),
+            (str, ".1"),
+            (str, "Nan"),
+            (str, " -inf"),
+            (str, " +InFiNiTy "),
+            (bytes, b"\01\00\02\03"),
             (Set(int), [1, 3, 5, 7]),
-            (TupleOf(Int64), (7, 6, 5, 4, 3, 2, -1)),
+            (TupleOf(int), (7, 6, 5, 4, 3, 2, -1)),
             (TupleOf(Int32), (7, 6, 5, 4, 3, 2, -2)),
             (TupleOf(Int16), (7, 6, 5, 4, 3, 2, -3)),
             (TupleOf(Int8), (7, 6, 5, 4, 3, 2, -4)),
@@ -123,8 +123,8 @@ class TestBuiltinCompilation(unittest.TestCase):
             (Dict(str, int), {'y': 7, 'n': 6}),
             (ConstDict(str, int), {'y': 2, 'n': 4}),
             (TupleOf(int), tuple(range(10000))),
-            (OneOf(String, Int64), "ab"),
-            (OneOf(String, Int64), 34),
+            (OneOf(str, int), "ab"),
+            (OneOf(str, int), 34),
             (NT1, NT1(a=1, b=2.3, c="c", d="d")),
             (NT2, NT2(s="xyz", t=tuple(range(10000))))
         ]

@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Bytes, Compiled, Entrypoint, ListOf
+from typed_python import Compiled, Entrypoint, ListOf
 import unittest
 import time
 
@@ -135,7 +135,7 @@ class TestBytesCompilation(unittest.TestCase):
 
     def test_bytes_conversions(self):
 
-        def f(x: Bytes):
+        def f(x: bytes):
             return bytes(x)
 
         cf = Compiled(f)

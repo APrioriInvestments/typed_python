@@ -13,8 +13,8 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python import Int64, Bool, String, Int32, Dict
-
+from typed_python import Int32, Dict, Float32
+from typed_python.type_promotion import isInteger
 from typed_python.compiler.type_wrappers.list_of_wrapper import MasqueradingListOfWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
@@ -41,7 +41,7 @@ def strJoinIterable(sep, iterable):
     :param iterable: iterable container with strings only
     :return: string with joined values
     """
-    items = ListOf(String)()
+    items = ListOf(str)()
 
     for item in iterable:
         if isinstance(item, str):
@@ -97,7 +97,7 @@ class StringWrapper(RefcountedWrapper):
     is_pass_by_ref = True
 
     def __init__(self):
-        super().__init__(String)
+        super().__init__(str)
 
         self.layoutType = native_ast.Type.Struct(element_types=(
             ('refcount', native_ast.Int64),
@@ -131,7 +131,7 @@ class StringWrapper(RefcountedWrapper):
         return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
 
     def _can_convert_to_type(self, otherType, explicit):
-        return otherType.typeRepresentation is Bool or otherType == self
+        return otherType.typeRepresentation is bool or otherType == self
 
     def _can_convert_from_type(self, otherType, explicit):
         return False
@@ -224,13 +224,13 @@ class StringWrapper(RefcountedWrapper):
                 )
 
         # emulate a few specific error strings
-        if op.matches.Add and left.expr_type.typeRepresentation is String \
+        if op.matches.Add and left.expr_type.typeRepresentation is str \
                 and right.expr_type.is_arithmetic:
-            if right.expr_type.typeRepresentation.IsInteger:
+            if isInteger(right.expr_type.typeRepresentation):
                 return context.pushException(TypeError, "must be str, not int")
-            elif right.expr_type.typeRepresentation.IsFloat:
+            elif right.expr_type.typeRepresentation in (float, Float32):
                 return context.pushException(TypeError, "must be str, not float")
-            elif right.expr_type.typeRepresentation is Bool:
+            elif right.expr_type.typeRepresentation is bool:
                 return context.pushException(TypeError, "must be str, not bool")
 
         return super().convert_bin_op(context, left, op, right, inplace)
@@ -409,7 +409,7 @@ class StringWrapper(RefcountedWrapper):
         elif methodname in self._bool_methods:
             if len(args) == 0:
                 return context.push(
-                    Bool,
+                    bool,
                     lambda bRef: bRef.expr.store(
                         self._bool_methods[methodname].call(
                             instance.nonref_expr.cast(VoidPtr)
@@ -448,7 +448,7 @@ class StringWrapper(RefcountedWrapper):
                         )
                         return
 
-                if len(args) == 3 and args[2].expr_type.typeRepresentation != Int64:
+                if len(args) == 3 and args[2].expr_type.typeRepresentation != int:
                     context.pushException(
                         TypeError,
                         f"replace() argument 3 must be int, not {args[2].expr_type.typeRepresentation}"
@@ -463,7 +463,7 @@ class StringWrapper(RefcountedWrapper):
         elif methodname == "find":
             if len(args) == 1:
                 return context.push(
-                    Int64,
+                    int,
                     lambda iRef: iRef.expr.store(
                         runtime_functions.string_find_2.call(
                             instance.nonref_expr.cast(VoidPtr),
@@ -473,7 +473,7 @@ class StringWrapper(RefcountedWrapper):
                 )
             elif len(args) == 2:
                 return context.push(
-                    Int64,
+                    int,
                     lambda iRef: iRef.expr.store(
                         runtime_functions.string_find_3.call(
                             instance.nonref_expr.cast(VoidPtr),
@@ -484,7 +484,7 @@ class StringWrapper(RefcountedWrapper):
                 )
             elif len(args) == 3:
                 return context.push(
-                    Int64,
+                    int,
                     lambda iRef: iRef.expr.store(
                         runtime_functions.string_find.call(
                             instance.nonref_expr.cast(VoidPtr),
@@ -521,7 +521,7 @@ class StringWrapper(RefcountedWrapper):
                         ).cast(outStrings.expr_type.getNativeLayoutType())
                     )
                 )
-            elif len(args) == 1 and args[0].expr_type.typeRepresentation == String:
+            elif len(args) == 1 and args[0].expr_type.typeRepresentation == str:
                 return context.push(
                     MasqueradingListOfWrapper(ListOf(str)),
                     lambda outStrings: outStrings.expr.store(
@@ -531,7 +531,7 @@ class StringWrapper(RefcountedWrapper):
                         ).cast(outStrings.expr_type.getNativeLayoutType())
                     )
                 )
-            elif len(args) == 1 and args[0].expr_type.typeRepresentation == Int64:
+            elif len(args) == 1 and args[0].expr_type.typeRepresentation == int:
                 return context.push(
                     MasqueradingListOfWrapper(ListOf(str)),
                     lambda outStrings: outStrings.expr.store(
@@ -541,7 +541,7 @@ class StringWrapper(RefcountedWrapper):
                         ).cast(outStrings.expr_type.getNativeLayoutType())
                     )
                 )
-            elif len(args) == 2 and args[0].expr_type.typeRepresentation == String and args[1].expr_type.typeRepresentation == Int64:
+            elif len(args) == 2 and args[0].expr_type.typeRepresentation == str and args[1].expr_type.typeRepresentation == int:
                 return context.push(
                     MasqueradingListOfWrapper(ListOf(str)),
                     lambda outStrings: outStrings.expr.store(

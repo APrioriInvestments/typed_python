@@ -13,7 +13,7 @@
 #   limitations under the License.
 import unittest
 from typed_python import (
-    ListOf, Set, Dict, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String,
+    ListOf, Set, Dict, TupleOf, OneOf, Tuple, NamedTuple,
     ConstDict, Alternative, Forward, Class, PointerTo, Type
 )
 
@@ -39,25 +39,25 @@ class TypesMetadataTest(unittest.TestCase):
         assert issubclass(A, Class)
 
     def test_tupleOf(self):
-        self.assertEqual(TupleOf(int), TupleOf(Int64))
-        self.assertEqual(TupleOf(int).ElementType, Int64)
+        self.assertEqual(TupleOf(int), TupleOf(int))
+        self.assertEqual(TupleOf(int).ElementType, int)
 
-        self.assertEqual(TupleOf(float).ElementType, Float64)
+        self.assertEqual(TupleOf(float).ElementType, float)
         self.assertEqual(TupleOf(OneOf(10, 20)).ElementType, OneOf(10, 20))
 
         self.assertEqual(TupleOf(object).ElementType.__typed_python_category__, "PythonObjectOfType")
         self.assertEqual(TupleOf(10).ElementType.__typed_python_category__, "Value")
 
     def test_tuple(self):
-        self.assertEqual(Tuple(int, int, OneOf(10, 20)).ElementTypes, (Int64, Int64, OneOf(10, 20)))
+        self.assertEqual(Tuple(int, int, OneOf(10, 20)).ElementTypes, (int, int, OneOf(10, 20)))
 
     def test_named_tuple(self):
-        self.assertEqual(NamedTuple(x=int, y=int, z=OneOf(10, 20)).ElementTypes, (Int64, Int64, OneOf(10, 20)))
+        self.assertEqual(NamedTuple(x=int, y=int, z=OneOf(10, 20)).ElementTypes, (int, int, OneOf(10, 20)))
         self.assertEqual(NamedTuple(x=int, y=int, z=OneOf(10, 20)).ElementNames, ('x', 'y', 'z'))
 
     def test_const_dict(self):
-        self.assertEqual(ConstDict(str, int).KeyType, String)
-        self.assertEqual(ConstDict(str, int).ValueType, Int64)
+        self.assertEqual(ConstDict(str, int).KeyType, str)
+        self.assertEqual(ConstDict(str, int).ValueType, int)
 
     def test_alternatives(self):
         X = Forward("X")
@@ -75,9 +75,9 @@ class TypesMetadataTest(unittest.TestCase):
         self.assertEqual(Right.Index, 1)
 
         self.assertEqual(Left.ElementType.ElementNames, ("x", "y"))
-        self.assertEqual(Left.ElementType.ElementTypes, (Int64, String))
+        self.assertEqual(Left.ElementType.ElementTypes, (int, str))
         self.assertEqual(Right.ElementType.ElementNames, ('x', 'val'))
-        self.assertEqual(Right.ElementType.ElementTypes, (X, Int64))
+        self.assertEqual(Right.ElementType.ElementTypes, (X, int))
 
     def test_oneof(self):
         someInts = TupleOf(int)((1, 2))

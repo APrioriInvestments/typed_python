@@ -15,7 +15,7 @@ import unittest
 
 from typed_python import (
     TupleOf, OneOf, Alternative, Class, Member, Function,
-    Forward, Int64, NamedTuple, Tuple, Dict, ListOf, ConstDict, Module
+    Forward, NamedTuple, Tuple, Dict, ListOf, ConstDict, Module
 )
 
 from typed_python._types import mutuallyRecursiveGroup
@@ -28,9 +28,9 @@ class ForwardTypesTests(unittest.TestCase):
 
         f.define(int)
 
-        self.assertEqual(T.__name__, "TupleOf(Int64)")
+        self.assertEqual(T.__name__, "TupleOf(int)")
 
-        self.assertEqual(f.get(), Int64)
+        self.assertEqual(f.get(), int)
 
     def test_class_in_forward(self):
         class C(Class):
@@ -58,7 +58,7 @@ class ForwardTypesTests(unittest.TestCase):
         F1.define(T0)
         F0.define(int)
 
-        self.assertEqual(T1.__name__, "TupleOf(TupleOf(Int64))")
+        self.assertEqual(T1.__name__, "TupleOf(TupleOf(int))")
 
     def test_recursive_alternative(self):
         List = Forward("List")
@@ -183,7 +183,7 @@ class ForwardTypesTests(unittest.TestCase):
         TO = TO.define(TupleOf(OneOf(None, TO)))
         self.assertEqual(TO.__qualname__, "TO")
         self.assertIs(TO.ElementType.Types[1], TO)
-        self.assertEqual(TO.ElementType.__qualname__, "OneOf(NoneType, TO)")
+        self.assertEqual(TO.ElementType.__qualname__, "OneOf(None, TO)")
 
     def test_forward_types_identity_container(self):
         for ContainerKind in [TupleOf, ListOf]:

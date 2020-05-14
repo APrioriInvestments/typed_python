@@ -36,7 +36,7 @@ public:
 
     StringType() : Type(TypeCategory::catString)
     {
-        m_name = "String";
+        m_name = "str";
         m_is_default_constructible = true;
         m_size = sizeof(void*);
 

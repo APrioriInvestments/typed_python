@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ConstDict, String, TupleOf, ListOf, Tuple, Compiled
+from typed_python import ConstDict, TupleOf, ListOf, Tuple, Compiled
 import typed_python._types as _types
 from typed_python import Entrypoint
 import unittest
@@ -30,12 +30,12 @@ def makeSomeValues(dtype, count=10):
     res = dtype()
 
     for i in range(count):
-        if res.KeyType is String:
+        if res.KeyType is str:
             k = str(i)
         else:
             k = i
 
-        if res.ValueType is String:
+        if res.ValueType is str:
             v = str(i)
         else:
             v = i

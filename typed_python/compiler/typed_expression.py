@@ -66,7 +66,7 @@ class TypedExpression(object):
         )
 
     def refToHeld(self):
-        if getattr(self.expr_type.typeRepresentation, "__typed_python_category__") == "RefTo":
+        if getattr(self.expr_type.typeRepresentation, "__typed_python_category__", None) == "RefTo":
             return TypedExpression(
                 self.context,
                 self.nonref_expr,
@@ -77,7 +77,7 @@ class TypedExpression(object):
         return self
 
     def heldToRef(self):
-        if getattr(self.expr_type.typeRepresentation, "__typed_python_category__") == "HeldClass":
+        if getattr(self.expr_type.typeRepresentation, "__typed_python_category__", None) == "HeldClass":
             assert self.isReference
             return self.changeType(RefTo(self.expr_type.typeRepresentation), isReferenceOverride=False)
 

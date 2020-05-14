@@ -19,7 +19,7 @@ from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin impo
     ClassOrAlternativeWrapperMixin
 )
 
-from typed_python import _types, Bool, RefTo
+from typed_python import _types, RefTo
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -291,11 +291,11 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
 
         if op.matches.Eq:
             native_expr = left.expr.cast(native_ast.UInt64).eq(right.expr.cast(native_ast.UInt64))
-            return TypedExpression(context, native_expr, Bool, False)
+            return TypedExpression(context, native_expr, bool, False)
 
         if op.matches.NotEq:
             native_expr = left.expr.cast(native_ast.UInt64).neq(right.expr.cast(native_ast.UInt64))
-            return TypedExpression(context, native_expr, Bool, False)
+            return TypedExpression(context, native_expr, bool, False)
 
         return context.pushException(TypeError, f"Can't compare instances of {left.expr_type.typeRepresentation}"
                                                 f" and {right.expr_type.typeRepresentation} with {op}")

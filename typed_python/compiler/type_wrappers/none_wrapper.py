@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python import NoneType, Int32
+from typed_python import Int32
 import typed_python.compiler.native_ast as native_ast
 
 
@@ -24,7 +24,7 @@ class NoneWrapper(Wrapper):
     is_compile_time_constant = True
 
     def __init__(self):
-        super().__init__(NoneType)
+        super().__init__(type(None))
 
     def getCompileTimeConstant(self):
         return None

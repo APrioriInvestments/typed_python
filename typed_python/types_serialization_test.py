@@ -36,8 +36,8 @@ from typed_python.Codebase import Codebase
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
-    NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Int64, Float64, Class,
-    Member, String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
+    TupleOf, ListOf, OneOf, Tuple, NamedTuple, Class,
+    Member, ConstDict, Alternative, serialize, deserialize,
     Dict, Set, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject,
     Forward, Final, Function, Entrypoint
@@ -398,7 +398,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(o2.o, o2)
 
     def test_serialize_primitive_native_types(self):
-        for t in [Int64, Float64, Bool, NoneType, String, Bytes]:
+        for t in [int, float, bool, type(None), str, bytes]:
             self.assertIs(ping_pong(t), t)
 
     def test_serialize_primitive_compound_types(self):
@@ -1484,7 +1484,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(f2(), 1)
 
         f2Typed = Function(f2)
-        self.assertEqual(f2Typed.overloads[0].returnType, Int64)
+        self.assertEqual(f2Typed.overloads[0].returnType, int)
 
     def test_roundtrip_serialization_of_functions_with_defaults(self):
         def f(x=10, *, y=20):
@@ -1527,21 +1527,6 @@ class TypesSerializationTest(unittest.TestCase):
             20
         )
 
-    def test_serialize_class_with_recursive_statics(self):
-        class ClassWithSelfStatic(Class, Final):
-            @staticmethod
-            def ownName():
-                return str(ClassWithSelfStatic)
-
-        sc = SerializationContext({})
-
-        ClassWithSelfStatic2 = sc.deserialize(sc.serialize(ClassWithSelfStatic))
-
-        self.assertEqual(
-            ClassWithSelfStatic2.ownName(),
-            ClassWithSelfStatic.ownName(),
-        )
-
     def test_serialize_class_with_classmethod(self):
         class ClassWithClassmethod(Class, Final):
             @classmethod
@@ -1555,4 +1540,24 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(
             ClassWithClassmethod2.ownName(),
             ClassWithClassmethod.ownName(),
+        )
+
+    def test_serialize_class_with_nontrivial_signatures(self):
+        N = NamedTuple(x=int, y=float)
+
+        class ClassWithStaticmethod(Class, Final):
+            @staticmethod
+            def hi(x: ListOf(N)):
+                return len(x)
+
+        sc = SerializationContext({})
+
+        ClassWithStaticmethod2 = sc.deserialize(sc.serialize(ClassWithStaticmethod))
+
+        lst = ListOf(N)()
+        lst.resize(2)
+
+        self.assertEqual(
+            ClassWithStaticmethod2.hi(lst),
+            ClassWithStaticmethod.hi(lst),
         )

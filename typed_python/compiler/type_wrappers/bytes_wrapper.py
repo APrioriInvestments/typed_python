@@ -15,7 +15,7 @@
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import Bytes, Int32, Dict, ListOf
+from typed_python import Int32, Dict, ListOf
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -34,7 +34,7 @@ class BytesWrapper(RefcountedWrapper):
     is_pass_by_ref = True
 
     def __init__(self):
-        super().__init__(Bytes)
+        super().__init__(bytes)
 
         self.layoutType = native_ast.Type.Struct(element_types=(
             ('refcount', native_ast.Int64),

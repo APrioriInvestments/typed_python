@@ -18,7 +18,7 @@ import numpy
 import unittest
 import traceback
 
-from typed_python import TupleOf, Float32, Float64, Int64, Int32, ListOf, Function
+from typed_python import TupleOf, Float32, Int32, ListOf, Function
 
 
 class Operation:
@@ -493,13 +493,13 @@ def typeModelForType(typ):
     if issubclass(typ, TupleOf):
         return TupleOfTypeModel(typeModelForType(typ.ElementType))
 
-    if typ is float or typ is Float64:
+    if typ is float or typ is float:
         return FloatTypeModel()
 
     if typ is Float32:
         return Float32TypeModel()
 
-    if typ is int or typ is Int64:
+    if typ is int or typ is int:
         return IntTypeModel()
 
     if typ is bool:

@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 import typed_python.compiler
-from typed_python import String, Int64, Bool, NoneType, Float64, Type, PythonObjectOfType
+from typed_python import Type, PythonObjectOfType
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
@@ -39,21 +39,11 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
         """Unwrap a typed_python type back to the normal python representation.
 
         For things where typed_python has its own internal representation,
-        like Int64 <-> int, we convert back to normal python values.
+        like int <-> int, we convert back to normal python values.
         """
-        # internally, we track int, bool, float, and str as Int64, Bool, Float64, etc.
+        # internally, we track int, bool, float, and str as int, bool, float, etc.
         # but that's now how python programs would see them. So, we have to convert
         # to the python object representation of those objects.
-        if typeRep == Int64:
-            return int
-        if typeRep == Float64:
-            return float
-        if typeRep == Bool:
-            return bool
-        if typeRep == String:
-            return str
-        if typeRep == NoneType:
-            return type(None)
         if isinstance(typeRep, type) and issubclass(typeRep, PythonObjectOfType):
             return typeRep.PyType
 

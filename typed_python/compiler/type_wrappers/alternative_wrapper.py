@@ -16,7 +16,7 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python import NoneType, _types, Bool
+from typed_python import _types
 import typed_python.compiler
 from typed_python.compiler.native_ast import VoidPtr
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
@@ -67,7 +67,7 @@ class AlternativeWrapperMixin(ClassOrAlternativeWrapperMixin):
 
         if tp_l and tp_l == tp_r:
             return context.pushPod(
-                Bool,
+                bool,
                 runtime_functions.alternative_cmp.call(
                     tp_l,
                     lhs.expr.cast(VoidPtr),
@@ -212,7 +212,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
                 "destructor_" + str(self.typeRepresentation),
                 ('destructor', self),
                 [self],
-                typeWrapper(NoneType),
+                typeWrapper(type(None)),
                 self.generateNativeDestructorFunction
             )
             .call(instance)

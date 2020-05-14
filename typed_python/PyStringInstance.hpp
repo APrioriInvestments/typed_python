@@ -42,7 +42,7 @@ public:
                 );
             return;
         }
-        throw std::logic_error("Can't initialize a StringType from an instance of " +
+        throw std::logic_error("Can't initialize a string from an instance of " +
             std::string(pyRepresentation->ob_type->tp_name));
     }
 
@@ -97,4 +97,3 @@ public:
     }
 
 };
-

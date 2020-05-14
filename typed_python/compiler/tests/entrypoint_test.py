@@ -14,7 +14,7 @@
 
 from typed_python import (
     ListOf, Class, Member, Final, TupleOf, DisableCompiledCode,
-    Int64, isCompiled, SerializationContext
+    isCompiled, SerializationContext
 )
 from typed_python._types import touchCompiledSpecializations
 from typed_python import Entrypoint, NotCompiled
@@ -416,7 +416,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
             f.resultTypeFor(int)
 
         self.assertTrue(f.overloads[0].functionCode in out, out)
-        self.assertEqual(out[f.overloads[0].functionCode][2]['y'], Int64)
+        self.assertEqual(out[f.overloads[0].functionCode][2]['y'], int)
 
     def test_star_args_on_entrypoint(self):
         @Entrypoint
@@ -442,9 +442,9 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "annot find a valid overload"):
             argCount(1, 2, "hi")
 
-        self.assertEqual(argCount.resultTypeFor().typeRepresentation, Int64)
-        self.assertEqual(argCount.resultTypeFor(int).typeRepresentation, Int64)
-        self.assertEqual(argCount.resultTypeFor(int, int).typeRepresentation, Int64)
+        self.assertEqual(argCount.resultTypeFor().typeRepresentation, int)
+        self.assertEqual(argCount.resultTypeFor(int).typeRepresentation, int)
+        self.assertEqual(argCount.resultTypeFor(int, int).typeRepresentation, int)
 
         self.assertEqual(argCount.resultTypeFor(int, int, str), None)
 

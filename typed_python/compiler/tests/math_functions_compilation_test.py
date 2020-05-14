@@ -18,7 +18,7 @@ import time
 import numpy
 
 from typed_python import (
-    Float32, UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8, Float64
+    Float32, UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8
 )
 
 from typed_python import Entrypoint
@@ -100,7 +100,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         for mathFun in [callcos, callsin, calllog, callexp]:
             compiled = Entrypoint(mathFun)
 
-            self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, Float64)
+            self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, float)
             self.assertEqual(compiled.resultTypeFor(Float32).typeRepresentation, Float32)
 
             self.assertEqual(compiled(1.0), mathFun(1.0))

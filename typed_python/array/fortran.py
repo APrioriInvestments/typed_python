@@ -2,7 +2,7 @@ import os
 import numpy
 import ctypes
 
-from typed_python import Int32, Float64, Float32, Entrypoint, PointerTo, ListOf, TupleOf, UInt8
+from typed_python import Int32, Float32, Entrypoint, PointerTo, ListOf, TupleOf, UInt8
 
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python.compiler.type_wrappers.runtime_functions import externalCallTarget
@@ -96,14 +96,14 @@ class axpy_(CompilableBuiltin):
             # handle these arguments
             return super().convert_call(context, instance, args, kwargs)
 
-        x = makePointer(args[2], (Float64, Float32))
+        x = makePointer(args[2], (float, Float32))
         if not x:
             return
 
         T = x.expr_type.typeRepresentation.ElementType
-        assert T in (Float32, Float64), T
+        assert T in (Float32, float), T
 
-        nativeT = native_ast.Float64 if T is Float64 else native_ast.Float32
+        nativeT = native_ast.Float64 if T is float else native_ast.Float32
 
         y = makePointer(args[4], (T,))
         if not y:
@@ -118,7 +118,7 @@ class axpy_(CompilableBuiltin):
             return
 
         targetFun = externalCallTarget(
-            "daxpy_" if T is Float64 else "faxpy_",
+            "daxpy_" if T is float else "faxpy_",
             native_ast.Void,
             native_ast.Int32.pointer(),
             nativeT.pointer(),
@@ -149,7 +149,7 @@ def axpy(n: int, a, x, xinc: int, y, yinc: int):
     Args:
         n - the number of values
         a - the constant to multiply by. Must be float convertible.
-        x - either a ListOf / TupleOf Float32 or Float64, or a pointer to same.
+        x - either a ListOf / TupleOf Float32 or float, or a pointer to same.
         xinc - an integer indicating the step size within 'x'
         y - like x, but must be the same type
         yinc - increment in 'y'
@@ -187,10 +187,10 @@ class gemm_(CompilableBuiltin):
             return super().convert_call(context, instance, args, kwargs)
 
         # determine the type from 'A'
-        A = makePointer(args[6], (Float64, Float32))
+        A = makePointer(args[6], (float, Float32))
         T = A.expr_type.typeRepresentation.ElementType
-        assert T in (Float32, Float64), T
-        nativeT = native_ast.Float64 if T is Float64 else native_ast.Float32
+        assert T in (Float32, float), T
+        nativeT = native_ast.Float64 if T is float else native_ast.Float32
 
         TRANSA = ensureOnStack(args[0], UInt8)
         TRANSB = ensureOnStack(args[1], UInt8)
@@ -199,17 +199,17 @@ class gemm_(CompilableBuiltin):
         K = ensureOnStack(args[4], Int32)
         ALPHA = ensureOnStack(args[5], T)
         LDA = ensureOnStack(args[7], Int32)  # stride
-        B = makePointer(args[8], (Float64, Float32))
+        B = makePointer(args[8], (float, Float32))
         LDB = ensureOnStack(args[9], Int32)  # stride
         BETA = ensureOnStack(args[10], T)  # stride
-        C = makePointer(args[11], (Float64, Float32))
+        C = makePointer(args[11], (float, Float32))
         LDC = ensureOnStack(args[12], Int32)  # stride
 
         if not all([TRANSA, TRANSB, M, N, K, ALPHA, LDA, B, LDB, BETA, C, LDC]):
             return
 
         targetFun = externalCallTarget(
-            "dgemm_" if T is Float64 else "fgemm_",
+            "dgemm_" if T is float else "fgemm_",
             native_ast.Void,
             native_ast.UInt8.pointer(),
             native_ast.UInt8.pointer(),
@@ -293,27 +293,27 @@ class gemv_(CompilableBuiltin):
             return super().convert_call(context, instance, args, kwargs)
 
         # determine the type from 'A'
-        A = makePointer(args[4], (Float64, Float32))
+        A = makePointer(args[4], (float, Float32))
         T = A.expr_type.typeRepresentation.ElementType
-        assert T in (Float32, Float64), T
-        nativeT = native_ast.Float64 if T is Float64 else native_ast.Float32
+        assert T in (Float32, float), T
+        nativeT = native_ast.Float64 if T is float else native_ast.Float32
 
         TRANS = ensureOnStack(args[0], UInt8)
         M = ensureOnStack(args[1], Int32)
         N = ensureOnStack(args[2], Int32)
         ALPHA = ensureOnStack(args[3], T)
         LDA = ensureOnStack(args[5], Int32)  # stride
-        X = makePointer(args[6], (Float64, Float32))
+        X = makePointer(args[6], (float, Float32))
         INCX = ensureOnStack(args[7], Int32)  # stride
         BETA = ensureOnStack(args[8], T)  # stride
-        Y = makePointer(args[9], (Float64, Float32))
+        Y = makePointer(args[9], (float, Float32))
         INCY = ensureOnStack(args[10], Int32)  # stride
 
         if not all([TRANS, M, N, ALPHA, LDA, X, INCX, BETA, Y, INCY]):
             return
 
         targetFun = externalCallTarget(
-            "dgemv_" if T is Float64 else "fgemv_",
+            "dgemv_" if T is float else "fgemv_",
             native_ast.Void,
             native_ast.UInt8.pointer(),
             native_ast.Int32.pointer(),
@@ -382,10 +382,10 @@ class getrf_(CompilableBuiltin):
             return super().convert_call(context, instance, args, kwargs)
 
         # determine the type from 'A'
-        A = makePointer(args[2], (Float64, Float32))
+        A = makePointer(args[2], (float, Float32))
         T = A.expr_type.typeRepresentation.ElementType
-        assert T in (Float32, Float64), T
-        nativeT = native_ast.Float64 if T is Float64 else native_ast.Float32
+        assert T in (Float32, float), T
+        nativeT = native_ast.Float64 if T is float else native_ast.Float32
 
         M = ensureOnStack(args[0], Int32)
         N = ensureOnStack(args[1], Int32)
@@ -397,7 +397,7 @@ class getrf_(CompilableBuiltin):
             return
 
         targetFun = externalCallTarget(
-            "dgetrf_" if T is Float64 else "fgetrf_",
+            "dgetrf_" if T is float else "fgetrf_",
             native_ast.Void,
             native_ast.Int32.pointer(),
             native_ast.Int32.pointer(),
@@ -461,15 +461,15 @@ class getri_(CompilableBuiltin):
             return super().convert_call(context, instance, args, kwargs)
 
         # determine the type from 'A'
-        A = makePointer(args[1], (Float64, Float32))
+        A = makePointer(args[1], (float, Float32))
         T = A.expr_type.typeRepresentation.ElementType
-        assert T in (Float32, Float64), T
-        nativeT = native_ast.Float64 if T is Float64 else native_ast.Float32
+        assert T in (Float32, float), T
+        nativeT = native_ast.Float64 if T is float else native_ast.Float32
 
         N = ensureOnStack(args[0], Int32)
         LDA = ensureOnStack(args[2], Int32)
         IPIV = makePointer(args[3], (Int32,))
-        WORK = makePointer(args[4], (Float64, Float32))
+        WORK = makePointer(args[4], (float, Float32))
         LWORK = makePointer(args[5], (Int32,))
         INFO = ensureOnStack(args[6], Int32)
 
@@ -477,7 +477,7 @@ class getri_(CompilableBuiltin):
             return
 
         targetFun = externalCallTarget(
-            "dgetri_" if T is Float64 else "fgetri_",
+            "dgetri_" if T is float else "fgetri_",
             native_ast.Void,
             native_ast.Int32.pointer(),
             nativeT.pointer(),

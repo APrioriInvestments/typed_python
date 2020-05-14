@@ -581,12 +581,22 @@ PyObject *MakeTypeFor(PyObject* nullValue, PyObject* args) {
     PyObjectHolder arg(PyTuple_GetItem(args,0));
 
     if (arg == Py_None) {
-        return incref((PyObject*)PyInstance::typeObj(::NoneType::Make()));
+        return incref((PyObject*)Py_None->ob_type);
     }
 
     if (!PyType_Check(arg)) {
         PyErr_Format(PyExc_TypeError, "TypeFor expects a python primitive or an existing native value, not %S", (PyObject*)arg);
         return NULL;
+    }
+
+    if (arg == &PyLong_Type ||
+        arg == &PyFloat_Type ||
+        arg == Py_None->ob_type ||
+        arg == &PyBool_Type ||
+        arg == &PyBytes_Type ||
+        arg == &PyUnicode_Type
+    ) {
+        return incref(arg);
     }
 
     Type* type = PyInstance::unwrapTypeArgToTypePtr(arg);
@@ -2102,20 +2112,14 @@ PyInit__types(void)
 
     PyModule_AddObject(module, "Type", (PyObject*)incref(PyInstance::allTypesBaseType()));
     PyModule_AddObject(module, "ListOf", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catListOf)));
-    PyModule_AddObject(module, "NoneType", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catNone)));
-    PyModule_AddObject(module, "Bool", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catBool)));
     PyModule_AddObject(module, "Int8", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catInt8)));
     PyModule_AddObject(module, "Int16", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catInt16)));
     PyModule_AddObject(module, "Int32", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catInt32)));
-    PyModule_AddObject(module, "Int64", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catInt64)));
     PyModule_AddObject(module, "UInt8", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catUInt8)));
     PyModule_AddObject(module, "UInt16", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catUInt16)));
     PyModule_AddObject(module, "UInt32", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catUInt32)));
     PyModule_AddObject(module, "UInt64", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catUInt64)));
     PyModule_AddObject(module, "Float32", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catFloat32)));
-    PyModule_AddObject(module, "Float64", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catFloat64)));
-    PyModule_AddObject(module, "String", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catString)));
-    PyModule_AddObject(module, "Bytes", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catBytes)));
     PyModule_AddObject(module, "TupleOf", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catTupleOf)));
     PyModule_AddObject(module, "PointerTo", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPointerTo)));
     PyModule_AddObject(module, "RefTo", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catRefTo)));

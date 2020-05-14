@@ -23,7 +23,7 @@ from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
-from typed_python import Function, NoneType, _types, Value
+from typed_python import Function, _types, Value
 
 _singleton = [None]
 _singletonLock = threading.Lock()
@@ -247,7 +247,7 @@ class Runtime:
 
             overload._installNativePointer(
                 fp.fp,
-                callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
+                callTarget.output_type.typeRepresentation if callTarget.output_type is not None else type(None),
                 [i.typeRepresentation for i in inputWrappers]
             )
 

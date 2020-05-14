@@ -208,7 +208,11 @@ void PyInstance::constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, Py
         return;
     }
 
-    throw std::logic_error("Can't initialize " + t->name() + " with this signature.");
+    if (kwargs && PyDict_Size(kwargs)) {
+        throw std::logic_error("Can't initialize " + t->name() + " with keyword arguments.");
+    }
+
+    throw std::logic_error("Can't initialize " + t->name() + " with " + format(args ? PyTuple_Size(args) : 0) + " arguments.");
 }
 
 /**
@@ -636,6 +640,10 @@ PyTypeObject* PyInstance::typeObj(Type* inType) {
     return inType->getTypeRep();
 }
 
+PyObject* PyInstance::typePtrToPyTypeRepresentation(Type* inType) {
+    return (PyObject*)typeObj(inType);
+}
+
 // static
 PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
     if (    t->getTypeCategory() == Type::TypeCategory::catAlternative ||
@@ -1033,6 +1041,28 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
 }
 
 PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
+    if (inType->getTypeCategory() == ::Type::TypeCategory::catPythonSubclass) {
+        return inType->getTypeRep();
+    }
+    if (inType->getTypeCategory() == ::Type::TypeCategory::catInt64) {
+        return &PyLong_Type;
+    }
+    if (inType->getTypeCategory() == ::Type::TypeCategory::catFloat64) {
+        return &PyFloat_Type;
+    }
+    if (inType->getTypeCategory() == ::Type::TypeCategory::catBool) {
+        return &PyBool_Type;
+    }
+    if (inType->getTypeCategory() == ::Type::TypeCategory::catString) {
+        return &PyUnicode_Type;
+    }
+    if (inType->getTypeCategory() == ::Type::TypeCategory::catBytes) {
+        return &PyBytes_Type;
+    }
+    if (inType->getTypeCategory() == ::Type::TypeCategory::catNone) {
+        return Py_None->ob_type;
+    }
+
     static std::map<Type*, NativeTypeWrapper*> types;
 
     auto it = types.find(inType);
@@ -1040,12 +1070,7 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
         return (PyTypeObject*)it->second;
     }
 
-    if (inType->getTypeCategory() == ::Type::TypeCategory::catPythonSubclass) {
-        throw std::runtime_error(
-            "a PythonSubclass type object is already known. "
-            "We shouldn't need to create a native type wrapper for it."
-        );
-    }
+    Type::TypeCategory cat = inType->getTypeCategory();
 
     types[inType] = new NativeTypeWrapper { {
             PyVarObject_HEAD_INIT(NULL, 0)              // TYPE (c.f., Type Objects)
@@ -1075,12 +1100,12 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_clear = 0,                              // inquiry
             .tp_richcompare = tp_richcompare,           // richcmpfunc
             .tp_weaklistoffset = 0,                     // Py_ssize_t
-            .tp_iter = inType->getTypeCategory() == Type::TypeCategory::catConstDict ||
-                        inType->getTypeCategory() == Type::TypeCategory::catDict ||
-                        inType->getTypeCategory() == Type::TypeCategory::catSet ||
-                        inType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative ||
-                        inType->getTypeCategory() == Type::TypeCategory::catClass ||
-                        inType->getTypeCategory() == Type::TypeCategory::catPointerTo
+            .tp_iter = cat == Type::TypeCategory::catConstDict ||
+                        cat == Type::TypeCategory::catDict ||
+                        cat == Type::TypeCategory::catSet ||
+                        cat == Type::TypeCategory::catConcreteAlternative ||
+                        cat == Type::TypeCategory::catClass ||
+                        cat == Type::TypeCategory::catPointerTo
                          ?
                 PyInstance::tp_iter
             :   0,                                      // getiterfunc tp_iter;
@@ -1579,15 +1604,6 @@ Type* PyInstance::tryUnwrapPyInstanceToValueType(PyObject* typearg, bool allowAr
 
     PyErr_Clear();
     return nullptr;
-}
-
-//static
-PyObject* PyInstance::typePtrToPyTypeRepresentation(Type* t) {
-    if (t->getTypeCategory() == ::Type::TypeCategory::catPythonSubclass) {
-        return (PyObject*)t->getTypeRep();
-    }
-
-    return (PyObject*)typeObjInternal(t);
 }
 
 // static

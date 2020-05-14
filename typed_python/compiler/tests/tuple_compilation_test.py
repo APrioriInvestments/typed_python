@@ -185,7 +185,7 @@ class TestTupleCompilation(unittest.TestCase):
         self.assertEqual(makeNtXY(ListOf(int)([1, 2, 3]), 2.0), NT(x=[1, 2, 3], y=2.0))
         self.assertEqual(makeNtY(2.0), NT(y=2.0))
 
-        with self.assertRaisesRegex(TypeError, "convert from type Float64 to type List"):
+        with self.assertRaisesRegex(TypeError, "convert from type float to type List"):
             makeNtX(1.2)
 
     def test_compile_make_named_tuple(self):

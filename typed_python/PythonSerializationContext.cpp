@@ -104,6 +104,25 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
         if (PyType_Check(o)) {
             Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)o);
 
+            if ((PyTypeObject*)o == &PyLong_Type) {
+                nativeType = Int64::Make();
+            }
+            else if ((PyTypeObject*)o == &PyFloat_Type) {
+                nativeType = Float64::Make();
+            }
+            else if ((PyTypeObject*)o == Py_None->ob_type) {
+                nativeType = NoneType::Make();
+            }
+            else if ((PyTypeObject*)o == &PyBool_Type) {
+                nativeType = Bool::Make();
+            }
+            else if ((PyTypeObject*)o == &PyBytes_Type) {
+                nativeType = BytesType::Make();
+            }
+            else if ((PyTypeObject*)o == &PyUnicode_Type) {
+                nativeType = StringType::Make();
+            }
+
             if (nativeType) {
                 serializeNativeType(nativeType, b, FieldNumbers::NATIVE_TYPE);
             } else {
@@ -717,6 +736,30 @@ void PythonSerializationContext::serializeNativeTypeInner(
             Type* nativeType,
             SerializationBuffer& b
             ) const {
+    Type::TypeCategory cat = nativeType->getTypeCategory();
+
+    if (cat == Type::TypeCategory::catInt8 ||
+        cat == Type::TypeCategory::catInt16 ||
+        cat == Type::TypeCategory::catInt32 ||
+        cat == Type::TypeCategory::catInt64 ||
+        cat == Type::TypeCategory::catUInt8 ||
+        cat == Type::TypeCategory::catUInt16 ||
+        cat == Type::TypeCategory::catUInt32 ||
+        cat == Type::TypeCategory::catUInt64 ||
+        cat == Type::TypeCategory::catFloat32 ||
+        cat == Type::TypeCategory::catFloat64 ||
+        cat == Type::TypeCategory::catNone ||
+        cat == Type::TypeCategory::catBytes ||
+        cat == Type::TypeCategory::catString ||
+        cat == Type::TypeCategory::catBool ||
+        cat == Type::TypeCategory::catPyCell)
+    {
+        b.writeBeginCompound(FieldNumbers::NATIVE_TYPE);
+        b.writeUnsignedVarintObject(0, nativeType->getTypeCategory());
+        b.writeEndCompound();
+        return;
+    }
+
     PyEnsureGilAcquired acquireTheGil;
 
     uint32_t id;
@@ -771,24 +814,7 @@ void PythonSerializationContext::serializeNativeTypeInner(
 
     b.writeUnsignedVarintObject(0, nativeType->getTypeCategory());
 
-    if (nativeType->getTypeCategory() == Type::TypeCategory::catInt8 ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catInt16 ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catInt32 ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catInt64 ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catUInt8 ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catUInt16 ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catUInt32 ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catUInt64 ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catFloat32 ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catFloat64 ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catNone ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catBytes ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catString ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catBool ||
-            nativeType->getTypeCategory() == Type::TypeCategory::catPyCell
-            ) {
-        //do nothing
-    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+    if (nativeType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
         serializeNativeType(nativeType->getBaseType(), b, 1);
         b.writeUnsignedVarintObject(2, ((ConcreteAlternative*)nativeType)->which());
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catSet) {
@@ -1083,7 +1109,26 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
                 throw std::runtime_error("Expected value named " + name + " to be a type.");
             }
 
-            resultType = PyInstance::extractTypeFrom((PyTypeObject*)result);
+            if (result == &PyLong_Type) {
+                resultType = Int64::Make();
+            }
+            else if (result == &PyFloat_Type) {
+                resultType = Float64::Make();
+            }
+            else if (result == &PyBool_Type) {
+                resultType = Bool::Make();
+            }
+            else if (result == &PyUnicode_Type) {
+                resultType = StringType::Make();
+            }
+            else if (result == &PyBytes_Type) {
+                resultType = BytesType::Make();
+            }
+            else if (result == Py_None->ob_type) {
+                resultType = NoneType::Make();
+            } else {
+                resultType = PyInstance::extractTypeFrom((PyTypeObject*)result);
+            }
 
             if (!resultType) {
                 throw std::runtime_error("Expected value named " + name + " to be a type.");

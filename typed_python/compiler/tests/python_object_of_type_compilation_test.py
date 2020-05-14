@@ -13,11 +13,12 @@
 #   limitations under the License.
 
 from typed_python import (
-    Class, Member, Function, Tuple, TupleOf, ListOf, String, Bytes, ConstDict, Dict, NamedTuple, Set,
-    Alternative, OneOf, NoneType, Bool,
-    Int8, Int16, Int32, Int64,
+    Class, Member, Function, Tuple, TupleOf, ListOf,
+    ConstDict, Dict, NamedTuple, Set,
+    Alternative, OneOf,
+    Int8, Int16, Int32,
     UInt8, UInt16, UInt32, UInt64,
-    Float32, Float64, Final,
+    Float32, Final,
     PointerTo, Compiled
 )
 
@@ -231,7 +232,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         @Compiled
         def fro_and_to(x: object):
-            return OneOf(String, Int64)(x)
+            return OneOf(str, int)(x)
 
         self.assertEqual(fro_and_to("ab"), "ab")
 
@@ -253,20 +254,20 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
     def test_object_conversions(self):
         NT1 = NamedTuple(a=int, b=float, c=str, d=str)
-        NT2 = NamedTuple(s=String, t=TupleOf(int))
+        NT2 = NamedTuple(s=str, t=TupleOf(int))
         cases = [
-            (Bool, True),
+            (bool, True),
             (Int8, -128),
             (Int16, -32768),
             (Int32, -2**31),
-            (Int64, -2**63),
+            (int, -2**63),
             (UInt8, 127),
             (UInt16, 65535),
             (UInt32, 2**32-1),
             (UInt64, 2**64-1),
-            (Float64, 1.2345),
-            (String, "abcd"),
-            (TupleOf(Int64), (7, 6, 5, 4, 3, 2, -1)),
+            (float, 1.2345),
+            (str, "abcd"),
+            (TupleOf(int), (7, 6, 5, 4, 3, 2, -1)),
             (TupleOf(Int32), (7, 6, 5, 4, 3, 2, -2)),
             (TupleOf(Int16), (7, 6, 5, 4, 3, 2, -3)),
             (TupleOf(Int8), (7, 6, 5, 4, 3, 2, -4)),
@@ -279,8 +280,8 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (Float32, 1.2345),
             (Dict(str, int), {'y': 7, 'n': 6}),
             (TupleOf(int), tuple(range(10000))),
-            (OneOf(String, Int64), "ab"),
-            (OneOf(String, Int64), 34),
+            (OneOf(str, int), "ab"),
+            (OneOf(str, int), 34),
             (NT1, NT1(a=1, b=2.3, c="c", d="d")),
             (NT2, NT2(s="xyz", t=tuple(range(10000)))),
             (PointerTo(int), PointerTo(int)() + 4),
@@ -299,7 +300,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             def fro_and_to(x: object):
                 return toObject(T(x))
 
-            if T in [Float32, Float64]:
+            if T in [Float32, float]:
                 self.assertEqual(to_and_fro(v), T(v))
             else:
                 self.assertEqual(to_and_fro(v), v)
@@ -310,8 +311,10 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
                 self.assertEqual(fro_and_to(v), v, (type(v), T))
 
             x = T(v)
-            if T.__typed_python_category__ in ["ListOf", "TupleOf", "Alternative", "ConcreteAlternative",
-                                               "Class", "Dict", "ConstDict", "Set"]:
+            if getattr(T, '__typed_python_category__', None) in [
+                "ListOf", "TupleOf", "Alternative", "ConcreteAlternative",
+                "Class", "Dict", "ConstDict", "Set"
+            ]:
                 self.assertEqual(refcount(x), 1)
                 self.assertEqual(to_and_fro(x), x)
                 self.assertEqual(refcount(x), 1, T)
@@ -364,12 +367,12 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (Int8, Int8(0)), (Int8, Int8(1)), (UInt8, UInt8(0)), (UInt8, UInt8(-1)),
             (Int16, Int16(0)), (Int16, Int16(1)), (UInt16, UInt16(0)), (UInt16, UInt16(-1)),
             (Int32, Int32(0)), (Int32, Int32(1)), (UInt32, UInt32(0)), (UInt32, UInt32(-1)),
-            (Int64, Int64(0)), (Int64, Int64(1)), (UInt64, UInt64(0)), (UInt64, UInt64(-1)),
-            (Float64, 0.0), (Float64, 0.1),
+            (int, int(0)), (int, int(1)), (UInt64, UInt64(0)), (UInt64, UInt64(-1)),
+            (float, 0.0), (float, 0.1),
             (Float32, 0.0), (Float32, 0.1),
-            (NoneType, NoneType()),
-            (String, ""), (String, "0"), (String, "1"),
-            (Bytes, b""), (Bytes, b"0"), (Bytes, b"\x00"), (Bytes, b"\x01"),
+            (type(None), None),
+            (str, ""), (str, "0"), (str, "1"),
+            (bytes, b""), (bytes, b"0"), (bytes, b"\x00"), (bytes, b"\x01"),
             (IDict, IDict()), (IDict, IDict({0: 0})), (IDict, IDict({1: 1, 2: 4})),
             (IConstDict, IConstDict()), (IConstDict, IConstDict({0: 0})), (IConstDict, IConstDict({1: 1, 2: 4})),
 
@@ -425,7 +428,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (B4, B4.a(s='')),
             (B4, B4.a(s='a')),
             (B5, B5.a(s='')),
-            (PointerTo(Int64), x0.pointerUnsafe(0)),
+            (PointerTo(int), x0.pointerUnsafe(0)),
         ]
 
         @Entrypoint
