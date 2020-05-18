@@ -355,3 +355,10 @@ class TestOneOfOfCompilation(unittest.TestCase):
             A.g(abc)
 
         do()
+
+    def test_make_oneof(self):
+        @Entrypoint
+        def f(x):
+            return OneOf("A", "B")(x)
+
+        assert f("A") == "A"

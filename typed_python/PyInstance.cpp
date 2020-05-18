@@ -200,7 +200,7 @@ void PyInstance::constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, Py
         }
     }
 
-    if (kwargs == NULL && PyTuple_Size(args) == 1) {
+    if ((kwargs == NULL || PyDict_Size(kwargs) == 0) && PyTuple_Size(args) == 1) {
         PyObjectHolder argTuple(PyTuple_GetItem(args, 0));
 
         copyConstructFromPythonInstance(t, data, argTuple, true /* mark isExplicit */);
