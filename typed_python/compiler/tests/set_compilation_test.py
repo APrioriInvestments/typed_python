@@ -17,6 +17,7 @@ from typed_python.compiler.type_wrappers.set_wrapper import set_union, set_inter
     set_symmetric_difference, set_union_multiple, set_intersection_multiple, set_difference_multiple, \
     set_disjoint, set_subset, set_proper_subset, set_equal, set_not_equal, \
     set_update, set_intersection_update, set_difference_update
+from flaky import flaky
 import typed_python._types as _types
 import time
 import numpy
@@ -521,6 +522,7 @@ class TestSetCompilation(unittest.TestCase):
                     with self.assertRaises(TypeError):
                         Compiled(symmetric_difference_update2)(S(x), S(y), S(z))
 
+    @flaky(max_runs=3, min_passes=1)
     def test_set_binop_perf(self):
         for T in [int, str]:
             S = Set(T)
