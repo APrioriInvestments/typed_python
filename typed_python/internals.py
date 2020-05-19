@@ -123,7 +123,8 @@ magicMethodTypes = {
     '__setattr__': type(None),
     '__delattr__': type(None),
     '__setitem__': type(None),
-    '__delitem__': type(None),
+    '__delitem__': type(None)
+    # '__mro__': type(None)
 }
 
 
@@ -222,6 +223,15 @@ class ClassMetaclass(type):
     @classmethod
     def __prepare__(cls, *args, **kwargs):
         return ClassMetaNamespace()
+
+    @property
+    def __bases__(cls):
+        return cls.BaseClasses
+
+    @property
+    def __mro__(cls):
+        print(" in metaclass __mro__")
+        return cls.MRO
 
     def __new__(cls, name, bases, namespace, **kwds):
         if not bases:

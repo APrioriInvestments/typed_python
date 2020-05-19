@@ -1121,7 +1121,8 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
 
     // if we are an instance of 'Class', we must explicitly set our Metaclass to internals.ClassMetaclass,
     // so that when other classes inherit from us they also inherit our metaclass.
-    if (inType->getTypeCategory() == Type::TypeCategory::catClass) {
+    if (inType->getTypeCategory() == Type::TypeCategory::catClass
+            || inType->getTypeCategory() == Type::TypeCategory::catPythonSubclass) {
         static PyTypeObject* classMetaclass = (PyTypeObject*)getInternalModuleMember("ClassMetaclass");
         ((PyObject*)&types[inType]->typeObj)->ob_type = incref(classMetaclass);
     }

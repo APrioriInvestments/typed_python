@@ -23,6 +23,65 @@ import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime
 
 
+class TestClassCompilation2(unittest.TestCase):
+
+    def test_super(self):
+
+        class A0():
+            def f(self) -> int:
+                return 1
+
+        class B0(A0):
+            def f(self) -> int:
+                print("original")
+                print("self =", self)
+                print(" .__class__ =", self.__class__)
+                print("  .__mro__ =", self.__class__.__mro__)
+                print("  .mro() =", self.__class__.mro())
+                m = self.__class__.__mro__
+                i = m.index(self.__class__)
+                print("    i =", i)
+                print("    __mro__[i+1] =", m[i + 1])
+                d = m[i+1].__dict__['f']
+                print("d =", d)
+                d1 = d.__get__(self, self.__class__)
+                print("d1 =", d1)
+                d2 = d1()
+                print("d2 =", d2)
+                return super().f()
+
+        b0 = B0()
+        print(b0.f())
+
+        class A(Class):
+            def f(self) -> int:
+                return 3
+
+        class B(A):
+            def f(self) -> int:
+                print("test")
+                print("self =", self)
+                print(" .__class__ =", self.__class__)
+                print("  .__mro__ =", self.__class__.__mro__)
+                print("  .mro() =", self.__class__.mro())
+                m = self.__class__.__mro__
+                i = m.index(self.__class__)
+                print("    i =", i)
+                print("    __mro__[i+1] =", m[i + 1])
+                d = m[i+1].__dict__['f']
+                print("d =", d)
+                d1 = d.__get__(self, self.__class__)
+                print("d1 =", d1)
+                d2 = d1()
+                print("d2 =", d2)
+                return super().f()
+                # This is the error:
+                # AttributeError: 'super' object has no attribute 'f'
+
+        b = B()
+        print(b.f())
+
+
 def resultType(f, **kwargs):
     return Runtime.singleton().resultTypes(f, kwargs)
 
