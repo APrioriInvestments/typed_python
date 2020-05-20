@@ -587,6 +587,12 @@ def const_float_expr(f):
     )
 
 
+def const_float32_expr(f):
+    return Expression.Constant(
+        val=Constant.Float(bits=32, val=f)
+    )
+
+
 def const_int_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=64, val=i, signed=True)
