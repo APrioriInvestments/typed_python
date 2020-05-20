@@ -1663,6 +1663,11 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_named_subclass_of_named_tuple(self):
         sc = SerializationContext()
 
+        self.assertEqual(
+            ModuleLevelNamedTupleSubclass.__module__,
+            "typed_python.types_serialization_test"
+        )
+
         self.assertIs(
             sc.deserialize(sc.serialize(ModuleLevelNamedTupleSubclass)),
             ModuleLevelNamedTupleSubclass

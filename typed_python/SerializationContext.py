@@ -130,7 +130,7 @@ class SerializationContext(object):
                 return ".modules." + t.__name__
 
         elif isinstance(t, type):
-            mname = t.__module__
+            mname = getattr(t, "__typed_python_module__", t.__module__)
             fname = t.__name__
 
             if self.objectFromName(mname + "." + fname) is t:
