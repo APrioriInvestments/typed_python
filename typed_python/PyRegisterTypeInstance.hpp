@@ -598,6 +598,11 @@ public:
 
         if (isInteger(t->getTypeCategory()))  {
             if (PyLong_Check(pyRepresentation)) {
+//                if (std::is_unsigned<T>()) {
+//                    if (PyLong_AsLongLong(pyRepresentation) < 0) {
+//                        return false;
+//                    }
+//                }
                 return true;
             }
 

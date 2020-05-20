@@ -444,3 +444,24 @@ class NamedTupleWrapper(TupleWrapper):
                 if converted is None:
                     return None
                 self.refAs(context, toInitialize, i).convert_copy_initialize(converted)
+
+
+class MasqueradingTupleWrapper(TupleWrapper):
+    # A 'Tuple' that's masquerading as a regular 'tuple'
+    def __str__(self):
+        return "Masquerading" + super().__str__()
+
+    @property
+    def interpreterTypeRepresentation(self):
+        return tuple
+
+    def convert_mutable_masquerade_to_untyped_type(self):
+        return typeWrapper(tuple)
+
+    def convert_mutable_masquerade_to_untyped(self, context, instance):
+        return context.constant(tuple).convert_call([instance], {}).changeType(typeWrapper(tuple))
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        # Allow the typed form of the object to perform the conversion
+        e = e.changeType(typeWrapper(self.typeRepresentation))
+        return e.convert_to_type_with_target(targetVal, explicit)

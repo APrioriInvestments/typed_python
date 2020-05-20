@@ -27,12 +27,272 @@ extern "C" {
         throw PythonExceptionSet();
     }
 
+    // START math functions
+    // parameters are checked before calling these functions
+
+    double np_acos_float64(double d) {
+        return std::acos(d);
+    }
+
+    float np_acos_float32(float f) {
+        return std::acos(f);
+    }
+
+    double np_acosh_float64(double d) {
+        return std::acosh(d);
+    }
+
+    float np_acosh_float32(float f) {
+        return std::acosh(f);
+    }
+
+    double np_asin_float64(double d) {
+        return std::asin(d);
+    }
+
+    float np_asin_float32(float f) {
+        return std::asin(f);
+    }
+
+    double np_asinh_float64(double d) {
+        return std::asinh(d);
+    }
+
+    float np_asinh_float32(float f) {
+        return std::asinh(f);
+    }
+
+    double np_atan_float64(double d) {
+        return std::atan(d);
+    }
+
+    float np_atan_float32(float f) {
+        return std::atan(f);
+    }
+
+    double np_atan2_float64(double d1, double d2) {
+        return std::atan2(d1, d2);
+    }
+
+    float np_atan2_float32(float f1, float f2) {
+        return std::atan2(f1, f2);
+    }
+
+    double np_atanh_float64(double d) {
+        return std::atanh(d);
+    }
+
+    float np_atanh_float32(float f) {
+        return std::atanh(f);
+    }
+
+    double np_cosh_float64(double d) {
+        return std::cosh(d);
+    }
+
+    float np_cosh_float32(float f) {
+        return std::cosh(f);
+    }
+
+    double np_erf_float64(double d) {
+        return std::erf(d);
+    }
+
+    float np_erf_float32(float f) {
+        return std::erf(f);
+    }
+
+    double np_erfc_float64(double d) {
+        return std::erfc(d);
+    }
+
+    float np_erfc_float32(float f) {
+        return std::erfc(f);
+    }
+
+    double np_expm1_float64(double d) {
+        return std::expm1(d);
+    }
+
+    float np_expm1_float32(float f) {
+        return std::expm1(f);
+    }
+
+    // d = 171.0 will overflow 64-bit float, so could replace this calculation with a table lookup
+    // from 0 to 170.
+    // This also would avoid some accumulated errors in the multiplication.
+    double np_factorial64(double d) {
+        double ret = 1;
+        double d1 = 1.0;
+        while (d1 < d) {
+            ret *= ++d1;
+        }
+        return ret;
+    }
+
+    // f = 35.0 will overflow 32-bit float, so could replace this calculation with a table lookup
+    // from 0 to 34.
+    // This also would avoid some accumulated errors in the multiplication.
+    float np_factorial32(float f) {
+        float ret = 1;
+        float f1 = 1.0;
+        while (f1 < f) {
+            ret *= ++f1;
+        }
+        return ret;
+    }
+
+    // As for all of these, parameter checks have already occurred.
+    // n = 21 will overflow 64-bit integer, so could replace this calculation with a table lookup
+    // from 0 to 20.
+    int64_t np_factorial(int64_t n) {
+        int64_t ret = 1;
+        int64_t i = 1;
+        while (i < n) {
+            ret *= ++i;
+        }
+        return ret;
+    }
+
+    // END math functions
+
+    double np_fmod_float64(double d1, double d2) {
+        return std::fmod(d1, d2);
+    }
+
+    float np_fmod_float32(float f1, float f2) {
+        return std::fmod(f1, f2);
+    }
+
+    void np_frexp_float64(double d, instance_ptr ret) {
+        int exp;
+        double man = frexp(d, &exp);
+        static Tuple* tupleT = Tuple::Make({Float64::Make(), Int64::Make()});
+
+        tupleT->constructor(ret,
+            [&](uint8_t* eltPtr, int64_t k) {
+                if (k == 0)
+                    *(double*)eltPtr = man;
+                else
+                    *(int64_t*)eltPtr = (int64_t)exp;
+                }
+            );
+    }
+
+    void np_frexp_float32(float f, instance_ptr ret) {
+        int exp;
+        float man = frexp(f, &exp);
+        static Tuple* tupleT = Tuple::Make({Float32::Make(), Int64::Make()});
+
+        tupleT->constructor(ret,
+            [&](uint8_t* eltPtr, int64_t k) {
+                if (k == 0)
+                    *(float*)eltPtr = man;
+                else
+                    *(int64_t*)eltPtr = (int64_t)exp;
+                }
+            );
+    }
+
+    double np_gamma_float64(double d) {
+        return std::tgamma(d);
+    }
+
+    float np_gamma_float32(float f) {
+        return std::tgamma(f);
+    }
+
+    uint64_t np_gcd(uint64_t i1, uint64_t i2) {
+        if (i1 == 0) {
+            return i2;
+        }
+        while (i2 != 0) {
+            if (i1 % i2 == 0) {
+                return i2;
+            }
+            uint64_t i1t = i1;
+            i1 = i2;
+            i2 = i1t % i2;
+        }
+        return i1;
+    }
+
+    bool np_isclose_float64(double d1, double d2, double rel_tol, double abs_tol) {
+        double m = fmax(fabs(d1), fabs(d2));
+        return fabs(d1 - d2) <= fmax(rel_tol * m, abs_tol);
+    }
+
+    bool np_isclose_float32(float f1, float f2, float rel_tol, float abs_tol) {
+        double m = fmax(fabs(f1), fabs(f2));
+        return fabs(f1 - f2) <= fmax(rel_tol * m, abs_tol);
+    }
+
+    double np_ldexp_float64(double d, int i) {
+        return std::ldexp(d, i);
+    }
+
+    float np_ldexp_float32(float f, int i) {
+        return std::ldexp(f, i);
+    }
+
+    double np_lgamma_float64(double d) {
+        return std::lgamma(d);
+    }
+
+    float np_lgamma_float32(float f) {
+        return std::lgamma(f);
+    }
+
+    double np_log1p_float64(double d) {
+        return std::log1p(d);
+    }
+
+    float np_log1p_float32(float f) {
+        return std::log1p(f);
+    }
+
+    void np_modf_float64(double d, instance_ptr ret) {
+        double integer;
+        double frac = modf(d, &integer);
+        static Tuple* tupleT = Tuple::Make({Float64::Make(), Float64::Make()});
+
+        tupleT->constructor(ret,
+            [&](uint8_t* eltPtr, int64_t k) { *(double*)eltPtr = k == 0 ? frac : integer; }
+        );
+    }
+
+    void np_modf_float32(float f, instance_ptr ret) {
+        float integer;
+        float frac = modff(f, &integer);
+        static Tuple* tupleT = Tuple::Make({Float32::Make(), Float32::Make()});
+
+        tupleT->constructor(ret,
+            [&](uint8_t* eltPtr, int64_t k) { *(float*)eltPtr = k == 0 ? frac : integer; }
+        );
+    }
+
+    double np_sinh_float64(double d) {
+        return std::sinh(d);
+    }
+
+    float np_sinh_float32(float f) {
+        return std::sinh(f);
+    }
+
+    double np_tan_float64(double d) {
+        return std::tan(d);
+    }
+
+    float np_tan_float32(float f) {
+        return std::tan(f);
+    }
+
     double np_tanh_float64(double d) {
         return std::tanh(d);
     }
 
-    float np_tanh_float32(float d) {
-        return std::tanh(d);
+    float np_tanh_float32(float f) {
+        return std::tanh(f);
     }
 
     bool nativepython_runtime_string_eq(StringType::layout* lhs, StringType::layout* rhs) {
@@ -373,7 +633,6 @@ extern "C" {
     void np_fetch_exception_tuple(instance_ptr inst) {
         PyEnsureGilAcquired getTheGil;
 
-        //PyErr_SetString(PyExc_TypeError, "specific value");
         PyObject* type;
         PyObject* value;
         PyObject* traceback;
