@@ -27,12 +27,92 @@ extern "C" {
         throw PythonExceptionSet();
     }
 
+    double np_acos_float64(double d) {
+        return std::acos(d);
+    }
+
+    float np_acos_float32(float f) {
+        return std::acos(f);
+    }
+
+    double np_acosh_float64(double d) {
+        return std::acosh(d);
+    }
+
+    float np_acosh_float32(float f) {
+        return std::acoshf(f);
+    }
+
+    double np_asin_float64(double d) {
+        return std::asin(d);
+    }
+
+    float np_asin_float32(float f) {
+        return std::asin(f);
+    }
+
+    double np_asinh_float64(double d) {
+        return std::asinh(d);
+    }
+
+    float np_asinh_float32(float f) {
+        return std::asinhf(f);
+    }
+
+    double np_atan_float64(double d) {
+        return std::atan(d);
+    }
+
+    float np_atan_float32(float f) {
+        return std::atan(f);
+    }
+
+    double np_atan2_float64(double d1, double d2) {
+        return std::atan2(d1, d2);
+    }
+
+    float np_atan2_float32(float f1, float f2) {
+        return std::atan2(f1, f2);
+    }
+
+    double np_atanh_float64(double d) {
+        return std::atanh(d);
+    }
+
+    float np_atanh_float32(float f) {
+        return std::atanhf(f);
+    }
+
+    double np_cosh_float64(double d) {
+        return std::cosh(d);
+    }
+
+    float np_cosh_float32(float f) {
+        return std::cosh(f);
+    }
+
+    double np_sinh_float64(double d) {
+        return std::sinh(d);
+    }
+
+    float np_sinh_float32(float f) {
+        return std::sinh(f);
+    }
+
+    double np_tan_float64(double d) {
+        return std::tan(d);
+    }
+
+    float np_tan_float32(float f) {
+        return std::tan(f);
+    }
+
     double np_tanh_float64(double d) {
         return std::tanh(d);
     }
 
-    float np_tanh_float32(float d) {
-        return std::tanh(d);
+    float np_tanh_float32(float f) {
+        return std::tanh(f);
     }
 
     bool nativepython_runtime_string_eq(StringType::layout* lhs, StringType::layout* rhs) {

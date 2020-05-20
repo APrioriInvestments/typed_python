@@ -97,12 +97,6 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         print("speedup vs numpy is", speedupVsNumpy)
 
     def test_math_transcendental_fns(self):
-        def callcos(x):
-            return math.cos(x)
-
-        def callsin(x):
-            return math.sin(x)
-
         def calllog(x):
             return math.log(x)
 
@@ -118,9 +112,6 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def callsqrt(x):
             return math.sqrt(x)
 
-        def calltanh(x):
-            return math.tanh(x)
-
         def callpow1(x):
             return math.pow(x, type(x)(2.0))
 
@@ -130,39 +121,90 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def callpow3(x):
             return math.pow(x, type(x)(-2.5))
 
+        def callacos(x):
+            return math.acos(x)
+
+        def callacosh(x):
+            return math.acosh(x)
+
+        def callasin(x):
+            return math.asin(x)
+
+        def callasinh(x):
+            return math.asinh(x)
+
+        def callatan(x):
+            return math.atan(x)
+
+        def callatanh(x):
+            return math.atanh(x)
+
+        def callcos(x):
+            return math.cos(x)
+
+        def callcosh(x):
+            return math.cosh(x)
+
+        def callsin(x):
+            return math.sin(x)
+
+        def callsinh(x):
+            return math.sinh(x)
+
+        def calltan(x):
+            return math.tan(x)
+
+        def calltanh(x):
+            return math.tanh(x)
+
+        # added in 3.7:
+        # def callremainder(x, y):
+        #     return math.remainder(x, y)
+
         def callpow(x, y):
             return math.pow(x, y)
 
-        for mathFun in [callcos, callsin, calltanh, calllog, calllog2, calllog10, callexp, callsqrt, callpow1, callpow2, callpow3]:
+        def callatan2(x, y):
+            return math.atan2(x, y)
+
+        for mathFun in [callacos, callacosh, callasin, callasinh,
+                        callcos, callcosh, callsin, callsinh,
+                        callatan, callatanh, calltan, calltanh,
+                        calllog, calllog2, calllog10,
+                        callexp, callsqrt,
+                        callpow1, callpow2, callpow3]:
             compiled = Entrypoint(mathFun)
 
             self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, float)
             self.assertEqual(compiled.resultTypeFor(Float32).typeRepresentation, Float32)
 
-            for v in [0.5, 0.6, 1.0, 2.34]:
-                self.assertEqual(compiled(v), mathFun(v))
-                self.assertIsInstance(compiled(v), float)
+            for v in [-2.34, -1.0, -0.6, -0.5, 0.0, 0.5, 0.6, 1.0, 2.34]:
+                raisesValueError = False
+                try:
+                    r1 = mathFun(v)
+                except ValueError:
+                    raisesValueError = True
 
-                self.assertLess(abs(float(compiled(Float32(v))) - mathFun(v)), 1e-6, (mathFun, v))
-                self.assertIsInstance(compiled(Float32(v)), Float32, (mathFun, v))
+                if raisesValueError:
+                    with self.assertRaises(ValueError):
+                        compiled(v)
+                    with self.assertRaises(ValueError):
+                        compiled(Float32(v))
+                else:
+                    r2 = compiled(v)
+                    self.assertIsInstance(r2, float)
+                    self.assertEqual(r1, r2, (v, r1, r2))
+                    r3 = compiled(Float32(v))
+                    self.assertIsInstance(r3, Float32, (mathFun, v))
+                    if r1 == 0.0:
+                        self.assertLess(abs(r3 - r1), 1e-6, (v, r1, r3))
+                    else:
+                        self.assertLess(abs((r3 - r1) / r1), 1e-6, (v, r1, r3))
 
-        for mathFun in [calllog, calllog2, calllog10]:
-            compiled = Entrypoint(mathFun)
-            for v in [0.0, -0.6, -1.0, -2.34]:
-                with self.assertRaises(ValueError):
-                    compiled(v)
-
-        for mathFun in [callsqrt]:
-            compiled = Entrypoint(mathFun)
-            for v in [-0.6, -1.0, -2.34]:
-                with self.assertRaises(ValueError):
-                    compiled(v)
-
-        for mathFun in [callpow]:
+        for mathFun in [callpow, callatan2]:
             compiled = Entrypoint(mathFun)
             for v1 in [-5.4, -3.0, -1.0, -0.6, -0.5, 0.0, 0.5, 0.6, 1.0, 3.0, 5.4]:
                 for v2 in [-5.4, -3.0, -1.0, -0.6, -0.5, 0.0, 0.5, 0.6, 1.0, 3.0, 5.4]:
-
                     raisesValueError = False
                     try:
                         r1 = mathFun(v1, v2)
@@ -187,19 +229,28 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def callfabs(x):
             return math.fabs(x)
 
+        def callceil(x):
+            return math.ceil(x)
+
+        def callfloor(x):
+            return math.floor(x)
+
+        def calltrunc(x):
+            return math.trunc(x)
+
         def callcopysign1(x):
             return math.copysign(x, type(x)(1.0))
 
         def callcopysign2(x):
             return math.copysign(x, type(x)(-1.0))
 
-        for mathFun in [callfabs, callcopysign1, callcopysign2]:
+        for mathFun in [callfabs, callcopysign1, callcopysign2, callceil, callfloor, calltrunc]:
             compiled = Entrypoint(mathFun)
 
             self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, float)
             self.assertEqual(compiled.resultTypeFor(Float32).typeRepresentation, Float32)
 
-            for v in [-1234.0, -12.34, -1.0, -0.5, 0.0, 0.5, 1.0, 12.34, 1234.0]:
+            for v in [-1234.5, -12.34, -1.0, -0.5, 0.0, 0.5, 1.0, 12.34, 1234.5]:
                 self.assertEqual(compiled(v), mathFun(v))
                 self.assertIsInstance(compiled(v), float)
 
