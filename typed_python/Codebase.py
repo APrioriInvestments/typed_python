@@ -19,104 +19,144 @@ import sys
 import threading
 import logging
 
-from typed_python.SerializationContext import SerializationContext
 from typed_python import sha_hash
 
+
+# lock to guard our process-wide state
 _lock = threading.RLock()
-_root_level_module_codebase_cache = {}
-_coreSerializationContext = [None]
+
+# map from sha-hash to installed codebase
+_installed_codebases = {}
+
+# map from root modulename to the installed codebase
+_installed_rootlevel_modules = {}
 
 
 class Codebase:
     """Represents a bundle of code and objects on disk somewhere.
 
-    Also provides services for building a serialization context.
+    Codebases can be builtin (e.g. they come from an existing module
+    on the system already) or they can be 'foreign' (meaning they
+    don't already exist on the system) and can then be instantiated,
+    which means we can import their modules.
+
+    You may instantiate multiple codebases per process, but they
+    must have disjoint root module names. You may not instantiate a codebase
+    with a module name that's already defined locally.
     """
 
-    def __init__(self, rootDirectory, filesToContents, modules):
+    def __init__(self, rootDirectory, filesToContents, rootModuleNames):
+        """Initialize a codebase.
+
+        Args:
+            rootDirectory - the path to the root where the filesystem lives.
+                For instance, if the code is in /home/ubuntu/code/typed_python,
+                this would be '/home/ubuntu/code'
+            filesToContents - a dict containing the filename (relative to
+                rootDirectory) of each file, mapping to the byte contents.
+            rootModuleNames - a list of root-level module names
+            modules - None, or a dict from dotted module name to the actual
+                module object, if its known.
+        """
         self.rootDirectory = rootDirectory
         self.filesToContents = filesToContents
-        self.modules = modules
+        self.rootModuleNames = rootModuleNames
+        self._sha_hash = None
 
-        self.serializationContext = Codebase.coreSerializationContext().union(
-            SerializationContext.FromModules(modules.values())
+    @staticmethod
+    def FromFileMap(filesToContents):
+        modules_by_name = Codebase.filesToModuleNames(list(filesToContents), None)
+
+        rootLevelModuleNames = set([x.split(".")[0] for x in modules_by_name])
+
+        return Codebase(
+            None,
+            filesToContents,
+            rootLevelModuleNames
         )
 
-    def hash(self):
-        return sha_hash(self.filesToContents).hexdigest
+    @property
+    def sha_hash(self):
+        if self._sha_hash is None:
+            self._sha_hash = sha_hash(self.filesToContents).hexdigest
+        return self._sha_hash
+
+    def isInstantiated(self):
+        with _lock:
+            return self.rootDirectory or self.sha_hash in _installed_codebases
+
+    @property
+    def moduleNames(self):
+        return set(self.filesToModuleNames(self.filesToContents))
 
     def allModuleLevelValues(self):
         """Iterate over all module-level values. Yields (name, object) pairs."""
-        for mname, module in self.modules.items():
+        for moduleName, module in self.importModulesByName(self.moduleNames).items():
             for item in dir(module):
-                yield (mname + "." + item, getattr(module, item))
+                yield (moduleName + "." + item, getattr(module, item))
 
     def getModuleByName(self, module_name):
-        if module_name not in self.modules:
-            raise ImportError(module_name)
-        return self.modules[module_name]
+        return importlib.import_module(module_name)
 
     def getClassByName(self, qualifiedName):
         modulename, classname = qualifiedName.rsplit(".", 1)
         return getattr(self.getModuleByName(modulename), classname)
 
-    @staticmethod
-    def coreSerializationContext():
+    def markNative(self):
+        """Indicate that this codebase is already instantiated."""
         with _lock:
-            if _coreSerializationContext[0] is None:
-                import typed_python
+            for mname in self.rootModuleNames:
+                _installed_rootlevel_modules[mname] = self
 
-                _coreSerializationContext[0] = SerializationContext.FromModules(
-                    Codebase._walkModuleDiskRepresentation(typed_python)[2].values()
-                )
-
-                try:
-                    import object_database
-                except ImportError:
-                    object_database = None
-
-                if object_database is not None:
-                    context2 = SerializationContext.FromModules(
-                        Codebase._walkModuleDiskRepresentation(object_database)[2].values()
-                    )
-
-                    _coreSerializationContext[0] = _coreSerializationContext[0].union(context2)
-
-            return _coreSerializationContext[0]
+            _installed_codebases[self.sha_hash] = self
 
     @staticmethod
     def FromRootlevelModule(module, **kwargs):
         assert '.' not in module.__name__
-        return Codebase._FromModule(module, **kwargs)
+        assert module.__file__.endswith("__init__.py") or module.__file__.endswith("__init__.pyc")
 
-    @staticmethod
-    def _FromModule(module, ignoreCache=False, **kwargs):
-        if '.' in module.__name__:
-            prefix = module.__name__.rsplit(".", 1)[0]
-        else:
-            prefix = None
+        prefix = module.__name__.rsplit(".", 1)[0]
+        dirpart = os.path.dirname(module.__file__)
 
-        with _lock:
-            if module in _root_level_module_codebase_cache and not ignoreCache:
-                return _root_level_module_codebase_cache[module]
+        codebase = Codebase.FromRootlevelPath(
+            dirpart,
+            prefix=prefix,
 
-            assert module.__file__.endswith("__init__.py") or module.__file__.endswith("__init__.pyc")
+        )
 
-            root, files, modules = Codebase._walkModuleDiskRepresentation(module, prefix=prefix, **kwargs)
+        codebase.markNative()
 
-            codebase = Codebase(root, files, modules)
-
-            if 'suppressFun' not in kwargs:
-                _root_level_module_codebase_cache[module] = codebase
-
-            return codebase
-
-    @staticmethod
-    def FromRootlevelPath(rootPath, **kwargs):
-        root, files, modules = Codebase._walkDiskRepresentation(rootPath, **kwargs)
-
-        codebase = Codebase(root, files, modules)
         return codebase
+
+    @staticmethod
+    def FromRootlevelPath(
+        rootPath,
+        prefix=None,
+        extensions=('.py',),
+        maxTotalBytes=100 * 1024 * 1024,
+        suppressFun=None
+    ):
+        """Build a codebase from the path to the root directory containing a module.
+
+        Args:
+            rootPath (str) - the root path we're going to pull in. This should point
+                to a directory with the name of the python module this codebase
+                will represent.
+            extensions (tuple of strings) - a list of file extensions with the files
+                we want to grab
+            maxTotalBytes - a maximum bytecount before we'll throw an exception
+            suppressFun - a function from module path (a dotted name) that returns
+                True if we should stop walking into the path.
+        """
+        root, files, rootModuleNames = Codebase._walkDiskRepresentation(
+            rootPath,
+            prefix=prefix,
+            extensions=extensions,
+            maxTotalBytes=maxTotalBytes,
+            suppressFun=suppressFun
+        )
+
+        return Codebase(root, files, rootModuleNames)
 
     @staticmethod
     def _walkDiskRepresentation(
@@ -182,14 +222,10 @@ class Codebase:
         walkDisk(os.path.abspath(rootPath), moduleDir)
 
         modules_by_name = Codebase.filesToModuleNames(files, prefix)
-        modules = Codebase.importModulesByName(modules_by_name)
 
-        return parentDir, files, modules
+        rootLevelModuleNames = set([x.split(".")[0] for x in modules_by_name])
 
-    @staticmethod
-    def _walkModuleDiskRepresentation(module, **kwargs):
-        dirpart = os.path.dirname(module.__file__)
-        return Codebase._walkDiskRepresentation(dirpart, **kwargs)
+        return parentDir, files, rootLevelModuleNames
 
     @staticmethod
     def filesToModuleNames(files, prefix=None):
@@ -210,16 +246,36 @@ class Codebase:
 
         return modules_by_name
 
-    @staticmethod
-    def Instantiate(filesToContents, rootDirectory=None):
-        """Instantiate a codebase on disk and import the modules."""
+    def instantiate(self, rootDirectory=None):
+        """Instantiate a codebase on disk
+
+        Args:
+            rootDirectory - if None, then pick a directory. otherwise,
+                this is where to put the code. This directory must be
+                persistent for the life of the process.
+        """
+        if self.isInstantiated():
+            return
+
+        if self.rootDirectory is not None:
+            raise Exception("Codebase is already instantiated, but not marked as such?")
+
         with _lock:
+            if self.sha_hash in _installed_codebases:
+                # we're already installed
+                return
+
+            for rootMod in self.rootModuleNames:
+                if rootMod in _installed_rootlevel_modules:
+                    # we can't have the same root-level module instantiated in a different codebase.
+                    raise Exception(f"Module {rootMod} is instantiated in another codebase already")
+
             if rootDirectory is None:
                 # this works, despite the fact that we immediately destroy
                 # the directory, because we use 'makedirs' below to repopulate.
                 rootDirectory = tempfile.TemporaryDirectory().name
 
-            for fpath, fcontents in filesToContents.items():
+            for fpath, fcontents in self.filesToContents.items():
                 path, name = os.path.split(fpath)
                 fullpath = os.path.join(rootDirectory, path)
 
@@ -229,28 +285,13 @@ class Codebase:
                 with open(os.path.join(fullpath, name), "wb") as f:
                     f.write(fcontents.encode("utf-8"))
 
-            importlib.invalidate_caches()
-
             sys.path = [rootDirectory] + sys.path
 
-            # get a list of all modules and import each one
-            modules_by_name = Codebase.filesToModuleNames(filesToContents)
+            for rootMod in self.rootModuleNames:
+                _installed_rootlevel_modules[rootMod] = self
 
-            try:
-                modules = Codebase.importModulesByName(modules_by_name)
-            finally:
-                sys.path.pop(0)
-                Codebase.removeUserModules([rootDirectory])
-
-            codebase = Codebase(rootDirectory, filesToContents, modules)
-
-            # now make sure we install these modules in our cache so that later
-            # we can walk them if we need to.
-            for m in modules:
-                if "." not in m:
-                    _root_level_module_codebase_cache[modules[m]] = codebase
-
-            return codebase
+            _installed_codebases[self.sha_hash] = self
+            self.rootDirectory = rootDirectory
 
     @staticmethod
     def importModulesByName(modules_by_name):
@@ -263,22 +304,6 @@ class Codebase:
                 logging.getLogger(__name__).warn(
                     "Error importing module '%s' from codebase: %s", mname, e)
         return modules
-
-    @staticmethod
-    def removeUserModules(paths):
-        paths = [os.path.abspath(path) for path in paths]
-
-        for f in list(sys.path_importer_cache):
-            if any(os.path.abspath(f).startswith(disk_path) for disk_path in paths):
-                del sys.path_importer_cache[f]
-
-        for m, sysmodule in list(sys.modules.items()):
-            if sysmodule is not None:
-                if getattr(sysmodule, '__file__', None) is not None and any(sysmodule.__file__.startswith(p) for p in paths):
-                    del sys.modules[m]
-                elif getattr(sysmodule, '__path__', None) is not None and hasattr(sysmodule.__path__, '_path'):
-                    if any(any(pathElt.startswith(p) for p in paths) for pathElt in sysmodule.__path__._path):
-                        del sys.modules[m]
 
     @staticmethod
     def rootlevelPathFromModule(module):

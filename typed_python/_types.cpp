@@ -15,6 +15,7 @@
 ******************************************************************************/
 
 #include <Python.h>
+#include <frameobject.h>
 #include <numpy/arrayobject.h>
 #include <map>
 #include <memory>
@@ -1865,6 +1866,25 @@ PyObject *touchCompiledSpecializations(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
+PyObject *isRecursive(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "isRecursive takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t1) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'isRecursive' must be a native type object");
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        return incref(t1->isRecursive() ? Py_True : Py_False);
+    });
+}
+
 PyObject *mutuallyRecursiveGroup(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "mutuallyRecursiveGroup takes 1 positional argument");
@@ -2012,6 +2032,17 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
 
     static_assert(PY_MAJOR_VERSION >= 3, "typed_python is a python3 project only");
 
+    PyThreadState * ts = PyThreadState_Get();
+    std::string moduleName;
+    PyObject* pyModuleName;
+
+    if (ts->frame && ts->frame->f_globals &&
+            (pyModuleName = PyDict_GetItemString(ts->frame->f_globals, "__name__"))) {
+        if (PyUnicode_Check(pyModuleName)) {
+            moduleName = PyUnicode_AsUTF8(pyModuleName);
+        }
+    }
+
     if (PY_MINOR_VERSION <= 5) {
         //we cannot rely on the ordering of 'kwargs' here because of the python version, so
         //we sort it. this will be a problem for anyone running some processes using different
@@ -2020,7 +2051,7 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
     }
 
     return incref((PyObject*)PyInstance::typeObj(
-        ::Alternative::Make(name, definitions, functions)
+        ::Alternative::Make(name, moduleName, definitions, functions)
     ));
 }
 
@@ -2051,6 +2082,7 @@ static PyMethodDef module_methods[] = {
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
     {"mutuallyRecursiveGroup", (PyCFunction)mutuallyRecursiveGroup, METH_VARARGS, NULL},
+    {"isRecursive", (PyCFunction)isRecursive, METH_VARARGS, NULL},
     {"referencedTypes", (PyCFunction)referencedTypes, METH_VARARGS, NULL},
     {"wantsToDefaultConstruct", (PyCFunction)wantsToDefaultConstruct, METH_VARARGS, NULL},
     {"all_alternatives_empty", (PyCFunction)all_alternatives_empty, METH_VARARGS, NULL},

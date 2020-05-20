@@ -143,9 +143,13 @@ public:
 
     void serializeClassMembers(const std::vector<std::tuple<std::string, Type*, Instance> >& members, SerializationBuffer& b, int fieldNumber) const;
 
+    void serializeAlternativeMembers(const std::vector<std::pair<std::string, NamedTuple*> >& members, SerializationBuffer& b, int fieldNumber) const;
+
     void serializeClassFunDict(const std::map<std::string, Function*>& dict, SerializationBuffer& b, int fieldNumber) const;
 
     void serializeClassClassMemberDict(const std::map<std::string, PyObject*>& dict, SerializationBuffer& b, int fieldNumber) const;
+
+    void deserializeAlternativeMembers(std::vector<std::pair<std::string, NamedTuple*> >& members, DeserializationBuffer& b, int wireType) const;
 
     void deserializeClassMembers(std::vector<std::tuple<std::string, Type*, Instance> >& members, DeserializationBuffer& b, int wireType) const;
 

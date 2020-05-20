@@ -12,36 +12,19 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python._types import serialize, deserialize, Type
+from typed_python._types import serialize, deserialize, Type, Alternative
 from typed_python.python_ast import (
     convertFunctionToAlgebraicPyAst,
     evaluateFunctionPyAst,
-    evaluateFunctionDefWithLocalsInCells,
-    Expr,
-    Statement
+    evaluateFunctionDefWithLocalsInCells
 )
 from typed_python.hash import sha_hash
-from typed_python.type_function import ConcreteTypeFunction, isTypeFunctionType, reconstructTypeFunctionType
-from types import FunctionType, ModuleType, CodeType
-import builtins
+from typed_python.type_function import isTypeFunctionType, reconstructTypeFunctionType
+from types import FunctionType, ModuleType, CodeType, BuiltinFunctionType
 import numpy
 import datetime
-import pytz
 import lz4.frame
-import logging
 import importlib
-
-try:
-    from google.protobuf.message import Message as GoogleProtobufMessage
-except ImportError:
-    GoogleProtobufMessage = None
-
-_reconstruct = numpy.array([1, 2, 3]).__reduce__()[0]
-_ndarray = numpy.ndarray
-
-
-def importSystemSubmodule(name):
-    return importlib.import_module(name)
 
 
 def createEmptyFunction(ast):
@@ -57,57 +40,17 @@ def astToCodeObject(ast, freevars):
     ).__code__
 
 
-_builtin_name_to_value = {
-    ".builtin." + k: v for k, v in __builtins__.items()
-}
-_builtin_name_to_value[".builtin.importSystemSubmodule"] = importSystemSubmodule
-_builtin_name_to_value[".builtin.createEmptyFunction"] = createEmptyFunction
-_builtin_name_to_value[".builtin.astToCodeObject"] = astToCodeObject
-_builtin_name_to_value[".builtin._reconstruct"] = _reconstruct
-_builtin_name_to_value[".builtin._ndarray"] = _ndarray
-_builtin_name_to_value[".builtin.numpy.scalar"] = numpy.int64(10).__reduce__()[0]  # the 'scalar' function
-_builtin_name_to_value[".builtin.dtype"] = numpy.dtype
-_builtin_name_to_value[".builtin.numpy"] = numpy
-_builtin_name_to_value[".builtin.datetime.datetime"] = datetime.datetime
-_builtin_name_to_value[".builtin.datetime.date"] = datetime.date
-_builtin_name_to_value[".builtin.datetime.time"] = datetime.time
-_builtin_name_to_value[".builtin.datetime.timedelta"] = datetime.timedelta
-_builtin_name_to_value[".builtin.property"] = property
-_builtin_name_to_value[".builtin.pytz"] = pytz
-_builtin_name_to_value[".builtins.module"] = builtins
-_builtin_name_to_value[".builtins.dict"] = builtins.__dict__
-_builtin_name_to_value[".ast.Expr.Lambda"] = Expr.Lambda
-_builtin_name_to_value[".ast.Statement.FunctionDef"] = Statement.FunctionDef
-
-_builtin_value_to_name = {id(v): k for k, v in _builtin_name_to_value.items()}
-
-
 class SerializationContext(object):
     """Represents a collection of types with well-specified names that we can use to serialize objects."""
-    def __init__(self, nameToObject=None, objToName=None, compressionEnabled=True, encodeLineInformationForCode=True):
+    def __init__(self, nameToObjectOverride=None, compressionEnabled=True, encodeLineInformationForCode=True, objectToNameOverride=None):
         super().__init__()
 
-        self.nameToObject = nameToObject or {}
-        self.objToName = objToName
-
-        assert '' not in self.nameToObject, (
-            "Empty object/type name not allowed: {}"
-            .format(self.nameToObject[''])
+        self.nameToObjectOverride = dict(nameToObjectOverride or {})
+        self.objectToNameOverride = (
+            dict(objectToNameOverride)
+            if objectToNameOverride is not None else
+            {id(v): n for n, v in self.nameToObjectOverride.items()}
         )
-
-        if self.objToName is None:
-            for k in self.nameToObject:
-                assert isinstance(k, str), (
-                    "nameToObject keys must be strings (This one was not: {})"
-                    .format(k)
-                )
-
-            # take the lexically lowest name, so that we're not dependent on ordering.
-            self.objToName = {}
-            for k, v in self.nameToObject.items():
-                if id(v) not in self.objToName or k < self.objToName[id(v)]:
-                    self.objToName[id(v)] = k
-
         self.compressionEnabled = compressionEnabled
         self.encodeLineInformationForCode = encodeLineInformationForCode
 
@@ -124,92 +67,102 @@ class SerializationContext(object):
         else:
             return bytes
 
-    @staticmethod
-    def FromModules(modules):
-        """Given a list of modules, produce a serialization context by walking the objects."""
-        nameToObject = {}
-
-        for module in modules:
-            modulename = module.__name__
-
-            for membername, member in module.__dict__.items():
-                if isinstance(member, (type, FunctionType, ConcreteTypeFunction)):
-                    nameToObject[modulename + "." + membername] = member
-                elif isinstance(member, ModuleType):
-                    nameToObject[".modules." + member.__name__] = member
-
-            # also add the module itself so we can serialize it
-            nameToObject[".modules." + modulename] = module
-
-        for module in modules:
-            modulename = module.__name__
-
-            for membername, member in module.__dict__.items():
-                if isinstance(member, type) and hasattr(member, '__dict__'):
-                    for sub_name, sub_obj in member.__dict__.items():
-                        if not (sub_name[:2] == "__" and sub_name[-2:] == "__"):
-                            if isinstance(sub_obj, (type, FunctionType, ConcreteTypeFunction)):
-                                nameToObject[modulename + "." + membername + "." + sub_name] = sub_obj
-                            elif isinstance(sub_obj, ModuleType):
-                                nameToObject[".modules." + sub_obj.__name__] = sub_obj
-
-        return SerializationContext(nameToObject)
-
-    def union(self, other):
-        nameToObject = dict(self.nameToObject)
-        nameToObject.update(other.nameToObject)
-        return SerializationContext(nameToObject)
-
-    def withPrefix(self, prefix):
-        return SerializationContext(
-            {prefix + "." + k: v for k, v in self.nameToObject.items()},
-            self.compressionEnabled,
-            self.encodeLineInformationForCode
-        )
-
     def withoutLineInfoEncoded(self):
         if not self.encodeLineInformationForCode:
             return self
 
-        return SerializationContext(self.nameToObject, self.objToName, self.compressionEnabled, False)
+        return SerializationContext(
+            nameToObjectOverride=self.nameToObjectOverride,
+            compressionEnabled=self.compressionEnabled,
+            encodeLineInformationForCode=False,
+            objectToNameOverride=self.objectToNameOverride
+        )
 
     def withoutCompression(self):
         if not self.compressionEnabled:
             return self
 
-        return SerializationContext(self.nameToObject, self.objToName, False, self.encodeLineInformationForCode)
+        return SerializationContext(
+            nameToObjectOverride=self.nameToObjectOverride,
+            compressionEnabled=False,
+            encodeLineInformationForCode=self.encodeLineInformationForCode,
+            objectToNameOverride=self.objectToNameOverride
+        )
 
     def withCompression(self):
         if self.compressionEnabled:
             return self
 
-        return SerializationContext(self.nameToObject, self.objToName, True, self.encodeLineInformationForCode)
+        return SerializationContext(
+            nameToObjectOverride=self.nameToObjectOverride,
+            compressionEnabled=True,
+            encodeLineInformationForCode=self.encodeLineInformationForCode,
+            objectToNameOverride=self.objectToNameOverride
+        )
 
     def nameForObject(self, t):
         ''' Return a name(string) for an input object t, or None if not found. '''
-        tid = id(t)
-        res = self.objToName.get(tid)
+        if id(t) in self.objectToNameOverride:
+            return self.objectToNameOverride[id(t)]
 
-        if res is None:
-            res = _builtin_value_to_name.get(tid)
+        if isinstance(t, dict) and '__name__' in t:
+            maybeModule = self.objectFromName('.modules.' + t['__name__'])
+            if maybeModule is not None and t is getattr(maybeModule, '__dict__', None):
+                return ".module_dict." + t['__name__']
 
-        return res
+        if isinstance(t, (FunctionType, BuiltinFunctionType)):
+            mname = t.__module__
+            fname = t.__name__
+
+            if mname is not None:
+                if self.objectFromName(mname + "." + fname) is t:
+                    return mname + "." + fname
+
+        elif isinstance(t, type) and issubclass(t, Alternative):
+            mname = t.__typed_python_module__
+            fname = t.__name__
+
+            if self.objectFromName(mname + "." + fname) is t:
+                return mname + "." + fname
+
+        elif isinstance(t, ModuleType):
+            if self.objectFromName(".modules." + t.__name__) is t:
+                return ".modules." + t.__name__
+
+        elif isinstance(t, type):
+            mname = t.__module__
+            fname = t.__name__
+
+            if self.objectFromName(mname + "." + fname) is t:
+                return mname + "." + fname
+
+        return None
 
     def objectFromName(self, name):
         ''' Return an object for an input name(string), or None if not found. '''
-        res = self.nameToObject.get(name)
+        if name in self.nameToObjectOverride:
+            return self.nameToObjectOverride[name]
 
-        if res is None:
-            res = _builtin_name_to_value.get(name)
+        if name.startswith(".module_dict."):
+            return self.objectFromName(".modules." + name[13:]).__dict__
 
-        if res is None:
-            logging.warn(
-                "Failed to find a value for object named %s. unique prefixes are %s",
-                name,
-                set([x.split(".")[0] for x in self.nameToObject])
-            )
+        if name.startswith(".modules."):
+            try:
+                return importlib.import_module(name[9:])
+            except ImportError:
+                return None
 
-        return res
+        names = name.rsplit(".", 1)
+
+        if len(names) != 2:
+            return None
+
+        module, objName = name.rsplit(".", 1)
+
+        try:
+            return getattr(importlib.import_module(module), objName, None)
+        except ImportError:
+            return None
 
     def sha_hash(self, o):
         return sha_hash(self.serialize(o))
@@ -240,9 +193,6 @@ class SerializationContext(object):
             @param inst: an instance to be serialized
             @return a representation object or None
         '''
-        if GoogleProtobufMessage is not None and isinstance(inst, GoogleProtobufMessage):
-            return (type(inst), (), inst.SerializeToString())
-
         if isinstance(inst, type):
             isTF = isTypeFunctionType(inst)
             if isTF is not None:
@@ -328,18 +278,9 @@ class SerializationContext(object):
 
             return (createEmptyFunction, args, representation)
 
-        if isinstance(inst, ModuleType):
-            rootModule = inst.__name__.split(".")[0]
-            if rootModule == "numpy" or (".modules." + rootModule) in self.nameToObject:
-                return (importSystemSubmodule, (inst.__name__,), ())
-
         return None
 
     def setInstanceStateFromRepresentation(self, instance, representation):
-        if GoogleProtobufMessage is not None and isinstance(instance, GoogleProtobufMessage):
-            instance.ParseFromString(representation)
-            return True
-
         if isinstance(instance, property):
             return True
 
@@ -373,7 +314,7 @@ class SerializationContext(object):
         if isinstance(instance, numpy.number):
             return True
 
-        if isinstance(instance, _ndarray):
+        if isinstance(instance, numpy.ndarray):
             instance.__setstate__(representation)
             return True
 

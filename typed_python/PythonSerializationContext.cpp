@@ -760,8 +760,6 @@ void PythonSerializationContext::serializeNativeTypeInner(
         return;
     }
 
-    PyEnsureGilAcquired acquireTheGil;
-
     uint32_t id;
     bool isNew;
     std::tie(id, isNew) = b.cachePointer(nativeType, nullptr);
@@ -771,6 +769,8 @@ void PythonSerializationContext::serializeNativeTypeInner(
     if (!isNew) {
         return;
     }
+
+    PyEnsureGilAcquired acquireTheGil;
 
     PyObjectStealer nameForObject(PyObject_CallMethod(mContextObj, "nameForObject", "O", PyInstance::typeObj(nativeType)));
 
@@ -804,7 +804,20 @@ void PythonSerializationContext::serializeNativeTypeInner(
 
     MarkTypeBeingSerialized marker(nativeType, b);
 
-    if (nativeType->isRecursiveForward()) {
+    // concrete alternatives, even if they are part of a recursive alternative, might
+    // have a name, so we don't want to create a forward for them if its not necessary.
+    // when we deserialize, we always end up deserializing the base and then grabbing its
+    // concrete alternatives by index, rather than creating new ones.
+    if (nativeType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+        b.writeBeginCompound(FieldNumbers::NATIVE_TYPE);
+        b.writeUnsignedVarintObject(0, nativeType->getTypeCategory());
+        serializeNativeType(nativeType->getBaseType(), b, 1);
+        b.writeUnsignedVarintObject(2, ((ConcreteAlternative*)nativeType)->which());
+        b.writeEndCompound();
+        return;
+    }
+
+    if (nativeType->isRecursive()) {
         b.writeBeginCompound(FieldNumbers::RECURSIVE_NATIVE_TYPE);
         b.writeStringObject(0, nativeType->name());
         b.writeBeginCompound(1);
@@ -814,9 +827,13 @@ void PythonSerializationContext::serializeNativeTypeInner(
 
     b.writeUnsignedVarintObject(0, nativeType->getTypeCategory());
 
-    if (nativeType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
-        serializeNativeType(nativeType->getBaseType(), b, 1);
-        b.writeUnsignedVarintObject(2, ((ConcreteAlternative*)nativeType)->which());
+    if (nativeType->getTypeCategory() == Type::TypeCategory::catAlternative) {
+        Alternative* altType = (Alternative*)nativeType;
+
+        b.writeStringObject(1, altType->name());
+        b.writeStringObject(2, altType->moduleName());
+        serializeAlternativeMembers(altType->subtypes(), b, 3);
+        serializeClassFunDict(altType->getMethods(), b, 4);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catSet) {
         serializeNativeType(((SetType*)nativeType)->keyType(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catConstDict) {
@@ -909,7 +926,7 @@ void PythonSerializationContext::serializeNativeTypeInner(
         );
     }
 
-    if (nativeType->isRecursiveForward()) {
+    if (nativeType->isRecursive()) {
         b.writeEndCompound();
         b.writeEndCompound();
     } else {
@@ -941,6 +958,22 @@ void PythonSerializationContext::serializeClassMembers(
 
                 b.writeEndCompound();
             }
+        b.writeEndCompound();
+    }
+    b.writeEndCompound();
+}
+
+void PythonSerializationContext::serializeAlternativeMembers(
+    const std::vector<std::pair<std::string, NamedTuple*> >& members,
+    SerializationBuffer& b,
+    int fieldNumber
+) const {
+    b.writeBeginCompound(fieldNumber);
+    for (long k = 0; k < members.size(); k++) {
+        b.writeBeginCompound(k);
+            b.writeStringObject(0, std::get<0>(members[k]));
+
+            serializeNativeType(std::get<1>(members[k]), b, 1);
         b.writeEndCompound();
     }
     b.writeEndCompound();
@@ -988,6 +1021,37 @@ void PythonSerializationContext::serializeClassClassMemberDict(
     b.writeEndCompound();
 }
 
+void PythonSerializationContext::deserializeAlternativeMembers(
+    std::vector<std::pair<std::string, NamedTuple*> >& members,
+    DeserializationBuffer& b,
+    int inWireType
+) const {
+    b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
+        std::string name;
+        Type* t = nullptr;
+
+        b.consumeCompoundMessage(wireType, [&](size_t fieldNumber2, size_t wireType2) {
+            if (fieldNumber2 == 0) {
+                name = b.readStringObject();
+            } else if (fieldNumber2 == 1) {
+                t = deserializeNativeType(b, wireType2);
+            } else {
+                throw std::runtime_error("Corrupt Alternative member definition when deserializing.");
+            }
+        });
+
+        if (!t || name.size() == 0) {
+            throw std::runtime_error("Corrupt Alternative member when deserializing.");
+        }
+
+        if (t->getTypeCategory() != Type::TypeCategory::catNamedTuple) {
+            throw std::runtime_error("Corrupt Alternative member definition when deserializing.");
+        }
+
+        members.push_back(std::pair<std::string, NamedTuple*>(name, (NamedTuple*)t));
+    });
+}
+
 void PythonSerializationContext::deserializeClassMembers(
     std::vector<std::tuple<std::string, Type*, Instance> >& members,
     DeserializationBuffer& b,
@@ -995,7 +1059,7 @@ void PythonSerializationContext::deserializeClassMembers(
 ) const {
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
         std::string name;
-        Type* t;
+        Type* t = nullptr;
         Instance i;
 
         b.consumeCompoundMessage(wireType, [&](size_t fieldNumber2, size_t wireType2) {
@@ -1078,7 +1142,11 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
     Type* resultType = nullptr;
     int32_t memo = -1;
 
+    std::vector<size_t> fieldNumbers;
+
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
+        fieldNumbers.push_back(fieldNumber);
+
         if (fieldNumber == FieldNumbers::MEMO) {
             assertWireTypesEqual(wireType, WireType::VARINT);
 
@@ -1174,11 +1242,16 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
                     throw std::runtime_error("Corrupt Recursive Forward");
                 }
             });
+        } else {
+            throw std::runtime_error("Corrupt native type: invalid field number " + format(fieldNumber));
         }
     });
 
     if (!resultType) {
-        throw std::runtime_error("Corrupt native type");
+        if (memo != -1) {
+            throw std::runtime_error("Corrupt native type: memo " + format(memo) + " never populated.");
+        }
+        throw std::runtime_error("Corrupt native type: no result type. " + format(fieldNumbers));
     }
 
     return resultType;
@@ -1234,6 +1307,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
 
     std::vector<Class*> classBases;
     bool classIsFinal = false;
+    std::vector<std::pair<std::string, NamedTuple*> > alternativeMembers;
     std::map<std::string, Function*> classMethods, classStatics, classPropertyFunctions;
     std::map<std::string, PyObject*> classClassMembers;
     std::vector<std::tuple<std::string, Type*, Instance> > classMembers;
@@ -1255,6 +1329,15 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             } else
             if (category == Type::TypeCategory::catHeldClass) {
                 types.push_back(deserializeNativeType(b, wireType));
+            } else
+            if (category == Type::TypeCategory::catAlternative) {
+                if (fieldNumber == 1 || fieldNumber == 2) {
+                    names.push_back(b.readStringObject());
+                } else if (fieldNumber == 3) {
+                    deserializeAlternativeMembers(alternativeMembers, b, wireType);
+                } else if (fieldNumber == 4) {
+                    deserializeClassFunDict(classMethods, b, wireType);
+                }
             } else
             if (category == Type::TypeCategory::catClass) {
                 if (fieldNumber == 1) {
@@ -1350,6 +1433,18 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             throw std::runtime_error("Corrupt 'HeldClass' encountered.");
         }
         resultType = ((Class*)types[0])->getHeldClass();
+    }
+    else if (category == Type::TypeCategory::catAlternative) {
+        if (names.size() != 2) {
+            throw std::runtime_error("Corrupt 'Alternative' encountered: invalid number of names");
+        }
+
+        resultType = Alternative::Make(
+            names[0],
+            names[1],
+            alternativeMembers,
+            classMethods
+        );
     }
     else if (category == Type::TypeCategory::catForward) {
         if (names.size() != 1 || types.size() > 1) {
@@ -1507,7 +1602,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             throw std::runtime_error("corrupt data: invalid alternative specified");
         }
 
-        resultType = ::ConcreteAlternative::Make(a, whichIndex);
+        resultType = a->concreteSubtype(whichIndex);
     } else {
         throw std::runtime_error("Invalid native type category");
     }

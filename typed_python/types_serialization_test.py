@@ -32,7 +32,6 @@ import pprint
 import tempfile
 import typed_python.dummy_test_module as dummy_test_module
 
-from typed_python.Codebase import Codebase
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
@@ -43,9 +42,21 @@ from typed_python import (
     Forward, Final, Function, Entrypoint
 )
 
-from typed_python._types import refcount
+from typed_python._types import refcount, isRecursive
 
 module_level_testfun = dummy_test_module.testfunction
+
+
+ModuleLevelAlternative = Alternative(
+    "ModuleLevelAlternative",
+    X={'a': int},
+    Y={'b': float}
+)
+
+
+class ModuleLevelClass(Class, Final):
+    def f(self):
+        return "HI!"
 
 
 def moduleLevelIdentityFunction(x):
@@ -422,7 +433,7 @@ class TypesSerializationTest(unittest.TestCase):
                     ]:
             self.assertIs(ping_pong(t, ts), t)
 
-    def test_serialize_functions(self):
+    def test_serialize_functions_basic(self):
         def f():
             return 10
 
@@ -538,13 +549,6 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.check_idempotence(X(x=20), ts)
 
-    def test_bad_serialization_context(self):
-        with self.assertRaises(AssertionError):
-            SerializationContext({'': int})
-
-        with self.assertRaises(AssertionError):
-            SerializationContext({b'': int})
-
     def test_serialization_context_queries(self):
         sc = SerializationContext({
             'X': False,
@@ -615,7 +619,7 @@ class TypesSerializationTest(unittest.TestCase):
         AT = Forward("AT")
         AT = AT.define(Alternative("AT", X={'x': int, 'y': float}, Y={'x': int, 'y': AT}))
 
-        context = SerializationContext({'AT': AT})
+        context = SerializationContext({'AT': AT}).withoutCompression()
 
         self.serializeInLoop(lambda: AT, context=context)
         self.serializeInLoop(lambda: AT.Y, context=context)
@@ -650,8 +654,9 @@ class TypesSerializationTest(unittest.TestCase):
 
         t0 = time.time()
 
+        data = context.serialize(objectMaker())
+
         while time.time() - t0 < .25:
-            data = context.serialize(objectMaker())
             context.deserialize(data)
 
         gc.collect()
@@ -1023,31 +1028,24 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(g2(10), g(10))
 
     def test_serialize_modules(self):
-        codebase = Codebase._FromModule(dummy_test_module)
-        sc = codebase.serializationContext
-
-        self.assertIn('.modules.pytz', sc.nameToObject)
-
-        pytz = dummy_test_module.pytz
+        sc = SerializationContext()
         self.assertIs(pytz, sc.deserialize(sc.serialize(pytz)))
 
     def test_serialize_submodules(self):
-        codebase = Codebase._FromModule(dummy_test_module)
-        context = codebase.serializationContext
+        sc = SerializationContext()
 
         self.assertEqual(
-            context.deserialize(context.serialize(numpy.linalg)),
+            sc.deserialize(sc.serialize(numpy.linalg)),
             numpy.linalg
         )
 
         self.assertEqual(
-            context.deserialize(context.serialize(lz4.frame)),
+            sc.deserialize(sc.serialize(lz4.frame)),
             lz4.frame
         )
 
     def test_serialize_lambdas_with_references_in_list_comprehensions(self):
-        codebase = Codebase._FromModule(dummy_test_module)
-        sc = codebase.serializationContext
+        sc = SerializationContext()
 
         # note that it matters that the 'module_level_testfun' is at the module level,
         # because that induces a freevar in a list-comprehension code object
@@ -1152,6 +1150,8 @@ class TypesSerializationTest(unittest.TestCase):
         T = Dict(int, int)
         d = T({i: i+1 for i in range(100)})
         x = SerializationContext({})
+
+        assert not isRecursive(T)
 
         usage = currentMemUsageMb()
         for _ in range(20000):
@@ -1560,4 +1560,80 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(
             ClassWithStaticmethod2.hi(lst),
             ClassWithStaticmethod.hi(lst),
+        )
+
+    def test_serialize_class_simple(self):
+        sc = SerializationContext()
+        self.assertTrue(
+            sc.deserialize(sc.serialize(C)) is C
+        )
+
+    def test_serialize_unnamed_alternative(self):
+        X = Alternative("X", A={}, B={'x': int})
+
+        sc = SerializationContext()
+
+        self.assertTrue(
+            sc.deserialize(sc.serialize(X)).B(x=2).x == 2
+        )
+
+    def test_serialize_mutually_recursive_unnamed_forwards_alternatives(self):
+        X1 = Forward("X1")
+        X2 = Forward("X2")
+
+        X1 = X1.define(Alternative("X1", A={}, B={'x': X2}))
+        X2 = X2.define(Alternative("X2", A={}, B={'x': X1}))
+
+        sc = SerializationContext()
+        sc.deserialize(sc.serialize(X1))
+
+    def test_serialize_mutually_recursive_unnamed_forwards_tuples(self):
+        X1 = Forward("X1")
+        X2 = Forward("X2")
+
+        X1 = X1.define(TupleOf(OneOf(int, X2)))
+        X2 = X2.define(TupleOf(OneOf(float, X1)))
+
+        self.assertTrue(isRecursive(X1))
+        self.assertTrue(isRecursive(X2))
+
+        self.assertIs(X1.ElementType.Types[1], X2)
+        self.assertIs(X2.ElementType.Types[1], X1)
+
+        sc = SerializationContext().withoutCompression()
+        sc.deserialize(sc.serialize(X1))
+
+    def test_serialize_named_alternative(self):
+        self.assertEqual(
+            ModuleLevelAlternative.__typed_python_module__,
+            "typed_python.types_serialization_test"
+        )
+
+        sc = SerializationContext()
+
+        self.assertIs(
+            sc.deserialize(sc.serialize(ModuleLevelAlternative)),
+            ModuleLevelAlternative
+        )
+
+    def test_serialize_unnamed_recursive_alternative(self):
+        X = Forward("X")
+        X = X.define(
+            Alternative("X", A={}, B={'x': int}, C={'anX': X})
+        )
+
+        sc = SerializationContext()
+
+        self.assertTrue(
+            sc.deserialize(sc.serialize(X)).B(x=2).x == 2
+        )
+
+    def test_serialize_module_level_class(self):
+        sc = SerializationContext().withoutCompression()
+
+        self.assertIs(sc.deserialize(sc.serialize(ModuleLevelClass)), ModuleLevelClass)
+
+        self.assertIn(
+            b'typed_python.types_serialization_test.ModuleLevelClass',
+            sc.serialize(ModuleLevelClass),
         )

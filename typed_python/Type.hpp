@@ -141,8 +141,11 @@ public:
         return m_typeCategory == catNamedTuple;
     }
 
-    bool isRecursiveForward() const {
-        return m_is_recursive_forward;
+    bool isRecursive() const {
+        return (
+            mMutuallyRecursiveTypeGroupHead != nullptr &&
+            mMutuallyRecursiveTypeGroupHead->mMutuallyRecursiveTypeGroup.size() > 1
+        );
     }
 
     bool isRefTo() const {

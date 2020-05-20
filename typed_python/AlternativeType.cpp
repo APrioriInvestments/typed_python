@@ -264,11 +264,13 @@ void Alternative::assign(instance_ptr self, instance_ptr other) {
 }
 
 // static
-Alternative* Alternative::Make(std::string name,
-                               const std::vector<std::pair<std::string, NamedTuple*> >& types,
-                               const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
-                              ) {
-    return new Alternative(name, types, methods);
+Alternative* Alternative::Make(
+                            std::string name,
+                            std::string moduleName,
+                            const std::vector<std::pair<std::string, NamedTuple*> >& types,
+                            const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
+                            ) {
+    return new Alternative(name, moduleName, types, methods);
 }
 
 Type* Alternative::concreteSubtype(size_t which) {

@@ -30,6 +30,7 @@ public:
     };
 
     Alternative(std::string name,
+                std::string moduleName,
                 const std::vector<std::pair<std::string, NamedTuple*> >& subtypes,
                 const std::map<std::string, Function*>& methods
                 ) :
@@ -41,6 +42,7 @@ public:
             m_hasGetAttributeMagicMethod(false)
     {
         m_name = name;
+        m_moduleName = moduleName;
         m_is_simple = false;
         m_hasGetAttributeMagicMethod = m_methods.find("__getattribute__") != m_methods.end();
 
@@ -146,13 +148,15 @@ public:
 
     void assign(instance_ptr self, instance_ptr other);
 
-    static Alternative* Make(std::string name,
-                         const std::vector<std::pair<std::string, NamedTuple*> >& types,
-                         const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
-                         );
+    static Alternative* Make(
+                        std::string name,
+                        std::string moduleName,
+                        const std::vector<std::pair<std::string, NamedTuple*> >& types,
+                        const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
+                        );
 
     Alternative* renamed(std::string newName) {
-        return Make(newName, m_subtypes, m_methods);
+        return Make(newName, m_moduleName, m_subtypes, m_methods);
     }
 
     const std::vector<std::pair<std::string, NamedTuple*> >& subtypes() const {
@@ -175,7 +179,14 @@ public:
 
     Type* concreteSubtype(size_t which);
 
+    std::string moduleName() const {
+        return m_moduleName;
+    }
+
 private:
+    //name of the module in which this Alternative was defined.
+    std::string m_moduleName;
+
     bool m_all_alternatives_empty;
 
     int m_default_construction_ix;
