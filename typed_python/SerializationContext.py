@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python._types import serialize, deserialize, Type, Alternative
+from typed_python._types import serialize, deserialize, Type, Alternative, NamedTuple
 from typed_python.python_ast import (
     convertFunctionToAlgebraicPyAst,
     evaluateFunctionPyAst,
@@ -195,10 +195,16 @@ class SerializationContext(object):
         '''
         if isinstance(inst, type):
             isTF = isTypeFunctionType(inst)
+
             if isTF is not None:
                 return (reconstructTypeFunctionType, isTF, None)
 
-            if not issubclass(inst, Type):
+            if (
+                # is this a regular python class
+                not issubclass(inst, Type)
+                # or is it a subclass of a NamedTuple
+                or (issubclass(inst, NamedTuple) and inst.__bases__[0] != NamedTuple)
+            ):
                 # this is a regular class
                 classMembers = {}
 

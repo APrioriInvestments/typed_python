@@ -2170,6 +2170,7 @@ PyInit__types(void)
     PyModule_AddObject(module, "TypedCell", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catTypedCell)));
     PyModule_AddObject(module, "PyCell", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPyCell)));
     PyModule_AddObject(module, "PythonObjectOfType", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPythonObjectOfType)));
+    PyModule_AddObject(module, "PythonSubclass", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPythonSubclass)));
 
 
     if (module == NULL)
