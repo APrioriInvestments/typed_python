@@ -58,7 +58,7 @@ from math import (
     # modf,
     # nan,
     # pi,
-    # pow,
+    pow,
     # radians,
     sin,
     # sinh,
@@ -75,7 +75,7 @@ class MathFunctionWrapper(Wrapper):
     is_empty = False
     is_pass_by_ref = False
 
-    SUPPORTED_FUNCTIONS = (copysign, fabs, isnan, isfinite, isinf, cos, sin, log, log2, log10, exp, tanh, sqrt)
+    SUPPORTED_FUNCTIONS = (copysign, cos, exp, fabs, isnan, isfinite, isinf, log, log2, log10, pow, sin, sqrt, tanh)
 
     def __init__(self, mathFun):
         assert mathFun in self.SUPPORTED_FUNCTIONS
@@ -110,6 +110,21 @@ class MathFunctionWrapper(Wrapper):
 
             if self.typeRepresentation is copysign:
                 func = runtime_functions.copysign32 if argType1 is Float32 else runtime_functions.copysign64
+                outT = argType1
+            elif self.typeRepresentation is pow:
+                f_func = runtime_functions.floor32 if argType1 is Float32 else runtime_functions.floor64
+                with context.ifelse(arg1.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
+                    with ifTrue:  # arg1 <= 0.0
+                        with context.ifelse(arg1.nonref_expr.eq(0.0)) as (ifTrue2, ifFalse2):
+                            with ifTrue2:  # arg1 == 0.0
+                                with context.ifelse(arg2.nonref_expr.lt(0.0)) as (ifTrue3, ifFalse3):
+                                    with ifTrue3:
+                                        context.pushException(ValueError, "math domain error")
+                            with ifFalse2:  # arg1 < 0.0
+                                with context.ifelse(f_func.call(arg2.nonref_expr).sub(arg2.nonref_expr).eq(0.0)) as (ifTrue4, ifFalse4):
+                                    with ifFalse4:
+                                        context.pushException(ValueError, "math domain error")
+                func = runtime_functions.pow32 if argType1 is Float32 else runtime_functions.pow64
                 outT = argType1
             else:
                 assert False, "Unreachable"
@@ -147,12 +162,21 @@ class MathFunctionWrapper(Wrapper):
                 func = runtime_functions.isinf_float32 if argType is Float32 else runtime_functions.isinf_float64
                 outT = bool
             elif self.typeRepresentation is log:
+                with context.ifelse(arg.nonref_expr.gt(0.0)) as (ifTrue, ifFalse):
+                    with ifFalse:
+                        context.pushException(ValueError, "math domain error")
                 func = runtime_functions.log32 if argType is Float32 else runtime_functions.log64
                 outT = argType
             elif self.typeRepresentation is log2:
+                with context.ifelse(arg.nonref_expr.gt(0.0)) as (ifTrue, ifFalse):
+                    with ifFalse:
+                        context.pushException(ValueError, "math domain error")
                 func = runtime_functions.log2_32 if argType is Float32 else runtime_functions.log2_64
                 outT = argType
             elif self.typeRepresentation is log10:
+                with context.ifelse(arg.nonref_expr.gt(0.0)) as (ifTrue, ifFalse):
+                    with ifFalse:
+                        context.pushException(ValueError, "math domain error")
                 func = runtime_functions.log10_32 if argType is Float32 else runtime_functions.log10_64
                 outT = argType
             elif self.typeRepresentation is tanh:
@@ -168,6 +192,9 @@ class MathFunctionWrapper(Wrapper):
                 func = runtime_functions.exp32 if argType is Float32 else runtime_functions.exp64
                 outT = argType
             elif self.typeRepresentation is sqrt:
+                with context.ifelse(arg.nonref_expr.gte(0.0)) as (ifTrue, ifFalse):
+                    with ifFalse:
+                        context.pushException(ValueError, "math domain error")
                 func = runtime_functions.sqrt32 if argType is Float32 else runtime_functions.sqrt64
                 outT = argType
             else:

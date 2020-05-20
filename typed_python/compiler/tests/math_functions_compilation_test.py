@@ -121,18 +121,67 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def calltanh(x):
             return math.tanh(x)
 
-        for mathFun in [callcos, callsin, calltanh, calllog, calllog2, calllog10, callexp, callsqrt]:
+        def callpow1(x):
+            return math.pow(x, type(x)(2.0))
+
+        def callpow2(x):
+            return math.pow(x, type(x)(0.8))
+
+        def callpow3(x):
+            return math.pow(x, type(x)(-2.5))
+
+        def callpow(x, y):
+            return math.pow(x, y)
+
+        for mathFun in [callcos, callsin, calltanh, calllog, calllog2, calllog10, callexp, callsqrt, callpow1, callpow2, callpow3]:
             compiled = Entrypoint(mathFun)
 
             self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, float)
             self.assertEqual(compiled.resultTypeFor(Float32).typeRepresentation, Float32)
 
-            for v in [0.5, 0.6, 1.0]:
+            for v in [0.5, 0.6, 1.0, 2.34]:
                 self.assertEqual(compiled(v), mathFun(v))
                 self.assertIsInstance(compiled(v), float)
 
-                self.assertLess(abs(float(compiled(Float32(v))) - mathFun(v)), 1e-6)
-                self.assertIsInstance(compiled(Float32(v)), Float32)
+                self.assertLess(abs(float(compiled(Float32(v))) - mathFun(v)), 1e-6, (mathFun, v))
+                self.assertIsInstance(compiled(Float32(v)), Float32, (mathFun, v))
+
+        for mathFun in [calllog, calllog2, calllog10]:
+            compiled = Entrypoint(mathFun)
+            for v in [0.0, -0.6, -1.0, -2.34]:
+                with self.assertRaises(ValueError):
+                    compiled(v)
+
+        for mathFun in [callsqrt]:
+            compiled = Entrypoint(mathFun)
+            for v in [-0.6, -1.0, -2.34]:
+                with self.assertRaises(ValueError):
+                    compiled(v)
+
+        for mathFun in [callpow]:
+            compiled = Entrypoint(mathFun)
+            for v1 in [-5.4, -3.0, -1.0, -0.6, -0.5, 0.0, 0.5, 0.6, 1.0, 3.0, 5.4]:
+                for v2 in [-5.4, -3.0, -1.0, -0.6, -0.5, 0.0, 0.5, 0.6, 1.0, 3.0, 5.4]:
+
+                    raisesValueError = False
+                    try:
+                        r1 = mathFun(v1, v2)
+                    except ValueError:
+                        raisesValueError = True
+
+                    if raisesValueError:
+                        with self.assertRaises(ValueError):
+                            compiled(v1, v2)
+                        with self.assertRaises(ValueError):
+                            compiled(Float32(v1), Float32(v2))
+                    else:
+                        r2 = compiled(v1, v2)
+                        self.assertEqual(r1, r2)
+                        r3 = compiled(Float32(v1), Float32(v2))
+                        if r1 == 0.0:
+                            self.assertLess(abs(r3 - r1), 1e-6, (v1, v2, r1, r3))
+                        else:
+                            self.assertLess(abs((r3 - r1)/r1), 1e-6, (v1, v2, r1, r3))
 
     def test_math_other_float(self):
         def callfabs(x):
