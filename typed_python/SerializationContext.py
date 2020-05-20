@@ -118,6 +118,10 @@ class SerializationContext(object):
                 if self.objectFromName(mname + "." + fname) is t:
                     return mname + "." + fname
 
+                if t.__name__ != t.__qualname__:
+                    if self.objectFromName('.fun_in_class.' + mname + "." + t.__qualname__) is t:
+                        return '.fun_in_class.' + mname + "." + t.__qualname__
+
         elif isinstance(t, type) and issubclass(t, Alternative):
             mname = t.__typed_python_module__
             fname = t.__name__
@@ -142,6 +146,27 @@ class SerializationContext(object):
         ''' Return an object for an input name(string), or None if not found. '''
         if name in self.nameToObjectOverride:
             return self.nameToObjectOverride[name]
+
+        if name.startswith(".fun_in_class."):
+            items = name[14:].split(".")
+            if len(items) < 3:
+                return
+
+            fname = items[-1]
+            classname = items[-2]
+            moduleName = ".".join(items[:-2])
+
+            try:
+                module = importlib.import_module(moduleName)
+            except ImportError:
+                return None
+
+            clsObj = getattr(module, classname, None)
+
+            if clsObj is None:
+                return None
+
+            return getattr(clsObj, fname, None)
 
         if name.startswith(".module_dict."):
             return self.objectFromName(".modules." + name[13:]).__dict__

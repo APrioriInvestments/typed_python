@@ -54,6 +54,11 @@ ModuleLevelAlternative = Alternative(
 )
 
 
+class ModuleLevelNormalClass:
+    def method(self):
+        pass
+
+
 class ModuleLevelNamedTupleSubclass(NamedTuple(x=int)):
     def f(self):
         return self.x
@@ -1691,3 +1696,18 @@ class TypesSerializationTest(unittest.TestCase):
             self.assertIs(
                 sc.deserialize(sc.serialize(thing)), thing
             )
+
+    def test_serialize_methods_on_named_classes(self):
+        sc = SerializationContext()
+
+        print(ModuleLevelNormalClass.method)
+        print(ModuleLevelNormalClass.method.__module__)
+        print(ModuleLevelNormalClass.method.__class__)
+        print(ModuleLevelNormalClass.method.__name__)
+        print(ModuleLevelNormalClass.method.__qualname__)
+        print(dir(ModuleLevelNormalClass.method))
+
+        self.assertIs(
+            ModuleLevelNormalClass.method,
+            sc.deserialize(sc.serialize(ModuleLevelNormalClass.method))
+        )
