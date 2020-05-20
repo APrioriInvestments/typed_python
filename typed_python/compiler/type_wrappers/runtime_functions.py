@@ -113,6 +113,20 @@ cos64 = externalCallTarget("llvm.cos.f64", Float64, Float64, intrinsic=True)
 sin32 = externalCallTarget("llvm.sin.f32", Float32, Float32, intrinsic=True)
 sin64 = externalCallTarget("llvm.sin.f64", Float64, Float64, intrinsic=True)
 
+log2_32 = externalCallTarget("llvm.log2.f32", Float32, Float32, intrinsic=True)
+log2_64 = externalCallTarget("llvm.log2.f64", Float64, Float64, intrinsic=True)
+
+log10_32 = externalCallTarget("llvm.log10.f32", Float32, Float32, intrinsic=True)
+log10_64 = externalCallTarget("llvm.log10.f64", Float64, Float64, intrinsic=True)
+
+sqrt32 = externalCallTarget("llvm.sqrt.f32", Float32, Float32, intrinsic=True)
+sqrt64 = externalCallTarget("llvm.sqrt.f64", Float64, Float64, intrinsic=True)
+
+copysign32 = externalCallTarget("llvm.copysign.f32", Float32, Float32, Float32, intrinsic=True)
+copysign64 = externalCallTarget("llvm.copysign.f64", Float64, Float64, Float64, intrinsic=True)
+
+fabs32 = externalCallTarget("llvm.fabs.f32", Float32, Float32, intrinsic=True)
+fabs64 = externalCallTarget("llvm.fabs.f64", Float64, Float64, intrinsic=True)
 
 initialize_exception = externalCallTarget(
     "np_initialize_exception",

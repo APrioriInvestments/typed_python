@@ -26,7 +26,7 @@ from math import (
     # atan2,
     # atanh,
     # ceil,
-    # copysign,
+    copysign,
     cos,
     # cosh,
     # degrees,
@@ -35,7 +35,7 @@ from math import (
     # erfc,
     exp,
     # expm1,
-    # fabs,
+    fabs,
     # factorial,
     # floor,
     # fmod,
@@ -52,9 +52,9 @@ from math import (
     # ldexp,
     # lgamma,
     log,
-    # log10,
+    log10,
     # log1p,
-    # log2,
+    log2,
     # modf,
     # nan,
     # pi,
@@ -62,7 +62,7 @@ from math import (
     # radians,
     sin,
     # sinh,
-    # sqrt,
+    sqrt,
     # tan,
     tanh,
     # tau,
@@ -75,7 +75,7 @@ class MathFunctionWrapper(Wrapper):
     is_empty = False
     is_pass_by_ref = False
 
-    SUPPORTED_FUNCTIONS = (isnan, isfinite, isinf, cos, sin, log, exp, tanh)
+    SUPPORTED_FUNCTIONS = (copysign, fabs, isnan, isfinite, isinf, cos, sin, log, log2, log10, exp, tanh, sqrt)
 
     def __init__(self, mathFun):
         assert mathFun in self.SUPPORTED_FUNCTIONS
@@ -85,7 +85,37 @@ class MathFunctionWrapper(Wrapper):
         return native_ast.Type.Void()
 
     def convert_call(self, context, expr, args, kwargs):
-        if len(args) == 1 and not kwargs:
+        if len(args) == 2 and not kwargs:
+            arg1 = args[0]
+            arg2 = args[1]
+            argType1 = arg1.expr_type.typeRepresentation
+            argType2 = arg2.expr_type.typeRepresentation
+            if argType1 not in (Float32, float):
+                arg1 = arg1.convert_to_type(float)
+                if arg1 is None:
+                    return None
+                argType1 = float
+            if argType2 not in (Float32, float):
+                arg2 = arg2.convert_to_type(float)
+                if arg2 is None:
+                    return None
+                argType2 = float
+            if argType1 == Float32 and argType2 == float:
+                arg1 = arg1.convert_to_type(float)
+                argType1 = float
+            if argType1 == float and argType2 == Float32:
+                arg2 = arg2.convert_to_type(float)
+                argType2 = float
+            assert argType1 == argType2
+
+            if self.typeRepresentation is copysign:
+                func = runtime_functions.copysign32 if argType1 is Float32 else runtime_functions.copysign64
+                outT = argType1
+            else:
+                assert False, "Unreachable"
+
+            return context.pushPod(outT, func.call(arg1.nonref_expr, arg2.nonref_expr))
+        elif len(args) == 1 and not kwargs:
             arg = args[0]
 
             if not arg.expr_type.is_arithmetic:
@@ -98,13 +128,16 @@ class MathFunctionWrapper(Wrapper):
                     return context.constant(False)
                 elif self.typeRepresentation in (isfinite,):
                     return context.constant(True)
-                elif self.typeRepresentation in (log, exp, cos, sin):
+                elif self.typeRepresentation in (log, log2, log10, exp, cos, sin, sqrt, fabs):
                     arg = arg.convert_to_type(float)
                     if arg is None:
                         return None
                     argType = float
 
-            if self.typeRepresentation is isnan:
+            if self.typeRepresentation is fabs:
+                func = runtime_functions.fabs32 if argType is Float32 else runtime_functions.fabs64
+                outT = argType
+            elif self.typeRepresentation is isnan:
                 func = runtime_functions.isnan_float32 if argType is Float32 else runtime_functions.isnan_float64
                 outT = bool
             elif self.typeRepresentation is isfinite:
@@ -116,7 +149,13 @@ class MathFunctionWrapper(Wrapper):
             elif self.typeRepresentation is log:
                 func = runtime_functions.log32 if argType is Float32 else runtime_functions.log64
                 outT = argType
-            elif self.typeRepresentation is log:
+            elif self.typeRepresentation is log2:
+                func = runtime_functions.log2_32 if argType is Float32 else runtime_functions.log2_64
+                outT = argType
+            elif self.typeRepresentation is log10:
+                func = runtime_functions.log10_32 if argType is Float32 else runtime_functions.log10_64
+                outT = argType
+            elif self.typeRepresentation is tanh:
                 func = runtime_functions.tanh32 if argType is Float32 else runtime_functions.tanh64
                 outT = argType
             elif self.typeRepresentation is cos:
@@ -127,6 +166,9 @@ class MathFunctionWrapper(Wrapper):
                 outT = argType
             elif self.typeRepresentation is exp:
                 func = runtime_functions.exp32 if argType is Float32 else runtime_functions.exp64
+                outT = argType
+            elif self.typeRepresentation is sqrt:
+                func = runtime_functions.sqrt32 if argType is Float32 else runtime_functions.sqrt64
                 outT = argType
             else:
                 assert False, "Unreachable"

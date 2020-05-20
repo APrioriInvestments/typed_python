@@ -30,6 +30,18 @@ def compiledHash(x):
 
 
 class TestMathFunctionsCompilation(unittest.TestCase):
+    def test_entrypoint_overrides(self):
+        @Entrypoint
+        def f(x):
+            return (type(x), int(x))
+
+        r1 = f(UInt8(-1))
+        r2 = f(-1)
+        r3 = f(0)
+        print(r1)
+        print(r2)
+        print(r3)
+
     def test_math_functions(self):
         for funToTest in [
             lambda x: math.isinf(x),
@@ -84,7 +96,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         # I get about .9x, so we're a little slower than numpy but not much
         print("speedup vs numpy is", speedupVsNumpy)
 
-    def test_math_log_sin_exp_float(self):
+    def test_math_transcendental_fns(self):
         def callcos(x):
             return math.cos(x)
 
@@ -94,17 +106,53 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def calllog(x):
             return math.log(x)
 
+        def calllog2(x):
+            return math.log2(x)
+
+        def calllog10(x):
+            return math.log10(x)
+
         def callexp(x):
             return math.exp(x)
 
-        for mathFun in [callcos, callsin, calllog, callexp]:
+        def callsqrt(x):
+            return math.sqrt(x)
+
+        def calltanh(x):
+            return math.tanh(x)
+
+        for mathFun in [callcos, callsin, calltanh, calllog, calllog2, calllog10, callexp, callsqrt]:
             compiled = Entrypoint(mathFun)
 
             self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, float)
             self.assertEqual(compiled.resultTypeFor(Float32).typeRepresentation, Float32)
 
-            self.assertEqual(compiled(1.0), mathFun(1.0))
-            self.assertIsInstance(compiled(1.0), float)
+            for v in [0.5, 0.6, 1.0]:
+                self.assertEqual(compiled(v), mathFun(v))
+                self.assertIsInstance(compiled(v), float)
 
-            self.assertLess(abs(float(compiled(Float32(1.0))) - mathFun(1.0)), 1e-6)
-            self.assertIsInstance(compiled(Float32(1.0)), Float32)
+                self.assertLess(abs(float(compiled(Float32(v))) - mathFun(v)), 1e-6)
+                self.assertIsInstance(compiled(Float32(v)), Float32)
+
+    def test_math_other_float(self):
+        def callfabs(x):
+            return math.fabs(x)
+
+        def callcopysign1(x):
+            return math.copysign(x, type(x)(1.0))
+
+        def callcopysign2(x):
+            return math.copysign(x, type(x)(-1.0))
+
+        for mathFun in [callfabs, callcopysign1, callcopysign2]:
+            compiled = Entrypoint(mathFun)
+
+            self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, float)
+            self.assertEqual(compiled.resultTypeFor(Float32).typeRepresentation, Float32)
+
+            for v in [-1234.0, -12.34, -1.0, -0.5, 0.0, 0.5, 1.0, 12.34, 1234.0]:
+                self.assertEqual(compiled(v), mathFun(v))
+                self.assertIsInstance(compiled(v), float)
+
+                self.assertLess(abs(float(compiled(Float32(v))) - mathFun(v)), 1e-6)
+                self.assertIsInstance(compiled(Float32(v)), Float32)
