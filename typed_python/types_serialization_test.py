@@ -1677,3 +1677,17 @@ class TypesSerializationTest(unittest.TestCase):
             sc.deserialize(sc.serialize(ModuleLevelNamedTupleSubclass(x=10))).f(),
             10
         )
+
+    def test_serialize_builtin_tp_functions(self):
+        sc = SerializationContext()
+
+        for thing in [
+            TupleOf, ListOf, OneOf, Tuple, NamedTuple, Class,
+            Member, ConstDict, Alternative, serialize, deserialize,
+            Dict, Set, SerializationContext, EmbeddedMessage,
+            serializeStream, deserializeStream, decodeSerializedObject,
+            Forward, Final, Function, Entrypoint
+        ]:
+            self.assertIs(
+                sc.deserialize(sc.serialize(thing)), thing
+            )

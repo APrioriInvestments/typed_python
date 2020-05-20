@@ -910,7 +910,7 @@ PyTypeObject* PyInstance::allTypesBaseType() {
     auto allocateBaseType = [&]() {
         PyTypeObject* result = new PyTypeObject {
             PyVarObject_HEAD_INIT(NULL, 0)              // TYPE (c.f., Type Objects)
-            .tp_name = "Type",          // const char*
+            .tp_name = "typed_python._types.Type",          // const char*
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
             .tp_dealloc = PyInstance::tp_dealloc,       // destructor
@@ -975,9 +975,12 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
     static std::map<Type::TypeCategory, NativeTypeCategoryWrapper*> types;
 
     if (types.find(category) == types.end()) {
+        PyObject* classDict = PyDict_New();
+        PyDict_SetItemString(classDict, "__typed_python_module__", PyUnicode_FromString("typed_python._types"));
+
         types[category] = new NativeTypeCategoryWrapper { {
             PyVarObject_HEAD_INIT(NULL, 0)              // TYPE (c.f., Type Objects)
-            .tp_name = (new std::string(Type::categoryToString(category)))->c_str(),          // const char*
+            .tp_name = (new std::string("typed_python._types." + Type::categoryToString(category)))->c_str(),          // const char*
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
             .tp_dealloc = PyInstance::tp_dealloc,       // destructor
@@ -1008,7 +1011,7 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
             .tp_members = 0,                            // struct PyMemberDef*
             .tp_getset = 0,                             // struct PyGetSetDef*
             .tp_base = allTypesBaseType(),              // struct _typeobject*
-            .tp_dict = 0,                               // PyObject*
+            .tp_dict = classDict,                       // PyObject*
             .tp_descr_get = 0,                          // descrgetfunc
             .tp_descr_set = 0,                          // descrsetfunc
             .tp_dictoffset = 0,                         // Py_ssize_t

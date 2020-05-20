@@ -751,6 +751,7 @@ void PythonSerializationContext::serializeNativeTypeInner(
         cat == Type::TypeCategory::catNone ||
         cat == Type::TypeCategory::catBytes ||
         cat == Type::TypeCategory::catString ||
+        cat == Type::TypeCategory::catEmbeddedMessage ||
         cat == Type::TypeCategory::catBool ||
         cat == Type::TypeCategory::catPyCell)
     {
@@ -1513,6 +1514,9 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
     }
     else if (category == Type::TypeCategory::catInt64) {
         resultType = ::Int64::Make();
+    }
+    else if (category == Type::TypeCategory::catEmbeddedMessage) {
+        resultType = ::EmbeddedMessageType::Make();
     }
     else if (category == Type::TypeCategory::catFloat32) {
         resultType = ::Float32::Make();
