@@ -74,8 +74,13 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
             b.write_bytes((uint8_t*)PyBytes_AsString(o), PyBytes_GET_SIZE(o));
         } else
         if (PyUnicode_CheckExact(o)) {
-            Py_ssize_t sz;
+            Py_ssize_t sz = 0;
             const char* c = PyUnicode_AsUTF8AndSize(o, &sz);
+
+            if (!c) {
+                throw PythonExceptionSet();
+            }
+
             b.writeBeginBytes(FieldNumbers::UNICODE, sz);
             b.write_bytes((uint8_t*)c, sz);
         } else
@@ -882,10 +887,12 @@ void PythonSerializationContext::serializeNativeTypeInner(
 
         serializeNativeType(ftype->getClosureType(), b, 1);
         b.writeStringObject(2, ftype->name());
-        b.writeUnsignedVarintObject(3, ftype->isEntrypoint() ? 1 : 0);
-        b.writeUnsignedVarintObject(4, ftype->isNocompile() ? 1 : 0);
+        b.writeStringObject(3, ftype->qualname());
+        b.writeStringObject(4, ftype->moduleName());
+        b.writeUnsignedVarintObject(5, ftype->isEntrypoint() ? 1 : 0);
+        b.writeUnsignedVarintObject(6, ftype->isNocompile() ? 1 : 0);
 
-        int whichIndex = 5;
+        int whichIndex = 7;
         for (auto& overload: ftype->getOverloads()) {
             overload.serialize(*this, b, whichIndex++);
         }
@@ -1381,15 +1388,15 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
                 if (fieldNumber == 1) {
                     closureType = deserializeNativeType(b, wireType);
                 }
-                else if (fieldNumber == 2) {
+                else if (fieldNumber >= 2 && fieldNumber <= 4) {
                     assertWireTypesEqual(wireType, WireType::BYTES);
                     names.push_back(b.readStringObject());
                 }
-                else if (fieldNumber == 3) {
+                else if (fieldNumber == 5) {
                     assertWireTypesEqual(wireType, WireType::VARINT);
                     isEntrypoint = b.readUnsignedVarint();
                 }
-                else if (fieldNumber == 4) {
+                else if (fieldNumber == 6) {
                     assertWireTypesEqual(wireType, WireType::VARINT);
                     isNocompile = b.readUnsignedVarint();
                 }
@@ -1479,12 +1486,14 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
         );
     }
     else if (category == Type::TypeCategory::catFunction) {
-        if (names.size() != 1) {
+        if (names.size() != 3) {
             throw std::runtime_error("Badly structured 'Function' encountered.");
         }
 
         resultType = Function::Make(
             names[0],
+            names[1],
+            names[2],
             overloads,
             closureType,
             isEntrypoint,

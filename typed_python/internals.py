@@ -127,14 +127,14 @@ magicMethodTypes = {
 }
 
 
-def makeFunctionType(name, f, isMethod=False, ignoreAnnotations=False, assumeClosuresGlobal=False, returnTypeOverride=None):
+def makeFunctionType(name, f, classname=None, ignoreAnnotations=False, assumeClosuresGlobal=False, returnTypeOverride=None):
     if isinstance(f, typed_python._types.Function):
         if assumeClosuresGlobal:
             if typed_python.bytecount(type(f).ClosureType):
                 # we need to build the equivalent function with global closures
                 assert len(f.overloads) == 1, "Can't do this for multiple overloads yet"
 
-                res = makeFunctionType(name, f.extractPyFun(0), isMethod, ignoreAnnotations, assumeClosuresGlobal)
+                res = makeFunctionType(name, f.extractPyFun(0), classname, ignoreAnnotations, assumeClosuresGlobal)
 
                 assert typed_python.bytecount(res.ClosureType) == 0
 
@@ -191,7 +191,7 @@ def makeFunctionType(name, f, isMethod=False, ignoreAnnotations=False, assumeClo
             ann = type(None)
         return_type = ann
 
-    if isMethod and name in magicMethodTypes:
+    if classname is not None and name in magicMethodTypes:
         tgtType = magicMethodTypes[name]
 
         if return_type is None:
@@ -213,7 +213,12 @@ def makeFunctionType(name, f, isMethod=False, ignoreAnnotations=False, assumeClo
     if spec.varkw is not None:
         arg_types.append((spec.varkw, getAnn(spec.varkw), None, False, True))
 
-    res = typed_python._types.Function(name, return_type, f, tuple(arg_types), assumeClosuresGlobal)
+    if classname is not None:
+        qualname = classname + "." + name
+    else:
+        qualname = name
+
+    res = typed_python._types.Function(name, qualname, return_type, f, tuple(arg_types), assumeClosuresGlobal)
 
     return res
 
@@ -257,14 +262,19 @@ class ClassMetaclass(type):
                 or isinstance(elt, type) and issubclass(elt, typed_python._types.Function)
             ):
                 if eltName not in memberFunctions:
-                    memberFunctions[eltName] = makeFunctionType(eltName, elt, isMethod=True, assumeClosuresGlobal=True)
+                    memberFunctions[eltName] = makeFunctionType(eltName, elt, classname=name, assumeClosuresGlobal=True)
                 else:
                     memberFunctions[eltName] = typed_python._types.Function(
                         memberFunctions[eltName],
-                        makeFunctionType(eltName, elt, isMethod=True, assumeClosuresGlobal=True)
+                        makeFunctionType(eltName, elt, classname=name, assumeClosuresGlobal=True)
                     )
             else:
                 classMembers.append((eltName, elt))
+
+                if eltName == "__module__":
+                    # __module__ gets swallowed by the base Class instance, so we have to
+                    # communicate the variable by sticking the 'typed_python' in it
+                    classMembers.append(("__typed_python_module__", elt))
 
         if "__name__" in kwds:
             name = kwds["__name__"]

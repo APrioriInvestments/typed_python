@@ -650,16 +650,16 @@ PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 5 && PyTuple_Size(args) != 2) {
-        PyErr_SetString(PyExc_TypeError, "Function takes 2 or 4 arguments");
+    if (PyTuple_Size(args) != 6 && PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "Function takes 2 or 6 arguments");
         return NULL;
     }
 
     Function* resType;
 
     if (PyTuple_Size(args) == 2) {
-        PyObjectHolder a0(PyTuple_GetItem(args,0));
-        PyObjectHolder a1(PyTuple_GetItem(args,1));
+        PyObjectHolder a0(PyTuple_GetItem(args, 0));
+        PyObjectHolder a1(PyTuple_GetItem(args, 1));
 
         Type* t0 = PyInstance::unwrapTypeArgToTypePtr(a0);
         Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
@@ -675,16 +675,21 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
 
         resType = Function::merge((Function*)t0, (Function*)t1);
     } else {
-        PyObjectHolder nameObj(PyTuple_GetItem(args,0));
+        PyObjectHolder nameObj(PyTuple_GetItem(args, 0));
         if (!PyUnicode_Check(nameObj)) {
             PyErr_SetString(PyExc_TypeError, "First arg should be a string.");
             return NULL;
         }
-        PyObjectHolder retType(PyTuple_GetItem(args,1));
-        PyObjectHolder funcObj(PyTuple_GetItem(args,2));
-        PyObjectHolder argTuple(PyTuple_GetItem(args,3));
+        PyObjectHolder qualnameObj(PyTuple_GetItem(args, 1));
+        if (!PyUnicode_Check(qualnameObj)) {
+            PyErr_SetString(PyExc_TypeError, "First arg should be a string.");
+            return NULL;
+        }
+        PyObjectHolder retType(PyTuple_GetItem(args, 2));
+        PyObjectHolder funcObj(PyTuple_GetItem(args, 3));
+        PyObjectHolder argTuple(PyTuple_GetItem(args, 4));
 
-        int assumeClosureGlobal = PyObject_IsTrue(PyTuple_GetItem(args,4));
+        int assumeClosureGlobal = PyObject_IsTrue(PyTuple_GetItem(args, 5));
 
         if (assumeClosureGlobal == -1) {
             return NULL;
@@ -767,6 +772,20 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                 ));
         }
 
+        std::string moduleName = "<unknown>";
+
+        if (PyObject_HasAttrString(funcObj, "__module__")) {
+            PyObject* pyModulename = PyObject_GetAttrString(funcObj, "__module__");
+
+            if (!pyModulename) {
+                return NULL;
+            }
+
+            if (PyUnicode_Check(pyModulename)) {
+                moduleName = PyUnicode_AsUTF8(pyModulename);
+            }
+        }
+
         incref(funcObj);
 
         std::vector<Function::Overload> overloads;
@@ -841,6 +860,8 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
 
         resType = Function::Make(
             PyUnicode_AsUTF8(nameObj),
+            PyUnicode_AsUTF8(qualnameObj),
+            moduleName,
             overloads,
             Tuple::Make({
                 assumeClosureGlobal ?

@@ -544,7 +544,19 @@ void PyFunctionInstance::mirrorTypeInformationIntoPyTypeConcrete(Function* inTyp
     PyDict_SetItemString(
         pyType->tp_dict,
         "__qualname__",
-        PyUnicode_FromString(inType->name().c_str())
+        PyUnicode_FromString(inType->qualname().c_str())
+    );
+
+    PyDict_SetItemString(
+        pyType->tp_dict,
+        "__typed_python_qualname__",
+        PyUnicode_FromString(inType->qualname().c_str())
+    );
+
+    PyDict_SetItemString(
+        pyType->tp_dict,
+        "__typed_python_module__",
+        PyUnicode_FromString(inType->moduleName().c_str())
     );
 
     PyDict_SetItemString(

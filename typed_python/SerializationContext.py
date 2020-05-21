@@ -13,6 +13,8 @@
 #   limitations under the License.
 
 from typed_python._types import serialize, deserialize, Type, Alternative, NamedTuple
+from typed_python import _types
+
 from typed_python.python_ast import (
     convertFunctionToAlgebraicPyAst,
     evaluateFunctionPyAst,
@@ -110,17 +112,24 @@ class SerializationContext(object):
             if maybeModule is not None and t is getattr(maybeModule, '__dict__', None):
                 return ".module_dict." + t['__name__']
 
-        if isinstance(t, (FunctionType, BuiltinFunctionType)):
-            mname = t.__module__
+        if isinstance(t, (FunctionType, BuiltinFunctionType)) or isinstance(t, type) and issubclass(t, _types.Function):
+            mname = getattr(t, "__typed_python_module__", t.__module__)
+            qualname = getattr(t, "__typed_python_qualname__", t.__qualname__)
             fname = t.__name__
 
             if mname is not None:
-                if self.objectFromName(mname + "." + fname) is t:
-                    return mname + "." + fname
+                if fname == qualname:
+                    name = mname + "." + fname
+                else:
+                    name = '.fun_in_class.' + mname + "." + qualname
 
-                if t.__name__ != t.__qualname__:
-                    if self.objectFromName('.fun_in_class.' + mname + "." + t.__qualname__) is t:
-                        return '.fun_in_class.' + mname + "." + t.__qualname__
+                o = self.objectFromName(name)
+
+                if o is t:
+                    return name
+
+                if type(o) is t:
+                    return ".typeof." + name
 
         elif isinstance(t, type) and issubclass(t, Alternative):
             mname = t.__typed_python_module__
@@ -134,11 +143,17 @@ class SerializationContext(object):
                 return ".modules." + t.__name__
 
         elif isinstance(t, type):
-            mname = getattr(t, "__typed_python_module__", t.__module__)
             fname = t.__name__
 
-            if self.objectFromName(mname + "." + fname) is t:
-                return mname + "." + fname
+            if hasattr(t, "__typed_python_module__"):
+                mname = getattr(t, "__typed_python_module__", None)
+                if self.objectFromName(mname + "." + fname) is t:
+                    return mname + "." + fname
+
+            if hasattr(t, "__module__"):
+                mname = getattr(t, "__module__", None)
+                if self.objectFromName(mname + "." + fname) is t:
+                    return mname + "." + fname
 
         return None
 
@@ -146,6 +161,12 @@ class SerializationContext(object):
         ''' Return an object for an input name(string), or None if not found. '''
         if name in self.nameToObjectOverride:
             return self.nameToObjectOverride[name]
+
+        if name.startswith(".typeof."):
+            res = self.objectFromName(name[8:])
+            if res is not None:
+                return type(res)
+            return None
 
         if name.startswith(".fun_in_class."):
             items = name[14:].split(".")

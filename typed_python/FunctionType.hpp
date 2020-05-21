@@ -1031,6 +1031,8 @@ public:
     };
 
     Function(std::string inName,
+            std::string qualname,
+            std::string moduleName,
             const std::vector<Overload>& overloads,
             Type* closureType,
             bool isEntrypoint,
@@ -1040,7 +1042,9 @@ public:
         mOverloads(overloads),
         mIsEntrypoint(isEntrypoint),
         mIsNocompile(isNocompile),
-        mRootName(inName)
+        mRootName(inName),
+        mQualname(qualname),
+        mModulename(moduleName)
     {
         m_is_simple = false;
 
@@ -1058,20 +1062,20 @@ public:
         m_is_default_constructible = mClosureType->is_default_constructible();
     }
 
-    static Function* Make(std::string inName, const std::vector<Overload>& overloads, Type* closureType, bool isEntrypoint, bool isNocompile) {
+    static Function* Make(std::string inName, std::string qualname, std::string moduleName, const std::vector<Overload>& overloads, Type* closureType, bool isEntrypoint, bool isNocompile) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        typedef std::tuple<const std::string, const std::vector<Overload>, Type*, bool, bool> keytype;
+        typedef std::tuple<const std::string, const std::string, const std::string, const std::vector<Overload>, Type*, bool, bool> keytype;
 
         static std::map<keytype, Function*> *m = new std::map<keytype, Function*>();
 
-        auto it = m->find(keytype(inName, overloads, closureType, isEntrypoint, isNocompile));
+        auto it = m->find(keytype(inName, qualname, moduleName, overloads, closureType, isEntrypoint, isNocompile));
         if (it == m->end()) {
             it = m->insert(std::pair<keytype, Function*>(
-                keytype(inName, overloads, closureType, isEntrypoint, isNocompile),
-                new Function(inName, overloads, closureType, isEntrypoint, isNocompile)
+                keytype(inName, qualname, moduleName, overloads, closureType, isEntrypoint, isNocompile),
+                new Function(inName, qualname, moduleName, overloads, closureType, isEntrypoint, isNocompile)
             )).first;
         }
 
@@ -1110,6 +1114,8 @@ public:
 
             return Function::Make(
                 f1->mRootName,
+                f1->mQualname,
+                f1->mModulename,
                 overloads,
                 Tuple::Make(types),
                 f1->isEntrypoint() || f2->isEntrypoint(),
@@ -1220,11 +1226,11 @@ public:
     }
 
     Function* withEntrypoint(bool isEntrypoint) {
-        return Function::Make(mRootName, mOverloads, mClosureType, isEntrypoint, mIsNocompile);
+        return Function::Make(mRootName, mQualname, mModulename, mOverloads, mClosureType, isEntrypoint, mIsNocompile);
     }
 
     Function* withNocompile(bool isNocompile) {
-        return Function::Make(mRootName, mOverloads, mClosureType, mIsEntrypoint, isNocompile);
+        return Function::Make(mRootName, mQualname, mModulename, mOverloads, mClosureType, mIsEntrypoint, isNocompile);
     }
 
     Type* getClosureType() const {
@@ -1289,11 +1295,11 @@ public:
     }
 
     Function* replaceClosure(Type* closureType) {
-        return Function::Make(mRootName, mOverloads, closureType, mIsEntrypoint, mIsNocompile);
+        return Function::Make(mRootName, mQualname, mModulename, mOverloads, closureType, mIsEntrypoint, mIsNocompile);
     }
 
     Function* replaceOverloads(const std::vector<Overload>& overloads) {
-        return Function::Make(mRootName, overloads, mClosureType, mIsEntrypoint, mIsNocompile);
+        return Function::Make(mRootName, mQualname, mModulename, overloads, mClosureType, mIsEntrypoint, mIsNocompile);
     }
 
     Function* replaceOverloadVariableBindings(long index, const std::map<std::string, ClosureVariableBinding>& bindings) {
@@ -1304,7 +1310,19 @@ public:
 
         overloads[index] = overloads[index].withClosureBindings(bindings);
 
-        return Function::Make(mRootName, overloads, mClosureType, mIsEntrypoint, mIsNocompile);
+        return Function::Make(mRootName, mQualname, mModulename, overloads, mClosureType, mIsEntrypoint, mIsNocompile);
+    }
+
+    std::string qualname() const {
+        if (mQualname.size()) {
+            return mQualname;
+        }
+
+        return m_name;
+    }
+
+    std::string moduleName() const {
+        return mModulename;
     }
 
 private:
@@ -1316,5 +1334,5 @@ private:
 
     bool mIsNocompile;
 
-    std::string mRootName;
+    std::string mRootName, mQualname, mModulename;
 };

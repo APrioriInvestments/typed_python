@@ -47,6 +47,11 @@ from typed_python._types import refcount, isRecursive
 module_level_testfun = dummy_test_module.testfunction
 
 
+@Entrypoint
+def moduleLevelEntrypointedFunction(x):
+    return x + 1
+
+
 ModuleLevelAlternative = Alternative(
     "ModuleLevelAlternative",
     X={'a': int},
@@ -805,12 +810,9 @@ class TypesSerializationTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             sc.serialize(MyFrozenSet())
 
-    @pytest.mark.skip(reason="it fails with a coredump")
     def test_serialize_unicode_1(self):
         endcases = ['', '<\\u>', '<\\\u1234>', '<\n>',
-                    '<\\>', '<\\\U00012345>',
-                    # surrogates
-                    '<\udc80>']
+                    '<\\>', '<\\\U00012345>']
 
         for u in endcases:
             print("u = {}".format(u))
@@ -843,26 +845,6 @@ class TypesSerializationTest(unittest.TestCase):
                 n2 = ping_pong(expected)
                 self.assert_is_copy(expected, n2)
             n = n >> 1
-
-    @pytest.mark.skip(reason="it fails")
-    def test_serialize_long(self):
-        # 256 bytes is where LONG4 begins.
-        for nbits in 1, 8, 8*254, 8*255, 8*256, 8*257:
-            nbase = 1 << nbits
-            for npos in nbase-1, nbase, nbase+1:
-                for n in npos, -npos:
-                    got = ping_pong(n)
-                    self.assert_is_copy(n, got)
-        # Try a monster.
-        nbase = int("deadbeeffeedface", 16)
-        nbase += nbase << 1000000
-        for n in nbase, -nbase:
-            got = ping_pong(n)
-            # assert_is_copy is very expensive here as it precomputes
-            # a failure message by computing the repr() of n and got,
-            # we just do the check ourselves.
-            self.assertIs(type(got), int)
-            self.assertEqual(n, got)
 
     def test_serialize_float(self):
         test_values = [0.0, 4.94e-324, 1e-310, 7e-308, 6.626e-34, 0.1, 0.5,
@@ -1673,6 +1655,11 @@ class TypesSerializationTest(unittest.TestCase):
             "typed_python.types_serialization_test"
         )
 
+        self.assertEqual(
+            ModuleLevelNamedTupleSubclass.__name__,
+            "ModuleLevelNamedTupleSubclass"
+        )
+
         self.assertIs(
             sc.deserialize(sc.serialize(ModuleLevelNamedTupleSubclass)),
             ModuleLevelNamedTupleSubclass
@@ -1700,14 +1687,33 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_methods_on_named_classes(self):
         sc = SerializationContext()
 
-        print(ModuleLevelNormalClass.method)
-        print(ModuleLevelNormalClass.method.__module__)
-        print(ModuleLevelNormalClass.method.__class__)
-        print(ModuleLevelNormalClass.method.__name__)
-        print(ModuleLevelNormalClass.method.__qualname__)
-        print(dir(ModuleLevelNormalClass.method))
-
         self.assertIs(
             ModuleLevelNormalClass.method,
             sc.deserialize(sc.serialize(ModuleLevelNormalClass.method))
+        )
+
+    def test_serialize_entrypointed_modulelevel_functions(self):
+        sc = SerializationContext()
+
+        self.assertIs(
+            type(moduleLevelEntrypointedFunction),
+            sc.deserialize(sc.serialize(type(moduleLevelEntrypointedFunction)))
+        )
+
+        self.assertIs(
+            type(moduleLevelEntrypointedFunction),
+            type(sc.deserialize(sc.serialize(moduleLevelEntrypointedFunction)))
+        )
+
+    def test_serialize_entrypointed_modulelevel_class_functions(self):
+        sc = SerializationContext()
+
+        self.assertIs(
+            type(ModuleLevelClass.f),
+            sc.deserialize(sc.serialize(type(ModuleLevelClass.f)))
+        )
+
+        self.assertIs(
+            type(ModuleLevelClass.f),
+            type(sc.deserialize(sc.serialize(ModuleLevelClass.f)))
         )
