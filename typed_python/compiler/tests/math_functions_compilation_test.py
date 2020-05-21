@@ -97,102 +97,102 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         print("speedup vs numpy is", speedupVsNumpy)
 
     def test_math_transcendental_fns(self):
-        def callacos(x):
+        def f_acos(x):
             return math.acos(x)
 
-        def callacosh(x):
+        def f_acosh(x):
             return math.acosh(x)
 
-        def callasin(x):
+        def f_asin(x):
             return math.asin(x)
 
-        def callasinh(x):
+        def f_asinh(x):
             return math.asinh(x)
 
-        def callatan(x):
+        def f_atan(x):
             return math.atan(x)
 
-        def callatanh(x):
+        def f_atanh(x):
             return math.atanh(x)
 
-        def callcos(x):
+        def f_cos(x):
             return math.cos(x)
 
-        def callcosh(x):
+        def f_cosh(x):
             return math.cosh(x)
 
-        def callerf(x):
+        def f_erf(x):
             return math.erf(x)
 
-        def callerfc(x):
+        def f_erfc(x):
             return math.erfc(x)
 
-        def callexp(x):
+        def f_exp(x):
             return math.exp(x)
 
-        def callexpm1(x):
+        def f_expm1(x):
             return math.expm1(x)
 
-        def callgamma(x):
+        def f_gamma(x):
             return math.gamma(x)
 
-        def calllgamma(x):
+        def f_lgamma(x):
             return math.lgamma(x)
 
-        def calllog(x):
+        def f_log(x):
             return math.log(x)
 
-        def calllog1p(x):
+        def f_log1p(x):
             return math.log1p(x)
 
-        def calllog2(x):
+        def f_log2(x):
             return math.log2(x)
 
-        def calllog10(x):
+        def f_log10(x):
             return math.log10(x)
 
-        def callpow1(x):
+        def f_pow1(x):
             return math.pow(x, type(x)(2.0))
 
-        def callpow2(x):
+        def f_pow2(x):
             return math.pow(x, type(x)(0.8))
 
-        def callpow3(x):
+        def f_pow3(x):
             return math.pow(x, type(x)(-2.5))
 
-        def callsin(x):
+        def f_sin(x):
             return math.sin(x)
 
-        def callsinh(x):
+        def f_sinh(x):
             return math.sinh(x)
 
-        def callsqrt(x):
+        def f_sqrt(x):
             return math.sqrt(x)
 
-        def calltan(x):
+        def f_tan(x):
             return math.tan(x)
 
-        def calltanh(x):
+        def f_tanh(x):
             return math.tanh(x)
 
         # added in 3.7:
-        # def callremainder(x, y):
+        # def f_remainder(x, y):
         #     return math.remainder(x, y)
 
-        def callpow(x, y):
+        def f_pow(x, y):
             return math.pow(x, y)
 
-        def callatan2(x, y):
+        def f_atan2(x, y):
             return math.atan2(x, y)
 
-        for mathFun in [callacos, callacosh, callasin, callasinh,
-                        callcos, callcosh, callsin, callsinh,
-                        callatan, callatanh, calltan, calltanh,
-                        callerf, callerfc, callgamma, calllgamma,
-                        calllog, calllog1p, calllog2, calllog10,
-                        callexp, callexpm1,
-                        callpow1, callpow2, callpow3,
-                        callsqrt]:
+        for mathFun in [f_acos, f_acosh, f_asin, f_asinh,
+                        f_cos, f_cosh, f_sin, f_sinh,
+                        f_atan, f_atanh, f_tan, f_tanh,
+                        f_erf, f_erfc, f_gamma, f_lgamma,
+                        f_log, f_log1p, f_log2, f_log10,
+                        f_exp, f_expm1,
+                        f_pow1, f_pow2, f_pow3,
+                        f_sqrt]:
             compiled = Entrypoint(mathFun)
 
             self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, float)
@@ -225,7 +225,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                     else:
                         self.assertLess(abs((r3 - r1) / r1), 1e-6, (mathFun, v, r1, r3))
 
-        for mathFun in [callpow, callatan2]:
+        for mathFun in [f_pow, f_atan2]:
             compiled = Entrypoint(mathFun)
             self.assertEqual(compiled.resultTypeFor(float, float).typeRepresentation, float)
             self.assertEqual(compiled.resultTypeFor(Float32, float).typeRepresentation, float)
@@ -254,32 +254,32 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                         else:
                             self.assertLess(abs((r3 - r1)/r1), 1e-6, (mathFun, v1, v2, r1, r3))
 
-    def test_math_other_float(self):
-        def callfabs(x):
+    def test_math_other_one(self):
+        def f_fabs(x):
             return math.fabs(x)
 
-        def callceil(x):
+        def f_ceil(x):
             return math.ceil(x)
 
-        def callfloor(x):
+        def f_floor(x):
             return math.floor(x)
 
-        def calltrunc(x):
+        def f_trunc(x):
             return math.trunc(x)
 
-        def callcopysign1(x):
+        def f_copysign1(x):
             return math.copysign(x, type(x)(1.0))
 
-        def callcopysign2(x):
+        def f_copysign2(x):
             return math.copysign(x, type(x)(-1.0))
 
-        def calldegrees(x):
+        def f_degrees(x):
             return math.degrees(x)
 
-        def callradians(x):
+        def f_radians(x):
             return math.radians(x)
 
-        for mathFun in [callfabs, callcopysign1, callcopysign2, callceil, callfloor, calltrunc, calldegrees, callradians]:
+        for mathFun in [f_fabs, f_copysign1, f_copysign2, f_ceil, f_floor, f_trunc, f_degrees, f_radians]:
             compiled = Entrypoint(mathFun)
 
             self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, float)
@@ -298,10 +298,15 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                 else:
                     self.assertLess(abs((r3 - r1) / r1), 1e-6, (mathFun, v, r1, r3))
 
-        def callhypot(x, y):
+    def test_math_other_two(self):
+        def f_hypot(x, y):
             return math.hypot(x, y)
 
-        for mathFun in [callhypot]:
+        def f_fmod(x, y):
+            return math.fmod(x, y)
+
+        test_values = [-1234.5, -12.34, -1.0, -0.5, 0.0, 0.5, 1.0, 12.34, 1234.5]
+        for mathFun in [f_hypot, f_fmod]:
             compiled = Entrypoint(mathFun)
 
             self.assertEqual(compiled.resultTypeFor(float, float).typeRepresentation, float)
@@ -309,16 +314,76 @@ class TestMathFunctionsCompilation(unittest.TestCase):
             self.assertEqual(compiled.resultTypeFor(float, Float32).typeRepresentation, float)
             self.assertEqual(compiled.resultTypeFor(Float32, Float32).typeRepresentation, Float32)
 
-            for v1 in [-1234.5, -12.34, -1.0, -0.5, 0.0, 0.5, 1.0, 12.34, 1234.5]:
-                for v2 in [-1234.5, -12.34, -1.0, -0.5, 0.0, 0.5, 1.0, 12.34, 1234.5]:
-                    r1 = mathFun(v1, v2)
-                    r2 = compiled(v1, v2)
-                    self.assertIsInstance(r2, float)
-                    self.assertEqual(r1, r2, (mathFun, v1, v2))
+            for v1 in test_values:
+                for v2 in test_values:
+                    raisesValueError = False
+                    try:
+                        r1 = mathFun(v1, v2)
+                    except ValueError:
+                        raisesValueError = True
 
-                    r3 = compiled(Float32(v1), Float32(v2))
-                    self.assertIsInstance(r3, Float32)
-                    if r1 == 0.0:
-                        self.assertLess(abs(r3 - r1), 1e-6, (mathFun, v1, v2, r1, r3))
+                    if raisesValueError:
+                        with self.assertRaises(ValueError):
+                            compiled(v1, v2)
                     else:
-                        self.assertLess(abs((r3 - r1) / r1), 1e-6, (mathFun, v1, v2, r1, r3))
+                        r2 = compiled(v1, v2)
+                        self.assertIsInstance(r2, float)
+                        self.assertEqual(r1, r2, (mathFun, v1, v2))
+
+                    if raisesValueError:
+                        with self.assertRaises(ValueError):
+                            compiled(Float32(v1), Float32(v2))
+                    else:
+                        r3 = compiled(Float32(v1), Float32(v2))
+                        self.assertIsInstance(r3, Float32)
+                        if r1 == 0.0:
+                            self.assertLess(abs(r3 - r1), 1e-6, (mathFun, v1, v2, r1, r3))
+                        else:
+                            self.assertLess(abs((r3 - r1) / r1), 5e-5, (mathFun, v1, v2, r1, r3))
+
+        def f_isclose(x, y, r, a):
+            if r is None and a is None:
+                return math.isclose(x, y)
+            if r is None:
+                return math.isclose(x, y, abs_tol=a)
+            if a is None:
+                return math.isclose(x, y, rel_tol=r)
+            return math.isclose(x, y, rel_tol=r, abs_tol=a)
+
+        for mathFun in [f_isclose]:
+            compiled = Entrypoint(mathFun)
+            for v1 in test_values:
+                for v2 in [v1,
+                           v1 + 1, v1 - 1,
+                           v1 + 1.1e-5, v1 - 1.1e-5,
+                           v1 + 9e-6, v1 - 9e-6,
+                           v1 + 1.1e-9, v1 - 1.1e-9,
+                           v1 + 9e-10, v1 - 9e-10]:
+                    for rel_tol in [None, 1, 1e-3, 1e-5, 1e-9]:
+                        for abs_tol in [None, 0, 1e-7, 1e-5, 1e-3, 1]:
+                            r1 = mathFun(v1, v2, rel_tol, abs_tol)
+                            r2 = compiled(v1, v2, rel_tol, abs_tol)
+                            self.assertIsInstance(r2, bool)
+                            self.assertEqual(r1, r2, (mathFun, v1, v2, rel_tol, abs_tol))
+
+                            # don't bother testing Float32 if rel_tol is too small
+                            if rel_tol is not None and rel_tol < 1e-5:
+                                continue
+
+                            # default rel_tol is different for Float32
+                            r3 = mathFun(v1, v2, 1e-5 if rel_tol is None else rel_tol, abs_tol)
+                            r4 = compiled(Float32(v1), Float32(v2), rel_tol, abs_tol)
+                            self.assertIsInstance(r4, bool)
+                            self.assertEqual(r3, r4, (mathFun, v1, v2, rel_tol, abs_tol))
+
+    def test_math_constants(self):
+        def all_constants(x):
+            return (type(x), math.pi, math.e, math.tau, math.inf, math.nan)
+
+        compiled = Entrypoint(all_constants)
+        r1 = all_constants(1.0)
+        r2 = compiled(1.0)
+        self.assertTrue(math.isnan(r1[5]))
+        self.assertTrue(math.isnan(r2[5]))
+        # Note r1 != r2 because nan != nan
+        self.assertEqual(r1[0:-1], r2[0:-1])

@@ -149,8 +149,14 @@ fabs64 = externalCallTarget("llvm.fabs.f64", Float64, Float64, intrinsic=True)
 floor32 = externalCallTarget("llvm.floor.f32", Float32, Float32, intrinsic=True)
 floor64 = externalCallTarget("llvm.floor.f64", Float64, Float64, intrinsic=True)
 
+fmod32 = externalCallTarget("np_fmod_float32", Float32, Float32, Float32)
+fmod64 = externalCallTarget("np_fmod_float64", Float64, Float64, Float64)
+
 gamma32 = externalCallTarget("np_gamma_float32", Float32, Float32)
 gamma64 = externalCallTarget("np_gamma_float64", Float64, Float64)
+
+isclose32 = externalCallTarget("np_isclose_float32", Bool, Float32, Float32, Float32, Float32)
+isclose64 = externalCallTarget("np_isclose_float64", Bool, Float64, Float64, Float64, Float64)
 
 lgamma32 = externalCallTarget("np_lgamma_float32", Float32, Float32)
 lgamma64 = externalCallTarget("np_lgamma_float64", Float64, Float64)

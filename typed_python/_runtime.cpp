@@ -115,12 +115,30 @@ extern "C" {
         return std::expm1f(f);
     }
 
+    double np_fmod_float64(double d1, double d2) {
+        return std::fmod(d1, d2);
+    }
+
+    float np_fmod_float32(float f1, float f2) {
+        return std::fmod(f1, f2);
+    }
+
     double np_gamma_float64(double d) {
         return std::tgamma(d);
     }
 
     float np_gamma_float32(float f) {
         return std::tgammaf(f);
+    }
+
+    bool np_isclose_float64(double d1, double d2, double rel_tol, double abs_tol) {
+        double m = fmax(fabs(d1), fabs(d2));
+        return fabs(d1 - d2) <= fmax(rel_tol * m, abs_tol);
+    }
+
+    bool np_isclose_float32(float f1, float f2, float rel_tol, float abs_tol) {
+        double m = fmax(fabs(f1), fabs(f2));
+        return fabs(f1 - f2) <= fmax(rel_tol * m, abs_tol);
     }
 
     double np_lgamma_float64(double d) {

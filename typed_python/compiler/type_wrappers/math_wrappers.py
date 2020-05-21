@@ -38,14 +38,14 @@ from math import (
     fabs,
     # factorial,
     floor,
-    # fmod,
+    fmod,
     # frexp,
     # fsum,
     gamma,
     # gcd,
     hypot,
     # inf,
-    # isclose,
+    isclose,
     isfinite,
     isinf,
     isnan,
@@ -77,7 +77,7 @@ class MathFunctionWrapper(Wrapper):
 
     SUPPORTED_FUNCTIONS = (acos, acosh, asin, asinh, atan, atan2, atanh,
                            copysign, cos, cosh, degrees, erf, erfc, exp, expm1, fabs,
-                           hypot, gamma, isnan, isfinite, isinf, lgamma,
+                           fmod, hypot, gamma, isclose, isnan, isfinite, isinf, lgamma,
                            log, log2, log10, log1p, pow, radians,
                            sin, sinh, sqrt, tan, tanh)
 
@@ -89,7 +89,7 @@ class MathFunctionWrapper(Wrapper):
         return native_ast.Type.Void()
 
     def convert_call(self, context, expr, args, kwargs):
-        if len(args) == 2 and not kwargs:
+        if len(args) == 2 and (not kwargs or self.typeRepresentation is isclose):
             arg1 = args[0]
             arg2 = args[1]
             argType1 = arg1.expr_type.typeRepresentation
@@ -115,7 +115,6 @@ class MathFunctionWrapper(Wrapper):
             outT = argType1  # default behavior is to return same type as arguments
             if self.typeRepresentation is copysign:
                 func = runtime_functions.copysign32 if argType1 is Float32 else runtime_functions.copysign64
-                outT = argType1
             elif self.typeRepresentation is pow:
                 f_func = runtime_functions.floor32 if argType1 is Float32 else runtime_functions.floor64
                 with context.ifelse(arg1.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
@@ -132,9 +131,43 @@ class MathFunctionWrapper(Wrapper):
                 func = runtime_functions.pow32 if argType1 is Float32 else runtime_functions.pow64
             elif self.typeRepresentation is atan2:
                 func = runtime_functions.atan2_32 if argType1 is Float32 else runtime_functions.atan2_64
+            elif self.typeRepresentation is fmod:
+                with context.ifelse(arg2.nonref_expr.eq(0.0)) as (ifTrue, ifFalse):
+                    with ifTrue:
+                        context.pushException(ValueError, "math domain error")
+                func = runtime_functions.fmod32 if argType1 is Float32 else runtime_functions.fmod64
             elif self.typeRepresentation is hypot:
                 func = runtime_functions.sqrt32 if argType1 is Float32 else runtime_functions.sqrt64
                 return context.pushPod(outT, func.call(arg1.nonref_expr.mul(arg1.nonref_expr).add(arg2.nonref_expr.mul(arg2.nonref_expr))))
+            elif self.typeRepresentation is isclose:
+                func = runtime_functions.isclose32 if argType1 is Float32 else runtime_functions.isclose64
+                if argType1 is Float32:
+                    if "rel_tol" in kwargs:
+                        rel_tol = kwargs["rel_tol"].convert_to_type(Float32)
+                        if rel_tol is None:
+                            return None
+                    else:
+                        rel_tol = native_ast.const_float32_expr(1e-05)
+                    if "abs_tol" in kwargs:
+                        abs_tol = kwargs["abs_tol"].convert_to_type(Float32)
+                        if abs_tol is None:
+                            return None
+                    else:
+                        abs_tol = native_ast.const_float32_expr(0.0)
+                else:
+                    if "rel_tol" in kwargs:
+                        rel_tol = kwargs["rel_tol"].convert_to_type(float)
+                        if rel_tol is None:
+                            return None
+                    else:
+                        rel_tol = native_ast.const_float_expr(1e-09)
+                    if "abs_tol" in kwargs:
+                        abs_tol = kwargs["abs_tol"].convert_to_type(float)
+                        if abs_tol is None:
+                            return None
+                    else:
+                        abs_tol = native_ast.const_float_expr(0.0)
+                return context.pushPod(bool, func.call(arg1.nonref_expr, arg2.nonref_expr, rel_tol, abs_tol))
             # elif self.typeRepresentation is remainder:  # added in 3.7
             #     func = runtime_functions.remainder32 if argType1 is Float32 else runtime_functions.remainder64
             else:
