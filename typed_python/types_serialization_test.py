@@ -39,7 +39,7 @@ from typed_python import (
     Member, ConstDict, Alternative, serialize, deserialize,
     Dict, Set, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject,
-    Forward, Final, Function, Entrypoint
+    Forward, Final, Function, Entrypoint, TypeFunction
 )
 
 from typed_python._types import refcount, isRecursive
@@ -265,6 +265,17 @@ sc = SerializationContext({
     'pickling_metaclass': pickling_metaclass,
     'AAA': AAA,
 })
+
+
+@TypeFunction
+def FancyClass(T):
+    class FancyClass_(Class, Final):
+        __name__ = "FancyClass(" + T.__name__ + ")"
+
+        def f(self):
+            return 1
+
+    return FancyClass_
 
 
 def ping_pong(obj, serialization_context=None):
@@ -1716,4 +1727,12 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(
             type(ModuleLevelClass.f),
             type(sc.deserialize(sc.serialize(ModuleLevelClass.f)))
+        )
+
+    def test_serialize_type_function(self):
+        sc = SerializationContext()
+
+        self.assertIs(
+            FancyClass(int),
+            sc.deserialize(sc.serialize(FancyClass(int)))
         )

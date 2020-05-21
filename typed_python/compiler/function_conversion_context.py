@@ -346,7 +346,7 @@ class ConversionContextBase(object):
 
             memberFunctions = {
                 '__init__':
-                makeFunctionType('__init__', lambda self: None, isMethod=True, assumeClosuresGlobal=True)
+                makeFunctionType('__init__', lambda self: None, classname=self.name + ".closure", assumeClosuresGlobal=True)
             }
 
             self.closureType = self.closureType.define(

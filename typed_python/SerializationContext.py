@@ -21,7 +21,7 @@ from typed_python.python_ast import (
     evaluateFunctionDefWithLocalsInCells
 )
 from typed_python.hash import sha_hash
-from typed_python.type_function import isTypeFunctionType, reconstructTypeFunctionType
+from typed_python.type_function import ConcreteTypeFunction, isTypeFunctionType, reconstructTypeFunctionType
 from types import FunctionType, ModuleType, CodeType, BuiltinFunctionType
 import numpy
 import datetime
@@ -106,6 +106,12 @@ class SerializationContext(object):
         ''' Return a name(string) for an input object t, or None if not found. '''
         if id(t) in self.objectToNameOverride:
             return self.objectToNameOverride[id(t)]
+
+        if isinstance(t, ConcreteTypeFunction):
+            name = t._concreteTypeFunction.__module__ + "." + t._concreteTypeFunction.__name__
+            if self.objectFromName(name) is t:
+                return name
+            return None
 
         if isinstance(t, dict) and '__name__' in t:
             maybeModule = self.objectFromName('.modules.' + t['__name__'])
