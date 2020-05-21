@@ -31,17 +31,17 @@ from math import (
     cosh,
     # degrees,
     # e,
-    # erf,
-    # erfc,
+    erf,
+    erfc,
     exp,
-    # expm1,
+    expm1,
     fabs,
     # factorial,
     floor,
     # fmod,
     # frexp,
     # fsum,
-    # gamma,
+    gamma,
     # gcd,
     # hypot,
     # inf,
@@ -50,10 +50,10 @@ from math import (
     isinf,
     isnan,
     # ldexp,
-    # lgamma,
+    lgamma,
     log,
     log10,
-    # log1p,
+    log1p,
     log2,
     # modf,
     # nan,
@@ -76,10 +76,10 @@ class MathFunctionWrapper(Wrapper):
     is_pass_by_ref = False
 
     SUPPORTED_FUNCTIONS = (acos, acosh, asin, asinh, atan, atan2, atanh,
-                           ceil, copysign, cos, cosh, exp, fabs, floor,
-                           isnan, isfinite, isinf,
-                           log, log2, log10, pow,
-                           sin, sinh, sqrt, tan, tanh, trunc)
+                           copysign, cos, cosh, erf, erfc, exp, expm1, fabs,
+                           gamma, isnan, isfinite, isinf, lgamma,
+                           log, log2, log10, log1p, pow,
+                           sin, sinh, sqrt, tan, tanh)
 
     def __init__(self, mathFun):
         assert mathFun in self.SUPPORTED_FUNCTIONS
@@ -197,12 +197,26 @@ class MathFunctionWrapper(Wrapper):
                 func = runtime_functions.cos32 if argType is Float32 else runtime_functions.cos64
             elif self.typeRepresentation is cosh:
                 func = runtime_functions.cosh32 if argType is Float32 else runtime_functions.cosh64
+            elif self.typeRepresentation is erf:
+                func = runtime_functions.erf32 if argType is Float32 else runtime_functions.erf64
+            elif self.typeRepresentation is erfc:
+                func = runtime_functions.erfc32 if argType is Float32 else runtime_functions.erfc64
             elif self.typeRepresentation is exp:
                 func = runtime_functions.exp32 if argType is Float32 else runtime_functions.exp64
+            elif self.typeRepresentation is expm1:
+                func = runtime_functions.expm1_32 if argType is Float32 else runtime_functions.expm1_64
             elif self.typeRepresentation is fabs:
                 func = runtime_functions.fabs32 if argType is Float32 else runtime_functions.fabs64
             elif self.typeRepresentation is floor:
                 func = runtime_functions.floor32 if argType is Float32 else runtime_functions.floor64
+            elif self.typeRepresentation is gamma:
+                f_func = runtime_functions.floor32 if argType is Float32 else runtime_functions.floor64
+                with context.ifelse(arg.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
+                    with ifTrue:
+                        with context.ifelse(f_func.call(arg.nonref_expr).sub(arg.nonref_expr).eq(0.0)) as (ifTrue2, ifFalse2):
+                            with ifTrue2:
+                                context.pushException(ValueError, "math domain error")
+                func = runtime_functions.gamma32 if argType is Float32 else runtime_functions.gamma64
             elif self.typeRepresentation is isnan:
                 func = runtime_functions.isnan_float32 if argType is Float32 else runtime_functions.isnan_float64
                 outT = bool
@@ -212,11 +226,24 @@ class MathFunctionWrapper(Wrapper):
             elif self.typeRepresentation is isinf:
                 func = runtime_functions.isinf_float32 if argType is Float32 else runtime_functions.isinf_float64
                 outT = bool
+            elif self.typeRepresentation is lgamma:
+                f_func = runtime_functions.floor32 if argType is Float32 else runtime_functions.floor64
+                with context.ifelse(arg.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
+                    with ifTrue:
+                        with context.ifelse(f_func.call(arg.nonref_expr).sub(arg.nonref_expr).eq(0.0)) as (ifTrue2, ifFalse2):
+                            with ifTrue2:
+                                context.pushException(ValueError, "math domain error")
+                func = runtime_functions.lgamma32 if argType is Float32 else runtime_functions.lgamma64
             elif self.typeRepresentation is log:
                 with context.ifelse(arg.nonref_expr.gt(0.0)) as (ifTrue, ifFalse):
                     with ifFalse:
                         context.pushException(ValueError, "math domain error")
                 func = runtime_functions.log32 if argType is Float32 else runtime_functions.log64
+            elif self.typeRepresentation is log1p:
+                with context.ifelse(arg.nonref_expr.gt(-1.0)) as (ifTrue, ifFalse):
+                    with ifFalse:
+                        context.pushException(ValueError, "math domain error")
+                func = runtime_functions.log1p32 if argType is Float32 else runtime_functions.log1p64
             elif self.typeRepresentation is log2:
                 with context.ifelse(arg.nonref_expr.gt(0.0)) as (ifTrue, ifFalse):
                     with ifFalse:

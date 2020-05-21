@@ -131,8 +131,17 @@ cos64 = externalCallTarget("llvm.cos.f64", Float64, Float64, intrinsic=True)
 cosh32 = externalCallTarget("np_cosh_float32", Float32, Float32)
 cosh64 = externalCallTarget("np_cosh_float64", Float64, Float64)
 
+erf32 = externalCallTarget("np_erf_float32", Float32, Float32)
+erf64 = externalCallTarget("np_erf_float64", Float64, Float64)
+
+erfc32 = externalCallTarget("np_erfc_float32", Float32, Float32)
+erfc64 = externalCallTarget("np_erfc_float64", Float64, Float64)
+
 exp32 = externalCallTarget("llvm.exp.f32", Float32, Float32, intrinsic=True)
 exp64 = externalCallTarget("llvm.exp.f64", Float64, Float64, intrinsic=True)
+
+expm1_32 = externalCallTarget("np_expm1_float32", Float32, Float32)
+expm1_64 = externalCallTarget("np_expm1_float64", Float64, Float64)
 
 fabs32 = externalCallTarget("llvm.fabs.f32", Float32, Float32, intrinsic=True)
 fabs64 = externalCallTarget("llvm.fabs.f64", Float64, Float64, intrinsic=True)
@@ -140,8 +149,17 @@ fabs64 = externalCallTarget("llvm.fabs.f64", Float64, Float64, intrinsic=True)
 floor32 = externalCallTarget("llvm.floor.f32", Float32, Float32, intrinsic=True)
 floor64 = externalCallTarget("llvm.floor.f64", Float64, Float64, intrinsic=True)
 
+gamma32 = externalCallTarget("np_gamma_float32", Float32, Float32)
+gamma64 = externalCallTarget("np_gamma_float64", Float64, Float64)
+
+lgamma32 = externalCallTarget("np_lgamma_float32", Float32, Float32)
+lgamma64 = externalCallTarget("np_lgamma_float64", Float64, Float64)
+
 log32 = externalCallTarget("llvm.log.f32", Float32, Float32, intrinsic=True)
 log64 = externalCallTarget("llvm.log.f64", Float64, Float64, intrinsic=True)
+
+log1p32 = externalCallTarget("np_log1p_float32", Float32, Float32)
+log1p64 = externalCallTarget("np_log1p_float64", Float64, Float64)
 
 log2_32 = externalCallTarget("llvm.log2.f32", Float32, Float32, intrinsic=True)
 log2_64 = externalCallTarget("llvm.log2.f64", Float64, Float64, intrinsic=True)

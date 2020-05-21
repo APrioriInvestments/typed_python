@@ -97,30 +97,6 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         print("speedup vs numpy is", speedupVsNumpy)
 
     def test_math_transcendental_fns(self):
-        def calllog(x):
-            return math.log(x)
-
-        def calllog2(x):
-            return math.log2(x)
-
-        def calllog10(x):
-            return math.log10(x)
-
-        def callexp(x):
-            return math.exp(x)
-
-        def callsqrt(x):
-            return math.sqrt(x)
-
-        def callpow1(x):
-            return math.pow(x, type(x)(2.0))
-
-        def callpow2(x):
-            return math.pow(x, type(x)(0.8))
-
-        def callpow3(x):
-            return math.pow(x, type(x)(-2.5))
-
         def callacos(x):
             return math.acos(x)
 
@@ -145,11 +121,53 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def callcosh(x):
             return math.cosh(x)
 
+        def callerf(x):
+            return math.erf(x)
+
+        def callerfc(x):
+            return math.erfc(x)
+
+        def callexp(x):
+            return math.exp(x)
+
+        def callexpm1(x):
+            return math.expm1(x)
+
+        def callgamma(x):
+            return math.gamma(x)
+
+        def calllgamma(x):
+            return math.lgamma(x)
+
+        def calllog(x):
+            return math.log(x)
+
+        def calllog1p(x):
+            return math.log1p(x)
+
+        def calllog2(x):
+            return math.log2(x)
+
+        def calllog10(x):
+            return math.log10(x)
+
+        def callpow1(x):
+            return math.pow(x, type(x)(2.0))
+
+        def callpow2(x):
+            return math.pow(x, type(x)(0.8))
+
+        def callpow3(x):
+            return math.pow(x, type(x)(-2.5))
+
         def callsin(x):
             return math.sin(x)
 
         def callsinh(x):
             return math.sinh(x)
+
+        def callsqrt(x):
+            return math.sqrt(x)
 
         def calltan(x):
             return math.tan(x)
@@ -170,9 +188,11 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         for mathFun in [callacos, callacosh, callasin, callasinh,
                         callcos, callcosh, callsin, callsinh,
                         callatan, callatanh, calltan, calltanh,
-                        calllog, calllog2, calllog10,
-                        callexp, callsqrt,
-                        callpow1, callpow2, callpow3]:
+                        callerf, callerfc, callgamma, calllgamma,
+                        calllog, calllog1p, calllog2, calllog10,
+                        callexp, callexpm1,
+                        callpow1, callpow2, callpow3,
+                        callsqrt]:
             compiled = Entrypoint(mathFun)
 
             self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, float)
@@ -193,13 +213,17 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                 else:
                     r2 = compiled(v)
                     self.assertIsInstance(r2, float)
-                    self.assertEqual(r1, r2, (v, r1, r2))
+                    if r1 == 0.0:
+                        self.assertLess(abs(r2 - r1), 1e-10, (mathFun, v, r1, r2))
+                    else:
+                        self.assertLess(abs((r2 - r1) / r1), 1e-10, (mathFun, v, r1, r2))
+
                     r3 = compiled(Float32(v))
                     self.assertIsInstance(r3, Float32, (mathFun, v))
                     if r1 == 0.0:
-                        self.assertLess(abs(r3 - r1), 1e-6, (v, r1, r3))
+                        self.assertLess(abs(r3 - r1), 1e-6, (mathFun, v, r1, r3))
                     else:
-                        self.assertLess(abs((r3 - r1) / r1), 1e-6, (v, r1, r3))
+                        self.assertLess(abs((r3 - r1) / r1), 1e-6, (mathFun, v, r1, r3))
 
         for mathFun in [callpow, callatan2]:
             compiled = Entrypoint(mathFun)
@@ -221,9 +245,9 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                         self.assertEqual(r1, r2)
                         r3 = compiled(Float32(v1), Float32(v2))
                         if r1 == 0.0:
-                            self.assertLess(abs(r3 - r1), 1e-6, (v1, v2, r1, r3))
+                            self.assertLess(abs(r3 - r1), 1e-6, (mathFun, v1, v2, r1, r3))
                         else:
-                            self.assertLess(abs((r3 - r1)/r1), 1e-6, (v1, v2, r1, r3))
+                            self.assertLess(abs((r3 - r1)/r1), 1e-6, (mathFun, v1, v2, r1, r3))
 
     def test_math_other_float(self):
         def callfabs(x):

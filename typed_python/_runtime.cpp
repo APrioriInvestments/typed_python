@@ -91,6 +91,54 @@ extern "C" {
         return std::cosh(f);
     }
 
+    double np_erf_float64(double d) {
+        return std::erf(d);
+    }
+
+    float np_erf_float32(float f) {
+        return std::erff(f);
+    }
+
+    double np_erfc_float64(double d) {
+        return std::erfc(d);
+    }
+
+    float np_erfc_float32(float f) {
+        return std::erfcf(f);
+    }
+
+    double np_expm1_float64(double d) {
+        return std::expm1(d);
+    }
+
+    float np_expm1_float32(float f) {
+        return std::expm1f(f);
+    }
+
+    double np_gamma_float64(double d) {
+        return std::tgamma(d);
+    }
+
+    float np_gamma_float32(float f) {
+        return std::tgammaf(f);
+    }
+
+    double np_lgamma_float64(double d) {
+        return std::lgamma(d);
+    }
+
+    float np_lgamma_float32(float f) {
+        return std::lgammaf(f);
+    }
+
+    double np_log1p_float64(double d) {
+        return std::log1p(d);
+    }
+
+    float np_log1p_float32(float f) {
+        return std::log1pf(f);
+    }
+
     double np_sinh_float64(double d) {
         return std::sinh(d);
     }
