@@ -278,7 +278,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(_types.bytecount(int), 8)
 
     def test_type_stringification(self):
-        self.assertEqual(str(_types.Int8), "<class 'Int8'>")
+        self.assertEqual(str(_types.Int8), "<class 'typed_python._types.Int8'>")
         self.assertEqual(str(Tuple(int)), "<class 'Tuple(int)'>")
 
     def test_tuple_of(self):
