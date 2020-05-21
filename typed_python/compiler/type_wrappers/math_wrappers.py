@@ -29,7 +29,7 @@ from math import (
     copysign,
     cos,
     cosh,
-    # degrees,
+    degrees,
     # e,
     erf,
     erfc,
@@ -43,7 +43,7 @@ from math import (
     # fsum,
     gamma,
     # gcd,
-    # hypot,
+    hypot,
     # inf,
     # isclose,
     isfinite,
@@ -57,9 +57,9 @@ from math import (
     log2,
     # modf,
     # nan,
-    # pi,
+    pi,
     pow,
-    # radians,
+    radians,
     sin,
     sinh,
     sqrt,
@@ -76,9 +76,9 @@ class MathFunctionWrapper(Wrapper):
     is_pass_by_ref = False
 
     SUPPORTED_FUNCTIONS = (acos, acosh, asin, asinh, atan, atan2, atanh,
-                           copysign, cos, cosh, erf, erfc, exp, expm1, fabs,
-                           gamma, isnan, isfinite, isinf, lgamma,
-                           log, log2, log10, log1p, pow,
+                           copysign, cos, cosh, degrees, erf, erfc, exp, expm1, fabs,
+                           hypot, gamma, isnan, isfinite, isinf, lgamma,
+                           log, log2, log10, log1p, pow, radians,
                            sin, sinh, sqrt, tan, tanh)
 
     def __init__(self, mathFun):
@@ -132,6 +132,9 @@ class MathFunctionWrapper(Wrapper):
                 func = runtime_functions.pow32 if argType1 is Float32 else runtime_functions.pow64
             elif self.typeRepresentation is atan2:
                 func = runtime_functions.atan2_32 if argType1 is Float32 else runtime_functions.atan2_64
+            elif self.typeRepresentation is hypot:
+                func = runtime_functions.sqrt32 if argType1 is Float32 else runtime_functions.sqrt64
+                return context.pushPod(outT, func.call(arg1.nonref_expr.mul(arg1.nonref_expr).add(arg2.nonref_expr.mul(arg2.nonref_expr))))
             # elif self.typeRepresentation is remainder:  # added in 3.7
             #     func = runtime_functions.remainder32 if argType1 is Float32 else runtime_functions.remainder64
             else:
@@ -197,6 +200,11 @@ class MathFunctionWrapper(Wrapper):
                 func = runtime_functions.cos32 if argType is Float32 else runtime_functions.cos64
             elif self.typeRepresentation is cosh:
                 func = runtime_functions.cosh32 if argType is Float32 else runtime_functions.cosh64
+            elif self.typeRepresentation is degrees:
+                if argType is Float32:
+                    return context.pushPod(outT, arg.nonref_expr.mul(native_ast.const_float32_expr(180 / pi)))
+                else:
+                    return context.pushPod(outT, arg.nonref_expr.mul(native_ast.const_float_expr(180 / pi)))
             elif self.typeRepresentation is erf:
                 func = runtime_functions.erf32 if argType is Float32 else runtime_functions.erf64
             elif self.typeRepresentation is erfc:
@@ -254,6 +262,11 @@ class MathFunctionWrapper(Wrapper):
                     with ifFalse:
                         context.pushException(ValueError, "math domain error")
                 func = runtime_functions.log10_32 if argType is Float32 else runtime_functions.log10_64
+            elif self.typeRepresentation is radians:
+                if argType is Float32:
+                    return context.pushPod(outT, arg.nonref_expr.mul(native_ast.const_float32_expr(pi / 180)))
+                else:
+                    return context.pushPod(outT, arg.nonref_expr.mul(native_ast.const_float_expr(pi / 180)))
             elif self.typeRepresentation is sin:
                 func = runtime_functions.sin32 if argType is Float32 else runtime_functions.sin64
             elif self.typeRepresentation is sinh:

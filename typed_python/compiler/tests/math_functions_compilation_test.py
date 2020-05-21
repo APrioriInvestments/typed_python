@@ -227,6 +227,11 @@ class TestMathFunctionsCompilation(unittest.TestCase):
 
         for mathFun in [callpow, callatan2]:
             compiled = Entrypoint(mathFun)
+            self.assertEqual(compiled.resultTypeFor(float, float).typeRepresentation, float)
+            self.assertEqual(compiled.resultTypeFor(Float32, float).typeRepresentation, float)
+            self.assertEqual(compiled.resultTypeFor(float, Float32).typeRepresentation, float)
+            self.assertEqual(compiled.resultTypeFor(Float32, Float32).typeRepresentation, Float32)
+
             for v1 in [-5.4, -3.0, -1.0, -0.6, -0.5, 0.0, 0.5, 0.6, 1.0, 3.0, 5.4]:
                 for v2 in [-5.4, -3.0, -1.0, -0.6, -0.5, 0.0, 0.5, 0.6, 1.0, 3.0, 5.4]:
                     raisesValueError = False
@@ -268,15 +273,52 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def callcopysign2(x):
             return math.copysign(x, type(x)(-1.0))
 
-        for mathFun in [callfabs, callcopysign1, callcopysign2, callceil, callfloor, calltrunc]:
+        def calldegrees(x):
+            return math.degrees(x)
+
+        def callradians(x):
+            return math.radians(x)
+
+        for mathFun in [callfabs, callcopysign1, callcopysign2, callceil, callfloor, calltrunc, calldegrees, callradians]:
             compiled = Entrypoint(mathFun)
 
             self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, float)
             self.assertEqual(compiled.resultTypeFor(Float32).typeRepresentation, Float32)
 
             for v in [-1234.5, -12.34, -1.0, -0.5, 0.0, 0.5, 1.0, 12.34, 1234.5]:
-                self.assertEqual(compiled(v), mathFun(v))
-                self.assertIsInstance(compiled(v), float)
+                r1 = mathFun(v)
+                r2 = compiled(v)
+                self.assertIsInstance(r2, float)
+                self.assertEqual(r1, r2, (mathFun, v))
 
-                self.assertLess(abs(float(compiled(Float32(v))) - mathFun(v)), 1e-6)
-                self.assertIsInstance(compiled(Float32(v)), Float32)
+                r3 = compiled(Float32(v))
+                self.assertIsInstance(r3, Float32)
+                if r1 == 0.0:
+                    self.assertLess(abs(r3 - r1), 1e-6, (mathFun, v, r1, r3))
+                else:
+                    self.assertLess(abs((r3 - r1) / r1), 1e-6, (mathFun, v, r1, r3))
+
+        def callhypot(x, y):
+            return math.hypot(x, y)
+
+        for mathFun in [callhypot]:
+            compiled = Entrypoint(mathFun)
+
+            self.assertEqual(compiled.resultTypeFor(float, float).typeRepresentation, float)
+            self.assertEqual(compiled.resultTypeFor(Float32, float).typeRepresentation, float)
+            self.assertEqual(compiled.resultTypeFor(float, Float32).typeRepresentation, float)
+            self.assertEqual(compiled.resultTypeFor(Float32, Float32).typeRepresentation, Float32)
+
+            for v1 in [-1234.5, -12.34, -1.0, -0.5, 0.0, 0.5, 1.0, 12.34, 1234.5]:
+                for v2 in [-1234.5, -12.34, -1.0, -0.5, 0.0, 0.5, 1.0, 12.34, 1234.5]:
+                    r1 = mathFun(v1, v2)
+                    r2 = compiled(v1, v2)
+                    self.assertIsInstance(r2, float)
+                    self.assertEqual(r1, r2, (mathFun, v1, v2))
+
+                    r3 = compiled(Float32(v1), Float32(v2))
+                    self.assertIsInstance(r3, Float32)
+                    if r1 == 0.0:
+                        self.assertLess(abs(r3 - r1), 1e-6, (mathFun, v1, v2, r1, r3))
+                    else:
+                        self.assertLess(abs((r3 - r1) / r1), 1e-6, (mathFun, v1, v2, r1, r3))
