@@ -1987,12 +1987,29 @@ PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
 
 PyObject *MakeForward(PyObject* nullValue, PyObject* args) {
     int num_args = PyTuple_Size(args);
+
+    PyThreadState * ts = PyThreadState_Get();
+    std::string moduleName;
+    PyObject* pyModuleName;
+
+    if (ts->frame && ts->frame->f_globals &&
+            (pyModuleName = PyDict_GetItemString(ts->frame->f_globals, "__name__"))) {
+        if (PyUnicode_Check(pyModuleName)) {
+            moduleName = PyUnicode_AsUTF8(pyModuleName);
+        }
+    }
+
     if (num_args > 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
         PyErr_SetString(PyExc_TypeError, "Forward takes a zero or one string positional arguments.");
         return NULL;
     }
+
     if (num_args == 1) {
         std::string name = PyUnicode_AsUTF8(PyTuple_GetItem(args,0));
+
+        if (moduleName.size()) {
+            name = moduleName + "." + name;
+        }
 
         return incref((PyObject*)PyInstance::typeObj(
             ::Forward::Make(name)

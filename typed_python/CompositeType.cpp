@@ -166,8 +166,10 @@ bool NamedTuple::_updateAfterForwardTypesChanged() {
 
     if (m_is_recursive_forward) {
         m_name = m_recursive_name;
+        m_stripped_name = "";
     } else {
         m_name = "NamedTuple(";
+        m_stripped_name = "";
 
         if (m_types.size() != m_names.size()) {
             throw std::logic_error("Names mismatched with types!");
@@ -177,7 +179,7 @@ bool NamedTuple::_updateAfterForwardTypesChanged() {
             if (k) {
                 m_name += ", ";
             }
-            m_name += m_names[k] + "=" + m_types[k]->name();
+            m_name += m_names[k] + "=" + m_types[k]->name(true);
         }
         m_name += ")";
     }
@@ -192,15 +194,17 @@ bool Tuple::_updateAfterForwardTypesChanged() {
 
     if (m_is_recursive_forward) {
         m_name = m_recursive_name;
+        m_stripped_name = "";
     } else {
         m_name = "Tuple(";
         for (long k = 0; k < m_types.size();k++) {
             if (k) {
                 m_name += ", ";
             }
-            m_name += m_types[k]->name();
+            m_name += m_types[k]->name(true);
         }
         m_name += ")";
+        m_stripped_name = "";
     }
 
     return anyChanged || m_name != oldName;

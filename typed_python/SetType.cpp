@@ -67,7 +67,7 @@ int64_t SetType::size(instance_ptr self) const {
 }
 
 bool SetType::_updateAfterForwardTypesChanged() {
-    std::string name = "Set(" + m_key_type->name() + ")";
+    std::string name = "Set(" + m_key_type->name(true) + ")";
     m_size = sizeof(void*);
     m_is_default_constructible = true;
     m_bytes_per_el = m_key_type->bytecount();
@@ -78,6 +78,7 @@ bool SetType::_updateAfterForwardTypesChanged() {
 
     bool anyChanged = name != m_name;
     m_name = name;
+    m_stripped_name = "";
     return anyChanged;
 }
 

@@ -1056,6 +1056,7 @@ public:
 
     void _updateAfterForwardTypesChanged() {
         m_name = mRootName;
+        m_stripped_name = "";
 
         m_size = mClosureType->bytecount();
 

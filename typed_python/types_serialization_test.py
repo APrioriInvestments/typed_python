@@ -78,6 +78,12 @@ def moduleLevelIdentityFunction(x):
     return x
 
 
+ModuleLevelRecursiveForward = Forward("ModuleLevelRecursiveForward")
+ModuleLevelRecursiveForward = ModuleLevelRecursiveForward.define(
+    ConstDict(int, OneOf(None, ModuleLevelRecursiveForward))
+)
+
+
 class C:
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
@@ -1677,6 +1683,16 @@ class TypesSerializationTest(unittest.TestCase):
         )
 
         self.assertIs(
+            type(sc.deserialize(sc.serialize(ModuleLevelNamedTupleSubclass()))),
+            ModuleLevelNamedTupleSubclass
+        )
+
+        self.assertIs(
+            type(sc.deserialize(sc.serialize([ModuleLevelNamedTupleSubclass()]))[0]),
+            ModuleLevelNamedTupleSubclass
+        )
+
+        self.assertIs(
             sc.deserialize(sc.serialize(ModuleLevelNamedTupleSubclass(x=10))).f(),
             10
         )
@@ -1735,4 +1751,12 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(
             FancyClass(int),
             sc.deserialize(sc.serialize(FancyClass(int)))
+        )
+
+    def test_serialize_module_level_recursive_forward(self):
+        sc = SerializationContext()
+
+        self.assertIs(
+            ModuleLevelRecursiveForward,
+            sc.deserialize(sc.serialize(ModuleLevelRecursiveForward))
         )

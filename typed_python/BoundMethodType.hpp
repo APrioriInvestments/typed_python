@@ -49,7 +49,7 @@ public:
         // otherwise, the __name__ attribute of the type gets cut off at the last '.' and
         // looks like a memory corruption issue. It also prevents you from knowing what
         // type you're looking at.
-        std::string name = "BoundMethod(" + m_first_arg->name() + ", " + m_funcName + ")";
+        std::string name = "BoundMethod(" + m_first_arg->name(true) + ", " + m_funcName + ")";
         size_t size = m_first_arg->bytecount();
 
         anyChanged = (
@@ -58,6 +58,7 @@ public:
         );
 
         m_name = name;
+        m_stripped_name = "";
         m_size = size;
 
         return anyChanged;

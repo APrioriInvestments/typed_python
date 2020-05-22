@@ -18,7 +18,7 @@ from typed_python import (
     Forward, NamedTuple, Tuple, Dict, ListOf, ConstDict, Module
 )
 
-from typed_python._types import mutuallyRecursiveGroup
+from typed_python._types import mutuallyRecursiveGroup, isRecursive
 
 
 class ForwardTypesTests(unittest.TestCase):
@@ -183,6 +183,7 @@ class ForwardTypesTests(unittest.TestCase):
         TO = TO.define(TupleOf(OneOf(None, TO)))
         self.assertEqual(TO.__qualname__, "TO")
         self.assertIs(TO.ElementType.Types[1], TO)
+        self.assertTrue(isRecursive(TO.ElementType))
         self.assertEqual(TO.ElementType.__qualname__, "OneOf(None, TO)")
 
     def test_forward_types_identity_container(self):

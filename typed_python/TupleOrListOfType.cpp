@@ -27,7 +27,7 @@ bool TupleOrListOfType::isBinaryCompatibleWithConcrete(Type* other) {
 }
 
 bool TupleOrListOfType::_updateAfterForwardTypesChanged() {
-    std::string name = (m_is_tuple ? "TupleOf(" : "ListOf(") + m_element_type->name() + ")";
+    std::string name = (m_is_tuple ? "TupleOf(" : "ListOf(") + m_element_type->name(true) + ")";
 
     if (m_is_recursive_forward) {
         name = m_recursive_name;
@@ -36,6 +36,7 @@ bool TupleOrListOfType::_updateAfterForwardTypesChanged() {
     bool anyChanged = name != m_name;
 
     m_name = name;
+    m_stripped_name = "";
 
     return anyChanged;
 }

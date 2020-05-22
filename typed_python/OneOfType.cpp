@@ -60,7 +60,10 @@ bool OneOfType::_updateAfterForwardTypesChanged() {
     );
 
     m_size = size;
+    m_stripped_name = "";
     m_name = name;
+    m_stripped_name = "";
+
     m_is_default_constructible = is_default_constructible;
 
     return anyChanged;
@@ -78,7 +81,7 @@ std::string OneOfType::computeName() const {
             res += ", ";
         }
 
-        res += t->name();
+        res += t->name(true);
     }
 
     res += ")";

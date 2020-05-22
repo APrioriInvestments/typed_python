@@ -332,7 +332,7 @@ void iterateWithEarlyExit(PyObject* o, func_type f) {
 // 1.200001 -> 1.200001
 // 1.500e7 -> 1.5e7
 // 1.000e7 -> 1e7
-void remove_trailing_zeros_pystyle(char *s) {
+inline void remove_trailing_zeros_pystyle(char *s) {
     char *cur = s;
     char *decimal = 0;
     char *firstzero = 0;
@@ -367,4 +367,14 @@ void remove_trailing_zeros_pystyle(char *s) {
             *firstzero = 0;
         }
     }
+}
+
+//if a name has a '.' in it, strip out everything but the last part
+std::string qualname_to_name(std::string n) {
+    size_t ix = n.rfind(".");
+    if (ix == std::string::npos) {
+        return n;
+    }
+
+    return n.substr(ix + 1);
 }

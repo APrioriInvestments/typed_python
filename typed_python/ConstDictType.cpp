@@ -25,7 +25,7 @@ bool ConstDictType::_updateAfterForwardTypesChanged() {
     m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
     m_bytes_per_key_subtree_pair = m_key->bytecount() + this->bytecount();
 
-    std::string name = "ConstDict(" + m_key->name() + "->" + m_value->name() + ")";
+    std::string name = "ConstDict(" + m_key->name(true) + "->" + m_value->name(true) + ")";
 
     if (m_is_recursive_forward) {
         name = m_recursive_name;
@@ -34,6 +34,7 @@ bool ConstDictType::_updateAfterForwardTypesChanged() {
     bool anyChanged = name != m_name || m_bytes_per_key_value_pair != old_bytes_per_key_value_pair;
 
     m_name = name;
+    m_stripped_name = "";
 
     return anyChanged;
 }

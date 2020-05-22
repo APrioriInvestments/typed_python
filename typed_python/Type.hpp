@@ -167,7 +167,14 @@ public:
             );
     }
 
-    const std::string& name() const {
+    const std::string& name(bool stripQualname=false) const {
+        if (stripQualname) {
+            if (!m_stripped_name.size()) {
+                m_stripped_name = qualname_to_name(m_name);
+            }
+
+            return m_stripped_name;
+        }
         return m_name;
     }
 
@@ -553,7 +560,7 @@ public:
         return mMutuallyRecursiveTypeGroupHead;
     }
 
-    const std::map<int32_t, Type*> getRecursiveTypeGroup() const {
+    const std::map<int32_t, Type*>& getRecursiveTypeGroup() const {
         if (!mMutuallyRecursiveTypeGroupHead) {
             throw std::runtime_error("Type " + name() + " is not resolved yet.");
         }
@@ -584,6 +591,8 @@ protected:
     std::string m_recursive_name;
 
     std::string m_name;
+
+    mutable std::string m_stripped_name;
 
     PyTypeObject* mTypeRep;
 

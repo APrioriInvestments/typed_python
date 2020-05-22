@@ -35,7 +35,7 @@ public:
             Type(TypeCategory::catTypedCell),
             mHeldType(heldType)
     {
-        m_name = std::string("TypedCell(") + heldType->name() + ")";
+        m_name = std::string("TypedCell(") + heldType->name(true) + ")";
 
         m_is_simple = false;
 
@@ -60,11 +60,12 @@ public:
     }
 
     bool _updateAfterForwardTypesChanged() {
-        std::string newName = std::string("TypedCell(") + mHeldType->name() + ")";
+        std::string newName = std::string("TypedCell(") + mHeldType->name(true) + ")";
 
         bool nameChanged = newName != m_name;
 
         m_name = newName;
+        m_stripped_name = "";
 
         return nameChanged;
     }

@@ -62,7 +62,7 @@ public:
     }
 
     bool _updateAfterForwardTypesChanged() {
-        std::string name = "RefTo(" + m_element_type->name() + ")";
+        std::string name = "RefTo(" + m_element_type->name(true) + ")";
 
         if (m_is_recursive_forward) {
             name = m_recursive_name;
@@ -71,6 +71,7 @@ public:
         bool anyChanged = name != m_name;
 
         m_name = name;
+        m_stripped_name = "";
 
         return anyChanged;
     }

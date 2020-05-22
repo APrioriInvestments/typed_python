@@ -22,7 +22,7 @@ bool DictType::_updateAfterForwardTypesChanged() {
     m_bytes_per_key = m_key->bytecount();
     m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
 
-    std::string name = "Dict(" + m_key->name() + "->" + m_value->name() + ")";
+    std::string name = "Dict(" + m_key->name(true) + "->" + m_value->name(true) + ")";
 
     if (m_is_recursive_forward) {
         name = m_recursive_name;
@@ -31,6 +31,7 @@ bool DictType::_updateAfterForwardTypesChanged() {
     bool anyChanged = name != m_name;
 
     m_name = name;
+    m_stripped_name = "";
 
     return anyChanged;
 }

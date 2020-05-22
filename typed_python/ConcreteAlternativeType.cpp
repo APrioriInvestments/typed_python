@@ -54,6 +54,7 @@ bool ConcreteAlternative::_updateAfterForwardTypesChanged() {
     );
 
     m_name = name;
+    m_stripped_name = "";
     m_size = size;
     m_is_default_constructible = is_default_constructible;
 
