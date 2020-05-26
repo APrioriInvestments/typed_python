@@ -29,6 +29,7 @@ UInt8 = native_ast.UInt8
 Float64 = native_ast.Float64
 Float32 = native_ast.Float32
 Void = native_ast.Void
+Array16B = native_ast.Array16B
 
 
 def externalCallTarget(name, output, *inputs, varargs=False, intrinsic=False):
@@ -146,17 +147,29 @@ expm1_64 = externalCallTarget("np_expm1_float64", Float64, Float64)
 fabs32 = externalCallTarget("llvm.fabs.f32", Float32, Float32, intrinsic=True)
 fabs64 = externalCallTarget("llvm.fabs.f64", Float64, Float64, intrinsic=True)
 
+factorial = externalCallTarget("np_factorial", Int64, Int64)
+factorial32 = externalCallTarget("np_factorial32", Float32, Float32)
+factorial64 = externalCallTarget("np_factorial64", Float64, Float64)
+
 floor32 = externalCallTarget("llvm.floor.f32", Float32, Float32, intrinsic=True)
 floor64 = externalCallTarget("llvm.floor.f64", Float64, Float64, intrinsic=True)
 
 fmod32 = externalCallTarget("np_fmod_float32", Float32, Float32, Float32)
 fmod64 = externalCallTarget("np_fmod_float64", Float64, Float64, Float64)
 
+frexp32 = externalCallTarget("np_frexp_float32", Array16B, Float32)
+frexp64 = externalCallTarget("np_frexp_float64", Array16B, Float64)
+
 gamma32 = externalCallTarget("np_gamma_float32", Float32, Float32)
 gamma64 = externalCallTarget("np_gamma_float64", Float64, Float64)
 
+gcd = externalCallTarget("np_gcd", UInt64, UInt64, UInt64)
+
 isclose32 = externalCallTarget("np_isclose_float32", Bool, Float32, Float32, Float32, Float32)
 isclose64 = externalCallTarget("np_isclose_float64", Bool, Float64, Float64, Float64, Float64)
+
+ldexp32 = externalCallTarget("np_ldexp_float32", Float32, Float32, Int64)
+ldexp64 = externalCallTarget("np_ldexp_float64", Float64, Float64, Int64)
 
 lgamma32 = externalCallTarget("np_lgamma_float32", Float32, Float32)
 lgamma64 = externalCallTarget("np_lgamma_float64", Float64, Float64)

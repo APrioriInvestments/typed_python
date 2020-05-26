@@ -279,6 +279,12 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def f_radians(x):
             return math.radians(x)
 
+        # def f_frexp(x):
+        #    return math.frexp(x)
+
+        def f_factorial(x):
+            return math.factorial(x)
+
         for mathFun in [f_fabs, f_copysign1, f_copysign2, f_ceil, f_floor, f_trunc, f_degrees, f_radians]:
             compiled = Entrypoint(mathFun)
 
@@ -297,6 +303,38 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                     self.assertLess(abs(r3 - r1), 1e-6, (mathFun, v, r1, r3))
                 else:
                     self.assertLess(abs((r3 - r1) / r1), 1e-6, (mathFun, v, r1, r3))
+
+        for mathFun in [f_factorial]:
+            compiled = Entrypoint(mathFun)
+
+            self.assertEqual(compiled.resultTypeFor(int).typeRepresentation, int)
+            self.assertEqual(compiled.resultTypeFor(Int32).typeRepresentation, int)
+            self.assertEqual(compiled.resultTypeFor(UInt8).typeRepresentation, int)
+
+            for v in range(21):
+                r1 = mathFun(v)
+                r2 = compiled(v)
+                self.assertIsInstance(r2, int)
+                self.assertEqual(r1, r2, (mathFun, v))
+
+            with self.assertRaises(ValueError):
+                compiled(-1)
+            with self.assertRaises(ValueError):
+                compiled(-1.0)
+            with self.assertRaises(ValueError):
+                compiled(3.5)
+
+            for v in range(34):
+                r1 = mathFun(v)
+                r2 = compiled(Float32(v))
+                self.assertIsInstance(r2, Float32)
+                self.assertTrue(abs(Float32(r1) - r2) / Float32(r1) < 1e-6, (mathFun, v))
+
+            for v in range(170):
+                r1 = mathFun(v)
+                r2 = compiled(float(v))
+                self.assertIsInstance(r2, float)
+                self.assertTrue(abs(r1 - r2) / r1 < 1e-15, (mathFun, v))
 
     def test_math_other_two(self):
         def f_hypot(x, y):
@@ -375,6 +413,53 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                             r4 = compiled(Float32(v1), Float32(v2), rel_tol, abs_tol)
                             self.assertIsInstance(r4, bool)
                             self.assertEqual(r3, r4, (mathFun, v1, v2, rel_tol, abs_tol))
+
+        def f_gcd(x, y):
+            return math.gcd(x, y)
+
+        for mathFun in [f_gcd]:
+            compiled = Entrypoint(mathFun)
+            self.assertEqual(compiled.resultTypeFor(int, int).typeRepresentation, UInt64)
+            self.assertEqual(compiled.resultTypeFor(Int32, Int32).typeRepresentation, UInt64)
+            self.assertEqual(compiled.resultTypeFor(UInt32, Int16).typeRepresentation, UInt64)
+            self.assertEqual(compiled.resultTypeFor(Int8, UInt64).typeRepresentation, UInt64)
+            self.assertEqual(compiled.resultTypeFor(UInt64, UInt64).typeRepresentation, UInt64)
+
+            test_values = [-2**63+1, -35, 0, 1, 2, 3, 12, 15, 81, 90, 360, 1000, 1080, 2**16 * 3 * 5 * 7, 2**63-1]
+            for v1 in test_values:
+                for v2 in test_values:
+                    raisesTypeError = False
+                    try:
+                        r1 = mathFun(v1, v2)
+                    except TypeError:
+                        raisesTypeError = True
+                    if raisesTypeError:
+                        with self.assertRaises(TypeError):
+                            compiled(v1, v2)
+                    else:
+                        r2 = compiled(v1, v2)
+                        self.assertEqual(r1, r2, (mathFun, v1, v2))
+
+        def f_ldexp(x, y):
+            return math.ldexp(x, y)
+
+        for mathFun in [f_ldexp]:
+            compiled = Entrypoint(mathFun)
+            self.assertEqual(compiled.resultTypeFor(float, int).typeRepresentation, float)
+            self.assertEqual(compiled.resultTypeFor(Float32, int).typeRepresentation, Float32)
+            self.assertEqual(compiled.resultTypeFor(float, Int32).typeRepresentation, float)
+            self.assertEqual(compiled.resultTypeFor(Float32, Int32).typeRepresentation, Float32)
+
+            for v1 in [-123.45, -2.0, -1.0, -0.999, -0.7, -0.5, 0.0, 0.5, 0.7, 0.999, 1.0, 2.0, 123.45]:
+                for v2 in range(-10, 10):
+                    r1 = mathFun(v1, v2)
+                    r2 = compiled(v1, v2)
+
+                    self.assertEqual(r1, r2, (mathFun, v1, v2))
+
+                    r3 = Float32(r1)
+                    r4 = compiled(Float32(v1), Float32(v2))
+                    self.assertEqual(r3, r4, (mathFun, v1, v2))
 
     def test_math_constants(self):
         def all_constants(x):

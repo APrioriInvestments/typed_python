@@ -14,7 +14,7 @@
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
-from typed_python import Float32
+from typed_python import UInt64, Float32, Tuple
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
 from math import (
@@ -36,20 +36,20 @@ from math import (
     exp,
     expm1,
     fabs,
-    # factorial,
+    factorial,
     floor,
     fmod,
-    # frexp,
+    frexp,
     # fsum,
     gamma,
-    # gcd,
+    gcd,
     hypot,
     # inf,
     isclose,
     isfinite,
     isinf,
     isnan,
-    # ldexp,
+    ldexp,
     lgamma,
     log,
     log10,
@@ -76,8 +76,8 @@ class MathFunctionWrapper(Wrapper):
     is_pass_by_ref = False
 
     SUPPORTED_FUNCTIONS = (acos, acosh, asin, asinh, atan, atan2, atanh,
-                           copysign, cos, cosh, degrees, erf, erfc, exp, expm1, fabs,
-                           fmod, hypot, gamma, isclose, isnan, isfinite, isinf, lgamma,
+                           copysign, cos, cosh, degrees, erf, erfc, exp, expm1, fabs, factorial,
+                           fmod, frexp, hypot, gamma, gcd, isclose, isnan, isfinite, isinf, ldexp, lgamma,
                            log, log2, log10, log1p, pow, radians,
                            sin, sinh, sqrt, tan, tanh)
 
@@ -89,6 +89,48 @@ class MathFunctionWrapper(Wrapper):
         return native_ast.Type.Void()
 
     def convert_call(self, context, expr, args, kwargs):
+        if len(args) == 2 and not kwargs and self.typeRepresentation is ldexp:
+            arg1 = args[0]
+            arg2 = args[1]
+            argType1 = arg1.expr_type.typeRepresentation
+            argType2 = arg2.expr_type.typeRepresentation
+            if argType1 not in (Float32, float):
+                arg1 = arg1.convert_to_type(float)
+                if arg1 is None:
+                    return None
+                argType1 = float
+            if argType2 not in (int,):
+                arg2 = arg2.convert_to_type(int)
+                if arg2 is None:
+                    return None
+            argType2 = int
+            outT = argType1
+            func = runtime_functions.ldexp32 if argType1 is Float32 else runtime_functions.ldexp64
+            return context.pushPod(outT, func.call(arg1.nonref_expr, arg2.nonref_expr))
+
+        if len(args) == 2 and not kwargs and self.typeRepresentation is gcd:
+            arg1 = args[0]
+            arg2 = args[1]
+            argType1 = arg1.expr_type.typeRepresentation
+            argType2 = arg2.expr_type.typeRepresentation
+            if argType1 in (Float32, float):
+                return context.pushException(ValueError, f"'{argType1}' object cannot be interpreted as an integer")
+            if argType2 in (Float32, float):
+                return context.pushException(ValueError, f"'{argType2}' object cannot be interpreted as an integer")
+            arg1 = arg1.convert_abs()
+            if arg1 is None:
+                return None
+            arg1 = arg1.convert_to_type(UInt64)
+            if arg1 is None:
+                return None
+            arg2 = arg2.convert_abs()
+            if arg2 is None:
+                return None
+            arg2 = arg2.convert_to_type(UInt64)
+            if arg2 is None:
+                return None
+            return context.pushPod(UInt64, runtime_functions.gcd.call(arg1.nonref_expr, arg2.nonref_expr))
+
         if len(args) == 2 and (not kwargs or self.typeRepresentation is isclose):
             arg1 = args[0]
             arg2 = args[1]
@@ -113,30 +155,17 @@ class MathFunctionWrapper(Wrapper):
             assert argType1 == argType2
 
             outT = argType1  # default behavior is to return same type as arguments
-            if self.typeRepresentation is copysign:
-                func = runtime_functions.copysign32 if argType1 is Float32 else runtime_functions.copysign64
-            elif self.typeRepresentation is pow:
-                f_func = runtime_functions.floor32 if argType1 is Float32 else runtime_functions.floor64
-                with context.ifelse(arg1.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
-                    with ifTrue:  # arg1 <= 0.0
-                        with context.ifelse(arg1.nonref_expr.eq(0.0)) as (ifTrue2, ifFalse2):
-                            with ifTrue2:  # arg1 == 0.0
-                                with context.ifelse(arg2.nonref_expr.lt(0.0)) as (ifTrue3, ifFalse3):
-                                    with ifTrue3:
-                                        context.pushException(ValueError, "math domain error")
-                            with ifFalse2:  # arg1 < 0.0
-                                with context.ifelse(f_func.call(arg2.nonref_expr).sub(arg2.nonref_expr).eq(0.0)) as (ifTrue4, ifFalse4):
-                                    with ifFalse4:
-                                        context.pushException(ValueError, "math domain error")
-                func = runtime_functions.pow32 if argType1 is Float32 else runtime_functions.pow64
-            elif self.typeRepresentation is atan2:
+            if self.typeRepresentation is atan2:
                 func = runtime_functions.atan2_32 if argType1 is Float32 else runtime_functions.atan2_64
+            elif self.typeRepresentation is copysign:
+                func = runtime_functions.copysign32 if argType1 is Float32 else runtime_functions.copysign64
             elif self.typeRepresentation is fmod:
                 with context.ifelse(arg2.nonref_expr.eq(0.0)) as (ifTrue, ifFalse):
                     with ifTrue:
                         context.pushException(ValueError, "math domain error")
                 func = runtime_functions.fmod32 if argType1 is Float32 else runtime_functions.fmod64
             elif self.typeRepresentation is hypot:
+                # calculate this one directly
                 func = runtime_functions.sqrt32 if argType1 is Float32 else runtime_functions.sqrt64
                 return context.pushPod(outT, func.call(arg1.nonref_expr.mul(arg1.nonref_expr).add(arg2.nonref_expr.mul(arg2.nonref_expr))))
             elif self.typeRepresentation is isclose:
@@ -168,13 +197,42 @@ class MathFunctionWrapper(Wrapper):
                     else:
                         abs_tol = native_ast.const_float_expr(0.0)
                 return context.pushPod(bool, func.call(arg1.nonref_expr, arg2.nonref_expr, rel_tol, abs_tol))
+            elif self.typeRepresentation is pow:
+                f_func = runtime_functions.floor32 if argType1 is Float32 else runtime_functions.floor64
+                with context.ifelse(arg1.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
+                    with ifTrue:  # arg1 <= 0.0
+                        with context.ifelse(arg1.nonref_expr.eq(0.0)) as (ifTrue2, ifFalse2):
+                            with ifTrue2:  # arg1 == 0.0
+                                with context.ifelse(arg2.nonref_expr.lt(0.0)) as (ifTrue3, ifFalse3):
+                                    with ifTrue3:
+                                        context.pushException(ValueError, "math domain error")
+                            with ifFalse2:  # arg1 < 0.0
+                                with context.ifelse(f_func.call(arg2.nonref_expr).sub(arg2.nonref_expr).eq(0.0)) as (ifTrue4, ifFalse4):
+                                    with ifFalse4:
+                                        context.pushException(ValueError, "math domain error")
+                func = runtime_functions.pow32 if argType1 is Float32 else runtime_functions.pow64
             # elif self.typeRepresentation is remainder:  # added in 3.7
             #     func = runtime_functions.remainder32 if argType1 is Float32 else runtime_functions.remainder64
             else:
                 assert False, "Unreachable"
 
             return context.pushPod(outT, func.call(arg1.nonref_expr, arg2.nonref_expr))
-        elif len(args) == 1 and not kwargs:
+
+        if len(args) == 1 and not kwargs and self.typeRepresentation is factorial:
+            arg = args[0]
+            argType = arg.expr_type.typeRepresentation
+            if argType not in (Float32, float):
+                if argType not in (int,):
+                    arg = arg.convert_to_type(int, explicit=True)
+                    if arg is None:
+                        return None
+                with context.ifelse(arg.nonref_expr.lt(0)) as (ifTrue, ifFalse):
+                    with ifTrue:
+                        context.pushException(ValueError, "factorial() not defined for negative values")
+                return context.pushPod(int, runtime_functions.factorial.call(arg.nonref_expr))
+            # let Float32 and float args fall through to next section
+
+        if len(args) == 1 and not kwargs:
             arg = args[0]
 
             if not arg.expr_type.is_arithmetic:
@@ -248,6 +306,16 @@ class MathFunctionWrapper(Wrapper):
                 func = runtime_functions.expm1_32 if argType is Float32 else runtime_functions.expm1_64
             elif self.typeRepresentation is fabs:
                 func = runtime_functions.fabs32 if argType is Float32 else runtime_functions.fabs64
+            elif self.typeRepresentation is factorial:
+                f_func = runtime_functions.floor32 if argType is Float32 else runtime_functions.floor64
+                with context.ifelse(arg.nonref_expr.gte(0.0)) as (ifTrue, ifFalse):
+                    with ifTrue:  # arg >= 0
+                        with context.ifelse(f_func.call(arg.nonref_expr).sub(arg.nonref_expr).neq(0.0)) as (ifTrue2, ifFalse2):
+                            with ifTrue2:
+                                context.pushException(ValueError, "factorial() only accepts integral values")
+                    with ifFalse:  # arg < 0
+                        context.pushException(ValueError, "factorial() not defined for negative values")
+                func = runtime_functions.factorial32 if argType is Float32 else runtime_functions.factorial64
             elif self.typeRepresentation is floor:
                 func = runtime_functions.floor32 if argType is Float32 else runtime_functions.floor64
             elif self.typeRepresentation is gamma:
@@ -258,6 +326,15 @@ class MathFunctionWrapper(Wrapper):
                             with ifTrue2:
                                 context.pushException(ValueError, "math domain error")
                 func = runtime_functions.gamma32 if argType is Float32 else runtime_functions.gamma64
+            elif self.typeRepresentation is frexp:
+                func = runtime_functions.frexp32 if argType is Float32 else runtime_functions.frexp64
+                outT = Tuple(float, int)  # TODO: make this masquerading tuple
+                return context.push(
+                    outT,
+                    lambda out: out.expr.store(
+                        func.call(arg.nonref_expr).cast(out.expr_type.getNativeLayoutType())
+                    )
+                )
             elif self.typeRepresentation is isnan:
                 func = runtime_functions.isnan_float32 if argType is Float32 else runtime_functions.isnan_float64
                 outT = bool

@@ -665,6 +665,7 @@ UInt16 = Type.Int(bits=16, signed=False)
 UInt8 = Type.Int(bits=8, signed=False)
 Int32Ptr = Int32.pointer()
 Int64Ptr = Int64.pointer()
+Array16B = Type.Array(element_type=UInt8, count=16)
 
 
 def var(name):
