@@ -14,7 +14,7 @@
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
-from typed_python import UInt64, Float32, Tuple
+from typed_python import UInt64, Float32, Tuple, ListOf
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
 from math import (
@@ -40,7 +40,7 @@ from math import (
     floor,
     fmod,
     frexp,
-    # fsum,
+    fsum,
     gamma,
     gcd,
     hypot,
@@ -70,6 +70,41 @@ from math import (
 )
 
 
+def sumIterable(iterable):
+    """Full precision summation using multiple floats for intermediate values,
+    from code.activestate.com/recipes/393090/"""
+    # Rounded x+y stored in hi with the round-off stored in lo.  Together
+    # hi+lo are exactly equal to x+y.  The inner loop applies hi/lo summation
+    # to each partial so that the list of partial sums remains exact.
+    # Depends on IEEE-754 arithmetic guarantees.  See proof of correctness at:
+    # www-2.cs.cmu.edu/afs/cs/project/quake/public/papers/robust-arithmetic.ps
+
+    partials = ListOf(float)()
+    for item in iterable:
+        x = float(item)
+        i = 0
+        for y in partials:
+            if abs(x) < abs(y):
+                t = x
+                x = y
+                y = t
+            hi = x + y
+            lo = y - (hi - x)
+            if lo:
+                partials[i] = lo
+                i += 1
+            x = hi
+        popindex = len(partials) - 1
+        while popindex >= i:
+            partials.pop()
+            popindex -= 1
+        partials.append(x)
+    ret = 0.0
+    for p in partials:
+        ret += p
+    return ret
+
+
 class MathFunctionWrapper(Wrapper):
     is_pod = True
     is_empty = False
@@ -77,7 +112,7 @@ class MathFunctionWrapper(Wrapper):
 
     SUPPORTED_FUNCTIONS = (acos, acosh, asin, asinh, atan, atan2, atanh,
                            copysign, cos, cosh, degrees, erf, erfc, exp, expm1, fabs, factorial,
-                           fmod, frexp, hypot, gamma, gcd, isclose, isnan, isfinite, isinf, ldexp, lgamma,
+                           fmod, frexp, fsum, hypot, gamma, gcd, isclose, isnan, isfinite, isinf, ldexp, lgamma,
                            log, log2, log10, log1p, pow, radians,
                            sin, sinh, sqrt, tan, tanh)
 
@@ -231,6 +266,10 @@ class MathFunctionWrapper(Wrapper):
                         context.pushException(ValueError, "factorial() not defined for negative values")
                 return context.pushPod(int, runtime_functions.factorial.call(arg.nonref_expr))
             # let Float32 and float args fall through to next section
+
+        if len(args) == 1 and not kwargs and self.typeRepresentation is fsum:
+            arg = args[0]
+            return context.call_py_function(sumIterable, (arg,), {})
 
         if len(args) == 1 and not kwargs:
             arg = args[0]

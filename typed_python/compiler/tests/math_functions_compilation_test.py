@@ -18,7 +18,7 @@ import time
 import numpy
 
 from typed_python import (
-    Float32, UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8
+    Float32, UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8, ListOf, TupleOf
 )
 
 from typed_python import Entrypoint
@@ -460,6 +460,28 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                     r3 = Float32(r1)
                     r4 = compiled(Float32(v1), Float32(v2))
                     self.assertEqual(r3, r4, (mathFun, v1, v2))
+
+    def test_math_fsum(self):
+        def f_fsum(iterable):
+            return math.fsum(iterable)
+
+        compiled = Entrypoint(f_fsum)
+
+        test_cases = [
+            [1, 1e100, 1, -1e100],
+            ([1, 1e100] * 10 + [1, -1e100] * 10) * 10,
+            range(100),
+            range(-1000, 1000, 5),
+            ListOf(float)([1.1, 2.2, 3.3]),
+            TupleOf(float)([1.1, 2.2, 3.3])
+        ]
+        for v in test_cases:
+            r1 = math.fsum(v)
+            r2 = compiled(v)
+            self.assertEqual(r1, r2)
+
+        with self.assertRaises(TypeError):
+            compiled([0.1, 0.2, 0.3, "abc"])
 
     def test_math_constants(self):
         def all_constants(x):
