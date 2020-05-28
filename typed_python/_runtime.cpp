@@ -284,7 +284,7 @@ extern "C" {
 
     array8b np_modf_float32(float f) {
         float integer;
-        float frac = modf(f, &integer);
+        float frac = modff(f, &integer);
         array8b ret;
         static Tuple* tupleT = Tuple::Make({Float32::Make(), Float32::Make()});
 
