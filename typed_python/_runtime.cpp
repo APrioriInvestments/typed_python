@@ -27,18 +27,6 @@ extern "C" {
         throw PythonExceptionSet();
     }
 
-    struct array16b {
-        uint8_t b[16];
-    };
-
-    struct array12b {
-        uint8_t b[12];
-    };
-
-    struct array8b {
-        uint8_t b[8];
-    };
-
     double np_acos_float64(double d) {
         return std::acos(d);
     }
@@ -171,13 +159,12 @@ extern "C" {
         return std::fmod(f1, f2);
     }
 
-    array16b np_frexp_float64(double d) {
+    void np_frexp_float64(double d, instance_ptr ret) {
         int exp;
         double man = frexp(d, &exp);
-        array16b ret;
         static Tuple* tupleT = Tuple::Make({Float64::Make(), Int64::Make()});
 
-        tupleT->constructor((instance_ptr)&ret,
+        tupleT->constructor(ret,
             [&](uint8_t* eltPtr, int64_t k) {
                 if (k == 0)
                     *(double*)eltPtr = man;
@@ -185,17 +172,14 @@ extern "C" {
                     *(int64_t*)eltPtr = (int64_t)exp;
                 }
             );
-
-        return ret;
     }
 
-    array12b np_frexp_float32(float f) {
+    void np_frexp_float32(float f, instance_ptr ret) {
         int exp;
         float man = frexp(f, &exp);
-        array12b ret;
         static Tuple* tupleT = Tuple::Make({Float32::Make(), Int64::Make()});
 
-        tupleT->constructor((instance_ptr)&ret,
+        tupleT->constructor(ret,
             [&](uint8_t* eltPtr, int64_t k) {
                 if (k == 0)
                     *(float*)eltPtr = man;
@@ -203,8 +187,6 @@ extern "C" {
                     *(int64_t*)eltPtr = (int64_t)exp;
                 }
             );
-
-        return ret;
     }
 
     double np_gamma_float64(double d) {
@@ -264,40 +246,24 @@ extern "C" {
         return std::log1p(f);
     }
 
-    array16b np_modf_float64(double d) {
+    void np_modf_float64(double d, instance_ptr ret) {
         double integer;
         double frac = modf(d, &integer);
-        array16b ret;
         static Tuple* tupleT = Tuple::Make({Float64::Make(), Float64::Make()});
 
-        tupleT->constructor((instance_ptr)&ret,
-            [&](uint8_t* eltPtr, int64_t k) {
-                if (k == 0)
-                    *(double*)eltPtr = frac;
-                else
-                    *(double*)eltPtr = integer;
-                }
-            );
-
-        return ret;
+        tupleT->constructor(ret,
+            [&](uint8_t* eltPtr, int64_t k) { *(double*)eltPtr = k == 0 ? frac : integer; }
+        );
     }
 
-    array8b np_modf_float32(float f) {
+    void np_modf_float32(float f, instance_ptr ret) {
         float integer;
         float frac = modff(f, &integer);
-        array8b ret;
         static Tuple* tupleT = Tuple::Make({Float32::Make(), Float32::Make()});
 
-        tupleT->constructor((instance_ptr)&ret,
-            [&](uint8_t* eltPtr, int64_t k) {
-                if (k == 0)
-                    *(float*)eltPtr = frac;
-                else
-                    *(float*)eltPtr = integer;
-                }
-            );
-
-        return ret;
+        tupleT->constructor(ret,
+            [&](uint8_t* eltPtr, int64_t k) { *(float*)eltPtr = k == 0 ? frac : integer; }
+        );
     }
 
     double np_sinh_float64(double d) {

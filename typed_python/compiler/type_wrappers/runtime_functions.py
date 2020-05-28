@@ -29,9 +29,6 @@ UInt8 = native_ast.UInt8
 Float64 = native_ast.Float64
 Float32 = native_ast.Float32
 Void = native_ast.Void
-Array16B = native_ast.Array16B
-Array12B = native_ast.Array12B
-Array8B = native_ast.Array8B
 
 
 def externalCallTarget(name, output, *inputs, varargs=False, intrinsic=False):
@@ -159,8 +156,8 @@ floor64 = externalCallTarget("llvm.floor.f64", Float64, Float64, intrinsic=True)
 fmod32 = externalCallTarget("np_fmod_float32", Float32, Float32, Float32)
 fmod64 = externalCallTarget("np_fmod_float64", Float64, Float64, Float64)
 
-frexp32 = externalCallTarget("np_frexp_float32", Array12B, Float32)
-frexp64 = externalCallTarget("np_frexp_float64", Array16B, Float64)
+frexp32 = externalCallTarget("np_frexp_float32", Void, Float32, Void.pointer())
+frexp64 = externalCallTarget("np_frexp_float64", Void, Float64, Void.pointer())
 
 gamma32 = externalCallTarget("np_gamma_float32", Float32, Float32)
 gamma64 = externalCallTarget("np_gamma_float64", Float64, Float64)
@@ -188,8 +185,8 @@ log2_64 = externalCallTarget("llvm.log2.f64", Float64, Float64, intrinsic=True)
 log10_32 = externalCallTarget("llvm.log10.f32", Float32, Float32, intrinsic=True)
 log10_64 = externalCallTarget("llvm.log10.f64", Float64, Float64, intrinsic=True)
 
-modf32 = externalCallTarget("np_modf_float32", Array8B, Float32)
-modf64 = externalCallTarget("np_modf_float64", Array16B, Float64)
+modf32 = externalCallTarget("np_modf_float32", Void, Float32, Void.pointer())
+modf64 = externalCallTarget("np_modf_float64", Void, Float64, Void.pointer())
 
 pow32 = externalCallTarget("llvm.pow.f32", Float32, Float32, Float32, intrinsic=True)
 pow64 = externalCallTarget("llvm.pow.f64", Float64, Float64, Float64, intrinsic=True)

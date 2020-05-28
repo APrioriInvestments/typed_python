@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import typed_python.compiler
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
 from typed_python import UInt64, Float32, Tuple, ListOf
@@ -206,32 +207,21 @@ class MathFunctionWrapper(Wrapper):
                 return context.pushPod(outT, func.call(arg1.nonref_expr.mul(arg1.nonref_expr).add(arg2.nonref_expr.mul(arg2.nonref_expr))))
             elif self.typeRepresentation is isclose:
                 func = runtime_functions.isclose32 if argType1 is Float32 else runtime_functions.isclose64
-                if argType1 is Float32:
-                    if "rel_tol" in kwargs:
-                        rel_tol = kwargs["rel_tol"].convert_to_type(Float32)
-                        if rel_tol is None:
-                            return None
-                    else:
-                        rel_tol = native_ast.const_float32_expr(1e-05)
-                    if "abs_tol" in kwargs:
-                        abs_tol = kwargs["abs_tol"].convert_to_type(Float32)
-                        if abs_tol is None:
-                            return None
-                    else:
-                        abs_tol = native_ast.const_float32_expr(0.0)
+
+                if "rel_tol" in kwargs:
+                    rel_tol = kwargs["rel_tol"].convert_to_type(argType1)
+                    if rel_tol is None:
+                        return None
                 else:
-                    if "rel_tol" in kwargs:
-                        rel_tol = kwargs["rel_tol"].convert_to_type(float)
-                        if rel_tol is None:
-                            return None
-                    else:
-                        rel_tol = native_ast.const_float_expr(1e-09)
-                    if "abs_tol" in kwargs:
-                        abs_tol = kwargs["abs_tol"].convert_to_type(float)
-                        if abs_tol is None:
-                            return None
-                    else:
-                        abs_tol = native_ast.const_float_expr(0.0)
+                    rel_tol = native_ast.const_float32_expr(1e-5) if argType1 is Float32 else native_ast.const_float_expr(1e-9)
+
+                if "abs_tol" in kwargs:
+                    abs_tol = kwargs["abs_tol"].convert_to_type(argType1)
+                    if abs_tol is None:
+                        return None
+                else:
+                    abs_tol = native_ast.const_float32_expr(0.0) if argType1 is Float32 else native_ast.const_float_expr(0.0)
+
                 return context.pushPod(bool, func.call(arg1.nonref_expr, arg2.nonref_expr, rel_tol, abs_tol))
             elif self.typeRepresentation is pow:
                 f_func = runtime_functions.floor32 if argType1 is Float32 else runtime_functions.floor64
@@ -285,7 +275,7 @@ class MathFunctionWrapper(Wrapper):
                     return context.constant(False)
                 elif self.typeRepresentation in (isfinite,):
                     return context.constant(True)
-                elif self.typeRepresentation in (log, log2, log10, exp, cos, sin, sqrt, fabs):
+                else:
                     arg = arg.convert_to_type(float)
                     if arg is None:
                         return None
@@ -359,12 +349,11 @@ class MathFunctionWrapper(Wrapper):
             elif self.typeRepresentation is floor:
                 func = runtime_functions.floor32 if argType is Float32 else runtime_functions.floor64
             elif self.typeRepresentation is frexp:
-                if argType is Float32:
-                    outT = MasqueradingTupleWrapper(Tuple(Float32, int))
-                else:
-                    outT = MasqueradingTupleWrapper(Tuple(float, int))
+                outT = MasqueradingTupleWrapper(Tuple(argType, int))
+                return_tuple = native_ast.Expression.StackSlot(name=".return_tuple", type=outT.layoutType)
                 func = runtime_functions.frexp32 if argType is Float32 else runtime_functions.frexp64
-                return context.push(outT, lambda out: out.expr.store(func.call(arg.nonref_expr)))
+                context.pushEffect(func.call(arg.nonref_expr, return_tuple.elemPtr(0).cast(native_ast.VoidPtr)))
+                return typed_python.compiler.typed_expression.TypedExpression(self, return_tuple, outT, True)
             elif self.typeRepresentation is gamma:
                 f_func = runtime_functions.floor32 if argType is Float32 else runtime_functions.floor64
                 with context.ifelse(arg.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
@@ -416,15 +405,11 @@ class MathFunctionWrapper(Wrapper):
                 else:
                     return context.pushPod(outT, arg.nonref_expr.mul(native_ast.const_float_expr(pi / 180)))
             elif self.typeRepresentation is modf:
-                if argType is Float32:
-                    outT = MasqueradingTupleWrapper(Tuple(Float32, Float32))
-                else:
-                    outT = MasqueradingTupleWrapper(Tuple(float, float))
-                # without masquerade, still doesn't work:
-                # outT = Tuple(float, float)
-                # return context.push(outT, lambda out: out.expr.store(runtime_functions.modf64.call(arg.nonref_expr)))
+                outT = MasqueradingTupleWrapper(Tuple(argType, argType))
+                return_tuple = native_ast.Expression.StackSlot(name=".return_tuple", type=outT.layoutType)
                 func = runtime_functions.modf32 if argType is Float32 else runtime_functions.modf64
-                return context.push(outT, lambda out: out.expr.store(func.call(arg.nonref_expr)))
+                context.pushEffect(func.call(arg.nonref_expr, return_tuple.elemPtr(0).cast(native_ast.VoidPtr)))
+                return typed_python.compiler.typed_expression.TypedExpression(self, return_tuple, outT, True)
             elif self.typeRepresentation is sin:
                 func = runtime_functions.sin32 if argType is Float32 else runtime_functions.sin64
             elif self.typeRepresentation is sinh:

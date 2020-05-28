@@ -24,6 +24,10 @@ from typed_python import (
 from typed_python import Entrypoint
 
 
+import typed_python.compiler
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
 @Entrypoint
 def compiledHash(x):
     return hash(x)
@@ -279,19 +283,8 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def f_radians(x):
             return math.radians(x)
 
-        def f_frexp(x):
-            return math.frexp(x)
-
         def f_factorial(x):
             return math.factorial(x)
-
-        def f_modf(x):
-            return math.modf(x)
-
-        # compiled = Entrypoint(f_modf)
-        # r1 = f_modf(2.5)
-        # r2 = compiled(2.5)  # garbage value, doesn't match
-        # return
 
         for mathFun in [f_fabs, f_copysign1, f_copysign2, f_ceil, f_floor, f_trunc, f_degrees, f_radians]:
             compiled = Entrypoint(mathFun)
@@ -343,6 +336,32 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                 r2 = compiled(float(v))
                 self.assertIsInstance(r2, float)
                 self.assertTrue(abs(r1 - r2) / r1 < 1e-15, (mathFun, v))
+
+    def test_math_frexp_modf(self):
+        def f_frexp(x):
+            return math.frexp(x)
+
+        def f_modf(x):
+            return math.modf(x)
+
+        for mathFun in [f_frexp, f_modf]:
+            compiled = Entrypoint(mathFun)
+
+            self.assertEqual(compiled.resultTypeFor(float).typeRepresentation, typeWrapper(tuple).typeRepresentation)
+            self.assertEqual(compiled.resultTypeFor(Float32).typeRepresentation, typeWrapper(tuple).typeRepresentation)
+            for v in [-1e30/7, -1234.5, -12.34, -1.0, -0.5, 0.0, 0.5, 1.0, 12.34, 1234.5, 1e30/7]:
+                r1 = mathFun(v)
+                r2 = compiled(v)
+                self.assertIsInstance(r2[0], float)
+                self.assertIsInstance(r2[1], float if mathFun is f_modf else int)
+                self.assertEqual(r1, r2, (mathFun, v))
+
+                r3 = compiled(Float32(v))
+                self.assertTrue(type(r3[0]) is Float32)
+                # self.assertIsInstance(r2[0], Float32) fails for some reason
+                self.assertTrue(type(r3[1]) is (Float32 if mathFun is f_modf else int))
+                for i in range(2):
+                    self.assertLess(abs((r1[i] - r3[i])/r1[i]) if r1[i] else abs(r1[i] - r3[i]), 1e-6)
 
     def test_math_other_two(self):
         def f_hypot(x, y):
