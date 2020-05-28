@@ -279,11 +279,19 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def f_radians(x):
             return math.radians(x)
 
-        # def f_frexp(x):
-        #    return math.frexp(x)
+        def f_frexp(x):
+            return math.frexp(x)
 
         def f_factorial(x):
             return math.factorial(x)
+
+        def f_modf(x):
+            return math.modf(x)
+
+        # compiled = Entrypoint(f_modf)
+        # r1 = f_modf(2.5)
+        # r2 = compiled(2.5)  # garbage value, doesn't match
+        # return
 
         for mathFun in [f_fabs, f_copysign1, f_copysign2, f_ceil, f_floor, f_trunc, f_degrees, f_radians]:
             compiled = Entrypoint(mathFun)

@@ -16,6 +16,7 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
 from typed_python import UInt64, Float32, Tuple, ListOf
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
+from typed_python.compiler.type_wrappers.tuple_wrapper import MasqueradingTupleWrapper
 
 from math import (
     acos,
@@ -55,7 +56,7 @@ from math import (
     log10,
     log1p,
     log2,
-    # modf,
+    modf,
     # nan,
     pi,
     pow,
@@ -113,7 +114,7 @@ class MathFunctionWrapper(Wrapper):
     SUPPORTED_FUNCTIONS = (acos, acosh, asin, asinh, atan, atan2, atanh,
                            copysign, cos, cosh, degrees, erf, erfc, exp, expm1, fabs, factorial,
                            fmod, frexp, fsum, hypot, gamma, gcd, isclose, isnan, isfinite, isinf, ldexp, lgamma,
-                           log, log2, log10, log1p, pow, radians,
+                           log, log2, log10, log1p, modf, pow, radians,
                            sin, sinh, sqrt, tan, tanh)
 
     def __init__(self, mathFun):
@@ -357,6 +358,13 @@ class MathFunctionWrapper(Wrapper):
                 func = runtime_functions.factorial32 if argType is Float32 else runtime_functions.factorial64
             elif self.typeRepresentation is floor:
                 func = runtime_functions.floor32 if argType is Float32 else runtime_functions.floor64
+            elif self.typeRepresentation is frexp:
+                if argType is Float32:
+                    outT = MasqueradingTupleWrapper(Tuple(Float32, int))
+                else:
+                    outT = MasqueradingTupleWrapper(Tuple(float, int))
+                func = runtime_functions.frexp32 if argType is Float32 else runtime_functions.frexp64
+                return context.push(outT, lambda out: out.expr.store(func.call(arg.nonref_expr)))
             elif self.typeRepresentation is gamma:
                 f_func = runtime_functions.floor32 if argType is Float32 else runtime_functions.floor64
                 with context.ifelse(arg.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
@@ -365,15 +373,6 @@ class MathFunctionWrapper(Wrapper):
                             with ifTrue2:
                                 context.pushException(ValueError, "math domain error")
                 func = runtime_functions.gamma32 if argType is Float32 else runtime_functions.gamma64
-            elif self.typeRepresentation is frexp:
-                func = runtime_functions.frexp32 if argType is Float32 else runtime_functions.frexp64
-                outT = Tuple(float, int)  # TODO: make this masquerading tuple
-                return context.push(
-                    outT,
-                    lambda out: out.expr.store(
-                        func.call(arg.nonref_expr).cast(out.expr_type.getNativeLayoutType())
-                    )
-                )
             elif self.typeRepresentation is isnan:
                 func = runtime_functions.isnan_float32 if argType is Float32 else runtime_functions.isnan_float64
                 outT = bool
@@ -416,6 +415,16 @@ class MathFunctionWrapper(Wrapper):
                     return context.pushPod(outT, arg.nonref_expr.mul(native_ast.const_float32_expr(pi / 180)))
                 else:
                     return context.pushPod(outT, arg.nonref_expr.mul(native_ast.const_float_expr(pi / 180)))
+            elif self.typeRepresentation is modf:
+                if argType is Float32:
+                    outT = MasqueradingTupleWrapper(Tuple(Float32, Float32))
+                else:
+                    outT = MasqueradingTupleWrapper(Tuple(float, float))
+                # without masquerade, still doesn't work:
+                # outT = Tuple(float, float)
+                # return context.push(outT, lambda out: out.expr.store(runtime_functions.modf64.call(arg.nonref_expr)))
+                func = runtime_functions.modf32 if argType is Float32 else runtime_functions.modf64
+                return context.push(outT, lambda out: out.expr.store(func.call(arg.nonref_expr)))
             elif self.typeRepresentation is sin:
                 func = runtime_functions.sin32 if argType is Float32 else runtime_functions.sin64
             elif self.typeRepresentation is sinh:
