@@ -27,6 +27,9 @@ extern "C" {
         throw PythonExceptionSet();
     }
 
+    // START math functions
+    // parameters are checked before calling these functions
+
     double np_acos_float64(double d) {
         return std::acos(d);
     }
@@ -150,6 +153,8 @@ extern "C" {
         }
         return ret;
     }
+
+    // END math functions
 
     double np_fmod_float64(double d1, double d2) {
         return std::fmod(d1, d2);

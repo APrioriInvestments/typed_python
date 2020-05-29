@@ -179,10 +179,6 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def f_tanh(x):
             return math.tanh(x)
 
-        # added in 3.7:
-        # def f_remainder(x, y):
-        #     return math.remainder(x, y)
-
         def f_pow(x, y):
             return math.pow(x, y)
 
@@ -510,6 +506,9 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             compiled([0.1, 0.2, 0.3, "abc"])
 
+        with self.assertRaises(TypeError):
+            compiled(1234)  # not iterable
+
     def test_math_constants(self):
         def all_constants(x):
             return (type(x), math.pi, math.e, math.tau, math.inf, math.nan)
@@ -521,3 +520,55 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         self.assertTrue(math.isnan(r2[5]))
         # Note r1 != r2 because nan != nan
         self.assertEqual(r1[0:-1], r2[0:-1])
+
+    def test_math_functions_perf_other(self):
+        count = 1000000
+        element = lambda i: -5.0 + i / (count / 10.0)
+        domain = [element(i) for i in range(count)]
+        a = numpy.fromiter(domain, numpy.float64)
+
+        def many_sin(n: int):
+            sum = 0.0
+            for i in range(n):
+                sum += math.sin(element(i))
+            return sum
+
+        def many_exp(n: int):
+            sum = 0.0
+            for i in range(n):
+                sum += math.exp(element(i))
+            return sum
+
+        def many_hypot(n: int):
+            sum = 0.0
+            for i in range(n):
+                sum += math.hypot(element(i), 2.0)
+            return sum
+
+        for f, numpy_f in [(many_sin, numpy.sin), (many_exp, numpy.exp), (many_hypot, numpy.hypot)]:
+            compiled = Entrypoint(f)
+            compiled(1)
+
+            t0 = time.time()
+            r0 = f(count)
+            t1 = time.time()
+            r1 = compiled(count)
+            t2 = time.time()
+            if numpy_f is numpy.hypot:
+                r2 = numpy_f(a, 2.0).sum()
+            else:
+                r2 = numpy_f(a).sum()
+            t3 = time.time()
+
+            if r0 != r1:
+                pass
+            if r0 != r2:
+                pass
+
+            speedup = (t1 - t0) / (t2 - t1)
+
+            print(f"{f.__name__} speedup is", speedup)
+
+            speedupVsNumpy = (t3 - t2) / (t2 - t1)
+
+            print(f"{f.__name__} speedup vs numpy is", speedupVsNumpy)
