@@ -3177,3 +3177,81 @@ class NativeTypesTests(unittest.TestCase):
                     self.assertEqual(t1 >= t2, t1Untyped >= t2Untyped)
                     self.assertEqual(t1 != t2, t1Untyped != t2Untyped)
                     self.assertEqual(t1 == t2, t1Untyped == t2Untyped)
+
+    def test_compare_dictionaries_containing_user_classes(self):
+        class C:
+            def __init__(self, x):
+                self.x = x
+
+            def __eq__(self, other):
+                return self.x == other.x
+
+        x = Dict(str, C)()
+        y = Dict(str, C)()
+
+        x["a"] = C(10)
+        y["a"] = C(10)
+
+        self.assertEqual(x, y)
+
+    def test_extend_and_refcounts(self):
+        T = ListOf(ListOf(int))
+
+        t = T()
+        ls = ListOf(int)()
+        assert _types.refcount(ls) == 1
+
+        t.extend([ls, ls])
+
+        assert _types.refcount(ls) == 3
+
+        t.resize(0)
+
+        assert _types.refcount(ls) == 1
+
+        t2 = T([ls, ls])
+
+        assert _types.refcount(ls) == 3
+
+        t.extend(t2)
+        t2.resize(0)
+
+        assert _types.refcount(ls) == 3
+
+        t.resize(0)
+
+        assert _types.refcount(ls) == 1
+
+    def test_string_count(self):
+        sc = _types.stringCount()
+
+        l = ListOf(str)()
+        l.append("a")
+
+        self.assertEqual(sc + 1, _types.stringCount())
+
+        l.resize(0)
+
+        self.assertEqual(sc, _types.stringCount())
+
+        @Entrypoint
+        def appendString(x, s):
+            x.append(s)
+
+        appendString(l, "a")
+
+        @Entrypoint
+        def resizeNull(x):
+            x.resize(0)
+
+        resizeNull(l)
+
+        sc = _types.stringCount()
+
+        appendString(l, "a")
+
+        self.assertEqual(sc + 1, _types.stringCount())
+
+        resizeNull(l)
+
+        self.assertEqual(sc + 1, _types.stringCount())

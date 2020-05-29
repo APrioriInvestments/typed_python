@@ -17,7 +17,7 @@ import time
 import gc
 import math
 from typed_python.test_util import currentMemUsageMb
-from typed_python._types import is_default_constructible
+from typed_python._types import is_default_constructible, refcount
 from typed_python import (
     Int16, UInt64, Float32, ListOf, TupleOf, OneOf, NamedTuple, Class, Alternative,
     ConstDict, PointerTo, Member, _types, Forward, Final, Function, Entrypoint, Tuple,
@@ -1591,3 +1591,36 @@ class NativeClassTypesTests(unittest.TestCase):
         # duplicate their internals.
         t[3] = t[2]
         self.assertEqual(t[3].x, 20)
+
+    def test_class_equality(self):
+        class H(Class, Final):
+            x = Member(int)
+
+            def __eq__(self, other):
+                return self.x == other.x
+
+        h1 = H(x=10)
+        h2 = H(x=10)
+
+        self.assertEqual(h1, h1)
+        self.assertEqual(h1, h2)
+
+    def test_subclass_destructors(self):
+        class B(Class):
+            x = Member(ListOf(int))
+
+        class C(B):
+            y = Member(ListOf(int))
+
+        ls1 = ListOf(int)()
+        ls2 = ListOf(int)()
+
+        aC = C(x=ls1, y=ls2)
+
+        self.assertEqual(refcount(ls1), 2)
+        self.assertEqual(refcount(ls2), 2)
+
+        aC = None  # noqa
+
+        self.assertEqual(refcount(ls1), 1)
+        self.assertEqual(refcount(ls2), 1)

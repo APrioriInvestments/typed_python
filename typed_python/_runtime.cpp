@@ -16,6 +16,11 @@
 // Note: extern C identifiers are distinguished only up to 32 characters
 // nativepython_runtime_12345678901
 extern "C" {
+    void freeStringMem(uint8_t* data) {
+        free(data);
+        StringType::stringCount -= 1;
+    }
+
     void np_raiseAttributeErr(uint8_t* attributeName) {
         PyEnsureGilAcquired getTheGil;
 

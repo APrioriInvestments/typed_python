@@ -61,7 +61,7 @@ ModuleLevelAlternative = Alternative(
 
 class ModuleLevelNormalClass:
     def method(self):
-        pass
+        return "hi"
 
 
 class ModuleLevelNamedTupleSubclass(NamedTuple(x=int)):
@@ -1743,6 +1743,26 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(
             type(ModuleLevelClass.f),
             type(sc.deserialize(sc.serialize(ModuleLevelClass.f)))
+        )
+
+    def test_serialize_entrypointed_modulelevel_class_method(self):
+        sc = SerializationContext()
+
+        c = ModuleLevelClass()
+
+        self.assertIs(
+            type(c.f),
+            sc.deserialize(sc.serialize(type(c.f)))
+        )
+
+    def test_serialize_regular_modulelevel_class_method(self):
+        sc = SerializationContext()
+
+        c = ModuleLevelNormalClass()
+
+        self.assertEqual(
+            sc.deserialize(sc.serialize(c.method())),
+            "hi"
         )
 
     def test_serialize_type_function(self):

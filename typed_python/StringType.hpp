@@ -21,6 +21,8 @@
 
 class StringType : public Type {
 public:
+    static std::atomic<int64_t> stringCount;
+
     class layout {
     public:
         std::atomic<int64_t> refcount;

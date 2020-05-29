@@ -34,6 +34,10 @@
 #include "UnicodeProps.hpp"
 #include "_types.hpp"
 
+PyObject* stringCount(PyObject* nullValue, PyObject* args, PyObject ** kwargs) {
+    return PyLong_FromLong(StringType::stringCount);
+}
+
 PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
     std::vector<Type*> types;
 
@@ -2118,6 +2122,7 @@ static PyMethodDef module_methods[] = {
     {"canConstructFrom", (PyCFunction)canConstructFrom, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
+    {"stringCount", (PyCFunction)stringCount, METH_VARARGS | METH_KEYWORDS, NULL},
     {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
     {"mutuallyRecursiveGroup", (PyCFunction)mutuallyRecursiveGroup, METH_VARARGS, NULL},
     {"isRecursive", (PyCFunction)isRecursive, METH_VARARGS, NULL},
