@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -582,7 +582,7 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* t, PyObject* pyRepresentation, bool isExplicit) {
         if (isFloat(t->getTypeCategory()))  {
             if (PyFloat_Check(pyRepresentation)) {
-                return true;
+                return isExplicit || t->getTypeCategory() == Type::TypeCategory::catFloat64;
             }
 
             if (!isExplicit) {
@@ -598,12 +598,7 @@ public:
 
         if (isInteger(t->getTypeCategory()))  {
             if (PyLong_Check(pyRepresentation)) {
-//                if (std::is_unsigned<T>()) {
-//                    if (PyLong_AsLongLong(pyRepresentation) < 0) {
-//                        return false;
-//                    }
-//                }
-                return true;
+                return isExplicit || t->getTypeCategory() == Type::TypeCategory::catInt64;
             }
 
             if (!isExplicit) {
@@ -615,7 +610,6 @@ public:
             }
 
             return pyRepresentation->ob_type->tp_as_number->nb_int != nullptr;
-
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catBool) {
