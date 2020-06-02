@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -252,7 +252,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         to_and_fro(t)
         self.assertEqual(refcount(t), 1)
 
-    def test_object_conversions(self):
+    def test_object_conversions1(self):
         NT1 = NamedTuple(a=int, b=float, c=str, d=str)
         NT2 = NamedTuple(s=str, t=TupleOf(int))
         cases = [
@@ -300,15 +300,9 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             def fro_and_to(x: object):
                 return toObject(T(x))
 
-            if T in [Float32, float]:
-                self.assertEqual(to_and_fro(v), T(v))
-            else:
-                self.assertEqual(to_and_fro(v), v)
+            self.assertEqual(to_and_fro(T(v)), T(v), (v, type(v), T))
 
-            if T in [Float32]:
-                self.assertEqual(fro_and_to(v), T(v))
-            else:
-                self.assertEqual(fro_and_to(v), v, (type(v), T))
+            self.assertEqual(fro_and_to(v), T(v), (v, type(v), T))
 
             x = T(v)
             if getattr(T, '__typed_python_category__', None) in [

@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -582,3 +582,51 @@ class TestMathFunctionsCompilation(unittest.TestCase):
             speedupVsNumpy = (t3 - t2) / (t2 - t1)
 
             print(f"{f.__name__} speedup vs numpy is", speedupVsNumpy)
+
+    def test_math_float_overload_order(self):
+        @Entrypoint
+        def f(x):
+            return type(x)(x + 1e-8)
+
+        @Entrypoint
+        def g(x):
+            return type(x)(x + 1e-8)
+
+        r1 = f(1.0)
+        r2 = f(Float32(1.0))
+        print(r1, r2)
+
+        r3 = g(Float32(1.0))
+        r4 = g(1.0)
+        print(r3, r4)
+
+        self.assertEqual(r1, r4)
+        self.assertEqual(r2, r3)
+
+    def test_math_int_overload_order(self):
+        for T1 in [UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, int]:
+            for T2 in [UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, int]:
+                @Entrypoint
+                def f(x):
+                    return type(x)(x)
+
+                @Entrypoint
+                def g(x):
+                    return type(x)(x)
+
+                if T1 == T2:
+                    continue
+
+                r1 = f(T1(0))
+                r2 = f(T2(0))
+                print(r1, r2)
+
+                r3 = g(T2(0))
+                r4 = g(T1(0))
+                print(r3, r4)
+
+                self.assertEqual(type(r1), type(r4))
+                self.assertEqual(type(r2), type(r3))
+
+                del f
+                del g
