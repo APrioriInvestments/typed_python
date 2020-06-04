@@ -989,7 +989,11 @@ void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, in
                 setIsInitialized = true;
 
                 for (long k = 0; k < tupType->count(argDataPtr); k++) {
-                    setType->insertKey(tgt, tupType->eltPtr(argDataPtr, k));
+                    instance_ptr data = tupType->eltPtr(argDataPtr, k);
+                    instance_ptr found = setType->lookupKey(tgt, data);
+                    if (!found) {
+                        setType->insertKey(tgt, data);
+                    }
                 }
 
                 return;
@@ -1004,7 +1008,11 @@ void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, in
                 setIsInitialized = true;
 
                 for (long k = 0; k < listType->count(argDataPtr); k++) {
-                    setType->insertKey(tgt, listType->eltPtr(argDataPtr, k));
+                    instance_ptr data = listType->eltPtr(argDataPtr, k);
+                    instance_ptr found = setType->lookupKey(tgt, data);
+                    if (!found) {
+                         setType->insertKey(tgt, data);
+                    }
                 }
 
                 return;

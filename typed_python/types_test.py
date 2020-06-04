@@ -2968,6 +2968,13 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(s1, Set(str)(word1))
         self.assertEqual(type(i), Set(str))
 
+    def test_set_listof_tupleof_constructors(self):
+        s1 = Set(int)(ListOf(int)([1, 1]))
+        self.assertEqual(len(s1), 1)
+
+        s2 = Set(int)(TupleOf(int)((1, 1)))
+        self.assertEqual(len(s2), 1)
+
     def test_list_of_tuples_transpose(self):
         listOfTuples = ListOf(NamedTuple(x=int, y=str, z=bool))()
         listOfTuples.append(dict(x=1, y="hi", z=False))

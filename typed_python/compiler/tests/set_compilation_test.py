@@ -22,6 +22,7 @@ import typed_python._types as _types
 import time
 import numpy
 import unittest
+import pytest
 
 
 class TestSetCompilation(unittest.TestCase):
@@ -789,3 +790,14 @@ class TestSetCompilation(unittest.TestCase):
         set_update(s1, s2)
         set_intersection_update(s1, s1)
         set_difference_update(s1, [9, 11])
+
+    @pytest.mark.skip(reason="not addressed yet")
+    def test_compiled_set_constructors(self):
+        @Entrypoint
+        def f(x):
+            return Set(int)(x)
+
+        r1 = f(ListOf(int)([1, 1]))
+        self.assertEqual(len(r1), 1)
+        r2 = f(TupleOf(int)([1, 1]))
+        self.assertEqual(len(r2), 1)
