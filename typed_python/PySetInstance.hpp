@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -51,10 +51,7 @@ class PySetInstance : public PyInstance {
                                                         PyObject* pyRepresentation,
                                                         bool isExplicit);
     static void mirrorTypeInformationIntoPyTypeConcrete(SetType* setType, PyTypeObject* pyType);
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation,
-                                           bool isExplicit) {
-        return true;
-    }
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit);
     static bool compare_to_python_concrete(SetType* setT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
     int pyInquiryConcrete(const char* op, const char* opErrRep);
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
@@ -75,9 +72,9 @@ class PySetInstance : public PyInstance {
     static int set_difference_update(PyObject* o, PyObject* other);
     static PyObject* set_symmetric_difference(PyObject* o, PyObject* other);
     static int set_symmetric_difference_update(PyObject* o, PyObject* other);
-    static bool set_is_subset(PyObject* o, PyObject* other);
-    static bool set_is_superset(PyObject* o, PyObject* other);
-    static bool set_is_disjoint(PyObject* o, PyObject* other);
+    static int set_is_subset(PyObject* o, PyObject* other);
+    static int set_is_superset(PyObject* o, PyObject* other);
+    static int set_is_disjoint(PyObject* o, PyObject* other);
     SetType* type();
     static void getDataFromNative(PySetInstance* src, std::function<void(instance_ptr)> func);
     static void getDataFromNative(PyTupleOrListOfInstance* src,

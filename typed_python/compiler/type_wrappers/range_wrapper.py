@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -55,6 +55,11 @@ class RangeWrapper(Wrapper):
                     >> newInstance.expr.ElementPtrIntegers(0, 1).store(arg1.nonref_expr)
             )
         return super().convert_call(context, expr, args, kwargs)
+
+    def convert_str_cast(self, context, instance):
+        # need this to be able to print(type(r)) if r is a range, in compiled code
+        # otherwise the tuple confuses 'print'
+        return context.constant(str(self.typeRepresentation[0]))
 
 
 class RangeInstanceWrapper(Wrapper):

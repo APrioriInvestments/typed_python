@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -147,6 +147,10 @@ def const_dict_contains(constDict, key):
             return True
 
     return False
+
+
+def const_dict_contains_not(constDict, key):
+    return not const_dict_contains(constDict, key)
 
 
 class ConstDictWrapperBase(RefcountedWrapper):
@@ -315,13 +319,13 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_bin_op_reverse(self, context, left, op, right, inplace):
-        if op.matches.In:
+        if op.matches.In or op.matches.NotIn:
             right = right.convert_to_type(self.keyType)
             if right is None:
                 return None
 
             return context.call_py_function(
-                const_dict_contains,
+                const_dict_contains if op.matches.In else const_dict_contains_not,
                 (left, right),
                 {}
             )
