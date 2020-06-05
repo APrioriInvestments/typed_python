@@ -1,4 +1,4 @@
-#   Copyright 2018 Braxton Mckee
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.native_hash import table_next_slot, table_clear, table_contains, \
-    table_contains_not, dict_delitem, dict_getitem, dict_get, dict_setitem
+    dict_delitem, dict_getitem, dict_get, dict_setitem
 from typed_python import Tuple, PointerTo, Int32, UInt8
 
 import typed_python.compiler.native_ast as native_ast
@@ -447,16 +447,12 @@ class DictWrapper(DictWrapperBase):
         return context.pushPod(int, self.convert_len_native(expr))
 
     def convert_bin_op_reverse(self, context, left, op, right, inplace):
-        if op.matches.In or op.matches.NotIn:
+        if op.matches.In:
             right = right.convert_to_type(self.keyType)
             if right is None:
                 return None
 
-            return context.call_py_function(
-                table_contains if op.matches.In else table_contains_not,
-                (left, right),
-                {}
-            )
+            return context.call_py_function(table_contains, (left, right), {})
 
         return super().convert_bin_op_reverse(context, left, op, right, inplace)
 

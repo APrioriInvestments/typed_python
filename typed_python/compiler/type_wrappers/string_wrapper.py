@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -242,8 +242,6 @@ class StringWrapper(RefcountedWrapper):
                     expr.nonref_expr.cast(native_ast.VoidPtr)
                 )
             )
-
-        print(a1, f)
 
         return super().convert_builtin(f, context, expr, a1)
 

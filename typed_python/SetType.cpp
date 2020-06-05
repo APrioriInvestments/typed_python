@@ -36,9 +36,10 @@ void SetType::clear(instance_ptr self) {
     hash_table_layout& record = **(hash_table_layout**)self;
     for (long k = 0; k < record.items_reserved; k++) {
         if (record.items_populated[k]) {
-            discard(self, keyAtSlot(self, k));
+            m_key_type->destroy(record.items + m_bytes_per_el * k);
         }
     }
+    record.allItemsHaveBeenRemoved();
 }
 
 instance_ptr SetType::insertKey(instance_ptr self, instance_ptr key) {
