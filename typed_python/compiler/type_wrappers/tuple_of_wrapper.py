@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -14,7 +14,10 @@
 
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
+from typed_python.compiler.type_wrappers.const_dict_wrapper import ConstDictWrapper
+from typed_python.compiler.type_wrappers.dict_wrapper import DictWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python.compiler.type_wrappers.tuple_wrapper import TupleWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
@@ -404,7 +407,14 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
     def _can_convert_from_type(self, otherType, explicit):
-        if explicit and isinstance(otherType, TupleOrListOfWrapper):
+        convertible = (
+            TupleOrListOfWrapper,
+            typed_python.compiler.type_wrappers.set_wrapper.SetWrapper,
+            DictWrapper,
+            ConstDictWrapper,
+            # TupleWrapper  # doesn't have .ElementType
+        )
+        if explicit and isinstance(otherType, convertible):
             sourceEltType = typeWrapper(otherType.typeRepresentation.ElementType)
             destEltType = typeWrapper(self.typeRepresentation.ElementType)
 
@@ -413,7 +423,14 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         return super()._can_convert_from_type(otherType, explicit)
 
     def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
-        if explicit and isinstance(sourceVal.expr_type, TupleOrListOfWrapper):
+        convertible = (
+            TupleOrListOfWrapper,
+            typed_python.compiler.type_wrappers.set_wrapper.SetWrapper,
+            DictWrapper,
+            ConstDictWrapper,
+            TupleWrapper
+        )
+        if explicit and isinstance(sourceVal.expr_type, convertible):
             canConvert = self._can_convert_from_type(sourceVal.expr_type, True)
 
             if canConvert is False:
@@ -433,7 +450,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
 
     def convert_type_call_on_container_expression(self, context, typeInst, argExpr):
-        if not (argExpr.matches.Tuple or argExpr.matches.List):
+        if not (argExpr.matches.Tuple or argExpr.matches.List or argExpr.matches.Set):
             return super().convert_type_call_on_container_expression(context, typeInst, argExpr)
 
         # we're calling TupleOf(T) or ListOf(T) with an expression like [1, 2, 3, ...]

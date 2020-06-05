@@ -254,7 +254,15 @@ class OneOfWrapper(Wrapper):
                     with subcontext:
                         self.refAs(context, expr, ix).convert_destroy()
 
+    def _can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
+        if otherType == self:
+            return True
+
+        return "Maybe"
+
     def _can_convert_from_type(self, targetType, explicit):
+        if targetType == self:
+            return True
         if targetType.typeRepresentation in self.typeRepresentation.Types:
             return True
         return "Maybe"
