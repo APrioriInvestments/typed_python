@@ -963,7 +963,7 @@ void PySetInstance::insertKey(PySetInstance* self, PyObject* pyKey, instance_ptr
 
 void PySetInstance::mirrorTypeInformationIntoPyTypeConcrete(SetType* setType,
                                                             PyTypeObject* pyType) {
-    PyDict_SetItemString(pyType->tp_dict, "KeyType",
+    PyDict_SetItemString(pyType->tp_dict, "ElementType", // was KeyType
                          typePtrToPyTypeRepresentation(setType->keyType()));
 }
 
@@ -1024,7 +1024,8 @@ void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, in
 
         iterate(pyRepresentation, [&](PyObject* item) {
             Instance key(setType->keyType(), [&](instance_ptr data) {
-                copyConstructFromPythonInstance(setType->keyType(), data, item);
+                copyConstructFromPythonInstance(setType->keyType(), data, item, isExplicit);
+                return true;
             });
 
             instance_ptr found = setType->lookupKey(tgt, key.data());
@@ -1222,4 +1223,18 @@ bool PySetInstance::compare_to_python_concrete(SetType* setT, instance_ptr left,
 
     assert(false);
     return false;
+}
+
+bool PySetInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+    if (!isExplicit) {
+        return PySet_Check(pyRepresentation);
+    }
+
+    return
+        PyTuple_Check(pyRepresentation) ||
+        PyList_Check(pyRepresentation) ||
+        PyDict_Check(pyRepresentation) ||
+        PyIter_Check(pyRepresentation) ||
+        PyArray_Check(pyRepresentation)
+        ;
 }

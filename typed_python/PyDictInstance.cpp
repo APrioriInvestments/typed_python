@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -457,13 +457,15 @@ PyMethodDef* PyDictInstance::typeMethodsConcrete(Type* t) {
 }
 
 void PyDictInstance::mirrorTypeInformationIntoPyTypeConcrete(DictType* dictT, PyTypeObject* pyType) {
-    //expose 'ElementType' as a member of the type object
     PyDict_SetItemString(pyType->tp_dict, "KeyType",
-            typePtrToPyTypeRepresentation(dictT->keyType())
-            );
+        typePtrToPyTypeRepresentation(dictT->keyType())
+    );
+    PyDict_SetItemString(pyType->tp_dict, "ElementType",  // ElementType is what you get if you iterate
+        typePtrToPyTypeRepresentation(dictT->keyType())
+    );
     PyDict_SetItemString(pyType->tp_dict, "ValueType",
-            typePtrToPyTypeRepresentation(dictT->valueType())
-            );
+        typePtrToPyTypeRepresentation(dictT->valueType())
+    );
 }
 
 
@@ -546,7 +548,7 @@ bool PyDictInstance::compare_to_python_concrete(DictType* dictType, instance_ptr
             PyErr_Clear();
             return false;
         } catch(...) {
-            //if we can't convert to KeyType, we're not equal
+            //if we can't convert to keyType, we're not equal
             return false;
         }
 

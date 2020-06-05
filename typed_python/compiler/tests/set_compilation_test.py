@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Set, ListOf, Entrypoint, Compiled, Tuple, TupleOf, NamedTuple
+from typed_python import Set, ListOf, Entrypoint, Compiled, Tuple, TupleOf, NamedTuple, Dict, ConstDict
 from typed_python.compiler.type_wrappers.set_wrapper import set_union, set_intersection, set_difference, \
     set_symmetric_difference, set_union_multiple, set_intersection_multiple, set_difference_multiple, \
     set_disjoint, set_subset, set_proper_subset, set_equal, set_not_equal, \
@@ -22,7 +22,6 @@ import typed_python._types as _types
 import time
 import numpy
 import unittest
-import pytest
 
 
 class TestSetCompilation(unittest.TestCase):
@@ -791,13 +790,30 @@ class TestSetCompilation(unittest.TestCase):
         set_intersection_update(s1, s1)
         set_difference_update(s1, [9, 11])
 
-    @pytest.mark.skip(reason="not addressed yet")
     def test_compiled_set_constructors(self):
-        @Entrypoint
-        def f(x):
+        def f_set(x):
             return Set(int)(x)
 
-        r1 = f(ListOf(int)([1, 1]))
-        self.assertEqual(len(r1), 1)
-        r2 = f(TupleOf(int)([1, 1]))
-        self.assertEqual(len(r2), 1)
+        def f_listof(x):
+            return ListOf(int)(x)
+
+        def f_tupleof(x):
+            return TupleOf(int)(x)
+
+        test_values = [
+            Set(int)({1, 2}),
+            ListOf(int)([3, 3, 4, 4]),
+            TupleOf(int)((5, 6, 5, 6)),
+            Dict(int, int)({101: 1, 202: 2}),
+            ConstDict(int, int)({101: 1, 202: 2}),
+            Set(float)({1.0, 2.0}),
+            ListOf(float)([3.0, 3.0, 4.0, 4.0]),
+            TupleOf(float)((5.0, 6.0, 5.0, 6.0)),
+            Dict(float, int)({101.0: 1, 102.0: 2}),
+        ]
+        # let's test all these container types, not just Set
+        for f in [f_set, f_listof, f_tupleof]:
+            for v in test_values:
+                r1 = f(v)
+                r2 = Entrypoint(f)(v)
+                self.assertEqual(r1, r2)
