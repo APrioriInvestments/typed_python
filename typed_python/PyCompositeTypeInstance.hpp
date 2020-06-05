@@ -37,7 +37,7 @@ public:
     static bool compare_to_python_concrete(CompositeType* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
-        return PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation) || PyDict_Check(pyRepresentation);
+        return PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation) || PySet_Check(pyRepresentation) || PyDict_Check(pyRepresentation);
     }
 
     int pyInquiryConcrete(const char* op, const char* opErrRep);

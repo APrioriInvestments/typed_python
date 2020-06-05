@@ -1518,6 +1518,30 @@ extern "C" {
         return np_pyobj_compare(lhs, rhs, Py_GE);
     }
 
+    PythonObjectOfType::layout_type* np_pyobj_In(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        int res = PySequence_Contains(rhs->pyObj, lhs->pyObj);
+
+        if (res == -1) {
+            throw PythonExceptionSet();
+        }
+
+        return PythonObjectOfType::createLayout(res == 1 ? Py_True : Py_False);
+    }
+
+    PythonObjectOfType::layout_type* np_pyobj_NotIn(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        int res = PySequence_Contains(rhs->pyObj, lhs->pyObj);
+
+        if (res == -1) {
+            throw PythonExceptionSet();
+        }
+
+        return PythonObjectOfType::createLayout(res == 1 ? Py_False : Py_True);
+    }
+
     PythonObjectOfType::layout_type* np_pyobj_Invert(PythonObjectOfType::layout_type* lhs) {
         PyEnsureGilAcquired acquireTheGil;
 

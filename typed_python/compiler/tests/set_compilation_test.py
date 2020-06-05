@@ -12,17 +12,32 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Set, ListOf, Entrypoint, Compiled, Tuple, TupleOf, NamedTuple
+from typed_python import Set, ListOf, Entrypoint, Compiled, Tuple, TupleOf, NamedTuple, Dict, ConstDict, OneOf
 from typed_python.compiler.type_wrappers.set_wrapper import set_union, set_intersection, set_difference, \
     set_symmetric_difference, set_union_multiple, set_intersection_multiple, set_difference_multiple, \
-    set_disjoint, set_subset, set_proper_subset, set_equal, set_not_equal, \
-    set_update, set_intersection_update, set_difference_update
+    set_disjoint, set_subset, set_subset_iterable, set_superset, set_proper_subset, set_equal, set_not_equal, \
+    set_update, set_intersection_update, set_difference_update, set_symmetric_difference_update, \
+    initialize_set_from_other
 from flaky import flaky
 import typed_python._types as _types
 import time
 import numpy
 import unittest
-import pytest
+
+
+def result_or_exception(f, *p):
+    try:
+        return f(*p)
+    except Exception as e:
+        return str(e)
+
+
+def some_fibs():
+    a = 0
+    b = 1
+    while b < 100:
+        yield b
+        a, b = b, a + b
 
 
 class TestSetCompilation(unittest.TestCase):
@@ -422,8 +437,8 @@ class TestSetCompilation(unittest.TestCase):
                     r1 = f(left, right)
                     r2 = f(S(left), S(right))  # retesting interpreter here
                     r3 = Compiled(f)(S(left), S(right))  # testing compiled code
-                    self.assertEqual(r1, r2)
-                    self.assertEqual(r2, r3)
+                    self.assertEqual(r1, r2, (f, left, right))
+                    self.assertEqual(r2, r3, (f, left, right))
 
         def union0(x: S):
             return x.union()
@@ -506,7 +521,7 @@ class TestSetCompilation(unittest.TestCase):
             x.difference_update(y, z)
 
         def symmetric_difference_update2(x: S, y: S, z: S):
-            return x.symmetric_difference_update(y, z)
+            x.symmetric_difference_update(y, z)
 
         for x in sets:
             for y in sets:
@@ -522,6 +537,170 @@ class TestSetCompilation(unittest.TestCase):
                         self.assertEqual(x1, x3)
                     with self.assertRaises(TypeError):
                         Compiled(symmetric_difference_update2)(S(x), S(y), S(z))
+
+    def test_set_iterable_comparisons(self):
+        S = Set(int)
+
+        def issubset(x, y):
+            return x.issubset(y)
+
+        def issuperset(x, y):
+            return x.issuperset(y)
+
+        def isdisjoint(x, y):
+            return x.isdisjoint(y)
+
+        test_cases = [
+            {1, 2, 3, 5, 8, 13, 21, 34, 55, 89},
+            {1, 2, 3, 5, 13, 21, 34, 55, 89},
+            {1, 2, 3, 5, 9, 8, 13, 21, 34, 55, 89},
+            {1, 2, 3, 5, 9, 13, 21, 34, 55, 89},
+            {2, 3, 5, 8, 13, 21, 34, 55, 89},
+            {1, 2, 3, 5, 8, 13, 21, 34, 55},
+            {1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 90},
+            {0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89},
+            {},
+        ]
+        for f in [issubset, issuperset, isdisjoint]:
+            for s in test_cases:
+                r1 = f(S(s), some_fibs())
+                r2 = Entrypoint(f)(S(s), some_fibs())
+                self.assertEqual(r1, r2)
+
+                r1 = f(S(s), range(3))
+                r2 = Entrypoint(f)(S(s), range(3))
+                self.assertEqual(r1, r2)
+
+                r1 = f(S(s), range(10))
+                r2 = Entrypoint(f)(S(s), range(10))
+                self.assertEqual(r1, r2)
+
+        fail_cases = [
+            Set(str)("abc"),
+            ListOf(str)("abc"),
+            TupleOf(str)("abc"),
+            Dict(str, int)({}.fromkeys("xyz", 1)),
+            ConstDict(str, int)({}.fromkeys("xyz", 1)),
+        ]
+        for f in [issubset, issuperset, isdisjoint]:
+            s = S({1, 2, 3})
+            for v in fail_cases:
+                with self.assertRaises(TypeError):
+                    f(s, v)
+                with self.assertRaises(TypeError):
+                    Entrypoint(f)(s, v)
+
+    def test_set_iterable_updates(self):
+        S = Set(int)
+
+        def update(x, y):
+            x.update(y)
+            return x
+
+        def intersection_update(x, y):
+            x.intersection_update(y)
+            return x
+
+        def difference_update(x, y):
+            x.difference_update(y)
+            return x
+
+        def symmetric_difference_update(x, y):
+            x.symmetric_difference_update(y)
+            return x
+
+        def is_subset(x, y):
+            return x.issubset(y)
+
+        def is_superset(x, y):
+            return x.issuperset(y)
+
+        def is_disjoint(x, y):
+            return x.isdisjoint(y)
+
+        test_sets = [
+            {-1, -2},
+            set(range(20)),
+            {1, 3, 5},
+            {-1, 3, 5},
+            set(range(20)),
+            set(some_fibs()),
+            set(some_fibs()) | {0},
+            set(some_fibs()).difference({5}),
+        ]
+        test_iterables = [
+            [1, 2, 2, 3],
+            [-1, -1, 2, 2, 3],
+            (89, 4, 89),
+            ListOf(int)([1, 4, 4, 5, 5]),
+            TupleOf(int)(some_fibs()),
+            Dict(int, int)({}.fromkeys(range(20), 1)),
+            ConstDict(int, int)({}.fromkeys(range(20), 1)),
+        ]
+        for f in [update, intersection_update, difference_update, symmetric_difference_update, is_subset, is_superset, is_disjoint]:
+            for s in test_sets:
+                for v in test_iterables:
+                    s0 = s.copy()
+                    r0 = f(s0, v)
+
+                    s1 = S(s)
+                    r1 = f(s1, v)
+                    self.assertEqual(s0, s1)  # test interpreted side effect
+                    self.assertEqual(r0, r1)  # test interpreted return value
+
+                    s2 = S(s)
+                    r2 = Entrypoint(f)(s2, v)
+                    self.assertEqual(s0, s2)  # test compiled side effect
+                    self.assertEqual(r0, r2)  # test compiled return value
+
+                # now test range() and some_fibs() separately
+                s0 = s.copy()
+                r0 = f(s0, range(10))
+
+                s1 = S(s)
+                r1 = f(s1, range(10))
+                self.assertEqual(s0, s1, (f, s, "range()"))  # test interpreted result
+                self.assertEqual(r0, r1, (f, s, "range()"))  # test interpreted result
+
+                s2 = S(s)
+                r2 = Entrypoint(f)(s2, range(10))
+                self.assertEqual(s0, s2, (f, s, "range()"))  # test compiled result
+                self.assertEqual(r0, r2, (f, s, "range()"))  # test compiled result
+
+                s0 = s.copy()
+                r0 = f(s0, some_fibs())
+
+                s1 = S(s)
+                r1 = f(s1, some_fibs())
+                self.assertEqual(s0, s1, (f, s, "some_fibs()"))  # test interpreted result
+                self.assertEqual(r0, r1, (f, s, "some_fibs()"))  # test interpreted result
+
+                s2 = S(s)
+                r2 = Entrypoint(f)(s2, some_fibs())
+                self.assertEqual(s0, s2, (f, s, "some_fibs()"))  # test compiled result
+                self.assertEqual(r0, r2, (f, s, "some_fibs()"))  # test compiled result
+
+        fail_iterables = [
+            [[]],
+            ['a', 1, 2, 3],
+            ['x', -1, -1, 2, 3],
+            ('b', 2, 'b'),
+            ListOf(OneOf(int, str))(['q', 1, 4, 4, 5]),
+            TupleOf(OneOf(int, str))(('a', 1, 2, 3)),
+            Dict(str, int)({'a': 1, 'b': 2, 'c': 3}),
+            ConstDict(str, int)({'a': 1, 'b': 2, 'c': 3}),
+        ]
+        for f in [update, intersection_update, difference_update, symmetric_difference_update, is_subset, is_superset, is_disjoint]:
+            s = {1, 2, 3}
+            for v in fail_iterables:
+                print("TEST", v)
+                s1 = S(s)
+                with self.assertRaises(TypeError):
+                    f(s1, v)
+
+                s2 = S(s)
+                with self.assertRaises(TypeError):
+                    Entrypoint(f)(s2, v)
 
     @flaky(max_runs=3, min_passes=1)
     def test_set_binop_perf(self):
@@ -782,22 +961,103 @@ class TestSetCompilation(unittest.TestCase):
 
         s4 = {2, 3}
         self.assertEqual(set_disjoint(s3, s4), s3.isdisjoint(s4))
+        self.assertEqual(set_disjoint(s3, s3), s3.isdisjoint(s3))
         self.assertEqual(set_subset(s3, s4), s3 <= s4)
+        self.assertEqual(set_subset(s3, s3), s3 <= s3)
+        self.assertEqual(set_superset(s4, s3), s4 >= s3)
+        self.assertEqual(set_superset(s3, s3), s3 >= s3)
+        self.assertEqual(set_subset_iterable(s3, s4), s3 <= s4)
         self.assertEqual(set_proper_subset(s3, s4), s3 < s4)
         self.assertEqual(set_equal(s3, s4), s3 == s4)
         self.assertEqual(set_not_equal(s3, s4), s3 != s4)
 
         set_update(s1, s2)
-        set_intersection_update(s1, s1)
-        set_difference_update(s1, [9, 11])
+        set_intersection_update(s1, [5, 6])
+        set_difference_update(s1, [3, 7])
+        set_symmetric_difference_update(s1, [2, 8])
 
-    @pytest.mark.skip(reason="not addressed yet")
+        class P_mock:
+            ElementType = Set(int)
+
+            def initialize(self, src):
+                pass
+
+        p1 = P_mock()
+        initialize_set_from_other(p1, [1, 2])
+
     def test_compiled_set_constructors(self):
-        @Entrypoint
-        def f(x):
+        def f_set(x):
             return Set(int)(x)
 
-        r1 = f(ListOf(int)([1, 1]))
-        self.assertEqual(len(r1), 1)
-        r2 = f(TupleOf(int)([1, 1]))
-        self.assertEqual(len(r2), 1)
+        def f_listof(x):
+            return ListOf(int)(x)
+
+        def f_tupleof(x):
+            return TupleOf(int)(x)
+
+        test_values = [
+            range(10),
+            {1, 2},
+            [3, 3, 4, 4],
+            (5, 6, 5, 6),
+            {101: 1, 202: 2},
+            Set(int)({1, 2}),
+            ListOf(int)([3, 3, 4, 4]),
+            TupleOf(int)((5, 6, 5, 6)),
+            Tuple(int, int, int, int)((7, 8, 8, 7)),
+            Dict(int, int)({101: 1, 202: 2}),
+            ConstDict(int, int)({101: 1, 202: 2}),
+            Set(float)({1.0, 2.0}),
+            ListOf(float)([3.0, 3.0, 4.0, 4.0]),
+            TupleOf(float)((5.0, 6.0, 5.0, 6.0)),
+            Tuple(float, float, float, float)((7.0, 8.0, 8.0, 7.0)),
+            Dict(float, int)({101.0: 1, 102.0: 2}),
+        ]
+
+        test_values_mismatch = [
+            Set(str)({"a", "b"}),
+            ListOf(str)(["c", "c", "d", "d"]),
+            TupleOf(str)(("e", "f", "e", "f")),
+            Tuple(str, int, int, int)(("g", 8, 8, 7)),
+            Dict(str, int)({"x": 1, "y": 2}),
+        ]
+
+        # let's test all these types, not just Set
+        for f in [f_set, f_listof, f_tupleof]:
+            for v in test_values:
+                r1 = f(v)
+                r2 = Entrypoint(f)(v)
+                self.assertEqual(r1, r2)
+
+            r1 = f(some_fibs())
+            r2 = Entrypoint(f)(some_fibs())
+            self.assertEqual(r1, r2)
+
+            for v in test_values_mismatch:
+                with self.assertRaises(TypeError):
+                    f(v)
+                with self.assertRaises(TypeError):
+                    Entrypoint(f)(v)
+
+        S = Set(TupleOf(TupleOf(int)))
+
+        def f_set_t(x):
+            return S(x)
+
+        t1 = TupleOf(TupleOf(int))(((1, 2), (3, 0)))
+        t2 = TupleOf(TupleOf(int))(((4, 5, 5), (6,)))
+
+        r1 = f_set_t({t1, t2})
+        r2 = Entrypoint(f_set_t)({t1, t2})
+        self.assertEqual(r1, r2)
+
+        t3 = TupleOf(TupleOf(OneOf(int, str)))(((7, 7, 7), (8, 9)))
+        r1 = f_set_t({t1, t2, t3})
+        r2 = Entrypoint(f_set_t)({t1, t2, t3})
+        self.assertEqual(r1, r2)
+
+        t4 = TupleOf(TupleOf(OneOf(int, str)))(((7, 7, 7), (8, "x")))
+        with self.assertRaises(TypeError):
+            f_set_t({t1, t2, t4})
+        with self.assertRaises(TypeError):
+            Entrypoint(f_set_t)({t1, t2, t4})

@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -320,11 +320,7 @@ class ConstDictWrapper(ConstDictWrapperBase):
             if right is None:
                 return None
 
-            return context.call_py_function(
-                const_dict_contains,
-                (left, right),
-                {}
-            )
+            return context.call_py_function(const_dict_contains, (left, right), {})
 
         return super().convert_bin_op_reverse(context, left, op, right, inplace)
 

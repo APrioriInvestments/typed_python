@@ -215,14 +215,6 @@ def table_contains(instance, item):
     return slot != -1
 
 
-def table_contains_not(instance, item):
-    itemHash = NativeHash()(item)
-
-    slot = table_slot_for_key(instance, itemHash, item)
-
-    return slot == -1
-
-
 # Operations specific to dicts that manipulate the fields directly:
 
 

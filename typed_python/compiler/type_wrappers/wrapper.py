@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -452,7 +452,7 @@ class Wrapper(object):
                 context.markUninitializedSlotInitialized(targetVal)
 
             with ifFalse:
-                context.pushException(TypeError, "Can't convert from type %s to type %s" % (self, target_type))
+                context.pushException(TypeError, f"Can't convert from type {self} to type {target_type}")
 
         return targetVal
 

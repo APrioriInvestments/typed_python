@@ -82,6 +82,8 @@ pyOpToBinaryCallTarget = {
     python_ast.ComparisonOp.Gt(): binaryPyobjCallTarget("np_pyobj_GT"),
     python_ast.ComparisonOp.LtE(): binaryPyobjCallTarget("np_pyobj_LE"),
     python_ast.ComparisonOp.GtE(): binaryPyobjCallTarget("np_pyobj_GE"),
+    python_ast.ComparisonOp.In(): binaryPyobjCallTarget("np_pyobj_In"),
+    python_ast.ComparisonOp.NotIn(): binaryPyobjCallTarget("np_pyobj_NotIn"),
 }
 
 pyOpToUnaryCallTarget = {

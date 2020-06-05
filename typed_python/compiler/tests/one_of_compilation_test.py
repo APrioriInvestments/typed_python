@@ -402,4 +402,3 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(oneof_abs(-234.5), 234.5)
         self.assertEqual(oneof_not(0), True)
         self.assertEqual(oneof_not(1), False)
-

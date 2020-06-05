@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -1696,28 +1696,30 @@ class ExpressionConversionContext(object):
             return aList
 
         if ast.matches.Tuple:
-            aList = self.constant(list).convert_call([], {})
+            # While constructing, it is a list, so we can append to it.
+            aTuple = self.constant(list).convert_call([], {})
 
             for e in ast.elts:
                 eVal = self.convert_expression_ast(e)
                 if eVal is None:
                     return None
 
-                aList.convert_method_call("append", (eVal,), {})
+                aTuple.convert_method_call("append", (eVal,), {})
 
-            return self.constant(tuple).convert_call([aList], {})
+            # Now it becomes a tuple.
+            return self.constant(tuple).convert_call([aTuple], {})
 
         if ast.matches.Set:
-            aList = self.constant(set).convert_call([], {})
+            aSet = self.constant(set).convert_call([], {})
 
             for e in ast.elts:
                 eVal = self.convert_expression_ast(e)
                 if eVal is None:
                     return None
 
-                aList.convert_method_call("add", (eVal,), {})
+                aSet.convert_method_call("add", (eVal,), {})
 
-            return aList
+            return aSet
 
         if ast.matches.Dict:
             aList = self.constant(dict).convert_call([], {})
