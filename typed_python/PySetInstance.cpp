@@ -1234,6 +1234,7 @@ bool PySetInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyR
         PyTuple_Check(pyRepresentation) ||
         PyList_Check(pyRepresentation) ||
         PyDict_Check(pyRepresentation) ||
+        PySet_Check(pyRepresentation) ||
         PyIter_Check(pyRepresentation) ||
         PyArray_Check(pyRepresentation)
         ;

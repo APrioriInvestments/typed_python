@@ -16,6 +16,7 @@ from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWra
 from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
+from typed_python.compiler.type_wrappers.tuple_wrapper import TupleWrapper
 from typed_python.compiler.type_wrappers.tuple_of_wrapper import TupleOrListOfWrapper
 from typed_python.compiler.type_wrappers.const_dict_wrapper import ConstDictWrapper
 from typed_python.compiler.type_wrappers.dict_wrapper import DictWrapper
@@ -624,8 +625,58 @@ class SetWrapper(SetWrapperBase):
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
+    def _can_convert_to_type(self, otherType, explicit):
+        convertible = (
+            TupleOrListOfWrapper,
+            typed_python.compiler.type_wrappers.set_wrapper.SetWrapper,
+            DictWrapper,
+            ConstDictWrapper,
+            TupleWrapper  # doesn't have .ElementType, length must match
+        )
+        if explicit and isinstance(otherType, convertible):
+            if isinstance(otherType, TupleWrapper):
+                destEltType = typeWrapper(otherType.unionType)
+            else:
+                destEltType = typeWrapper(otherType.typeRepresentation.ElementType)
+            sourceEltType = typeWrapper(self.typeRepresentation.ElementType)
+
+            ret = sourceEltType.can_convert_to_type(destEltType, True)
+            if isinstance(otherType, TupleWrapper) and ret:
+                return "Maybe"  # since length might not match
+            return ret
+
+        return super()._can_convert_to_type(otherType, explicit)
+
+    def _can_convert_from_type(self, otherType, explicit):
+        convertible = (
+            TupleOrListOfWrapper,
+            typed_python.compiler.type_wrappers.set_wrapper.SetWrapper,
+            DictWrapper,
+            ConstDictWrapper,
+            TupleWrapper  # doesn't have .ElementType
+        )
+        if explicit and isinstance(otherType, convertible):
+            if isinstance(otherType, TupleWrapper):
+                minimum = True
+                destEltType = typeWrapper(self.typeRepresentation.ElementType)
+                for one_src in otherType.typeRepresentation.ElementTypes:
+                    sourceEltType = typeWrapper(one_src)
+                    cvt_one = sourceEltType.can_convert_to_type(destEltType, True)
+                    if cvt_one is False:
+                        return False
+                    if cvt_one == "Maybe":
+                        minimum = "Maybe"
+                return minimum
+            else:
+                sourceEltType = typeWrapper(otherType.typeRepresentation.ElementType)
+            destEltType = typeWrapper(self.typeRepresentation.ElementType)
+
+            return sourceEltType.can_convert_to_type(destEltType, True)
+
+        return super()._can_convert_from_type(otherType, explicit)
+
     def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
-        convertible = (SetWrapper, TupleOrListOfWrapper, DictWrapper, ConstDictWrapper)
+        convertible = (SetWrapper, TupleWrapper, TupleOrListOfWrapper, DictWrapper, ConstDictWrapper)
         if explicit and isinstance(sourceVal.expr_type, convertible):
             canConvert = self._can_convert_from_type(sourceVal.expr_type, True)
 

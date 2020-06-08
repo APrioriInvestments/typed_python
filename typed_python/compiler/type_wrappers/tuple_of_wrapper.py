@@ -17,6 +17,7 @@ from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWra
 from typed_python.compiler.type_wrappers.const_dict_wrapper import ConstDictWrapper
 from typed_python.compiler.type_wrappers.dict_wrapper import DictWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python.compiler.type_wrappers.tuple_wrapper import TupleWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
@@ -410,7 +411,8 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             TupleOrListOfWrapper,
             typed_python.compiler.type_wrappers.set_wrapper.SetWrapper,
             DictWrapper,
-            ConstDictWrapper
+            ConstDictWrapper,
+            # TupleWrapper  # doesn't have .ElementType
         )
         if explicit and isinstance(otherType, convertible):
             sourceEltType = typeWrapper(otherType.typeRepresentation.ElementType)
@@ -425,7 +427,8 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             TupleOrListOfWrapper,
             typed_python.compiler.type_wrappers.set_wrapper.SetWrapper,
             DictWrapper,
-            ConstDictWrapper
+            ConstDictWrapper,
+            TupleWrapper
         )
         if explicit and isinstance(sourceVal.expr_type, convertible):
             canConvert = self._can_convert_from_type(sourceVal.expr_type, True)

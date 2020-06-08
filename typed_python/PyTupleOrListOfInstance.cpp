@@ -37,6 +37,7 @@ bool PyTupleOrListOfInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyO
         PyTuple_Check(pyRepresentation) ||
         PyList_Check(pyRepresentation) ||
         PyDict_Check(pyRepresentation) ||
+        PySet_Check(pyRepresentation) ||
         PyIter_Check(pyRepresentation) ||
         PyArray_Check(pyRepresentation)
         ;

@@ -801,19 +801,38 @@ class TestSetCompilation(unittest.TestCase):
             return TupleOf(int)(x)
 
         test_values = [
+            {1, 2},
+            [3, 3, 4, 4],
+            (5, 6, 5, 6),
+            {101: 1, 202: 2},
             Set(int)({1, 2}),
             ListOf(int)([3, 3, 4, 4]),
             TupleOf(int)((5, 6, 5, 6)),
+            Tuple(int, int, int, int)((7, 8, 8, 7)),
             Dict(int, int)({101: 1, 202: 2}),
             ConstDict(int, int)({101: 1, 202: 2}),
             Set(float)({1.0, 2.0}),
             ListOf(float)([3.0, 3.0, 4.0, 4.0]),
             TupleOf(float)((5.0, 6.0, 5.0, 6.0)),
+            Tuple(float, float, float, float)((7.0, 8.0, 8.0, 7.0)),
             Dict(float, int)({101.0: 1, 102.0: 2}),
         ]
-        # let's test all these container types, not just Set
+        test_values_mismatch = [
+            Set(str)({"a", "b"}),
+            ListOf(str)(["c", "c", "d", "d"]),
+            TupleOf(str)(("e", "f", "e", "f")),
+            Tuple(str, int, int, int)(("g", 8, 8, 7)),
+            Dict(str, int)({"x": 1, "y": 2}),
+        ]
+        # let's test all these types, not just Set
         for f in [f_set, f_listof, f_tupleof]:
             for v in test_values:
                 r1 = f(v)
                 r2 = Entrypoint(f)(v)
                 self.assertEqual(r1, r2)
+
+            for v in test_values_mismatch:
+                with self.assertRaises(TypeError):
+                    f(v)
+                with self.assertRaises(TypeError):
+                    Entrypoint(f)(v)
