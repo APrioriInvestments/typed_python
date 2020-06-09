@@ -3255,3 +3255,39 @@ class NativeTypesTests(unittest.TestCase):
         resizeNull(l)
 
         self.assertEqual(sc + 1, _types.stringCount())
+
+    def test_destructors_of_python_objects_in_compiled_code(self):
+        class C:
+            def __init__(self, x):
+                self.holding = ListOf(ListOf(int))([x])
+
+        i = ListOf(int)()
+        y = ListOf(object)()
+        y.append(C(i))
+
+        @Entrypoint
+        def release(it):
+            it.resize(0)
+
+        self.assertEqual(_types.refcount(i), 2)
+        release(y)
+        self.assertEqual(_types.refcount(i), 1)
+
+    def test_destructors_of_python_objects_in_compiled_code_2(self):
+        class C:
+            def __init__(self, x):
+                self.holding = ListOf(ListOf(int))([x])
+
+        A = Alternative("A", X=dict(y=object))
+
+        i = ListOf(int)()
+        y = ListOf(A)()
+        y.append(A.X(y=C(i)))
+
+        @Entrypoint
+        def release(it):
+            it.clear()
+
+        self.assertEqual(_types.refcount(i), 2)
+        release(y)
+        self.assertEqual(_types.refcount(i), 1)
