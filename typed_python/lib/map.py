@@ -38,6 +38,55 @@ class Map(CompilableBuiltin):
         raise TypeError("Currently, 'map' only works on typed python Tuple or NamedTuple objects")
 
     def mapTuple(self, f, tup):
+        if not isinstance(f, (Tuple, NamedTuple)):
+            return self.mapTupleWithPlainFunction(f, tup)
+
+        if isinstance(f, NamedTuple) and isinstance(tup, NamedTuple):
+            assert f.ElementNames == tup.ElementNames
+        else:
+            assert len(f) == len(tup)
+
+        funs = []
+
+        for i in range(len(f)):
+            fun = f[i]
+            if not isinstance(fun, FunctionType):
+                fun = Function(f[i])
+            funs.append(fun)
+
+        if isinstance(f, NamedTuple):
+            f_t = NamedTuple(**{f.ElementNames[i]: type(funs[i]) for i in range(len(f))})
+        else:
+            f_t = Tuple(*[type(funs[i]) for i in range(len(f))])
+
+        if (f_t, type(tup)) not in _typeCache:
+            outTypes = []
+            for i in range(len(f)):
+                if (type(funs[i]), type(tup[i])) not in _typeCache:
+                    outType = funs[i].resultTypeFor(type(tup[i])).interpreterTypeRepresentation
+                    _typeCache[type(funs[i]), type(tup[i])] = outType
+                else:
+                    outType = _typeCache[type(funs[i]), type(tup[i])]
+                outTypes.append(outType)
+            if isinstance(f, NamedTuple):
+                resT = NamedTuple(**{f.ElementNames[i]: outTypes[i] for i in range(len(f))})
+            elif isinstance(tup, NamedTuple):
+                resT = NamedTuple(**{tup.ElementNames[i]: outTypes[i] for i in range(len(f))})
+            else:
+                resT = Tuple(*outTypes)
+
+            _typeCache[f_t, type(tup)] = resT
+        else:
+            resT = _typeCache[f_t, type(tup)]
+
+        outElts = []
+
+        for i in range(len(f)):
+            outElts.append(funs[i](tup[i]))
+
+        return resT(outElts)
+
+    def mapTupleWithPlainFunction(self, f, tup):
         if not isinstance(f, FunctionType):
             f = Function(f)
 
