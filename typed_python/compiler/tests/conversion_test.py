@@ -2828,3 +2828,40 @@ class TestCompilationStructures(unittest.TestCase):
             return h() + 1
 
         self.assertEqual(g(), 3)
+
+    def test_converting_where_type_alternates(self):
+        def add(x, y):
+            return x if y is None else y if x is None else x + y
+
+        populated1 = ListOf(bool)([False, True, True, False])
+        populated2 = ListOf(bool)([False, True, False, True])
+        vals1 = ListOf(float)([0.0, 1.0, 2.0, 3.0])
+
+        @Entrypoint
+        def addUp(p1, p2, v1, v2):
+            out = ListOf(float)()
+            outP = ListOf(bool)()
+
+            for i in range(len(p1)):
+                if p1[i] and p2[i]:
+                    res = add(v1[i], v2[i])
+                elif p1[i]:
+                    res = add(v1[i], None)
+                elif p2[i]:
+                    res = add(None, v2[i])
+                else:
+                    res = None
+
+                if res is not None:
+                    out.append(res)
+                    outP.append(True)
+                else:
+                    out.append(0.0)
+                    outP.append(False)
+
+            return makeNamedTuple(v=out, p=outP)
+
+        v, p = addUp(populated1, populated2, vals1, vals1)
+
+        assert v == [0.0, 2.0, 2.0, 3.0]
+        assert p == [False, True, True, True]

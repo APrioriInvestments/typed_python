@@ -1620,7 +1620,14 @@ class ExpressionConversionContext(object):
                 with false_block:
                     false_res = self.convert_expression_ast(ast.orelse)
 
-                if true_res.expr_type != false_res.expr_type:
+                if true_res is None and false_res is None:
+                    return None
+
+                if true_res is None:
+                    out_type = false_res.expr_type
+                elif false_res is None:
+                    out_type = true_res.expr_type
+                elif true_res.expr_type != false_res.expr_type:
                     out_type = typeWrapper(
                         OneOf(
                             true_res.expr_type.interpreterTypeRepresentation,
@@ -1632,15 +1639,17 @@ class ExpressionConversionContext(object):
 
                 out_slot = self.allocateUninitializedSlot(out_type)
 
-                with true_block:
-                    true_res = true_res.convert_to_type(out_type)
-                    out_slot.convert_copy_initialize(true_res)
-                    self.markUninitializedSlotInitialized(out_slot)
+                if true_res is not None:
+                    with true_block:
+                        true_res = true_res.convert_to_type(out_type)
+                        out_slot.convert_copy_initialize(true_res)
+                        self.markUninitializedSlotInitialized(out_slot)
 
-                with false_block:
-                    false_res = false_res.convert_to_type(out_type)
-                    out_slot.convert_copy_initialize(false_res)
-                    self.markUninitializedSlotInitialized(out_slot)
+                if false_res is not None:
+                    with false_block:
+                        false_res = false_res.convert_to_type(out_type)
+                        out_slot.convert_copy_initialize(false_res)
+                        self.markUninitializedSlotInitialized(out_slot)
 
             return out_slot
 

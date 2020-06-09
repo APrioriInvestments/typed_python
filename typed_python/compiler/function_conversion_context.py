@@ -515,10 +515,13 @@ class ConversionContextBase(object):
         if existingType == new_type.typeRepresentation:
             return
 
-        if hasattr(existingType, '__typed_python_category__') and \
-                existingType.__typed_python_category__ == 'OneOf':
+        if issubclass(existingType, OneOf):
             if new_type.typeRepresentation in existingType.Types:
                 return
+
+            if issubclass(new_type.typeRepresentation, OneOf):
+                if all(x in existingType.Types for x in new_type.typeRepresentation.Types):
+                    return
 
         final_type = OneOf(new_type.typeRepresentation, existingType)
 
