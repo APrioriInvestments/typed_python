@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Set, ListOf, Entrypoint, Compiled, Tuple, TupleOf, NamedTuple, Dict, ConstDict
+from typed_python import Set, ListOf, Entrypoint, Compiled, Tuple, TupleOf, NamedTuple, Dict, ConstDict, OneOf
 from typed_python.compiler.type_wrappers.set_wrapper import set_union, set_intersection, set_difference, \
     set_symmetric_difference, set_union_multiple, set_intersection_multiple, set_difference_multiple, \
     set_disjoint, set_subset, set_proper_subset, set_equal, set_not_equal, \
@@ -817,6 +817,7 @@ class TestSetCompilation(unittest.TestCase):
             Tuple(float, float, float, float)((7.0, 8.0, 8.0, 7.0)),
             Dict(float, int)({101.0: 1, 102.0: 2}),
         ]
+
         test_values_mismatch = [
             Set(str)({"a", "b"}),
             ListOf(str)(["c", "c", "d", "d"]),
@@ -824,6 +825,7 @@ class TestSetCompilation(unittest.TestCase):
             Tuple(str, int, int, int)(("g", 8, 8, 7)),
             Dict(str, int)({"x": 1, "y": 2}),
         ]
+
         # let's test all these types, not just Set
         for f in [f_set, f_listof, f_tupleof]:
             for v in test_values:
@@ -836,3 +838,26 @@ class TestSetCompilation(unittest.TestCase):
                     f(v)
                 with self.assertRaises(TypeError):
                     Entrypoint(f)(v)
+
+        S = Set(TupleOf(TupleOf(int)))
+
+        def f_set_t(x):
+            return S(x)
+
+        t1 = TupleOf(TupleOf(int))(((1, 2), (3, 0)))
+        t2 = TupleOf(TupleOf(int))(((4, 5, 5), (6,)))
+
+        r1 = f_set_t({t1, t2})
+        r2 = Entrypoint(f_set_t)({t1, t2})
+        self.assertEqual(r1, r2)
+
+        t3 = TupleOf(TupleOf(OneOf(int, str)))(((7, 7, 7), (8, 9)))
+        r1 = f_set_t({t1, t2, t3})
+        r2 = Entrypoint(f_set_t)({t1, t2, t3})
+        self.assertEqual(r1, r2)
+
+        t4 = TupleOf(TupleOf(OneOf(int, str)))(((7, 7, 7), (8, "x")))
+        with self.assertRaises(TypeError):
+            f_set_t({t1, t2, t4})
+        with self.assertRaises(TypeError):
+            Entrypoint(f_set_t)({t1, t2, t4})
