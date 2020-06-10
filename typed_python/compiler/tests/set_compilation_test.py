@@ -22,6 +22,14 @@ import typed_python._types as _types
 import time
 import numpy
 import unittest
+import pytest
+
+
+def result_or_exception(f, *p):
+    try:
+        return f(*p)
+    except Exception as e:
+        return str(e)
 
 
 class TestSetCompilation(unittest.TestCase):
@@ -505,7 +513,7 @@ class TestSetCompilation(unittest.TestCase):
             x.difference_update(y, z)
 
         def symmetric_difference_update2(x: S, y: S, z: S):
-            return x.symmetric_difference_update(y, z)
+            x.symmetric_difference_update(y, z)
 
         for x in sets:
             for y in sets:
@@ -521,6 +529,83 @@ class TestSetCompilation(unittest.TestCase):
                         self.assertEqual(x1, x3)
                     with self.assertRaises(TypeError):
                         Compiled(symmetric_difference_update2)(S(x), S(y), S(z))
+
+    @pytest.mark.skip(reason="working on it")
+    def test_set_iterable_updates(self):
+
+        def update(x, y):
+            x.update(y)
+            return x
+
+        def intersection_update(x, y):
+            x.intersection_update(y)
+            return x
+
+        def difference_update(x, y):
+            x.difference_update(y)
+            return x
+
+        def symmetric_difference_update(x, y):
+            x.symmetric_difference_update(y)
+            return x
+
+        def is_subset(x, y):
+            return x.issubset(y)
+
+        def is_superset(x, y):
+            return x.issuperset(y)
+
+        def f_is(x, y):
+            return x is y
+
+        def f_is_not(x, y):
+            return x is not y
+
+        def some_fibs():
+            a = 0
+            b = 1
+            while b < 100:
+                yield b
+                a, b = b, a + b
+
+        # s1 = Set(int)({-1,3,5})
+        # r3 = result_or_exception(Entrypoint(update), s1.copy(), (2, 3, 7))
+        # r4 = result_or_exception(Entrypoint(intersection_update), s1.copy(), (1, 3, 7))
+        # r4a = result_or_exception(Entrypoint(intersection_update), s1.copy(), [1, 3, 8])
+        # r4b = result_or_exception(Entrypoint(intersection_update), s1.copy(), {1, 3, 9})
+        # r4c = result_or_exception(Entrypoint(intersection_update), s1.copy(), range(10))
+        # r4d = result_or_exception(Entrypoint(intersection_update), s1.copy(), some_fibs())
+        # r4e = result_or_exception(Entrypoint(intersection_update), s1.copy(), Set(int)({11,22}))
+        # r1 = result_or_exception(Entrypoint(is_subset), s1.copy(), (1, 3, 7))
+        # r2 = result_or_exception(Entrypoint(is_superset), s1.copy(), (1, 3, 7))
+        # r5 = result_or_exception(Entrypoint(difference_update), s1.copy(), (1, 3, 7))
+        # r6 = result_or_exception(Entrypoint(symmetric_difference_update), s1.copy(), (1, 3, 7))
+        for f in [intersection_update, update, intersection_update, difference_update,
+                  symmetric_difference_update, is_subset, is_superset]:
+            for s in [set(range(20)), {1, 3, 5}, {-1, 3, 5}, set(range(20)), set(some_fibs()) | {0}]:
+                s0 = s.copy()
+                r0 = f(s0, range(10))
+
+                s1 = Set(int)(s)
+                r1 = f(s1, range(10))
+                self.assertEqual(r0, r1)  # test interpreted result
+
+                s2 = Set(int)(s)
+                r2 = Entrypoint(f)(s2, range(10))
+                self.assertEqual(r0, r2)  # test compiled result
+
+                s0 = s.copy()
+                r0 = f(s0, some_fibs())
+
+                s1 = Set(int)(s)
+                r1 = f(s1, some_fibs())
+                if r0 != r1:
+                    print("mismatch")
+                self.assertEqual(r0, r1)  # test interpreted result
+
+                s2 = Set(int)(s)
+                r2 = Entrypoint(f)(s2, some_fibs())
+                self.assertEqual(r0, r2)  # test compiled result
 
     @flaky(max_runs=3, min_passes=1)
     def test_set_binop_perf(self):
@@ -800,7 +885,15 @@ class TestSetCompilation(unittest.TestCase):
         def f_tupleof(x):
             return TupleOf(int)(x)
 
+        def some_fibs():
+            a = 0
+            b = 1
+            while b < 100:
+                yield b
+                a, b = b, a + b
+
         test_values = [
+            range(10),
             {1, 2},
             [3, 3, 4, 4],
             (5, 6, 5, 6),
@@ -832,6 +925,10 @@ class TestSetCompilation(unittest.TestCase):
                 r1 = f(v)
                 r2 = Entrypoint(f)(v)
                 self.assertEqual(r1, r2)
+
+            r1 = f(some_fibs())
+            r2 = Entrypoint(f)(some_fibs())
+            self.assertEqual(r1, r2)
 
             for v in test_values_mismatch:
                 with self.assertRaises(TypeError):

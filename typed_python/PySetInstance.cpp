@@ -299,6 +299,7 @@ int PySetInstance::set_intersection_update(PyObject* o, PyObject* other) {
                 }
             });
         }
+
     } catch (PythonExceptionSet& e) {
         return -1;
     } catch (std::exception& e) {
@@ -594,7 +595,7 @@ PyObject* PySetInstance::setIsSubset(PyObject* o, PyObject* args) {
     }
     PyObjectHolder arg(PyTuple_GetItem(args, 0));
     if (!PyIter_Check(arg) && !PyList_Check(arg) && !PySet_Check(arg)
-            && !PyTuple_Check(arg)) {
+            && !PyTuple_Check(arg) && !PySequence_Check(arg)) {
         PyErr_Format(PyExc_TypeError, "'%s' object is not iterable", Py_TYPE(arg)->tp_name);
         return NULL;
     }
@@ -609,7 +610,7 @@ PyObject* PySetInstance::setIsSuperset(PyObject* o, PyObject* args) {
     }
     PyObjectHolder arg(PyTuple_GetItem(args, 0));
     if (!PyIter_Check(arg) && !PyList_Check(arg) && !PySet_Check(arg)
-            && !PyTuple_Check(arg)) {
+            && !PyTuple_Check(arg) && !PySequence_Check(arg)) {
         PyErr_Format(PyExc_TypeError, "'%s' object is not iterable", Py_TYPE(arg)->tp_name);
         return NULL;
     }
@@ -640,7 +641,7 @@ PyObject* PySetInstance::setIntersection(PyObject* o, PyObject* args) {
     for (size_t k = 0; k < PyTuple_Size(args); ++k) {
         PyObjectHolder item(PyTuple_GetItem(args, k));
         if (!PyIter_Check(item) && !PyList_Check(item) && !PySet_Check(item)
-            && !PyTuple_Check(item)) {
+                && !PyTuple_Check(item) && !PySequence_Check(item)) {
             PyErr_SetString(PyExc_TypeError, "Set.intersection one of args has wrong type");
             return NULL;
         }
@@ -678,7 +679,7 @@ PyObject* PySetInstance::setUnion(PyObject* o, PyObject* args) {
     for (size_t k = 0; k < PyTuple_Size(args); ++k) {
         PyObjectHolder item(PyTuple_GetItem(args, k));
         if (!PyIter_Check(item) && !PyList_Check(item) && !PyAnySet_Check(item)
-            && !PyTuple_Check(item)) {
+                && !PyTuple_Check(item) && !PySequence_Check(item)) {
             PyErr_SetString(PyExc_TypeError, "Set.union one of args has wrong type");
             return NULL;
         }
@@ -723,7 +724,7 @@ PyObject* PySetInstance::setIntersectionUpdate(PyObject* o, PyObject* args) {
     for (size_t k = 0; k < PyTuple_Size(args); ++k) {
         PyObjectHolder item(PyTuple_GetItem(args, k));
         if (!PyIter_Check(item) && !PyList_Check(item) && !PySet_Check(item)
-            && !PyTuple_Check(item)) {
+                && !PyTuple_Check(item) && !PySequence_Check(item)) {
             PyErr_SetString(PyExc_TypeError, "Set.intersection_update one of args has wrong type");
             return NULL;
         }
@@ -732,6 +733,7 @@ PyObject* PySetInstance::setIntersectionUpdate(PyObject* o, PyObject* args) {
     try {
         for (size_t k = 0; k < PyTuple_Size(args); ++k) {
             PyObjectHolder item(PyTuple_GetItem(args, k));
+
             if (set_intersection_update(o, item) < 0) {
                 return NULL;
             }
@@ -753,7 +755,7 @@ PyObject* PySetInstance::setDifferenceUpdate(PyObject* o, PyObject* args) {
     for (size_t k = 0; k < PyTuple_Size(args); ++k) {
         PyObjectHolder item(PyTuple_GetItem(args, k));
         if (!PyIter_Check(item) && !PyList_Check(item) && !PySet_Check(item)
-            && !PyTuple_Check(item)) {
+                && !PyTuple_Check(item) && !PySequence_Check(item)) {
             PyErr_SetString(PyExc_TypeError, "Set.difference_update one of args has wrong type");
             return NULL;
         }
@@ -810,7 +812,7 @@ PyObject* PySetInstance::setUpdate(PyObject* o, PyObject* args) {
     for (size_t k = 0; k < PyTuple_Size(args); ++k) {
         PyObjectHolder item(PyTuple_GetItem(args, k));
         if (!PyIter_Check(item) && !PyList_Check(item) && !PyAnySet_Check(item)
-            && !PyTuple_Check(item)) {
+                && !PyTuple_Check(item) && !PySequence_Check(item)) {
             PyErr_SetString(PyExc_TypeError, "Set.update one of args has wrong type");
             return NULL;
         }
@@ -1236,6 +1238,7 @@ bool PySetInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyR
         PyDict_Check(pyRepresentation) ||
         PySet_Check(pyRepresentation) ||
         PyIter_Check(pyRepresentation) ||
+        PySequence_Check(pyRepresentation) ||
         PyArray_Check(pyRepresentation)
         ;
 }
