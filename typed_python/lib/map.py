@@ -124,6 +124,39 @@ class Map(CompilableBuiltin):
         context.pushException(TypeError, "Currently, 'map' only works on typed python Tuple or NamedTuple objects")
 
     def convert_call_on_tuple(self, context, fArg, tupArg):
+        fT = fArg.expr_type.typeRepresentation
+
+        if not issubclass(fT, (Tuple, NamedTuple)):
+            return self.convert_plain_function_call_on_tuple(context, fArg, tupArg)
+
+        argT = tupArg.expr_type.typeRepresentation
+
+        if issubclass(fT, NamedTuple) and issubclass(argT, NamedTuple):
+            assert fT.ElementNames == argT.ElementNames
+        else:
+            assert len(fT.ElementTypes) == len(argT.ElementTypes)
+
+        resArgs = []
+        resTypes = []
+
+        for i in range(len(argT.ElementTypes)):
+            resArgs.append(fArg.refAs(i).convert_call((tupArg.refAs(i),), {}))
+
+            if resArgs[-1] is None:
+                return None
+
+            resTypes.append(resArgs[-1].expr_type.interpreterTypeRepresentation)
+
+        if issubclass(argT, NamedTuple):
+            outTupType = NamedTuple(**{argT.ElementNames[i]: resTypes[i] for i in range(len(resTypes))})
+        elif issubclass(fT, NamedTuple):
+            outTupType = NamedTuple(**{fT.ElementNames[i]: resTypes[i] for i in range(len(resTypes))})
+        else:
+            outTupType = Tuple(*resTypes)
+
+        return typeWrapper(outTupType).createFromArgs(context, resArgs)
+
+    def convert_plain_function_call_on_tuple(self, context, fArg, tupArg):
         resArgs = []
         resTypes = []
 

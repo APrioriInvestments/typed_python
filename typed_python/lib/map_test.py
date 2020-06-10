@@ -105,3 +105,18 @@ class TestMap(unittest.TestCase):
         aTup = Tuple(int, int, float)((1, 2, 3.0))
 
         self.assertEqual(type(map(f, aTup)), Tuple(OneOf(int, float), OneOf(int, float), OneOf(int, float)))
+
+    def test_map_with_tuple_func(self):
+        def doIt(x, **kwargs):
+            return map(makeNamedTuple(**kwargs), x)
+
+        doItCompiled = Entrypoint(doIt)
+
+        self.assertEqual(
+            doItCompiled(makeNamedTuple(a=1), a=lambda y: y+1),
+            makeNamedTuple(a=2),
+        )
+        self.assertEqual(
+            doIt(makeNamedTuple(a=1), a=lambda y: y+1),
+            makeNamedTuple(a=2),
+        )
