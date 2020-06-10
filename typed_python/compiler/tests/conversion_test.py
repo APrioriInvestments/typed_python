@@ -23,7 +23,7 @@ from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBui
 from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
     _types, Compiled, Member, Final, PythonObjectOfType, isCompiled, ConstDict,
-    makeNamedTuple
+    makeNamedTuple, UInt32, Int32
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
@@ -2865,3 +2865,19 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert v == [0.0, 2.0, 2.0, 3.0]
         assert p == [False, True, True, True]
+
+    def test_convert_not_on_ints_and_floats(self):
+        def check():
+            y = ListOf(int)()
+            y.append(not 10)
+            y.append(not 10.5)
+            y.append(not 0.0)
+            y.append(not 0.5)
+            y.append(not Int32(10))
+            y.append(not UInt32(10.5))
+
+            return y
+
+        self.assertEqual(
+            check(), Entrypoint(check)()
+        )
