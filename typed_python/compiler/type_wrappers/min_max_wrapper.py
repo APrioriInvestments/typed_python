@@ -63,7 +63,7 @@ class MinWrapper(Wrapper):
 
             # returns False to abort this attempt
             def comparison_tree(j, k):
-                cond = args[j].expr_type.convert_bin_op(context, args[j], python_ast.ComparisonOp.Lt(), args[k], False)
+                cond = args[j].expr_type.convert_bin_op(context, args[j], python_ast.ComparisonOp.LtE(), args[k], False)
                 if cond is None:
                     return False
                 with context.ifelse(cond.nonref_expr) as (ifTrue, ifFalse):
@@ -125,7 +125,7 @@ class MaxWrapper(Wrapper):
 
             # returns False to abort this attempt
             def comparison_tree(j, k):
-                cond = args[j].expr_type.convert_bin_op(context, args[j], python_ast.ComparisonOp.Gt(), args[k], False)
+                cond = args[j].expr_type.convert_bin_op(context, args[j], python_ast.ComparisonOp.GtE(), args[k], False)
                 if cond is None:
                     return False
                 with context.ifelse(cond.nonref_expr) as (ifTrue, ifFalse):
