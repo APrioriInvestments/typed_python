@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ from math import isnan
 
 from typed_python import ListOf, TupleOf, NamedTuple, Dict, ConstDict, \
     Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Float32, \
-    Alternative, Set, OneOf, Compiled
+    Alternative, Set, OneOf, Compiled, Entrypoint
 
 
 def result_or_exception(f, *p):
@@ -161,3 +161,46 @@ class TestBuiltinCompilation(unittest.TestCase):
                     self.assertEqual(isnan(r1), isnan(r2))
                 else:
                     self.assertEqual(r1, r2)
+
+    def test_min_max(self):
+        def f_min(*v):
+            return min(*v)
+
+        def f_max(*v):
+            return max(*v)
+
+        C = Alternative("C", a={'val': int}, b={},
+                        __eq__=lambda self, other: self.val == other.val,
+                        __ne__=lambda self, other: self.val != other.val,
+                        __lt__=lambda self, other: self.val > other.val,
+                        __gt__=lambda self, other: self.val < other.val,
+                        __le__=lambda self, other: self.val >= other.val,
+                        __ge__=lambda self, other: self.val <= other.val,
+                        )
+        test_cases = [
+            (1.1, 2.1, 3, 0.5),
+            (1, 9), (9, 1),
+            (-1, -9), (-9, -1),
+            range(100), range(100, 0, -1),
+            (3, 4, 5, 6, 2, 7, 8, 9), (9, 8, 7, 6, 5, 4, 3, 2, 0),
+            (1e-99, 1e99), (1e99, 1e-99),
+            (1.1, 2.1, 3.1, 0.5),
+            (1, 1e99), (1e99, 1),
+            (1, 1e-99), (1e-99, 1),
+            (UInt8(2), Int16(10), Int32(5), 22.5),
+            (UInt8(15), Int16(10), Int32(20), 12.5),
+            (UInt8(10), Int16(20), Int32(5), 12.5),
+            (UInt8(15), Int16(10), Int32(5), 2.5),
+            (UInt8(3), Int16(3), Int32(3), 3.0),
+            (3.0, UInt8(3), Int16(3), Int32(3)),
+            (Int32(3), 3.0, UInt8(3), Int16(3)),
+            (Int16(3), Int32(3), 3.0, UInt8(3)),
+            (C.a(100), C.a(80), C.a(120)),
+            (C.a(1), C.a(2), C.a(3)),
+            (C.a(3), C.a(2), C.a(1)),
+        ]
+        for f in [f_min, f_max]:
+            for v in test_cases:
+                r1 = f(*v)
+                r2 = Entrypoint(f)(*v)
+                self.assertEqual(r1, r2)
