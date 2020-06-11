@@ -203,3 +203,4 @@ class TestBuiltinCompilation(unittest.TestCase):
                 r1 = f(*v)
                 r2 = Entrypoint(f)(*v)
                 self.assertEqual(r1, r2)
+                self.assertEqual(type(r1), type(r2))
