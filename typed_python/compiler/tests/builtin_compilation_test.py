@@ -178,7 +178,6 @@ class TestBuiltinCompilation(unittest.TestCase):
                         __ge__=lambda self, other: self.val <= other.val,
                         )
         test_cases = [
-            (1.1, 2.1, 3, 0.5),
             (1, 9), (9, 1),
             (-1, -9), (-9, -1),
             range(100), range(100, 0, -1),
