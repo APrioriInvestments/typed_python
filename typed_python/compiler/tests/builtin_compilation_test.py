@@ -204,3 +204,59 @@ class TestBuiltinCompilation(unittest.TestCase):
                 r2 = Entrypoint(f)(*v)
                 self.assertEqual(r1, r2)
                 self.assertEqual(type(r1), type(r2))
+
+    def test_min_max_with_key(self):
+        T = OneOf(str, ListOf(int), TupleOf(int), Set(int))
+
+        def f_key1(s: T) -> int:
+            return len(s)
+
+        def f_min1(*v):
+            return min(*v, key=f_key1)
+
+        def f_max1(*v):
+            return max(*v, key=f_key1)
+
+        def f_key2(s: T) -> OneOf(int, float):
+            r = len(s)
+            if r == 2:
+                return 2.5
+            else:
+                return r
+
+        def f_min2(*v):
+            return min(*v, key=f_key2)
+
+        def f_max2(*v):
+            return max(*v, key=f_key2)
+
+        test_cases = [
+            ('abc', 'de', 'fghi', 'klm'),
+            ('abc', 'de', 'fghi', 'klm') * 5,
+            ('abc', (2, 3), 'fghi', 'klm'),
+            ('abc', (2, 3), 'fghi', 'klm') * 5,
+            ('abc', (2, 3), 'de', 'klm'),
+            ('abc', (2, 3), 'de', 'klm') * 5,
+            ('abc', 'de', (2, 3), 'klm'),
+            ('abc', 'de', (2, 3), 'klm') * 5,
+            ('abc', 'de', (1, 2, 3, 4), 'klm'),
+            ('abc', 'de', (1, 2, 3, 4), 'klm') * 5,
+            ('abc', 'de', (1, 2, 3, 4), 'klmn'),
+            ('abc', 'de', (1, 2, 3, 4), 'klmn') * 5,
+            ('abc', 'de', 'klmn', (1, 2, 3, 4)),
+            ('abc', 'de', 'klmn', (1, 2, 3, 4)) * 5,
+            ('ab', (1, 2), [3, 4], {5, 6}),
+            ('ab', (1, 2), [3, 4], {5, 6}) * 5,
+            ((1, 2), [3, 4], {5, 6}, 'ab'),
+            ((1, 2), [3, 4], {5, 6}, 'ab') * 5,
+            ([3, 4], {5, 6}, 'ab', (1, 2)),
+            ([3, 4], {5, 6}, 'ab', (1, 2)) * 5,
+            ({5, 6}, 'ab', (1, 2), [3, 4]),
+            ({5, 6}, 'ab', (1, 2), [3, 4]) * 5,
+        ]
+        for f in [f_min1, f_max1, f_min2, f_max2]:
+            for v in test_cases:
+                r1 = f(*v)
+                r2 = Entrypoint(f)(*v)
+                self.assertEqual(r1, r2)
+                self.assertEqual(type(r1), type(r2))
