@@ -57,6 +57,7 @@ from typed_python.compiler.type_wrappers.string_wrapper import StringWrapper
 from typed_python.compiler.type_wrappers.bytes_wrapper import BytesWrapper
 from typed_python.compiler.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
 from typed_python.compiler.type_wrappers.abs_wrapper import AbsWrapper
+from typed_python.compiler.type_wrappers.min_max_wrapper import MinWrapper, MaxWrapper
 from typed_python.compiler.type_wrappers.repr_wrapper import ReprWrapper
 from types import ModuleType
 from typed_python._types import TypeFor, bytecount, prepareArgumentToBePassedToCompiler
@@ -192,6 +193,12 @@ def pythonObjectRepresentation(context, f):
 
     if f is abs:
         return TypedExpression(context, native_ast.nullExpr, AbsWrapper(), False)
+
+    if f is min:
+        return TypedExpression(context, native_ast.nullExpr, MinWrapper(), False)
+
+    if f is max:
+        return TypedExpression(context, native_ast.nullExpr, MaxWrapper(), False)
 
     if f is repr:
         return TypedExpression(context, native_ast.nullExpr, ReprWrapper(), False)
