@@ -27,20 +27,146 @@ typeWrapper = lambda t: typed_python.compiler.python_object_representation.typed
 _MINMAX_SPACE_VS_COPY_THRESHOLD = 10
 
 
+def i_min(v):
+    first = 1
+    for e in v:
+        if first or e < ret:  # noqa: F821
+            first = 0
+            ret = e
+    if first:
+        raise ValueError("min() arg is an empty sequence")
+    return ret
+
+
+def i_min_default(v, default):
+    first = 1
+    for e in v:
+        if first or e < ret:  # noqa: F821
+            first = 0
+            ret = e
+    if first:
+        return default
+    return ret
+
+
+def i_min_key(v, key_f):
+    first = 1
+    for e in v:
+        elt_key = key_f(e)
+        if first or elt_key < ret_key:  # noqa: F821
+            first = 0
+            ret_key = elt_key  # noqa: F841
+            ret = e
+    if first:
+        raise ValueError("min() arg is an empty sequence")
+    return ret
+
+
+def i_min_key_default(v, key_f, default):
+    first = 1
+    for e in v:
+        elt_key = key_f(e)
+        if first or elt_key < ret_key:  # noqa: F821
+            first = 0
+            ret_key = elt_key  # noqa: F841
+            ret = e
+    if first:
+        return default
+    return ret
+
+
+def i_max(v):
+    first = 1
+    for e in v:
+        if first or e > ret:  # noqa: F821
+            first = 0
+            ret = e
+    if first:
+        raise ValueError("max() arg is an empty sequence")
+    return ret
+
+
+def i_max_default(v, default):
+    first = 1
+    for e in v:
+        if first or e > ret:  # noqa: F821
+            first = 0
+            ret = e
+    if first:
+        return default
+    return ret
+
+
+def i_max_key(v, key_f):
+    first = 1
+    for e in v:
+        elt_key = key_f(e)
+        if first or elt_key > ret_key:  # noqa: F821
+            first = 0
+            ret_key = elt_key  # noqa: F841
+            ret = e
+    if first:
+        raise ValueError("max() arg is an empty sequence")
+    return ret
+
+
+def i_max_key_default(v, key_f, default):
+    first = 1
+    for e in v:
+        elt_key = key_f(e)
+        if first or elt_key > ret_key:  # noqa: F821
+            first = 0
+            ret_key = elt_key  # noqa: F841
+            ret = e
+    if first:
+        return default
+    return ret
+
+
+def no_more_kwargs(**kwargs):
+    for e in kwargs:
+        raise TypeError(f"'{e}' is an invalid keyword argument for this function")
+
+
 class MinMaxWrapper(Wrapper):
     is_pod = True
     is_empty = False
     is_pass_by_ref = False
 
-    def __init__(self, comparison1, comparison2, builtin):
+    def __init__(self, comparison1, comparison2, i_call, i_default_call, i_key_call, i_key_default_call, builtin):
         self.comparison_op1 = comparison1
         self.comparison_op2 = comparison2
+        self.i_call = i_call
+        self.i_default_call = i_default_call
+        self.i_key_call = i_key_call
+        self.i_key_default_call = i_key_default_call
         super().__init__(builtin)
 
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
     def convert_call(self, context, expr, args, kwargs):
+        # iterable case
+        if len(args) == 1:
+            if 'key' in kwargs:
+                key_f = kwargs['key']
+                del kwargs['key']
+                if 'default' in kwargs:
+                    default = kwargs['default']
+                    del kwargs['default']
+                    no_more_kwargs(**kwargs)
+                    return context.call_py_function(self.i_key_default_call, (args[0], key_f, default), {})
+                else:
+                    no_more_kwargs(**kwargs)
+                    return context.call_py_function(self.i_key_call, (args[0], key_f), {})
+            if 'default' in kwargs:
+                default = kwargs['default']
+                del kwargs['default']
+                no_more_kwargs(**kwargs)
+                return context.call_py_function(self.i_default_call, (args[0], default), {})
+            no_more_kwargs(**kwargs)
+            return context.call_py_function(self.i_call, (args[0],), {})
+
         # this algorithm generates O(n) in code size and does O(n) copies
         if len(args) >= 2 and len(args) > _MINMAX_SPACE_VS_COPY_THRESHOLD and 'key' in kwargs:
             outT = OneOfWrapper.mergeTypes([a.expr_type.typeRepresentation for a in args]).typeRepresentation
@@ -49,6 +175,8 @@ class MinMaxWrapper(Wrapper):
             context.markUninitializedSlotInitialized(selected)
 
             key_f = kwargs['key']
+            del kwargs['key']
+            no_more_kwargs(**kwargs)
 
             # determine key type
             keyT = None
@@ -105,6 +233,8 @@ class MinMaxWrapper(Wrapper):
             selected = context.allocateUninitializedSlot(outT)
 
             key_f = kwargs['key']
+            del kwargs['key']
+            no_more_kwargs(**kwargs)
 
             # determine key type
             keyT = None
@@ -184,9 +314,25 @@ class MinMaxWrapper(Wrapper):
 
 class MinWrapper(MinMaxWrapper):
     def __init__(self):
-        super().__init__(python_ast.ComparisonOp.Gt(), python_ast.ComparisonOp.GtE(), min)
+        super().__init__(
+            python_ast.ComparisonOp.Gt(),
+            python_ast.ComparisonOp.GtE(),
+            i_min,
+            i_min_default,
+            i_min_key,
+            i_min_key_default,
+            min
+        )
 
 
 class MaxWrapper(MinMaxWrapper):
     def __init__(self):
-        super().__init__(python_ast.ComparisonOp.Lt(), python_ast.ComparisonOp.LtE(), max)
+        super().__init__(
+            python_ast.ComparisonOp.Lt(),
+            python_ast.ComparisonOp.LtE(),
+            i_max,
+            i_max_default,
+            i_max_key,
+            i_max_key_default,
+            max
+        )
