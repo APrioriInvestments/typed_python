@@ -19,6 +19,9 @@ from typed_python import ListOf, TupleOf, Tuple, NamedTuple, Dict, ConstDict, \
     Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Float32, \
     Alternative, Set, OneOf, Compiled, Entrypoint
 
+from typed_python.compiler.type_wrappers.min_max_wrapper import i_min, i_min_default, i_min_key, i_min_key_default,\
+    i_max, i_max_default, i_max_key, i_max_key_default
+
 
 def result_or_exception(f, *p):
     try:
@@ -431,3 +434,18 @@ class TestBuiltinCompilation(unittest.TestCase):
                 f(v, x=99)
             with self.assertRaises(TypeError):
                 Entrypoint(f)(v, x=99)
+
+    def test_min_max_cover(self):
+        # these functions are compiled indirectly and tested elsewhere
+        # to avoid codecov failures, they appear here
+        v = (1, 2, 3)
+        d = -99
+        k = lambda x: 1
+        i_min(v)
+        i_min_default(v, d)
+        i_min_key(v, k)
+        i_min_key_default(v, k, d)
+        i_max(v)
+        i_max_default(v, d)
+        i_max_key(v, k)
+        i_max_key_default(v, k, d)
