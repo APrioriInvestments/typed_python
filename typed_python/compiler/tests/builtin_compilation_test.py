@@ -15,7 +15,7 @@
 import unittest
 from math import isnan
 
-from typed_python import ListOf, TupleOf, NamedTuple, Dict, ConstDict, \
+from typed_python import ListOf, TupleOf, Tuple, NamedTuple, Dict, ConstDict, \
     Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Float32, \
     Alternative, Set, OneOf, Compiled, Entrypoint
 
@@ -232,6 +232,121 @@ class TestBuiltinCompilation(unittest.TestCase):
 
         test_cases = [
             ('abc', 'de', 'fghi', 'klm'),
+            ('abc', 'de', 'fghi', 'klm') * 3,
+            ('abc', (2, 3), 'fghi', 'klm'),
+            ('abc', (2, 3), 'fghi', 'klm') * 3,
+            ('abc', (2, 3), 'de', 'klm'),
+            ('abc', (2, 3), 'de', 'klm') * 3,
+            ('abc', 'de', (2, 3), 'klm'),
+            ('abc', 'de', (2, 3), 'klm') * 3,
+            ('abc', 'de', (1, 2, 3, 4), 'klm'),
+            ('abc', 'de', (1, 2, 3, 4), 'klm') * 3,
+            ('abc', 'de', (1, 2, 3, 4), 'klmn'),
+            ('abc', 'de', (1, 2, 3, 4), 'klmn') * 3,
+            ('abc', 'de', 'klmn', (1, 2, 3, 4)),
+            ('abc', 'de', 'klmn', (1, 2, 3, 4)) * 3,
+            ('ab', (1, 2), [3, 4], {5, 6}),
+            ('ab', (1, 2), [3, 4], {5, 6}) * 3,
+            ((1, 2), [3, 4], {5, 6}, 'ab'),
+            ((1, 2), [3, 4], {5, 6}, 'ab') * 3,
+            ([3, 4], {5, 6}, 'ab', (1, 2)),
+            ([3, 4], {5, 6}, 'ab', (1, 2)) * 3,
+            ({5, 6}, 'ab', (1, 2), [3, 4]),
+            ({5, 6}, 'ab', (1, 2), [3, 4]) * 3,
+        ]
+        for f in [f_min1, f_max1, f_min2, f_max2]:
+            for v in test_cases:
+                r1 = f(*v)
+                r2 = Entrypoint(f)(*v)
+                self.assertEqual(r1, r2)
+                self.assertEqual(type(r1), type(r2))
+
+    def test_min_max_iterable(self):
+        def f_min(v):
+            return min(v)
+
+        def f_max(v):
+            return max(v)
+
+        C = Alternative("C", a={'val': int}, b={},
+                        __eq__=lambda self, other: self.val == other.val,
+                        __ne__=lambda self, other: self.val != other.val,
+                        __lt__=lambda self, other: self.val > other.val,
+                        __gt__=lambda self, other: self.val < other.val,
+                        __le__=lambda self, other: self.val >= other.val,
+                        __ge__=lambda self, other: self.val <= other.val,
+                        )
+
+        test_cases = [
+            TupleOf(int)((1, 9)), TupleOf(int)((9, 1)),
+            Tuple(int, int)((1, 9)), Tuple(int, int)((9, 1)),
+            (1, 9), (9, 1),
+            [-1, -9], [-9, -1],
+            {-2, 9}, {9, -2},
+            Tuple(int, int)((1, 9)), Tuple(int, int)((9, 1)),
+            TupleOf(int)((1, 9)), TupleOf(int)((9, 1)),
+            ListOf(int)([-1, -9]), ListOf(int)([-9, -1]),
+            Set(int)({-2, 9}), Set(int)({9, -2}),
+            range(100), range(100, 0, -1),
+            list(range(100)), list(range(100, 0, -1)),
+            set(range(100)), set(range(100, 0, -1)),
+            tuple(range(100)), tuple(range(100, 0, -1)),
+            ListOf(int)(range(100)), ListOf(int)(range(100, 0, -1)),
+            Set(int)(range(100)), Set(int)(range(100, 0, -1)),
+            TupleOf(int)(range(100)), TupleOf(int)(range(100, 0, -1)),
+            (3, 4, 5, 6, 2, 7, 8, 9), (9, 8, 7, 6, 5, 4, 3, 2, 0),
+            (1e-99, 1e99), (1e99, 1e-99),
+            (1.1, 2.1, 3.1, 0.5),
+            (1, 1e99), (1e99, 1),
+            Tuple(int, float)((1, 1e99)), Tuple(float, int)((1e99, 1)),
+            (1, 1e-99), (1e-99, 1),
+            Tuple(int, float)((1, 1e-99)), Tuple(float, int)((1e-99, 1)),
+            (UInt8(2), Int16(10), Int32(5), 22.5),
+            (UInt8(15), Int16(10), Int32(20), 12.5),
+            (UInt8(10), Int16(20), Int32(5), 12.5),
+            (UInt8(15), Int16(10), Int32(5), 2.5),
+            (UInt8(3), Int16(3), Int32(3), 3.0),
+            (3.0, UInt8(3), Int16(3), Int32(3)),
+            (Int32(3), 3.0, UInt8(3), Int16(3)),
+            (Int16(3), Int32(3), 3.0, UInt8(3)),
+            (C.a(100), C.a(80), C.a(120)),
+            (C.a(1), C.a(2), C.a(3)),
+            (C.a(3), C.a(2), C.a(1)),
+        ]
+        for f in [f_min, f_max]:
+            for v in test_cases:
+                r1 = f(v)
+                r2 = Entrypoint(f)(v)
+                self.assertEqual(r1, r2)
+                self.assertEqual(type(r1), type(r2))
+
+    def test_min_max_iterable_with_key(self):
+        T = OneOf(str, ListOf(int), TupleOf(int), Set(int))
+
+        def f_key1(s: T) -> int:
+            return len(s)
+
+        def f_min1(v):
+            return min(v, key=f_key1)
+
+        def f_max1(v):
+            return max(v, key=f_key1)
+
+        def f_key2(s: T) -> OneOf(int, float):
+            r = len(s)
+            if r == 2:
+                return 2.5
+            else:
+                return r
+
+        def f_min2(v):
+            return min(v, key=f_key2)
+
+        def f_max2(v):
+            return max(v, key=f_key2)
+
+        test_cases = [
+            ('abc', 'de', 'fghi', 'klm'),
             ('abc', 'de', 'fghi', 'klm') * 5,
             ('abc', (2, 3), 'fghi', 'klm'),
             ('abc', (2, 3), 'fghi', 'klm') * 5,
@@ -256,7 +371,63 @@ class TestBuiltinCompilation(unittest.TestCase):
         ]
         for f in [f_min1, f_max1, f_min2, f_max2]:
             for v in test_cases:
-                r1 = f(*v)
-                r2 = Entrypoint(f)(*v)
+                r1 = f(v)
+                r2 = Entrypoint(f)(v)
                 self.assertEqual(r1, r2)
                 self.assertEqual(type(r1), type(r2))
+
+    def test_min_max_defaults(self):
+        def f_min(v):
+            return min(v)
+
+        def f_max(v):
+            return max(v)
+
+        def f_min_default(v, default):
+            return min(v, default=default)
+
+        def f_max_default(v, default):
+            return max(v, default=default)
+
+        def f_key1(s):
+            return len(s)
+
+        def f_min_key_default(v, default):
+            return min(v, key=f_key1, default=default)
+
+        def f_max_key_default(v, default):
+            return max(v, key=f_key1, default=default)
+
+        empty_sequences = [(), [], {}, TupleOf(int)(), ListOf(int)(), Set(int)()]
+        for f in [f_min, f_max]:
+            for v in empty_sequences:
+                with self.assertRaises(ValueError):
+                    f(v)
+                with self.assertRaises(ValueError):
+                    Entrypoint(f)(v)
+
+        for f in [f_min_default, f_max_default]:
+            for v in empty_sequences:
+                for d in [-99, 123]:
+                    self.assertEqual(f(v, d), d)
+                    self.assertEqual(Entrypoint(f)(v, d), d)
+
+        for f in [f_min_key_default, f_max_key_default]:
+            for v in empty_sequences:
+                for d in [-99, 123]:
+                    self.assertEqual(f(v, d), d)
+                    self.assertEqual(Entrypoint(f)(v, d), d)
+
+    def test_min_max_extra_kwargs(self):
+        def f_min_kw(v, **kw):
+            return min(v, **kw)
+
+        def f_max_kw(v, **kw):
+            return max(v, **kw)
+
+        for f in [f_min_kw, f_max_kw]:
+            v = (1, 2, 3)
+            with self.assertRaises(TypeError):
+                f(v, x=99)
+            with self.assertRaises(TypeError):
+                Entrypoint(f)(v, x=99)
