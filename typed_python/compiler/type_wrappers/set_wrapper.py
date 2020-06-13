@@ -146,9 +146,9 @@ def set_intersection_multiple(left, *others):
 
 # for generic iterable *others
 def set_intersection_update(left, *others):
-    temp = left.copy()
-    left.clear()
     for o in others:
+        temp = left.copy()
+        left.clear()
         for i in o:
             if i in temp:
                 left.add(i)
@@ -168,8 +168,8 @@ def set_difference_update(left, *others):
 
 
 def set_disjoint(left, right):
-    for i in left:
-        if i in right:
+    for i in right:
+        if i in left:
             return False
     return True
 
