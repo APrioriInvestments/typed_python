@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -290,6 +290,7 @@ class hash_table_layout {
 
         setTo(hash_table_slots, EMPTY, hash_table_size);
         setTo(hash_table_hashes, EMPTY, hash_table_size);
+        std::memset(items_populated, 0, items_reserved);
     }
 
     template <class copy_constructor_type>

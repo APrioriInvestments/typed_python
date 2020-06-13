@@ -22,7 +22,6 @@ import typed_python._types as _types
 import time
 import numpy
 import unittest
-import pytest
 
 
 def result_or_exception(f, *p):
@@ -429,8 +428,8 @@ class TestSetCompilation(unittest.TestCase):
                     r1 = f(left, right)
                     r2 = f(S(left), S(right))  # retesting interpreter here
                     r3 = Compiled(f)(S(left), S(right))  # testing compiled code
-                    self.assertEqual(r1, r2)
-                    self.assertEqual(r2, r3)
+                    self.assertEqual(r1, r2, (f, left, right))
+                    self.assertEqual(r2, r3, (f, left, right))
 
         def union0(x: S):
             return x.union()
@@ -530,7 +529,6 @@ class TestSetCompilation(unittest.TestCase):
                     with self.assertRaises(TypeError):
                         Compiled(symmetric_difference_update2)(S(x), S(y), S(z))
 
-    @pytest.mark.skip(reason="working on it")
     def test_set_iterable_updates(self):
 
         def update(x, y):
@@ -555,11 +553,8 @@ class TestSetCompilation(unittest.TestCase):
         def is_superset(x, y):
             return x.issuperset(y)
 
-        def f_is(x, y):
-            return x is y
-
-        def f_is_not(x, y):
-            return x is not y
+        def is_disjoint(x, y):
+            return x.isdisjoint(y)
 
         def some_fibs():
             a = 0
@@ -568,44 +563,33 @@ class TestSetCompilation(unittest.TestCase):
                 yield b
                 a, b = b, a + b
 
-        # s1 = Set(int)({-1,3,5})
-        # r3 = result_or_exception(Entrypoint(update), s1.copy(), (2, 3, 7))
-        # r4 = result_or_exception(Entrypoint(intersection_update), s1.copy(), (1, 3, 7))
-        # r4a = result_or_exception(Entrypoint(intersection_update), s1.copy(), [1, 3, 8])
-        # r4b = result_or_exception(Entrypoint(intersection_update), s1.copy(), {1, 3, 9})
-        # r4c = result_or_exception(Entrypoint(intersection_update), s1.copy(), range(10))
-        # r4d = result_or_exception(Entrypoint(intersection_update), s1.copy(), some_fibs())
-        # r4e = result_or_exception(Entrypoint(intersection_update), s1.copy(), Set(int)({11,22}))
-        # r1 = result_or_exception(Entrypoint(is_subset), s1.copy(), (1, 3, 7))
-        # r2 = result_or_exception(Entrypoint(is_superset), s1.copy(), (1, 3, 7))
-        # r5 = result_or_exception(Entrypoint(difference_update), s1.copy(), (1, 3, 7))
-        # r6 = result_or_exception(Entrypoint(symmetric_difference_update), s1.copy(), (1, 3, 7))
-        for f in [intersection_update, update, intersection_update, difference_update,
-                  symmetric_difference_update, is_subset, is_superset]:
-            for s in [set(range(20)), {1, 3, 5}, {-1, 3, 5}, set(range(20)), set(some_fibs()) | {0}]:
-                s0 = s.copy()
-                r0 = f(s0, range(10))
+        for f in [update, intersection_update, difference_update, symmetric_difference_update, is_subset, is_superset, is_disjoint]:
+            for s in [{-1, -2}, set(range(20)), {1, 3, 5}, {-1, 3, 5}, set(range(20)), set(some_fibs()) | {0}]:
+                for v in [[1, 2, 2, 3], [-1, -1, 2, 2, 3], (89, 4, 89), ListOf(int)([1, 4, 4, 5, 5]), TupleOf(int)(some_fibs())]:
+                    r0 = f(s.copy(), v)
 
-                s1 = Set(int)(s)
-                r1 = f(s1, range(10))
-                self.assertEqual(r0, r1)  # test interpreted result
+                    r1 = f(Set(int)(s), v)
+                    self.assertEqual(r0, r1)  # test interpreted result
 
-                s2 = Set(int)(s)
-                r2 = Entrypoint(f)(s2, range(10))
-                self.assertEqual(r0, r2)  # test compiled result
+                    r2 = Entrypoint(f)(Set(int)(s), v)
+                    self.assertEqual(r0, r2)  # test compiled result
 
-                s0 = s.copy()
-                r0 = f(s0, some_fibs())
+                # now test range() and some_fibs() separately
+                r0 = f(s.copy(), range(10))
 
-                s1 = Set(int)(s)
-                r1 = f(s1, some_fibs())
-                if r0 != r1:
-                    print("mismatch")
-                self.assertEqual(r0, r1)  # test interpreted result
+                r1 = f(Set(int)(s), range(10))
+                self.assertEqual(r0, r1, (f, s, "range()"))  # test interpreted result
 
-                s2 = Set(int)(s)
-                r2 = Entrypoint(f)(s2, some_fibs())
-                self.assertEqual(r0, r2)  # test compiled result
+                r2 = Entrypoint(f)(Set(int)(s), range(10))
+                self.assertEqual(r0, r2, (f, s, "range()"))  # test compiled result
+
+                r0 = f(s.copy(), some_fibs())
+
+                r1 = f(Set(int)(s), some_fibs())
+                self.assertEqual(r0, r1, (f, s, "some_fibs()"))  # test interpreted result
+
+                r2 = Entrypoint(f)(Set(int)(s), some_fibs())
+                self.assertEqual(r0, r2, (f, s, "some_fibs()"))  # test compiled result
 
     @flaky(max_runs=3, min_passes=1)
     def test_set_binop_perf(self):

@@ -105,8 +105,16 @@ def set_symmetric_difference(left, right):
 
 
 def set_symmetric_difference_update(left, right):
+    to_remove = type(left)()
+    to_add = type(left)()
     for i in right:
-        set_add_or_remove(left, i)
+        if i in left:
+            to_remove.add(i)
+        else:
+            to_add.add(i)
+            left.add(i)
+    left.difference_update(to_remove)
+    left.update(to_add)
 
 
 def set_union_multiple(left, *others):
@@ -129,11 +137,21 @@ def set_intersection_multiple(left, *others):
     return result
 
 
+# for *others that have __contains__:
+# def set_intersection_update0(left, *others):
+#    for i in left:
+#        for o in others:
+#            if i not in o:
+#                left.discard(i)
+
+# for generic iterable *others
 def set_intersection_update(left, *others):
-    for i in left:
-        for o in others:
-            if i not in o:
-                left.discard(i)
+    temp = left.copy()
+    left.clear()
+    for o in others:
+        for i in o:
+            if i in temp:
+                left.add(i)
 
 
 def set_difference_multiple(left, *others):
@@ -144,10 +162,9 @@ def set_difference_multiple(left, *others):
 
 
 def set_difference_update(left, *others):
-    for i in left:
-        for o in others:
-            if i in o:
-                left.discard(i)
+    for o in others:
+        for e in o:
+            left.discard(e)
 
 
 def set_disjoint(left, right):
