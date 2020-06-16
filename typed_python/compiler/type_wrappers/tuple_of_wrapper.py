@@ -38,6 +38,13 @@ def tuple_or_list_contains(tup, elt):
     return False
 
 
+def tuple_or_list_contains_not(tup, elt):
+    for x in tup:
+        if x == elt:
+            return False
+    return True
+
+
 def tuple_compare_eq(left, right):
     """Compare two 'TupleOf' instances by comparing their individual elements."""
     if len(left) != len(right):
@@ -275,8 +282,15 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_bin_op_reverse(self, context, right, op, left, inplace):
-        if op.matches.In:
-            return context.call_py_function(tuple_or_list_contains, (right, left), {})
+        if op.matches.In or op.matches.NotIn:
+            left = left.convert_to_type(self.typeRepresentation.ElementType, False)
+            if left is None:
+                return None
+            return context.call_py_function(
+                tuple_or_list_contains if op.matches.In else tuple_or_list_contains_not,
+                (right, left),
+                {}
+            )
 
         return super().convert_bin_op_reverse(context, right, op, left, inplace)
 

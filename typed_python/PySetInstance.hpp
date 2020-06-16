@@ -72,9 +72,9 @@ class PySetInstance : public PyInstance {
     static int set_difference_update(PyObject* o, PyObject* other);
     static PyObject* set_symmetric_difference(PyObject* o, PyObject* other);
     static int set_symmetric_difference_update(PyObject* o, PyObject* other);
-    static bool set_is_subset(PyObject* o, PyObject* other);
-    static bool set_is_superset(PyObject* o, PyObject* other);
-    static bool set_is_disjoint(PyObject* o, PyObject* other);
+    static int set_is_subset(PyObject* o, PyObject* other);
+    static int set_is_superset(PyObject* o, PyObject* other);
+    static int set_is_disjoint(PyObject* o, PyObject* other);
     SetType* type();
     static void getDataFromNative(PySetInstance* src, std::function<void(instance_ptr)> func);
     static void getDataFromNative(PyTupleOrListOfInstance* src,

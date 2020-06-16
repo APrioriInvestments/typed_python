@@ -174,9 +174,30 @@ def set_disjoint(left, right):
     return True
 
 
+# for types that support "not in":
 def set_subset(left, right):
     for i in left:
         if i not in right:
+            return False
+    return True
+
+
+# for generic iterables:
+def set_subset_iterable(left, right):
+    if len(left) == 0:
+        return True
+    shadow = type(left)()
+    for i in right:
+        if i in left:
+            shadow.add(i)
+            if len(shadow) == len(left):
+                return True
+    return False
+
+
+def set_superset(left, right):
+    for i in right:
+        if i not in left:
             return False
     return True
 
@@ -468,9 +489,14 @@ class SetWrapper(SetWrapperBase):
             if methodname == "isdisjoint":
                 return context.call_py_function(set_disjoint, (instance, args[0]), {})
             if methodname == "issubset":
-                return context.call_py_function(set_subset, (instance, args[0]), {})
+                argType = args[0].expr_type.typeRepresentation
+                argCat = getattr(argType, "__typed_python_category__", None)
+                if argCat in ('Set', 'Dict', 'ConstDict'):  # types that have fast "in" operator
+                    return context.call_py_function(set_subset, (instance, args[0]), {})
+                else:  # generic iterable type
+                    return context.call_py_function(set_subset_iterable, (instance, args[0]), {})
             if methodname == "issuperset":
-                return context.call_py_function(set_subset, (args[0], instance), {})
+                return context.call_py_function(set_superset, (instance, args[0]), {})
 
             if methodname == "add":
                 key = args[0].convert_to_type(self.keyType, explicit=False)

@@ -391,63 +391,87 @@ int PySetInstance::set_difference_update(PyObject* o, PyObject* other) {
     return ret;
 }
 
-bool PySetInstance::set_is_subset(PyObject *o, PyObject* other) {
+// returns 1 on true, 0 on false, -1 on error
+int PySetInstance::set_is_subset(PyObject *o, PyObject* other) {
     if (o == other) {
-        return true;
+        return (int)true;
     }
     PySetInstance* self_w = (PySetInstance*)o;
     PySetInstance* shadow = (PySetInstance*)PyInstance::tp_new(Py_TYPE(o), NULL, NULL);
     if (!shadow) {
-        return false;
+        return -1;
     }
 
     if (self_w->mp_and_sq_length_concrete() == 0) {
-        return true;
+        return (int)true;
     }
 
     bool ret = false;
-    iterateWithEarlyExit(other, [&](PyObject* item) {
-        Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
-            copyConstructFromPythonInstance(self_w->type()->keyType(), data, item);
-        });
-        if (self_w->type()->lookupKey(self_w->dataPtr(), key.data())) {
-            insertKey(shadow, item, key.data());
-            if (shadow->mp_and_sq_length_concrete() == self_w->mp_and_sq_length_concrete()) {
-                ret = true;
-                return false;
+    try {
+        iterateWithEarlyExit(other, [&](PyObject* item) {
+            Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
+                copyConstructFromPythonInstance(self_w->type()->keyType(), data, item);
+            });
+            if (self_w->type()->lookupKey(self_w->dataPtr(), key.data())) {
+                insertKey(shadow, item, key.data());
+                if (shadow->mp_and_sq_length_concrete() == self_w->mp_and_sq_length_concrete()) {
+                    ret = true;
+                    return false;
+                }
             }
-        }
-        return true;
-    });
-    return ret;
+            return true;
+        });
+    } catch (PythonExceptionSet& e) {
+        return -1;
+    } catch (std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return -1;
+    }
+    return (int)ret;
 }
 
-bool PySetInstance::set_is_superset(PyObject *o, PyObject* other) {
+// returns 1 on true, 0 on false, -1 on error
+int PySetInstance::set_is_superset(PyObject *o, PyObject* other) {
     if (o == other) {
-        return true;
+        return (int)true;
     }
     PySetInstance* self_w = (PySetInstance*)o;
     bool contains = true;
-    iterateWithEarlyExit(other, [&](PyObject* item) {
-        contains = self_w->sq_contains_concrete(item);
-        return contains;
-    });
+    try {
+        iterateWithEarlyExit(other, [&](PyObject* item) {
+            contains = self_w->sq_contains_concrete(item);
+            return contains;
+        });
+    } catch (PythonExceptionSet& e) {
+        return -1;
+    } catch (std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return -1;
+    }
 
-    return contains;
+    return (int)contains;
 }
 
-bool PySetInstance::set_is_disjoint(PyObject *o, PyObject* other) {
+// returns 1 on true, 0 on false, -1 on error
+int PySetInstance::set_is_disjoint(PyObject *o, PyObject* other) {
     if (o == other) {
-        return false;
+        return (int)false;
     }
     PySetInstance* self_w = (PySetInstance*)o;
     bool contains = false;
-    iterateWithEarlyExit(other, [&](PyObject* item) {
-        contains = self_w->sq_contains_concrete(item);
-        return !contains;
-    });
+    try {
+        iterateWithEarlyExit(other, [&](PyObject* item) {
+            contains = self_w->sq_contains_concrete(item);
+            return !contains;
+        });
+    } catch (PythonExceptionSet& e) {
+        return -1;
+    } catch (std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return -1;
+    }
 
-    return !contains;
+    return (int)(!contains);
 }
 
 PyObject* PySetInstance::set_symmetric_difference(PyObject* o, PyObject* other) {
@@ -490,12 +514,12 @@ PyObject* PySetInstance::set_symmetric_difference(PyObject* o, PyObject* other) 
     } else {
         new_inst = (PySetInstance*)setCopy(o, NULL);
         if (!new_inst) {
-            PyErr_SetString(PyExc_TypeError, "symmetric_difference() allocation error");
+            PyErr_SetString(PyExc_TypeError, "symmetric_difference allocation error");
             return NULL;
         }
         if (set_symmetric_difference_update((PyObject*)new_inst, other) < 0) {
             decref((PyObject*)new_inst);
-            PyErr_SetString(PyExc_TypeError, "symmetric_difference() type mismatch");
+            PyErr_SetString(PyExc_TypeError, "symmetric_difference type mismatch");
             return NULL;
         }
     }
@@ -634,7 +658,10 @@ PyObject* PySetInstance::setIsSubset(PyObject* o, PyObject* args) {
         return NULL;
     }
 
-    return incref(set_is_subset(o, arg) ? Py_True : Py_False);
+    int ret = set_is_subset(o, arg);
+    if (ret < 0)
+        return NULL;
+    return incref(ret ? Py_True : Py_False);
 }
 
 PyObject* PySetInstance::setIsSuperset(PyObject* o, PyObject* args) {
@@ -649,7 +676,10 @@ PyObject* PySetInstance::setIsSuperset(PyObject* o, PyObject* args) {
         return NULL;
     }
 
-    return incref(set_is_superset(o, arg) ? Py_True : Py_False);
+    int ret = set_is_superset(o, arg);
+    if (ret < 0)
+        return NULL;
+    return incref(ret ? Py_True : Py_False);
 }
 
 PyObject* PySetInstance::setIsDisjoint(PyObject* o, PyObject* args) {
@@ -664,7 +694,10 @@ PyObject* PySetInstance::setIsDisjoint(PyObject* o, PyObject* args) {
         return NULL;
     }
 
-    return incref(set_is_disjoint(o, arg) ? Py_True : Py_False);
+    int ret = set_is_disjoint(o, arg);
+    if (ret < 0)
+        return NULL;
+    return incref(ret ? Py_True : Py_False);
 }
 
 PyObject* PySetInstance::setIntersection(PyObject* o, PyObject* args) {
@@ -790,7 +823,7 @@ PyObject* PySetInstance::setDifferenceUpdate(PyObject* o, PyObject* args) {
         PyObjectHolder item(PyTuple_GetItem(args, k));
         if (!PyIter_Check(item) && !PyList_Check(item) && !PySet_Check(item)
                 && !PyTuple_Check(item) && !PySequence_Check(item)) {
-            PyErr_SetString(PyExc_TypeError, "Set.difference_update one of args has wrong type");
+            PyErr_SetString(PyExc_TypeError, "difference_update one of args has wrong type");
             return NULL;
         }
     }
@@ -799,6 +832,7 @@ PyObject* PySetInstance::setDifferenceUpdate(PyObject* o, PyObject* args) {
         for (size_t k = 0; k < PyTuple_Size(args); ++k) {
             PyObjectHolder item(PyTuple_GetItem(args, k));
             if (set_difference_update(o, item) < 0) {
+                PyErr_SetString(PyExc_TypeError, "difference_update element type conversion error");
                 return NULL;
             }
         }
@@ -820,13 +854,14 @@ PyObject* PySetInstance::setSymmetricDifferenceUpdate(PyObject* o, PyObject* arg
     PyObjectHolder item(PyTuple_GetItem(args, 0));
     if (!PyIter_Check(item) && !PyList_Check(item) && !PySet_Check(item)
             && !PyTuple_Check(item) && !PySequence_Check(item)) {
-        PyErr_SetString(PyExc_TypeError, "Set.symmetric_difference_update arg has wrong type");
+        PyErr_SetString(PyExc_TypeError, "symmetric_difference_update arg has wrong type");
         return NULL;
     }
 
     try {
         PyObjectHolder item(PyTuple_GetItem(args, 0));
         if (set_symmetric_difference_update(o, item) < 0) {
+            PyErr_SetString(PyExc_TypeError, "symmetric_difference_update element type conversion error");
             return NULL;
         }
     } catch (PythonExceptionSet& e) {
