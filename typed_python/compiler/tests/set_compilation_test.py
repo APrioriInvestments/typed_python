@@ -15,8 +15,9 @@
 from typed_python import Set, ListOf, Entrypoint, Compiled, Tuple, TupleOf, NamedTuple, Dict, ConstDict, OneOf
 from typed_python.compiler.type_wrappers.set_wrapper import set_union, set_intersection, set_difference, \
     set_symmetric_difference, set_union_multiple, set_intersection_multiple, set_difference_multiple, \
-    set_disjoint, set_subset, set_subset_iterable, set_proper_subset, set_equal, set_not_equal, \
-    set_update, set_intersection_update, set_difference_update
+    set_disjoint, set_subset, set_subset_iterable, set_superset, set_proper_subset, set_equal, set_not_equal, \
+    set_update, set_intersection_update, set_difference_update, set_symmetric_difference_update, \
+    initialize_set_from_other
 from flaky import flaky
 import typed_python._types as _types
 import time
@@ -960,15 +961,29 @@ class TestSetCompilation(unittest.TestCase):
 
         s4 = {2, 3}
         self.assertEqual(set_disjoint(s3, s4), s3.isdisjoint(s4))
+        self.assertEqual(set_disjoint(s3, s3), s3.isdisjoint(s3))
         self.assertEqual(set_subset(s3, s4), s3 <= s4)
+        self.assertEqual(set_subset(s3, s3), s3 <= s3)
+        self.assertEqual(set_superset(s4, s3), s4 >= s3)
+        self.assertEqual(set_superset(s3, s3), s3 >= s3)
         self.assertEqual(set_subset_iterable(s3, s4), s3 <= s4)
         self.assertEqual(set_proper_subset(s3, s4), s3 < s4)
         self.assertEqual(set_equal(s3, s4), s3 == s4)
         self.assertEqual(set_not_equal(s3, s4), s3 != s4)
 
         set_update(s1, s2)
-        set_intersection_update(s1, s1)
-        set_difference_update(s1, [9, 11])
+        set_intersection_update(s1, [5, 6])
+        set_difference_update(s1, [3, 7])
+        set_symmetric_difference_update(s1, [2, 8])
+
+        class P_mock:
+            ElementType = Set(int)
+
+            def initialize(self, src):
+                pass
+
+        p1 = P_mock()
+        initialize_set_from_other(p1, [1, 2])
 
     def test_compiled_set_constructors(self):
         def f_set(x):

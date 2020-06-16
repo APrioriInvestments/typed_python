@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Compiled
+from typed_python import ListOf, Compiled, Entrypoint
 import unittest
 
 
@@ -65,3 +65,13 @@ class TestRangeCompilation(unittest.TestCase):
         self.assertEqual(repeat(aList, 1), aList)
         self.assertEqual(repeat(aList, 2), aList + aList)
         self.assertEqual(repeat(aList, 3), aList + aList + aList)
+
+    def test_range_type_str(self):
+        def f(x):
+            return str(type(x))
+
+        x = range(10)
+
+        r1 = f(x)
+        r2 = Entrypoint(f)(x)
+        self.assertEqual(r1, r2)

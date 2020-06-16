@@ -22,7 +22,7 @@ from typed_python.compiler.type_wrappers.const_dict_wrapper import ConstDictWrap
 from typed_python.compiler.type_wrappers.dict_wrapper import DictWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.native_hash import table_next_slot, table_clear, \
-    table_contains, table_contains_not, set_add, set_add_or_remove, set_remove, set_discard, set_pop
+    table_contains, set_add, set_add_or_remove, set_remove, set_discard, set_pop
 from typed_python import PointerTo, Int32, UInt8
 
 import typed_python.compiler.native_ast as native_ast
@@ -607,16 +607,12 @@ class SetWrapper(SetWrapperBase):
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_bin_op_reverse(self, context, right, op, left, inplace):
-        if op.matches.In or op.matches.NotIn:
+        if op.matches.In:
             left = left.convert_to_type(self.keyType, False)
             if left is None:
                 return None
 
-            return context.call_py_function(
-                table_contains if op.matches.In else table_contains_not,
-                (right, left),
-                {}
-            )
+            return context.call_py_function(table_contains, (right, left), {})
 
         return super().convert_bin_op_reverse(context, right, op, left, inplace)
 

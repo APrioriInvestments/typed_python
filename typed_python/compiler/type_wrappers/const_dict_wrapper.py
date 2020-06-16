@@ -149,10 +149,6 @@ def const_dict_contains(constDict, key):
     return False
 
 
-def const_dict_contains_not(constDict, key):
-    return not const_dict_contains(constDict, key)
-
-
 class ConstDictWrapperBase(RefcountedWrapper):
     """Common method wrappers for all ConstDicts.
 
@@ -319,16 +315,12 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_bin_op_reverse(self, context, left, op, right, inplace):
-        if op.matches.In or op.matches.NotIn:
+        if op.matches.In:
             right = right.convert_to_type(self.keyType)
             if right is None:
                 return None
 
-            return context.call_py_function(
-                const_dict_contains if op.matches.In else const_dict_contains_not,
-                (left, right),
-                {}
-            )
+            return context.call_py_function(const_dict_contains, (left, right), {})
 
         return super().convert_bin_op_reverse(context, left, op, right, inplace)
 
