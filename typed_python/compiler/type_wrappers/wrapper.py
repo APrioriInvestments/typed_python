@@ -328,7 +328,10 @@ class Wrapper(object):
 
     def convert_unary_op(self, context, expr, op):
         if op.matches.Not:
-            return self.convert_bool_cast(context, expr).convert_unary_op(op)
+            res = self.convert_bool_cast(context, expr)
+            if res is None:
+                return res
+            return res.convert_unary_op(op)
 
         return context.pushException(
             TypeError,
