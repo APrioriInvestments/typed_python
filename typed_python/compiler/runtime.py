@@ -55,6 +55,7 @@ class RuntimeEventVisitor:
 
     def __enter__(self):
         Runtime.singleton().addEventVisitor(self)
+        return self
 
     def __exit__(self, *args):
         Runtime.singleton().removeEventVisitor(self)
@@ -82,6 +83,14 @@ class PrintNewFunctionVisitor(RuntimeEventVisitor):
                 print("        ", varname, " which is a Value(", varVal.Value, " of type ", type(varVal.Value), ")")
             else:
                 print("        ", varname, varVal)
+
+
+class CountCompilationsVisitor(RuntimeEventVisitor):
+    def __init__(self):
+        self.count = 0
+
+    def onNewFunction(self, f, inputTypes, outputType, variables):
+        self.count += 1
 
 
 class Runtime:

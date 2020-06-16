@@ -16,8 +16,26 @@ from typed_python import (
     TypeFunction, Class, Alternative, Member, SerializationContext,
     Forward, ListOf, Final, isCompiled, Entrypoint, NotCompiled
 )
+from typed_python.compiler.runtime import Runtime
 
 import unittest
+
+
+@TypeFunction
+def TfLevelMethod(T):
+    @Entrypoint
+    def aMethod2(x: int) -> int:
+        return x
+
+    @Entrypoint
+    def aMethod(x) -> int:
+        return aMethod2(x)
+
+    class A(Class, Final):
+        def f(self, x):
+            return aMethod(x)
+
+    return A
 
 
 class TypeFunctionTest(unittest.TestCase):
@@ -182,3 +200,11 @@ class TypeFunctionTest(unittest.TestCase):
             return A
 
         makeClass(int)()
+
+    def test_compiled_method_in_tf_closure(self):
+        timesCompiled = Runtime.singleton().timesCompiled
+
+        for _ in range(1000):
+            TfLevelMethod(str)().f(1)
+
+        assert Runtime.singleton().timesCompiled - timesCompiled < 10

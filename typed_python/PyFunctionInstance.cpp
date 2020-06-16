@@ -242,12 +242,40 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(
 
         // convert the object back to a function
         Type* convertedFType = PyInstance::extractTypeFrom(fConvertedAsObj->ob_type);
+
         if (!convertedFType || convertedFType->getTypeCategory() != Type::TypeCategory::catFunction) {
             throw std::runtime_error("prepareArgumentToBePassedToCompiler returned a non-function!");
         }
 
         Function* convertedF = (Function*)convertedFType;
+
         instance_ptr convertedFData = ((PyInstance*)(PyObject*)fConvertedAsObj)->dataPtr();
+
+        // attempt a second dispatch. Some functions change every time they're called
+        // because of what's held in their closures.
+
+        // the overloadIx shouldn't change because 'prepareArgumentToBePassedToCompiler'
+        // doesn't fundamentally change the nature of the function - it just picks
+        // appropriate types for the closures.
+        if (convertedF->getOverloads().size() != f->getOverloads().size()) {
+            throw std::runtime_error("Somehow, the number of overloads in the function changed.");
+        }
+
+        const Function::Overload& overload2(convertedF->getOverloads()[overloadIx]);
+
+        for (const auto& spec: overload2.getCompiledSpecializations()) {
+            auto res = dispatchFunctionCallToCompiledSpecialization(
+                overload2,
+                convertedF->getClosureType(),
+                convertedFData,
+                spec,
+                mapper
+            );
+
+            if (res.first) {
+                return res;
+            }
+        }
 
         static PyObject* runtimeModule = PyImport_ImportModule("typed_python.compiler.runtime");
 
