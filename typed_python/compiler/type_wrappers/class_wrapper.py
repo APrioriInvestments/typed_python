@@ -786,19 +786,18 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                 .ElementPtrIntegers(self.BYTES_BEFORE_INIT_BITS + byteOffset).store(native_ast.const_uint8_expr(0))
             )
 
-        if _types.is_default_constructible(self.typeRepresentation):
-            for i in range(len(self.classType.MemberTypes)):
-                if _types.wantsToDefaultConstruct(self.classType.MemberTypes[i]):
-                    name = self.classType.MemberNames[i]
+        for i in range(len(self.classType.MemberTypes)):
+            if _types.wantsToDefaultConstruct(self.classType.MemberTypes[i]):
+                name = self.classType.MemberNames[i]
 
-                    if name in self.classType.MemberDefaultValues:
-                        defVal = self.classType.MemberDefaultValues.get(name)
-                        context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_copy_initialize(
-                            typed_python.compiler.python_object_representation.pythonObjectRepresentation(context, defVal)
-                        )
-                    else:
-                        context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_default_initialize()
-                    context.pushEffect(self.setIsInitializedExpr(out, i))
+                if name in self.classType.MemberDefaultValues:
+                    defVal = self.classType.MemberDefaultValues.get(name)
+                    context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_copy_initialize(
+                        typed_python.compiler.python_object_representation.pythonObjectRepresentation(context, defVal)
+                    )
+                else:
+                    context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_default_initialize()
+                context.pushEffect(self.setIsInitializedExpr(out, i))
 
         if '__init__' in self.typeRepresentation.MemberFunctions:
             initFuncType = typeWrapper(self.typeRepresentation.MemberFunctions['__init__'])

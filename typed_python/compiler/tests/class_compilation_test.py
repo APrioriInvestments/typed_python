@@ -34,6 +34,13 @@ def result_or_exception(f, *p):
         return type(e)
 
 
+class ShouldInitializeMembers(Class):
+    x = Member(OneOf(None, ListOf(int)))
+
+    def __init__(self):
+        pass
+
+
 class AClass(Class):
     x = Member(int)
     y = Member(float)
@@ -101,6 +108,15 @@ class AClassWithInit(Class):
 
 
 class TestClassCompilationCompilation(unittest.TestCase):
+    def test_initializes_correctly(self):
+        ShouldInitializeMembers().x
+
+        @Entrypoint
+        def f():
+            return ShouldInitializeMembers()
+
+        f().x
+
     def test_class_attribute(self):
         a = AClass(x=10, y=20.5, z=(1, 2, 3))
 

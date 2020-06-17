@@ -802,7 +802,16 @@ class ExpressionFunctionConversionContext(ConversionContextBase):
     def convert_function_body(self, variableStates: FunctionStackState):
         subcontext = ExpressionConversionContext(self, variableStates)
 
-        expr = self._generator(*[subcontext.namedVariableLookup(a) for a in self.funcArgNames])
+        try:
+            expr = self._generator(*[subcontext.namedVariableLookup(a) for a in self.funcArgNames])
+        except Exception as e:
+            newMessage = f"\n{self.identity}\n"
+
+            if e.args:
+                e.args = (str(e.args[0]) + newMessage,)
+            else:
+                e.args = (newMessage,)
+            raise
 
         if expr is not None:
             if not self._functionOutputTypeKnown:
