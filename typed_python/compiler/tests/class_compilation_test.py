@@ -17,8 +17,11 @@ import psutil
 from math import trunc, floor, ceil
 import unittest
 from flaky import flaky
-from typed_python import Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, UInt64, Int16, \
-    Float32, Final, PointerTo, makeNamedTuple, Compiled, Function, Held
+from typed_python import (
+    Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, UInt64, Int16,
+    Float32, Final, PointerTo, makeNamedTuple, Compiled, Function, Held, Value
+)
+
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime
 
@@ -1953,3 +1956,15 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(getitem(aList, 0).x, 2)
         self.assertEqual(getitem(aList, 5).x, 2)
+
+    def test_default_initialize_class_with_type_members(self):
+        class C(Class, Final):
+            t = Member(Value(float))
+
+        assert C().t is float
+
+        @Entrypoint
+        def callIt():
+            return C()
+
+        assert callIt().t is float

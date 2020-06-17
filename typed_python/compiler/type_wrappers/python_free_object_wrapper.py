@@ -40,6 +40,9 @@ class PythonFreeObjectWrapper(Wrapper):
     def getCompileTimeConstant(self):
         return self.typeRepresentation.Value
 
+    def convert_default_initialize(self, context, instance):
+        pass
+
     def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type == self:
             if op.matches.Eq or op.matches.Is:

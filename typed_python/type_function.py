@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import threading
+import logging
 
 from types import FunctionType
 from typed_python._types import Forward, ListOf, TupleOf, Dict, ConstDict
@@ -118,6 +119,7 @@ class ConcreteTypeFunction(object):
                 return resultType
             except Exception as e:
                 self._memoForKey[key] = e
+                logging.exception("TypeFunction errored")
                 raise
 
 

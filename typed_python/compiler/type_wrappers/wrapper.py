@@ -202,7 +202,7 @@ class Wrapper(object):
             raise NotImplementedError()
 
     def convert_default_initialize(self, context, target):
-        raise NotImplementedError(self)
+        raise NotImplementedError(type(self))
 
     def convert_mutable_masquerade_to_untyped_type(self):
         """What Wrapper would 'convert_mutable_masquerade_to_untyped' return?"""

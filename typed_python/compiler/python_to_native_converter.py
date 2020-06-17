@@ -463,6 +463,7 @@ class PythonToNativeConverter(object):
 
                 self._inflight_function_conversions.clear()
                 self._inflight_definitions.clear()
+                self._linktimeHooks.clear()
                 raise
             finally:
                 self._currentlyConverting = None

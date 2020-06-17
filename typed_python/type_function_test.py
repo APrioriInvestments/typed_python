@@ -208,3 +208,22 @@ class TypeFunctionTest(unittest.TestCase):
             TfLevelMethod(str)().f(1)
 
         assert Runtime.singleton().timesCompiled - timesCompiled < 10
+
+    def test_pass_function_with_reference_doesnt_recompile(self):
+        timesCompiled = Runtime.singleton().timesCompiled
+
+        @NotCompiled
+        def f(x):
+            return x + 1
+
+        def g(x):
+            return f(x)
+
+        @Entrypoint
+        def callIt(aFun, anArg):
+            return aFun(anArg)
+
+        for _ in range(1000):
+            callIt(g, 10)
+
+        assert Runtime.singleton().timesCompiled - timesCompiled < 10
