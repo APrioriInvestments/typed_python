@@ -182,6 +182,14 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
                 )
             )
 
+        if op.matches.IsNot:
+            return context.pushPod(
+                bool,
+                l.nonref_expr.ElementPtrIntegers(0, 1).cast(UInt64.pointer()).load().neq(
+                    rAsObj.nonref_expr.ElementPtrIntegers(0, 1).cast(UInt64.pointer()).load()
+                )
+            )
+
         tgt = runtime_functions.pyOpToBinaryCallTarget.get(op)
 
         if tgt is not None:
