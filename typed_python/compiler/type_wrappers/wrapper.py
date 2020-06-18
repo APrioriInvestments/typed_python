@@ -510,7 +510,10 @@ class Wrapper(object):
             raise context.pushException(TypeError, "We don't support conversion in the base wrapper.")
 
     def convert_type_call(self, context, typeInst, args, kwargs):
-        raise Exception(f"We can't call type {self.typeRepresentation} with args {args} and kwargs {kwargs}")
+        context.pushException(
+            TypeError,
+            f"We can't call type {self.typeRepresentation} with args {args} and kwargs {kwargs}"
+        )
 
     def convert_call_on_container_expression(self, context, inst, argExpr):
         """Convert a case where we are calling x([...]) or similar.
