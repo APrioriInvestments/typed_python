@@ -1061,3 +1061,20 @@ class TestSetCompilation(unittest.TestCase):
             f_set_t({t1, t2, t4})
         with self.assertRaises(TypeError):
             Entrypoint(f_set_t)({t1, t2, t4})
+
+    def test_set_comprehensions(self):
+        def f1(s):
+            return {x for x in s}
+
+        def f2(s, k):
+            return {x for x in s if x % k}
+
+        for s in [set(range(10)), set(range(100)), set()]:
+            r1 = f1(s)
+            r2 = Entrypoint(f1)(s)
+            self.assertEqual(r1, r2)
+
+            for k in [1, 2, 3]:
+                r1 = f2(s, k)
+                r2 = Entrypoint(f2)(s, k)
+                self.assertEqual(r1, r2)

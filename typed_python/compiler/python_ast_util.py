@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ def pyAstForCode(codeObject):
     if len(defs) == 0:
         raise Exception(
             f"Error: can't convert {codeObject} back to code because when we"
-            f" look, there are no defs or lambas at "
+            f" look, there are no defs or lambdas at "
             f"{codeObject.co_filename}:{codeObject.co_firstlineno}"
         )
 

@@ -31,6 +31,8 @@ from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapp
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from typed_python.compiler.type_wrappers.typed_cell_wrapper import TypedCellWrapper
 from typed_python import bytecount
+# from typed_python.python_ast import convertFunctionToAlgebraicPyAst
+import typed_python.python_ast as python_ast
 
 builtinValueIdToNameAndValue = {id(v): (k, v) for k, v in __builtins__.items()}
 
@@ -1334,6 +1336,77 @@ class ExpressionConversionContext(object):
 
         return self.call_typed_call_target(callTarget, args)
 
+    def pyast_setcomp(self, ast, result_id):
+        """
+        :param ast: set comprehension in python ast form
+        :return: transformed python ast, with set comprehension replaced with more elementary expressions that we can handle
+            return value is TupleOf(Statement) and result is provided in "result" variable
+        """
+        s1 = python_ast.Statement.Assign(
+            targets=TupleOf(python_ast.Expr)(
+                (python_ast.Expr.Name(
+                    id=result_id,
+                    ctx=python_ast.ExprContext.Store()
+                ),)
+            ),
+            value=python_ast.Expr.Call(
+                func=python_ast.Expr.Name(
+                    id="set",
+                    ctx=python_ast.ExprContext.Load()
+                ),
+                args=(),
+                keywords=()
+            ),
+        )
+
+        if len(ast.generators[0].ifs) == 0:
+            s2 = python_ast.Statement.For(
+                target=ast.generators[0].target,  # <<<<<<<<
+                iter=ast.generators[0].iter,  # <<<<<<<<
+                body=TupleOf(python_ast.Statement)(
+                    (python_ast.Statement.Expr(
+                        value=python_ast.Expr.Call(
+                            func=python_ast.Expr.Attribute(
+                                value=python_ast.Expr.Name(
+                                    id=result_id,  # <<<<<<<<
+                                    ctx=python_ast.ExprContext.Load(),
+                                ),
+                                attr="add",
+                                ctx=python_ast.ExprContext.Load()
+                            ),
+                            args=TupleOf(python_ast.Expr)((ast.elt,))  # <<<<<<<<
+                        )
+                    ),)
+                )
+            )
+        else:
+            s2 = python_ast.Statement.For(
+                target=ast.generators[0].target,  # <<<<<<<<
+                iter=ast.generators[0].iter,  # <<<<<<<<
+                body=TupleOf(python_ast.Statement)(
+                    (python_ast.Statement.If(
+                        test=ast.generators[0].ifs[0],
+                        body=TupleOf(python_ast.Statement)(
+                            (python_ast.Statement.Expr(
+                                value=python_ast.Expr.Call(
+                                    func=python_ast.Expr.Attribute(
+                                        value=python_ast.Expr.Name(
+                                            id=result_id,  # <<<<<<<<
+                                            ctx=python_ast.ExprContext.Load(),
+                                        ),
+                                        attr="add",
+                                        ctx=python_ast.ExprContext.Load()
+                                    ),
+                                    args=TupleOf(python_ast.Expr)((ast.elt,))  # <<<<<<<<
+                                )
+                            ),)
+                        )
+                    ),)
+                )
+            )
+
+        return TupleOf(python_ast.Statement)((s1, s2))
+
     def convert_expression_ast(self, ast):
         """Convert a python_ast.Expression node to a TypedExpression.
 
@@ -1720,6 +1793,24 @@ class ExpressionConversionContext(object):
                 aSet.convert_method_call("add", (eVal,), {})
 
             return aSet
+
+        if ast.matches.SetComp:
+            # get the pyast:
+            # def internal_setcomprehension(elt, tgt, iter, cond):
+            #     result = set()
+            #     for tgt in iter:
+            #         if cond:
+            #             result.add(elt)
+            #
+            # pyast = convertFunctionToAlgebraicPyAst(internal_setcomprehension, keepLineInformation=False)
+            # pyast.body is a TupleOf(Statement)
+
+            result_id = "result"
+            transformed_ast = self.pyast_setcomp(ast, result_id)
+
+            body, body_returns = self.functionContext.convert_statement_list_ast(transformed_ast, self.variableStates)
+            self.pushEffect(body)
+            return self.functionContext.localVariableExpression(self, result_id)
 
         if ast.matches.Dict:
             aList = self.constant(dict).convert_call([], {})
