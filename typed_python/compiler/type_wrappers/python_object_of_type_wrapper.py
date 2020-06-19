@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ import _thread
 
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
+from typed_python.compiler.type_wrappers.arithmetic_wrapper import IntWrapper
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python import OneOf
 import typed_python.compiler.native_ast as native_ast
@@ -407,6 +408,24 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
             return context.pushPod(bool, nativeFun.call(instance.nonref_expr.cast(VoidPtr)))
 
+        if self.typeRepresentation.PyType is range and methodname == "__iter__" and not args and not kwargs:
+            method = context.push(
+                object,
+                lambda targetSlot: targetSlot.expr.store(
+                    runtime_functions.getattr_pyobj.call(
+                        instance.nonref_expr.cast(VoidPtr),
+                        native_ast.const_utf8_cstr(methodname)
+                    ).cast(self.getNativeLayoutType())
+                )
+            )
+            m = method.convert_call(args, kwargs)
+            return TypedExpression(
+                m.context,
+                m.expr,
+                _RangeObjectIteratorWrapper,
+                m.isReference
+            )
+
         method = self.convert_attribute(context, instance, methodname)
         if method is None:
             return None
@@ -424,3 +443,26 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             return self.convert_method_call(context, instance, "release", (), {})
 
         return super().convert_context_manager_exit(context, instance, args)
+
+    def get_iteration_elt_wrapper(self):
+        if self.typeRepresentation.PyType is range:
+            return IntWrapper(int)
+        else:
+            return None
+
+
+# Purpose of this wrapper:
+#   When compiling any iteration over PythonObjectOfType(range), we can infer that the iteration values are integers.
+class RangeObjectIteratorWrapper(PythonObjectOfTypeWrapper):
+    def __init__(self, pyType):
+        super().__init__(pyType)
+
+    def convert_next(self, context, expr):
+        (next_value, continue_iteration) = super(RangeObjectIteratorWrapper, self).convert_next(context, expr)
+        with context.ifelse(TypedExpression.asBool(continue_iteration)) as (ifTrue, ifFalse):
+            with ifTrue:
+                next_value = next_value.convert_to_type(int)
+        return (next_value, continue_iteration)
+
+
+_RangeObjectIteratorWrapper = RangeObjectIteratorWrapper(object)

@@ -200,6 +200,47 @@ PyObject* PyDictInstance::dictClear(PyObject* o) {
     return incref(Py_None);
 }
 
+void copy_elements(PyObject* dst, PyObject* src) {
+    PyDictInstance* dst_w = (PyDictInstance*)dst;
+    iterate(src, [&](PyObject* key) {
+        PyObjectHolder value(PyObject_GetItem(src, key));
+        if (!value) {
+            throw PythonExceptionSet();
+        }
+
+        if (dst_w->mp_ass_subscript_concrete(key, value) == -1) {
+            throw PythonExceptionSet();
+        }
+    });
+}
+
+PyObject* PyDictInstance::dictCopy(PyObject* o, PyObject* args) {
+    if (args && PyTuple_Size(args) != 0) {
+        PyErr_SetString(PyExc_TypeError, "Dict.copy takes no arguments");
+        return NULL;
+    }
+
+    PySetInstance* new_inst = (PySetInstance*)PyInstance::tp_new(Py_TYPE(o), NULL, NULL);
+    if (!new_inst) {
+        return NULL;
+    }
+    new_inst->mIteratorOffset = -1;
+    new_inst->mIteratorFlag = 0;
+    new_inst->mIsMatcher = false;
+
+    try {
+        copy_elements((PyObject*)new_inst, (PyObject*)(PySetInstance*)o);
+    } catch (PythonExceptionSet& e) {
+        decref((PyObject*)new_inst);
+        return NULL;
+    } catch (std::exception& e) {
+        decref((PyObject*)new_inst);
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    }
+    return (PyObject*)new_inst;
+}
+
 PyObject* PyDictInstance::tp_iter_concrete() {
     return createIteratorToSelf(mIteratorFlag);
 }
@@ -443,9 +484,10 @@ int PyDictInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
 }
 
 PyMethodDef* PyDictInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [9] {
+    return new PyMethodDef [10] {
         {"get", (PyCFunction)PyDictInstance::dictGet, METH_VARARGS, NULL},
         {"clear", (PyCFunction)PyDictInstance::dictClear, METH_NOARGS, NULL},
+        {"copy", (PyCFunction)PyDictInstance::dictCopy, METH_VARARGS, NULL},
         {"update", (PyCFunction)PyDictInstance::dictUpdate, METH_VARARGS, NULL},
         {"items", (PyCFunction)PyDictInstance::dictItems, METH_NOARGS, NULL},
         {"keys", (PyCFunction)PyDictInstance::dictKeys, METH_NOARGS, NULL},

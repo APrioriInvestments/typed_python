@@ -1061,3 +1061,35 @@ class TestSetCompilation(unittest.TestCase):
             f_set_t({t1, t2, t4})
         with self.assertRaises(TypeError):
             Entrypoint(f_set_t)({t1, t2, t4})
+
+    def test_set_comprehensions(self):
+        def f1(s):
+            return {x for x in s}
+
+        def f2(s, k):
+            return {x * 2 + 1 for x in s if x % k}
+
+        def f3(s, k):
+            return {0.01 * x for x in s if x % k if x % 5}
+
+        def f4(s, k):
+            return {(x, y) for x in s for y in range(7) if x % k if y % (x+2)}
+
+        def f5(s, k):
+            return {(x, y) for x in s if x % k for y in range(7) if y % (x+2)}
+
+        def f6(s, k):
+            return {Tuple(int, int)((x, y)) for x in s if x % k for y in range(7) if y % (x+2)}
+
+        for s in [range(10), range(100), set()]:
+            r1 = f1(s)
+            r2 = Entrypoint(f1)(s)
+            self.assertTrue(type(r2) is set)
+            self.assertEqual(r1, r2)
+
+            for f in [f2, f3, f4, f5, f6]:
+                for k in [1, 2, 3]:
+                    r1 = f(s, k)
+                    r2 = Entrypoint(f)(s, k)
+                    self.assertTrue(type(r2) is set)
+                    self.assertEqual(r1, r2)

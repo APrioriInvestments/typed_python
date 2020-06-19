@@ -827,6 +827,9 @@ class SetIteratorWrapper(Wrapper):
     def convert_destroy(self, context, expr):
         self.refAs(context, expr, 1).convert_destroy()
 
+    def get_iteration_elt_wrapper(self):
+        return self.keyType
+
 
 class SetKeysIteratorWrapper(SetIteratorWrapper):
     def __init__(self, setType):
@@ -840,3 +843,27 @@ class SetKeysIteratorWrapper(SetIteratorWrapper):
             (ixExpr,),
             {}
         )
+
+
+class MasqueradingSetWrapper(SetWrapper):
+    # A 'Set' that's masquerading as a regular 'set'
+    def __str__(self):
+        return "Masquerading" + super().__str__()
+
+    @property
+    def interpreterTypeRepresentation(self):
+        return set
+
+    def convert_mutable_masquerade_to_untyped_type(self):
+        return typeWrapper(set)
+
+    def convert_mutable_masquerade_to_untyped(self, context, instance):
+        return context.constant(set).convert_call([instance], {}).changeType(
+            typeWrapper(set)
+        )
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        # Allow the typed form of the object to perform the conversion
+        e = e.changeType(typeWrapper(self.typeRepresentation))
+
+        return e.convert_to_type_with_target(targetVal, explicit)

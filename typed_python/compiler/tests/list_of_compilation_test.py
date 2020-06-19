@@ -12,12 +12,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Function, TupleOf, OneOf, Compiled, Entrypoint
+from typed_python import ListOf, Function, TupleOf, OneOf, Compiled, Entrypoint, Tuple
 import typed_python._types as _types
 import unittest
 import time
 import numpy
 import psutil
+import pytest
 
 
 class TestListOfCompilation(unittest.TestCase):
@@ -544,3 +545,110 @@ class TestListOfCompilation(unittest.TestCase):
 
         r1(lst)
         r2(lst)
+
+    def test_list_comprehensions_int(self):
+        def f1(i):
+            return [x for x in i]
+
+        def f2(i, k):
+            return [x * 2 + 1 for x in i if x % k]
+
+        def f3(i, k):
+            return [0.01 * x for x in i if x % k if x % 5]
+
+        def f4(i, k):
+            return [(x, y) for x in i for y in range(7) if x % k if y % (x + 2)]
+
+        def f5(i, k):
+            return [(x, y) for x in i if x % k for y in range(7) if y % (x + 2)]
+
+        def f6(i, k):
+            return [Tuple(int, int)((x, y)) for x in i if x % k for y in range(x) if y % k]
+
+        for i in [range(5), ListOf(int)(range(10)), range(100), []]:
+            r1 = f1(i)
+            r2 = Entrypoint(f1)(i)
+            self.assertTrue(type(r2) is list)
+            self.assertEqual(r1, r2)
+
+            for f in [f2, f3, f4, f5, f6]:
+                for k in [1, 2, 3]:
+                    r1 = f(i, k)
+                    r2 = Entrypoint(f)(i, k)
+                    self.assertTrue(type(r2) is list)
+                    self.assertEqual(r1, r2)
+
+    def test_list_comprehensions_str(self):
+        def f1(i):
+            return [x for x in i]
+
+        def f2(i, k):
+            return [x * len(k) for x in i if x != ' ' ]
+
+        def f3(i, k):
+            return [0.5 * len(x*len(k)) for x in i if x != ' ' if len(x) != 3 ]
+
+        def f4(i, k):
+            return [(y, len(x)) for x in i for y in k if x != y]
+
+        def f5(i, k):
+            return [x + y for x in i if x != 'A' for y in k+x if x != 'e']
+
+        def f6(i, k):
+            return [Tuple(int, int)((len(x), x.find(y))) for x in i for y in k]
+
+        for i in ['one', 'h e l l o', 'ABC' * 1000, 'A ' * 1000, ['one', 'two', 'three', ' ', ''] * 1000, '']:
+            r1 = f1(i)
+            r2 = Entrypoint(f1)(i)
+            self.assertTrue(type(r2) is list)
+            self.assertEqual(r1, r2)
+
+            for f in [f2, f3, f4, f5, f6]:
+                for k in ['e', 'AB', 'one']:
+                    r1 = f(i, k)
+                    r2 = Entrypoint(f)(i, k)
+                    self.assertTrue(type(r2) is list)
+                    self.assertEqual(r1, r2)
+
+    @pytest.mark.skip(reason="fails")
+    def test_list_comprehensions_nested(self):
+        def pr(x):
+            print(x)
+            return x
+
+        def f1(i1, i2):
+            return [[pr(x) for x in i1] for y in i2]
+            # all bad:
+            # return [[x+y for x in i1 * y] for y in i2]
+            # return [[x for x in i1] for y in i1]
+            # ok:
+            # return [x+y for y in i2 for x in i1 * y]
+
+        def f3(i1, i2):
+            r = ListOf(ListOf(int))()
+            for y in range(4):
+                r1 = ListOf(int)()
+                for x in range(3):
+                    r1.append(x)
+                r.append(r1)
+            r = None
+            return r
+
+        def f2a(i1, y):
+            return [x+y for x in i1 * y]
+
+        def f2(i1, i2):
+            return [f2a(i1, y) for y in i2]
+
+        f = f1
+        i1 = [10, 11, 12]
+        i2 = [1, 2]
+        r1 = f(i1, i2)
+        r2 = Entrypoint(f)(i1, i2)
+        self.assertEqual(r1, r2)
+
+        for i1 in [[1, 2, 3], [10, 20, 30, 40, 50]]:
+            for i2 in [[1, 2], [30, 20, 10]]:
+                r1 = f1(i1, i2)
+                r2 = Entrypoint(f1)(i1, i2)
+                self.assertEqual(r1, r2)

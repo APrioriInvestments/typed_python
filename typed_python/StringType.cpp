@@ -550,6 +550,30 @@ uint32_t StringType::getord(layout* lhs) {
     return 0;
 }
 
+
+StringType::layout* StringType::mult(layout* lhs, int64_t rhs) {
+    if (!lhs) {
+        return lhs;
+    }
+    if (rhs <= 0)
+        return 0;
+    int64_t new_length = lhs->pointcount * rhs;
+    int64_t new_byteCount = sizeof(layout) + new_length * lhs->bytes_per_codepoint;
+
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = lhs->bytes_per_codepoint;
+    new_layout->pointcount = new_length;
+
+    int64_t old_size = lhs->pointcount * lhs->bytes_per_codepoint;
+    for (size_t i = 0; i < rhs; i++) {
+        memcpy(new_layout->data + i * old_size, lhs->data, old_size);
+    }
+
+    return new_layout;
+}
+
 StringType::layout* StringType::getitem(layout* lhs, int64_t offset) {
     if (!lhs) {
         return lhs;

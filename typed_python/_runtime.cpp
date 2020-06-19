@@ -579,6 +579,10 @@ extern "C" {
         return StringType::getitem(lhs, index);
     }
 
+    StringType::layout* nativepython_runtime_string_mult(StringType::layout* lhs, int64_t rhs) {
+        return StringType::mult(lhs, rhs);
+    }
+
     StringType::layout* nativepython_runtime_string_chr(int64_t code) {
         if (code < 0 || code > 0x10ffff) {
             PyEnsureGilAcquired getTheGil;
@@ -2014,7 +2018,7 @@ extern "C" {
      PyIter_Next returns NULL if there are no remaining items, but can also throw an exception.
 
      This function retains the convention that upon exhausting the container we return 'nullptr',
-     but raises the exception if its present.
+     but raises the exception if it's present.
     ******/
     PythonObjectOfType::layout_type* np_pyobj_iter_next(PythonObjectOfType::layout_type* toIterate) {
         PyEnsureGilAcquired getTheGil;
