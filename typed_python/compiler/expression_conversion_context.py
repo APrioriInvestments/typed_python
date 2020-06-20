@@ -1336,12 +1336,39 @@ class ExpressionConversionContext(object):
 
         return self.call_typed_call_target(callTarget, args)
 
-    def pyast_setcomp(self, ast, result_id):
+    def pyast_comprehension(self, ast, result_id):
         """
-        :param ast: set comprehension in python ast form
-        :return: transformed python ast, with set comprehension replaced with more elementary expressions that we can handle
-            return value is TupleOf(Statement) and result is provided in "result" variable
+        :param ast: list or set or dict comprehension in python ast form.
+        :param result_id: id used to return the result.
+        :return: transformed python ast, with set comprehension replaced with more elementary expressions that we can handle.
+            The return value of this function is a TupleOf(Statement), a python AST.
+            The result of the comprehension is in the variable named result_id within this code.
+
+        E.g. this will transform the python AST representing
+
+            {e for x in s if c}
+
+        into the python AST that represents the following code:
+
+            <result_id> = set()
+            for x in s:
+                if c:
+                    <result_id>.add(e)
         """
+
+        if ast.matches.SetComp:
+            type_name = "set"
+            append_attribute = "add"
+            append_args = TupleOf(python_ast.Expr)((ast.elt,))
+        elif ast.matches.ListComp:
+            type_name = "list"
+            append_attribute = "append"
+            append_args = TupleOf(python_ast.Expr)((ast.elt,))
+        elif ast.matches.DictComp:
+            type_name = "dict"
+            append_attribute = "__setitem__"
+            append_args = TupleOf(python_ast.Expr)((ast.key, ast.value))
+
         s1 = python_ast.Statement.Assign(
             targets=TupleOf(python_ast.Expr)(
                 (python_ast.Expr.Name(
@@ -1351,7 +1378,7 @@ class ExpressionConversionContext(object):
             ),
             value=python_ast.Expr.Call(
                 func=python_ast.Expr.Name(
-                    id="set",
+                    id=type_name,
                     ctx=python_ast.ExprContext.Load()
                 ),
                 args=(),
@@ -1359,52 +1386,45 @@ class ExpressionConversionContext(object):
             ),
         )
 
-        if len(ast.generators[0].ifs) == 0:
-            s2 = python_ast.Statement.For(
-                target=ast.generators[0].target,  # <<<<<<<<
-                iter=ast.generators[0].iter,  # <<<<<<<<
-                body=TupleOf(python_ast.Statement)(
-                    (python_ast.Statement.Expr(
-                        value=python_ast.Expr.Call(
-                            func=python_ast.Expr.Attribute(
-                                value=python_ast.Expr.Name(
-                                    id=result_id,  # <<<<<<<<
-                                    ctx=python_ast.ExprContext.Load(),
-                                ),
-                                attr="add",
-                                ctx=python_ast.ExprContext.Load()
-                            ),
-                            args=TupleOf(python_ast.Expr)((ast.elt,))  # <<<<<<<<
-                        )
-                    ),)
-                )
+        s2 = python_ast.Statement.Expr(
+            value=python_ast.Expr.Call(
+                func=python_ast.Expr.Attribute(
+                    value=python_ast.Expr.Name(
+                        id=result_id,  # <<<<<<<<
+                        ctx=python_ast.ExprContext.Load(),
+                    ),
+                    attr=append_attribute,
+                    ctx=python_ast.ExprContext.Load()
+                ),
+                args=append_args  # <<<<<<<<
             )
-        else:
-            s2 = python_ast.Statement.For(
-                target=ast.generators[0].target,  # <<<<<<<<
-                iter=ast.generators[0].iter,  # <<<<<<<<
-                body=TupleOf(python_ast.Statement)(
-                    (python_ast.Statement.If(
-                        test=ast.generators[0].ifs[0],
-                        body=TupleOf(python_ast.Statement)(
-                            (python_ast.Statement.Expr(
-                                value=python_ast.Expr.Call(
-                                    func=python_ast.Expr.Attribute(
-                                        value=python_ast.Expr.Name(
-                                            id=result_id,  # <<<<<<<<
-                                            ctx=python_ast.ExprContext.Load(),
-                                        ),
-                                        attr="add",
-                                        ctx=python_ast.ExprContext.Load()
-                                    ),
-                                    args=TupleOf(python_ast.Expr)((ast.elt,))  # <<<<<<<<
-                                )
-                            ),)
-                        )
-                    ),)
+        )
+        for g in list(reversed(ast.generators)):
+            if len(g.ifs) == 0:
+                s2 = python_ast.Statement.For(
+                    target=g.target,  # <<<<<<<<
+                    iter=g.iter,  # <<<<<<<<
+                    body=TupleOf(python_ast.Statement)((s2,))
                 )
-            )
+            else:
+                if len(g.ifs) == 1:
+                    cond = g.ifs[0]
+                else:
+                    cond = python_ast.Expr.BoolOp(
+                        op=python_ast.BooleanOp.And(),
+                        values=g.ifs
+                    )
 
+                s2 = python_ast.Statement.For(
+                    target=g.target,  # <<<<<<<<
+                    iter=g.iter,  # <<<<<<<<
+                    body=TupleOf(python_ast.Statement)(
+                        (python_ast.Statement.If(
+                            test=cond,  # <<<<<<<<
+                            body=TupleOf(python_ast.Statement)((s2,))
+                        ),)
+                    )
+                )
         return TupleOf(python_ast.Statement)((s1, s2))
 
     def convert_expression_ast(self, ast):
@@ -1794,24 +1814,6 @@ class ExpressionConversionContext(object):
 
             return aSet
 
-        if ast.matches.SetComp:
-            # get the pyast:
-            # def internal_setcomprehension(elt, tgt, iter, cond):
-            #     result = set()
-            #     for tgt in iter:
-            #         if cond:
-            #             result.add(elt)
-            #
-            # pyast = convertFunctionToAlgebraicPyAst(internal_setcomprehension, keepLineInformation=False)
-            # pyast.body is a TupleOf(Statement)
-
-            result_id = "result"
-            transformed_ast = self.pyast_setcomp(ast, result_id)
-
-            body, body_returns = self.functionContext.convert_statement_list_ast(transformed_ast, self.variableStates)
-            self.pushEffect(body)
-            return self.functionContext.localVariableExpression(self, result_id)
-
         if ast.matches.Dict:
             aList = self.constant(dict).convert_call([], {})
 
@@ -1827,6 +1829,30 @@ class ExpressionConversionContext(object):
                 aList.convert_method_call("__setitem__", (keyVal, valVal), {})
 
             return aList
+
+        if ast.matches.ListComp:
+            result_id = f".result{ast.line_number}.{ast.col_offset}"
+            transformed_ast = self.pyast_comprehension(ast, result_id)
+
+            body, body_returns = self.functionContext.convert_statement_list_ast(transformed_ast, self.variableStates)
+            self.pushEffect(body)
+            return self.functionContext.localVariableExpression(self, result_id)
+
+        if ast.matches.SetComp:
+            result_id = f".result{ast.line_number}.{ast.col_offset}"
+            transformed_ast = self.pyast_comprehension(ast, result_id)
+
+            body, body_returns = self.functionContext.convert_statement_list_ast(transformed_ast, self.variableStates)
+            self.pushEffect(body)
+            return self.functionContext.localVariableExpression(self, result_id)
+
+        if ast.matches.DictComp:
+            result_id = f".result{ast.line_number}.{ast.col_offset}"
+            transformed_ast = self.pyast_comprehension(ast, result_id)
+
+            body, body_returns = self.functionContext.convert_statement_list_ast(transformed_ast, self.variableStates)
+            self.pushEffect(body)
+            return self.functionContext.localVariableExpression(self, result_id)
 
         if ast.matches.Lambda:
             return self.functionContext.localVariableExpression(self, ".closure").changeType(

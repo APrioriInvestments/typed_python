@@ -1067,9 +1067,18 @@ class TestSetCompilation(unittest.TestCase):
             return {x for x in s}
 
         def f2(s, k):
-            return {x for x in s if x % k}
+            return {x * 2 + 1 for x in s if x % k}
 
-        for s in [set(range(10)), set(range(100)), set()]:
+        def f3(s, k1, k2):
+            return {0.01 * x for x in s if x % k1 if x % k2}
+
+        def f4(s, k1, k2):
+            return {(x, y) for x in s for y in range(7) if x % k1 if y % (x+k2)}
+
+        def f5(s, k1, k2):
+            return {(x, y) for x in s if x % k1 for y in range(7) if y % (x+k2)}
+
+        for s in [range(10), range(100), set()]:
             r1 = f1(s)
             r2 = Entrypoint(f1)(s)
             self.assertEqual(r1, r2)
@@ -1077,4 +1086,16 @@ class TestSetCompilation(unittest.TestCase):
             for k in [1, 2, 3]:
                 r1 = f2(s, k)
                 r2 = Entrypoint(f2)(s, k)
+                self.assertEqual(r1, r2)
+
+                r1 = f3(s, k, 5)
+                r2 = Entrypoint(f3)(s, k, 5)
+                self.assertEqual(r1, r2)
+
+                r1 = f4(s, k, 2)
+                r2 = Entrypoint(f4)(s, k, 2)
+                self.assertEqual(r1, r2)
+
+                r1 = f5(s, k, 2)
+                r2 = Entrypoint(f5)(s, k, 2)
                 self.assertEqual(r1, r2)

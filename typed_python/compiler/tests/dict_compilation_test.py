@@ -690,3 +690,41 @@ class TestDictCompilation(unittest.TestCase):
         self.assertEqual(dict_assign_and_modify_original(d, 'q', 'b'), {'a': 1, 'c': 5, 'q': 7})
         d = Dict(str, int)({'a': 1, 'b': 3, 'c': 5})
         self.assertEqual(dict_copy_and_modify_original(d, 'q', 'b'), {'a': 1, 'b': 3, 'c': 5})
+
+    def test_dict_comprehensions(self):
+        def f1(i):
+            return {x: x+1 for x in i}
+
+        def f2(i, k):
+            return {2*x: 2*x+1 for x in i if x % k}
+
+        def f3(i, k1, k2):
+            return {10*x: 0.1*x for x in i if x % k1 if x % k2}
+
+        def f4(i, k1, k2):
+            return {x*7+y: (x, y) for x in i for y in range(7) if x % k1 if y % (x + k2)}
+
+        def f5(i, k1, k2):
+            return {x*7+y: (x, y) for x in i if x % k1 for y in range(7) if y % (x + k2)}
+
+        for i in [range(10), range(100), []]:
+            r1 = f1(i)
+            r2 = Entrypoint(f1)(i)
+            self.assertEqual(r1, r2)
+
+            for k in [1, 2, 3]:
+                r1 = f2(i, k)
+                r2 = Entrypoint(f2)(i, k)
+                self.assertEqual(r1, r2)
+
+                r1 = f3(i, k, 5)
+                r2 = Entrypoint(f3)(i, k, 5)
+                self.assertEqual(r1, r2)
+
+                r1 = f4(i, k, 2)
+                r2 = Entrypoint(f4)(i, k, 2)
+                self.assertEqual(r1, r2)
+
+                r1 = f5(i, k, 2)
+                r2 = Entrypoint(f5)(i, k, 2)
+                self.assertEqual(r1, r2)
