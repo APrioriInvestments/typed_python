@@ -168,6 +168,10 @@ public:
 
     bool checkInitializationFlag(instance_ptr self, int64_t ix) const;
 
+    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+        return ShaHash(1, m_typeCategory) + m_heldClass->identityHash(groupHead);
+    }
+
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
     static bool cmpStatic(Class* T, instance_ptr left, instance_ptr right, int64_t pyComparisonOp);
 

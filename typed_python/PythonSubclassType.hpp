@@ -52,6 +52,10 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
+    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+        return ShaHash(1, m_typeCategory) + m_base->identityHash(groupHead) + Type::pyObjectShaHash((PyObject*)mTypeRep);
+    }
+
     bool isBinaryCompatibleWithConcrete(Type* other);
 
     template<class visitor_type>

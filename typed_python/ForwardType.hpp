@@ -119,7 +119,57 @@ public:
             }
         }
 
+        // we need to order the nodes in a canonical way, which we do by
+        // taking the lowest-indexed 'Forward' and walking forward through the
+        // graph. The remaining nodes will all be non-recursive, and so we can
+        // visit them last, and in any order we like
+
+        std::map<int, Type*> forwardByIndex;
         for (auto t: resolvedThisPass) {
+            int index = t->getRecursiveForwardIndex();
+
+            if (index >= 0) {
+                if (forwardByIndex.find(index) != forwardByIndex.end()) {
+                    throw std::runtime_error("Somehow, a forward index got used twice?");
+                }
+
+                forwardByIndex[index] = t;
+            }
+        }
+
+        std::set<Type*> resolvedThisPassOrderedSet;
+        std::vector<Type*> resolvedThisPassOrdered;
+
+        std::function<void (Type*)> visitForOrdering = [&](Type* t) {
+            // dont bother with types we didn't resolve this pass
+            if (resolvedThisPass.find(t) == resolvedThisPass.end()) {
+                return;
+            }
+
+            // if we already visited it, bail
+            if (resolvedThisPassOrderedSet.find(t) != resolvedThisPassOrderedSet.end()) {
+                return;
+            }
+
+            resolvedThisPassOrdered.push_back(t);
+            resolvedThisPassOrderedSet.insert(t);
+
+            t->visitReferencedTypes(visitForOrdering);
+        };
+
+        for (auto idAndT: forwardByIndex) {
+            visitForOrdering(idAndT.second);
+        }
+
+        // make sure we covered everything
+        for (auto t: resolvedThisPass) {
+            if (resolvedThisPassOrderedSet.find(t) == resolvedThisPassOrderedSet.end()) {
+                resolvedThisPassOrdered.push_back(t);
+            }
+        }
+
+        // this ordering is independent of Type pointer values.
+        for (auto t: resolvedThisPassOrdered) {
             t->buildMutuallyRecursiveTypeCycle();
         }
 

@@ -33,6 +33,10 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
+    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+        return ShaHash(1, m_typeCategory) + m_element_type->identityHash(groupHead);
+    }
+
     void _updateTypeMemosAfterForwardResolution() {
         RefTo::Make(m_element_type, this);
     }

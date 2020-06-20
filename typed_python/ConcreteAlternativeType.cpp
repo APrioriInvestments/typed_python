@@ -32,6 +32,10 @@ bool ConcreteAlternative::isBinaryCompatibleWithConcrete(Type* other) {
     return false;
 }
 
+ShaHash ConcreteAlternative::_computeShaHash() const {
+    return ShaHash(1, m_typeCategory) + ShaHash(m_which) + m_alternative->identityHash();
+}
+
 bool ConcreteAlternative::_updateAfterForwardTypesChanged() {
     if (m_which < 0 || m_which >= m_alternative->subtypes().size()) {
       throw std::runtime_error(

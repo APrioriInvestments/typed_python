@@ -24,6 +24,16 @@ void Type::repr(instance_ptr self, ReprAccumulator& out, bool isStr) {
     });
 }
 
+ShaHash Type::pyObjectShaHash(PyObject* h) {
+    //TODO: actually handle this correctly.
+    return ShaHash::poison();
+}
+
+ShaHash Type::pyObjectShaHash(Instance h) {
+    return ShaHash::poison();
+}
+
+
 bool Type::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     assertForwardsResolvedSufficientlyToInstantiate();
 
@@ -310,18 +320,14 @@ void Type::endOfConstructorInitialization() {
         mMutuallyRecursiveTypeGroup[0] = this;
         mMutuallyRecursiveTypeGroupHead = this;
     } else {
-        this->check([&](auto& subtype) {
-            subtype._updateAfterForwardTypesChanged();
-        });
+        updateAfterForwardTypesChanged();
     }
 }
 
 void Type::forwardTypesAreResolved() {
     m_resolved = true;
 
-    this->check([&](auto& subtype) {
-        subtype._updateAfterForwardTypesChanged();
-    });
+    updateAfterForwardTypesChanged();
 
     if (m_is_simple) {
         bool isSimple = true;

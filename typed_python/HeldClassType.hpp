@@ -306,6 +306,48 @@ public:
         m_name = inName;
     }
 
+    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+        ShaHash res = ShaHash(1, m_typeCategory) + ShaHash(m_name);
+
+        res += ShaHash(0);
+        for (auto b: m_bases) {
+            res += b->identityHash(groupHead);
+        }
+
+        res += ShaHash(1);
+        for (auto tup: m_own_members) {
+            res += ShaHash(std::get<0>(tup));
+            res += ShaHash(std::get<1>(tup)->identityHash(groupHead));
+            res += Type::pyObjectShaHash(std::get<2>(tup));
+        }
+
+        res += ShaHash(2);
+        for (auto nameAndFun: m_own_memberFunctions) {
+            res += ShaHash(nameAndFun.first);
+            res += nameAndFun.second->identityHash(groupHead);
+        }
+
+        res += ShaHash(3);
+        for (auto nameAndFun: m_own_staticFunctions) {
+            res += ShaHash(nameAndFun.first);
+            res += nameAndFun.second->identityHash(groupHead);
+        }
+
+        res += ShaHash(4);
+        for (auto nameAndFun: m_own_propertyFunctions) {
+            res += ShaHash(nameAndFun.first);
+            res += nameAndFun.second->identityHash(groupHead);
+        }
+
+        res += ShaHash(5);
+        for (auto nameAndFun: m_own_classMembers) {
+            res += ShaHash(nameAndFun.first);
+            res += Type::pyObjectShaHash(nameAndFun.second);
+        }
+
+        return res;
+    }
+
     bool isBinaryCompatibleWithConcrete(Type* other);
 
     template<class visitor_type>

@@ -31,6 +31,7 @@ CPP_FLAGS = -std=c++14  -O2  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
 LINKER_FLAGS = -Wl,-O1 \
                -Wl,-Bsymbolic-functions \
                -Wl,-z,relro
+LINK_FLAGS_POST = -lssl -lcrypto
 
 SHAREDLIB_FLAGS = -pthread -shared -g -fstack-protector-strong \
                   -Wformat -Werror=format-security -Wdate-time \
@@ -119,7 +120,7 @@ typed_python/_types.cpython-36m-x86_64-linux-gnu.so: $(TP_LIB_PATH)/_types.cpyth
 $(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so: $(TP_LIB_PATH) $(TP_BUILD_PATH) $(TP_O_FILES)
 	$(CXX) $(SHAREDLIB_FLAGS) $(LINKER_FLAGS) \
 		$(TP_O_FILES) \
-		-o $(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so
+		-o $(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so $(LINK_FLAGS_POST)
 
 $(TP_BUILD_PATH):
 	mkdir -p $(TP_BUILD_PATH)

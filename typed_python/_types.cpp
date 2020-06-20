@@ -1303,6 +1303,24 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
 
     return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
 }
+
+PyObject *identityHash(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "identityHash takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'identityHash' must be a Type object");
+        return NULL;
+    }
+
+    return PyBytes_FromStringAndSize((const char*)&t->identityHash()[0], sizeof(ShaHash));
+}
+
 /**
     Serializes a container instance as a stream of concatenated messages, and return a pointer to a PyBytes object
 
@@ -2112,6 +2130,7 @@ static PyMethodDef module_methods[] = {
     {"decodeSerializedObject", (PyCFunction)decodeSerializedObject, METH_VARARGS, NULL},
     {"validateSerializedObject", (PyCFunction)validateSerializedObject, METH_VARARGS, NULL},
     {"validateSerializedObjectStream", (PyCFunction)validateSerializedObjectStream, METH_VARARGS, NULL},
+    {"identityHash", (PyCFunction)identityHash, METH_VARARGS, NULL},
     {"serializeStream", (PyCFunction)serializeStream, METH_VARARGS, NULL},
     {"deserializeStream", (PyCFunction)deserializeStream, METH_VARARGS, NULL},
     {"is_default_constructible", (PyCFunction)is_default_constructible, METH_VARARGS, NULL},

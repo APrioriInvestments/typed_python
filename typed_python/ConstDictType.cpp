@@ -31,7 +31,10 @@ bool ConstDictType::_updateAfterForwardTypesChanged() {
         name = m_recursive_name;
     }
 
-    bool anyChanged = name != m_name || m_bytes_per_key_value_pair != old_bytes_per_key_value_pair;
+    bool anyChanged = (
+        name != m_name ||
+        m_bytes_per_key_value_pair != old_bytes_per_key_value_pair
+    );
 
     m_name = name;
     m_stripped_name = "";

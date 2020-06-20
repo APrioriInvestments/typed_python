@@ -52,6 +52,8 @@ public:
         assert(t == m_alternative);
     }
 
+    ShaHash _computeShaHash() const;
+
     bool _updateAfterForwardTypesChanged();
 
     typed_python_hash_type hash(instance_ptr left) {

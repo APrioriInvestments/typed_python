@@ -50,6 +50,20 @@ int64_t Alternative::refcount(instance_ptr i) const {
     return ((layout**)i)[0]->refcount;
 }
 
+ShaHash Alternative::_computeIdentityHash(Type* groupHead) {
+    ShaHash newHash(1, m_typeCategory);
+
+    newHash = newHash + ShaHash(m_name) + ShaHash(0);
+    for (auto& subtype_pair: m_subtypes) {
+        newHash = newHash + ShaHash(subtype_pair.first) + subtype_pair.second->identityHash(groupHead);
+    }
+    newHash = newHash + ShaHash(1);
+    for (auto nameAndMethod: m_methods) {
+        newHash = newHash + ShaHash(nameAndMethod.first) + nameAndMethod.second->identityHash(groupHead);
+    }
+    return newHash;
+}
+
 bool Alternative::_updateAfterForwardTypesChanged() {
     m_arg_positions.clear();
     m_default_construction_type = nullptr;

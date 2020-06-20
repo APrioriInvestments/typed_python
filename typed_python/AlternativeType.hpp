@@ -88,6 +88,8 @@ public:
 
     bool _updateAfterForwardTypesChanged();
 
+    ShaHash _computeIdentityHash(Type* groupHead = nullptr);
+
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
     static bool cmpStatic(Alternative* altT, instance_ptr left, instance_ptr right, int64_t pyComparisonOp);
 

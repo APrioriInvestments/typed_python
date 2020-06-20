@@ -31,6 +31,7 @@
 #include "ReprAccumulator.hpp"
 #include "SerializationContext.hpp"
 #include "HashAccumulator.hpp"
+#include "ShaHash.hpp"
 #include "util.hpp"
 
 class SerializationBuffer;
@@ -181,6 +182,10 @@ public:
     size_t bytecount() const {
         return m_size;
     }
+
+    static ShaHash pyObjectShaHash(PyObject* h);
+
+    static ShaHash pyObjectShaHash(Instance h);
 
     Type* pickConcreteSubclass(instance_ptr data) {
         assertForwardsResolvedSufficientlyToInstantiate();
@@ -464,6 +469,13 @@ public:
         });
     }
 
+    // dispatch to the actual subtype
+    bool updateAfterForwardTypesChanged() {
+        return this->check([&](auto& subtype) {
+            return subtype._updateAfterForwardTypesChanged();
+        });
+    }
+
     // subtype-specific calculation
     bool _updateAfterForwardTypesChanged() { return false; }
 
@@ -567,6 +579,101 @@ public:
         return mMutuallyRecursiveTypeGroupHead->mMutuallyRecursiveTypeGroup;
     }
 
+    /*****
+        compute our identity hash, which is a sha hash that uniquely identifies
+        this type and all the code it can reach. This hash should be precise enough
+        that any binaries produced that work with two implementions with the same hash
+        will produce the same result.
+
+        Practically, we have two modes: for nonrecursive types, we simply sha-hash
+        the hashes of the type parameters we depend on, along with some constants (
+        e.g. the typeCategory) to uniquely id the type.
+
+        For recursive types, we have to compute a 'group head hash', which is the
+        sha-hash of all the types in the mutually recursive type group. We rely on
+        'Forward' picking the same type to be the 'first' type in the group every time,
+        and that the order of the types is stable across program invocations. We then
+        hash all the types in the group, but are careful to simply hash the type's
+        index within the group when we're hashing a parameter type that's in our group.
+        This gives us a unique signature for the group. The final hash is then that
+        hash plus our id within the group.
+    ******/
+    ShaHash identityHash(Type* groupHead = nullptr) {
+        // check if we're being asked for our identity during the computation of 'groupHead's
+        // hash, in which case we want to simply use our position in the group.
+        if (groupHead && groupHead == mMutuallyRecursiveTypeGroupHead) {
+            return ShaHash(3, mMutuallyRecursiveTypeGroupIndex);
+        }
+
+        if (mIdentityHash == ShaHash()) {
+            // we never initialized it
+            mIdentityHash = computeIdentityHash(groupHead);
+        }
+
+        return mIdentityHash;
+    }
+
+    // compute our identity hash. if groupHead is not our group, then
+    // compute it normally. Otherwise, compute it where we hash types
+    // not in our group normally, but types in our group get hashed
+    // just as a pair
+    ShaHash computeIdentityHash(Type* groupHead = nullptr) {
+        if (isRecursive() && groupHead != mMutuallyRecursiveTypeGroupHead) {
+            return (
+                ShaHash(2)
+                + mMutuallyRecursiveTypeGroupHead->getRecursiveGroupHeadHash()
+                + ShaHash(mMutuallyRecursiveTypeGroupIndex)
+            );
+        }
+
+        return this->check([&](auto& subtype) {
+            return subtype._computeIdentityHash(groupHead);
+        });
+    }
+
+    ShaHash getRecursiveGroupHeadHash() {
+        if (mRecursiveTypeGroupHeadHash == ShaHash()) {
+            mRecursiveTypeGroupHeadHash = computeRecursiveGroupHeadHash();
+        }
+
+        return mRecursiveTypeGroupHeadHash;
+    }
+
+    ShaHash computeRecursiveGroupHeadHash() {
+        // we are a recursive group head. We want to compute the hash
+        // of all of our constituents where, when each of them looks at
+        // other types within _our_ group, we simply hash in a placeholder
+        // for the position.
+        if (this != mMutuallyRecursiveTypeGroupHead) {
+            throw std::runtime_error("Non recursive group head asked for sha hash!");
+        }
+
+        ShaHash wholeGroupHash;
+
+        for (auto idAndType: mMutuallyRecursiveTypeGroup) {
+            wholeGroupHash += idAndType.second->computeIdentityHash(this);
+
+            if (idAndType.second->isRecursive()) {
+                wholeGroupHash += ShaHash(idAndType.second->m_recursive_name);
+            }
+        }
+
+        return wholeGroupHash;
+    }
+
+    // subtype-specific calculation
+    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+        return ShaHash(1, m_typeCategory);
+    }
+
+    int64_t getRecursiveForwardIndex() {
+        if (!m_is_recursive_forward) {
+            return -1;
+        }
+
+        return m_recursive_forward_index;
+    }
+
 protected:
     Type(TypeCategory in_typeCategory) :
             m_typeCategory(in_typeCategory),
@@ -637,4 +744,17 @@ protected:
     // the set of types in our mutually recursive type group. This is
     // only populated if we're the head of the group
     std::map<int32_t, Type*> mMutuallyRecursiveTypeGroup;
+
+    // a sha-hash that uniquely identifies this type. If this value is
+    // the same for two types, then they should be indistinguishable except
+    // for pointers values.
+    ShaHash mIdentityHash;
+
+    // a sha-hash that identifies this, but that doesn't try to pay any
+    // attention to the other types in the recursive group.
+    ShaHash mIdentityHashShallow;
+
+    // the sha-hash of all the things this group (if we're a group head)
+    // in the order in which we can see them.
+    ShaHash mRecursiveTypeGroupHeadHash;
 };

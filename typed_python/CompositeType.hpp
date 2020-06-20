@@ -34,7 +34,21 @@ public:
         for (long k = 0; k < names.size(); k++) {
             m_nameToIndex[names[k]] = k;
         }
+
         endOfConstructorInitialization(); // finish initializing the type object.
+    }
+
+    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+        ShaHash res = ShaHash(1, m_typeCategory);
+
+        for (long k = 0; k < m_types.size(); k++) {
+            res = res + ShaHash(m_types[k]->identityHash(groupHead));
+        }
+        for (long k = 0; k < m_names.size(); k++) {
+            res = res + ShaHash(m_names[k]);
+        }
+
+        return res;
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);

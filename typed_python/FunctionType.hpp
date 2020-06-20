@@ -1119,13 +1119,15 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
-    void _updateAfterForwardTypesChanged() {
+    bool _updateAfterForwardTypesChanged() {
         m_name = mRootName;
         m_stripped_name = "";
 
         m_size = mClosureType->bytecount();
 
         m_is_default_constructible = mClosureType->is_default_constructible();
+
+        return false;
     }
 
     static Function* Make(std::string inName, std::string qualname, std::string moduleName, const std::vector<Overload>& overloads, Type* closureType, bool isEntrypoint, bool isNocompile) {

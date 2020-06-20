@@ -55,6 +55,10 @@ public:
         visitor(m_element_type);
     }
 
+    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+        return ShaHash(1, m_typeCategory) + m_element_type->identityHash(groupHead);
+    }
+
     bool _updateAfterForwardTypesChanged();
 
     //serialize, but don't write a count

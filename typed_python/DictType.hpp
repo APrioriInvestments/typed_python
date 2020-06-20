@@ -46,6 +46,10 @@ public:
         visitor(m_value);
     }
 
+    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+        return ShaHash(1, m_typeCategory) + m_key->identityHash(groupHead) + m_value->identityHash(groupHead);
+    }
+
     bool _updateAfterForwardTypesChanged();
 
     bool isBinaryCompatibleWithConcrete(Type* other);

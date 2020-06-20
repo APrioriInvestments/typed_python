@@ -31,6 +31,16 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
+    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+        ShaHash newHash = ShaHash(1, m_typeCategory);
+
+        for (auto t: m_types) {
+            newHash += t->identityHash(groupHead);
+        }
+
+        return newHash;
+    }
+
     bool isBinaryCompatibleWithConcrete(Type* other);
 
     template<class visitor_type>
