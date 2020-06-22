@@ -224,21 +224,36 @@ int PyClassInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
     if (!p.first) {
         p = callMemberFunction("__len__");
         // if neither __bool__ nor __len__ is available, return True
-        if (!p.first)
+        if (!p.first) {
             return 1;
+        }
     }
-    return PyObject_IsTrue(p.second);
+
+    if (!p.second) {
+        return -1;
+    }
+
+    int result = PyObject_IsTrue(p.second);
+    decref(p.second);
+    return result;
 }
 
 // try to call user-defined hash method
 // returns -1 if not defined or if it returns an invalid value
 int64_t PyClassInstance::tryCallHashMemberFunction() {
     auto result = callMemberFunction("__hash__");
+
     if (!result.first)
         return -1;
-    if (!PyLong_Check(result.second))
+
+    if (!PyLong_Check(result.second)) {
+        decref(result.second);
         return -1;
-    return PyLong_AsLong(result.second);
+    }
+
+    int64_t res = PyLong_AsLong(result.second);
+    decref(result.second);
+    return res;
 }
 
 std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
@@ -286,7 +301,7 @@ std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name,
         type()->name().c_str(),
         name
     );
-    return res;
+    return std::make_pair(true, (PyObject*)nullptr);
 }
 
 Py_ssize_t PyClassInstance::mp_and_sq_length_concrete() {
@@ -297,6 +312,7 @@ Py_ssize_t PyClassInstance::mp_and_sq_length_concrete() {
     }
 
     if (!res.second) {
+        decref(res.second);
         return -1;
     }
 
@@ -307,10 +323,12 @@ Py_ssize_t PyClassInstance::mp_and_sq_length_concrete() {
             type()->name().c_str(),
             res.second->ob_type->tp_name
             );
+        decref(res.second);
         return -1;
     }
 
     long result = PyLong_AsLong(res.second);
+    decref(res.second);
 
     if (result < 0) {
         PyErr_Format(PyExc_ValueError, "'__len__()' should return >= 0");
@@ -558,13 +576,25 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
 int PyClassInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
     if (!attrVal) {
         auto p = callMemberFunction("__delattr__", attrName);
-        if (p.first)
-            return 0;
+        if (p.first) {
+            if (p.second) {
+                decref(p.second);
+                return 0;
+            } else {
+                return -1;
+            }
+        }
     }
     else {
         auto p = callMemberFunction("__setattr__", attrName, attrVal);
-        if (p.first)
-            return 0;
+        if (p.first) {
+            if (p.second) {
+                decref(p.second);
+                return 0;
+            } else {
+                return -1;
+            }
+        }
     }
     return PyClassInstance::classInstanceSetAttributeFromPyObject(type(), dataPtr(), attrName, attrVal);
 }
@@ -633,7 +663,13 @@ int PyClassInstance::sq_contains_concrete(PyObject* item) {
     if (!p.first) {
         return 0;
     }
-    return PyObject_IsTrue(p.second);
+    if (p.second) {
+        int res = PyObject_IsTrue(p.second);
+        decref(p.second);
+        return res;
+    } else {
+        return -1;
+    }
 }
 
 PyObject* PyClassInstance::mp_subscript_concrete(PyObject* item) {
@@ -647,11 +683,18 @@ PyObject* PyClassInstance::mp_subscript_concrete(PyObject* item) {
 
 int PyClassInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* v) {
     auto p = callMemberFunction("__setitem__", item, v);
+
     if (!p.first) {
         PyErr_Format(PyExc_TypeError, "__setitem__ not defined for type %s", type()->name().c_str());
         return -1;
     }
-    return 0;
+
+    if (p.second) {
+        decref(p.second);
+        return 0;
+    } else {
+        return -1;
+    }
 }
 
 PyObject* PyClassInstance::tp_iter_concrete() {

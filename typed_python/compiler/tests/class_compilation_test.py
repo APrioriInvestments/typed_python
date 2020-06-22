@@ -21,7 +21,6 @@ from typed_python import (
     Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, UInt64, Int16,
     Float32, Final, PointerTo, makeNamedTuple, Compiled, Function, Held, Value
 )
-
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime
 
@@ -42,6 +41,11 @@ class ShouldInitializeMembers(Class):
 
     def __init__(self):
         pass
+
+
+@Function
+def moduleLevelIdentityFun(x):
+    return x
 
 
 class AClass(Class):

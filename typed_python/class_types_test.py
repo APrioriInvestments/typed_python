@@ -1591,3 +1591,57 @@ class NativeClassTypesTests(unittest.TestCase):
         # duplicate their internals.
         t[3] = t[2]
         self.assertEqual(t[3].x, 20)
+
+    def test_class_len_leak(self):
+        class C(Class, Final):
+            def __len__(self):
+                return 123 + 123123123
+
+        c = C()
+
+        m0 = currentMemUsageMb()
+        t0 = time.time()
+        t1 = time.time()
+        iterations = 0
+        while time.time() - t0 < 2.0:
+            iterations += 1
+
+            if c:
+                pass
+            len(c)
+
+            if time.time() - t1 > 1.0:
+                print(iterations, currentMemUsageMb() - m0)
+                t1 = time.time()
+        assert currentMemUsageMb() - m0 < 10.0
+
+    def test_class_inquiry_method_exception_resolution(self):
+        class C(Class, Final):
+            def __len__(self):
+                return None
+
+            def __contains__(self, other):
+                return bool("is true?")
+
+            def __delattr__(self, attr):
+                return bool("is true?")
+
+            def __setattr__(self, attr, val):
+                return bool("is true?")
+
+            def __setitem__(self, ix, thing):
+                return bool("is true?")
+
+        c = C()
+
+        with self.assertRaisesRegex(Exception, "an integer is required"):
+            len(c)
+
+        with self.assertRaisesRegex(Exception, "Can't initialize None from an instance of bool"):
+            del c.x
+
+        with self.assertRaisesRegex(Exception, "Can't initialize None from an instance of bool"):
+            c.x = 10
+
+        with self.assertRaisesRegex(Exception, "Can't initialize None from an instance of bool"):
+            c[10] = 20
