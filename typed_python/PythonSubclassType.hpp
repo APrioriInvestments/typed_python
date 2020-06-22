@@ -53,7 +53,11 @@ public:
     }
 
     ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
-        return ShaHash(1, m_typeCategory) + m_base->identityHash(groupHead) + Type::pyObjectShaHash((PyObject*)mTypeRep);
+        return (
+            ShaHash(1, m_typeCategory)
+            + m_base->identityHash(groupHead)
+            + Type::pyObjectShaHash((PyObject*)mTypeRep, groupHead)
+        );
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);

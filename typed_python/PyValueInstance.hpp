@@ -52,10 +52,16 @@ public:
 
     static void mirrorTypeInformationIntoPyTypeConcrete(Value* v, PyTypeObject* pyType) {
         //expose the actual Instance we represent as a member of the type object
+        PyObject* pyObj = PyInstance::extractPythonObject(v->value());
+
+        if (!pyObj) {
+            throw PythonExceptionSet();
+        }
+
         PyDict_SetItemString(
             pyType->tp_dict,
             "Value",
-            PyInstance::extractPythonObject(v->value())
+            pyObj
         );
     }
 };

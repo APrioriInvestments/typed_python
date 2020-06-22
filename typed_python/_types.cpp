@@ -1925,9 +1925,9 @@ PyObject *isRecursive(PyObject* nullValue, PyObject* args) {
     });
 }
 
-PyObject *mutuallyRecursiveGroup(PyObject* nullValue, PyObject* args) {
+PyObject *recursiveTypeGroup(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "mutuallyRecursiveGroup takes 1 positional argument");
+        PyErr_SetString(PyExc_TypeError, "recursiveTypeGroup takes 1 positional argument");
         return NULL;
     }
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
@@ -1935,14 +1935,14 @@ PyObject *mutuallyRecursiveGroup(PyObject* nullValue, PyObject* args) {
     Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!t1) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'mutuallyRecursiveGroup' must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "first argument to 'recursiveTypeGroup' must be a native type object");
         return NULL;
     }
 
     return translateExceptionToPyObject([&]() {
         PyObjectStealer res(PyList_New(0));
 
-        for (auto ixAndType: t1->getRecursiveTypeGroup()) {
+        for (auto ixAndType: t1->getCompilerRecursiveTypeGroup()) {
             PyList_Append(
                 res,
                 (PyObject*)PyInstance::typeObj(ixAndType.second)
@@ -2139,7 +2139,7 @@ static PyMethodDef module_methods[] = {
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
-    {"mutuallyRecursiveGroup", (PyCFunction)mutuallyRecursiveGroup, METH_VARARGS, NULL},
+    {"recursiveTypeGroup", (PyCFunction)recursiveTypeGroup, METH_VARARGS, NULL},
     {"isRecursive", (PyCFunction)isRecursive, METH_VARARGS, NULL},
     {"referencedTypes", (PyCFunction)referencedTypes, METH_VARARGS, NULL},
     {"wantsToDefaultConstruct", (PyCFunction)wantsToDefaultConstruct, METH_VARARGS, NULL},

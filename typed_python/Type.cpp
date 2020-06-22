@@ -24,7 +24,110 @@ void Type::repr(instance_ptr self, ReprAccumulator& out, bool isStr) {
     });
 }
 
-ShaHash Type::pyObjectShaHash(PyObject* h) {
+
+// these types can all see each other through their references, either
+// through the compiler, or just through normal type references. We need to
+// pick a 'first' type, which we can do by picking the first type to be defined
+// in the program, and then walk through the group placing them in order.
+void Type::buildCompilerRecursiveGroup(const std::set<Type*>& types) {
+    if (types.size() == 0) {
+        throw std::runtime_error("Empty compiler recursive group makes no sense.");
+    }
+
+    // order the types by their type index
+    std::map<int64_t, Type*> typeIndex;
+    for (auto t: types) {
+        typeIndex[t->m_global_type_index] = t;
+    }
+
+    // then collapse that to the index with which we visit them here
+    int visitIx = 0;
+    std::map<int32_t, Type*> visitOrder;
+    for (auto orderAndType: typeIndex) {
+        visitOrder[visitIx] = orderAndType.second;
+        orderAndType.second->mCompilerRecursiveTypeGroupIndex = visitIx;
+
+        visitIx++;
+    }
+
+    Type* typeHead = visitOrder[0];
+
+    for (auto t: types) {
+        t->mCompilerRecursiveTypeGroupHead = typeHead;
+    }
+
+    typeHead->mCompilerRecursiveTypeGroup = visitOrder;
+}
+
+Type* Type::computeCompilerReferenceGroupHead() {
+    std::vector<Type*> callStack;
+    std::vector<std::shared_ptr<std::set<Type*> > > aboveUs;
+    std::set<Type*> aboveUsSet;
+
+    std::function<void (Type*)> visit = [&](Type* t) {
+        // exclude any type that already has a recursive type group head.
+        if (t->mCompilerRecursiveTypeGroupHead) {
+            return;
+        }
+
+        if (aboveUsSet.find(t) == aboveUsSet.end()) {
+            // we've never seen this type before
+            callStack.push_back(t);
+            aboveUsSet.insert(t);
+
+            aboveUs.push_back(
+                std::shared_ptr<std::set<Type*> >(
+                    new std::set<Type*>()
+                )
+            );
+            aboveUs.back()->insert(t);
+
+            // now recurse into the subtypes
+            t->visitReferencedTypes(visit);
+            t->visitCompilerVisibleReferencedTypes(visit);
+
+            callStack.pop_back();
+
+            if (aboveUs.size() > callStack.size()) {
+                // this group is now complete. Every element in it needs
+                // to get a group head, and then get removed.
+                Type::buildCompilerRecursiveGroup(*aboveUs.back());
+
+                for (auto subT: *aboveUs.back()) {
+                    aboveUsSet.erase(subT);
+                }
+
+                aboveUs.pop_back();
+            }
+        } else {
+            // this is not a new type. We need to collapse this group into its parent,
+            // since all of these types are mutually recursive
+            while (aboveUs.back()->find(t) == aboveUs.back()->end()) {
+                if (aboveUs.size() == 1) {
+                    throw std::runtime_error(
+                        "Somehow, we can't find this type even though we know"
+                        " its above us."
+                    );
+                }
+
+                aboveUs[aboveUs.size() - 2]->insert(
+                    aboveUs.back()->begin(), aboveUs.back()->end()
+                );
+                aboveUs.pop_back();
+            }
+        }
+    };
+
+    visit(this);
+
+    if (!mCompilerRecursiveTypeGroupHead) {
+        throw std::runtime_error("Somehow we don't have a recursive type group head");
+    }
+
+    return mCompilerRecursiveTypeGroupHead;
+}
+
+ShaHash Type::pyObjectShaHash(PyObject* h, Type* groupHead) {
     // handle basic constants
     if (h == Py_None) {
         return ShaHash(0);
@@ -60,9 +163,25 @@ ShaHash Type::pyObjectShaHash(PyObject* h) {
         ShaHash res(6);
         res += ShaHash(PyTuple_Size(h));
         for (long k = 0; k < PyTuple_Size(h); k++) {
-            res += pyObjectShaHash(PyTuple_GetItem(h, k));
+            res += pyObjectShaHash(PyTuple_GetItem(h, k), groupHead);
         }
         return res;
+    }
+
+    static PyObject* builtinsModule = PyImport_ImportModule("builtins");
+    static PyObject* builtinsModuleDict = PyObject_GetAttrString(builtinsModule, "__dict__");
+
+    if (h == builtinsModule) {
+        return ShaHash(7);
+    }
+    if (h == builtinsModuleDict) {
+        return ShaHash(8);
+    }
+
+    Type* argType = PyInstance::extractTypeFrom(h->ob_type);
+    if (argType) {
+        // this is wrong because we're not including the closure
+        return argType->identityHash(groupHead);
     }
 
     //TODO: actually handle this correctly.
@@ -77,7 +196,7 @@ ShaHash Type::pyObjectShaHash(PyObject* h) {
     return ShaHash::poison();
 }
 
-ShaHash Type::pyObjectShaHash(Instance h) {
+ShaHash Type::pyObjectShaHash(Instance h, Type* groupHead) {
     if (h.type()->getTypeCategory() == Type::TypeCategory::catNone) {
         return ShaHash(0);
     }
@@ -248,104 +367,6 @@ Maybe Type::canConstructFrom(Type* otherType, bool isExplicit) {
     return mCanConvert[otherType];
 }
 
-void Type::buildMutuallyRecursiveTypeCycle() {
-    if (mMutuallyRecursiveTypeGroupHead) {
-        return;
-    }
-
-    std::map<Type*, int> index;
-    std::vector<Type*> stack;
-    std::set<Type*> stackContents;
-    std::map<Type*, int> link;
-
-    long curIndex = 0;
-
-    std::function<void (Type*)> visit = [&](Type* cur) {
-        index[cur] = curIndex;
-        link[cur] = curIndex;
-        curIndex += 1;
-
-        stack.push_back(cur);
-        stackContents.insert(cur);
-
-        cur->visitReferencedTypes([&](Type* child) {
-            if (cur->mMutuallyRecursiveTypeGroupHead) {
-                // don't consider this node at all
-                return;
-            }
-
-            if (index.find(child) == index.end()) {
-                visit(child);
-                link[cur] = std::min(link[cur], link[child]);
-            }
-            else if (stackContents.find(child) != stackContents.end()) {
-                link[cur] = std::min(link[cur], index[child]);
-            }
-        });
-
-        if (link[cur] == index[cur]) {
-            // we're the top of a connected component
-            std::vector<Type*> curComponent;
-
-            while (stackContents.find(cur) != stackContents.end()) {
-                curComponent.push_back(stack.back());
-                stackContents.erase(stack.back());
-                stack.pop_back();
-            }
-
-            Type* lowest = nullptr;
-
-            for (auto t: curComponent) {
-                if (t->m_is_recursive_forward && (!lowest || m_recursive_forward_index < lowest->m_recursive_forward_index)) {
-                    lowest = t;
-                }
-            }
-
-            if (!lowest) {
-                // pick the one with the lowest name
-                for (auto t: curComponent) {
-                    if (!lowest || t->name() < lowest->name()) {
-                        lowest = t;
-                    }
-                }
-            }
-
-            for (auto t: curComponent) {
-                t->mMutuallyRecursiveTypeGroupHead = lowest;
-                t->mMutuallyRecursiveTypeGroupIndex = -1;
-            }
-
-            std::set<Type*> curComponentSet;
-            curComponentSet.insert(curComponent.begin(), curComponent.end());
-
-            // order the nodes in the group in the order in which we traverse them
-            // in the graph, filling out 'mMutuallyRecursiveTypeGroupIndex'
-            long curIndex = 0;
-            std::function<void (Type*)> visitForIndex = [&](Type* cur) {
-                // if the node isn't in this connected component, do nothing
-                if (curComponentSet.find(cur) == curComponentSet.end()) {
-                    return;
-                }
-
-                // if the node already has an index, do nothing.
-                if (cur->mMutuallyRecursiveTypeGroupIndex >= 0) {
-                    return;
-                }
-
-                cur->mMutuallyRecursiveTypeGroupIndex = curIndex;
-                lowest->mMutuallyRecursiveTypeGroup[curIndex] = cur;
-                curIndex++;
-
-                cur->visitReferencedTypes(visitForIndex);
-            };
-
-            visitForIndex(lowest);
-        }
-    };
-
-    visit(this);
-}
-
 void Type::endOfConstructorInitialization() {
     visitReferencedTypes([&](Type* &t) {
         while (t->getTypeCategory() == TypeCategory::catForward && ((Forward*)t)->getTarget()) {
@@ -379,8 +400,6 @@ void Type::endOfConstructorInitialization() {
 
     if (!m_referenced_forwards.size()) {
         forwardTypesAreResolved();
-        mMutuallyRecursiveTypeGroup[0] = this;
-        mMutuallyRecursiveTypeGroupHead = this;
     } else {
         updateAfterForwardTypesChanged();
     }

@@ -318,7 +318,7 @@ public:
         for (auto tup: m_own_members) {
             res += ShaHash(std::get<0>(tup));
             res += ShaHash(std::get<1>(tup)->identityHash(groupHead));
-            res += Type::pyObjectShaHash(std::get<2>(tup));
+            res += Type::pyObjectShaHash(std::get<2>(tup), groupHead);
         }
 
         res += ShaHash(2);
@@ -342,7 +342,7 @@ public:
         res += ShaHash(5);
         for (auto nameAndFun: m_own_classMembers) {
             res += ShaHash(nameAndFun.first);
-            res += Type::pyObjectShaHash(nameAndFun.second);
+            res += Type::pyObjectShaHash(nameAndFun.second, groupHead);
         }
 
         return res;

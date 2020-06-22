@@ -37,7 +37,7 @@ public:
     }
 
     ShaHash _computeIdentityHash(Type* groupHead=nullptr) {
-        return ShaHash(m_typeCategory) + Type::pyObjectShaHash(mInstance);
+        return ShaHash(m_typeCategory) + Type::pyObjectShaHash(mInstance, groupHead);
     }
 
     typed_python_hash_type hash(instance_ptr left) {

@@ -23,7 +23,6 @@
 
 class Function;
 
-
 class ClosureVariableBindingStep {
     enum class BindingType {
         FUNCTION = 1,
@@ -363,6 +362,9 @@ inline ClosureVariableBinding operator+(const ClosureVariableBindingStep& step, 
     }
     return ClosureVariableBinding(steps);
 }
+
+
+Type* extractCompilerVisibleTypeFromGlobal(PyObject* o);
 
 
 class Function : public Type {
@@ -771,6 +773,39 @@ public:
         }
 
         template<class visitor_type>
+        void _visitCompilerVisibleReferencedTypes(const visitor_type& visitor) {
+            auto visitHeldPyObject = [&](PyObject* o) {
+                Type* argType = extractCompilerVisibleTypeFromGlobal(o);
+
+                if (argType) {
+                    visitor(argType);
+                }
+            };
+
+            for (auto nameAndGlobal: mFunctionGlobalsInCells) {
+                PyObject* cell = nameAndGlobal.second;
+                if (!PyCell_Check(cell)) {
+                    throw std::runtime_error(
+                        "A global in mFunctionGlobalsInCells is somehow not a cell"
+                    );
+                }
+
+                if (PyCell_Get(cell)) {
+                    visitHeldPyObject(PyCell_GET(cell));
+                }
+            }
+
+            if (!mFunctionUsedGlobals) {
+                populateUsedGlobals();
+            }
+
+            iterate(mFunctionUsedGlobals, [&](PyObject* globalName) {
+                PyObject* o = PyDict_GetItem(mFunctionUsedGlobals, globalName);
+                visitHeldPyObject(o);
+            });
+        }
+
+        template<class visitor_type>
         void _visitContainedTypes(const visitor_type& visitor) {
         }
 
@@ -1092,21 +1127,49 @@ public:
                 + ShaHash(co->co_flags)
                 + ShaHash(co->co_firstlineno)
                 + ShaHash::SHA1(PyBytes_AsString(co->co_code), PyBytes_GET_SIZE(co->co_code))
-                + Type::pyObjectShaHash(co->co_consts)
-                + Type::pyObjectShaHash(co->co_names)
-                + Type::pyObjectShaHash(co->co_varnames)
-                + Type::pyObjectShaHash(co->co_freevars)
-                + Type::pyObjectShaHash(co->co_cellvars)
-                + Type::pyObjectShaHash(co->co_filename)
-                + Type::pyObjectShaHash(co->co_name)
-                + Type::pyObjectShaHash(co->co_lnotab)
+                + Type::pyObjectShaHash(co->co_consts, groupHead)
+                + Type::pyObjectShaHash(co->co_names, groupHead)
+                + Type::pyObjectShaHash(co->co_varnames, groupHead)
+                + Type::pyObjectShaHash(co->co_freevars, groupHead)
+                + Type::pyObjectShaHash(co->co_cellvars, groupHead)
+                // we ignore this, because otherwise, we'd have the hash change
+                // whenever we instantiate code in a new location
+                // + Type::pyObjectShaHash(co->co_filename)
+                + Type::pyObjectShaHash(co->co_name, groupHead)
+                + Type::pyObjectShaHash(co->co_lnotab, groupHead)
             );
+
+            res += ShaHash(1);
+
+            if (!mFunctionUsedGlobals) {
+                populateUsedGlobals();
+            }
+
+            if (mFunctionUsedGlobals) {
+                std::map<std::string, ShaHash> globals;
+                iterate(mFunctionUsedGlobals, [&](PyObject* globalName) {
+                    PyObject* val = PyDict_GetItem(mFunctionGlobals, globalName);
+                    if (val && PyUnicode_Check(globalName)) {
+                        // wrong to hash the values here - should be hashing the identities?
+                        // or have to do this at some macro level, because core type inference doesn't
+                        // know about this relationship
+                        if (mClosureBindings.find(std::string(PyUnicode_AsUTF8(globalName))) == mClosureBindings.end()) {
+                            globals[PyUnicode_AsUTF8(globalName)] = Type::pyObjectShaHash(val, groupHead);
+                        }
+                    }
+                });
+
+                for (auto nameAndHash: globals) {
+                    res += ShaHash(nameAndHash.first);
+                    res += nameAndHash.second;
+                }
+            }
 
             res += ShaHash(1);
 
             for (auto nameAndGlobal: mFunctionGlobalsInCells) {
                 res += ShaHash(nameAndGlobal.first);
-                res += Type::pyObjectShaHash(nameAndGlobal.second);
+                res += Type::pyObjectShaHash(nameAndGlobal.second, groupHead);
             }
 
             return res;
@@ -1242,6 +1305,13 @@ public:
             o._visitReferencedTypes(visitor);
         }
         visitor(mClosureType);
+    }
+
+    template<class visitor_type>
+    void _visitCompilerVisibleReferencedTypes(const visitor_type& visitor) {
+        for (auto& o: mOverloads) {
+            o._visitCompilerVisibleReferencedTypes(visitor);
+        }
     }
 
     static Function* merge(Function* f1, Function* f2) {

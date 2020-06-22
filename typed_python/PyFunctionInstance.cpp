@@ -563,6 +563,10 @@ void PyFunctionInstance::mirrorTypeInformationIntoPyTypeConcrete(Function* inTyp
     //expose a list of overloads
     PyObjectStealer overloads(createOverloadPyRepresentation(inType));
 
+    if (!overloads) {
+        throw PythonExceptionSet();
+    }
+
     PyDict_SetItemString(
         pyType->tp_dict,
         "__name__",
@@ -593,11 +597,17 @@ void PyFunctionInstance::mirrorTypeInformationIntoPyTypeConcrete(Function* inTyp
         overloads
     );
 
-    PyDict_SetItemString(
-        pyType->tp_dict,
-        "ClosureType",
-        PyInstance::typePtrToPyTypeRepresentation(inType->getClosureType())
-    );
+    PyObject* closureTypeObj = PyInstance::typePtrToPyTypeRepresentation(inType->getClosureType());
+
+    if (closureTypeObj) {
+        PyDict_SetItemString(
+            pyType->tp_dict,
+            "ClosureType",
+            closureTypeObj
+        );
+    } else {
+        throw std::runtime_error("Couldn't get a type object for the closure of " + inType->name());
+    }
 
     PyDict_SetItemString(
         pyType->tp_dict,

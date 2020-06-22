@@ -18,7 +18,7 @@ from typed_python import (
     Forward, NamedTuple, Tuple, Dict, ListOf, ConstDict, Module
 )
 
-from typed_python._types import mutuallyRecursiveGroup, isRecursive
+from typed_python._types import recursiveTypeGroup, isRecursive
 
 
 class ForwardTypesTests(unittest.TestCase):
@@ -259,10 +259,10 @@ class ForwardTypesTests(unittest.TestCase):
         class B(Class):
             a = Member(OneOf(None, module.A))
 
-        self.assertEqual(mutuallyRecursiveGroup(A), mutuallyRecursiveGroup(B))
+        self.assertEqual(recursiveTypeGroup(A), recursiveTypeGroup(B))
 
-        self.assertTrue(A in mutuallyRecursiveGroup(A))
-        self.assertTrue(B in mutuallyRecursiveGroup(A))
+        self.assertTrue(A in recursiveTypeGroup(A))
+        self.assertTrue(B in recursiveTypeGroup(A))
 
     def test_call_function_with_unresolved_forward_fails(self):
         X = Forward("X")

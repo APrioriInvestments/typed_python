@@ -137,42 +137,6 @@ public:
             }
         }
 
-        std::set<Type*> resolvedThisPassOrderedSet;
-        std::vector<Type*> resolvedThisPassOrdered;
-
-        std::function<void (Type*)> visitForOrdering = [&](Type* t) {
-            // dont bother with types we didn't resolve this pass
-            if (resolvedThisPass.find(t) == resolvedThisPass.end()) {
-                return;
-            }
-
-            // if we already visited it, bail
-            if (resolvedThisPassOrderedSet.find(t) != resolvedThisPassOrderedSet.end()) {
-                return;
-            }
-
-            resolvedThisPassOrdered.push_back(t);
-            resolvedThisPassOrderedSet.insert(t);
-
-            t->visitReferencedTypes(visitForOrdering);
-        };
-
-        for (auto idAndT: forwardByIndex) {
-            visitForOrdering(idAndT.second);
-        }
-
-        // make sure we covered everything
-        for (auto t: resolvedThisPass) {
-            if (resolvedThisPassOrderedSet.find(t) == resolvedThisPassOrderedSet.end()) {
-                resolvedThisPassOrdered.push_back(t);
-            }
-        }
-
-        // this ordering is independent of Type pointer values.
-        for (auto t: resolvedThisPassOrdered) {
-            t->buildMutuallyRecursiveTypeCycle();
-        }
-
         m_name = mTarget->name();
         m_referencing_us_indirectly.clear();
 
