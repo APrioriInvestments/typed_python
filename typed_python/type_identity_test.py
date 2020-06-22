@@ -14,7 +14,8 @@
 
 from typed_python import (
     UInt64, UInt32,
-    ListOf, TupleOf, Tuple, NamedTuple, Dict, OneOf, Forward, identityHash
+    ListOf, TupleOf, Tuple, NamedTuple, Dict, OneOf, Forward, identityHash,
+    Entrypoint
 )
 
 
@@ -78,3 +79,17 @@ def test_identity_of_recursive_types_produced_same_way():
     assert identityHash(make("X", int)) == identityHash(make("X", int))
     assert identityHash(make("X", int)) != identityHash(make("X", float))
     assert identityHash(make("X", int)) != identityHash(make("X2", int))
+
+
+def test_identity_of_lambda_functions():
+    @Entrypoint
+    def makeAdder(a):
+        return lambda x: x + a
+
+    # these two have the same closure type
+    assert makeAdder(10).ClosureType == makeAdder(11).ClosureType
+    assert identityHash(type(makeAdder(10))) == identityHash(type(makeAdder(10)))
+    assert identityHash(type(makeAdder(10))) == identityHash(type(makeAdder(11)))
+
+    # these two are different
+    assert identityHash(type(makeAdder(10))) != identityHash(type(makeAdder(10.5)))

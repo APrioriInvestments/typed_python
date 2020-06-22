@@ -58,6 +58,23 @@ public:
         mIndexedFieldToAccess(elementAccess)
     {}
 
+    ShaHash identityHash(Type* groupHead=nullptr) {
+        if (isFunction()) {
+            return ShaHash(1) + getFunction()->identityHash(groupHead);
+        }
+        if (isNamedField()) {
+            return ShaHash(2) + ShaHash(getNamedField());
+        }
+        if (isIndexedField()) {
+            return ShaHash(3) + ShaHash(getIndexedField());
+        }
+        if (isCellAccess()) {
+            return ShaHash(4);
+        }
+
+        return ShaHash::poison();
+    }
+
     static ClosureVariableBindingStep AccessCell() {
         ClosureVariableBindingStep step;
         return step;
@@ -230,6 +247,14 @@ public:
 
     ClosureVariableBinding(const ClosureVariableBinding& other) : mSteps(other.mSteps)
     {}
+
+    ShaHash identityHash(Type* groupHead=nullptr) {
+        ShaHash res;
+        for (auto step: *mSteps) {
+            res += step.identityHash(groupHead);
+        }
+        return res;
+    }
 
     ClosureVariableBinding& operator=(const ClosureVariableBinding& other) {
         mSteps = other.mSteps;
@@ -1048,6 +1073,45 @@ public:
             }
         }
 
+        ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+            ShaHash res = (
+                mReturnType ? mReturnType->identityHash(groupHead) : ShaHash()
+            );
+
+            for (auto nameAndClosure: mClosureBindings) {
+                res += ShaHash(nameAndClosure.first) + nameAndClosure.second.identityHash(groupHead);
+            }
+
+            PyCodeObject* co = (PyCodeObject*)mFunctionCode;
+
+            res += (
+                ShaHash(co->co_argcount)
+                + ShaHash(co->co_kwonlyargcount)
+                + ShaHash(co->co_nlocals)
+                + ShaHash(co->co_stacksize)
+                + ShaHash(co->co_flags)
+                + ShaHash(co->co_firstlineno)
+                + ShaHash::SHA1(PyBytes_AsString(co->co_code), PyBytes_GET_SIZE(co->co_code))
+                + Type::pyObjectShaHash(co->co_consts)
+                + Type::pyObjectShaHash(co->co_names)
+                + Type::pyObjectShaHash(co->co_varnames)
+                + Type::pyObjectShaHash(co->co_freevars)
+                + Type::pyObjectShaHash(co->co_cellvars)
+                + Type::pyObjectShaHash(co->co_filename)
+                + Type::pyObjectShaHash(co->co_name)
+                + Type::pyObjectShaHash(co->co_lnotab)
+            );
+
+            res += ShaHash(1);
+
+            for (auto nameAndGlobal: mFunctionGlobalsInCells) {
+                res += ShaHash(nameAndGlobal.first);
+                res += Type::pyObjectShaHash(nameAndGlobal.second);
+            }
+
+            return res;
+        }
+
     private:
         PyObject* mFunctionCode;
 
@@ -1128,6 +1192,23 @@ public:
         m_is_default_constructible = mClosureType->is_default_constructible();
 
         return false;
+    }
+
+    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+        ShaHash res = (
+            ShaHash(1, m_typeCategory)
+            + ShaHash(m_name)
+            + ShaHash(mRootName)
+            + ShaHash(mQualname)
+            + ShaHash(mModulename)
+            + mClosureType->identityHash(groupHead)
+        );
+
+        for (auto o: mOverloads) {
+            res += o._computeIdentityHash(groupHead);
+        }
+
+        return res;
     }
 
     static Function* Make(std::string inName, std::string qualname, std::string moduleName, const std::vector<Overload>& overloads, Type* closureType, bool isEntrypoint, bool isNocompile) {

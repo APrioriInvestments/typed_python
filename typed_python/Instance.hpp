@@ -94,6 +94,11 @@ public:
         return mLayout->type;
     }
 
+    template<class T>
+    T& cast() {
+        return *(T*)data();
+    }
+
     instance_ptr data() const {
         return mLayout->data;
     }

@@ -36,6 +36,10 @@ public:
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
+    ShaHash _computeIdentityHash(Type* groupHead=nullptr) {
+        return ShaHash(m_typeCategory) + Type::pyObjectShaHash(mInstance);
+    }
+
     typed_python_hash_type hash(instance_ptr left) {
         return mInstance.hash();
     }

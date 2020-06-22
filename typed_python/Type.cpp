@@ -25,11 +25,73 @@ void Type::repr(instance_ptr self, ReprAccumulator& out, bool isStr) {
 }
 
 ShaHash Type::pyObjectShaHash(PyObject* h) {
+    // handle basic constants
+    if (h == Py_None) {
+        return ShaHash(0);
+    }
+
+    if (h == Py_True) {
+        return ShaHash(1);
+    }
+
+    if (h == Py_False) {
+        return ShaHash(2);
+    }
+
+    if (PyLong_Check(h)) {
+        return ShaHash(3) + ShaHash(PyLong_AsLong(h));
+    }
+
+    if (PyBytes_Check(h)) {
+        return ShaHash(4) + ShaHash::SHA1(
+            PyBytes_AsString(h),
+            PyBytes_GET_SIZE(h)
+        );
+    }
+
+    if (PyUnicode_Check(h)) {
+        Py_ssize_t s;
+        const char* c = PyUnicode_AsUTF8AndSize(h, &s);
+
+        return ShaHash(5) + ShaHash::SHA1(c, s);
+    }
+
+    if (PyTuple_Check(h)) {
+        ShaHash res(6);
+        res += ShaHash(PyTuple_Size(h));
+        for (long k = 0; k < PyTuple_Size(h); k++) {
+            res += pyObjectShaHash(PyTuple_GetItem(h, k));
+        }
+        return res;
+    }
+
     //TODO: actually handle this correctly.
+    PyObject* repr = PyObject_Repr(h);
+    if (!repr) {
+        std::cout << "WARNING: tried to hash an unprintable object of type "
+            << repr->ob_type->tp_name << "\n";
+    } else {
+        std::cout << "WARNING: tried to hash " << PyUnicode_AsUTF8(repr) << "\n";
+        decref(repr);
+    }
     return ShaHash::poison();
 }
 
 ShaHash Type::pyObjectShaHash(Instance h) {
+    if (h.type()->getTypeCategory() == Type::TypeCategory::catNone) {
+        return ShaHash(0);
+    }
+
+    if (h.type()->getTypeCategory() == Type::TypeCategory::catBool) {
+        return ShaHash(h.cast<bool>() ? 1 : 2);
+    }
+
+    if (h.type()->getTypeCategory() == Type::TypeCategory::catInt64) {
+        return ShaHash(3) + ShaHash(h.cast<int64_t>());
+    }
+
+    std::cout << "WARNING: tried to hash Instance " << h.repr() << "\n";
+
     return ShaHash::poison();
 }
 
