@@ -245,6 +245,7 @@ public:
 
     void buildTypes() {
         auto it = sResolvedTypes.find(std::make_pair(mUnresolvedFunctionTypes, mCellTypes));
+
         if (it != sResolvedTypes.end()) {
             mClosureType = std::get<0>(it->second);
             mClosureIndices = std::get<1>(it->second);

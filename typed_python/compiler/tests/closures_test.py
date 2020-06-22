@@ -19,6 +19,7 @@ from flaky import flaky
 from typed_python import Class, Final, Function, NamedTuple, bytecount, ListOf, TypedCell, Forward, PyCell, Tuple, TupleOf
 from typed_python.compiler.runtime import RuntimeEventVisitor, Entrypoint
 from typed_python._types import refcount
+from typed_python.test_util import currentMemUsageMb
 
 
 class DidCompileVisitor(RuntimeEventVisitor):
@@ -796,3 +797,22 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(callF(C1()), 1)
         self.assertEqual(callF(C2()), 2)
+
+    def test_calling_doesnt_leak(self):
+        @Entrypoint
+        def g(x):
+            return x
+
+        @Entrypoint
+        def f(x):
+            return g(x)
+
+        f(10)
+
+        m0 = currentMemUsageMb()
+        t0 = time.time()
+
+        while time.time() - t0 < 2.0:
+            f(10)
+
+        assert currentMemUsageMb() - m0 < 2.0

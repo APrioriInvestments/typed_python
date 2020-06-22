@@ -27,7 +27,7 @@ PyObject* PyFunctionInstance::prepareArgumentToBePassedToCompiler(PyObject* o) {
     TypedClosureBuilder builder;
 
     if (builder.isFunctionObject(o)) {
-        return incref(builder.convert(o));
+        return builder.convert(o);
     }
 
     return incref(o);
