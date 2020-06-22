@@ -590,6 +590,13 @@ class Wrapper(object):
         """
         return None
 
+    def get_iteration_elt_wrapper(self):
+        """Return the wrapper of the elements of this type.
+        By 'elements' I mean the objects you would get if you iterated this type.
+        e.g. typeWrapper(ListOf(T)).get_iteration_elt_wrapper()) = typeWrapper(T)
+        """
+        return None
+
     def convert_context_manager_enter(self, context, instance):
         return instance.convert_method_call("__enter__", (), {})
 

@@ -1821,7 +1821,7 @@ extern "C" {
      PyIter_Next returns NULL if there are no remaining items, but can also throw an exception.
 
      This function retains the convention that upon exhausting the container we return 'nullptr',
-     but raises the exception if its present.
+     but raises the exception if it's present.
     ******/
     PythonObjectOfType::layout_type* np_pyobj_iter_next(PythonObjectOfType::layout_type* toIterate) {
         PyEnsureGilAcquired getTheGil;

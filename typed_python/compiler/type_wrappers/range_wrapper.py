@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python.compiler.type_wrappers.arithmetic_wrapper import IntWrapper
 import typed_python.compiler.native_ast as native_ast
 
 
@@ -81,6 +82,9 @@ class RangeInstanceWrapper(Wrapper):
                     instance.expr.store(expr.nonref_expr)
             )
         return super().convert_method_call(context, expr, methodname, args, kwargs)
+
+    def get_iteration_elt_wrapper(self):
+        return IntWrapper(int)
 
 
 class RangeIteratorWrapper(Wrapper):

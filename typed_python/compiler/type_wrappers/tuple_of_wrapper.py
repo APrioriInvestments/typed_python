@@ -509,6 +509,9 @@ class TupleOrListOfWrapper(RefcountedWrapper):
     def convert_bool_cast(self, context, expr):
         return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
 
+    def get_iteration_elt_wrapper(self):
+        return self.underlyingWrapperType
+
 
 class TupleOrListOfIteratorWrapper(Wrapper):
     is_pod = False
