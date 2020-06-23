@@ -26,7 +26,8 @@ CPP_FLAGS = -std=c++14  -O2  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
             -I$(VIRTUAL_ENV)/include/python3.6m                             \
             -I$(VIRTUAL_ENV)/lib/python3.6/site-packages/numpy/core/include \
             -I/usr/include/python3.6m                                       \
-            -I/usr/local/lib/python3.6/dist-packages/numpy/core/include
+            -I/usr/local/lib/python3.6/dist-packages/numpy/core/include     \
+            -DTYPED_PYTHON_HAS_OPENSSL=1
 
 LINKER_FLAGS = -Wl,-O1 \
                -Wl,-Bsymbolic-functions \

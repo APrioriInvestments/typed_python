@@ -82,154 +82,138 @@ def checkHash(filesToWrite, expression):
         )
 
 
-def test_identity_of_register_types():
-    assert isinstance(identityHash(UInt64), bytes)
-    assert len(identityHash(UInt64)) == 20
+if sys.platform != "darwin":
+    def test_identity_of_register_types():
+        assert isinstance(identityHash(UInt64), bytes)
+        assert len(identityHash(UInt64)) == 20
 
-    assert identityHash(UInt64) != identityHash(UInt32)
+        assert identityHash(UInt64) != identityHash(UInt32)
 
+    def test_identity_of_list_of():
+        assert identityHash(ListOf(int)) != identityHash(ListOf(float))
+        assert identityHash(ListOf(int)) == identityHash(ListOf(int))
+        assert identityHash(ListOf(int)) != identityHash(TupleOf(int))
 
-def test_identity_of_list_of():
-    assert identityHash(ListOf(int)) != identityHash(ListOf(float))
-    assert identityHash(ListOf(int)) == identityHash(ListOf(int))
-    assert identityHash(ListOf(int)) != identityHash(TupleOf(int))
+    def test_identity_of_named_tuple_and_tuple():
+        assert identityHash(NamedTuple(x=int)) != identityHash(NamedTuple(x=float))
+        assert identityHash(NamedTuple(x=int)) == identityHash(NamedTuple(x=int))
+        assert identityHash(NamedTuple(x=int)) != identityHash(Tuple(float))
 
+        assert identityHash(NamedTuple(x=int)) != identityHash(NamedTuple(y=int))
+        assert identityHash(NamedTuple(x=int, y=float)) != identityHash(NamedTuple(y=float, x=int))
 
-def test_identity_of_named_tuple_and_tuple():
-    assert identityHash(NamedTuple(x=int)) != identityHash(NamedTuple(x=float))
-    assert identityHash(NamedTuple(x=int)) == identityHash(NamedTuple(x=int))
-    assert identityHash(NamedTuple(x=int)) != identityHash(Tuple(float))
+    def test_identity_of_dict():
+        assert identityHash(Dict(int, float)) != identityHash(Dict(int, int))
+        assert identityHash(Dict(int, float)) != identityHash(Dict(float, int))
 
-    assert identityHash(NamedTuple(x=int)) != identityHash(NamedTuple(y=int))
-    assert identityHash(NamedTuple(x=int, y=float)) != identityHash(NamedTuple(y=float, x=int))
+    def test_identity_of_oneof():
+        assert identityHash(OneOf(None, int)) != identityHash(OneOf(None, float))
 
+    def test_identity_of_recursive_types():
+        X = Forward("X")
+        X = X.define(TupleOf(OneOf(int, X)))
 
-def test_identity_of_dict():
-    assert identityHash(Dict(int, float)) != identityHash(Dict(int, int))
-    assert identityHash(Dict(int, float)) != identityHash(Dict(float, int))
+        X2 = Forward("X")
+        X2 = X2.define(TupleOf(OneOf(int, X2)))
 
+        X3 = Forward("X")
+        X3 = X3.define(TupleOf(OneOf(float, X3)))
 
-def test_identity_of_oneof():
-    assert identityHash(OneOf(None, int)) != identityHash(OneOf(None, float))
+        assert identityHash(X2) == identityHash(X)
+        assert identityHash(X3) != identityHash(X)
 
+    def test_identity_of_recursive_types_2():
+        X = Forward("X")
+        X = X.define(TupleOf(OneOf(int, TupleOf(X))))
 
-def test_identity_of_recursive_types():
-    X = Forward("X")
-    X = X.define(TupleOf(OneOf(int, X)))
+        identityHash(X)
 
-    X2 = Forward("X")
-    X2 = X2.define(TupleOf(OneOf(int, X2)))
+    def test_identity_of_recursive_types_produced_same_way():
+        def make(name, T):
+            X = Forward(name)
+            return X.define(TupleOf(OneOf(T, X)))
 
-    X3 = Forward("X")
-    X3 = X3.define(TupleOf(OneOf(float, X3)))
+        assert identityHash(make("X", int)) == identityHash(make("X", int))
+        assert identityHash(make("X", int)) != identityHash(make("X", float))
+        assert identityHash(make("X", int)) != identityHash(make("X2", int))
 
-    assert identityHash(X2) == identityHash(X)
-    assert identityHash(X3) != identityHash(X)
+    def test_identity_of_lambda_functions():
+        @Entrypoint
+        def makeAdder(a):
+            return lambda x: x + a
 
+        # these two have the same closure type
+        assert makeAdder(10).ClosureType == makeAdder(11).ClosureType
+        assert identityHash(type(makeAdder(10))) == identityHash(type(makeAdder(10)))
+        assert identityHash(type(makeAdder(10))) == identityHash(type(makeAdder(11)))
 
-def test_identity_of_recursive_types_2():
-    X = Forward("X")
-    X = X.define(TupleOf(OneOf(int, TupleOf(X))))
+        # these two are different
+        assert identityHash(type(makeAdder(10))) != identityHash(type(makeAdder(10.5)))
 
-    identityHash(X)
+    def test_checkHash_works():
+        assert checkHash({"x.py": "A = TupleOf(int)\n"}, 'x.A') == identityHash(TupleOf(int))
 
+    def test_mutually_recursive_group_basic():
+        assert recursiveTypeGroup(TupleOf(int)) == [TupleOf(int)]
 
-def test_identity_of_recursive_types_produced_same_way():
-    def make(name, T):
-        X = Forward(name)
-        return X.define(TupleOf(OneOf(T, X)))
+        X = Forward("X")
+        X = X.define(TupleOf(OneOf(int, X)))
 
-    assert identityHash(make("X", int)) == identityHash(make("X", int))
-    assert identityHash(make("X", int)) != identityHash(make("X", float))
-    assert identityHash(make("X", int)) != identityHash(make("X2", int))
+        assert recursiveTypeGroup(X) == [OneOf(int, X), X]
 
+    def test_mutually_recursive_group_through_functions_in_closure():
+        @Entrypoint
+        def f(x):
+            return g(x)
 
-def test_identity_of_lambda_functions():
-    @Entrypoint
-    def makeAdder(a):
-        return lambda x: x + a
+        @Entrypoint
+        def g(x):
+            return f(x)
 
-    # these two have the same closure type
-    assert makeAdder(10).ClosureType == makeAdder(11).ClosureType
-    assert identityHash(type(makeAdder(10))) == identityHash(type(makeAdder(10)))
-    assert identityHash(type(makeAdder(10))) == identityHash(type(makeAdder(11)))
+        gType = type(prepareArgumentToBePassedToCompiler(g))
+        fType = gType.overloads[0].closureVarLookups['f'][0]
 
-    # these two are different
-    assert identityHash(type(makeAdder(10))) != identityHash(type(makeAdder(10.5)))
+        assert recursiveTypeGroup(gType) == [gType, fType]
 
+    def test_mutually_recursive_group_through_functions_at_module_level():
+        assert recursiveTypeGroup(type(gModuleLevel)) == [
+            type(fModuleLevel), type(gModuleLevel)
+        ]
 
-def test_checkHash_works():
-    assert checkHash({"x.py": "A = TupleOf(int)\n"}, 'x.A') == identityHash(TupleOf(int))
+    @pytest.mark.skip("We can't make 'value' objects out of functions yet.")
+    def test_recursive_group_of_function_values():
+        @Entrypoint
+        def f(x):
+            return g(x)
 
+        @Entrypoint
+        def g(x):
+            return f(x)
 
-def test_mutually_recursive_group_basic():
-    assert recursiveTypeGroup(TupleOf(int)) == [TupleOf(int)]
+        assert recursiveTypeGroup(f)
 
-    X = Forward("X")
-    X = X.define(TupleOf(OneOf(int, X)))
+    def test_checkHash_lambdas_stable():
+        contents = {"x.py": "@Entrypoint\ndef f(x):\n    return x + 1\n"}
 
-    assert recursiveTypeGroup(X) == [OneOf(int, X), X]
+        h1 = checkHash(contents, 'type(x.f)')
 
+        for passIx in range(4):
+            assert h1 == checkHash(contents, 'type(x.f)')
 
-def test_mutually_recursive_group_through_functions_in_closure():
-    @Entrypoint
-    def f(x):
-        return g(x)
+    def test_checkHash_lambdas_hash_code_correctly():
+        contents1 = {"x.py": "@Entrypoint\ndef f(x):\n    return x + 1\n"}
+        contents2 = {"x.py": "@Entrypoint\ndef f(x):\n    return x + 2\n"}
 
-    @Entrypoint
-    def g(x):
-        return f(x)
+        assert checkHash(contents1, 'type(x.f)') != checkHash(contents2, 'type(x.f)')
 
-    gType = type(prepareArgumentToBePassedToCompiler(g))
-    fType = gType.overloads[0].closureVarLookups['f'][0]
+    def test_checkHash_lambdas_hash_dependent_functions_correctly():
+        contents1 = {"x.py": "@Entrypoint\ndef g(x):\n    return x + 1\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
+        contents2 = {"x.py": "@Entrypoint\ndef g(x):\n    return x + 2\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
 
-    assert recursiveTypeGroup(gType) == [gType, fType]
+        assert checkHash(contents1, 'type(x.f)') != checkHash(contents2, 'type(x.f)')
 
+    def test_checkHash_lambdas_hash_mutually_recursive_correctly():
+        contents1 = {"x.py": "@Entrypoint\ndef g(x):\n    return f(x + 1)\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
+        contents2 = {"x.py": "@Entrypoint\ndef g(x):\n    return f(x + 2)\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
 
-def test_mutually_recursive_group_through_functions_at_module_level():
-    assert recursiveTypeGroup(type(gModuleLevel)) == [
-        type(fModuleLevel), type(gModuleLevel)
-    ]
-
-
-@pytest.mark.skip("We can't make 'value' objects out of functions yet.")
-def test_recursive_group_of_function_values():
-    @Entrypoint
-    def f(x):
-        return g(x)
-
-    @Entrypoint
-    def g(x):
-        return f(x)
-
-    assert recursiveTypeGroup(f)
-
-
-def test_checkHash_lambdas_stable():
-    contents = {"x.py": "@Entrypoint\ndef f(x):\n    return x + 1\n"}
-
-    h1 = checkHash(contents, 'type(x.f)')
-
-    for passIx in range(4):
-        assert h1 == checkHash(contents, 'type(x.f)')
-
-
-def test_checkHash_lambdas_hash_code_correctly():
-    contents1 = {"x.py": "@Entrypoint\ndef f(x):\n    return x + 1\n"}
-    contents2 = {"x.py": "@Entrypoint\ndef f(x):\n    return x + 2\n"}
-
-    assert checkHash(contents1, 'type(x.f)') != checkHash(contents2, 'type(x.f)')
-
-
-def test_checkHash_lambdas_hash_dependent_functions_correctly():
-    contents1 = {"x.py": "@Entrypoint\ndef g(x):\n    return x + 1\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
-    contents2 = {"x.py": "@Entrypoint\ndef g(x):\n    return x + 2\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
-
-    assert checkHash(contents1, 'type(x.f)') != checkHash(contents2, 'type(x.f)')
-
-
-def test_checkHash_lambdas_hash_mutually_recursive_correctly():
-    contents1 = {"x.py": "@Entrypoint\ndef g(x):\n    return f(x + 1)\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
-    contents2 = {"x.py": "@Entrypoint\ndef g(x):\n    return f(x + 2)\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
-
-    assert checkHash(contents1, 'type(x.f)') != checkHash(contents2, 'type(x.f)')
+        assert checkHash(contents1, 'type(x.f)') != checkHash(contents2, 'type(x.f)')

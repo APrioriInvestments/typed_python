@@ -16,7 +16,9 @@
 
 #pragma once
 
+#ifdef TYPED_PYTHON_HAS_OPENSSL
 #include <openssl/sha.h>
+#endif
 
 class ShaHash;
 ShaHash operator+(const ShaHash& l, const ShaHash& r);
@@ -128,7 +130,10 @@ public:
         return SHA1(s.c_str(), s.size());
     }
 
+
+#ifdef TYPED_PYTHON_HAS_OPENSSL
     static ShaHash SHA1(const void* data, size_t sz) {
+
         ShaHash tr;
 
         if (sz) {
@@ -137,6 +142,11 @@ public:
 
         return tr;
     }
+#else
+    static ShaHash SHA1(const void* data, size_t sz) {
+        return ShaHash::poison();
+    }
+#endif
 
 private:
     uint32_t mData[5];
