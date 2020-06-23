@@ -14,6 +14,7 @@
 
 import llvmlite.binding as llvm
 import llvmlite.ir
+import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler.native_ast_to_llvm as native_ast_to_llvm
 import sys
 import ctypes
@@ -210,7 +211,7 @@ class Compiler:
         module = self.converter.add_functions(functions)
 
         try:
-            mod = llvm.parse_assembly(module)
+            mod = llvm.parse_assembly(module.moduleText)
             mod.verify()
         except Exception:
             print("failing: ", module)
@@ -240,4 +241,13 @@ class Compiler:
             )
             self.functions_by_name[fname] = native_function_pointers[fname]
 
-        return native_function_pointers
+        native_function_pointers[module.globalDefName] = (
+            NativeFunctionPointer(
+                module.globalDefName,
+                self.engine.get_function_address(module.globalDefName),
+                [native_ast.Void.pointer().pointer()],
+                native_ast.Void
+            )
+        )
+
+        return module, native_function_pointers

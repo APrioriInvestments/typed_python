@@ -31,6 +31,23 @@ pointer_size = 8
 CROSS_MODULE_INLINE_COMPLEXITY = 40
 
 
+GET_GLOBAL_VARIABLES_NAME = ".get_global_variables"
+
+
+class GlobalVariableDefinition:
+    """Representation for a single globally defined value.
+
+    Each such value has a formal name (which should be unique across
+    all possible compiled value sets, so usually its a hash), a type,
+    and some metadata indicating to the calling context what its for.
+    """
+    def __init__(self, name, typ, typedLLVMValue, metadata):
+        self.name = name
+        self.type = typ
+        self.typedLLVMValue = typedLLVMValue
+        self.metadata = metadata
+
+
 def llvmBool(i):
     return llvmlite.ir.Constant(llvm_i1, i)
 
@@ -161,7 +178,7 @@ def constant_to_typed_llvm_value(module, builder, c):
 
         return TypedLLVMValue(llvm_c, c.value_type)
 
-    assert False, c
+    assert False, (c, type(c))
 
 
 class TypedLLVMValue(object):
@@ -494,6 +511,7 @@ class TeardownHandler:
 class FunctionConverter:
     def __init__(self,
                  module,
+                 globalDefinitions,
                  function,
                  converter,
                  builder,
@@ -502,6 +520,10 @@ class FunctionConverter:
                  external_function_references
                  ):
         self.function = function
+
+        # dict from name to GlobalVariableDefinition
+        self.globalDefinitions = globalDefinitions
+
         self.module = module
         self.converter = converter
         self.builder = builder
@@ -725,6 +747,32 @@ class FunctionConverter:
             )
 
             return self.stack_slots[expr.name]
+
+        if expr.matches.GlobalVariable:
+            if expr.name in self.globalDefinitions:
+                assert expr.metadata == self.globalDefinitions[expr.name].metadata
+                assert expr.type == self.globalDefinitions[expr.name].type
+            else:
+                llvm_type = type_to_llvm_type(expr.type)
+
+                self.globalDefinitions[expr.name] = GlobalVariableDefinition(
+                    expr.name,
+                    expr.type,
+                    TypedLLVMValue(
+                        llvmlite.ir.GlobalVariable(self.module, llvm_type, expr.name),
+                        native_ast.Type.Pointer(value_type=expr.type)
+                    ),
+                    expr.metadata
+                )
+                self.globalDefinitions[expr.name].typedLLVMValue.llvm_value.initializer = (
+                    constant_to_typed_llvm_value(
+                        self.module,
+                        self.builder,
+                        expr.type.zero().val
+                    ).llvm_value
+                )
+
+            return self.globalDefinitions[expr.name].typedLLVMValue
 
         if expr.matches.Alloca:
             if expr.type.matches.Void:
@@ -1355,6 +1403,13 @@ def populate_needed_externals(external_function_references, module):
     define("__gxx_personality_v0", llvm_i32, [], vararg=True)
 
 
+class ModuleDefinition:
+    def __init__(self, moduleText, globalDefinitions, globalDefName):
+        self.moduleText = moduleText
+        self.globalDefinitions = globalDefinitions
+        self.globalDefName = globalDefName
+
+
 class Converter(object):
     def __init__(self):
         object.__init__(self)
@@ -1454,6 +1509,8 @@ class Converter(object):
                 print("*************")
                 print()
 
+        globalDefinitions = {}
+
         while names_to_definitions:
             for name in sorted(names_to_definitions):
                 definition = names_to_definitions.pop(name)
@@ -1471,6 +1528,7 @@ class Converter(object):
                 try:
                     func_converter = FunctionConverter(
                         module,
+                        globalDefinitions,
                         func,
                         self,
                         builder,
@@ -1506,4 +1564,56 @@ class Converter(object):
                 names_to_definitions[name] = self._function_definitions[name]
             self._inlineRequests.clear()
 
-        return str(module)
+        # define a function that accepts a pointer and fills it out with a table of pointer values
+        # so that we can link in any type objects that are defined within the source code.
+        globalDefName = GET_GLOBAL_VARIABLES_NAME + str(len(self._function_definitions))
+
+        self.defineGlobalMetadataAccessor(module, globalDefinitions, globalDefName)
+
+        return ModuleDefinition(
+            str(module),
+            globalDefinitions,
+            globalDefName
+        )
+
+    def defineGlobalMetadataAccessor(self, module, globalDefinitions, globalDefName):
+        """Given a list of global variables, make a function to access them.
+
+        The function will be named '.get_global_variables' and will accept
+        a single argument that takes a PointerTo(PointerTo(None)) and fills
+        it out with the values of the globalDefinitions in their lexical
+        ordering.
+        """
+        accessorFunction = llvmlite.ir.Function(
+            module,
+            type_to_llvm_type(
+                native_ast.Type.Function(
+                    output=native_ast.Void,
+                    args=[native_ast.Void.pointer().pointer()],
+                    varargs=False,
+                    can_throw=False
+                )
+            ),
+            globalDefName
+        )
+
+        accessorFunction.linkage = "external"
+
+        outPtr = accessorFunction.args[0]
+
+        block = accessorFunction.append_basic_block('entry')
+        builder = llvmlite.ir.IRBuilder(block)
+        voidPtr = type_to_llvm_type(native_ast.Void.pointer())
+
+        index = 0
+        for name in sorted(globalDefinitions):
+            builder.store(
+                builder.bitcast(
+                    globalDefinitions[name].typedLLVMValue.llvm_value,
+                    voidPtr
+                ),
+                builder.gep(outPtr, [llvmI64(index)])
+            )
+            index += 1
+
+        builder.ret_void()

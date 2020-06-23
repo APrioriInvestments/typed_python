@@ -375,6 +375,8 @@ def expr_str(self):
         return "mark slot %s initialized" % self.name
     if self.matches.StackSlot:
         return "slot(name=%s,t=%s)" % (self.name, str(self.type))
+    if self.matches.GlobalVariable:
+        return "global(name=%s,t=%s)" % (self.name, str(self.type))
     if self.matches.ExceptionPropagator:
         return (
             "try:\n" + indent(str(self.expr)) + "\n" +
@@ -518,6 +520,7 @@ Expression = Expression.define(Alternative(
     Sequence={'vals': TupleOf(Expression)},
     ActivatesTeardown={'name': str},
     StackSlot={'name': str, 'type': Type},
+    GlobalVariable={'name': str, 'type': Type, 'metadata': object},
     ElementPtrIntegers=lambda self, *offsets:
         Expression.ElementPtr(
             left=self,
