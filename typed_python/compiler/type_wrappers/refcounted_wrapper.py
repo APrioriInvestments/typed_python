@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-
+from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.native_ast as native_ast
 
 
@@ -35,6 +35,14 @@ class RefcountedWrapper(Wrapper):
                 this will be the pointer to the actual refcounted data structure.
         """
         return nonref_expr.ElementPtrIntegers(0, 0)
+
+    def getRefcount(self, context, inst):
+        return TypedExpression(
+            context,
+            self.get_refcount_ptr_expr(inst.nonref_expr).load(),
+            int,
+            False
+        )
 
     def convert_incref(self, context, expr):
         if self.CAN_BE_NULL:

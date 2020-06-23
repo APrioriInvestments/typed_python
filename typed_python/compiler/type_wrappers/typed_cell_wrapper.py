@@ -46,6 +46,7 @@ class TypedCellWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
+    CAN_BE_NULL = False
 
     def __init__(self, t):
         super().__init__(t)
@@ -57,8 +58,11 @@ class TypedCellWrapper(RefcountedWrapper):
     def convert_default_initialize(self, context, out):
         context.pushEffect(
             out.expr.store(
-                runtime_functions.malloc.call(native_ast.const_int_expr(16 + typeWrapper(self.typeRepresentation.HeldType).getBytecount()))
-                    .cast(self.getNativeLayoutType())
+                runtime_functions.malloc.call(
+                    native_ast.const_int_expr(
+                        16 + typeWrapper(self.typeRepresentation.HeldType).getBytecount()
+                    )
+                ).cast(self.getNativeLayoutType())
             ) >>
             out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>  # refcount
             out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int_expr(0))  # isinitialized
@@ -82,7 +86,9 @@ class TypedCellWrapper(RefcountedWrapper):
         )
 
     def generateNativeDestructorFunction(self, context, out, inst):
-        self.refHeld(inst).convert_destroy()
+        with context.ifelse(inst.nonref_expr.ElementPtrIntegers(0, 1).load()) as (ifTrue, ifFalse):
+            with ifTrue:
+                self.refHeld(inst).convert_destroy()
 
         context.pushEffect(
             runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))

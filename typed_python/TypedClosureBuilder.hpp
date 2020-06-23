@@ -412,11 +412,17 @@ public:
         return PyInstance::initialize(outType, [&](instance_ptr outClosure) {
             if (mClosureIsCell) {
                 ((TypedCellType*)mClosureType)->initializeHandleAt(outClosure);
-                buildClosureValues(
-                    (Tuple*)((TypedCellType*)mClosureType)->getHeldType(),
-                    ((TypedCellType*)mClosureType)->get(outClosure)
+
+                ((TypedCellType*)mClosureType)->set(
+                    outClosure,
+                    [&](instance_ptr data) {
+                        buildClosureValues(
+                            (Tuple*)((TypedCellType*)mClosureType)->getHeldType(),
+                            data
+                        );
+                    }
                 );
-            } else {
+           } else {
                 buildClosureValues(
                     (Tuple*)mClosureType,
                     outClosure

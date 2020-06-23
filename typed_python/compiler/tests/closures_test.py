@@ -19,7 +19,7 @@ from flaky import flaky
 
 from typed_python import (
     Class, Final, Function, NamedTuple, bytecount, ListOf, TypedCell, Forward,
-    PyCell, Tuple, TupleOf, NotCompiled
+    PyCell, Tuple, TupleOf, NotCompiled, TypeFunction, Member
 )
 
 from typed_python.compiler.runtime import RuntimeEventVisitor, Entrypoint
@@ -920,3 +920,31 @@ class TestCompilingClosures(unittest.TestCase):
             callIt.resultTypeFor(int)
 
         assert currentMemUsageMb() - m0 < 1.0
+
+    def test_copy_closure_with_cells(self):
+        # we need the closure to hold something with a refcount
+        # or else we don't generate a closure
+        z = "hi"
+
+        @Entrypoint
+        def f(x):
+            return x + z
+
+        @TypeFunction
+        def ClassHolding(T):
+            class C(Class, Final):
+                t = Member(T)
+
+                def __init__(self, t):
+                    self.t = t
+
+            return C
+
+        @Entrypoint
+        def makeClassHolding(x):
+            return ClassHolding(type(x))(x)
+
+        r = makeClassHolding(f)
+
+        # check that we are actually using a TypedCell
+        assert issubclass(r.MemberTypes[0].ClosureType, TypedCell)
