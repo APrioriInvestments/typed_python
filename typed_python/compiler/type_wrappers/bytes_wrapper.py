@@ -12,10 +12,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typed_python import sha_hash
+from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import Int32, Dict, ListOf
+from typed_python import Int32
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -23,9 +25,6 @@ import typed_python.compiler
 from typed_python.compiler.native_ast import VoidPtr
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
-
-
-_memoizedBytesTable = Dict(bytes, ListOf(bytes))()
 
 
 class BytesWrapper(RefcountedWrapper):
@@ -203,14 +202,13 @@ class BytesWrapper(RefcountedWrapper):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
     def constant(self, context, s):
-        if s not in _memoizedBytesTable:
-            _memoizedBytesTable[s] = ListOf(bytes)([s])
-
-        pointerVal = int(_memoizedBytesTable[s].pointerUnsafe(0))
-
         return typed_python.compiler.typed_expression.TypedExpression(
             context,
-            native_ast.const_uint64_expr(pointerVal).cast(self.layoutType.pointer()),
+            native_ast.Expression.GlobalVariable(
+                name='bytes_constant_' + sha_hash(s).hexdigest,
+                type=native_ast.VoidPtr,
+                metadata=GlobalVariableMetadata.BytesConstant(value=s)
+            ).cast(self.layoutType.pointer()),
             self,
             True,
             constantValue=s

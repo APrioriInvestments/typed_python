@@ -268,19 +268,20 @@ class Wrapper(object):
 
     def convert_str_cast(self, context, instance):
         t = instance.expr_type.typeRepresentation
-        tp = context.getTypePointer(t)
-        if tp:
-            if not instance.isReference:
-                instance = context.pushMove(instance)
 
-            return context.push(
-                str,
-                lambda newStr:
-                    newStr.expr.store(
-                        runtime_functions.np_str.call(instance.expr.cast(VoidPtr), tp).cast(typeWrapper(str).getNativeLayoutType())
-                    )
-            )
-        return instance.convert_to_type(str)
+        if not instance.isReference:
+            instance = context.pushMove(instance)
+
+        return context.push(
+            str,
+            lambda newStr:
+                newStr.expr.store(
+                    runtime_functions.np_str.call(
+                        instance.expr.cast(VoidPtr),
+                        context.getTypePointer(t)
+                    ).cast(typeWrapper(str).getNativeLayoutType())
+                )
+        )
 
     def convert_bytes_cast(self, context, expr):
         return context.pushException(
@@ -290,17 +291,21 @@ class Wrapper(object):
 
     def convert_builtin(self, f, context, expr, a1=None):
         if f is dir and a1 is None:
-            tp = context.getTypePointer(expr.expr_type.typeRepresentation)
-            if tp:
-                if not expr.isReference:
-                    expr = context.pushMove(expr)
-                retT = ListOf(str)
-                return context.push(
-                    typeWrapper(retT),
-                    lambda Ref: Ref.expr.store(
-                        runtime_functions.np_dir.call(expr.expr.cast(VoidPtr), tp).cast(typeWrapper(retT).layoutType)
-                    )
+            if not expr.isReference:
+                expr = context.pushMove(expr)
+
+            retT = ListOf(str)
+
+            return context.push(
+                typeWrapper(retT),
+                lambda Ref: Ref.expr.store(
+                    runtime_functions.np_dir.call(
+                        expr.expr.cast(VoidPtr),
+                        context.getTypePointer(expr.expr_type.typeRepresentation)
+                    ).cast(typeWrapper(retT).layoutType)
                 )
+            )
+
         if f is format and a1 is None:
             return expr.convert_str_cast()
 
@@ -311,19 +316,17 @@ class Wrapper(object):
         )
 
     def convert_repr(self, context, expr):
-        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
-        if tp:
-            if not expr.isReference:
-                expr = context.pushMove(expr)
-            return context.push(
-                str,
-                lambda r: r.expr.store(
-                    runtime_functions.np_repr.call(expr.expr.cast(VoidPtr), tp).cast(typeWrapper(str).layoutType)
-                )
+        if not expr.isReference:
+            expr = context.pushMove(expr)
+
+        return context.push(
+            str,
+            lambda r: r.expr.store(
+                runtime_functions.np_repr.call(
+                    expr.expr.cast(VoidPtr),
+                    context.getTypePointer(expr.expr_type.typeRepresentation)
+                ).cast(typeWrapper(str).layoutType)
             )
-        return context.pushException(
-            TypeError,
-            "No type pointer for '%s'" % (str(self),)
         )
 
     def convert_unary_op(self, context, expr, op):

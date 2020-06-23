@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -25,7 +26,7 @@ from typed_python.compiler.python_object_representation import pythonObjectRepre
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
 from typed_python import Alternative, OneOf, Int32, ListOf, Tuple, NamedTuple, TupleOf
-from typed_python._types import getTypePointer, TypeFor, pyInstanceHeldObjectAddress
+from typed_python._types import TypeFor, pyInstanceHeldObjectAddress
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
@@ -44,8 +45,6 @@ ExpressionIntermediate = Alternative(
     StackSlot={"name": str, "expr": native_ast.Expression}
 )
 
-_memoizedKeepalives = []
-_memoizedThingsById = {}
 _pyFuncToFuncCache = {}
 
 
@@ -93,15 +92,35 @@ class ExpressionConversionContext(object):
 
         return TypedExpression(self, T.getNativeLayoutType().zero(), T, False)
 
-    def constantTypedPythonObject(self, x):
-        _memoizedThingsById[id(x)] = x
+    def getTypePointer(self, t):
+        """Return a native expression with the type pointer for 't' as a void pointer
 
+        Args:
+            t - python representation of Type, e.g. int, UInt64, ListOf(str), ...
+        """
+        return native_ast.Expression.GlobalVariable(
+            name="type_pointer_" + str(id(t)) + "_" + str(t)[:20],
+            type=native_ast.VoidPtr,
+            metadata=GlobalVariableMetadata.RawTypePointer(
+                value=t
+            )
+        ).load()
+
+    def constantTypedPythonObject(self, x):
         wrapper = typeWrapper(type(x))
 
         return TypedExpression(
             self,
-            native_ast.const_uint64_expr(
-                pyInstanceHeldObjectAddress(x)
+            native_ast.Expression.GlobalVariable(
+                # this is bad - we should be using a formal name for
+                # this object plus its type, which would be enough to
+                # uniquely identify it
+                name="typed_python_object_" + str(pyInstanceHeldObjectAddress(x)),
+                type=wrapper.getNativeLayoutType(),
+                metadata=GlobalVariableMetadata.PointerToTypedPythonObject(
+                    value=x,
+                    type=type(x)
+                )
             ).cast(wrapper.getNativeLayoutType().pointer()),
             wrapper,
             True
@@ -114,27 +133,31 @@ class ExpressionConversionContext(object):
         code. Later, when we want our compiled code to be reusable, we'll have to have
         a secondary link stage for this.
         """
+        wrapper = typeWrapper(object)
 
-        # this guarantees the object stays alive as long as this module
-        _memoizedThingsById[id(x)] = x
-
-        return self.push(
-            object,
-            lambda oExpr:
-            oExpr.expr.store(
-                runtime_functions.create_pyobj.call(
-                    native_ast.const_uint64_expr(id(x)).cast(native_ast.Void.pointer())
-                ).cast(oExpr.expr_type.getNativeLayoutType())
-            )
+        return TypedExpression(
+            self,
+            native_ast.Expression.GlobalVariable(
+                # this is bad - we should be using a formal name for
+                # this object plus its type, which would be enough to
+                # uniquely identify it
+                name="py_object_" + str(id(x)),
+                type=native_ast.VoidPtr,
+                metadata=GlobalVariableMetadata.PointerToPyObject(
+                    value=x
+                )
+            ).cast(wrapper.getNativeLayoutType().pointer()),
+            wrapper,
+            True
         )
 
     @staticmethod
     def constantType(x, allowArbitrary=False):
         """Return the Wrapper for the type we'd get if we called self.constant(x)
         """
-
         if isinstance(x, str):
             return typed_python.compiler.type_wrappers.string_wrapper.StringWrapper()
+
         if isinstance(x, (bool, int, Int32, float)):
             return typeWrapper(type(x))
         if x is None:
@@ -159,7 +182,13 @@ class ExpressionConversionContext(object):
             lambda oExpr:
             oExpr.expr.store(
                 runtime_functions.match_exception.call(
-                    native_ast.const_uint64_expr(id(exc)).cast(native_ast.Void.pointer())
+                    native_ast.Expression.GlobalVariable(
+                        name="py_exception_type_" + str(exc),
+                        type=native_ast.VoidPtr,
+                        metadata=GlobalVariableMetadata.IdOfPyObject(
+                            value=exc
+                        )
+                    ).load().cast(native_ast.Void.pointer())
                 )
             )
         )
@@ -173,7 +202,13 @@ class ExpressionConversionContext(object):
             oExpr.expr.store(
                 runtime_functions.match_given_exception.call(
                     given.nonref_expr.cast(native_ast.Void.pointer()),
-                    native_ast.const_uint64_expr(id(exc)).cast(native_ast.Void.pointer())
+                    native_ast.Expression.GlobalVariable(
+                        name="py_exception_type_" + str(exc),
+                        type=native_ast.VoidPtr,
+                        metadata=GlobalVariableMetadata.IdOfPyObject(
+                            value=exc
+                        )
+                    ).cast(native_ast.Void.pointer())
                 )
             )
         )
@@ -1741,11 +1776,3 @@ class ExpressionConversionContext(object):
             )
 
         raise ConversionException("can't handle python expression type %s" % ast.Name)
-
-    def getTypePointer(self, t):
-        """Return a raw type pointer for type t
-
-        Args:
-            t - python representation of Type, e.g. int, UInt64, ListOf(str), ...
-        """
-        return getTypePointer(t)

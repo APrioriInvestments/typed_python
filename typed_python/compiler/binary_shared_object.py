@@ -21,15 +21,16 @@ import ctypes
 import struct
 
 from typed_python.compiler.native_function_pointer import NativeFunctionPointer
-
+from typed_python.compiler.loaded_module import LoadedModule
 from typed_python.hash import sha_hash
 
 
-class LoadedBinarySharedObject:
-    def __init__(self, binarySharedObject, storageDir, functionPointers):
+class LoadedBinarySharedObject(LoadedModule):
+    def __init__(self, binarySharedObject, storageDir, functionPointers, globalVariableDefinitions):
+        super().__init__(functionPointers, globalVariableDefinitions)
+
         self.binarySharedObject = binarySharedObject
         self.storageDir = storageDir
-        self.functionPointers = functionPointers
 
 
 class BinarySharedObject:
@@ -98,4 +99,5 @@ class BinarySharedObject:
             self,
             storageDir,
             functionPointers,
+            self.globalVariableDefinitions
         )

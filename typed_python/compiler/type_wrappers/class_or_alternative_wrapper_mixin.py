@@ -28,10 +28,13 @@ class ClassOrAlternativeWrapperMixin:
         if self.has_method(context, expr, "__hash__"):
             return self.convert_method_call(context, expr, "__hash__", (), {})
 
-        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
-
-        if tp:
-            return context.pushPod(Int32, runtime_functions.hash_alternative.call(expr.nonref_expr.cast(VoidPtr), tp))
+        return context.pushPod(
+            Int32,
+            runtime_functions.hash_alternative.call(
+                expr.nonref_expr.cast(VoidPtr),
+                context.getTypePointer(expr.expr_type.typeRepresentation)
+            )
+        )
 
         return None
 

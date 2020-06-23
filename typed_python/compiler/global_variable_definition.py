@@ -12,6 +12,25 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typed_python import Alternative
+
+
+GlobalVariableMetadata = Alternative(
+    "GlobalVariableMetadata",
+    StringConstant=dict(value=str),
+    BytesConstant=dict(value=bytes),
+    # a pointer to a PythonObjectOfType (e.g. our version, with
+    # refcounts that are not in the GIL)
+    PointerToPyObject=dict(value=object),
+    # the raw ID of a global python object, like a builtin or
+    # an exception
+    IdOfPyObject=dict(value=object),
+    # a pointer to the Type* in the underlying
+    RawTypePointer=dict(value=type),
+    PointerToTypedPythonObject=dict(value=object, type=type),
+    ClassVtable=dict(value=type)
+)
+
 
 class GlobalVariableDefinition:
     """Representation for a single globally defined value.

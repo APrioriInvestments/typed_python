@@ -171,9 +171,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             lambda oPtr:
                 oPtr.expr.store(
                     runtime_functions.call_func_as_pyobj.call(
-                        native_ast.const_int_expr(
-                            context.getTypePointer(self.typeRepresentation)
-                        ).cast(VoidPtr),
+                        context.getTypePointer(self.typeRepresentation).cast(VoidPtr),
                         instance.expr.cast(VoidPtr),
                         native_ast.const_int_expr(len(arguments)),
                         native_ast.const_int_expr(len(kwargsAsObjects)),

@@ -332,7 +332,10 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(
             }
         }
 
-        throw std::runtime_error("Compiled but then failed to dispatch!");
+        throw std::runtime_error(
+            "Compiled but then failed to dispatch to one of " +
+             format(convertedOverload.getCompiledSpecializations().size()) + " specializations"
+        );
     }
 
     return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);

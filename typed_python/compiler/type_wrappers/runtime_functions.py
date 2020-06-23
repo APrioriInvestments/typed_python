@@ -377,14 +377,14 @@ np_repr = externalCallTarget(
     "nativepython_runtime_repr",
     Void.pointer(),
     Void.pointer(),
-    UInt64
+    Void.pointer(),
 )
 
 np_str = externalCallTarget(
     "nativepython_runtime_str",
     Void.pointer(),
     Void.pointer(),
-    UInt64
+    Void.pointer(),
 )
 
 pyobj_len = externalCallTarget(
@@ -435,7 +435,7 @@ pyobj_to_typed = externalCallTarget(
     Bool,
     Void.pointer(),
     Void.pointer(),
-    UInt64,
+    Void.pointer(),
     Bool
 )
 
@@ -451,7 +451,7 @@ to_pyobj = externalCallTarget(
     "np_runtime_to_pyobj",
     Void.pointer(),
     Void.pointer(),
-    UInt64,
+    Void.pointer(),
 )
 
 string_concat = externalCallTarget(
@@ -475,7 +475,7 @@ string_eq = externalCallTarget(
 alternative_cmp = externalCallTarget(
     "np_runtime_alternative_cmp",
     Bool,
-    UInt64, Void.pointer(), Void.Pointer(), Int64
+    Void.pointer(), Void.pointer(), Void.Pointer(), Int64
 )
 
 class_cmp = externalCallTarget(
@@ -730,7 +730,7 @@ table_copy = externalCallTarget(
     "nativepython_tableCopy",
     Void.pointer(),
     Void.pointer(),
-    UInt64
+    Void.pointer()
 )
 
 table_resize = externalCallTarget(
@@ -785,14 +785,14 @@ hash_alternative = externalCallTarget(
     "nativepython_hash_alternative",
     Int32,
     Void.pointer(),
-    UInt64
+    Void.pointer()
 )
 
 hash_class = externalCallTarget(
     "nativepython_hash_class",
     Int32,
     Void.pointer(),
-    UInt64
+    Void.pointer()
 )
 
 isinf_float32 = externalCallTarget("nativepython_isinf_float32", Bool, Float32)
@@ -836,7 +836,7 @@ np_dir = externalCallTarget(
     "nativepython_runtime_dir",
     Void.pointer(),
     Void.pointer(),
-    UInt64
+    Void.pointer(),
 )
 
 pyobj_rlocktype_unlock = externalCallTarget(

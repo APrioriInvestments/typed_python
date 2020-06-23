@@ -409,17 +409,15 @@ class SetWrapper(SetWrapperBase):
                 return context.pushVoid()
 
             if methodname == "copy":
-                tp = context.getTypePointer(self.setType)
-                if tp:
-                    return context.push(
-                        typeWrapper(self.setType),
-                        lambda ref: ref.expr.store(
-                            runtime_functions.table_copy.call(
-                                instance.nonref_expr.cast(native_ast.VoidPtr),
-                                tp
-                            ).cast(self.layoutType)
-                        )
+                return context.push(
+                    typeWrapper(self.setType),
+                    lambda ref: ref.expr.store(
+                        runtime_functions.table_copy.call(
+                            instance.nonref_expr.cast(native_ast.VoidPtr),
+                            context.getTypePointer(self.setType)
+                        ).cast(self.layoutType)
                     )
+                )
 
             if methodname == "_allocateNewSlotUnsafe":
                 return context.pushPod(

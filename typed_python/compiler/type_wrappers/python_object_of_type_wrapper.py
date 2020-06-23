@@ -354,18 +354,15 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         t = target_type.typeRepresentation
 
         if not issubclass(t, OneOf):
-            tp = context.getTypePointer(t)
-
-            if tp:
-                return context.pushPod(
-                    bool,
-                    runtime_functions.pyobj_to_typed.call(
-                        e.nonref_expr.cast(VoidPtr),
-                        targetVal.expr.cast(VoidPtr),
-                        tp,
-                        context.constant(explicit)
-                    )
+            return context.pushPod(
+                bool,
+                runtime_functions.pyobj_to_typed.call(
+                    e.nonref_expr.cast(VoidPtr),
+                    targetVal.expr.cast(VoidPtr),
+                    context.getTypePointer(t),
+                    context.constant(explicit)
                 )
+            )
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
@@ -375,21 +372,19 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
         t = sourceVal.expr_type.typeRepresentation
 
-        tp = context.getTypePointer(t)
+        if not sourceVal.isReference:
+            sourceVal = context.pushMove(sourceVal)
 
-        if tp:
-            if not sourceVal.isReference:
-                sourceVal = context.pushMove(sourceVal)
-
-            context.pushEffect(
-                targetVal.expr.store(
-                    runtime_functions.to_pyobj.call(sourceVal.expr.cast(VoidPtr), tp)
-                    .cast(self.getNativeLayoutType())
+        context.pushEffect(
+            targetVal.expr.store(
+                runtime_functions.to_pyobj.call(
+                    sourceVal.expr.cast(VoidPtr),
+                    context.getTypePointer(t)
                 )
+                .cast(self.getNativeLayoutType())
             )
-            return context.constant(True)
-
-        return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
+        )
+        return context.constant(True)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         # if this is a regular python class, then we need to just convert it to an 'object' and call that.

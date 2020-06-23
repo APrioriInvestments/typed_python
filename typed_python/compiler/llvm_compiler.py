@@ -16,8 +16,11 @@ import llvmlite.binding as llvm
 import llvmlite.ir
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler.native_ast_to_llvm as native_ast_to_llvm
+
+from typed_python.compiler.loaded_module import LoadedModule
 from typed_python.compiler.native_function_pointer import NativeFunctionPointer
 from typed_python.compiler.binary_shared_object import BinarySharedObject
+
 import sys
 import ctypes
 from typed_python import _types
@@ -99,7 +102,7 @@ class Compiler:
     def mark_llvm_codegen_verbose(self):
         self.verbose = True
 
-    def compile_functions_and_return_shared_object(self, functions):
+    def buildSharedObject(self, functions):
         """Add native definitions and return a BinarySharedObject representing the compiled code."""
         module = self.converter.add_functions(functions)
 
@@ -118,16 +121,24 @@ class Compiler:
 
         return BinarySharedObject.fromModule(
             mod,
-            module.globalDefinitions,
+            module.globalVariableDefinitions,
             module.functionNameToType,
         )
 
     def function_pointer_by_name(self, name):
         return self.functions_by_name.get(name)
 
-    def add_functions(self, functions):
+    def buildModule(self, functions):
+        """Compile a list of functions into a new module.
+
+        Args:
+            functions - a map from name to native_ast.Function
+
+        Returns:
+            None, or a LoadedModule object.
+        """
         if not functions:
-            return {}
+            return None
 
         module = self.converter.add_functions(functions)
 
@@ -162,13 +173,15 @@ class Compiler:
             )
             self.functions_by_name[fname] = native_function_pointers[fname]
 
-        native_function_pointers[module.globalDefName] = (
+        native_function_pointers[module.GET_GLOBAL_VARIABLES_NAME] = (
             NativeFunctionPointer(
-                module.globalDefName,
-                self.engine.get_function_address(module.globalDefName),
+                module.GET_GLOBAL_VARIABLES_NAME,
+                self.engine.get_function_address(
+                    module.GET_GLOBAL_VARIABLES_NAME
+                ),
                 [native_ast.Void.pointer().pointer()],
                 native_ast.Void
             )
         )
 
-        return module, native_function_pointers
+        return LoadedModule(native_function_pointers, module.globalVariableDefinitions)

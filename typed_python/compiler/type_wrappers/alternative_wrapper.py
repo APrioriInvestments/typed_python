@@ -56,20 +56,17 @@ class AlternativeWrapperMixin(ClassOrAlternativeWrapperMixin):
         if py_code < 0:
             return super().convert_comparison(context, lhs, op, rhs)
 
-        tp_l = context.getTypePointer(lhs.expr_type.typeRepresentation)
-        tp_r = context.getTypePointer(rhs.expr_type.typeRepresentation)
-
         if not lhs.isReference:
             lhs = context.pushMove(lhs)
 
         if not rhs.isReference:
             rhs = context.pushMove(rhs)
 
-        if tp_l and tp_l == tp_r:
+        if lhs.expr_type.typeRepresentation == rhs.expr_type.typeRepresentation:
             return context.pushPod(
                 bool,
                 runtime_functions.alternative_cmp.call(
-                    tp_l,
+                    context.getTypePointer(lhs.expr_type.typeRepresentation),
                     lhs.expr.cast(VoidPtr),
                     rhs.expr.cast(VoidPtr),
                     py_code

@@ -8,7 +8,7 @@ class ModuleDefinition:
     """
     GET_GLOBAL_VARIABLES_NAME = ".get_global_variables"
 
-    def __init__(self, moduleText, functionNameToType, globalDefinitions):
+    def __init__(self, moduleText, functionNameToType, globalVariableDefinitions):
         self.moduleText = moduleText
         self.functionNameToType = functionNameToType
-        self.globalDefinitions = globalDefinitions
+        self.globalVariableDefinitions = globalVariableDefinitions

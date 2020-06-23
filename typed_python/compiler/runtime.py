@@ -249,9 +249,10 @@ class Runtime:
 
             targets = self.converter.extract_new_function_definitions()
 
-            self.llvm_compiler.add_functions(targets)
+            if targets:
+                loadedModule = self.llvm_compiler.buildModule(targets)
+                loadedModule.linkGlobalVariables()
 
-            # if the callTargetName isn't in the list, then we already compiled it and installed it.
             fp = self.llvm_compiler.function_pointer_by_name(wrappingCallTargetName)
 
             overload._installNativePointer(

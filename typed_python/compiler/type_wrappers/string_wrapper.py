@@ -12,8 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typed_python import sha_hash
+from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python import Int32, Dict, Float32
+from typed_python import Int32, Float32
 from typed_python.type_promotion import isInteger
 from typed_python.compiler.type_wrappers.list_of_wrapper import MasqueradingListOfWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -27,9 +29,6 @@ from typed_python import ListOf
 from typed_python.compiler.native_ast import VoidPtr
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
-
-
-_memoizedStringTable = Dict(str, ListOf(str))()
 
 
 def strJoinIterable(sep, iterable):
@@ -332,14 +331,13 @@ class StringWrapper(RefcountedWrapper):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
     def constant(self, context, s):
-        if s not in _memoizedStringTable:
-            _memoizedStringTable[s] = ListOf(str)([s])
-
-        pointerVal = int(_memoizedStringTable[s].pointerUnsafe(0))
-
         return typed_python.compiler.typed_expression.TypedExpression(
             context,
-            native_ast.const_uint64_expr(pointerVal).cast(self.layoutType.pointer()),
+            native_ast.Expression.GlobalVariable(
+                name='string_constant_' + sha_hash(s).hexdigest,
+                type=native_ast.VoidPtr,
+                metadata=GlobalVariableMetadata.StringConstant(value=s)
+            ).cast(self.layoutType.pointer()),
             self,
             True,
             constantValue=s

@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
@@ -98,13 +99,13 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
 
-        # we need this to actually be a global variable that we fill out, but we don't have the machinery
-        # yet in the native_ast. So for now, we just hack it together.
-        # because we are writing a pointer value directly into the generated code as a constant, we
-        # won't be able to reuse the binary we produced in another program.
-        self.vtableExpr = native_ast.const_uint64_expr(
-            _types._vtablePointer(self.typeRepresentation)
-        ).cast(vtable_type.pointer())
+        self.vtableExpr = native_ast.Expression.GlobalVariable(
+            name="cls_vtable_" + str(self.typeRepresentation) + "_" + str(id(self.typeRepresentation)),
+            type=vtable_type.pointer(),
+            metadata=GlobalVariableMetadata.ClassVtable(
+                value=self.typeRepresentation
+            )
+        ).load()
 
     def _can_convert_to_type(self, otherType, explicit):
         if otherType.typeRepresentation is bool:
@@ -827,10 +828,10 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         layoutPtr = self.get_layout_pointer(expr.nonref_expr).cast(native_ast.UInt64)
 
-        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
-        assert tp
-
         return context.pushPod(
             Int32,
-            runtime_functions.hash_class.call(layoutPtr.cast(native_ast.VoidPtr), tp)
+            runtime_functions.hash_class.call(
+                layoutPtr.cast(native_ast.VoidPtr),
+                context.getTypePointer(expr.expr_type.typeRepresentation)
+            )
         )

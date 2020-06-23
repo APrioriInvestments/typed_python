@@ -42,10 +42,10 @@ def test_global_variable_pointers():
     # is global.
     llvmCompiler = Runtime.singleton().llvm_compiler
 
-    moduleDef, functionPointers = llvmCompiler.add_functions({'f': f})
+    loadedModule = llvmCompiler.buildModule({'__test_f': f})
 
-    getGlobals = functionPointers[moduleDef.globalDefName]
-    fPtr = functionPointers['f']
+    getGlobals = loadedModule.functionPointers[loadedModule.GET_GLOBAL_VARIABLES_NAME]
+    fPtr = loadedModule.functionPointers['__test_f']
 
     pointers = ListOf(PointerTo(int))()
     pointers.resize(1)
@@ -82,8 +82,8 @@ def test_create_binary_shared_object():
 
     llvmCompiler = Runtime.singleton().llvm_compiler
 
-    bso = llvmCompiler.compile_functions_and_return_shared_object(
-        {'f': f}
+    bso = llvmCompiler.buildSharedObject(
+        {'__test_f_2': f}
     )
 
     assert len(bso.globalVariableDefinitions) == 1
@@ -101,4 +101,4 @@ def test_create_binary_shared_object():
         assert pointers[0]
         pointers[0].set(5)
 
-        assert loaded.functionPointers['f']() == 5
+        assert loaded.functionPointers['__test_f_2']() == 5

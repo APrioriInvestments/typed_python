@@ -250,17 +250,15 @@ class DictWrapper(DictWrapperBase):
 
         if len(args) == 0:
             if methodname == "copy":
-                tp = context.getTypePointer(self.dictType)
-                if tp:
-                    return context.push(
-                        typeWrapper(self.dictType),
-                        lambda ref: ref.expr.store(
-                            runtime_functions.table_copy.call(
-                                instance.nonref_expr.cast(native_ast.VoidPtr),
-                                tp
-                            ).cast(self.layoutType)
-                        )
+                return context.push(
+                    typeWrapper(self.dictType),
+                    lambda ref: ref.expr.store(
+                        runtime_functions.table_copy.call(
+                            instance.nonref_expr.cast(native_ast.VoidPtr),
+                            context.getTypePointer(self.dictType)
+                        ).cast(self.layoutType)
                     )
+                )
             if methodname == "_compressItemTableUnsafe":
                 context.pushEffect(
                     runtime_functions.table_compress.call(
