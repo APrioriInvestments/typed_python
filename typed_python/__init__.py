@@ -45,7 +45,7 @@ Float32 = _types.Float32()
 EmbeddedMessage = _types.EmbeddedMessage()
 PyCell = _types.PyCell()
 
-from typed_python.compiler.runtime import Entrypoint, Compiled, NotCompiled  # noqa
+from typed_python.compiler.runtime import Entrypoint, Compiled, NotCompiled, Runtime  # noqa
 
 # this has to come at the end to break import cyclic
 from typed_python.lib.map import map  # noqa

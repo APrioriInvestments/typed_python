@@ -60,7 +60,10 @@ Instance ClosureVariableBinding::extractValueOrContainingClosure(Type* closureTy
         if (step.isCellAccess()) {
             if (!(closureType->getTypeCategory() == Type::TypeCategory::catPyCell ||
                     closureType->getTypeCategory() == Type::TypeCategory::catTypedCell)) {
-                throw std::runtime_error("Invalid closure: expected a cell, but got " + closureType->getTypeCategory());
+                throw std::runtime_error(
+                    "Invalid closure: expected a cell, but got "
+                    + Type::categoryToString(closureType->getTypeCategory())
+                );
             }
 
             if (stepIx + 1 == size()) {

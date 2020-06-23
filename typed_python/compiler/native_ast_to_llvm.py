@@ -13,6 +13,8 @@
 #   limitations under the License.
 
 import typed_python.compiler.native_ast as native_ast
+from typed_python.compiler.module_definition import ModuleDefinition
+from typed_python.compiler.global_variable_definition import GlobalVariableDefinition
 import llvmlite.ir
 
 llvm_i8ptr = llvmlite.ir.IntType(8).as_pointer()
@@ -29,23 +31,6 @@ pointer_size = 8
 
 
 CROSS_MODULE_INLINE_COMPLEXITY = 40
-
-
-GET_GLOBAL_VARIABLES_NAME = ".get_global_variables"
-
-
-class GlobalVariableDefinition:
-    """Representation for a single globally defined value.
-
-    Each such value has a formal name (which should be unique across
-    all possible compiled value sets, so usually its a hash), a type,
-    and some metadata indicating to the calling context what its for.
-    """
-    def __init__(self, name, typ, typedLLVMValue, metadata):
-        self.name = name
-        self.type = typ
-        self.typedLLVMValue = typedLLVMValue
-        self.metadata = metadata
 
 
 def llvmBool(i):
@@ -512,6 +497,7 @@ class FunctionConverter:
     def __init__(self,
                  module,
                  globalDefinitions,
+                 globalDefinitionLlvmValues,
                  function,
                  converter,
                  builder,
@@ -523,6 +509,7 @@ class FunctionConverter:
 
         # dict from name to GlobalVariableDefinition
         self.globalDefinitions = globalDefinitions
+        self.globalDefinitionLlvmValues = globalDefinitionLlvmValues
 
         self.module = module
         self.converter = converter
@@ -758,13 +745,14 @@ class FunctionConverter:
                 self.globalDefinitions[expr.name] = GlobalVariableDefinition(
                     expr.name,
                     expr.type,
-                    TypedLLVMValue(
-                        llvmlite.ir.GlobalVariable(self.module, llvm_type, expr.name),
-                        native_ast.Type.Pointer(value_type=expr.type)
-                    ),
                     expr.metadata
                 )
-                self.globalDefinitions[expr.name].typedLLVMValue.llvm_value.initializer = (
+                self.globalDefinitionLlvmValues[expr.name] = TypedLLVMValue(
+                    llvmlite.ir.GlobalVariable(self.module, llvm_type, expr.name),
+                    native_ast.Type.Pointer(value_type=expr.type)
+                )
+
+                self.globalDefinitionLlvmValues[expr.name].llvm_value.initializer = (
                     constant_to_typed_llvm_value(
                         self.module,
                         self.builder,
@@ -772,7 +760,7 @@ class FunctionConverter:
                     ).llvm_value
                 )
 
-            return self.globalDefinitions[expr.name].typedLLVMValue
+            return self.globalDefinitionLlvmValues[expr.name]
 
         if expr.matches.Alloca:
             if expr.type.matches.Void:
@@ -1403,13 +1391,6 @@ def populate_needed_externals(external_function_references, module):
     define("__gxx_personality_v0", llvm_i32, [], vararg=True)
 
 
-class ModuleDefinition:
-    def __init__(self, moduleText, globalDefinitions, globalDefName):
-        self.moduleText = moduleText
-        self.globalDefinitions = globalDefinitions
-        self.globalDefName = globalDefName
-
-
 class Converter(object):
     def __init__(self):
         object.__init__(self)
@@ -1481,7 +1462,15 @@ class Converter(object):
         external_function_references = {}
         populate_needed_externals(external_function_references, module)
 
+        functionTypes = {}
+
         for name, function in names_to_definitions.items():
+            functionTypes[name] = native_ast.Type.Function(
+                output=function.output_type,
+                args=[x[1] for x in function.args],
+                varargs=False,
+                can_throw=True
+            )
             func_type = llvmlite.ir.FunctionType(
                 type_to_llvm_type(function.output_type),
                 [type_to_llvm_type(x[1]) for x in function.args]
@@ -1510,6 +1499,7 @@ class Converter(object):
                 print()
 
         globalDefinitions = {}
+        globalDefinitionsLlvmValues = {}
 
         while names_to_definitions:
             for name in sorted(names_to_definitions):
@@ -1529,6 +1519,7 @@ class Converter(object):
                     func_converter = FunctionConverter(
                         module,
                         globalDefinitions,
+                        globalDefinitionsLlvmValues,
                         func,
                         self,
                         builder,
@@ -1566,17 +1557,20 @@ class Converter(object):
 
         # define a function that accepts a pointer and fills it out with a table of pointer values
         # so that we can link in any type objects that are defined within the source code.
-        globalDefName = GET_GLOBAL_VARIABLES_NAME + str(len(self._function_definitions))
+        self.defineGlobalMetadataAccessor(module, globalDefinitions, globalDefinitionsLlvmValues)
 
-        self.defineGlobalMetadataAccessor(module, globalDefinitions, globalDefName)
+        functionTypes[ModuleDefinition.GET_GLOBAL_VARIABLES_NAME] = native_ast.Type.Function(
+            output=native_ast.Void,
+            args=[native_ast.Void.pointer().pointer()]
+        )
 
         return ModuleDefinition(
             str(module),
-            globalDefinitions,
-            globalDefName
+            functionTypes,
+            globalDefinitions
         )
 
-    def defineGlobalMetadataAccessor(self, module, globalDefinitions, globalDefName):
+    def defineGlobalMetadataAccessor(self, module, globalDefinitions, globalDefinitionsLlvmValues):
         """Given a list of global variables, make a function to access them.
 
         The function will be named '.get_global_variables' and will accept
@@ -1594,7 +1588,7 @@ class Converter(object):
                     can_throw=False
                 )
             ),
-            globalDefName
+            ModuleDefinition.GET_GLOBAL_VARIABLES_NAME
         )
 
         accessorFunction.linkage = "external"
@@ -1609,7 +1603,7 @@ class Converter(object):
         for name in sorted(globalDefinitions):
             builder.store(
                 builder.bitcast(
-                    globalDefinitions[name].typedLLVMValue.llvm_value,
+                    globalDefinitionsLlvmValues[name].llvm_value,
                     voidPtr
                 ),
                 builder.gep(outPtr, [llvmI64(index)])
