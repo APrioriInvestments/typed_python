@@ -140,8 +140,10 @@ def constant_to_typed_llvm_value(module, builder, c):
         llvm_c = llvmlite.ir.Constant(t, bytearray(byte_array + b"\x00"))
 
         value = llvmlite.ir.GlobalVariable(module, t, "string_constant_%s" % strings_ever[0])
+
         strings_ever[0] += 1
 
+        value.linkage = "private"
         value.initializer = llvm_c
 
         nt = native_ast.Type.Int(bits=8, signed=False).pointer()
@@ -752,6 +754,7 @@ class FunctionConverter:
                     native_ast.Type.Pointer(value_type=expr.type)
                 )
 
+                self.globalDefinitionLlvmValues[expr.name].llvm_value.linkage = "private"
                 self.globalDefinitionLlvmValues[expr.name].llvm_value.initializer = (
                     constant_to_typed_llvm_value(
                         self.module,
