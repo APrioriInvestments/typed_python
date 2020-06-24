@@ -19,7 +19,7 @@ class SetType : public Type {
         SetType::Make(m_key_type, this);
     }
 
-    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
         return ShaHash(1, m_typeCategory) + m_key_type->identityHash(groupHead);
     }
 

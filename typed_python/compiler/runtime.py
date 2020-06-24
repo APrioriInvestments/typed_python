@@ -211,15 +211,6 @@ class Runtime:
         with self.lock:
             inputWrappers = []
 
-            closureType = functionType.ClosureType
-
-            for closureVarName, closureVarPath in overload.closureVarLookups.items():
-                inputWrappers.append(
-                    typeWrapper(
-                        PythonTypedFunctionWrapper.closurePathToCellType(closureVarPath, closureType)
-                    )
-                )
-
             for i in range(len(arguments)):
                 inputWrappers.append(
                     self.pickSpecializationTypeFor(overload.args[i], arguments[i], argumentsAreTypes)
@@ -231,13 +222,10 @@ class Runtime:
 
             self.timesCompiled += 1
 
-            callTarget = self.converter.convert(
-                overload.name,
-                overload.functionCode,
-                overload.realizedGlobals,
-                list(overload.closureVarLookups),
+            callTarget = self.converter.convertTypedFunctionCall(
+                functionType,
+                overloadIx,
                 inputWrappers,
-                overload.returnType,
                 assertIsRoot=True
             )
 
@@ -258,7 +246,7 @@ class Runtime:
             overload._installNativePointer(
                 fp.fp,
                 callTarget.output_type.typeRepresentation if callTarget.output_type is not None else type(None),
-                [i.typeRepresentation for i in inputWrappers]
+                [i.typeRepresentation for i in callTarget.input_types]
             )
 
             self._collectLinktimeHooks()
@@ -364,8 +352,9 @@ def Compiled(pyFunc):
     # note that we have to call 'prepareArgumentToBePassedToCompiler' which
     # captures the current closure of 'pyFunc' as it currently stands, since 'Compiled'
     # is supposed to compile the function _as it currently stands_.
+    entrypoint = Entrypoint(pyFunc)
+    f = _types.prepareArgumentToBePassedToCompiler(entrypoint)
 
-    f = _types.prepareArgumentToBePassedToCompiler(Entrypoint(pyFunc))
     types = []
     for a in f.overloads[0].args:
         if a.typeFilter is None:

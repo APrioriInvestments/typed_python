@@ -128,8 +128,14 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
-    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
-        return ShaHash(1, m_typeCategory) + Type::pyObjectShaHash(mGivenType, groupHead);
+    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
+        ShaHash res(1, m_typeCategory);
+
+        if (mGivenType) {
+            res += MutuallyRecursiveTypeGroup::pyObjectShaHash(mGivenType, groupHead);
+        }
+
+        return res;
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other) {

@@ -306,7 +306,7 @@ public:
         m_name = inName;
     }
 
-    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
         ShaHash res = ShaHash(1, m_typeCategory) + ShaHash(m_name);
 
         res += ShaHash(0);
@@ -318,7 +318,7 @@ public:
         for (auto tup: m_own_members) {
             res += ShaHash(std::get<0>(tup));
             res += ShaHash(std::get<1>(tup)->identityHash(groupHead));
-            res += Type::pyObjectShaHash(std::get<2>(tup), groupHead);
+            res += MutuallyRecursiveTypeGroup::tpInstanceShaHash(std::get<2>(tup), groupHead);
         }
 
         res += ShaHash(2);
@@ -342,7 +342,7 @@ public:
         res += ShaHash(5);
         for (auto nameAndFun: m_own_classMembers) {
             res += ShaHash(nameAndFun.first);
-            res += Type::pyObjectShaHash(nameAndFun.second, groupHead);
+            res += MutuallyRecursiveTypeGroup::pyObjectShaHash(nameAndFun.second, groupHead);
         }
 
         return res;
@@ -359,6 +359,31 @@ public:
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
+        for (auto& b: m_bases) {
+            Type* baseT = b;
+            visitor(baseT);
+            if (b != baseT) {
+                throw std::runtime_error("Somehow, we modified the base type of a HeldClass?");
+            }
+        }
+        for (auto& o: m_own_members) {
+            visitor(std::get<1>(o));
+        }
+        for (auto& o: m_own_memberFunctions) {
+            Type* t = std::get<1>(o);
+            visitor(t);
+            assert(t == std::get<1>(o));
+        }
+        for (auto& o: m_own_staticFunctions) {
+            Type* t = std::get<1>(o);
+            visitor(t);
+            assert(t == std::get<1>(o));
+        }
+        for (auto& o: m_own_propertyFunctions) {
+            Type* t = std::get<1>(o);
+            visitor(t);
+            assert(t == std::get<1>(o));
+        }
         for (auto& o: m_members) {
             visitor(std::get<1>(o));
         }
@@ -371,6 +396,18 @@ public:
             Type* t = std::get<1>(o);
             visitor(t);
             assert(t == std::get<1>(o));
+        }
+        for (auto& o: m_propertyFunctions) {
+            Type* t = std::get<1>(o);
+            visitor(t);
+            assert(t == std::get<1>(o));
+        }
+    }
+
+    template<class visitor_type>
+    void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
+        for (auto nameAndFun: m_own_classMembers) {
+            visitor(nameAndFun.second);
         }
     }
 

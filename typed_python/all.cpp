@@ -62,3 +62,4 @@ compile the entire group all at once.
 
 #include "SerializationBuffer.cpp"
 #include "Sha1.cpp"
+#include "MutuallyRecursiveTypeGroup.cpp"

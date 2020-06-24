@@ -65,9 +65,6 @@ class ConcreteTypeFunction(object):
             [toStr(x) for x in args] + ["%s=%s" % (k, v) for k, v in kwargs]
         ) + ")"
 
-    def applyNameChangesToType(self, type, name):
-        return type
-
     def mapArg(self, arg):
         """Map a type argument to a valid value. Type arguments must be hashable,
         and if they're forward types, they must be resolvable.
@@ -130,17 +127,15 @@ def TypeFunction(f):
     produce a type object.  The function is memoized, so code in the
     decorated function is executed once only for each distinct set of
     arguments. The order of keyword arguments is not considered in the memo.
-    The function should not have sideeffects. The resulting type, if it is a
-    Class or  Alternative, will have its name amended to include the type
-    arguments.
+    The function should not have sideeffects.
 
     TypeFunctions may call each other recursively and in self-referential
-    cycles. If the function calls back into itself, a forward type lambda will
+    cycles. If the function calls back into itself, a Forward will
     be returned instead of a concrete type, which lets you express recursive
     types in a natural way.
 
     Don't stash the type you return, since the actual type returned by the
-    function may not be the one you returned (name changes require creating a
-    new object). """
+    function may not be the one you returned.
+    """
 
     return ConcreteTypeFunction(f)

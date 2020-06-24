@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -32,7 +32,9 @@
 #include "SerializationContext.hpp"
 #include "HashAccumulator.hpp"
 #include "ShaHash.hpp"
+#include "TypeOrPyobj.hpp"
 #include "util.hpp"
+#include "MutuallyRecursiveTypeGroup.hpp"
 
 class SerializationBuffer;
 class DeserializationBuffer;
@@ -90,6 +92,7 @@ enum class Maybe {
     Maybe
 };
 
+
 class Type {
 public:
     //the indices are part of the binary serialization format (except for 'Forward'),
@@ -143,7 +146,7 @@ public:
     }
 
     bool isRecursive() {
-        return getCompilerRecursiveTypeGroup().size() != 1;
+        return getRecursiveTypeGroupMembers().size() != 1;
     }
 
     bool isRefTo() const {
@@ -179,10 +182,6 @@ public:
     size_t bytecount() const {
         return m_size;
     }
-
-    static ShaHash pyObjectShaHash(PyObject* h, Type* groupHead);
-
-    static ShaHash pyObjectShaHash(Instance h, Type* groupHead);
 
     Type* pickConcreteSubclass(instance_ptr data) {
         assertForwardsResolvedSufficientlyToInstantiate();
@@ -423,10 +422,13 @@ public:
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}
 
-    // visit the set of types that can be seen from this type if you follow
-    // module references through function globals.
+    // visit the set of PyObject* that can be seen from this type if you
+    // were the compiler.
     template<class visitor_type>
-    void _visitCompilerVisibleReferencedTypes(const visitor_type& v) {}
+    void _visitCompilerVisiblePythonObjects(const visitor_type& v) {}
+
+    template<class visitor_type>
+    void _visitCompilerVisibleInstances(const visitor_type& v) {}
 
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& v) {}
@@ -472,9 +474,16 @@ public:
     }
 
     template<class visitor_type>
-    void visitCompilerVisibleReferencedTypes(const visitor_type& v) {
+    void visitCompilerVisiblePythonObjects(const visitor_type& v) {
         this->check([&](auto& subtype) {
-            subtype._visitCompilerVisibleReferencedTypes(v);
+            subtype._visitCompilerVisiblePythonObjects(v);
+        });
+    }
+
+    template<class visitor_type>
+    void visitCompilerVisibleInstances(const visitor_type& v) {
+        this->check([&](auto& subtype) {
+            subtype._visitCompilerVisibleInstances(v);
         });
     }
 
@@ -586,21 +595,25 @@ public:
 
         This involves tracing function, class, and module references
     *****/
-    Type* getCompilerRecursiveTypeGroupHead() {
-        if (!mCompilerRecursiveTypeGroupHead) {
-            mCompilerRecursiveTypeGroupHead = computeCompilerReferenceGroupHead();
+    MutuallyRecursiveTypeGroup* getRecursiveTypeGroup() {
+        if (!mTypeGroup) {
+            MutuallyRecursiveTypeGroup::constructRecursiveTypeGroup(this);
+
+            if (!mTypeGroup) {
+                throw std::runtime_error("Somehow, this type is not in a type group!");
+            }
         }
 
-        return mCompilerRecursiveTypeGroupHead;
+        return mTypeGroup;
     }
 
-    const std::map<int32_t, Type*>& getCompilerRecursiveTypeGroup() {
-        return getCompilerRecursiveTypeGroupHead()->mCompilerRecursiveTypeGroup;
+    bool hasTypeGroup() const {
+        return mTypeGroup != nullptr;
     }
 
-    Type* computeCompilerReferenceGroupHead();
-
-    static void buildCompilerRecursiveGroup(const std::set<Type*>& types);
+    const std::map<int32_t, TypeOrPyobj>& getRecursiveTypeGroupMembers() {
+        return getRecursiveTypeGroup()->getIndexToObject();
+    }
 
     /*****
         compute our identity hash, which is a sha hash that uniquely identifies
@@ -612,80 +625,50 @@ public:
         the hashes of the type parameters we depend on, along with some constants (
         e.g. the typeCategory) to uniquely id the type.
 
-        For recursive types, we have to compute a 'group head hash', which is the
-        sha-hash of all the types in the mutually recursive type group. We rely on
-        'Forward' picking the same type to be the 'first' type in the group every time,
-        and that the order of the types is stable across program invocations. We then
-        hash all the types in the group, but are careful to simply hash the type's
-        index within the group when we're hashing a parameter type that's in our group.
-        This gives us a unique signature for the group. The final hash is then that
-        hash plus our id within the group.
+        For recursive types, we have to compute a 'MutuallyRecursiveTypeGroup', which
+        is the set of types and python objects that are mutually visible to each other
+        at the compiler level.  We then hash all the types in the group, but are careful
+        to simply hash the type's index within the group when we're hashing a parameter
+        type that's in our group. This gives us a unique signature for the group. The
+        final hash is then that hash plus our id within the group.
     ******/
-    ShaHash identityHash(Type* groupHead = nullptr) {
-        // check if we're being asked for our identity during the computation of 'groupHead's
-        // hash, in which case we want to simply use our position in the group.
-        if (groupHead && groupHead == getCompilerRecursiveTypeGroupHead()) {
-            return ShaHash(3, mCompilerRecursiveTypeGroupIndex);
+    ShaHash identityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
+        // check if we're being asked for our identity during the computation of our own
+        // group's hash, in which case we can't recurse, and we just use our position
+        // in the group.
+        if (groupHead && groupHead == getRecursiveTypeGroup()) {
+            return ShaHash(3, mRecursiveTypeGroupIndex);
         }
 
+        // if we've never initialized our hash
         if (mIdentityHash == ShaHash()) {
-            // we never initialized it
-            mIdentityHash = computeIdentityHash(groupHead);
+            // then our hash is equal to our group's hash plus our position
+            // in the group/
+            mIdentityHash = (
+                ShaHash(2)
+                + getRecursiveTypeGroup()->hash()
+                + ShaHash(mRecursiveTypeGroupIndex)
+            );
         }
 
         return mIdentityHash;
     }
 
-    // compute our identity hash. if groupHead is not our group, then
-    // compute it normally. Otherwise, compute it where we hash types
-    // not in our group normally, but types in our group get hashed
-    // just as a pair
-    ShaHash computeIdentityHash(Type* groupHead = nullptr) {
-        if (groupHead != getCompilerRecursiveTypeGroupHead()) {
-            return (
-                ShaHash(2)
-                + getCompilerRecursiveTypeGroupHead()->getCompilerRecursiveGroupHeadHash()
-                + ShaHash(mCompilerRecursiveTypeGroupIndex)
-            );
-        }
-
+    // compute our identity hash by unfolding exactly one level. only the
+    // type group should use this function.
+    ShaHash computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
         return this->check([&](auto& subtype) {
             return subtype._computeIdentityHash(groupHead);
         });
     }
 
-    ShaHash getCompilerRecursiveGroupHeadHash() {
-        if (mCompilerRecursiveTypeGroupHeadHash == ShaHash()) {
-            mCompilerRecursiveTypeGroupHeadHash = computeCompilerRecursiveGroupHeadHash();
-        }
-
-        return mCompilerRecursiveTypeGroupHeadHash;
-    }
-
-    ShaHash computeCompilerRecursiveGroupHeadHash() {
-        // we are a recursive group head. We want to compute the hash
-        // of all of our constituents where, when each of them looks at
-        // other types within _our_ group, we simply hash in a placeholder
-        // for the position.
-        if (this != getCompilerRecursiveTypeGroupHead()) {
-            throw std::runtime_error("Non recursive group head asked for sha hash!");
-        }
-
-        ShaHash wholeGroupHash;
-
-        for (auto idAndType: mCompilerRecursiveTypeGroup) {
-            wholeGroupHash += idAndType.second->computeIdentityHash(this);
-
-            if (idAndType.second->isRecursive()) {
-                wholeGroupHash += ShaHash(idAndType.second->m_recursive_name);
-            }
-        }
-
-        return wholeGroupHash;
+    void setRecursiveTypeGroup(MutuallyRecursiveTypeGroup* group, int32_t index) {
+        mTypeGroup = group;
+        mRecursiveTypeGroupIndex = index;
     }
 
     // subtype-specific calculation
-    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
         return ShaHash(1, m_typeCategory);
     }
 
@@ -695,6 +678,10 @@ public:
         }
 
         return m_recursive_forward_index;
+    }
+
+    int64_t getGlobalTypeIndex() const {
+        return m_global_type_index;
     }
 
 protected:
@@ -709,7 +696,8 @@ protected:
             m_resolved(false),
             m_is_recursive_forward(false),
             m_recursive_forward_index(-1),
-            mCompilerRecursiveTypeGroupHead(nullptr),
+            mTypeGroup(nullptr),
+            mRecursiveTypeGroupIndex(-1),
             m_global_type_index(getNextGlobalTypeIndex())
         {}
 
@@ -774,19 +762,8 @@ protected:
     // for pointers values.
     ShaHash mIdentityHash;
 
-    // the sha-hash of all the things this group (if we're a group head)
-    // in the order in which we can see them.
-    ShaHash mCompilerRecursiveTypeGroupHeadHash;
+    // a pointer to our type group
+    MutuallyRecursiveTypeGroup* mTypeGroup;
 
-    // the type that has our 'compiler' recursion group head. This is
-    // similar to the 'mutually recursive type group', but is expanded
-    // to include the full set of objects that can see each other
-    // through module references. This can only be computed once modules
-    // are completely defined.
-    Type* mCompilerRecursiveTypeGroupHead;
-
-    // the complete set of types we can see in this type group.
-    std::map<int32_t, Type*> mCompilerRecursiveTypeGroup;
-
-    int32_t mCompilerRecursiveTypeGroupIndex;
+    int32_t mRecursiveTypeGroupIndex;
 };

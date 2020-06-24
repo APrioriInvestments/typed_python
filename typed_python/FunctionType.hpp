@@ -57,7 +57,7 @@ public:
         mIndexedFieldToAccess(elementAccess)
     {}
 
-    ShaHash identityHash(Type* groupHead=nullptr) {
+    ShaHash identityHash(MutuallyRecursiveTypeGroup* groupHead=nullptr) {
         if (isFunction()) {
             return ShaHash(1) + getFunction()->identityHash(groupHead);
         }
@@ -247,7 +247,7 @@ public:
     ClosureVariableBinding(const ClosureVariableBinding& other) : mSteps(other.mSteps)
     {}
 
-    ShaHash identityHash(Type* groupHead=nullptr) {
+    ShaHash identityHash(MutuallyRecursiveTypeGroup* groupHead=nullptr) {
         ShaHash res;
         for (auto step: *mSteps) {
             res += step.identityHash(groupHead);
@@ -362,9 +362,6 @@ inline ClosureVariableBinding operator+(const ClosureVariableBindingStep& step, 
     }
     return ClosureVariableBinding(steps);
 }
-
-
-Type* extractCompilerVisibleTypeFromGlobal(PyObject* o);
 
 
 class Function : public Type {
@@ -773,14 +770,16 @@ public:
         }
 
         template<class visitor_type>
-        void _visitCompilerVisibleReferencedTypes(const visitor_type& visitor) {
-            auto visitHeldPyObject = [&](PyObject* o) {
-                Type* argType = extractCompilerVisibleTypeFromGlobal(o);
+        void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
+            visitor(mFunctionCode);
 
-                if (argType) {
-                    visitor(argType);
-                }
-            };
+            if (mFunctionAnnotations) {
+                visitor(mFunctionAnnotations);
+            }
+
+            if (mFunctionDefaults) {
+                visitor(mFunctionDefaults);
+            }
 
             for (auto nameAndGlobal: mFunctionGlobalsInCells) {
                 PyObject* cell = nameAndGlobal.second;
@@ -791,7 +790,7 @@ public:
                 }
 
                 if (PyCell_Get(cell)) {
-                    visitHeldPyObject(PyCell_GET(cell));
+                    visitor(PyCell_GET(cell));
                 }
             }
 
@@ -801,7 +800,10 @@ public:
 
             iterate(mFunctionUsedGlobals, [&](PyObject* globalName) {
                 PyObject* o = PyDict_GetItem(mFunctionUsedGlobals, globalName);
-                visitHeldPyObject(o);
+                if (!o) {
+                    throw PythonExceptionSet();
+                }
+                visitor(o);
             });
         }
 
@@ -873,6 +875,13 @@ public:
             return mFunctionGlobals;
         }
 
+        PyObject* getFunctionUsedGlobals() const {
+            if (!mFunctionUsedGlobals) {
+                populateUsedGlobals();
+            }
+            return mFunctionUsedGlobals;
+        }
+
         const std::map<std::string, PyObject*> getFunctionGlobalsInCells() const {
             return mFunctionGlobalsInCells;
         }
@@ -896,14 +905,21 @@ public:
             extractNamesFromCode((PyCodeObject*)mFunctionCode, allNames);
 
             for (auto name: allNames) {
-                int res = PyDict_Contains(mFunctionGlobals, name);
-                if (res == -1) {
-                    throw PythonExceptionSet();
-                }
+                if (PyUnicode_Check(name)) {
+                    // don't include globals that are covered by our closure since we can't see them
+                    // anyways.
+                    std::string nameStr(PyUnicode_AsUTF8(name));
+                    if (mClosureBindings.find(nameStr) == mClosureBindings.end()) {
+                        int res = PyDict_Contains(mFunctionGlobals, name);
+                        if (res == -1) {
+                            throw PythonExceptionSet();
+                        }
 
-                if (res) {
-                    if (PyDict_SetItem(mFunctionUsedGlobals, name, PyDict_GetItem(mFunctionGlobals, name))) {
-                        throw PythonExceptionSet();
+                        if (res) {
+                            if (PyDict_SetItem(mFunctionUsedGlobals, name, PyDict_GetItem(mFunctionGlobals, name))) {
+                                throw PythonExceptionSet();
+                            }
+                        }
                     }
                 }
             }
@@ -1108,7 +1124,7 @@ public:
             }
         }
 
-        ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+        ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
             ShaHash res = (
                 mReturnType ? mReturnType->identityHash(groupHead) : ShaHash()
             );
@@ -1117,27 +1133,7 @@ public:
                 res += ShaHash(nameAndClosure.first) + nameAndClosure.second.identityHash(groupHead);
             }
 
-            PyCodeObject* co = (PyCodeObject*)mFunctionCode;
-
-            res += (
-                ShaHash(co->co_argcount)
-                + ShaHash(co->co_kwonlyargcount)
-                + ShaHash(co->co_nlocals)
-                + ShaHash(co->co_stacksize)
-                + ShaHash(co->co_flags)
-                + ShaHash(co->co_firstlineno)
-                + ShaHash::SHA1(PyBytes_AsString(co->co_code), PyBytes_GET_SIZE(co->co_code))
-                + Type::pyObjectShaHash(co->co_consts, groupHead)
-                + Type::pyObjectShaHash(co->co_names, groupHead)
-                + Type::pyObjectShaHash(co->co_varnames, groupHead)
-                + Type::pyObjectShaHash(co->co_freevars, groupHead)
-                + Type::pyObjectShaHash(co->co_cellvars, groupHead)
-                // we ignore this, because otherwise, we'd have the hash change
-                // whenever we instantiate code in a new location
-                // + Type::pyObjectShaHash(co->co_filename)
-                + Type::pyObjectShaHash(co->co_name, groupHead)
-                + Type::pyObjectShaHash(co->co_lnotab, groupHead)
-            );
+            res += MutuallyRecursiveTypeGroup::pyObjectShaHash(mFunctionCode, groupHead);
 
             res += ShaHash(1);
 
@@ -1145,31 +1141,39 @@ public:
                 populateUsedGlobals();
             }
 
-            if (mFunctionUsedGlobals) {
-                std::map<std::string, ShaHash> globals;
-                iterate(mFunctionUsedGlobals, [&](PyObject* globalName) {
-                    PyObject* val = PyDict_GetItem(mFunctionGlobals, globalName);
-                    if (val && PyUnicode_Check(globalName)) {
-                        // wrong to hash the values here - should be hashing the identities?
-                        // or have to do this at some macro level, because core type inference doesn't
-                        // know about this relationship
-                        if (mClosureBindings.find(std::string(PyUnicode_AsUTF8(globalName))) == mClosureBindings.end()) {
-                            globals[PyUnicode_AsUTF8(globalName)] = Type::pyObjectShaHash(val, groupHead);
-                        }
-                    }
-                });
+            std::map<std::string, ShaHash> globals;
+            iterate(mFunctionUsedGlobals, [&](PyObject* globalName) {
+                PyObject* val = PyDict_GetItem(mFunctionUsedGlobals, globalName);
+                if (val && PyUnicode_Check(globalName)) {
+                    std::string globalNameStr(PyUnicode_AsUTF8(globalName));
 
-                for (auto nameAndHash: globals) {
-                    res += ShaHash(nameAndHash.first);
-                    res += nameAndHash.second;
+                    globals[globalNameStr] = MutuallyRecursiveTypeGroup::pyObjectShaHash(val, groupHead);
                 }
+            });
+
+            for (auto nameAndHash: globals) {
+                res += ShaHash(nameAndHash.first);
+                res += nameAndHash.second;
             }
 
             res += ShaHash(1);
 
             for (auto nameAndGlobal: mFunctionGlobalsInCells) {
                 res += ShaHash(nameAndGlobal.first);
-                res += Type::pyObjectShaHash(nameAndGlobal.second, groupHead);
+
+                PyObject* cell = nameAndGlobal.second;
+                if (!PyCell_Check(cell)) {
+                    throw std::runtime_error(
+                        "A global in mFunctionGlobalsInCells is somehow not a cell"
+                    );
+                }
+
+                if (PyCell_Get(cell)) {
+                    res += MutuallyRecursiveTypeGroup::pyObjectShaHash(
+                        PyCell_GET(cell),
+                        groupHead
+                    );
+                }
             }
 
             return res;
@@ -1257,7 +1261,7 @@ public:
         return false;
     }
 
-    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
         ShaHash res = (
             ShaHash(1, m_typeCategory)
             + ShaHash(m_name)
@@ -1308,9 +1312,9 @@ public:
     }
 
     template<class visitor_type>
-    void _visitCompilerVisibleReferencedTypes(const visitor_type& visitor) {
+    void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
         for (auto& o: mOverloads) {
-            o._visitCompilerVisibleReferencedTypes(visitor);
+            o._visitCompilerVisiblePythonObjects(visitor);
         }
     }
 

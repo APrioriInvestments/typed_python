@@ -168,7 +168,7 @@ public:
 
     bool checkInitializationFlag(instance_ptr self, int64_t ix) const;
 
-    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
         return ShaHash(1, m_typeCategory) + m_heldClass->identityHash(groupHead);
     }
 

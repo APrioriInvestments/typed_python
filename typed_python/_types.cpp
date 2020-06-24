@@ -1311,14 +1311,18 @@ PyObject *identityHash(PyObject* nullValue, PyObject* args) {
     }
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
 
-    Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
+    ShaHash hash;
+    Type* typeArg = nullptr;
 
-    if (!t) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'identityHash' must be a Type object");
-        return NULL;
-    }
+    return translateExceptionToPyObject([&]() {
+        if (PyType_Check(a1) && (typeArg = PyInstance::extractTypeFrom(a1))) {
+            hash = typeArg->identityHash();
+        } else {
+            hash = MutuallyRecursiveTypeGroup::pyObjectShaHash(a1, nullptr);
+        }
 
-    return PyBytes_FromStringAndSize((const char*)&t->identityHash()[0], sizeof(ShaHash));
+        return PyBytes_FromStringAndSize((const char*)&hash, sizeof(ShaHash));
+    });
 }
 
 /**
@@ -1913,15 +1917,57 @@ PyObject *isRecursive(PyObject* nullValue, PyObject* args) {
     }
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
 
-    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
-
-    if (!t1) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'isRecursive' must be a native type object");
-        return NULL;
-    }
+    MutuallyRecursiveTypeGroup* group = nullptr;
 
     return translateExceptionToPyObject([&]() {
-        return incref(t1->isRecursive() ? Py_True : Py_False);
+        if (PyType_Check(a1)) {
+            Type* typeArg = PyInstance::extractTypeFrom(a1);
+            if (typeArg) {
+                group = typeArg->getRecursiveTypeGroup();
+            }
+        }
+
+        if (!group) {
+            group = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(a1).first;
+        }
+
+        if (!group) {
+            return incref(Py_False);
+        }
+
+        return incref(group->getIndexToObject().size() > 1 ? Py_True : Py_False);
+    });
+}
+
+PyObject *typesAndObjectsVisibleToCompilerFrom(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "typesAndObjectsVisibleToCompilerFrom takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    return translateExceptionToPyObject([&]() {
+        std::vector<TypeOrPyobj> visible;
+        Type* typeArg = nullptr;
+
+        if (PyType_Check(a1) && (typeArg=PyInstance::extractTypeFrom(a1))) {
+            MutuallyRecursiveTypeGroup::visibleFrom(typeArg, visible);
+        } else {
+            MutuallyRecursiveTypeGroup::visibleFrom((PyObject*)a1, visible);
+        }
+
+        PyObjectStealer res(PyList_New(0));
+
+        for (auto& t: visible) {
+            PyList_Append(
+                res,
+                t.type() ?
+                    (PyObject*)PyInstance::typeObj(t.type())
+                :   t.pyobj()
+            );
+        }
+
+        return incref(res);
     });
 }
 
@@ -1932,20 +1978,32 @@ PyObject *recursiveTypeGroup(PyObject* nullValue, PyObject* args) {
     }
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
 
-    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
-
-    if (!t1) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'recursiveTypeGroup' must be a native type object");
-        return NULL;
-    }
+    MutuallyRecursiveTypeGroup* group = nullptr;
 
     return translateExceptionToPyObject([&]() {
+        if (PyType_Check(a1)) {
+            Type* typeArg = PyInstance::extractTypeFrom(a1);
+            if (typeArg) {
+                group = typeArg->getRecursiveTypeGroup();
+            }
+        }
+
+        if (!group) {
+            group = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(a1).first;
+        }
+
+        if (!group) {
+            return incref(Py_None);
+        }
+
         PyObjectStealer res(PyList_New(0));
 
-        for (auto ixAndType: t1->getCompilerRecursiveTypeGroup()) {
+        for (auto ixAndType: group->getIndexToObject()) {
             PyList_Append(
                 res,
-                (PyObject*)PyInstance::typeObj(ixAndType.second)
+                ixAndType.second.type() ?
+                    (PyObject*)PyInstance::typeObj(ixAndType.second.type())
+                :   ixAndType.second.pyobj()
             );
         }
 
@@ -2140,6 +2198,7 @@ static PyMethodDef module_methods[] = {
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
     {"recursiveTypeGroup", (PyCFunction)recursiveTypeGroup, METH_VARARGS, NULL},
+    {"typesAndObjectsVisibleToCompilerFrom", (PyCFunction)typesAndObjectsVisibleToCompilerFrom, METH_VARARGS, NULL},
     {"isRecursive", (PyCFunction)isRecursive, METH_VARARGS, NULL},
     {"referencedTypes", (PyCFunction)referencedTypes, METH_VARARGS, NULL},
     {"wantsToDefaultConstruct", (PyCFunction)wantsToDefaultConstruct, METH_VARARGS, NULL},

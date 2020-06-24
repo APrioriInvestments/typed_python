@@ -21,6 +21,9 @@ class Hash:
     def __init__(self, digest):
         self.digest = digest
 
+    def isPoison(self):
+        return self.digest == b'\xff' * 20
+
     @staticmethod
     def from_integer(i):
         return Hash.from_string(struct.pack("!q", i))
@@ -37,7 +40,17 @@ class Hash:
         hasher.update(s)
         return Hash(hasher.digest())
 
+    @staticmethod
+    def poison():
+        # the 'poison' hash adds to any other hash to make 'poison' again.
+        # we use this here and in C++ code to indicate a collection of hashed
+        # objects where something went wrong.
+        return Hash(b'\xff' * 20)
+
     def __add__(self, other):
+        if self.isPoison() or other.isPoison():
+            return Hash.poison()
+
         assert isinstance(other, Hash)
         hasher = hashlib.sha1()
         hasher.update(self.digest)
@@ -82,7 +95,6 @@ def sha_hash(val, serializationContext=None):
         return Hash.from_string(repr(val))
     if val is None:
         return Hash.from_string("")
-
     if hasattr(val, "__sha_hash__"):
         return val.__sha_hash__()
 

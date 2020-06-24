@@ -191,12 +191,3 @@ PyObject* Function::Overload::buildFunctionObj(Type* closureType, instance_ptr c
 
     return res;
 }
-
-
-Type* extractCompilerVisibleTypeFromGlobal(PyObject* o) {
-    if (PyType_Check(o)) {
-        return PyInstance::extractTypeFrom((PyTypeObject*)o);
-    } else {
-        return PyInstance::extractTypeFrom(o->ob_type);
-    }
-}

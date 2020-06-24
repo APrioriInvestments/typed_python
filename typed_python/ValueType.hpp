@@ -36,8 +36,18 @@ public:
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
-    ShaHash _computeIdentityHash(Type* groupHead=nullptr) {
-        return ShaHash(m_typeCategory) + Type::pyObjectShaHash(mInstance, groupHead);
+    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead=nullptr) {
+        return ShaHash(m_typeCategory) + MutuallyRecursiveTypeGroup::tpInstanceShaHash(mInstance, groupHead);
+    }
+
+    template<class visitor_type>
+    void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
+
+    }
+
+    template<class visitor_type>
+    void _visitCompilerVisibleInstances(const visitor_type& visitor) {
+        visitor(mInstance);
     }
 
     typed_python_hash_type hash(instance_ptr left) {

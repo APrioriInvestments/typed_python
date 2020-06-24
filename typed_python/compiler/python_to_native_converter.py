@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -14,6 +14,8 @@
 
 import types
 
+from typed_python.hash import Hash
+
 import typed_python.python_ast as python_ast
 import typed_python._types as _types
 import typed_python.compiler
@@ -25,7 +27,7 @@ from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
 from typed_python.compiler.function_conversion_context import FunctionConversionContext, FunctionOutput
 from typed_python.compiler.native_function_conversion_context import NativeFunctionConversionContext
-
+from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
@@ -139,6 +141,7 @@ class PythonToNativeConverter(object):
         # if True, then insert additional code to check for undefined behavior.
         self.generateDebugChecks = False
         self._link_name_for_identity = {}
+        self._identity_to_identityHash = {}
         self._definitions = {}
         self._targets = {}
         self._inflight_definitions = {}
@@ -535,6 +538,32 @@ class PythonToNativeConverter(object):
 
         return True
 
+    def convertTypedFunctionCall(self, functionType, overloadIx, inputWrappers, assertIsRoot=False):
+        overload = functionType.overloads[overloadIx]
+
+        realizedInputWrappers = []
+
+        closureType = functionType.ClosureType
+
+        for closureVarName, closureVarPath in overload.closureVarLookups.items():
+            realizedInputWrappers.append(
+                typeWrapper(
+                    PythonTypedFunctionWrapper.closurePathToCellType(closureVarPath, closureType)
+                )
+            )
+
+        realizedInputWrappers.extend(inputWrappers)
+
+        return self.convert(
+            overload.name,
+            overload.functionCode,
+            overload.realizedGlobals,
+            list(overload.closureVarLookups),
+            realizedInputWrappers,
+            overload.returnType,
+            assertIsRoot=assertIsRoot
+        )
+
     def convert(
         self,
         funcName,
@@ -543,9 +572,9 @@ class PythonToNativeConverter(object):
         closureVars,
         input_types,
         output_type,
+        identityOverride=None,
         assertIsRoot=False,
         callback=None,
-        identityOverride=None
     ):
         """Convert a single pure python function using args of 'input_types'.
 
@@ -580,6 +609,32 @@ class PythonToNativeConverter(object):
             tuple(sorted([(k, id(v)) for k, v in funcGlobals.items()]))
         )
 
+        if False:
+            identityHash = Hash(_types.identityHash(funcCode))
+            identityHash += Hash(_types.identityHash(funcName))
+
+            for g in sorted(funcGlobals):
+                identityHash = identityHash + Hash(_types.identityHash(g)) + Hash(_types.identityHash(funcGlobals[g]))
+
+            for it in input_types:
+                identityHash = identityHash + it.identityHash()
+
+            if output_type is not None:
+                identityHash += typeWrapper(output_type).identityHash()
+
+            identityHash += Hash(_types.identityHash(tuple(closureVars)))
+
+            assert not identityHash.isPoison()
+
+            if identityHash is not None:
+                if identity not in self._identity_to_identityHash:
+                    self._identity_to_identityHash[identity] = identityHash
+                else:
+                    assert self._identity_to_identityHash[identity] == identityHash, (
+                        "Conflicting identity hashes:\n" + str(identity) + "\n"
+                        + str(identityHash) + " != " + str(self._identity_to_identityHash[identity])
+                    )
+
         if callback is not None:
             self.installLinktimeHook(identity, callback)
 
@@ -587,6 +642,7 @@ class PythonToNativeConverter(object):
             name = self._link_name_for_identity[identity]
         else:
             name = self.new_name(funcName)
+
             self._link_name_for_identity[identity] = name
 
         isRoot = len(self._inflight_function_conversions) == 0

@@ -50,7 +50,7 @@ int64_t Alternative::refcount(instance_ptr i) const {
     return ((layout**)i)[0]->refcount;
 }
 
-ShaHash Alternative::_computeIdentityHash(Type* groupHead) {
+ShaHash Alternative::_computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead) {
     ShaHash newHash(1, m_typeCategory);
 
     newHash = newHash + ShaHash(m_name) + ShaHash(0);

@@ -15,6 +15,7 @@
 import typed_python.compiler
 from typed_python.python_ast import ComparisonOp, UnaryOp
 from typed_python import _types, OneOf, ListOf
+from typed_python.hash import Hash
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.native_ast import VoidPtr
 
@@ -87,6 +88,12 @@ class Wrapper(object):
         # this is the representation of this type _in the compiler_
         self.typeRepresentation = typeRepresentation
         self._conversionCache = {}
+
+    def identityHash(self):
+        return (
+            Hash(_types.identityHash(self.typeRepresentation))
+            + Hash(_types.identityHash(self.interpreterTypeRepresentation))
+        )
 
     def __eq__(self, other):
         if type(self) != type(other):

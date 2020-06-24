@@ -69,18 +69,6 @@ mbedtls_sha1_context;
 void mbedtls_sha1_init( mbedtls_sha1_context *ctx );
 
 /**
- * \brief          This function clears a SHA-1 context.
- *
- * \warning        SHA-1 is considered a weak message digest and its use
- *                 constitutes a security risk. We recommend considering
- *                 stronger message digests instead.
- *
- * \param ctx      The SHA-1 context to clear.
- *
- */
-void mbedtls_sha1_free( mbedtls_sha1_context *ctx );
-
-/**
  * \brief          This function starts a SHA-1 checksum calculation.
  *
  * \warning        SHA-1 is considered a weak message digest and its use

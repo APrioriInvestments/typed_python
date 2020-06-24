@@ -385,11 +385,26 @@ class FunctionOverload:
         self._realizedGlobals = None
         self.args = ()
 
+    @staticmethod
+    def extractGlobalNamesFromCode(codeObj):
+        res = set()
+        res.update(codeObj.co_names);
+
+        for const in codeObj.co_consts:
+            if isinstance(const, type(codeObj)):
+                res.update(FunctionOverload.extractGlobalNamesFromCode(const))
+
+        return res
+
     @property
     def realizedGlobals(self):
         """Merge the 'functionGlobals' and the set of globals in 'cells' into a single dict."""
         if self._realizedGlobals is None:
-            res = dict(self.functionGlobals)
+            res = {}
+
+            for name in sorted(self.extractGlobalNamesFromCode(self.functionCode)):
+                if name in self.functionGlobals:
+                    res[name] = self.functionGlobals[name]
 
             for varname, cell in self.funcGlobalsInCells.items():
                 res[varname] = cell.cell_contents

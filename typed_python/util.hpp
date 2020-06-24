@@ -256,25 +256,16 @@ May throw, so use in conjunction with 'translateExceptionToPyObject'
 ********/
 template<class func_type>
 void iterate(PyObject* o, func_type f) {
-    PyObject *iterator = PyObject_GetIter(o);
-    PyObject *item;
+    PyObjectStealer iterator(PyObject_GetIter(o));
+    PyObjectHolder item;
 
-    if (iterator == NULL) {
+    if (!iterator) {
         throw PythonExceptionSet();
     }
 
-    while ((item = PyIter_Next(iterator))) {
-        try {
-            f(item);
-            Py_DECREF(item);
-        } catch(...) {
-            Py_DECREF(item);
-            Py_DECREF(iterator);
-            throw;
-        }
+    while (item.steal(PyIter_Next(iterator))) {
+        f((PyObject*)item);
     }
-
-    Py_DECREF(iterator);
 
     if (PyErr_Occurred()) {
         throw PythonExceptionSet();
@@ -290,30 +281,20 @@ May throw, so use in conjunction with 'translateExceptionToPyObject'
 ********/
 template<class func_type>
 void iterateWithEarlyExit(PyObject* o, func_type f) {
-    PyObject *iterator = PyObject_GetIter(o);
-    PyObject *item;
+    PyObjectStealer iterator(PyObject_GetIter(o));
+    PyObjectHolder item;
 
-    if (iterator == NULL) {
+    if (!iterator) {
         throw PythonExceptionSet();
     }
 
     bool exitEarly = false;
 
-    while ((item = PyIter_Next(iterator)) && !exitEarly) {
-        try {
-            if (!f(item)) {
-                exitEarly = true;
-            }
-
-            Py_DECREF(item);
-        } catch(...) {
-            Py_DECREF(item);
-            Py_DECREF(iterator);
-            throw;
+    while ((item.steal(PyIter_Next(iterator))) && !exitEarly) {
+        if (!f((PyObject*)item)) {
+            exitEarly = true;
         }
     }
-
-    Py_DECREF(iterator);
 
     if (PyErr_Occurred()) {
         throw PythonExceptionSet();

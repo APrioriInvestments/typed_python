@@ -449,23 +449,23 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
         PyObjectStealer pyClosureVarsDict(PyDict_New());
 
         for (auto nameAndClosureVar: overload.getClosureVariableBindings()) {
-            PyObjectStealer bindingObj(PyList_New(0));
+            PyObjectStealer bindingObj(PyTuple_New(nameAndClosureVar.second.size()));
+
             for (long k = 0; k < nameAndClosureVar.second.size(); k++) {
                 ClosureVariableBindingStep step = nameAndClosureVar.second[k];
 
                 if (step.isFunction()) {
-                    PyList_Append(bindingObj, (PyObject*)typePtrToPyTypeRepresentation(step.getFunction()));
+                    // recall that 'PyTuple_SetItem' steals a reference, so we need to incref it here
+                    PyTuple_SetItem(bindingObj, k, incref((PyObject*)typePtrToPyTypeRepresentation(step.getFunction())));
                 } else
                 if (step.isNamedField()) {
-                    PyObjectStealer nameAsObj(PyUnicode_FromString(step.getNamedField().c_str()));
-                    PyList_Append(bindingObj, nameAsObj);
+                    PyTuple_SetItem(bindingObj, k, PyUnicode_FromString(step.getNamedField().c_str()));
                 } else
                 if (step.isIndexedField()) {
-                    PyObjectStealer indexAsObj(PyLong_FromLong(step.getIndexedField()));
-                    PyList_Append(bindingObj, indexAsObj);
+                    PyTuple_SetItem(bindingObj, k, PyLong_FromLong(step.getIndexedField()));
                 } else
                 if (step.isCellAccess()) {
-                    PyList_Append(bindingObj, closureVariableCellLookupSingleton);
+                    PyTuple_SetItem(bindingObj, k, incref(closureVariableCellLookupSingleton));
                 } else {
                     throw std::runtime_error("Corrupt ClosureVariableBindingStep encountered");
                 }
@@ -580,6 +580,12 @@ void PyFunctionInstance::mirrorTypeInformationIntoPyTypeConcrete(Function* inTyp
         pyType->tp_dict,
         "__qualname__",
         PyUnicode_FromString(inType->qualname().c_str())
+    );
+
+    PyDict_SetItemString(
+        pyType->tp_dict,
+        "__module__",
+        PyUnicode_FromString(inType->moduleName().c_str())
     );
 
     PyDict_SetItemString(

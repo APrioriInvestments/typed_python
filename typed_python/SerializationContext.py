@@ -21,7 +21,7 @@ from typed_python.python_ast import (
     evaluateFunctionDefWithLocalsInCells
 )
 from typed_python.hash import sha_hash
-from typed_python.type_function import ConcreteTypeFunction, isTypeFunctionType, reconstructTypeFunctionType
+from typed_python.type_function import ConcreteTypeFunction
 from types import FunctionType, ModuleType, CodeType, BuiltinFunctionType
 import numpy
 import datetime
@@ -246,11 +246,6 @@ class SerializationContext(object):
             @return a representation object or None
         '''
         if isinstance(inst, type):
-            isTF = isTypeFunctionType(inst)
-
-            if isTF is not None:
-                return (reconstructTypeFunctionType, isTF, None)
-
             if (
                 # is this a regular python class
                 not issubclass(inst, Type)

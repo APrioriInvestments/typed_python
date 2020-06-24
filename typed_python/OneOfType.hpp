@@ -31,7 +31,7 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
-    ShaHash _computeIdentityHash(Type* groupHead = nullptr) {
+    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
         ShaHash newHash = ShaHash(1, m_typeCategory);
 
         for (auto t: m_types) {
