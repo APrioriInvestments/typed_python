@@ -61,3 +61,4 @@ compile the entire group all at once.
 #include "FunctionType.cpp"
 
 #include "SerializationBuffer.cpp"
+#include "Sha1.cpp"

@@ -25,18 +25,6 @@ class TypedPythonBuildExtension(build_ext):
             pkg_resources.resource_filename('numpy', 'core/include')
         )
 
-        if 'macosx' in self.plat_name:
-            # I can't reliably get us to build with libssl on macos, so
-            # I'm just removing support for the compiler cache on that until
-            # some enterprising mac user can help me out
-            pass
-        else:
-            module = self.distribution.ext_modules[0]
-
-            module.define_macros.append(('TYPED_PYTHON_HAS_OPENSSL', '1'))
-            module.libraries.append('ssl')
-            module.libraries.append('crypto')
-
         build_ext.run(self)
 
 

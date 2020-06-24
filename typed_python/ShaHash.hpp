@@ -16,9 +16,7 @@
 
 #pragma once
 
-#ifdef TYPED_PYTHON_HAS_OPENSSL
-#include <openssl/sha.h>
-#endif
+#include "Sha1.hpp"
 
 class ShaHash;
 ShaHash operator+(const ShaHash& l, const ShaHash& r);
@@ -137,7 +135,7 @@ public:
         ShaHash tr;
 
         if (sz) {
-            ::SHA1((const unsigned char*)data, sz, (unsigned char*)&tr);
+            ::mbedtls_sha1_ret((const unsigned char*)data, sz, (unsigned char*)&tr);
         }
 
         return tr;
