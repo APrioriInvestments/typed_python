@@ -972,7 +972,16 @@ Function* PyFunctionInstance::convertPythonObjectToFunctionType(
         return nullptr;
     }
 
-    memo[memoKey] = (Function*)actualType;
+    // if the closures can be assumed global, then its OK to put this in a memo,
+    // because this is a 'typelike' function (its in an Alternative or Class)
+    // if not, then the memo will just bloat because we'll have different function
+    // objects for each possible type.
+    if (assumeClosuresGlobal) {
+        //make sure this memo stays valid.
+        incref(funcObj);
+
+        memo[memoKey] = (Function*)actualType;
+    }
 
     return (Function*)actualType;
 }

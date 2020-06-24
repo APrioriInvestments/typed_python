@@ -16,10 +16,20 @@ import unittest
 import time
 import pytest
 from flaky import flaky
-from typed_python import Class, Final, Function, NamedTuple, bytecount, ListOf, TypedCell, Forward, PyCell, Tuple, TupleOf
+
+from typed_python import (
+    Class, Final, Function, NamedTuple, bytecount, ListOf, TypedCell, Forward,
+    PyCell, Tuple, TupleOf, NotCompiled
+)
+
 from typed_python.compiler.runtime import RuntimeEventVisitor, Entrypoint
 from typed_python._types import refcount
 from typed_python.test_util import currentMemUsageMb
+
+
+@NotCompiled
+def moduleLevelNotCompiled(x) -> int:
+    return x
 
 
 class DidCompileVisitor(RuntimeEventVisitor):
@@ -814,5 +824,48 @@ class TestCompilingClosures(unittest.TestCase):
 
         while time.time() - t0 < 2.0:
             f(10)
+
+        assert currentMemUsageMb() - m0 < 2.0
+
+    def test_building_closures_doesnt_leak(self):
+        m0 = currentMemUsageMb()
+        t0 = time.time()
+
+        y = 0
+
+        while time.time() - t0 < 2.0:
+            @Function
+            def f(x):
+                return x + y
+
+        assert currentMemUsageMb() - m0 < 2.0
+
+    def test_calling_notcompiled_doesnt_leak(self):
+        @Entrypoint
+        def callIt(x):
+            return moduleLevelNotCompiled(x)
+
+        callIt(10)
+
+        m0 = currentMemUsageMb()
+        t0 = time.time()
+
+        while time.time() - t0 < 2.0:
+            callIt(10)
+
+        assert currentMemUsageMb() - m0 < 2.0
+
+    def test_calling_entrypoint_with_closures_doesnt_leak(self):
+        @Entrypoint
+        def callIt(f, x):
+            return f(x)
+
+        callIt(moduleLevelNotCompiled, 10)
+
+        m0 = currentMemUsageMb()
+        t0 = time.time()
+
+        while time.time() - t0 < 2.0:
+            callIt(moduleLevelNotCompiled, 10)
 
         assert currentMemUsageMb() - m0 < 2.0

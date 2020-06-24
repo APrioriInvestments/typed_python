@@ -525,16 +525,15 @@ public:
             Type* returnType,
             const std::vector<FunctionArg>& args
         ) :
-                mFunctionCode(incref(pyFuncCode)),
-                mFunctionGlobals(incref(pyFuncGlobals)),
+                mFunctionCode(pyFuncCode),
+                mFunctionGlobals(pyFuncGlobals),
                 mFunctionUsedGlobals(nullptr),
-                mFunctionDefaults(incref(pyFuncDefaults)),
-                mFunctionAnnotations(incref(pyFuncAnnotations)),
+                mFunctionDefaults(pyFuncDefaults),
+                mFunctionAnnotations(pyFuncAnnotations),
                 mFunctionGlobalsInCells(pyFuncGlobalsInCells),
                 mFunctionClosureVarnames(pyFuncClosureVarnames),
                 mReturnType(returnType),
                 mArgs(args),
-                mCompiledCodePtr(nullptr),
                 mHasKwarg(false),
                 mHasStarArg(false),
                 mMinPositionalArgs(0),
@@ -563,9 +562,38 @@ public:
             if (!mHasStarArg) {
                 mMaxPositionalArgs = argsDefinitelyConsuming + argsWithDefaults;
             }
+
+            increfAllPyObjects();
+        }
+
+        Overload(const Overload& other) {
+            other.increfAllPyObjects();
+
+            mFunctionCode = other.mFunctionCode;
+            mFunctionGlobals = other.mFunctionGlobals;
+            mFunctionUsedGlobals = other.mFunctionUsedGlobals;
+            mFunctionDefaults = other.mFunctionDefaults;
+            mFunctionAnnotations = other.mFunctionAnnotations;
+
+            mFunctionClosureVarnames = other.mFunctionClosureVarnames;
+
+            mClosureBindings = other.mClosureBindings;
+            mReturnType = other.mReturnType;
+            mArgs = other.mArgs;
+            mCompiledSpecializations = other.mCompiledSpecializations;
+
+            mHasStarArg = other.mHasStarArg;
+            mHasKwarg = other.mHasKwarg;
+            mMinPositionalArgs = other.mMinPositionalArgs;
+            mMaxPositionalArgs = other.mMaxPositionalArgs;
+
+            mFunctionGlobalsInCells = other.mFunctionGlobalsInCells;
+
+            mCachedFunctionObj = other.mCachedFunctionObj;
         }
 
         ~Overload() {
+            decrefAllPyObjects();
         }
 
         Overload withShiftedFrontClosureBindings(long shiftAmount) const {
@@ -816,27 +844,27 @@ public:
         PyObject* buildFunctionObj(Type* closureType, instance_ptr closureData) const;
 
         Overload& operator=(const Overload& other) {
-            mFunctionCode = incref(other.mFunctionCode);
-            mFunctionGlobals = incref(other.mFunctionGlobals);
-            mFunctionUsedGlobals = incref(other.mFunctionUsedGlobals);
-            mFunctionDefaults = incref(other.mFunctionDefaults);
-            mFunctionAnnotations = incref(other.mFunctionAnnotations);
+            other.increfAllPyObjects();
+            decrefAllPyObjects();
+
+            mFunctionCode = other.mFunctionCode;
+            mFunctionGlobals = other.mFunctionGlobals;
+            mFunctionUsedGlobals = other.mFunctionUsedGlobals;
+            mFunctionDefaults = other.mFunctionDefaults;
+            mFunctionAnnotations = other.mFunctionAnnotations;
+
             mFunctionClosureVarnames = other.mFunctionClosureVarnames;
 
             mClosureBindings = other.mClosureBindings;
             mReturnType = other.mReturnType;
             mArgs = other.mArgs;
             mCompiledSpecializations = other.mCompiledSpecializations;
-            mCompiledCodePtr = other.mCompiledCodePtr;
 
             mHasStarArg = other.mHasStarArg;
             mHasKwarg = other.mHasKwarg;
             mMinPositionalArgs = other.mMinPositionalArgs;
             mMaxPositionalArgs = other.mMaxPositionalArgs;
-
-            for (auto nameAndOther: other.mFunctionGlobalsInCells) {
-                mFunctionGlobalsInCells[nameAndOther.first] = incref(nameAndOther.second);
-            }
+            mFunctionGlobalsInCells = other.mFunctionGlobalsInCells;
 
             mCachedFunctionObj = other.mCachedFunctionObj;
 
@@ -981,6 +1009,30 @@ public:
             );
         }
 
+        void increfAllPyObjects() const {
+            incref(mFunctionCode);
+            incref(mFunctionGlobals);
+            incref(mFunctionUsedGlobals);
+            incref(mFunctionDefaults);
+            incref(mFunctionAnnotations);
+
+            for (auto nameAndOther: mFunctionGlobalsInCells) {
+                incref(nameAndOther.second);
+            }
+        }
+
+        void decrefAllPyObjects() {
+            decref(mFunctionCode);
+            decref(mFunctionGlobals);
+            decref(mFunctionUsedGlobals);
+            decref(mFunctionDefaults);
+            decref(mFunctionAnnotations);
+
+            for (auto nameAndOther: mFunctionGlobalsInCells) {
+                decref(nameAndOther.second);
+            }
+        }
+
     private:
         PyObject* mFunctionCode;
 
@@ -1021,8 +1073,6 @@ public:
         // in compiled code, the closure arguments get passed in front of the
         // actual function arguments
         std::vector<CompiledSpecialization> mCompiledSpecializations;
-
-        compiled_code_entrypoint mCompiledCodePtr; //accepts a pointer to packed arguments and another pointer with the return value
 
         bool mHasStarArg;
         bool mHasKwarg;

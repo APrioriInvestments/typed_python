@@ -1,3 +1,4 @@
+
 /******************************************************************************
    Copyright 2017-2019 typed_python Authors
 
@@ -784,9 +785,9 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
             if (PyUnicode_Check(pyModulename)) {
                 moduleName = PyUnicode_AsUTF8(pyModulename);
             }
-        }
 
-        incref(funcObj);
+            decref(pyModulename);
+        }
 
         std::vector<Function::Overload> overloads;
 
