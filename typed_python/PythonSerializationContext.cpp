@@ -513,6 +513,9 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromName(Deserializ
     if (!result) {
         throw PythonExceptionSet();
     }
+    if (result == Py_None){
+        throw std::runtime_error("Failed to deserialize Type '" + name + "'");
+    }
 
     if (memo != -1) {
         b.addCachedPyObj(memo, incref(result));
