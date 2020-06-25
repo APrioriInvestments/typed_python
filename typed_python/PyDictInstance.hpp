@@ -56,6 +56,8 @@ public:
 
     static PyObject* dictClear(PyObject* o);
 
+    static PyObject* dictCopy(PyObject* o, PyObject* args);
+
     static PyMethodDef* typeMethodsConcrete(Type* t);
 
     static void mirrorTypeInformationIntoPyTypeConcrete(DictType* dictT, PyTypeObject* pyType);

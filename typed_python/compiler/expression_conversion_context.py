@@ -31,6 +31,9 @@ from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapp
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from typed_python.compiler.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
 from typed_python.compiler.type_wrappers.typed_cell_wrapper import TypedCellWrapper
+from typed_python.compiler.type_wrappers.list_of_wrapper import MasqueradingListOfWrapper
+from typed_python.compiler.type_wrappers.set_wrapper import MasqueradingSetWrapper
+from typed_python.compiler.type_wrappers.dict_wrapper import MasqueradingDictWrapper
 from typed_python import bytecount
 import typed_python.python_ast as python_ast
 
@@ -1415,12 +1418,16 @@ class ExpressionConversionContext(object):
             append_args = TupleOf(python_ast.Expr)((ast.key, ast.value))
 
         if element_type_ast:
+            if ast.matches.ListComp or ast.matches.SetComp:
+                typeargs = (element_type_ast,)
+            else:  # ast.matches.Dict
+                typeargs = (element_type_ast[0], element_type_ast[1])
             result_type_ast = python_ast.Expr.Call(
                 func=python_ast.Expr.Name(
                     id=type_name,
                     ctx=python_ast.ExprContext.Load()
                 ),
-                args=(element_type_ast,)
+                args=typeargs
             )
         else:
             result_type_ast = python_ast.Expr.Name(
@@ -1455,16 +1462,16 @@ class ExpressionConversionContext(object):
                 args=append_args  # <<<<<<<<
             )
         )
-        # debug = python_ast.Statement.Expr(
-        #     value=python_ast.Expr.Call(
-        #         func=python_ast.Expr.Name(
-        #             id="print",  # <<<<<<<<
-        #             ctx=python_ast.ExprContext.Load(),
-        #         ),
-        #         args = TupleOf(python_ast.Expr)((ast.target,))
-        #     )
-        # )
         for g in list(reversed(ast.generators)):
+            # debug = python_ast.Statement.Expr(
+            #     value=python_ast.Expr.Call(
+            #         func=python_ast.Expr.Name(
+            #             id="print",
+            #             ctx=python_ast.ExprContext.Load()
+            #         ),
+            #         args=TupleOf(python_ast.Expr)((ast.elt,))
+            #     )
+            # )
             if len(g.ifs) == 0:
                 s2 = python_ast.Statement.For(
                     target=g.target,  # <<<<<<<<
@@ -1488,7 +1495,8 @@ class ExpressionConversionContext(object):
                             test=cond,  # <<<<<<<<
                             body=TupleOf(python_ast.Statement)((s2,))
                         ),)
-                    )
+                    ),
+                    orelse=()
                 )
         return TupleOf(python_ast.Statement)((s1, s2))
 
@@ -1895,7 +1903,7 @@ class ExpressionConversionContext(object):
 
             return aList
 
-        if ast.matches.ListComp:
+        if ast.matches.ListComp or ast.matches.SetComp or ast.matches.DictComp:
             element_type_ast = None
             with self.subcontext():
                 # set up types for target variables for all generators
@@ -1903,38 +1911,52 @@ class ExpressionConversionContext(object):
                     throwaway_iter = self.convert_expression_ast(g.iter)
                     if throwaway_iter is not None:
                         iter_elt_wrapper = throwaway_iter.expr_type.get_iteration_elt_wrapper()
-                        if iter_elt_wrapper is not None:
+                        if iter_elt_wrapper is None:
+                            self.functionContext.upsizeVariableType(g.target.id, typeWrapper(object))
+                        else:
                             self.functionContext.upsizeVariableType(g.target.id, iter_elt_wrapper)
                 # given these types, can we determine a type for the elements of the comprehension?
-                throwaway_res = self.convert_expression_ast(ast.elt)
-                if throwaway_res is not None \
-                        and not isinstance(throwaway_res.expr_type, PythonObjectOfTypeWrapper):
-                    element_type_name = str(throwaway_res.expr_type)
-                    element_type_ast = pyast_from_typestring(element_type_name)
+                if ast.matches.ListComp or ast.matches.SetComp:
+                    throwaway_elt = self.convert_expression_ast(ast.elt)
+                    if throwaway_elt is not None \
+                            and not isinstance(throwaway_elt.expr_type, PythonObjectOfTypeWrapper):
+                        element_type_name = str(throwaway_elt.expr_type)
+                        element_type_ast = pyast_from_typestring(element_type_name)
+                else:  # ast.matches.DictComp
+                    key_type_name = None
+                    value_type_name = None
+                    throwaway_key = self.convert_expression_ast(ast.key)
+                    throwaway_value = self.convert_expression_ast(ast.value)
+
+                    if throwaway_key is not None \
+                            and not isinstance(throwaway_key.expr_type, PythonObjectOfTypeWrapper):
+                        key_type_name = str(throwaway_key.expr_type)
+                    if throwaway_value is not None \
+                            and not isinstance(throwaway_value.expr_type, PythonObjectOfTypeWrapper):
+                        value_type_name = str(throwaway_value.expr_type)
+
+                    if key_type_name and value_type_name:
+                        element_type_ast = (pyast_from_typestring(key_type_name), pyast_from_typestring(value_type_name))
 
             result_id = f".result{ast.line_number}.{ast.col_offset}"
-
             transformed_ast = self.pyast_comprehension(ast, result_id, element_type_ast)
 
             body, body_returns = self.functionContext.convert_statement_list_ast(transformed_ast, self.variableStates)
             self.pushEffect(body)
-            return self.functionContext.localVariableExpression(self, result_id)
+            result = self.functionContext.localVariableExpression(self, result_id)
 
-        if ast.matches.SetComp:
-            result_id = f".result{ast.line_number}.{ast.col_offset}"
-            transformed_ast = self.pyast_comprehension(ast, result_id, None)
-
-            body, body_returns = self.functionContext.convert_statement_list_ast(transformed_ast, self.variableStates)
-            self.pushEffect(body)
-            return self.functionContext.localVariableExpression(self, result_id)
-
-        if ast.matches.DictComp:
-            result_id = f".result{ast.line_number}.{ast.col_offset}"
-            transformed_ast = self.pyast_comprehension(ast, result_id, None)
-
-            body, body_returns = self.functionContext.convert_statement_list_ast(transformed_ast, self.variableStates)
-            self.pushEffect(body)
-            return self.functionContext.localVariableExpression(self, result_id)
+            # TODO: probably really only want to masquerade the outermost comprehension, if nested
+            if result.expr_type.typeRepresentation.__typed_python_category__ == 'ListOf':
+                new_type_wrapper = MasqueradingListOfWrapper(result.expr_type.typeRepresentation)
+                return TypedExpression(result.context, result.expr, new_type_wrapper, result.isReference)
+            elif result.expr_type.typeRepresentation.__typed_python_category__ == 'Set':
+                new_type_wrapper = MasqueradingSetWrapper(result.expr_type.typeRepresentation)
+                return TypedExpression(result.context, result.expr, new_type_wrapper, result.isReference)
+            elif result.expr_type.typeRepresentation.__typed_python_category__ == 'Dict':
+                new_type_wrapper = MasqueradingDictWrapper(result.expr_type.typeRepresentation)
+                return TypedExpression(result.context, result.expr, new_type_wrapper, result.isReference)
+            else:
+                return result
 
         if ast.matches.Lambda:
             return self.functionContext.localVariableExpression(self, ".closure").changeType(

@@ -132,7 +132,7 @@ class DictWrapper(DictWrapperBase):
                 "initializeValueByIndexUnsafe", "assignValueByIndexUnsafe",
                 "initializeKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
                 "_top_item_slot", "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault",
-                "pop", "clear", "copy", "update"):
+                "pop", "clear", "copy", "update", "__setitem__"):
             return expr.changeType(BoundMethodWrapper.Make(self, attr))
 
         if attr == '_items_populated':
@@ -306,6 +306,10 @@ class DictWrapper(DictWrapperBase):
         if methodname == "update":
             if len(args) == 1:
                 return context.call_py_function(dict_update, (instance, args[0]), {})
+
+        if methodname == "__setitem__":
+            if len(args) == 2:
+                return context.call_py_function(dict_setitem, (instance, args[0], args[1]), {})
 
         if len(args) == 1:
             if methodname == "get":
@@ -647,3 +651,27 @@ class DictValuesIteratorWrapper(DictIteratorWrapper):
             (ixExpr,),
             {}
         )
+
+
+class MasqueradingDictWrapper(DictWrapper):
+    # A 'Dict' that's masquerading as a regular 'dict'
+    def __str__(self):
+        return "Masquerading" + super().__str__()
+
+    @property
+    def interpreterTypeRepresentation(self):
+        return dict
+
+    def convert_mutable_masquerade_to_untyped_type(self):
+        return typeWrapper(dict)
+
+    def convert_mutable_masquerade_to_untyped(self, context, instance):
+        return context.constant(dict).convert_call([instance], {}).changeType(
+            typeWrapper(dict)
+        )
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        # Allow the typed form of the object to perform the conversion
+        e = e.changeType(typeWrapper(self.typeRepresentation))
+
+        return e.convert_to_type_with_target(targetVal, explicit)

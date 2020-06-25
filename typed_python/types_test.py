@@ -863,6 +863,22 @@ class NativeTypesTests(unittest.TestCase):
             d["1"] = "1"
             self.assertTrue("1" in d)
 
+    def test_dict_copy(self):
+        T = Dict(str, Tuple(int, str))
+
+        d = T({chr(i): (i, chr(i+1)) for i in range(96, 128)})
+        self.assertEqual(d['a'], (97, 'b'))
+        d1 = d.copy()
+        self.assertEqual(d1['a'], (97, 'b'))
+        d['a'] = (0, 'x')
+        d['a'] = (0, 'x')
+        d['A'] = (65, 'B')
+        self.assertEqual(d['a'], (0, 'x'))
+        self.assertEqual(d['A'], (65, 'B'))
+        self.assertEqual(d1['a'], (97, 'b'))
+        with self.assertRaises(KeyError):
+            d1['A']
+
     def test_deserialize_primitive(self):
         x = deserialize(str, serialize(str, "a"))
         self.assertTrue(isinstance(x, str))
