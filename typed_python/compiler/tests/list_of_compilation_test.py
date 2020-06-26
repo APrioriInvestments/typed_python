@@ -532,7 +532,7 @@ class TestListOfCompilation(unittest.TestCase):
 
         self.assertEqual(rc2, rc1 - 10)
 
-    def test_list_comprehensions(self):
+    def test_list_comprehensions_int(self):
         # r = convertFunctionToAlgebraicPyAst(f)
 
         def f1(i):
@@ -561,6 +561,38 @@ class TestListOfCompilation(unittest.TestCase):
 
             for f in [f2, f3, f4, f5, f6]:
                 for k in [1, 2, 3]:
+                    r1 = f(i, k)
+                    r2 = Entrypoint(f)(i, k)
+                    self.assertTrue(type(r2) is list)
+                    self.assertEqual(r1, r2)
+
+    def test_list_comprehensions_str(self):
+        def f1(i):
+            return [x for x in i]
+
+        def f2(i, k):
+            return [x * len(k) for x in i if x != ' ' ]
+
+        def f3(i, k):
+            return [0.5 * len(x*len(k)) for x in i if x != ' ' if len(x) != 3 ]
+
+        def f4(i, k):
+            return [(y, len(x)) for x in i for y in k if x != y]
+
+        def f5(i, k):
+            return [x + y for x in i if x != 'A' for y in k+x if x != 'e']
+
+        def f6(i, k):
+            return [Tuple(int, int)((len(x), x.find(y))) for x in i for y in k]
+
+        for i in ['one', 'h e l l o', 'ABC' * 1000, 'A ' * 1000, ['one', 'two', 'three', ' ', ''] * 1000, '']:
+            r1 = f1(i)
+            r2 = Entrypoint(f1)(i)
+            self.assertTrue(type(r2) is list)
+            self.assertEqual(r1, r2)
+
+            for f in [f2, f3, f4, f5, f6]:
+                for k in ['e', 'AB', 'one']:
                     r1 = f(i, k)
                     r2 = Entrypoint(f)(i, k)
                     self.assertTrue(type(r2) is list)

@@ -503,6 +503,12 @@ string_getitem_int64 = externalCallTarget(
     Void.pointer(), Int64
 )
 
+string_mult = externalCallTarget(
+    "nativepython_runtime_string_mult",
+    Void.pointer(),
+    Void.pointer(), Int64
+)
+
 string_from_utf8_and_len = externalCallTarget(
     "nativepython_runtime_string_from_utf8_and_len",
     Void.pointer(),

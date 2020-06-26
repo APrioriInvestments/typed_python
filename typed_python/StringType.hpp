@@ -98,6 +98,8 @@ public:
     //return an increffed string containing the data from the utf-encoded string
     static layout* createFromUtf8(const char* utfEncodedString, int64_t len);
 
+    static layout* mult(layout* lhs, int64_t rhs);
+
     bool isBinaryCompatibleWithConcrete(Type* other) {
         if (other->getTypeCategory() != m_typeCategory) {
             return false;

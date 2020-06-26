@@ -440,6 +440,10 @@ extern "C" {
         return StringType::getitem(lhs, index);
     }
 
+    StringType::layout* nativepython_runtime_string_mult(StringType::layout* lhs, int64_t rhs) {
+        return StringType::mult(lhs, rhs);
+    }
+
     StringType::layout* nativepython_runtime_string_chr(int64_t code) {
         if (code < 0 || code > 0x10ffff) {
             PyEnsureGilAcquired getTheGil;

@@ -871,7 +871,6 @@ class NativeTypesTests(unittest.TestCase):
         d1 = d.copy()
         self.assertEqual(d1['a'], (97, 'b'))
         d['a'] = (0, 'x')
-        d['a'] = (0, 'x')
         d['A'] = (65, 'B')
         self.assertEqual(d['a'], (0, 'x'))
         self.assertEqual(d['A'], (65, 'B'))

@@ -760,3 +760,38 @@ class TestStringCompilation(unittest.TestCase):
             return x["bd"]
 
         doIt({'bd': 'yes'})
+
+    def test_string_iteration(self):
+        def iter(x: str):
+            r = ListOf(str)()
+            for a in x:
+                r.append(a)
+            return r
+
+        def iter_constant():
+            r = ListOf(str)()
+            for a in "constant":
+                r.append(a)
+            return r
+
+        def contains_space(x: str):
+            for c in x:
+                if c == ' ':
+                    return True
+            return False
+
+        r1 = iter_constant()
+        r2 = Compiled(iter_constant)()
+        self.assertEqual(type(r1), type(r2))
+        self.assertEqual(r1, r2)
+
+        for v in ['whatever', 'o', '']:
+            r1 = iter(v)
+            r2 = Compiled(iter)(v)
+            self.assertEqual(type(r1), type(r2))
+            self.assertEqual(r1, r2)
+
+        for v in ['', 'a', ' ', 'abc ', 'x'*1000+' '+'x'*1000, 'y'*1000]:
+            r1 = contains_space(v)
+            r2 = Compiled(contains_space)(v)
+            self.assertEqual(r1, r2)
