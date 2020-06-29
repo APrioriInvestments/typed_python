@@ -52,7 +52,7 @@ public:
         assert(t == m_alternative);
     }
 
-    ShaHash _computeShaHash() const;
+    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr);
 
     bool _updateAfterForwardTypesChanged();
 

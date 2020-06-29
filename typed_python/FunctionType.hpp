@@ -498,6 +498,26 @@ public:
             return FunctionArg(name, typeFilterOrNull, defaultValue, isStarArg, isKwarg);
         }
 
+        ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
+            ShaHash res(m_name);
+
+            if (m_defaultValue) {
+                res += MutuallyRecursiveTypeGroup::pyObjectShaHash(m_defaultValue, groupHead);
+            } else {
+                res += ShaHash(1);
+            }
+
+            if (m_typeFilter) {
+                res += m_typeFilter->identityHash(groupHead);
+            } else {
+                res += ShaHash(1);
+            }
+
+            res += ShaHash((m_isStarArg ? 2 : 1) + (m_isKwarg ? 10: 11));
+
+            return res;
+        }
+
     private:
         std::string m_name;
         Type* m_typeFilter;
@@ -1134,6 +1154,12 @@ public:
             }
 
             res += MutuallyRecursiveTypeGroup::pyObjectShaHash(mFunctionCode, groupHead);
+
+            res += ShaHash(mArgs.size());
+
+            for (auto a: mArgs) {
+                res += a._computeIdentityHash(groupHead);
+            }
 
             res += ShaHash(1);
 

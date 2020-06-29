@@ -520,9 +520,10 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
     group->hash();
 }
 
-ShaHash MutuallyRecursiveTypeGroup::computeHash() {
+void MutuallyRecursiveTypeGroup::computeHash() {
     if (mAnyPyObjectsIncorrectlyOrdered) {
-        return ShaHash::poison();
+        mHash = ShaHash::poison();
+        return;
     }
 
     // we are a recursive group head. We want to compute the hash
@@ -547,7 +548,7 @@ ShaHash MutuallyRecursiveTypeGroup::computeHash() {
         }
     }
 
-    return wholeGroupHash;
+    mHash = wholeGroupHash;
 }
 
 // find strongly-connected groups of python objects and Type objects (as far as the
@@ -681,12 +682,14 @@ bool MutuallyRecursiveTypeGroup::objectIsUnassigned(TypeOrPyobj obj) {
 
 // static
 void MutuallyRecursiveTypeGroup::constructRecursiveTypeGroup(TypeOrPyobj root) {
+    // we do things with pyobj refcounts, so we need to hold the gil.
+    PyEnsureGilAcquired getTheGil;
+
     MutuallyRecursiveTypeGroupSearch groupFinder;
 
     static thread_local int count = 0;
     count++;
     if (count > 1) {
-        asm("int3");
         throw std::runtime_error("There should be only one group algo running at once");
     }
     try {
@@ -1120,8 +1123,45 @@ ShaHash MutuallyRecursiveTypeGroup::tpInstanceShaHash(Instance h, MutuallyRecurs
     return ShaHash::poison();
 }
 
+void MutuallyRecursiveTypeGroup::installTypeHash(Type* t) {
+    // now fill out 'mHashToType' so that the deserializer can look types up by hash.
+    // this will call back into the 'hash' function for this group, but we filled it out
+    // already, so that should be OK.
+    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+
+    if (!t->identityHash().isPoison()) {
+        auto it = mHashToType.find(t->identityHash());
+
+        // don't replace a type that's already in there, because when we deserialize
+        // we may rebuild the same type again, but we want to use the primary version
+        if (it == mHashToType.end()) {
+            // std::cout << "INSTALL " << t->name() << " = " << t->identityHash().digestAsHexString() << "\n";
+            mHashToType[t->identityHash()] = t;
+        }
+    }
+}
+
+//static
+Type* MutuallyRecursiveTypeGroup::lookupType(const ShaHash& hash) {
+    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+
+    auto it = mHashToType.find(hash);
+
+    if (it != mHashToType.end()) {
+        return it->second;
+    }
+
+    return nullptr;
+}
+
 //static
 std::unordered_map<PyObject*, ShaHash> MutuallyRecursiveTypeGroup::mPythonObjectShaHashes;
 
 //static
 std::unordered_map<PyObject*, std::pair<MutuallyRecursiveTypeGroup*, int> > MutuallyRecursiveTypeGroup::mPythonObjectTypeGroups;
+
+//static
+std::recursive_mutex MutuallyRecursiveTypeGroup::mHashToTypeMutex;
+
+//static
+std::map<ShaHash, Type*> MutuallyRecursiveTypeGroup::mHashToType;

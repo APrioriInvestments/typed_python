@@ -17,6 +17,7 @@
 #include "PythonSerializationContext.hpp"
 #include "AllTypes.hpp"
 #include "PyInstance.hpp"
+#include "MutuallyRecursiveTypeGroup.hpp"
 
 void PythonSerializationContext::setCompressionEnabled() {
     PyEnsureGilAcquired acquireTheGil;
@@ -149,6 +150,9 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
     PyEnsureGilAcquired acquireTheGil;
 
     PyObject* result = nullptr;
+
+    Type* typeHashExistingType = nullptr;
+    ShaHash typeHash;
     int64_t memo = -1;
 
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
@@ -169,6 +173,12 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
             if (memoObj) {
                 result = incref(memoObj);
             }
+        } else if (fieldNumber == FieldNumbers::TYPE_HASH) {
+            assertWireTypesEqual(wireType, WireType::BYTES);
+            std::string digest = b.readStringObject();
+
+            typeHash = ShaHash::fromDigest(digest);
+            typeHashExistingType = MutuallyRecursiveTypeGroup::lookupType(typeHash);
         } else {
             if (result) {
                 throw std::runtime_error("result already populated");
@@ -231,11 +241,36 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
             } else {
                 throw std::runtime_error("Unknown field number " + format(fieldNumber) + " deserializing python object.");
             }
+
+            // if this type already exists in the system, use the version we have,
+            // not the one we just deserialized.
+            if (typeHashExistingType) {
+                if (result) {
+                    decref(result);
+                }
+
+                result = incref((PyObject*)typeHashExistingType->getTypeRep());
+            }
         }
     });
 
     if (!result) {
         throw std::runtime_error("Corrupt state: neither a memo nor a result.");
+    }
+
+    // if the type hash didn't already exist, make sure after deserialization that
+    // we hash it
+    if (!typeHashExistingType && typeHash != ShaHash()) {
+        if (!PyType_Check(result)) {
+            throw std::runtime_error("result ought to be a type if it has a typeHash");
+        }
+        Type* resultType = PyInstance::extractTypeFrom((PyTypeObject*)result);
+
+        if (!resultType) {
+            throw std::runtime_error("result ought to be a type if it has a typeHash");
+        }
+
+        b.addTypeToHash(resultType, typeHash);
     }
 
     return result;
@@ -769,6 +804,11 @@ void PythonSerializationContext::serializeNativeTypeInner(
         return;
     }
 
+    ShaHash typeHash = nativeType->identityHash();
+    if (!typeHash.isPoison()) {
+        b.writeStringObject(FieldNumbers::TYPE_HASH, nativeType->identityHash().digestAsString());
+    }
+
     uint32_t id;
     bool isNew;
     std::tie(id, isNew) = b.cachePointer(nativeType, nullptr);
@@ -1111,12 +1151,30 @@ void PythonSerializationContext::deserializeClassFunDict(
             } else if (fieldNumber2 == 1) {
                 fun = deserializeNativeType(b, wireType2);
             } else {
-                throw std::runtime_error("Corrupt function definition when deserializing class.");
+                throw std::runtime_error("Corrupt function definition when deserializing class: bad field " + format(fieldNumber2));
             }
         });
 
-        if (!fun || name.size() == 0 || fun->getTypeCategory() != Type::TypeCategory::catFunction) {
-            throw std::runtime_error("Corrupt function definition when deserializing class.");
+        if (!fun) {
+            throw std::runtime_error("Corrupt function definition when deserializing class: no function");
+        }
+
+        if (name.size() == 0) {
+            throw std::runtime_error("Corrupt function definition when deserializing class: no name");
+        }
+
+        if (fun->getTypeCategory() == Type::TypeCategory::catForward && !((Forward*)fun)->getTarget()) {
+            throw std::runtime_error(
+                "Corrupt function definition when deserializing class: function is an untargeted forward."
+            );
+        }
+
+        if (fun->getTypeCategory() != Type::TypeCategory::catFunction) {
+            throw std::runtime_error(
+                "Corrupt function definition when deserializing class fun "
+                + name + ": not a function: "
+                + fun->name() + ". category=" + Type::categoryToString(fun->getTypeCategory())
+            );
         }
 
         dict[name] = (Function*)fun;
@@ -1156,6 +1214,9 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
     Type* resultType = nullptr;
     int32_t memo = -1;
 
+    ShaHash typeHash;
+    Type* typeHashExistingType = nullptr;
+
     std::vector<size_t> fieldNumbers;
 
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
@@ -1175,89 +1236,115 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             }
 
             resultType = (Type*)b.lookupCachedPointer(memo);
-        }
-        else if (fieldNumber == FieldNumbers::OBJECT_NAME) {
+        } else if (fieldNumber == FieldNumbers::TYPE_HASH) {
             assertWireTypesEqual(wireType, WireType::BYTES);
+            std::string digest = b.readStringObject();
 
-            std::string name = b.readStringObject();
+            typeHash = ShaHash::fromDigest(digest);
+            typeHashExistingType = MutuallyRecursiveTypeGroup::lookupType(typeHash);
+        } else {
+            if (fieldNumber == FieldNumbers::OBJECT_NAME) {
+                assertWireTypesEqual(wireType, WireType::BYTES);
 
-            PyObjectStealer result(PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str()));
+                std::string name = b.readStringObject();
 
-            if (!result) {
-                throw PythonExceptionSet();
-            }
+                PyObjectStealer result(PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str()));
 
-            if (!PyType_Check(result)) {
-                throw std::runtime_error("Expected value named " + name + " to be a type.");
-            }
+                if (!result) {
+                    throw PythonExceptionSet();
+                }
 
-            if (result == &PyLong_Type) {
-                resultType = Int64::Make();
-            }
-            else if (result == &PyFloat_Type) {
-                resultType = Float64::Make();
-            }
-            else if (result == &PyBool_Type) {
-                resultType = Bool::Make();
-            }
-            else if (result == &PyUnicode_Type) {
-                resultType = StringType::Make();
-            }
-            else if (result == &PyBytes_Type) {
-                resultType = BytesType::Make();
-            }
-            else if (result == Py_None->ob_type) {
-                resultType = NoneType::Make();
-            } else {
-                resultType = PyInstance::extractTypeFrom((PyTypeObject*)result);
-            }
+                if (!PyType_Check(result)) {
+                    throw std::runtime_error("Expected value named " + name + " to be a type.");
+                }
 
-            if (!resultType) {
-                throw std::runtime_error("Expected value named " + name + " to be a type.");
-            }
-
-            if (memo != -1) {
-                b.addCachedPointer(memo, resultType);
-            }
-        } else if (fieldNumber == FieldNumbers::OBJECT_REPRESENTATION) {
-            resultType = deserializeNativeTypeFromRepresentation(b, wireType, memo);
-        } else if (fieldNumber == FieldNumbers::NATIVE_TYPE) {
-            resultType = deserializeNativeTypeInner(b, wireType, memo);
-
-            if (!resultType) {
-                throw std::runtime_error("Corrupt native type: deserializeNativeTypeInner returned Null");
-            }
-        } else if (fieldNumber == FieldNumbers::RECURSIVE_NATIVE_TYPE) {
-            Forward* fwd = nullptr;
-
-            if (memo == -1) {
-                throw std::runtime_error("Corrupt Recursive Forward");
-            }
-
-            b.consumeCompoundMessage(wireType, [&](size_t subFieldNumber, size_t subWireType) {
-                if (subFieldNumber == 0) {
-                    assertWireTypesEqual(subWireType, WireType::BYTES);
-
-                    std::string name = b.readStringObject();
-
-                    fwd = Forward::Make(name);
-
-                    b.addCachedPointer(memo, fwd);
-                } else if (subFieldNumber == 1) {
-                    if (!fwd) {
-                        throw std::runtime_error("Corrupt Recursive Forward");
-                    }
-                    resultType = deserializeNativeTypeInner(b, subWireType, -1);
-
-                    fwd->define(resultType);
-
-                    b.updateCachedPointer(memo, resultType);
+                if (result == &PyLong_Type) {
+                    resultType = Int64::Make();
+                }
+                else if (result == &PyFloat_Type) {
+                    resultType = Float64::Make();
+                }
+                else if (result == &PyBool_Type) {
+                    resultType = Bool::Make();
+                }
+                else if (result == &PyUnicode_Type) {
+                    resultType = StringType::Make();
+                }
+                else if (result == &PyBytes_Type) {
+                    resultType = BytesType::Make();
+                }
+                else if (result == Py_None->ob_type) {
+                    resultType = NoneType::Make();
                 } else {
+                    resultType = PyInstance::extractTypeFrom((PyTypeObject*)result);
+                }
+
+                if (!resultType) {
+                    throw std::runtime_error("Expected value named " + name + " to be a type.");
+                }
+
+                if (typeHashExistingType) {
+                    resultType = typeHashExistingType;
+                }
+
+                if (memo != -1) {
+                    b.addCachedPointer(memo, resultType);
+                }
+            } else if (fieldNumber == FieldNumbers::OBJECT_REPRESENTATION) {
+                resultType = deserializeNativeTypeFromRepresentation(b, wireType, memo);
+
+                if (typeHashExistingType) {
+                    resultType = typeHashExistingType;
+                }
+            } else if (fieldNumber == FieldNumbers::NATIVE_TYPE) {
+                resultType = deserializeNativeTypeInner(b, wireType, memo);
+
+                if (!resultType) {
+                    throw std::runtime_error("Corrupt native type: deserializeNativeTypeInner returned Null");
+                }
+
+                if (typeHashExistingType) {
+                    resultType = typeHashExistingType;
+                }
+
+                if (memo != -1) {
+                    b.updateCachedPointer(memo, resultType);
+                }
+            } else if (fieldNumber == FieldNumbers::RECURSIVE_NATIVE_TYPE) {
+                Forward* fwd = nullptr;
+
+                if (memo == -1) {
                     throw std::runtime_error("Corrupt Recursive Forward");
                 }
-            });
-        } else {
-            throw std::runtime_error("Corrupt native type: invalid field number " + format(fieldNumber));
+
+                b.consumeCompoundMessage(wireType, [&](size_t subFieldNumber, size_t subWireType) {
+                    if (subFieldNumber == 0) {
+                        assertWireTypesEqual(subWireType, WireType::BYTES);
+
+                        std::string name = b.readStringObject();
+
+                        fwd = Forward::Make(name);
+
+                        b.addCachedPointer(memo, fwd);
+                    } else if (subFieldNumber == 1) {
+                        if (!fwd) {
+                            throw std::runtime_error("Corrupt Recursive Forward");
+                        }
+                        resultType = deserializeNativeTypeInner(b, subWireType, -1);
+
+                        if (typeHashExistingType) {
+                            resultType = typeHashExistingType;
+                        }
+
+                        fwd->define(resultType);
+
+                    } else {
+                        throw std::runtime_error("Corrupt Recursive Forward");
+                    }
+                });
+            } else {
+                throw std::runtime_error("Corrupt native type: invalid field number " + format(fieldNumber));
+            }
         }
     });
 
@@ -1268,8 +1355,20 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
         throw std::runtime_error("Corrupt native type: no result type. " + format(fieldNumbers));
     }
 
+    if (typeHashExistingType) {
+        resultType = typeHashExistingType;
+        if (memo != -1) {
+            b.updateCachedPointer(memo, resultType);
+        }
+    }
+
+    if (!typeHashExistingType && typeHash != ShaHash()) {
+        b.addTypeToHash(resultType, typeHash);
+    }
+
     return resultType;
 }
+
 
 Instance PythonSerializationContext::deserializeNativeInstance(DeserializationBuffer& b, size_t inWireType) const {
     PyEnsureGilAcquired acquireTheGil;

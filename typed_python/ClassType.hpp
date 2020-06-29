@@ -237,6 +237,7 @@ public:
                         throw std::runtime_error("Corrupt non-final class instance: body before type");
                     }
 
+                    //recursively call into the serializer for the actual known type
                     ((Class*)actualType)->deserialize(self, buffer, subWireType, true);
                     hasBody = true;
 

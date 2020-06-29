@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import tempfile
+import pickle
 import sys
 import subprocess
 import os
@@ -20,7 +21,7 @@ import os
 from typed_python import (
     UInt64, UInt32,
     ListOf, TupleOf, Tuple, NamedTuple, Dict, OneOf, Forward, identityHash,
-    Entrypoint, Class, Member, Final, TypeFunction
+    Entrypoint, Class, Member, Final, TypeFunction, SerializationContext
 )
 
 from typed_python.hash import Hash
@@ -41,6 +42,61 @@ def gModuleLevel(x):
     return fModuleLevel(x)
 
 
+def instantiateFiles(filesToWrite, tf):
+    # write all the files out
+    for fname, contents in filesToWrite.items():
+        fullname = os.path.join(tf, fname)
+        dirname = os.path.dirname(fullname)
+
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+
+        with open(fullname, "w") as f:
+            f.write(
+                "from typed_python import *\n"
+                + contents
+            )
+
+
+def evaluateExprInFreshProcess(filesToWrite, expression):
+    """Return the value of an expression
+
+    Args:
+        filesToWrite = a dictionary from filename to the actual file contents to write.
+            note that you need to provide __init__.py for any submodules you create.
+        expression - the expression to evaluate (assume we've imported all the modules)
+
+    Returns:
+        a bytes object containing the sha-hash of module.thingToGrab.
+    """
+    with tempfile.TemporaryDirectory() as tf:
+        instantiateFiles(filesToWrite, tf)
+
+        namesToImport = [
+            fname[:-3].replace("/", ".") for fname in filesToWrite if '__init__' not in fname
+        ]
+
+        output = subprocess.check_output(
+            [
+                sys.executable,
+                "-c",
+                "".join(f"import {modname};" for modname in namesToImport) + (
+                    f"import pickle;"
+                    f"from typed_python._types import identityHash;"
+                    f"from typed_python import *;"
+                    f"print(repr(pickle.dumps({expression})))"
+                )
+            ],
+            cwd=tf
+        )
+        try:
+            # we're returning a 'repr' of a bytes object. the 'eval'
+            # turns it back into a python bytes object so we can compare it.
+            return pickle.loads(eval(output.split(b"\n")[0]))
+        except Exception:
+            raise Exception("Failed to understand output:\n" + output.decode("ASCII"))
+
+
 def checkHash(filesToWrite, expression):
     """Check the hash of a piece of python code using a subprocess.
 
@@ -52,37 +108,11 @@ def checkHash(filesToWrite, expression):
     Returns:
         a bytes object containing the sha-hash of module.thingToGrab.
     """
-    with tempfile.TemporaryDirectory() as tf:
-        # write all the files out
-        for fname, contents in filesToWrite.items():
-            fullname = os.path.join(tf, fname)
-            dirname = os.path.dirname(fullname)
+    return Hash(evaluateExprInFreshProcess(filesToWrite, f"identityHash({expression})"))
 
-            if not os.path.exists(dirname):
-                os.makedirs(dirname)
 
-            with open(fullname, "w") as f:
-                f.write("from typed_python import *\n" + contents)
-
-        namesToImport = [
-            fname[:-3].replace("/", ".") for fname in filesToWrite if '__init__' not in fname
-        ]
-
-        output = subprocess.check_output(
-            [
-                sys.executable,
-                "-c",
-                "".join(f"import {modname};" for modname in namesToImport) +
-                f"from typed_python import identityHash; print(repr(identityHash({expression})))"
-            ],
-            cwd=tf
-        )
-        try:
-            # we're returning a 'repr' of a bytes object. the 'eval'
-            # turns it back into a python bytes object so we can compare it.
-            return Hash(eval(output))
-        except Exception:
-            raise Exception("Failed to understand output:\n" + output.decode("ASCII"))
+def returnSerializedValue(filesToWrite, expression):
+    return evaluateExprInFreshProcess(filesToWrite, f"SerializationContext({{}}).serialize({expression})")
 
 
 def test_identity_of_register_types():
@@ -256,6 +286,20 @@ def test_checkHash_function_body():
     assert checkHash(contents1, 'type(x.g)') != checkHash(contents2, 'type(x.g)')
 
 
+def test_checkHash_function_arg_types():
+    contents1 = {"x.py": "@Entrypoint\ndef g(x: int):\n    return f(x)\n"}
+    contents2 = {"x.py": "@Entrypoint\ndef g(x: float):\n    return f(x)\n"}
+
+    assert checkHash(contents1, 'type(x.g)') != checkHash(contents2, 'type(x.g)')
+
+
+def test_checkHash_function_arg_default_vals():
+    contents1 = {"x.py": "@Entrypoint\ndef g(x=1):\n    return f(x)\n"}
+    contents2 = {"x.py": "@Entrypoint\ndef g(x=2):\n    return f(x)\n"}
+
+    assert checkHash(contents1, 'type(x.g)') != checkHash(contents2, 'type(x.g)')
+
+
 def test_identityHash_of_none():
     assert not Hash(identityHash(type(None))).isPoison()
 
@@ -345,3 +389,47 @@ def test_hash_of_classObj():
 
     assert not Hash(identityHash(Member(int))).isPoison()
     assert not Hash(identityHash(C)).isPoison()
+
+
+MODULE = {
+    'x.py':
+    """
+
+def C():
+    class SomeOtherRandomClass:
+        def __init__(self):
+            self.x = x
+    return SomeOtherRandomClass
+
+def S():
+    class SomeRandomClass(Class, Final):
+        x=Member(int)
+        def f(self, y):
+            return self.x+y
+    return SomeRandomClass
+
+def MakeA():
+    return Alternative("A", A1={})
+
+NT = NamedTuple(aNameUnlikelyToShowUpAnywhereElse=int)
+
+"""
+}
+
+
+def test_repeated_deserialize_externally_defined_named_tuple():
+    ser = returnSerializedValue(MODULE, 'x.NT')
+
+    assert SerializationContext({}).deserialize(ser) is SerializationContext({}).deserialize(ser)
+
+
+def test_repeated_deserialize_externally_defined_class_is_stable():
+    ser = returnSerializedValue(MODULE, 'x.S()')
+
+    assert SerializationContext({}).deserialize(ser) is SerializationContext({}).deserialize(ser)
+
+
+def test_repeated_deserialize_externally_defined_alternative_is_stable():
+    ser = returnSerializedValue(MODULE, 'x.MakeA()')
+
+    assert SerializationContext({}).deserialize(ser) is SerializationContext({}).deserialize(ser)

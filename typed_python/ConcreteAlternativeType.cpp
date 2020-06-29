@@ -32,8 +32,8 @@ bool ConcreteAlternative::isBinaryCompatibleWithConcrete(Type* other) {
     return false;
 }
 
-ShaHash ConcreteAlternative::_computeShaHash() const {
-    return ShaHash(1, m_typeCategory) + ShaHash(m_which) + m_alternative->identityHash();
+ShaHash ConcreteAlternative::_computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead) {
+    return ShaHash(1, m_typeCategory) + ShaHash(m_which) + m_alternative->identityHash(groupHead);
 }
 
 bool ConcreteAlternative::_updateAfterForwardTypesChanged() {

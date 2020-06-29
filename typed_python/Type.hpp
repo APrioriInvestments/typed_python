@@ -642,13 +642,15 @@ public:
 
         // if we've never initialized our hash
         if (mIdentityHash == ShaHash()) {
-            // then our hash is equal to our group's hash plus our position
-            // in the group/
+            ShaHash groupHash = getRecursiveTypeGroup()->hash();
+
             mIdentityHash = (
                 ShaHash(2)
-                + getRecursiveTypeGroup()->hash()
+                + groupHash
                 + ShaHash(mRecursiveTypeGroupIndex)
             );
+
+            MutuallyRecursiveTypeGroup::installTypeHash(this);
         }
 
         return mIdentityHash;

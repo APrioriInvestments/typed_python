@@ -388,7 +388,7 @@ class FunctionOverload:
     @staticmethod
     def extractGlobalNamesFromCode(codeObj):
         res = set()
-        res.update(codeObj.co_names);
+        res.update(codeObj.co_names)
 
         for const in codeObj.co_consts:
             if isinstance(const, type(codeObj)):

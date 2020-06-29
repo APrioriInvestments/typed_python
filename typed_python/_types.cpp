@@ -1435,9 +1435,9 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
         context.reset(new PythonSerializationContext(a3));
     }
 
-    DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a2), PyBytes_GET_SIZE((PyObject*)a2), *context);
+    return translateExceptionToPyObject([&]() {
+        DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a2), PyBytes_GET_SIZE((PyObject*)a2), *context);
 
-    try {
         serializeType->assertForwardsResolved();
 
         Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
@@ -1447,12 +1447,7 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
         });
 
         return PyInstance::extractPythonObject(i.data(), i.type());
-    } catch(std::exception& e) {
-        PyErr_SetString(PyExc_TypeError, e.what());
-        return NULL;
-    } catch(PythonExceptionSet& e) {
-        return NULL;
-    }
+    });
 }
 
 PyObject *decodeSerializedObject(PyObject* nullValue, PyObject* args) {

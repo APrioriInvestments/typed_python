@@ -92,6 +92,7 @@ public:
                       //fields should be present in the stream.
             NATIVE_TYPE = 1, //an encoded native type.
             RECURSIVE_NATIVE_TYPE = 17, //a recursive encoded native type.
+            TYPE_HASH = 19, // the sha-hash of a recursive type
             NATIVE_INSTANCE = 2, //field 0 is the type, field 1 is the data.
             OBJECT_NAME = 3, //a string encoding the name of the object in the current codebase
             OBJECT_TYPEANDDICT = 4, //an object where the object's python type is encoded as

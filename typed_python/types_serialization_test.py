@@ -42,7 +42,7 @@ from typed_python import (
     Forward, Final, Function, Entrypoint, TypeFunction
 )
 
-from typed_python._types import refcount, isRecursive
+from typed_python._types import refcount, isRecursive, identityHash
 
 module_level_testfun = dummy_test_module.testfunction
 
@@ -1320,14 +1320,19 @@ class TypesSerializationTest(unittest.TestCase):
 
         B2 = sc.deserialize(sc.serialize(B))
 
+        assert identityHash(B) == identityHash(B2)
+
         instance = B2()
 
+        self.assertTrue(isinstance(instance.getSelf(), B))
         self.assertTrue(isinstance(instance.getSelf(), B2))
 
         B3 = sc.deserialize(sc.serialize(B2))
 
         instance2 = B3()
 
+        self.assertTrue(isinstance(instance2.getSelf(), B))
+        self.assertTrue(isinstance(instance2.getSelf(), B2))
         self.assertTrue(isinstance(instance2.getSelf(), B3))
 
     def test_serialize_functions_with_cells(self):
@@ -1394,6 +1399,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             self.assertEqual(f2(10), 11)
 
+        # clear the ast's filesystem cache.
         python_ast_util.clearAllCaches()
 
         # now the directory is deleted. When we reserialize it we shouldn't
@@ -1745,7 +1751,7 @@ class TypesSerializationTest(unittest.TestCase):
             type(sc.deserialize(sc.serialize(ModuleLevelClass.f)))
         )
 
-    def DISABLEDtest_serialize_type_function(self):
+    def test_serialize_type_function(self):
         sc = SerializationContext()
 
         self.assertIs(

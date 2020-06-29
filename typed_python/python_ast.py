@@ -880,6 +880,7 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
         algebraicAst = convertPyAstToAlgebraic(pyast, fCode.co_filename, keepLineInformation)
 
         _algebraicAstCache[fCode, keepLineInformation] = algebraicAst
+        _originalAstCache[fCode] = algebraicAst
 
         return algebraicAst
     except Exception as e:

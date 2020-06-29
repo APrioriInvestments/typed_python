@@ -128,12 +128,15 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
+    template<class visitor_type>
+    void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
+        visitor((PyObject*)mPyTypePtr);
+    }
+
     ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
         ShaHash res(1, m_typeCategory);
 
-        if (mGivenType) {
-            res += MutuallyRecursiveTypeGroup::pyObjectShaHash(mGivenType, groupHead);
-        }
+        res += MutuallyRecursiveTypeGroup::pyObjectShaHash((PyObject*)mPyTypePtr, groupHead);
 
         return res;
     }
@@ -207,5 +210,9 @@ public:
 
 private:
     PyTypeObject* mPyTypePtr;
+
+    // this is the object we were given, which in some cases might not really
+    // be a type, but which users expect to refer to a type (for instance, a threading.RLock,
+    // or anything else in internals._nonTypesAcceptedAsTypes);
     PyObject* mGivenType;
 };

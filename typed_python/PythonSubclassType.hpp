@@ -60,6 +60,11 @@ public:
         );
     }
 
+    template<class visitor_type>
+    void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
+        visitor((PyObject*)mTypeRep);
+    }
+
     bool isBinaryCompatibleWithConcrete(Type* other);
 
     template<class visitor_type>

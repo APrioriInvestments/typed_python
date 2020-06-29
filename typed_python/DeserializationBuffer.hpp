@@ -52,6 +52,14 @@ public:
         for (auto p: m_pyobj_needs_decref) {
             decref(p);
         }
+
+        for (auto tAndPresumedHash: mTypesToHash) {
+            if (tAndPresumedHash.first->identityHash() != tAndPresumedHash.second) {
+                std::cout << "WARNING: hash for " << tAndPresumedHash.first->name() << " not stable: "
+                    << " promised " << tAndPresumedHash.second.digestAsHexString()
+                    << " but given " << tAndPresumedHash.first->identityHash().digestAsHexString() << " \n";
+            }
+        }
     }
 
     DeserializationBuffer(const DeserializationBuffer&) = delete;
@@ -504,6 +512,13 @@ public:
         return *ptr;
     }
 
+    // mark this type to be hashed when we're done with deserialization. This
+    // forces the type into the hash memo, so that if we deserialize a second time,
+    // we'll get the type we just deserialized.
+    void addTypeToHash(Type* t, ShaHash expectedHash) {
+        mTypesToHash[t] = expectedHash;
+    }
+
 private:
     bool decompress() {
         if (!m_context.isCompressionEnabled()) {
@@ -579,4 +594,6 @@ private:
     std::map<Type*, std::vector<void*> > m_needs_decref;
 
     std::vector<PyObject*> m_pyobj_needs_decref;
+
+    std::map<Type*, ShaHash> mTypesToHash;
 };

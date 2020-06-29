@@ -28,7 +28,7 @@ public:
 
     ShaHash hash() {
         if (mHash == ShaHash()) {
-            mHash = computeHash();
+            computeHash();
         }
 
         return mHash;
@@ -64,6 +64,10 @@ public:
 
     static bool objectIsUnassigned(TypeOrPyobj obj);
 
+    // find a type by hash if we have it. return null if we don't.
+    static Type* lookupType(const ShaHash& h);
+
+    static void installTypeHash(Type* t);
 private:
     static ShaHash pyObjectShaHashByVisiting(PyObject* obj, MutuallyRecursiveTypeGroup* groupHead);
 
@@ -75,7 +79,12 @@ private:
     // for each python object where we have a hash
     static std::unordered_map<PyObject*, ShaHash> mPythonObjectShaHashes;
 
-    ShaHash computeHash();
+    static std::map<ShaHash, Type*> mHashToType;
+
+    // a guard for mHashToType, which can be accessed by multiple threads in the serializer
+    static std::recursive_mutex mHashToTypeMutex;
+
+    void computeHash();
 
     ShaHash mHash;
 

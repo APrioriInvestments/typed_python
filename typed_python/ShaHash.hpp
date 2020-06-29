@@ -90,6 +90,38 @@ public:
         return *this;
     }
 
+    std::string digestAsString() const {
+        return std::string((uint8_t*)mData, (uint8_t*)mData + sizeof(ShaHash));
+    }
+
+    std::string digestAsHexString() const {
+        char output[100];
+
+        uint8_t* datPtr = (uint8_t*)mData;
+
+        int pos = 0;
+        for (int i = 0; i < sizeof(*this); i++) {
+            pos += sprintf(
+                output + pos,
+                "%02X",
+                datPtr[i]
+            );
+        }
+
+        return "0x" + std::string(output);
+    }
+
+    static ShaHash fromDigest(std::string s) {
+        if (s.size() != sizeof(ShaHash)) {
+            throw std::runtime_error("Incorrect size for hash-digest");
+        }
+
+        ShaHash res;
+        memcpy((void*)&res, s.c_str(), sizeof(ShaHash));
+
+        return res;
+    }
+
     // create a 'poison' sha hash that, like a nan in float-land,
     // always produces another poison sha hash when added. We can use this
     // to indicate that a hash is 'bad' in some dimension.

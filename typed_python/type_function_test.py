@@ -86,7 +86,7 @@ class TypeFunctionTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             anX.y = Y(float)()
 
-    def DISABLEDtest_can_serialize_type_functions(self):
+    def test_can_serialize_type_functions(self):
         @TypeFunction
         def List(T):
             ListT = Forward("ListT")
