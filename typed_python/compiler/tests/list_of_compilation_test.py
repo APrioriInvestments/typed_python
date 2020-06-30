@@ -533,8 +533,6 @@ class TestListOfCompilation(unittest.TestCase):
         self.assertEqual(rc2, rc1 - 10)
 
     def test_list_comprehensions_int(self):
-        # r = convertFunctionToAlgebraicPyAst(f)
-
         def f1(i):
             return [x for x in i]
 
@@ -600,12 +598,17 @@ class TestListOfCompilation(unittest.TestCase):
 
     @pytest.mark.skip(reason="fails")
     def test_list_comprehensions_nested(self):
+        def pr(x):
+            print(x)
+            return x
+
         def f1(i1, i2):
+            return [[pr(x) for x in i1] for y in i2]
+            # all bad:
             # return [[x+y for x in i1 * y] for y in i2]
-            # ok: return [x+y for y in i2 for x in i1 * y]
-            # bad: return [[x for x in i1] for y in i1]
-            return [[x for x in range(3)] for y in range(4)]
-            # return [1/x for x in range(5, -1, -1)]
+            # return [[x for x in i1] for y in i1]
+            # ok:
+            # return [x+y for y in i2 for x in i1 * y]
 
         def f3(i1, i2):
             r = ListOf(ListOf(int))()
@@ -629,7 +632,6 @@ class TestListOfCompilation(unittest.TestCase):
         r1 = f(i1, i2)
         r2 = Entrypoint(f)(i1, i2)
         self.assertEqual(r1, r2)
-        return
 
         for i1 in [[1, 2, 3], [10, 20, 30, 40, 50]]:
             for i2 in [[1, 2], [30, 20, 10]]:

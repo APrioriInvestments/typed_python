@@ -829,6 +829,9 @@ class SetIteratorWrapper(Wrapper):
     def convert_destroy(self, context, expr):
         self.refAs(context, expr, 1).convert_destroy()
 
+    def get_iteration_elt_wrapper(self):
+        return self.keyType
+
 
 class SetKeysIteratorWrapper(SetIteratorWrapper):
     def __init__(self, setType):

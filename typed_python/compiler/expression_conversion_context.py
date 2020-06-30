@@ -36,6 +36,7 @@ from typed_python.compiler.type_wrappers.set_wrapper import MasqueradingSetWrapp
 from typed_python.compiler.type_wrappers.dict_wrapper import MasqueradingDictWrapper
 from typed_python import bytecount
 import typed_python.python_ast as python_ast
+import typed_python.compiler.python_ast_util as python_ast_util
 
 builtinValueIdToNameAndValue = {id(v): (k, v) for k, v in __builtins__.items()}
 
@@ -63,48 +64,132 @@ FunctionArgMapping = Alternative(
 )
 
 
-def pyast_from_typestring(s):
-    return pyast_type(s)[0]
+def pyAlgebraicAstFromText(text):
+    """
+    Parse a string containing a snippet of python code into algebraic AST.
+    One use case: get AST for a typename like "OneOf(Tuple(int, float), str)"
+
+    Args:
+            text: a string containing one line code in python syntax
+    Returns:
+            algrebraic AST corresponding to this string
+    """
+    module = python_ast.convertPyAstToAlgebraic(python_ast_util.pyAstFromText(text), "")
+    return module.body[0].value
 
 
-def pyast_type(s, pos=0):
-    def find_terminator(terms):
-        ret = len(s)
-        for t in terms:
-            p = s.find(t, pos)
-            if p == -1:
-                p = len(s)
-            ret = min(ret, p)
-        return ret
+def pyast_comprehension(ast, result_id, element_type_ast):
+    """
+    Given an algebraic AST representing some kind of comprehension (list, set, or dict),
+    transform the AST to something that uses more elementary operations, speci
 
-    x = find_terminator("(),")
-    if x == len(s) or s[x] != '(':
-        return (python_ast.Expr.Name(
-            id=s[pos:x].strip(),
+    Args:
+        ast: list or set or dict comprehension in algebraic python AST form.
+        result_id: id of variable used to hold the result.
+        element_type_ast: [may be None] algebraic AST indicating the type that the comprehension produces
+
+    Returns: transformed AST, with comprehension replaced with more elementary expressions that we can handle.
+        The return value of this function is a TupleOf(Statement)
+        Within this AST, the result of the comprehension is in the variable named result_id.
+
+    E.g. this will transform the AST representing
+
+        {e for x in s if c}
+
+    into the AST that represents the following code:
+
+        <result_id> = set()
+        for x in s:
+            if c:
+                <result_id>.add(e)
+    """
+
+    if ast.matches.SetComp:
+        type_name = "Set" if element_type_ast else "set"
+        append_attribute = "add"
+        append_args = TupleOf(python_ast.Expr)((ast.elt,))
+    elif ast.matches.ListComp:
+        type_name = "ListOf" if element_type_ast else "list"
+        append_attribute = "append"
+        append_args = TupleOf(python_ast.Expr)((ast.elt,))
+    elif ast.matches.DictComp:
+        type_name = "Dict" if element_type_ast else "dict"
+        append_attribute = "__setitem__"
+        append_args = TupleOf(python_ast.Expr)((ast.key, ast.value))
+
+    if element_type_ast:
+        if ast.matches.ListComp or ast.matches.SetComp:
+            typeargs = (element_type_ast,)
+        else:  # ast.matches.Dict
+            typeargs = (element_type_ast[0], element_type_ast[1])
+        result_type_ast = python_ast.Expr.Call(
+            func=python_ast.Expr.Name(
+                id=type_name,
+                ctx=python_ast.ExprContext.Load()
+            ),
+            args=typeargs
+        )
+    else:
+        result_type_ast = python_ast.Expr.Name(
+            id=type_name,
             ctx=python_ast.ExprContext.Load()
-        ), x)
+        )
 
-    t = s[pos:x].strip()
-    pos = x + 1
-    arg_asts = []
-    while True:
-        (arg_ast, pos) = pyast_type(s, pos)
-        arg_asts.append(arg_ast)
-        if s[pos].isspace() or s[pos] == ',':
-            pos += 1
-            continue
-        if s[pos] == ')':
-            pos += 1
-            break
-        assert False
-
-    return (python_ast.Expr.Call(
-        func=python_ast.Expr.Name(
-            id=t,
-            ctx=python_ast.ExprContext.Load()
+    s1 = python_ast.Statement.Assign(
+        targets=TupleOf(python_ast.Expr)((
+            python_ast.Expr.Name(
+                id=result_id,
+                ctx=python_ast.ExprContext.Store()
+            ),)
         ),
-        args=TupleOf(python_ast.Expr)(arg_asts),
-    ), pos)
+        value=python_ast.Expr.Call(
+            func=result_type_ast,
+            args=(),
+            keywords=()
+        ),
+    )
+
+    s2 = python_ast.Statement.Expr(
+        value=python_ast.Expr.Call(
+            func=python_ast.Expr.Attribute(
+                value=python_ast.Expr.Name(
+                    id=result_id,  # <<<<<<<<
+                    ctx=python_ast.ExprContext.Load(),
+                ),
+                attr=append_attribute,
+                ctx=python_ast.ExprContext.Load()
+            ),
+            args=append_args  # <<<<<<<<
+        )
+    )
+    for g in list(reversed(ast.generators)):
+        if len(g.ifs) == 0:
+            s2 = python_ast.Statement.For(
+                target=g.target,  # <<<<<<<<
+                iter=g.iter,  # <<<<<<<<
+                body=TupleOf(python_ast.Statement)((s2,))
+            )
+        else:
+            if len(g.ifs) == 1:
+                cond = g.ifs[0]
+            else:
+                cond = python_ast.Expr.BoolOp(
+                    op=python_ast.BooleanOp.And(),
+                    values=g.ifs
+                )
+
+            s2 = python_ast.Statement.For(
+                target=g.target,  # <<<<<<<<
+                iter=g.iter,  # <<<<<<<<
+                body=TupleOf(python_ast.Statement)((
+                    python_ast.Statement.If(
+                        test=cond,  # <<<<<<<<
+                        body=TupleOf(python_ast.Statement)((s2,))
+                    ),)
+                ),
+                orelse=()
+            )
+    return TupleOf(python_ast.Statement)((s1, s2))
 
 
 class ExpressionConversionContext(object):
@@ -1383,123 +1468,6 @@ class ExpressionConversionContext(object):
 
         return self.call_typed_call_target(callTarget, args)
 
-    def pyast_comprehension(self, ast, result_id, element_type_ast):
-        """
-        :param ast: list or set or dict comprehension in python ast form.
-        :param result_id: id used to return the result.
-        :param element_type_name: [may be None] the comprehension produces elements of this type
-        :return: transformed python ast, with set comprehension replaced with more elementary expressions that we can handle.
-            The return value of this function is a TupleOf(Statement), a python AST.
-            The result of the comprehension is in the variable named result_id within this code.
-
-        E.g. this will transform the python AST representing
-
-            {e for x in s if c}
-
-        into the python AST that represents the following code:
-
-            <result_id> = set()
-            for x in s:
-                if c:
-                    <result_id>.add(e)
-        """
-
-        if ast.matches.SetComp:
-            type_name = "Set" if element_type_ast else "set"
-            append_attribute = "add"
-            append_args = TupleOf(python_ast.Expr)((ast.elt,))
-        elif ast.matches.ListComp:
-            type_name = "ListOf" if element_type_ast else "list"
-            append_attribute = "append"
-            append_args = TupleOf(python_ast.Expr)((ast.elt,))
-        elif ast.matches.DictComp:
-            type_name = "Dict" if element_type_ast else "dict"
-            append_attribute = "__setitem__"
-            append_args = TupleOf(python_ast.Expr)((ast.key, ast.value))
-
-        if element_type_ast:
-            if ast.matches.ListComp or ast.matches.SetComp:
-                typeargs = (element_type_ast,)
-            else:  # ast.matches.Dict
-                typeargs = (element_type_ast[0], element_type_ast[1])
-            result_type_ast = python_ast.Expr.Call(
-                func=python_ast.Expr.Name(
-                    id=type_name,
-                    ctx=python_ast.ExprContext.Load()
-                ),
-                args=typeargs
-            )
-        else:
-            result_type_ast = python_ast.Expr.Name(
-                id=type_name,
-                ctx=python_ast.ExprContext.Load()
-            )
-
-        s1 = python_ast.Statement.Assign(
-            targets=TupleOf(python_ast.Expr)((
-                python_ast.Expr.Name(
-                    id=result_id,
-                    ctx=python_ast.ExprContext.Store()
-                ),)
-            ),
-            value=python_ast.Expr.Call(
-                func=result_type_ast,
-                args=(),
-                keywords=()
-            ),
-        )
-
-        s2 = python_ast.Statement.Expr(
-            value=python_ast.Expr.Call(
-                func=python_ast.Expr.Attribute(
-                    value=python_ast.Expr.Name(
-                        id=result_id,  # <<<<<<<<
-                        ctx=python_ast.ExprContext.Load(),
-                    ),
-                    attr=append_attribute,
-                    ctx=python_ast.ExprContext.Load()
-                ),
-                args=append_args  # <<<<<<<<
-            )
-        )
-        for g in list(reversed(ast.generators)):
-            # debug = python_ast.Statement.Expr(
-            #     value=python_ast.Expr.Call(
-            #         func=python_ast.Expr.Name(
-            #             id="print",
-            #             ctx=python_ast.ExprContext.Load()
-            #         ),
-            #         args=TupleOf(python_ast.Expr)((ast.elt,))
-            #     )
-            # )
-            if len(g.ifs) == 0:
-                s2 = python_ast.Statement.For(
-                    target=g.target,  # <<<<<<<<
-                    iter=g.iter,  # <<<<<<<<
-                    body=TupleOf(python_ast.Statement)((s2,))
-                )
-            else:
-                if len(g.ifs) == 1:
-                    cond = g.ifs[0]
-                else:
-                    cond = python_ast.Expr.BoolOp(
-                        op=python_ast.BooleanOp.And(),
-                        values=g.ifs
-                    )
-
-                s2 = python_ast.Statement.For(
-                    target=g.target,  # <<<<<<<<
-                    iter=g.iter,  # <<<<<<<<
-                    body=TupleOf(python_ast.Statement)((
-                        python_ast.Statement.If(
-                            test=cond,  # <<<<<<<<
-                            body=TupleOf(python_ast.Statement)((s2,))
-                        ),)
-                    ),
-                    orelse=()
-                )
-        return TupleOf(python_ast.Statement)((s1, s2))
-
     def convert_expression_ast(self, ast):
         """Convert a python_ast.Expression node to a TypedExpression.
 
@@ -1921,7 +1889,10 @@ class ExpressionConversionContext(object):
                     if throwaway_elt is not None \
                             and not isinstance(throwaway_elt.expr_type, PythonObjectOfTypeWrapper):
                         element_type_name = str(throwaway_elt.expr_type)
-                        element_type_ast = pyast_from_typestring(element_type_name)
+                        # TODO: I'm sure there is a better way to do this:
+                        if element_type_name.startswith('Masquerading'):
+                            element_type_name = element_type_name.replace('Masquerading', '', 1)
+                        element_type_ast = pyAlgebraicAstFromText(element_type_name)
                 else:  # ast.matches.DictComp
                     key_type_name = None
                     value_type_name = None
@@ -1936,16 +1907,15 @@ class ExpressionConversionContext(object):
                         value_type_name = str(throwaway_value.expr_type)
 
                     if key_type_name and value_type_name:
-                        element_type_ast = (pyast_from_typestring(key_type_name), pyast_from_typestring(value_type_name))
+                        element_type_ast = (pyAlgebraicAstFromText(key_type_name), pyAlgebraicAstFromText(value_type_name))
 
             result_id = f".result{ast.line_number}.{ast.col_offset}"
-            transformed_ast = self.pyast_comprehension(ast, result_id, element_type_ast)
+            transformed_ast = pyast_comprehension(ast, result_id, element_type_ast)
 
             body, body_returns = self.functionContext.convert_statement_list_ast(transformed_ast, self.variableStates)
             self.pushEffect(body)
             result = self.functionContext.localVariableExpression(self, result_id)
 
-            # TODO: probably really only want to masquerade the outermost comprehension, if nested
             if result.expr_type.typeRepresentation.__typed_python_category__ == 'ListOf':
                 new_type_wrapper = MasqueradingListOfWrapper(result.expr_type.typeRepresentation)
                 return TypedExpression(result.context, result.expr, new_type_wrapper, result.isReference)

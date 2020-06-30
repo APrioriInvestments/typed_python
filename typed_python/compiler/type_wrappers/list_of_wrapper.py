@@ -529,3 +529,6 @@ class MasqueradingListOfWrapper(ListOfWrapper):
         e = e.changeType(typeWrapper(self.typeRepresentation))
 
         return e.convert_to_type_with_target(targetVal, explicit)
+
+    def get_iteration_elt_wrapper(self):
+        return self.underlyingWrapperType
