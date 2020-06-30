@@ -33,8 +33,12 @@ def createEmptyFunction(ast):
     return evaluateFunctionPyAst(ast, stripAnnotations=True)
 
 
-def createFunctionWithLocalsAndGlobals(ast, globals, locals):
-    return evaluateFunctionDefWithLocalsInCells(ast, globals=globals, locals=locals, stripAnnotations=True)
+def createFunctionWithLocalsAndGlobals(code, globals, closure):
+    if globals is None:
+        globals = {}
+    if closure is None:
+        closure = ()
+    return _types.buildPyFunctionObject(code, globals, closure)
 
 
 def astToCodeObject(ast, freevars):
@@ -200,7 +204,12 @@ class SerializationContext(object):
             return getattr(clsObj, fname, None)
 
         if name.startswith(".module_dict."):
-            return self.objectFromName(".modules." + name[13:]).__dict__
+            res = self.objectFromName(".modules." + name[13:])
+
+            if res is None:
+                return None
+
+            return res.__dict__
 
         if name.startswith(".modules."):
             try:
@@ -338,9 +347,9 @@ class SerializationContext(object):
                 localsInCells[x] = inst.__closure__[ix].cell_contents
 
             args = (
-                convertFunctionToAlgebraicPyAst(inst, keepLineInformation=self.encodeLineInformationForCode),
+                inst.__code__,
                 globalsToUse,
-                localsInCells
+                inst.__closure__
             )
 
             return (createFunctionWithLocalsAndGlobals, args, representation)
@@ -388,6 +397,7 @@ class SerializationContext(object):
         if isinstance(instance, FunctionType):
             instance.__name__ = representation['name']
             instance.__qualname__ = representation['qualname']
+            instance.__module__ = representation['module']
             instance.__annotations__ = representation.get('annotations', {})
             instance.__kwdefaults__ = representation.get('kwdefaults', {})
             instance.__defaults__ = representation.get('defaults', ())

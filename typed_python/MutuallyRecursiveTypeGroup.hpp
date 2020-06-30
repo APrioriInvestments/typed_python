@@ -67,6 +67,9 @@ public:
     // find a type by hash if we have it. return null if we don't.
     static Type* lookupType(const ShaHash& h);
 
+    // find an object by hash if we have it. return null if we don't.
+    static PyObject* lookupObject(const ShaHash& h);
+
     static void installTypeHash(Type* t);
 private:
     static ShaHash pyObjectShaHashByVisiting(PyObject* obj, MutuallyRecursiveTypeGroup* groupHead);
@@ -80,6 +83,8 @@ private:
     static std::unordered_map<PyObject*, ShaHash> mPythonObjectShaHashes;
 
     static std::map<ShaHash, Type*> mHashToType;
+
+    static std::map<ShaHash, PyObject*> mHashToObject;
 
     // a guard for mHashToType, which can be accessed by multiple threads in the serializer
     static std::recursive_mutex mHashToTypeMutex;

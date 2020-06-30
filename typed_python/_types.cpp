@@ -2103,6 +2103,49 @@ PyObject *MakeForward(PyObject* nullValue, PyObject* args) {
     }
 }
 
+PyObject* buildPyFunctionObject(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {"code", "globals", "closure", NULL};
+
+    PyObject* pyCode;
+    PyObject* pyGlobals;
+    PyObject* pyClosure;
+
+    return translateExceptionToPyObject([&]() {
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOO", (char**)kwlist, &pyCode, &pyGlobals, &pyClosure)) {
+            throw PythonExceptionSet();
+        }
+
+        if (!PyCode_Check(pyCode)) {
+            throw std::runtime_error("'code' argument to buildPyFunctionObject must be a Code object.");
+        }
+
+        if (!PyDict_Check(pyGlobals)) {
+            throw std::runtime_error("'globals' argument to buildPyFunctionObject must be a dict.");
+        }
+
+        if (!PyTuple_Check(pyClosure)) {
+            throw std::runtime_error("'closure' argument to buildPyFunctionObject must be a tuple.");
+        }
+
+        iterate(pyClosure, [&](PyObject* shouldBeCell) {
+            if (!PyCell_Check(shouldBeCell)) {
+                throw std::runtime_error("closure elements must be cells.");
+            }
+        });
+
+        PyObject* result = PyFunction_New(pyCode, pyGlobals);
+        if (!result) {
+            throw PythonExceptionSet();
+        }
+
+        if (PyFunction_SetClosure(result, pyClosure) == -1) {
+            throw PythonExceptionSet();
+        }
+
+        return result;
+    });
+}
+
 PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     if (PyTuple_Size(args) != 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
         PyErr_SetString(PyExc_TypeError, "Alternative takes a single string positional argument.");
@@ -2197,6 +2240,7 @@ static PyMethodDef module_methods[] = {
     {"serializeStream", (PyCFunction)serializeStream, METH_VARARGS, NULL},
     {"deserializeStream", (PyCFunction)deserializeStream, METH_VARARGS, NULL},
     {"is_default_constructible", (PyCFunction)is_default_constructible, METH_VARARGS, NULL},
+    {"buildPyFunctionObject", (PyCFunction)buildPyFunctionObject, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isSimple", (PyCFunction)isSimple, METH_VARARGS, NULL},
     {"canConstructFrom", (PyCFunction)canConstructFrom, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},

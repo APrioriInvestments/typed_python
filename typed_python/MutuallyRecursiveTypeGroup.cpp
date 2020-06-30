@@ -67,6 +67,11 @@ void visitCompilerVisibleTypesAndPyobjects(
     const visitor_5& onErr
 ) {
     auto visitDict = [&](PyObject* d) {
+        if (!d) {
+            hashVisit(0);
+            return;
+        }
+
         if (!PyDict_Check(d)) {
             onErr();
             return;
@@ -81,6 +86,8 @@ void visitCompilerVisibleTypesAndPyobjects(
             }
         });
 
+        hashVisit(ShaHash(names.size()));
+
         for (auto nameAndO: names) {
             PyObject* val = PyDict_GetItem(d, nameAndO.second);
             if (!val) {
@@ -89,6 +96,18 @@ void visitCompilerVisibleTypesAndPyobjects(
             } else {
                 namedVisitor(nameAndO.first, val);
             }
+        }
+    };
+
+    auto visitTuple = [&](PyObject* t) {
+        if (!t) {
+            hashVisit(ShaHash(0));
+            return;
+        }
+
+        hashVisit(ShaHash(PyTuple_Size(t)));
+        for (long k = 0; k < PyTuple_Size(t); k++) {
+            visit(PyTuple_GetItem(t, k));
         }
     };
 
@@ -244,33 +263,16 @@ void visitCompilerVisibleTypesAndPyobjects(
         visit(f->func_name);
         visit(f->func_code);
 
-        if (f->func_annotations) {
-            hashVisit(ShaHash(1));
-            visit(f->func_annotations);
-        } else {
-            hashVisit(ShaHash(0));
-        }
-
-        if (f->func_defaults) {
-            hashVisit(ShaHash(1));
-            visit(f->func_defaults);
-        } else {
-            hashVisit(ShaHash(0));
-        }
-
-        if (f->func_kwdefaults) {
-            hashVisit(ShaHash(1));
-            visit(f->func_kwdefaults);
-        } else {
-            hashVisit(ShaHash(0));
-        }
+        visitDict(f->func_annotations);
+        visitTuple(f->func_defaults);
+        visitDict(f->func_kwdefaults);
 
         hashVisit(ShaHash(1));
         if (f->func_globals && PyDict_Check(f->func_globals)) {
             std::set<std::string> names;
 
-            // this is a little bit wrong - we should be trying to figure out which names are
-            // not in _cells_ for this.
+            // recursively walk through the code object and see which globals it reads from.
+            // we'll assume it reads from all of its locals.
             MutuallyRecursiveTypeGroup::extractNamesFromCode((PyCodeObject*)f->func_code, names);
 
             for (auto name: names) {
@@ -762,7 +764,6 @@ void MutuallyRecursiveTypeGroup::extractNamesFromCode(PyCodeObject* code, std::s
     };
 
     iterate(code->co_names, adder);
-    iterate(code->co_freevars, adder);
     iterate(code->co_consts, [&](PyObject* o) {
         if (PyCode_Check(o)) {
             extractNamesFromCode((PyCodeObject*)o, outNames);
@@ -803,6 +804,8 @@ ShaHash MutuallyRecursiveTypeGroup::pyObjectShaHashByVisiting(PyObject* obj, Mut
 
 // static
 ShaHash MutuallyRecursiveTypeGroup::pyObjectShaHash(PyObject* h, MutuallyRecursiveTypeGroup* groupHead) {
+    assertHoldingTheGil();
+
     if (!h) {
         return ShaHash(0);
     }
@@ -835,6 +838,7 @@ ShaHash MutuallyRecursiveTypeGroup::pyObjectShaHash(PyObject* h, MutuallyRecursi
 
     // stash the hash in a lookup
     mPythonObjectShaHashes[incref(h)] = res;
+    mHashToObject[res] = incref(h);
 
     return res;
 }
@@ -1142,6 +1146,19 @@ void MutuallyRecursiveTypeGroup::installTypeHash(Type* t) {
 }
 
 //static
+PyObject* MutuallyRecursiveTypeGroup::lookupObject(const ShaHash& hash) {
+    assertHoldingTheGil();
+
+    auto it = mHashToObject.find(hash);
+
+    if (it != mHashToObject.end()) {
+        return it->second;
+    }
+
+    return nullptr;
+}
+
+//static
 Type* MutuallyRecursiveTypeGroup::lookupType(const ShaHash& hash) {
     std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
 
@@ -1165,3 +1182,6 @@ std::recursive_mutex MutuallyRecursiveTypeGroup::mHashToTypeMutex;
 
 //static
 std::map<ShaHash, Type*> MutuallyRecursiveTypeGroup::mHashToType;
+
+//static
+std::map<ShaHash, PyObject*> MutuallyRecursiveTypeGroup::mHashToObject;

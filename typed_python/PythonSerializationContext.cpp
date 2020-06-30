@@ -143,6 +143,9 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
 
     Type* typeHashExistingType = nullptr;
     ShaHash typeHash;
+
+    PyObject* objectHashExistingObject = nullptr;
+    ShaHash objectHash;
     int64_t memo = -1;
 
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
@@ -162,6 +165,26 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
             PyObject* memoObj = (PyObject*)b.lookupCachedPointer(memo);
             if (memoObj) {
                 result = incref(memoObj);
+            }
+        } else if (fieldNumber == FieldNumbers::OBJECT_HASH) {
+            assertWireTypesEqual(wireType, WireType::BYTES);
+            std::string digest = b.readStringObject();
+
+            objectHash = ShaHash::fromDigest(digest);
+
+            objectHashExistingObject = MutuallyRecursiveTypeGroup::lookupObject(objectHash);
+
+            if (objectHashExistingObject) {
+                if (memo != -1 && result) {
+                    // this object is already in the memo
+                    if (result != objectHashExistingObject) {
+                        throw std::runtime_error("Somehow, we placed the wrong hashed object in the memo?");
+                    }
+                } else if (memo != -1) {
+                    // memoize this now and then proceed as if we weren't memozied.
+                    b.addCachedPyObj(memo, incref(objectHashExistingObject));
+                    memo = -1;
+                }
             }
         } else if (fieldNumber == FieldNumbers::TYPE_HASH) {
             assertWireTypesEqual(wireType, WireType::BYTES);
@@ -261,6 +284,20 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
         }
 
         b.addTypeToHash(resultType, typeHash);
+    }
+
+    if (!objectHashExistingObject && objectHash != ShaHash()) {
+        b.addObjectToHash(result, objectHash);
+    }
+
+    if (objectHashExistingObject) {
+        decref(result);
+        incref(objectHashExistingObject);
+        return objectHashExistingObject;
+    }
+
+    if (!result) {
+        throw std::runtime_error("FAILED: no result?");
     }
 
     return result;
@@ -389,38 +426,32 @@ PyObject* PythonSerializationContext::deserializePyFrozenSet(DeserializationBuff
         b.addCachedPyObj(memo, incref(res));
     }
 
-    try {
-        b.consumeCompoundMessageWithImpliedFieldNumbers(inWireType, [&](size_t fieldNumber, size_t wireType) {
-            if (fieldNumber == 0) {
-                b.finishReadingMessageAndDiscard(wireType);
-                return;
-            }
+    b.consumeCompoundMessageWithImpliedFieldNumbers(inWireType, [&](size_t fieldNumber, size_t wireType) {
+        if (fieldNumber == 0) {
+            b.finishReadingMessageAndDiscard(wireType);
+            return;
+        }
 
-            PyObject* item = deserializePythonObject(b, wireType);
+        PyObject* item = deserializePythonObject(b, wireType);
 
-            if (!item) {
-                throw std::runtime_error(std::string("object in frozenset couldn't be deserialized"));
-            }
-            // In the process of deserializing a member, we may have increfed the frozenset
-            // currently being deserialized. In that case PySet_Add will fail, so we temporarily
-            // decref it.
-            auto refcount = Py_REFCNT(res);
-            for (int i = 1; i < refcount; i++) decref(res);
+        if (!item) {
+            throw std::runtime_error(std::string("object in frozenset couldn't be deserialized"));
+        }
+        // In the process of deserializing a member, we may have increfed the frozenset
+        // currently being deserialized. In that case PySet_Add will fail, so we temporarily
+        // decref it.
+        auto refcount = Py_REFCNT(res);
+        for (int i = 1; i < refcount; i++) decref(res);
 
-            int success = PySet_Add(res, item);
+        int success = PySet_Add(res, item);
 
-            for (int i = 1; i < refcount; i++) incref(res);
+        for (int i = 1; i < refcount; i++) incref(res);
 
-            decref(item);
-            if (success < 0) {
-                throw PythonExceptionSet();
-            }
-        });
-    } catch(...) {
-        PySet_Clear(res);
-        decref(res);
-        throw;
-    }
+        decref(item);
+        if (success < 0) {
+            throw PythonExceptionSet();
+        }
+    });
 
     return res;
 }
@@ -456,6 +487,16 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
     if (PyDict_CheckExact(o)) {
         serializePyDict(o, b);
         return;
+    }
+
+    if (PyType_Check(o)) {
+        // we attempt to memoize any class instances. This means you'll have problems if you're
+        // repeatedly reserializing the same class with completely different members.
+        ShaHash hash = MutuallyRecursiveTypeGroup::pyObjectShaHash(o, nullptr);
+
+        if (!hash.isPoison()) {
+            b.writeStringObject(FieldNumbers::OBJECT_HASH, hash.digestAsString());
+        }
     }
 
     //give the plugin a chance to convert the instance to something else
@@ -535,6 +576,13 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromName(Deserializ
     }
     if (result == Py_None){
         throw std::runtime_error("Failed to deserialize Type '" + name + "'");
+    }
+
+    if (result == Py_None) {
+        throw std::runtime_error(
+            "Object named " + name + " doesn't exist in this codebase. Perhaps you "
+            "are deserializing an object from an earlier codebase?"
+        );
     }
 
     if (memo != -1) {

@@ -984,7 +984,11 @@ def cacheAstForCode(code, pyAst):
     from typed_python.compiler.python_ast_analysis import extractFunctionDefsInOrder
 
     codeConstants = [c for c in code.co_consts if isinstance(c, types.CodeType)]
-    funcDefs = extractFunctionDefsInOrder(pyAst.body)
+
+    if isinstance(pyAst, (Statement.FunctionDef, Expr.Lambda, Statement.ClassDef, Statement.AsyncFunctionDef)):
+        funcDefs = extractFunctionDefsInOrder(pyAst.body)
+    else:
+        funcDefs = extractFunctionDefsInOrder(pyAst.generators)
 
     _originalAstCache[code] = pyAst
 

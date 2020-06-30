@@ -89,10 +89,20 @@ def evaluateExprInFreshProcess(filesToWrite, expression):
             ],
             cwd=tf
         )
+
+        def isBytes(x):
+            return x.startswith(b"b'") or x.startswith(b'b"')
+
+        comments = [x for x in output.split(b"\n") if not isBytes(x) and x]
+        result = b'\n'.join([x for x in output.split(b"\n") if isBytes(x)])
+
+        if comments:
+            print("GOT COMMENTS:\n", "\n".join(["\t" + x.decode("ASCII") for x in comments]))
+
         try:
             # we're returning a 'repr' of a bytes object. the 'eval'
             # turns it back into a python bytes object so we can compare it.
-            return pickle.loads(eval(output.split(b"\n")[0]))
+            return pickle.loads(eval(result))
         except Exception:
             raise Exception("Failed to understand output:\n" + output.decode("ASCII"))
 
@@ -407,6 +417,15 @@ def C():
     class SomeOtherRandomClass:
         def __init__(self):
             self.x = x
+
+        @staticmethod
+        def staticM():
+            return
+
+        @property
+        def aProp(self):
+            return 10
+
     return SomeOtherRandomClass
 
 def S():
@@ -427,6 +446,13 @@ def deserializeTwiceAndCall(rep):
     v2 = SerializationContext({}).deserialize(rep)
 
     return (v1(), v2())
+
+
+def deserializeTwiceAndConfirmEquivalent(rep):
+    v1 = SerializationContext({}).deserialize(rep)
+    v2 = SerializationContext({}).deserialize(rep)
+
+    return v1 is v2
 """
 }
 
@@ -447,6 +473,15 @@ def test_repeated_deserialize_externally_defined_alternative_is_stable():
     ser = returnSerializedValue(MODULE, 'x.MakeA()')
 
     assert SerializationContext({}).deserialize(ser) is SerializationContext({}).deserialize(ser)
+
+
+def test_repeated_deserialize_externally_defined_anonymous_classes():
+    ser = returnSerializedValue(MODULE, 'x.C()')
+
+    assert evaluateExprInFreshProcess(
+        MODULE,
+        f'x.deserializeTwiceAndConfirmEquivalent({repr(ser)})'
+    )
 
 
 def test_serialization_of_anonymous_functions_preserves_references():

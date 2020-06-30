@@ -1424,6 +1424,30 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(f3(10), 11)
         self.assertEqual(h2(10), (13, 14))
 
+    def test_serialize_unnamed_classes_retains_identity(self):
+        sc = SerializationContext({})
+
+        class B:
+            def f(self):
+                return B
+
+        B2 = sc.deserialize(sc.serialize(B))
+
+        assert B2 is B
+        assert B2().f() is B2
+        assert B().f() is B2
+
+    def test_serialize_lambda_preserves_identity_hash(self):
+        sc = SerializationContext({})
+
+        def aFunction(self, x):
+            sys
+            return 10
+
+        aFunction2 = sc.deserialize(sc.serialize(aFunction))
+
+        assert identityHash(aFunction) == identityHash(aFunction2)
+
     def test_serialize_subclasses(self):
         sc = SerializationContext({})
 

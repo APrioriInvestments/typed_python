@@ -53,11 +53,26 @@ public:
             decref(p);
         }
 
-        for (auto tAndPresumedHash: mTypesToHash) {
-            if (tAndPresumedHash.first->identityHash() != tAndPresumedHash.second) {
-                std::cout << "WARNING: hash for " << tAndPresumedHash.first->name() << " not stable: "
-                    << " promised " << tAndPresumedHash.second.digestAsHexString()
-                    << " but given " << tAndPresumedHash.first->identityHash().digestAsHexString() << " \n";
+        // if we're unwinding a PythonExceptionSet, we can't have this
+        // code run because it'll undo the error state.
+        if (!PyErr_Occurred()) {
+            for (auto& tAndPresumedHash: mTypesToHash) {
+                if (tAndPresumedHash.first->identityHash() != tAndPresumedHash.second) {
+                    std::cout << "WARNING: hash for " << tAndPresumedHash.first->name() << " not stable: "
+                        << " promised " << tAndPresumedHash.second.digestAsHexString()
+                        << " but given " << tAndPresumedHash.first->identityHash().digestAsHexString() << " \n";
+                }
+            }
+
+            for (auto& oAndPresumedHash: mObjectToHash) {
+                if (MutuallyRecursiveTypeGroup::pyObjectShaHash(oAndPresumedHash.first, nullptr)
+                            != oAndPresumedHash.second) {
+                    std::cout << "WARNING: hash for py object not stable: "
+                        << MutuallyRecursiveTypeGroup::pyObjectShaHash(oAndPresumedHash.first, nullptr).digestAsHexString()
+                        << " vs " << oAndPresumedHash.second.digestAsHexString() << "\n";
+                }
+
+                decref(oAndPresumedHash.first);
             }
         }
     }
@@ -516,7 +531,11 @@ public:
     // forces the type into the hash memo, so that if we deserialize a second time,
     // we'll get the type we just deserialized.
     void addTypeToHash(Type* t, ShaHash expectedHash) {
-        mTypesToHash[t] = expectedHash;
+        mTypesToHash.push_back({t, expectedHash});
+    }
+
+    void addObjectToHash(PyObject* t, ShaHash expectedHash) {
+        mObjectToHash.push_back({incref(t), expectedHash});
     }
 
 private:
@@ -595,5 +614,7 @@ private:
 
     std::vector<PyObject*> m_pyobj_needs_decref;
 
-    std::map<Type*, ShaHash> mTypesToHash;
+    std::vector<std::pair<Type*, ShaHash> > mTypesToHash;
+
+    std::vector<std::pair<PyObject*, ShaHash> > mObjectToHash;
 };
