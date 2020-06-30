@@ -33,6 +33,10 @@ def createEmptyFunction(ast):
     return evaluateFunctionPyAst(ast, stripAnnotations=True)
 
 
+def createFunctionWithLocalsAndGlobals(ast, globals, locals):
+    return evaluateFunctionDefWithLocalsInCells(ast, globals=globals, locals=locals, stripAnnotations=True)
+
+
 def astToCodeObject(ast, freevars):
     return evaluateFunctionDefWithLocalsInCells(
         ast,
@@ -311,25 +315,35 @@ class SerializationContext(object):
             representation["defaults"] = inst.__defaults__
             representation["kwdefaults"] = inst.__kwdefaults__
 
-            all_names = set()
+            globalsToUse = None
 
-            def walkCodeObject(code):
-                all_names.update(code.co_names)
-                # there are 'code' objects for embedded list comprehensions.
-                for c in code.co_consts:
-                    if type(c) is type(code):
-                        walkCodeObject(c)
+            if self.nameForObject(inst.__globals__) is not None:
+                globalsToUse = inst.__globals__
+            else:
+                all_names = set()
 
-            walkCodeObject(inst.__code__)
+                def walkCodeObject(code):
+                    all_names.update(code.co_names)
+                    # there are 'code' objects for embedded list comprehensions.
+                    for c in code.co_consts:
+                        if type(c) is type(code):
+                            walkCodeObject(c)
 
-            representation["freevars"] = {k: v for k, v in inst.__globals__.items() if k in all_names}
+                walkCodeObject(inst.__code__)
 
+                globalsToUse = {k: v for k, v in inst.__globals__.items() if k in all_names}
+
+            localsInCells = {}
             for ix, x in enumerate(inst.__code__.co_freevars):
-                representation["freevars"][x] = inst.__closure__[ix].cell_contents
+                localsInCells[x] = inst.__closure__[ix].cell_contents
 
-            args = (convertFunctionToAlgebraicPyAst(inst, keepLineInformation=self.encodeLineInformationForCode),)
+            args = (
+                convertFunctionToAlgebraicPyAst(inst, keepLineInformation=self.encodeLineInformationForCode),
+                globalsToUse,
+                localsInCells
+            )
 
-            return (createEmptyFunction, args, representation)
+            return (createFunctionWithLocalsAndGlobals, args, representation)
 
         return None
 
@@ -372,7 +386,6 @@ class SerializationContext(object):
             return True
 
         if isinstance(instance, FunctionType):
-            instance.__globals__.update(representation['freevars'])
             instance.__name__ = representation['name']
             instance.__qualname__ = representation['qualname']
             instance.__annotations__ = representation.get('annotations', {})

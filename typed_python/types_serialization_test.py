@@ -84,6 +84,15 @@ ModuleLevelRecursiveForward = ModuleLevelRecursiveForward.define(
 )
 
 
+moduleLevelDict = Dict(int, int)()
+
+
+def moduleLevelDictGetter(x):
+    def f():
+        return (moduleLevelDict, x)
+    return f
+
+
 class C:
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
@@ -1402,6 +1411,10 @@ class TypesSerializationTest(unittest.TestCase):
         # clear the ast's filesystem cache.
         python_ast_util.clearAllCaches()
 
+        # make sure we can still serialize 'f' itself
+        sc.serialize(f)
+        sc.serialize(getH())
+
         # now the directory is deleted. When we reserialize it we shouldn't
         # need it because it should be stashed in the ast cache.
         h = getH2()
@@ -1766,3 +1779,10 @@ class TypesSerializationTest(unittest.TestCase):
             ModuleLevelRecursiveForward,
             sc.deserialize(sc.serialize(ModuleLevelRecursiveForward))
         )
+
+    def test_serialize_reference_to_module_level_constant(self):
+        sc = SerializationContext()
+
+        getter = sc.deserialize(sc.serialize(moduleLevelDictGetter(10)))
+
+        assert getter()[0] is moduleLevelDict

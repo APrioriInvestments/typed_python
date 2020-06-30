@@ -395,6 +395,14 @@ MODULE = {
     'x.py':
     """
 
+aTypedGlobal = Dict(int, int)()
+
+def addToTypedGlobalMaker():
+    def addToTypedGlobal():
+        aTypedGlobal[len(aTypedGlobal)] = 1
+        return len(aTypedGlobal)
+    return addToTypedGlobal
+
 def C():
     class SomeOtherRandomClass:
         def __init__(self):
@@ -413,6 +421,12 @@ def MakeA():
 
 NT = NamedTuple(aNameUnlikelyToShowUpAnywhereElse=int)
 
+
+def deserializeTwiceAndCall(rep):
+    v1 = SerializationContext({}).deserialize(rep)
+    v2 = SerializationContext({}).deserialize(rep)
+
+    return (v1(), v2())
 """
 }
 
@@ -433,3 +447,17 @@ def test_repeated_deserialize_externally_defined_alternative_is_stable():
     ser = returnSerializedValue(MODULE, 'x.MakeA()')
 
     assert SerializationContext({}).deserialize(ser) is SerializationContext({}).deserialize(ser)
+
+
+def test_serialization_of_anonymous_functions_preserves_references():
+    ser = returnSerializedValue(MODULE, 'x.addToTypedGlobalMaker()')
+
+    vals = evaluateExprInFreshProcess(
+        MODULE,
+        f'x.deserializeTwiceAndCall({repr(ser)})'
+    )
+
+    # this checks that the second copy of the function we deserialized in the process
+    # also refers to the same of 'aTypedGlobal' as the first one, which it should inherity
+    # through its closure.
+    assert vals == (1, 2)

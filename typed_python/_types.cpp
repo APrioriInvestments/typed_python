@@ -1304,6 +1304,16 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
     return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
 }
 
+
+PyObject *createPyCell(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "createPyCell takes 1 positional argument");
+        return NULL;
+    }
+
+    return PyCell_New(PyTuple_GetItem(args, 0));
+}
+
 PyObject *identityHash(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "identityHash takes 1 positional argument");
@@ -2207,6 +2217,7 @@ static PyMethodDef module_methods[] = {
     {"getOrSetTypeResolver", (PyCFunction)getOrSetTypeResolver, METH_VARARGS, NULL},
     {"pointerTo", (PyCFunction)pointerTo, METH_VARARGS, NULL},
     {"pyInstanceHeldObjectAddress", (PyCFunction)pyInstanceHeldObjectAddress, METH_VARARGS, NULL},
+    {"createPyCell", (PyCFunction)createPyCell, METH_VARARGS, NULL},
     {"copy", (PyCFunction)copyRefTo, METH_VARARGS, NULL},
     {"refTo", (PyCFunction)refTo, METH_VARARGS, NULL},
     {"getTypePointer", (PyCFunction)getTypePointer, METH_VARARGS, NULL},

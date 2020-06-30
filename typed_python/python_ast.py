@@ -970,14 +970,23 @@ def evaluateFunctionPyAst(pyAst, globals=None, stripAnnotations=False):
 
         res = globals[pyAstModule.body[0].name]
 
-    _originalAstCache[res.__code__] = pyAst
-
-    from typed_python.compiler.python_ast_analysis import extractFunctionDefsInOrder
-
     # extract any inline code constants from the resulting closure and ensure
     # that we know their definitions as well.
-    codeConstants = [c for c in res.__code__.co_consts if isinstance(c, types.CodeType)]
+    cacheAstForCode(res.__code__, pyAst)
+
+    return res
+
+
+def cacheAstForCode(code, pyAst):
+    """Remember that 'code' is equivalent to pyAst, and also for contained code objects."""
+
+    # we have to import this within the function to break the import cycle
+    from typed_python.compiler.python_ast_analysis import extractFunctionDefsInOrder
+
+    codeConstants = [c for c in code.co_consts if isinstance(c, types.CodeType)]
     funcDefs = extractFunctionDefsInOrder(pyAst.body)
+
+    _originalAstCache[code] = pyAst
 
     assert len(funcDefs) == len(codeConstants), (
         f"Expected {len(funcDefs)} func defs to cover the "
@@ -985,9 +994,7 @@ def evaluateFunctionPyAst(pyAst, globals=None, stripAnnotations=False):
     )
 
     for i in range(len(funcDefs)):
-        _originalAstCache[codeConstants[i]] = funcDefs[i]
-
-    return res
+        cacheAstForCode(codeConstants[i], funcDefs[i])
 
 
 def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals, stripAnnotations=False):

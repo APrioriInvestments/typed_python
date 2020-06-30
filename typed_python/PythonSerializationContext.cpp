@@ -97,16 +97,6 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
         if (PyFrozenSet_CheckExact(o)) {
             serializePyFrozenSet(o, b);
         } else
-        if (PyDict_CheckExact(o)) {
-            static PyObject* builtinsModule = PyImport_ImportModule("builtins");
-            static PyObject* builtinsModuleDict = PyObject_GetAttrString(builtinsModule, "__dict__");
-
-            if (builtinsModuleDict == o) {
-                serializePythonObjectNamedOrAsObj(o, b);
-            } else {
-                serializePyDict(o, b);
-            }
-        } else
         if (PyType_Check(o)) {
             Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)o);
 
@@ -321,16 +311,6 @@ PyObject* PythonSerializationContext::deserializePyCell(DeserializationBuffer& b
 void PythonSerializationContext::serializePyDict(PyObject* o, SerializationBuffer& b) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    uint32_t id;
-    bool isNew;
-    std::tie(id, isNew) = b.cachePointer(o);
-
-    b.writeUnsignedVarintObject(FieldNumbers::MEMO, id);
-
-    if (!isNew) {
-        return;
-    }
-
     b.writeBeginCompound(FieldNumbers::DICT);
 
     PyObject *key, *value;
@@ -470,6 +450,11 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
         }
 
         b.writeStringObject(FieldNumbers::OBJECT_NAME, std::string(PyUnicode_AsUTF8(typeName)));
+        return;
+    }
+
+    if (PyDict_CheckExact(o)) {
+        serializePyDict(o, b);
         return;
     }
 
