@@ -152,32 +152,55 @@ void visitCompilerVisibleTypesAndPyobjects(
                         // system module
                         std::string moduleName = PyUnicode_AsUTF8(name);
 
-                        std::function<bool (std::string)> startsWith = [&](std::string name) -> bool {
-                            if (moduleName == name) {
-                                return true;
-                            }
-                            if (moduleName.size() > name.size()) {
-                                return moduleName.substr(0, name.size() + 1) == name + ".";
-                            }
+                        // this is the list of standard library modules in python 3.8
+                        static std::set<string> canonicalPythonModuleNames({
+                            "abc", "aifc", "antigravity", "argparse", "ast", "asynchat", "asyncio", "asyncore",
+                            "base64", "bdb", "binhex", "bisect", "_bootlocale", "bz2", "calendar", "cgi", "cgitb",
+                            "chunk", "cmd", "codecs", "codeop", "code", "collections", "_collections_abc",
+                            "colorsys", "_compat_pickle", "compileall", "_compression", "concurrent",
+                            "configparser", "contextlib", "contextvars", "copy", "copyreg", "cProfile", "crypt",
+                            "csv", "ctypes", "curses", "dataclasses", "datetime", "dbm", "decimal", "difflib",
+                            "dis", "distutils", "doctest", "dummy_threading", "_dummy_thread", "email",
+                            "encodings", "ensurepip", "enum", "filecmp", "fileinput", "fnmatch", "formatter",
+                            "fractions", "ftplib", "functools", "__future__", "genericpath", "getopt", "getpass",
+                            "gettext", "glob", "gzip", "hashlib", "heapq", "hmac", "html", "http", "idlelib",
+                            "imaplib", "imghdr", "importlib", "imp", "inspect", "io", "ipaddress", "json",
+                            "keyword", "lib2to3", "linecache", "locale", "logging", "lzma", "mailbox", "mailcap",
+                            "marshal",
+                            "_markupbase", "mimetypes", "modulefinder", "msilib", "multiprocessing", "netrc",
+                            "nntplib", "ntpath", "nturl2path", "numbers", "opcode", "operator", "optparse", "os",
+                            "_osx_support", "pathlib", "pdb", "pickle", "pickletools", "pipes", "pkgutil",
+                            "platform", "plistlib", "poplib", "posixpath", "pprint", "profile", "pstats", "pty",
+                            "_py_abc", "pyclbr", "py_compile", "_pydecimal", "pydoc_data", "pydoc", "_pyio",
+                            "queue", "quopri", "random", "reprlib", "re", "rlcompleter", "runpy", "sched",
+                            "secrets", "selectors", "shelve", "shlex", "shutil", "signal", "_sitebuiltins",
+                            "site-packages", "site", "smtpd", "smtplib", "sndhdr", "socket", "socketserver",
+                            "sqlite3", "sre_compile", "sre_constants", "sre_parse", "ssl", "statistics", "stat",
+                            "stringprep", "string", "_strptime", "struct", "subprocess", "sunau", "symbol",
+                            "symtable", "sysconfig", "tabnanny", "tarfile", "telnetlib", "tempfile", "test",
+                            "textwrap", "this", "_threading_local", "threading", "timeit", "tkinter", "tokenize",
+                            "token", "traceback", "tracemalloc", "trace", "tty", "turtledemo", "turtle", "types",
+                            "typing", "unittest", "urllib", "uuid", "uu", "venv", "warnings", "wave", "weakref",
+                            "_weakrefset", "webbrowser", "wsgiref", "xdrlib", "xml", "xmlrpc", "zipapp",
+                            "zipfile", "zipimport",
 
-                            return false;
-                        };
+                            // and some standard ones we might commonly install
+                            "numpy", "pandas", "scipy", "pytest", "_pytest", "typed_python", "llvmlite",
+                            "requests", "redis", "websockets", "boto3", "py", "xdist", "pytest_jsonreport",
+                            "pytest_metadata", "flask", "flaky", "coverage"
+                        });
 
-                        if (
-                            startsWith("typed_python")
-                            || startsWith("numpy")
-                            || startsWith("io")
-                            || startsWith("pytest")
-                            || startsWith("_pytest")
-                            || startsWith("llvmlite")
-                            || startsWith("sys")
-                            || startsWith("os")
-                            || startsWith("typing")
-                            || startsWith("abc")
-                            || startsWith("importlib")
-                            || startsWith("collections")
-                            || startsWith("enum")
-                        ) {
+                        std::string moduleNameRoot;
+
+                        int posOfDot = moduleName.find(".");
+                        if (posOfDot != std::string::npos) {
+                            moduleNameRoot = moduleName.substr(0, posOfDot);
+                        } else {
+                            moduleNameRoot = moduleName;
+                        }
+
+                        //exclude modules that shouldn't change underneath us.
+                        if (canonicalPythonModuleNames.find(moduleNameRoot) != canonicalPythonModuleNames.end()) {
                             hashVisit(ShaHash(12));
                             nameVisit(moduleName);
                             return;
@@ -268,6 +291,7 @@ void visitCompilerVisibleTypesAndPyobjects(
         visitDict(f->func_kwdefaults);
 
         hashVisit(ShaHash(1));
+
         if (f->func_globals && PyDict_Check(f->func_globals)) {
             std::set<std::string> names;
 
@@ -476,14 +500,14 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
         }
 
         // uncomment to get a better handle on which objects are in which groups.
-        // std::cout << "Group item " << ordering.size() << " is " << parent.name() << "\n";
+        // std::cout << "    Group item " << ordering.size() << " is " << parent.name() << "\n";
 
         // visitCompilerVisibleTypesAndPyobjects(
         //     parent,
         //     [&](ShaHash h) {},
         //     [&](const std::string& s) {},
-        //     [&](TypeOrPyobj t) { std::cout << "  -> " << t.name() << "\n"; },
-        //     [&](const std::string& s, TypeOrPyobj t) { std::cout << "  -> " << t.name() << "\n"; },
+        //     [&](TypeOrPyobj t) { std::cout << "      -> " << t.name() << "\n"; },
+        //     [&](const std::string& s, TypeOrPyobj t) { std::cout << "      -> " << t.name() << "\n"; },
         //     [&]() {}
         // );
 
@@ -499,6 +523,8 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
             [&]() {}
         );
     };
+
+    // std::cout << "Finish group with " << types.size() << " items\n";
 
     visit(*root);
 
@@ -692,7 +718,10 @@ void MutuallyRecursiveTypeGroup::constructRecursiveTypeGroup(TypeOrPyobj root) {
     static thread_local int count = 0;
     count++;
     if (count > 1) {
-        throw std::runtime_error("There should be only one group algo running at once");
+        throw std::runtime_error(
+            "There should be only one group algo running at once. Somehow, "
+            "our reference to " + root.name() + " wasn't captured correctly."
+        );
     }
     try {
         groupFinder.pushGroup(root);
