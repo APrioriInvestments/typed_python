@@ -42,6 +42,8 @@ public:
 
     static ShaHash tpInstanceShaHash(Instance h, MutuallyRecursiveTypeGroup* groupHead);
 
+    static ShaHash tpInstanceShaHash(Type* t, uint8_t* data, MutuallyRecursiveTypeGroup* groupHead);
+
     static void constructRecursiveTypeGroup(TypeOrPyobj root);
 
     static ShaHash pyCodeObjectShaHash(PyCodeObject* co, MutuallyRecursiveTypeGroup* groupHead);

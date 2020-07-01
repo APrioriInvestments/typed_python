@@ -1135,25 +1135,103 @@ ShaHash MutuallyRecursiveTypeGroup::computePyObjectShaHash(PyObject* h, Mutually
 
 // static
 ShaHash MutuallyRecursiveTypeGroup::tpInstanceShaHash(Instance h, MutuallyRecursiveTypeGroup* groupHead) {
-    if (h.type()->getTypeCategory() == Type::TypeCategory::catNone) {
-        return ShaHash(0);
+    return tpInstanceShaHash(h.type(), h.data(), groupHead);
+}
+
+ShaHash MutuallyRecursiveTypeGroup::tpInstanceShaHash(Type* t, instance_ptr data, MutuallyRecursiveTypeGroup* groupHead) {
+    ShaHash typeHash = t->identityHash(groupHead);
+
+    if (t->getTypeCategory() == Type::TypeCategory::catNone) {
+        return typeHash;
     }
 
-    if (h.type()->getTypeCategory() == Type::TypeCategory::catBool) {
-        return ShaHash(h.cast<bool>() ? 1 : 2);
+    if (t->getTypeCategory() == Type::TypeCategory::catBool) {
+        return typeHash + ShaHash((*(bool*)data) ? 1 : 2);
     }
 
-    if (h.type()->getTypeCategory() == Type::TypeCategory::catInt64) {
-        return ShaHash(3) + ShaHash(h.cast<int64_t>());
+    if (t->getTypeCategory() == Type::TypeCategory::catInt64) {
+        return typeHash + ShaHash((*(int64_t*)data));
     }
 
-    if (h.type()->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
-        return pyObjectShaHash(h.cast<PythonObjectOfType::layout_type*>()->pyObj, groupHead);
+    if (t->getTypeCategory() == Type::TypeCategory::catInt32) {
+        return typeHash + ShaHash((*(int32_t*)data));
     }
 
-    std::cout << "WARNING: tried to hash Instance " << h.repr() << " of type " << h.type()->name() << "\n";
+    if (t->getTypeCategory() == Type::TypeCategory::catInt16) {
+        return typeHash + ShaHash((*(int16_t*)data));
+    }
 
-    return ShaHash::poison();
+    if (t->getTypeCategory() == Type::TypeCategory::catInt8) {
+        return typeHash + ShaHash((*(int8_t*)data));
+    }
+
+    if (t->getTypeCategory() == Type::TypeCategory::catUInt64) {
+        return typeHash + ShaHash((*(uint64_t*)data));
+    }
+
+    if (t->getTypeCategory() == Type::TypeCategory::catUInt32) {
+        return typeHash + ShaHash((*(uint32_t*)data));
+    }
+
+    if (t->getTypeCategory() == Type::TypeCategory::catUInt16) {
+        return typeHash + ShaHash((*(uint16_t*)data));
+    }
+
+    if (t->getTypeCategory() == Type::TypeCategory::catUInt8) {
+        return typeHash + ShaHash((*(uint8_t*)data));
+    }
+
+    if (t->getTypeCategory() == Type::TypeCategory::catFloat64) {
+        return typeHash + ShaHash::SHA1(data, sizeof(double));
+    }
+
+    if (t->getTypeCategory() == Type::TypeCategory::catFloat32) {
+        return typeHash + ShaHash::SHA1(data, sizeof(float));
+    }
+
+    if (t->getTypeCategory() == Type::TypeCategory::catString) {
+        static StringType* stringType = StringType::Make();
+        return typeHash + ShaHash(stringType->toUtf8String(data));
+    }
+
+    if (t->getTypeCategory() == Type::TypeCategory::catTuple || t->getTypeCategory() == Type::TypeCategory::catNamedTuple) {
+        ShaHash res = typeHash;
+        Tuple* tup = (Tuple*)t;
+        for (long k = 0; k < tup->getTypes().size(); k++) {
+            res += tpInstanceShaHash(t, data + tup->getOffsets()[k], groupHead);
+        }
+        return res;
+    }
+
+    if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+        ShaHash res = typeHash;
+        TupleOfType* tup = (TupleOfType*)t;
+        for (long k = 0; k < tup->count(data); k++) {
+            res += tpInstanceShaHash(tup->getEltType(), tup->eltPtr(data, k), groupHead);
+        }
+        return res;
+    }
+
+    if (t->getTypeCategory() == Type::TypeCategory::catAlternative) {
+        ShaHash res = typeHash;
+        Alternative* a = (Alternative*)t;
+        int which = a->which(data);
+        res += ShaHash(which);
+
+        res += tpInstanceShaHash(
+            a->subtypes()[which].second,
+            a->eltPtr(data),
+            groupHead
+        );
+
+        return res;
+    }
+
+    if (t->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
+        return pyObjectShaHash(((PythonObjectOfType::layout_type*)data)->pyObj, groupHead);
+    }
+
+    return typeHash;
 }
 
 void MutuallyRecursiveTypeGroup::installTypeHash(Type* t) {
