@@ -355,6 +355,13 @@ call_pyobj = externalCallTarget(
     varargs=True
 )
 
+call_func_as_pyobj = externalCallTarget(
+    "nativepython_runtime_call_func_as_pyobj",
+    Void.pointer(),
+    Void.pointer(),
+    varargs=True
+)
+
 get_pyobj_None = externalCallTarget(
     "nativepython_runtime_get_pyobj_None",
     Void.pointer()

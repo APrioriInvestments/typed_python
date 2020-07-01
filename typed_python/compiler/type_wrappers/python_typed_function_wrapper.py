@@ -20,6 +20,8 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
+import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
+from typed_python.compiler.native_ast import VoidPtr
 
 
 import typed_python.compiler.native_ast as native_ast
@@ -131,6 +133,58 @@ class PythonTypedFunctionWrapper(Wrapper):
 
         return t
 
+    def convert_nocompile_call(self, context, instance, args, kwargs):
+        if len(self.typeRepresentation.overloads) != 1:
+            raise Exception("Can't mark multi-overload functions nocompile yet.")
+
+        returnType = self.typeRepresentation.overloads[0].returnType or object
+
+        argsAsObjects = []
+        for a in args:
+            argsAsObjects.append(a.convert_to_type(object))
+            if argsAsObjects[-1] is None:
+                return None
+
+        kwargsAsObjects = {}
+
+        for k, a in kwargs.items():
+            kwargsAsObjects[k] = a.convert_to_type(object)
+
+            if kwargsAsObjects[k] is None:
+                return None
+
+        arguments = []
+        kwarguments = []
+
+        for a in argsAsObjects:
+            arguments.append(a.nonref_expr.cast(VoidPtr))
+
+        for kwargName, kwargVal in kwargsAsObjects.items():
+            kwarguments.append(kwargVal.nonref_expr.cast(VoidPtr))
+            kwarguments.append(native_ast.const_utf8_cstr(kwargName))
+
+        if not instance.isReference:
+            instance = context.pushMove(instance)
+
+        result = context.push(
+            object,
+            lambda oPtr:
+                oPtr.expr.store(
+                    runtime_functions.call_func_as_pyobj.call(
+                        native_ast.const_int_expr(
+                            context.getTypePointer(self.typeRepresentation)
+                        ).cast(VoidPtr),
+                        instance.expr.cast(VoidPtr),
+                        native_ast.const_int_expr(len(arguments)),
+                        native_ast.const_int_expr(len(kwargsAsObjects)),
+                        *arguments,
+                        *kwarguments,
+                    ).cast(typeWrapper(object).getNativeLayoutType())
+                )
+        )
+
+        return result.convert_to_type(returnType)
+
     def convert_call(self, context, left, args, kwargs):
         if left is None:
             assert bytecount(self.typeRepresentation) == 0
@@ -139,22 +193,7 @@ class PythonTypedFunctionWrapper(Wrapper):
         # check if we are marked 'nocompile' in which case we convert to 'object' and dispatch
         # to the interpreter. We do retain any typing information on the return type, however.
         if self.typeRepresentation.isNocompile:
-            if len(self.typeRepresentation.overloads) != 1:
-                raise Exception("Can't mark multi-overload functions nocompile yet.")
-
-            returnType = self.typeRepresentation.overloads[0].returnType or object
-
-            assert bytecount(self.typeRepresentation.ClosureType) == 0, "Only empty-closure functions should be marked nocompile"
-            asObject = self.typeRepresentation()
-
-            callRes = context.constantPyObject(asObject).convert_call(
-                args, kwargs
-            )
-
-            if callRes is None:
-                return None
-
-            return callRes.convert_to_type(returnType)
+            return self.convert_nocompile_call(context, left, args, kwargs)
 
         argTypes = [a.expr_type for a in args]
         kwargTypes = {k: v.expr_type for k, v in kwargs.items()}

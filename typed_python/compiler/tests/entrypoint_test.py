@@ -571,3 +571,34 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         adder2 = sc.deserialize(sc.serialize(adder))
 
         self.assertEqual(adder(10), adder2(10))
+
+    def test_not_compiled_references_work(self):
+        @NotCompiled
+        def simple():
+            return 10
+
+        def makeNotCompiled(x):
+            @NotCompiled
+            def f():
+                return x
+            return f
+
+        l1 = []
+        l2 = []
+
+        f1 = makeNotCompiled(l1)
+        f2 = makeNotCompiled(l2)
+        f3 = makeNotCompiled(l1)
+
+        assert f1() is l1
+        assert f2() is l2
+        assert f3() is l1
+
+        @Entrypoint
+        def callIt(aFun):
+            return aFun()
+
+        assert callIt(simple) == 10
+        assert callIt(f1) is l1
+        assert callIt(f2) is l2
+        assert callIt(f3) is l1

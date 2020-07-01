@@ -771,6 +771,56 @@ extern "C" {
         return PyObject_Length(layout->pyObj);
     }
 
+    // call a Function object from the interpreter
+    PythonObjectOfType::layout_type* nativepython_runtime_call_func_as_pyobj(
+        Function* func,
+        instance_ptr closure,
+        int argCount,
+        int kwargCount,
+        ...
+    ) {
+        PyEnsureGilAcquired getTheGil;
+
+        if (func->getOverloads().size() != 1) {
+            PyErr_SetString(PyExc_TypeError, "can't call a nocompile function with more than 1 overload");
+            throw PythonExceptionSet();
+        }
+
+        PyObjectStealer funcObj(func->getOverloads()[0].buildFunctionObj(func->getClosureType(), closure));
+
+        if (!funcObj) {
+            throw PythonExceptionSet();
+        }
+
+        // each of 'argCount' arguments is a PyObject* followed by a const char*
+        va_list va_args;
+        va_start(va_args, kwargCount);
+
+        PyObjectStealer args(PyTuple_New(argCount));
+        PyObjectStealer kwargs(PyDict_New());
+
+        for (int i = 0; i < argCount; ++i) {
+            PyTuple_SetItem((PyObject*)args, i, incref(va_arg(va_args, PythonObjectOfType::layout_type*)->pyObj));
+        }
+
+        for (int i = 0; i < kwargCount; ++i) {
+            PyObject* kwargVal = va_arg(va_args, PythonObjectOfType::layout_type*)->pyObj;
+            const char* kwargName = va_arg(va_args, const char*);
+
+            PyDict_SetItemString((PyObject*)kwargs, kwargName, kwargVal);
+        }
+
+        va_end(va_args);
+
+        PyObject* res = PyObject_Call((PyObject*)funcObj, args, kwargs);
+
+        if (!res) {
+            throw PythonExceptionSet();
+        }
+
+        return PythonObjectOfType::stealToCreateLayout(res);
+    }
+
     PythonObjectOfType::layout_type* nativepython_runtime_call_pyobj(PythonObjectOfType::layout_type* toCall, int argCount, int kwargCount, ...) {
         PyEnsureGilAcquired getTheGil;
 
