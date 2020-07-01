@@ -30,6 +30,11 @@ public:
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
+        Type* t = mInstance.type();
+        visitor(t);
+        if (t != mInstance.type()) {
+            throw std::runtime_error("visitor shouldn't have changed the type of a Value");
+        }
     }
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {

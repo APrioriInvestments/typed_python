@@ -455,6 +455,8 @@ std::string MutuallyRecursiveTypeGroup::pyObjectSortName(PyObject* o) {
 
 // static
 void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<TypeOrPyobj>& types) {
+    bool veryVerbose = false;
+
     MutuallyRecursiveTypeGroup* group = new MutuallyRecursiveTypeGroup();
 
     if (types.size() == 0) {
@@ -499,17 +501,18 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
             return;
         }
 
-        // uncomment to get a better handle on which objects are in which groups.
-        // std::cout << "    Group item " << ordering.size() << " is " << parent.name() << "\n";
+        if (veryVerbose) {
+            std::cout << "    Group item " << ordering.size() << " is " << parent.name() << "\n";
 
-        // visitCompilerVisibleTypesAndPyobjects(
-        //     parent,
-        //     [&](ShaHash h) {},
-        //     [&](const std::string& s) {},
-        //     [&](TypeOrPyobj t) { std::cout << "      -> " << t.name() << "\n"; },
-        //     [&](const std::string& s, TypeOrPyobj t) { std::cout << "      -> " << t.name() << "\n"; },
-        //     [&]() {}
-        // );
+            visitCompilerVisibleTypesAndPyobjects(
+                parent,
+                [&](ShaHash h) {},
+                [&](const std::string& s) {},
+                [&](TypeOrPyobj t) { std::cout << "      -> " << t.name() << "\n"; },
+                [&](const std::string& s, TypeOrPyobj t) { std::cout << "      -> " << t.name() << "\n"; },
+                [&]() {}
+            );
+        }
 
         int index = ordering.size();
         ordering[parent] = index;
@@ -524,7 +527,9 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
         );
     };
 
-    // std::cout << "Finish group with " << types.size() << " items\n";
+    if (veryVerbose) {
+        std::cout << "Finish group with " << types.size() << " items\n";
+    }
 
     visit(*root);
 
@@ -1198,7 +1203,7 @@ ShaHash MutuallyRecursiveTypeGroup::tpInstanceShaHash(Type* t, instance_ptr data
         ShaHash res = typeHash;
         Tuple* tup = (Tuple*)t;
         for (long k = 0; k < tup->getTypes().size(); k++) {
-            res += tpInstanceShaHash(t, data + tup->getOffsets()[k], groupHead);
+            res += tpInstanceShaHash(tup->getTypes()[k], data + tup->getOffsets()[k], groupHead);
         }
         return res;
     }
