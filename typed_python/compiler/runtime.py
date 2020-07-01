@@ -323,7 +323,6 @@ def NotCompiled(pyFunc, returnTypeOverride=None):
     pyFunc = Function(
         pyFunc,
         returnTypeOverride=returnTypeOverride,
-        assumeClosuresGlobal=True
     ).withNocompile(True)
 
     return pyFunc
