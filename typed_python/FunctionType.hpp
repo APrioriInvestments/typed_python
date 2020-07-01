@@ -506,6 +506,13 @@ public:
             return mArgTypes;
         }
 
+        bool operator==(const CompiledSpecialization& other) const {
+            return mFuncPtr == other.mFuncPtr
+                && mReturnType == other.mReturnType
+                && mArgTypes == other.mArgTypes
+                ;
+        }
+
     private:
         compiled_code_entrypoint mFuncPtr;
         Type* mReturnType;
@@ -747,7 +754,15 @@ public:
         }
 
         void addCompiledSpecialization(compiled_code_entrypoint e, Type* returnType, const std::vector<Type*>& argTypes) {
-            mCompiledSpecializations.push_back(CompiledSpecialization(e,returnType,argTypes));
+            CompiledSpecialization newSpec = CompiledSpecialization(e,returnType,argTypes);
+
+            for (auto& spec: mCompiledSpecializations) {
+                if (spec == newSpec) {
+                    return;
+                }
+            }
+
+            mCompiledSpecializations.push_back(newSpec);
         }
 
         void touchCompiledSpecializations() {

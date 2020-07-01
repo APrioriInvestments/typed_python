@@ -840,6 +840,21 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert currentMemUsageMb() - m0 < 2.0
 
+    def test_building_closures_of_closures_doesnt_leak(self):
+        m0 = currentMemUsageMb()
+        t0 = time.time()
+
+        @NotCompiled
+        def f(x):
+            return x + 1
+
+        while time.time() - t0 < 2.0:
+            @Function
+            def g(x):
+                return f(x)
+
+        assert currentMemUsageMb() - m0 < 2.0
+
     def test_calling_notcompiled_doesnt_leak(self):
         @Entrypoint
         def callIt(x):
@@ -869,3 +884,49 @@ class TestCompilingClosures(unittest.TestCase):
             callIt(moduleLevelNotCompiled, 10)
 
         assert currentMemUsageMb() - m0 < 2.0
+
+    def test_type_inference_doesnt_leak(self):
+        def g(x):
+            return x + 2.0
+
+        @Entrypoint
+        def callIt(x):
+            return g(x) + 1
+
+        callIt.resultTypeFor(int)
+
+        m0 = currentMemUsageMb()
+        t0 = time.time()
+
+        while time.time() - t0 < 2.0:
+            callIt.resultTypeFor(int)
+
+        assert currentMemUsageMb() - m0 < 1.0
+
+    def test_copy_closure_with_cells(self):
+        # we need the closure to hold something with a refcount
+        # or else we don't generate a closure
+        z = "hi"
+
+        @Entrypoint
+        def f(x):
+            return x + z
+
+        @TypeFunction
+        def ClassHolding(T):
+            class C(Class, Final):
+                t = Member(T)
+
+                def __init__(self, t):
+                    self.t = t
+
+            return C
+
+        @Entrypoint
+        def makeClassHolding(x):
+            return ClassHolding(type(x))(x)
+
+        r = makeClassHolding(f)
+
+        # check that we are actually using a TypedCell
+        assert issubclass(r.MemberTypes[0].ClosureType, TypedCell)
