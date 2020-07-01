@@ -89,6 +89,10 @@ public:
 
             Function* funcType = PyFunctionInstance::convertPythonObjectToFunctionType(name, o, false, true);
 
+            if (!funcType) {
+                throw PythonExceptionSet();
+            }
+
             Instance funcAsInstance = Instance::createAndInitialize(
                 funcType,
                 [&](instance_ptr ptr) {
@@ -96,7 +100,7 @@ public:
                 }
             );
 
-            result.set(PyInstance::extractPythonObject(funcAsInstance));
+            result.steal(PyInstance::extractPythonObject(funcAsInstance));
         }
 
         return result;
