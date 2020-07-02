@@ -38,7 +38,7 @@ class DidCompileVisitor(RuntimeEventVisitor):
 
         self.didCompile = False
 
-    def onNewFunction(self, f, inputTypes, outputType, variables):
+    def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variableTypes):
         self.didCompile = True
 
 

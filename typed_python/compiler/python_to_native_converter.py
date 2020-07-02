@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import types
+import logging
 
 from typed_python.hash import Hash
 
@@ -141,11 +142,11 @@ class PythonToNativeConverter(object):
         # if True, then insert additional code to check for undefined behavior.
         self.generateDebugChecks = False
         self._link_name_for_identity = {}
-        self._identity_to_identityHash = {}
         self._definitions = {}
         self._targets = {}
         self._inflight_definitions = {}
         self._inflight_function_conversions = {}
+        self._identifier_to_pyfunc = {}
         self._times_calculated = {}
         self._new_native_functions = set()
         self._used_names = set()
@@ -188,14 +189,11 @@ class PythonToNativeConverter(object):
 
         return res
 
-    def new_name(self, name, prefix="py."):
-        suffix = None
-        getname = lambda: prefix + name + ("" if suffix is None else ".%s" % suffix)
-        while getname() in self._used_names:
-            suffix = 1 if not suffix else suffix+1
-        res = getname()
-        self._used_names.add(res)
-        return res
+    def new_name(self, name, identityHash, prefix="tp."):
+        name = prefix + name + "." + identityHash
+        assert name not in self._used_names
+        self._used_names = name
+        return name
 
     def createConversionContext(self, identity, funcName, funcCode, funcGlobals, closureVars, input_types, output_type):
         pyast = self._code_to_ast(funcCode)
@@ -232,17 +230,19 @@ class PythonToNativeConverter(object):
         else:
             return None
 
-    def defineNonPythonFunction(self, name, identity, context, callback=None):
+    def defineNonPythonFunction(self, name, identityTuple, context, callback=None):
         """Define a non-python generating function (if we haven't defined it before already)
 
             name - the name to actually give the function.
-            identity - a unique identifier for this function to allow us to cache it.
+            identityTuple - a unique (sha)hashable tuple
             context - a FunctionConvertsionContext lookalike
             callback - a function taking a function pointer that gets called after codegen
                 to allow us to install this function pointer.
 
         returns a TypedCallTarget, or None if it's not known yet
         """
+        identity = self.hashObjectToIdentity(identityTuple).hexdigest
+
         if self._currentlyConverting is not None:
             self._dependencies.addEdge(self._currentlyConverting, identity)
         else:
@@ -254,7 +254,7 @@ class PythonToNativeConverter(object):
         if identity in self._link_name_for_identity:
             return self._targets.get(self._link_name_for_identity[identity])
 
-        new_name = self.new_name(name, "runtime.")
+        new_name = self.new_name(name, identity, "runtime.")
 
         self._link_name_for_identity[identity] = new_name
         self._inflight_function_conversions[identity] = context
@@ -279,7 +279,7 @@ class PythonToNativeConverter(object):
         """Define a native function if we haven't defined it before already.
 
             name - the name to actually give the function.
-            identity - a unique identifier for this function to allow us to cache it.
+            identity - a tuple consisting of strings, ints, type wrappers, and tuples of same
             input_types - list of Wrapper objects for the incoming types
             output_type - Wrapper object for the output type.
             generatingFunction - a function producing a native_function_definition.
@@ -295,7 +295,9 @@ class PythonToNativeConverter(object):
         output_type = typeWrapper(output_type)
         input_types = [typeWrapper(x) for x in input_types]
 
-        identity = ("native", identity, output_type, tuple(input_types))
+        identity = (
+            Hash.from_integer(2) + self.hashObjectToIdentity(identity)
+        ).hexdigest
 
         return self.defineNonPythonFunction(
             name,
@@ -427,7 +429,7 @@ class PythonToNativeConverter(object):
             output_type=native_ast.Type.Void()
         )
 
-        new_name = self.new_name(callTarget.name + ".dispatch")
+        new_name = callTarget.name + ".dispatch"
         self._link_name_for_identity[identifier] = new_name
 
         self._definitions[new_name] = definition
@@ -564,6 +566,37 @@ class PythonToNativeConverter(object):
             assertIsRoot=assertIsRoot
         )
 
+    def hashObjectToIdentity(self, hashable):
+        if isinstance(hashable, Hash):
+            return hashable
+
+        if isinstance(hashable, int):
+            return Hash.from_integer(hashable)
+
+        if isinstance(hashable, str):
+            return Hash.from_string(hashable)
+
+        if hashable is None:
+            return Hash.from_integer(1) + Hash.from_integer(0)
+
+        if isinstance(hashable, (tuple, list)):
+            res = Hash.from_integer(len(hashable))
+            for t in hashable:
+                res += self.hashObjectToIdentity(t)
+            return res
+
+        if isinstance(hashable, dict):
+            res = Hash.from_integer(len(hashable))
+            for t in sorted(hashable):
+                res += self.hashObjectToIdentity(t)
+                res += self.hashObjectToIdentity(hashable[t])
+            return res
+
+        if isinstance(hashable, Wrapper):
+            return hashable.identityHash()
+
+        return Hash(_types.identityHash(hashable))
+
     def convert(
         self,
         funcName,
@@ -572,7 +605,6 @@ class PythonToNativeConverter(object):
         closureVars,
         input_types,
         output_type,
-        identityOverride=None,
         assertIsRoot=False,
         callback=None,
     ):
@@ -601,39 +633,20 @@ class PythonToNativeConverter(object):
 
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
-        identity = (
-            "pyfunction",
-            identityOverride or funcCode,
-            input_types,
-            output_type,
-            tuple(sorted([(k, id(v)) for k, v in funcGlobals.items()]))
+        identityHash = (
+            Hash.from_integer(1)
+            + self.hashObjectToIdentity((
+                funcCode,
+                funcName,
+                funcGlobals,
+                input_types,
+                output_type,
+                closureVars
+            ))
         )
+        assert not identityHash.isPoison()
 
-        if False:
-            identityHash = Hash(_types.identityHash(funcCode))
-            identityHash += Hash(_types.identityHash(funcName))
-
-            for g in sorted(funcGlobals):
-                identityHash = identityHash + Hash(_types.identityHash(g)) + Hash(_types.identityHash(funcGlobals[g]))
-
-            for it in input_types:
-                identityHash = identityHash + it.identityHash()
-
-            if output_type is not None:
-                identityHash += typeWrapper(output_type).identityHash()
-
-            identityHash += Hash(_types.identityHash(tuple(closureVars)))
-
-            assert not identityHash.isPoison()
-
-            if identityHash is not None:
-                if identity not in self._identity_to_identityHash:
-                    self._identity_to_identityHash[identity] = identityHash
-                else:
-                    assert self._identity_to_identityHash[identity] == identityHash, (
-                        "Conflicting identity hashes:\n" + str(identity) + "\n"
-                        + str(identityHash) + " != " + str(self._identity_to_identityHash[identity])
-                    )
+        identity = identityHash.hexdigest
 
         if callback is not None:
             self.installLinktimeHook(identity, callback)
@@ -641,9 +654,14 @@ class PythonToNativeConverter(object):
         if identity in self._link_name_for_identity:
             name = self._link_name_for_identity[identity]
         else:
-            name = self.new_name(funcName)
+            name = self.new_name(funcName, identity)
 
             self._link_name_for_identity[identity] = name
+
+        if identity not in self._identifier_to_pyfunc:
+            self._identifier_to_pyfunc[identity] = (
+                funcName, funcCode, funcGlobals, closureVars, input_types, output_type
+            )
 
         isRoot = len(self._inflight_function_conversions) == 0
 
@@ -704,14 +722,25 @@ class PythonToNativeConverter(object):
                     self._currentlyConverting = None
 
         for identifier, functionConverter in self._inflight_function_conversions.items():
-            if identifier[:1] == ("pyfunction",):
+            if identifier in self._identifier_to_pyfunc:
                 for v in self._visitors:
-                    v.onNewFunction(
-                        identifier[1],
-                        identifier[2],
-                        functionConverter._varname_to_type.get(FunctionOutput),
-                        {k: v.typeRepresentation for k, v in functionConverter._varname_to_type.items() if isinstance(k, str)}
+
+                    funcName, funcCode, funcGlobals, closureVars, input_types, output_type = (
+                        self._identifier_to_pyfunc[identifier]
                     )
+
+                    try:
+                        v.onNewFunction(
+                            funcName,
+                            funcCode,
+                            funcGlobals,
+                            closureVars,
+                            input_types,
+                            functionConverter._varname_to_type.get(FunctionOutput),
+                            {k: v.typeRepresentation for k, v in functionConverter._varname_to_type.items() if isinstance(k, str)}
+                        )
+                    except Exception:
+                        logging.exception("event handler %s threw an unexpected exception", v.onNewFunction)
 
             if identifier not in self._inflight_definitions:
                 raise Exception(

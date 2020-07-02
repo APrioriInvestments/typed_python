@@ -226,7 +226,7 @@ def test_mutually_recursive_group_through_functions_in_closure():
     gType = type(prepareArgumentToBePassedToCompiler(g))
     fType = gType.overloads[0].closureVarLookups['f'][0]
 
-    assert recursiveTypeGroup(gType) == [fType, gType]
+    assert recursiveTypeGroup(gType) == [gType, fType]
 
 
 def test_mutually_recursive_group_through_functions_at_module_level():
@@ -329,13 +329,6 @@ def test_hash_of_oneof():
 
     hashes = set([identityHash(t) for t in oneOfs])
     assert len(hashes) == len(oneOfs)
-
-
-def test_checkHash_function_arg_default_vals_namedtuple():
-    contents1 = {"x.py": "@Entrypoint\ndef g(x=NamedTuple(x=int, y=str)(x=1, y='2')):\n    return f(x)\n"}
-    contents2 = {"x.py": "@Entrypoint\ndef g(x=NamedTuple(x=int, y=str)(x=1, y='3')):\n    return f(x)\n"}
-
-    assert checkHash(contents1, 'type(x.g)') != checkHash(contents2, 'type(x.g)')
 
 
 def test_identityHash_of_none():

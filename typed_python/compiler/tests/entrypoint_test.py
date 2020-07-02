@@ -404,8 +404,8 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         out = {}
 
         class Visitor(RuntimeEventVisitor):
-            def onNewFunction(self, f, inputTypes, outputType, variables):
-                out[f] = (inputTypes, outputType, variables)
+            def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variables):
+                out[funcName] = (inputTypes, outputType, variables)
 
         @Entrypoint
         def f(x):
@@ -415,8 +415,8 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         with Visitor():
             f.resultTypeFor(int)
 
-        self.assertTrue(f.overloads[0].functionCode in out, out)
-        self.assertEqual(out[f.overloads[0].functionCode][2]['y'], int)
+        self.assertTrue('f' in out, out)
+        self.assertEqual(out['f'][2]['y'], int)
 
     def test_star_args_on_entrypoint(self):
         @Entrypoint

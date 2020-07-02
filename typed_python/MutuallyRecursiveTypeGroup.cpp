@@ -16,6 +16,15 @@
 
 #include "MutuallyRecursiveTypeGroup.hpp"
 
+
+ShaHash TypeOrPyobj::identityHash() {
+    if (mType) {
+        return mType->identityHash();
+    }
+
+    return MutuallyRecursiveTypeGroup::pyObjectShaHash(mPyObj, nullptr);
+}
+
 std::string TypeOrPyobj::name() {
     if (mType) {
         return "<Type " + mType->name() + ">";
@@ -115,8 +124,9 @@ void visitCompilerVisibleTypesAndPyobjects(
         hashVisit(ShaHash(1));
         obj.type()->visitReferencedTypes(visit);
         obj.type()->visitCompilerVisiblePythonObjects(visit);
-
         obj.type()->visitCompilerVisibleInstances([&](Instance i) {
+            visit(i.type());
+
             if (i.type()->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
                 return visit(i.cast<PythonObjectOfType::layout_type*>()->pyObj);
             }
@@ -447,7 +457,6 @@ std::string MutuallyRecursiveTypeGroup::pyObjectSortName(PyObject* o) {
     return "<UNNAMED>";
 }
 
-
 // these types can all see each other through their references, either
 // through the compiler, or just through normal type references. We need to
 // pick a 'first' type, which we can do by picking the first type to be defined
@@ -463,10 +472,56 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
         throw std::runtime_error("Empty compiler recursive group makes no sense.");
     }
 
-    // we need to find the lexically lowest unique type or named pyobject in the group.
-    std::map<std::string, std::vector<TypeOrPyobj> > names;
-    for (auto t: types) {
-        names[t.name()].push_back(t);
+    // we need to pick a single type or object to be the 'root' of the group
+    // so we can order the hashes properly
+    std::map<TypeOrPyobj, ShaHash> curHashes;
+    std::map<TypeOrPyobj, ShaHash> newHashes;
+
+    for (auto& t: types) {
+        curHashes[t] = ShaHash();
+    }
+
+    // hash each type's visible inputs, using 'curHashes' as the hash
+    // for any type that's in the group. After N passes, the SHA hash
+    // contains information about paths through the graph of length "N"
+    // and so if there is a unique element, it should be visible after
+    // two passes.
+    for (long k = 0; k < 2; k++) {
+        for (auto& t: types) {
+            ShaHash newHash;
+
+            visitCompilerVisibleTypesAndPyobjects(
+                t,
+                [&](ShaHash h) { newHash += h; },
+                [&](const std::string& s) { newHash += ShaHash(s); },
+                [&](TypeOrPyobj t) {
+                    if (curHashes.find(t) != curHashes.end()) {
+                        newHash += curHashes[t];
+                    } else {
+                        newHash += t.identityHash();
+                    }
+                },
+                [&](const std::string& s, TypeOrPyobj t) {
+                    newHash += ShaHash(s);
+
+                    if (curHashes.find(t) != curHashes.end()) {
+                        newHash += curHashes[t];
+                    } else {
+                        newHash += t.identityHash();
+                    }
+                },
+                [&]() {}
+            );
+
+            newHashes[t] = newHash;
+        }
+
+        curHashes = newHashes;
+    }
+
+    std::map<ShaHash, std::vector<TypeOrPyobj> > names;
+    for (auto& t: types) {
+        names[curHashes[t]].push_back(t);
     }
 
     TypeOrPyobj* root = nullptr;
@@ -1233,7 +1288,7 @@ ShaHash MutuallyRecursiveTypeGroup::tpInstanceShaHash(Type* t, instance_ptr data
     }
 
     if (t->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
-        return pyObjectShaHash(((PythonObjectOfType::layout_type*)data)->pyObj, groupHead);
+        return pyObjectShaHash((*(PythonObjectOfType::layout_type**)data)->pyObj, groupHead);
     }
 
     return typeHash;

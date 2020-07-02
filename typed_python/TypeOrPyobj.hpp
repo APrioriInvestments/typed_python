@@ -70,6 +70,9 @@ public:
         return *this;
     }
 
+    ShaHash identityHash();
+
+    // warning - this calls 'repr', which may alter the object
     std::string name();
 
     bool operator==(const PyObject* o) const {

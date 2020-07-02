@@ -1079,8 +1079,7 @@ class ExpressionConversionContext(object):
             funcGlobals,
             [],
             [a.expr_type for a in concreteArgs],
-            returnTypeOverload,
-            identityOverride=f
+            returnTypeOverload
         )
 
         if call_target is None:

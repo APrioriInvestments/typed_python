@@ -50,7 +50,7 @@ class RuntimeEventVisitor:
     Clients should subclass this and pass it to 'addEventVisitor' in the runtime
     to find out about events like function typing assignments.
     """
-    def onNewFunction(self, function, inputTypes, outputType, variableTypes):
+    def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variableTypes):
         pass
 
     def __enter__(self):
@@ -73,12 +73,13 @@ class PrintNewFunctionVisitor(RuntimeEventVisitor):
             # this should print out the fact that we compiled 'f'
             f()
     """
-    def onNewFunction(self, f, inputTypes, outputType, variables):
-        print("compiling ", f)
+    def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variableTypes):
+        print("compiling ", funcName)
         print("   inputs: ", inputTypes)
         print("   output: ", outputType)
         print("   vars: ")
-        for varname, varVal in variables.items():
+
+        for varname, varVal in variableTypes.items():
             if isinstance(varVal, type) and issubclass(varVal, Value):
                 print("        ", varname, " which is a Value(", varVal.Value, " of type ", type(varVal.Value), ")")
             else:
@@ -89,7 +90,7 @@ class CountCompilationsVisitor(RuntimeEventVisitor):
     def __init__(self):
         self.count = 0
 
-    def onNewFunction(self, f, inputTypes, outputType, variables):
+    def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variableTypes):
         self.count += 1
 
 

@@ -348,6 +348,13 @@ public:
         return res;
     }
 
+    template<class visitor_type>
+    void _visitCompilerVisibleInstances(const visitor_type& visitor) {
+        for (auto tup: m_own_members) {
+            visitor(std::get<2>(tup));
+        }
+    }
+
     bool isBinaryCompatibleWithConcrete(Type* other);
 
     template<class visitor_type>

@@ -73,11 +73,11 @@ class GetCompiledTypes(RuntimeEventVisitor):
     def __init__(self):
         self.types = {}
 
-    def onNewFunction(self, f, inputTypes, outputType, variables):
-        self.types[f] = makeNamedTuple(
+    def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variableTypes):
+        self.types[funcName] = makeNamedTuple(
             inputTypes=inputTypes,
             outputType=outputType,
-            varTypes=variables
+            varTypes=variableTypes
         )
 
 
@@ -1299,7 +1299,7 @@ class TestCompilationStructures(unittest.TestCase):
 
     def test_method_not_returning_returns_none(self):
         class NoPythonObjectTypes(RuntimeEventVisitor):
-            def onNewFunction(self, function, inputTypes, outputType, variableTypes):
+            def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variableTypes):
                 assert not issubclass(outputType.typeRepresentation, PythonObjectOfType)
 
         class C(Class, Final):
@@ -2762,7 +2762,7 @@ class TestCompilationStructures(unittest.TestCase):
             )
 
         # our code should know the type of the const dict!
-        self.assertEqual(v.types[countIt.__code__].varTypes['res'], int)
+        self.assertEqual(v.types['countIt'].varTypes['res'], int)
 
         t0 = time.time()
         callIt(countIt, arg)
@@ -2794,7 +2794,7 @@ class TestCompilationStructures(unittest.TestCase):
             )
 
         # our code should know the type of the const dict!
-        self.assertEqual(v.types[countIt.__code__].varTypes['res'], int)
+        self.assertEqual(v.types['countIt'].varTypes['res'], int)
         self.assertEqual(aModuleLevelDict['modify_count'], 200000)
 
         t0 = time.time()
