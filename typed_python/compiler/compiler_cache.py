@@ -14,7 +14,6 @@
 
 import os
 import uuid
-import time
 import shutil
 
 from typed_python.compiler.loaded_module import LoadedModule
@@ -57,13 +56,9 @@ class CompilerCache:
         self.loadedModules = Dict(str, LoadedModule)()
         self.nameToModuleHash = Dict(str, str)()
 
-        t0 = time.time()
-        count = 0
         for moduleHash in os.listdir(self.cacheDir):
             if len(moduleHash) == 40:
                 self.loadNameManifestFromStoredModuleByHash(moduleHash)
-                count += 1
-        print("took ", time.time() - t0, " to load ", len(self.nameToModuleHash), " functions from ", count, " modules.")
 
     def hasSymbol(self, linkName):
         return linkName in self.nameToModuleHash

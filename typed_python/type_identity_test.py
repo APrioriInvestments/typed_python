@@ -197,6 +197,15 @@ def test_checkHash_lambdas_hash_code_correctly():
     assert checkHash(contents1, 'type(x.f)') != checkHash(contents2, 'type(x.f)')
 
 
+def test_checkHash_mutable_global_constants():
+    contents1 = {"x.py": "G=Dict(int, int)({1:2})\n@Entrypoint\ndef g(x):\n    return G[x]\n"}
+    contents2 = {"x.py": "G=Dict(int, int)({1:3})\n@Entrypoint\ndef g(x):\n    return G[x]\n"}
+    contents3 = {"x.py": "G=Dict(int, float)({1:3.0})\n@Entrypoint\ndef g(x):\n    return G[x]\n"}
+
+    assert checkHash(contents1, 'type(x.g)') == checkHash(contents2, 'type(x.g)')
+    assert checkHash(contents1, 'type(x.g)') != checkHash(contents3, 'type(x.g)')
+
+
 def test_checkHash_lambdas_hash_dependent_functions_correctly():
     contents1 = {"x.py": "@Entrypoint\ndef g(x):\n    return x + 1\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
     contents2 = {"x.py": "@Entrypoint\ndef g(x):\n    return x + 2\n@Entrypoint\ndef f(x):\n    return g(x)\n"}

@@ -18,6 +18,7 @@ import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 import types
 
+from typed_python.SerializationContext import SerializationContext
 from typed_python.internals import makeFunctionType, FunctionOverload
 from typed_python.compiler.function_stack_state import FunctionStackState
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
@@ -106,8 +107,28 @@ class ExpressionConversionContext(object):
             )
         ).load()
 
-    def constantTypedPythonObject(self, x):
+    def constantTypedPythonObject(self, x, owningGlobalScopeAndName=None):
         wrapper = typeWrapper(type(x))
+
+        meta = None
+
+        if owningGlobalScopeAndName:
+            # this object is visible as the member of a module. Instead of
+            # serializing it (and its state), we want to make sure we encode
+            # the object's location, so that the compiler cache can get the
+            # correct version of it.
+            globallyVisibleDict, name = owningGlobalScopeAndName
+
+            if SerializationContext().nameForObject(globallyVisibleDict) is not None:
+                meta = GlobalVariableMetadata.PointerToTypedPythonObjectAsMemberOfDict(
+                    sourceDict=globallyVisibleDict, name=name, type=type(x)
+                )
+
+        if meta is None:
+            meta = GlobalVariableMetadata.PointerToTypedPythonObject(
+                value=x,
+                type=type(x)
+            )
 
         return TypedExpression(
             self,
@@ -117,10 +138,7 @@ class ExpressionConversionContext(object):
                 # uniquely identify it
                 name="typed_python_object_" + str(pyInstanceHeldObjectAddress(x)),
                 type=wrapper.getNativeLayoutType(),
-                metadata=GlobalVariableMetadata.PointerToTypedPythonObject(
-                    value=x,
-                    type=type(x)
-                )
+                metadata=meta
             ).cast(wrapper.getNativeLayoutType().pointer()),
             wrapper,
             True
@@ -1077,6 +1095,7 @@ class ExpressionConversionContext(object):
             f.__name__,
             f.__code__,
             funcGlobals,
+            f.__globals__,
             [],
             [a.expr_type for a in concreteArgs],
             returnTypeOverload
@@ -1339,7 +1358,19 @@ class ExpressionConversionContext(object):
             return self.recastVariableAsRestrictedType(res, varType)
 
         if name in self.functionContext._globals:
-            return pythonObjectRepresentation(self, self.functionContext._globals[name])
+            if (
+                name in self.functionContext._globalsRaw
+                and self.functionContext._globalsRaw[name] is self.functionContext._globals[name]
+            ):
+                scopeAndName = (self.functionContext._globalsRaw, name)
+            else:
+                scopeAndName = None
+
+            return pythonObjectRepresentation(
+                self,
+                self.functionContext._globals[name],
+                owningGlobalScopeAndName=scopeAndName
+            )
 
         if name in __builtins__:
             return pythonObjectRepresentation(self, __builtins__[name])

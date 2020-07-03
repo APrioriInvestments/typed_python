@@ -57,7 +57,8 @@ class FunctionOutput:
 class ConversionContextBase(object):
     """Helper function for converting a single python function given some input and output types"""
 
-    def __init__(self, converter, name, identity, input_types, output_type, funcArgNames, closureVarnames, globalVars):
+    def __init__(self, converter, name, identity, input_types, output_type,
+                 funcArgNames, closureVarnames, globalVars, globalVarsRaw):
         """Initialize a FunctionConverter
 
         Args:
@@ -71,6 +72,7 @@ class ConversionContextBase(object):
             closureVarnames - names of the variables in this function's closure. These will be passed
                 before the actual func args.
             globalVars - a dict from name to the actual python object in the globals for this function
+            globalVarsRaw - the original dict where these globals live.
         """
         self.name = name
         self.funcArgNames = funcArgNames
@@ -124,6 +126,7 @@ class ConversionContextBase(object):
         self._argumentsWithoutStackslots = set()  # arguments that we don't bother to copy into the stack
         self._varname_to_type = {}
         self._globals = globalVars
+        self._globalsRaw = globalVarsRaw
         self._closureVarnames = closureVarnames
 
         self.tempLetVarIx = 0
@@ -829,8 +832,10 @@ class ExpressionFunctionConversionContext(ConversionContextBase):
 class FunctionConversionContext(ConversionContextBase):
     """Helper function for converting a single python function given some input and output types"""
 
-    def __init__(self, converter, name, identity, input_types, output_type, closureVarnames, globalVars, ast_arg, statements):
-        super().__init__(converter, name, identity, input_types, output_type, ast_arg.argumentNames(), closureVarnames, globalVars)
+    def __init__(self, converter, name, identity, input_types, output_type, closureVarnames,
+                 globalVars, globalVarsRaw, ast_arg, statements):
+        super().__init__(converter, name, identity, input_types, output_type, ast_arg.argumentNames(),
+                         closureVarnames, globalVars, globalVarsRaw)
 
         self._statements = statements
 

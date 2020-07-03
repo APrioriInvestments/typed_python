@@ -208,7 +208,7 @@ class PythonToNativeConverter(object):
 
         return prefix + name + "." + identityHash
 
-    def createConversionContext(self, identity, funcName, funcCode, funcGlobals, closureVars, input_types, output_type):
+    def createConversionContext(self, identity, funcName, funcCode, funcGlobals, funcGlobalsRaw, closureVars, input_types, output_type):
         pyast = self._code_to_ast(funcCode)
 
         if isinstance(pyast, python_ast.Statement.FunctionDef):
@@ -229,6 +229,7 @@ class PythonToNativeConverter(object):
             output_type,
             closureVars,
             funcGlobals,
+            funcGlobalsRaw,
             pyast.args,
             body,
         )
@@ -575,6 +576,7 @@ class PythonToNativeConverter(object):
             overload.name,
             overload.functionCode,
             overload.realizedGlobals,
+            overload.functionGlobals,
             list(overload.closureVarLookups),
             realizedInputWrappers,
             overload.returnType,
@@ -617,6 +619,7 @@ class PythonToNativeConverter(object):
         funcName,
         funcCode,
         funcGlobals,
+        funcGlobalsRaw,
         closureVars,
         input_types,
         output_type,
@@ -632,6 +635,8 @@ class PythonToNativeConverter(object):
             funcName - the name of the function
             funcCode - a Code object representing the code to compile
             funcGlobals - the globals object from the relevant function
+            funcGlobalsRaw - the original globals object (with no merging or filtering done)
+                which we use to figure out the location of global variables that are not in cells.
             input_types - a type for each free variable in the function closure, and
                 then again for each input argument
             output_type - the output type of the function, if known. if this is None,
@@ -706,6 +711,7 @@ class PythonToNativeConverter(object):
                 funcName,
                 funcCode,
                 funcGlobals,
+                funcGlobalsRaw,
                 closureVars,
                 input_types,
                 output_type

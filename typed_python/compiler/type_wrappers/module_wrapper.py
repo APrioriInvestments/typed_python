@@ -43,5 +43,5 @@ class ModuleWrapper(Wrapper):
 
         return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
             context,
-            getattr(self.typeRepresentation.Value, attribute)
+            getattr(self.typeRepresentation.Value, attribute),
         )

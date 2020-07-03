@@ -181,7 +181,15 @@ def _typedPythonTypeToTypeWrapper(t):
     assert False, (t, getattr(t, '__typed_python_category__', None))
 
 
-def pythonObjectRepresentation(context, f):
+def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
+    """Create a representation for a python constant.
+
+    Args:
+        context - the ExpressionConversionContext
+        f - the constant
+        owningGlobalScopeAndName - either None, or a pair (dict, name)
+            where the object is equivalent to dict[name]
+    """
     if isinstance(f, CompilableBuiltin):
         return TypedExpression(context, native_ast.nullExpr, f, False)
 
@@ -308,7 +316,7 @@ def pythonObjectRepresentation(context, f):
 
         if f.__typed_python_category__ == "Class":
             # global class instances get held as constants
-            return context.constantTypedPythonObject(f)
+            return context.constantTypedPythonObject(f, owningGlobalScopeAndName)
 
     if isinstance(f, type):
         return TypedExpression(context, native_ast.nullExpr, PythonTypeObjectWrapper(f), False)
@@ -321,7 +329,7 @@ def pythonObjectRepresentation(context, f):
 
     if isinstance(f, Type):
         # it's a typed python object at module level scope
-        return context.constantTypedPythonObject(f)
+        return context.constantTypedPythonObject(f, owningGlobalScopeAndName)
 
     return TypedExpression(context, native_ast.nullExpr, PythonFreeObjectWrapper(f), False)
 

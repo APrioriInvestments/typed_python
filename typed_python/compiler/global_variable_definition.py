@@ -29,6 +29,10 @@ GlobalVariableMetadata = Alternative(
     # a pointer to the Type* in the underlying
     RawTypePointer=dict(value=type),
     PointerToTypedPythonObject=dict(value=object, type=type),
+    # a typed python object at module scope (and therefore truly global)
+    PointerToTypedPythonObjectAsMemberOfDict=dict(
+        sourceDict=object, name=str, type=type
+    ),
     ClassVtable=dict(value=type)
 )
 

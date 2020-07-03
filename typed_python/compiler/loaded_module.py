@@ -53,6 +53,9 @@ class LoadedModule:
             if meta.matches.StringConstant:
                 pointers[i].cast(str).initialize(meta.value)
 
+            if meta.matches.IntegerConstant:
+                pointers[i].cast(int).initialize(meta.value)
+
             elif meta.matches.BytesConstant:
                 pointers[i].cast(bytes).initialize(meta.value)
 
@@ -61,6 +64,9 @@ class LoadedModule:
 
             elif meta.matches.PointerToTypedPythonObject:
                 pointers[i].cast(meta.type).initialize(meta.value)
+
+            elif meta.matches.PointerToTypedPythonObjectAsMemberOfDict:
+                pointers[i].cast(meta.type).initialize(meta.sourceDict[meta.name])
 
             elif meta.matches.IdOfPyObject:
                 pointers[i].cast(int).initialize(id(meta.value))
