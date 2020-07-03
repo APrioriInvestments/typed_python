@@ -23,6 +23,7 @@ from typed_python.python_ast import (
 from typed_python.hash import sha_hash
 from typed_python.type_function import ConcreteTypeFunction
 from types import FunctionType, ModuleType, CodeType, BuiltinFunctionType
+from _thread import LockType, RLock
 import numpy
 import datetime
 import lz4.frame
@@ -50,12 +51,18 @@ def astToCodeObject(ast, freevars):
     ).__code__
 
 
+DEFAUL_TNAME_TO_OVERRIDE = {
+    ".builtin.lock": LockType,
+    ".builtin.rlock": RLock,
+}
+
+
 class SerializationContext(object):
     """Represents a collection of types with well-specified names that we can use to serialize objects."""
     def __init__(self, nameToObjectOverride=None, compressionEnabled=True, encodeLineInformationForCode=True, objectToNameOverride=None):
         super().__init__()
 
-        self.nameToObjectOverride = dict(nameToObjectOverride or {})
+        self.nameToObjectOverride = dict(nameToObjectOverride or DEFAUL_TNAME_TO_OVERRIDE)
         self.objectToNameOverride = (
             dict(objectToNameOverride)
             if objectToNameOverride is not None else
@@ -121,7 +128,7 @@ class SerializationContext(object):
                 return name
             return None
 
-        if isinstance(t, dict) and '__name__' in t:
+        if isinstance(t, dict) and '__name__' in t and isinstance(t['__name__'], str):
             maybeModule = self.objectFromName('.modules.' + t['__name__'])
             if maybeModule is not None and t is getattr(maybeModule, '__dict__', None):
                 return ".module_dict." + t['__name__']

@@ -18,6 +18,7 @@ from typed_python.compiler.native_ast import (
 import tempfile
 from typed_python import PointerTo, ListOf, Runtime
 from typed_python.compiler.module_definition import ModuleDefinition
+from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 
 import pytest
 import ctypes
@@ -74,7 +75,7 @@ def test_create_binary_shared_object():
                 arg=Expression.GlobalVariable(
                     name="globalvar",
                     type=Int64,
-                    metadata='aGlobal'
+                    metadata=GlobalVariableMetadata.IntegerConstant(value=0)
                 ).load()
             )
         )

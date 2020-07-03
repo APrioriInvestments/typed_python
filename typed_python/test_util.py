@@ -15,6 +15,12 @@
 import psutil
 import time
 import threading
+import tempfile
+import pickle
+import subprocess
+import sys
+import os
+
 from typed_python import Entrypoint
 
 
@@ -63,3 +69,95 @@ def estimateFunctionMultithreadSlowdown(f, threadcount=2):
     t2 = time.time()
 
     return (t2 - t1) / (t1 - t0)
+
+
+def instantiateFiles(filesToWrite, tf):
+    """Write out a dict of files to a temporary directory.
+
+    Args:
+        filesToWrite - a dict from filename to file contents. Don't try to use
+            subdirectories yet - it won't be cross platform.
+        tf - the temporary directory to write into
+    """
+    for fname, contents in filesToWrite.items():
+        fullname = os.path.join(tf, fname)
+        dirname = os.path.dirname(fullname)
+
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+
+        with open(fullname, "w") as f:
+            f.write(
+                "from typed_python import *\n"
+                + contents
+            )
+
+
+def evaluateExprInFreshProcess(filesToWrite, expression, compilerCacheDir=None, printComments=False):
+    """Return the value of an expression evaluated in a subprocess.
+
+    We use this to test using typed_python in codebases other than the main
+    typed_python codebase, so that we can see what happens when some code itself
+    changes underneath us.
+
+    The value of the expression must be picklable, and shouldn't depend on
+    any of the code in 'filesToWrite', since it won't make sense in the calling
+    module.
+
+    Args:
+        filesToWrite = a dictionary from filename to the actual file contents to write.
+        expression - the expression to evaluate. You should assume that we've imported
+            all the modules given in 'filesToWrite', as well as everything
+            from typed_python.
+
+    Returns:
+        the result of the expression.
+
+    Example:
+        evaluateExprInFreshProcess({'M.py': "x = 10"}, "M.x")
+    """
+    with tempfile.TemporaryDirectory() as tf:
+        instantiateFiles(filesToWrite, tf)
+
+        namesToImport = [
+            fname[:-3].replace("/", ".") for fname in filesToWrite if '__init__' not in fname
+        ]
+
+        env = dict(os.environ)
+        if compilerCacheDir:
+            env["TP_COMPILER_CACHE"] = compilerCacheDir
+
+        try:
+            output = subprocess.check_output(
+                [
+                    sys.executable,
+                    "-c",
+                    "".join(f"import {modname};" for modname in namesToImport) + (
+                        f"import pickle;"
+                        f"from typed_python._types import identityHash;"
+                        f"from typed_python import *;"
+                        f"print(repr(pickle.dumps({expression})))"
+                    )
+                ],
+                cwd=tf,
+                env=env,
+                stderr=subprocess.PIPE
+            )
+        except subprocess.CalledProcessError as e:
+            raise Exception("Subprocess failed:\n\n" + e.stdout.decode("ASCII") + "\n\nerr=\n" + e.stderr.decode("ASCII"))
+
+        def isBytes(x):
+            return x.startswith(b"b'") or x.startswith(b'b"')
+
+        comments = [x for x in output.split(b"\n") if not isBytes(x) and x]
+        result = b'\n'.join([x for x in output.split(b"\n") if isBytes(x)])
+
+        if comments and printComments:
+            print("GOT COMMENTS:\n", "\n".join(["\t" + x.decode("ASCII") for x in comments]))
+
+        try:
+            # we're returning a 'repr' of a bytes object. the 'eval'
+            # turns it back into a python bytes object so we can compare it.
+            return pickle.loads(eval(result))
+        except Exception:
+            raise Exception("Failed to understand output:\n" + output.decode("ASCII"))

@@ -27,7 +27,7 @@ ShaHash TypeOrPyobj::identityHash() {
 
 std::string TypeOrPyobj::name() {
     if (mType) {
-        return "<Type " + mType->name() + ">";
+        return "<Type " + mType->name() + " of cat " + Type::categoryToString(mType->getTypeCategory()) + ">";
     }
 
     if (mPyObj) {

@@ -705,8 +705,30 @@ class TestCompilingClosures(unittest.TestCase):
         print("speedup is ", speedup)  # I get about 80
         self.assertGreater(speedup, 60)
 
+    def test_assign_functions_with_closure_works(self):
+        def callIt(x):
+            y = 10.0
+
+            if x % 2:
+                def f(a):
+                    return a + y + 1.0
+            else:
+                def f(a):
+                    return a + y + 2.0
+
+            res = 0.0
+            for i in range(x):
+                x = x + 1
+                res += f(i)
+            return res
+
+        callItE = Entrypoint(callIt)
+
+        for i in range(10):
+            self.assertEqual(callItE(i), callIt(i))
+
     @flaky(max_runs=3, min_passes=1)
-    def test_assign_functions_with_closure(self):
+    def test_assign_functions_with_closure_perf(self):
         def callIt(x):
             y = 10.0
 

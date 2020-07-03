@@ -57,10 +57,19 @@ public:
         // code run because it'll undo the error state.
         if (!PyErr_Occurred()) {
             for (auto& tAndPresumedHash: mTypesToHash) {
-                if (tAndPresumedHash.first->identityHash() != tAndPresumedHash.second) {
-                    std::cout << "WARNING: hash for " << tAndPresumedHash.first->name() << " not stable: "
+                Type* t = tAndPresumedHash.first;
+                if (t->getTypeCategory() == Type::catForward) {
+                    t = ((Forward*)t)->getTarget();
+
+                    if (!t) {
+                        throw std::runtime_error("Somehow we deserialized an unresolved forward");
+                    }
+                }
+
+                if (t->identityHash() != tAndPresumedHash.second) {
+                    std::cout << "WARNING: hash for " << t->name() << " not stable: "
                         << " promised " << tAndPresumedHash.second.digestAsHexString()
-                        << " but given " << tAndPresumedHash.first->identityHash().digestAsHexString() << " \n";
+                        << " but given " << t->identityHash().digestAsHexString() << " \n";
                 }
             }
 

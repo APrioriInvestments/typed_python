@@ -96,6 +96,10 @@ class Compiler:
         self.verbose = False
         self.optimize = True
 
+    def markExternal(self, functionNameToType):
+        """Provide type signatures for a set of external functions."""
+        self.converter.markExternal(functionNameToType)
+
     def mark_converter_verbose(self):
         self.converter.verbose = True
 
@@ -140,6 +144,7 @@ class Compiler:
         if not functions:
             return None
 
+        # module is a ModuleDefinition object
         module = self.converter.add_functions(functions)
 
         try:

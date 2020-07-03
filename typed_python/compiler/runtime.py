@@ -18,6 +18,8 @@ import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
 import typed_python.compiler.llvm_compiler as llvm_compiler
 import typed_python
+from typed_python.compiler.compiler_cache import CompilerCache
+from typed_python.compiler.native_function_pointer import NativeFunctionPointer
 from typed_python.type_function import ConcreteTypeFunction
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
@@ -107,8 +109,17 @@ class Runtime:
         return _singleton[0]
 
     def __init__(self):
+        if os.getenv("TP_COMPILER_CACHE"):
+            self.compilerCache = CompilerCache(
+                os.path.abspath(os.getenv("TP_COMPILER_CACHE"))
+            )
+        else:
+            self.compilerCache = None
         self.llvm_compiler = llvm_compiler.Compiler()
-        self.converter = python_to_native_converter.PythonToNativeConverter()
+        self.converter = python_to_native_converter.PythonToNativeConverter(
+            self.llvm_compiler,
+            self.compilerCache
+        )
         self.lock = threading.RLock()
         self.timesCompiled = 0
 
@@ -132,9 +143,7 @@ class Runtime:
 
             name = self.converter.identityToName(identity)
 
-            fp = self.llvm_compiler.function_pointer_by_name(name)
-
-            callback(fp)
+            callback(self.functionPointerByName(name))
 
     @staticmethod
     def passingTypeForValue(arg):
@@ -236,13 +245,9 @@ class Runtime:
 
             wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
 
-            targets = self.converter.extract_new_function_definitions()
+            self.converter.buildAndLinkNewModule()
 
-            if targets:
-                loadedModule = self.llvm_compiler.buildModule(targets)
-                loadedModule.linkGlobalVariables()
-
-            fp = self.llvm_compiler.function_pointer_by_name(wrappingCallTargetName)
+            fp = self.functionPointerByName(wrappingCallTargetName)
 
             overload._installNativePointer(
                 fp.fp,
@@ -253,6 +258,23 @@ class Runtime:
             self._collectLinktimeHooks()
 
             return callTarget
+
+    def functionPointerByName(self, linkerName) -> NativeFunctionPointer:
+        """Find a NativeFunctionPointer for a given link-time name.
+
+        Args:
+            linkerName (str) - the name of the compiled symbol we want
+
+        Returns:
+            a NativeFunctionPointer or None
+        """
+        if self.compilerCache is None:
+            # the llvm compiler holds it all
+            return self.llvm_compiler.function_pointer_by_name(linkerName)
+        else:
+            # the llvm compiler is just building shared objects, but the
+            # compiler cache has all the pointers.
+            return self.compilerCache.function_pointer_by_name(linkerName)
 
     def resultTypeForCall(self, funcObj, argTypes, kwargTypes):
         """Determine the result of calling funcObj with things of type 'argTypes' and 'kwargTypes'
@@ -326,6 +348,8 @@ def Entrypoint(pyFunc):
     Otherwise, we compile a new form (which blocks) and then use that when
     compilation has completed.
     """
+    Runtime.singleton()
+
     wrapInStatic = False
 
     typedFunc = pyFunc
@@ -353,6 +377,8 @@ def Compiled(pyFunc):
     # note that we have to call 'prepareArgumentToBePassedToCompiler' which
     # captures the current closure of 'pyFunc' as it currently stands, since 'Compiled'
     # is supposed to compile the function _as it currently stands_.
+    Runtime.singleton()
+
     entrypoint = Entrypoint(pyFunc)
     f = _types.prepareArgumentToBePassedToCompiler(entrypoint)
 

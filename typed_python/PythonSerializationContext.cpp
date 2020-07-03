@@ -242,7 +242,14 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
             } else if (fieldNumber == FieldNumbers::NATIVE_INSTANCE) {
                 result = PyInstance::fromInstance(deserializeNativeInstance(b, wireType));
             } else if (fieldNumber == FieldNumbers::NATIVE_TYPE) {
-                result = incref((PyObject*)PyInstance::typeObj(deserializeNativeType(b, wireType)));
+                Type* nativeType = deserializeNativeType(b, wireType);
+
+                if (nativeType->getTypeCategory() == Type::TypeCategory::catForward) {
+                    // by the time we get back to the object layer, everything should be resolved.
+                    throw std::runtime_error("Somehow, we deserialized an unresolved forward");
+                }
+
+                result = incref((PyObject*)PyInstance::typeObj(nativeType));
             } else if (fieldNumber == FieldNumbers::OBJECT_NAME) {
                 result = deserializePythonObjectFromName(b, wireType, memo);
             } else if (fieldNumber == FieldNumbers::OBJECT_REPRESENTATION) {
@@ -812,6 +819,13 @@ void PythonSerializationContext::serializeNativeTypeInner(
             Type* nativeType,
             SerializationBuffer& b
             ) const {
+    if (nativeType->getTypeCategory() == Type::TypeCategory::catForward) {
+        if (!((Forward*)nativeType)->getTarget()) {
+            throw std::runtime_error("Can't serialize an undefined forward");
+        }
+        nativeType = ((Forward*)nativeType)->getTarget();
+    }
+
     Type::TypeCategory cat = nativeType->getTypeCategory();
 
     if (cat == Type::TypeCategory::catInt8 ||
@@ -929,8 +943,12 @@ void PythonSerializationContext::serializeNativeTypeInner(
         serializePythonObject((PyObject*)((PythonSubclass*)nativeType)->pyType(), b, 2);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
         serializeNativeType(((TupleOfType*)nativeType)->getEltType(), b, 1);
+    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catPointerTo) {
+        serializeNativeType(((PointerTo*)nativeType)->getEltType(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catListOf) {
         serializeNativeType(((ListOfType*)nativeType)->getEltType(), b, 2);
+    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catTypedCell) {
+        serializeNativeType(((TypedCellType*)nativeType)->getHeldType(), b, 2);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catTuple) {
         size_t index = 1;
         for (auto t: ((CompositeType*)nativeType)->getTypes()) {
@@ -975,10 +993,7 @@ void PythonSerializationContext::serializeNativeTypeInner(
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catHeldClass) {
         serializeNativeType(((HeldClass*)nativeType)->getClassType(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catForward) {
-        b.writeStringObject(1, nativeType->name());
-        if (((Forward*)nativeType)->getTarget()) {
-            serializeNativeType(((Forward*)nativeType)->getTarget(), b, 2);
-        }
+        throw std::runtime_error("We shouldn't ever get here.");
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catClass) {
         Class* cls = (Class*)nativeType;
 
@@ -1399,6 +1414,15 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
         b.addTypeToHash(resultType, typeHash);
     }
 
+    if (resultType->getTypeCategory() == Type::TypeCategory::catForward) {
+        Forward* f = (Forward*)resultType;
+
+        // if resolved, return it
+        if (f->getTarget()) {
+            resultType = f->getTarget();
+        }
+    }
+
     return resultType;
 }
 
@@ -1412,6 +1436,10 @@ Instance PythonSerializationContext::deserializeNativeInstance(DeserializationBu
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
         if (fieldNumber == 0) {
             type = deserializeNativeType(b, wireType);
+
+            if (type->getTypeCategory() == Type::TypeCategory::catForward) {
+                throw std::runtime_error("shomehow we deserialized a forward type here.");
+            }
         }
         if (fieldNumber == 1) {
             if (!type) {
@@ -1544,6 +1572,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             if (category == Type::TypeCategory::catOneOf ||
                 category == Type::TypeCategory::catTupleOf ||
                 category == Type::TypeCategory::catListOf ||
+                category == Type::TypeCategory::catTypedCell ||
                 category == Type::TypeCategory::catSet ||
                 category == Type::TypeCategory::catDict ||
                 category == Type::TypeCategory::catConstDict ||
@@ -1700,6 +1729,12 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             throw std::runtime_error("Invalid native type: ListOf needs exactly 1 type.");
         }
         resultType = ::ListOfType::Make(types[0]);
+    }
+    else if (category == Type::TypeCategory::catTypedCell) {
+        if (types.size() != 1) {
+            throw std::runtime_error("Invalid native type: TypedCell needs exactly 1 type.");
+        }
+        resultType = ::TypedCellType::Make(types[0]);
     }
     else if (category == Type::TypeCategory::catPointerTo) {
         if (types.size() != 1) {

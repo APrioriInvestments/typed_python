@@ -690,7 +690,7 @@ class TypesSerializationTest(unittest.TestCase):
         if sys.platform == "darwin":
             return
 
-        context = context or SerializationContext({})
+        context = context or SerializationContext()
         memUsage = currentMemUsageMb()
 
         t0 = time.time()
@@ -1003,7 +1003,7 @@ class TypesSerializationTest(unittest.TestCase):
                 self.assertIs(obj, unpickled)
 
     def test_serialize_lambdas_more(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         with tempfile.TemporaryDirectory() as tf:
             fpath = os.path.join(tf, "weird_serialization_test.py")
@@ -1029,7 +1029,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(deserialized_f_2(10), 11)
 
     def test_serialize_result_of_decorator(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         def decorator(f):
             def addsOne(x):
@@ -1075,7 +1075,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(sc.deserialize(sc.serialize(f))(), "testfunction")
 
     def test_serialize_large_lists(self):
-        x = SerializationContext({})
+        x = SerializationContext()
 
         lst = ListOf(ListOf(int))()
 
@@ -1090,7 +1090,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(lst, l2)
 
     def test_serialize_large_numpy_arrays(self):
-        x = SerializationContext({})
+        x = SerializationContext()
 
         a = numpy.arange(100000000)
         a2 = x.deserialize(x.serialize(a))
@@ -1098,7 +1098,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertTrue(numpy.all(a == a2))
 
     def test_serialize_datetime_objects(self):
-        x = SerializationContext({})
+        x = SerializationContext()
 
         d = datetime.date.today()
         d2 = x.deserialize(x.serialize(d))
@@ -1125,7 +1125,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(d, d2, (d, type(d)))
 
     def test_serialize_dict(self):
-        x = SerializationContext({})
+        x = SerializationContext()
 
         d = Dict(str, str)()
         d["hi"] = "hi"
@@ -1136,7 +1136,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(d, d2)
 
     def test_serialize_set(self):
-        x = SerializationContext({})
+        x = SerializationContext()
 
         s = Set(str)()
         self.assertEqual(s, x.deserialize(x.serialize(s)))
@@ -1167,7 +1167,7 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_dict_doesnt_leak(self):
         T = Dict(int, int)
         d = T({i: i+1 for i in range(100)})
-        x = SerializationContext({})
+        x = SerializationContext()
 
         assert not isRecursive(T)
 
@@ -1232,7 +1232,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(t2.y, t.x)
 
     def test_serialize_untyped_classes(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         class B(object):
             def __init__(self, x):
@@ -1251,7 +1251,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(C2(20).g(), 20)
 
     def test_serialize_functions_with_return_types(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         @Function
         def f(x) -> int:
@@ -1261,7 +1261,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(f2(10.5), 10)
 
     def test_serialize_functions_with_annotations(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         B = int
         C = 10
@@ -1279,7 +1279,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(f(), f2())
 
     def test_serialize_typed_classes(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         class B(Class):
             x = Member(int)
@@ -1313,7 +1313,7 @@ class TypesSerializationTest(unittest.TestCase):
         )
 
     def test_serialize_recursive_typed_classes(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         B = Forward("B")
 
@@ -1356,7 +1356,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return f
 
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         f = fMaker()
 
@@ -1425,7 +1425,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(h2(10), (13, 14))
 
     def test_serialize_unnamed_classes_retains_identity(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         class B:
             def f(self):
@@ -1438,7 +1438,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert B().f() is B2
 
     def test_serialize_lambda_preserves_identity_hash(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         def aFunction(self, x):
             sys
@@ -1449,7 +1449,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert identityHash(aFunction) == identityHash(aFunction2)
 
     def test_serialize_subclasses(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         class B(Class):
             x = Member(int)
@@ -1485,7 +1485,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(aList2[0].x, 100)
 
     def test_serialize_subclasses_multiple_views(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         class B(Class):
             x = Member(int)
@@ -1509,7 +1509,7 @@ class TypesSerializationTest(unittest.TestCase):
             self.assertEqual(e.x4, 2)
 
     def test_serialize_classes_with_staticmethods_and_properties(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         class B:
             @staticmethod
@@ -1531,7 +1531,7 @@ class TypesSerializationTest(unittest.TestCase):
         def f() -> T:
             return 1
 
-        sc = SerializationContext({})
+        sc = SerializationContext()
         f2 = sc.deserialize(sc.serialize(f))
         self.assertEqual(f2(), 1)
 
@@ -1542,7 +1542,7 @@ class TypesSerializationTest(unittest.TestCase):
         def f(x=10, *, y=20):
             return x + y
 
-        sc = SerializationContext({})
+        sc = SerializationContext()
         f2 = sc.deserialize(sc.serialize(f))
         self.assertEqual(f2(), 30)
 
@@ -1556,7 +1556,7 @@ class TypesSerializationTest(unittest.TestCase):
         def fWrapper():
             return f()
 
-        sc = SerializationContext({})
+        sc = SerializationContext()
         f2 = sc.deserialize(sc.serialize(f))
 
         self.assertEqual(f2(), 1)
@@ -1565,7 +1565,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(fWrapper2(), 1)
 
     def test_serialize_many_large_equivalent_strings(self):
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         def f(x):
             return " " * x + "hi" * x
@@ -1585,7 +1585,7 @@ class TypesSerializationTest(unittest.TestCase):
             def ownName(cls):
                 return str(cls)
 
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         ClassWithClassmethod2 = sc.deserialize(sc.serialize(ClassWithClassmethod))
 
@@ -1602,7 +1602,7 @@ class TypesSerializationTest(unittest.TestCase):
             def hi(x: ListOf(N)):
                 return len(x)
 
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         ClassWithStaticmethod2 = sc.deserialize(sc.serialize(ClassWithStaticmethod))
 
@@ -1810,3 +1810,18 @@ class TypesSerializationTest(unittest.TestCase):
         getter = sc.deserialize(sc.serialize(moduleLevelDictGetter(10)))
 
         assert getter()[0] is moduleLevelDict
+
+    def test_serialize_type_with_reference_to_self_through_closure(self):
+        @Entrypoint
+        def f(x):
+            if x < 0:
+                return 0
+            return x + C.anF(x-1)
+
+        class C:
+            anF = f
+
+        assert f(100) == sum(range(101))
+
+        # C and 'f' are mutually recursive
+        sc.deserialize(sc.serialize(C))

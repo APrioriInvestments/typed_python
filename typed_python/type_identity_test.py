@@ -12,12 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import tempfile
-import pickle
-import sys
-import subprocess
-import os
-
+from typed_python.test_util import evaluateExprInFreshProcess
 from typed_python import (
     UInt64, UInt32,
     ListOf, TupleOf, Tuple, NamedTuple, Dict, OneOf, Forward, identityHash,
@@ -40,71 +35,6 @@ def fModuleLevel(x):
 @Entrypoint
 def gModuleLevel(x):
     return fModuleLevel(x)
-
-
-def instantiateFiles(filesToWrite, tf):
-    # write all the files out
-    for fname, contents in filesToWrite.items():
-        fullname = os.path.join(tf, fname)
-        dirname = os.path.dirname(fullname)
-
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
-
-        with open(fullname, "w") as f:
-            f.write(
-                "from typed_python import *\n"
-                + contents
-            )
-
-
-def evaluateExprInFreshProcess(filesToWrite, expression):
-    """Return the value of an expression
-
-    Args:
-        filesToWrite = a dictionary from filename to the actual file contents to write.
-            note that you need to provide __init__.py for any submodules you create.
-        expression - the expression to evaluate (assume we've imported all the modules)
-
-    Returns:
-        a bytes object containing the sha-hash of module.thingToGrab.
-    """
-    with tempfile.TemporaryDirectory() as tf:
-        instantiateFiles(filesToWrite, tf)
-
-        namesToImport = [
-            fname[:-3].replace("/", ".") for fname in filesToWrite if '__init__' not in fname
-        ]
-
-        output = subprocess.check_output(
-            [
-                sys.executable,
-                "-c",
-                "".join(f"import {modname};" for modname in namesToImport) + (
-                    f"import pickle;"
-                    f"from typed_python._types import identityHash;"
-                    f"from typed_python import *;"
-                    f"print(repr(pickle.dumps({expression})))"
-                )
-            ],
-            cwd=tf
-        )
-
-        def isBytes(x):
-            return x.startswith(b"b'") or x.startswith(b'b"')
-
-        comments = [x for x in output.split(b"\n") if not isBytes(x) and x]
-        result = b'\n'.join([x for x in output.split(b"\n") if isBytes(x)])
-
-        if comments:
-            print("GOT COMMENTS:\n", "\n".join(["\t" + x.decode("ASCII") for x in comments]))
-
-        try:
-            # we're returning a 'repr' of a bytes object. the 'eval'
-            # turns it back into a python bytes object so we can compare it.
-            return pickle.loads(eval(result))
-        except Exception:
-            raise Exception("Failed to understand output:\n" + output.decode("ASCII"))
 
 
 def checkHash(filesToWrite, expression):
@@ -230,13 +160,13 @@ def test_mutually_recursive_group_through_functions_in_closure():
 
 
 def test_mutually_recursive_group_through_functions_at_module_level():
-    assert recursiveTypeGroup(type(gModuleLevel)) == [
+    assert set(recursiveTypeGroup(type(gModuleLevel))) == set([
         fModuleLevel, type(fModuleLevel), gModuleLevel, type(gModuleLevel)
-    ]
+    ])
 
-    assert recursiveTypeGroup(gModuleLevel) == [
+    assert set(recursiveTypeGroup(gModuleLevel)) == set([
         fModuleLevel, type(fModuleLevel), gModuleLevel, type(gModuleLevel)
-    ]
+    ])
 
 
 def test_recursive_group_of_function_values():
@@ -463,15 +393,19 @@ NT = NamedTuple(aNameUnlikelyToShowUpAnywhereElse=int)
 
 
 def deserializeTwiceAndCall(rep):
-    v1 = SerializationContext({}).deserialize(rep)
-    v2 = SerializationContext({}).deserialize(rep)
+    v1 = SerializationContext().deserialize(rep)
+    v2 = SerializationContext().deserialize(rep)
 
     return (v1(), v2())
 
 
+def deserializeAndReturnHash(rep):
+    return identityHash(SerializationContext().deserialize(rep))
+
+
 def deserializeTwiceAndConfirmEquivalent(rep):
-    v1 = SerializationContext({}).deserialize(rep)
-    v2 = SerializationContext({}).deserialize(rep)
+    v1 = SerializationContext().deserialize(rep)
+    v2 = SerializationContext().deserialize(rep)
 
     return v1 is v2
 """
@@ -481,19 +415,19 @@ def deserializeTwiceAndConfirmEquivalent(rep):
 def test_repeated_deserialize_externally_defined_named_tuple():
     ser = returnSerializedValue(MODULE, 'x.NT')
 
-    assert SerializationContext({}).deserialize(ser) is SerializationContext({}).deserialize(ser)
+    assert SerializationContext().deserialize(ser) is SerializationContext().deserialize(ser)
 
 
 def test_repeated_deserialize_externally_defined_class_is_stable():
     ser = returnSerializedValue(MODULE, 'x.S()')
 
-    assert SerializationContext({}).deserialize(ser) is SerializationContext({}).deserialize(ser)
+    assert SerializationContext().deserialize(ser) is SerializationContext().deserialize(ser)
 
 
 def test_repeated_deserialize_externally_defined_alternative_is_stable():
     ser = returnSerializedValue(MODULE, 'x.MakeA()')
 
-    assert SerializationContext({}).deserialize(ser) is SerializationContext({}).deserialize(ser)
+    assert SerializationContext().deserialize(ser) is SerializationContext().deserialize(ser)
 
 
 def test_repeated_deserialize_externally_defined_anonymous_classes():
@@ -517,3 +451,19 @@ def test_serialization_of_anonymous_functions_preserves_references():
     # also refers to the same of 'aTypedGlobal' as the first one, which it should inherity
     # through its closure.
     assert vals == (1, 2)
+
+
+def test_hash_stability():
+    idHash = evaluateExprInFreshProcess({
+        'x.py': 'from typed_python.compiler.native_ast import NamedCallTarget\n'
+    }, 'identityHash(x.NamedCallTarget)')
+    ser = returnSerializedValue({
+        'x.py': 'from typed_python.compiler.native_ast import NamedCallTarget\n'
+    }, 'x.NamedCallTarget')
+
+    idHashDeserialized = evaluateExprInFreshProcess(
+        MODULE,
+        f'x.deserializeAndReturnHash({repr(ser)})'
+    )
+
+    assert idHash == idHashDeserialized

@@ -510,7 +510,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         def aFun(x):
             return x + 1
 
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         aFun2 = sc.deserialize(sc.serialize(aFun))
 
@@ -521,7 +521,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         def f(x):
             return x + 1
 
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         f2 = sc.deserialize(sc.serialize(f))
 
@@ -534,7 +534,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         def f(x):
             return x + 1
 
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         f2 = sc.deserialize(sc.serialize(f))
 
@@ -551,7 +551,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         def f(x, y):
             return "yes"
 
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         f2 = sc.deserialize(sc.serialize(f))
 
@@ -566,7 +566,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(adder(20), 30)
 
-        sc = SerializationContext({})
+        sc = SerializationContext()
 
         adder2 = sc.deserialize(sc.serialize(adder))
 

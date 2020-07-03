@@ -26,11 +26,11 @@ from typed_python.hash import sha_hash
 
 
 class LoadedBinarySharedObject(LoadedModule):
-    def __init__(self, binarySharedObject, storageDir, functionPointers, globalVariableDefinitions):
+    def __init__(self, binarySharedObject, diskPath, functionPointers, globalVariableDefinitions):
         super().__init__(functionPointers, globalVariableDefinitions)
 
         self.binarySharedObject = binarySharedObject
-        self.storageDir = storageDir
+        self.diskPath = diskPath
 
 
 class BinarySharedObject:
@@ -45,6 +45,18 @@ class BinarySharedObject:
         self.binaryForm = binaryForm
         self.functionTypes = functionTypes
         self.globalVariableDefinitions = globalVariableDefinitions
+        self.hash = sha_hash(binaryForm)
+
+    @property
+    def definedSymbols(self):
+        return self.functionTypes.keys()
+
+    @staticmethod
+    def fromDisk(path, globalVariableDefinitions, functionNameToType):
+        with open(path, "rb") as f:
+            binaryForm = f.read()
+
+        return BinarySharedObject(binaryForm, functionNameToType, globalVariableDefinitions)
 
     @staticmethod
     def fromModule(module, globalVariableDefinitions, functionNameToType):
@@ -72,16 +84,32 @@ class BinarySharedObject:
 
     def load(self, storageDir):
         """Instantiate this .so in temporary storage and return a dict from symbol -> integer function pointer"""
+        return self.loadFromPath(self.store(storageDir))
+
+    def store(self, storageDir):
+        """Write this module to disk with a name based on the module's sha-hash
+
+        Args:
+            storageDir - the directory where we want to write the binary.
+                we should be able to put files of any kind here.
+        Returns:
+            the path where we wrote the file.
+        """
         if not os.path.exists(storageDir):
             os.makedirs(storageDir)
 
-        modulename = sha_hash(self.binaryForm).hexdigest + "_module.so"
+        modulename = self.hash.hexdigest + "_module.so"
+
         modulePath = os.path.join(storageDir, modulename)
 
-        with open(modulePath, "wb") as f:
-            f.write(self.binaryForm)
+        if not os.path.exists(modulePath):
+            with open(modulePath, "wb") as f:
+                f.write(self.binaryForm)
 
-        dll = ctypes.CDLL(modulePath)
+        return modulePath
+
+    def loadFromPath(self, modulePath):
+        dll = ctypes.CDLL(modulePath, ctypes.RTLD_GLOBAL)
 
         functionPointers = {}
 
@@ -95,9 +123,12 @@ class BinarySharedObject:
                 self.functionTypes[symbol].output,
             )
 
-        return LoadedBinarySharedObject(
+        loadedModule = LoadedBinarySharedObject(
             self,
-            storageDir,
+            modulePath,
             functionPointers,
             self.globalVariableDefinitions
         )
+        loadedModule.linkGlobalVariables()
+
+        return loadedModule

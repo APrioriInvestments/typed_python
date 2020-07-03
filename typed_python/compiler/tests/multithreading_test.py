@@ -120,7 +120,7 @@ class TestMultithreading(unittest.TestCase):
         T = ListOf(int)
         x = T()
         x.resize(1000000)
-        sc = SerializationContext({}).withoutCompression()
+        sc = SerializationContext().withoutCompression()
 
         def f():
             for i in range(10):

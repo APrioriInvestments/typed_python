@@ -19,6 +19,7 @@ GlobalVariableMetadata = Alternative(
     "GlobalVariableMetadata",
     StringConstant=dict(value=str),
     BytesConstant=dict(value=bytes),
+    IntegerConstant=dict(value=int),
     # a pointer to a PythonObjectOfType (e.g. our version, with
     # refcounts that are not in the GIL)
     PointerToPyObject=dict(value=object),

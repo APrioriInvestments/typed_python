@@ -647,12 +647,30 @@ class FunctionConverter:
                         llvmlite.ir.Function(self.module, func_type, target.name)
 
             func = self.external_function_references[target.name]
+        elif target.name in self.converter._externallyDefinedFunctionTypes:
+            # this function is defined in a shared object that we've loaded from a prior
+            # invocation
+            if target.name not in self.external_function_references:
+                func_type = llvmlite.ir.FunctionType(
+                    type_to_llvm_type(target.output_type),
+                    [type_to_llvm_type(x) for x in target.arg_types],
+                    var_arg=target.varargs
+                )
+
+                self.external_function_references[target.name] = (
+                    llvmlite.ir.Function(self.module, func_type, target.name)
+                )
+
+            func = self.external_function_references[target.name]
         else:
             func = self.converter._functions_by_name[target.name]
 
             if func.module is not self.module:
                 # first, see if we'd like to inline this module
-                if self.converter.totalFunctionComplexity(target.name) < CROSS_MODULE_INLINE_COMPLEXITY:
+                if (
+                    self.converter.totalFunctionComplexity(target.name) < CROSS_MODULE_INLINE_COMPLEXITY
+                    and self.converter.canBeInlined(target.name)
+                ):
                     func = self.converter.repeatFunctionInModule(target.name, self.module)
                 else:
                     if target.name not in self.external_function_references:
@@ -1401,12 +1419,23 @@ class Converter(object):
         self._functions_by_name = {}
         self._function_definitions = {}
 
+        # a map from function name to function type for functions that
+        # are defined in external shared objects and linked in to this one.
+        self._externallyDefinedFunctionTypes = {}
+
         # total number of instructions in each function, by name
         self._function_complexity = {}
 
         self._inlineRequests = []
 
         self.verbose = False
+
+    def markExternal(self, functionNameToType):
+        """Provide type signatures for a set of external functions."""
+        self._externallyDefinedFunctionTypes.update(functionNameToType)
+
+    def canBeInlined(self, name):
+        return name not in self._externallyDefinedFunctionTypes
 
     def totalFunctionComplexity(self, name):
         """Return the total number of instructions contained in a function.
