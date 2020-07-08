@@ -814,17 +814,61 @@ public:
                 }
             }
 
-            if (!mFunctionUsedGlobals) {
-                populateUsedGlobals();
-            }
-
-            iterate(mFunctionUsedGlobals, [&](PyObject* globalName) {
-                PyObject* o = PyDict_GetItem(mFunctionUsedGlobals, globalName);
-                if (!o) {
-                    throw PythonExceptionSet();
-                }
-                visitor(o);
+            visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
+                visitor(val);
             });
+        }
+
+        template<class visitor_type>
+        void visitCompilerVisibleGlobals(const visitor_type& visitor) {
+            std::vector<std::vector<PyObject*> > dotAccesses;
+
+            extractDottedGlobalAccessesFromCode((PyCodeObject*)mFunctionCode, dotAccesses);
+
+            auto visitSequence = [&](const std::vector<PyObject*>& sequence) {
+                PyObjectHolder curObj;
+                std::string curName;
+
+                for (PyObject* name: sequence) {
+                    if (!curObj) {
+                        curName = PyUnicode_AsUTF8(name);
+                    } else {
+                        curName = curName + "." + PyUnicode_AsUTF8(name);
+                    }
+
+                    if (!curObj) {
+                        // this is a lookup in the global dict
+                        curObj.set(PyDict_GetItem(mFunctionGlobals, name));
+                        if (!curObj) {
+                            // this is an invalid global lookup, which is OK. no need to hash anything.
+                            PyErr_Clear();
+                            return;
+                        }
+                    } else {
+                        // we're looking up an attribute of this object. We only want to look into modules.
+                        if (PyModule_CheckExact(curObj) && PyObject_HasAttr(curObj, name)) {
+                            PyObjectStealer moduleMember(PyObject_GetAttr(curObj, name));
+
+                            curObj.steal(PyObject_GetAttr(curObj, name));
+                            if (!curObj) {
+                                // this is an invalid module member lookup. We can just bail.
+                                PyErr_Clear();
+                                return;
+                            }
+                        } else {
+                            visitor(curName, (PyObject*)curObj);
+                            return;
+                        }
+                    }
+                }
+
+                // also visit at the end of the sequence
+                visitor(curName, (PyObject*)curObj);
+            };
+
+            for (auto& sequence: dotAccesses) {
+                visitSequence(sequence);
+            }
         }
 
         template<class visitor_type>
@@ -904,6 +948,67 @@ public:
 
         const std::map<std::string, PyObject*> getFunctionGlobalsInCells() const {
             return mFunctionGlobalsInCells;
+        }
+
+        /* walk over the opcodes in 'code' and extract all cases where we're accessing globals by name.
+
+        In cases where we write something like 'x.y.z' the compiler shouldn't have a reference to 'x',
+        just to whatever 'x.y.z' refers to.
+
+        This transformation just figures out what the dotting sequences are.
+        */
+        static void extractDottedGlobalAccessesFromCode(PyCodeObject* code, std::vector<std::vector<PyObject*> >& outSequences) {
+            uint8_t* bytes;
+            Py_ssize_t bytecount;
+
+            PyBytes_AsStringAndSize(((PyCodeObject*)code)->co_code, (char**)&bytes, &bytecount);
+
+            long opcodeCount = bytecount / 2;
+
+            // opcodes are encoded in the low byte
+            auto opcodeFor = [&](int i) { return bytes[i * 2]; };
+
+            // opcode targets are encoded in the high byte
+            auto opcodeTargetFor = [&](int i) { return bytes[i * 2 + 1]; };
+
+            const uint8_t LOAD_ATTR = 106;
+            const uint8_t LOAD_GLOBAL = 116;
+            const uint8_t DELETE_GLOBAL = 98;
+            const uint8_t STORE_GLOBAL = 97;
+
+            std::vector<PyObject*> curDotSequence;
+            for (long ix = 0; ix < opcodeCount; ix++) {
+                // if we're loading an attr on an existing sequence, just make it bigger
+                if (opcodeFor(ix) == LOAD_ATTR && curDotSequence.size()) {
+                    curDotSequence.push_back(PyTuple_GetItem(code->co_names, opcodeTargetFor(ix)));
+                } else if (curDotSequence.size()) {
+                    // any other operation should flush the buffer
+                    outSequences.push_back(curDotSequence);
+                    curDotSequence.clear();
+                }
+
+                // if we're loading a global, we start a new sequence
+                if (opcodeFor(ix) == LOAD_GLOBAL) {
+                    curDotSequence.push_back(PyTuple_GetItem(code->co_names, opcodeTargetFor(ix)));
+                } else if (
+                    opcodeFor(ix) == STORE_GLOBAL
+                    || opcodeFor(ix) == DELETE_GLOBAL
+                ) {
+                    outSequences.push_back({PyTuple_GetItem(code->co_names, opcodeTargetFor(ix))});
+                }
+            }
+
+            // flush the buffer if we have something
+            if (curDotSequence.size()) {
+                outSequences.push_back(curDotSequence);
+            }
+
+            // recurse into sub code objects
+            iterate(code->co_consts, [&](PyObject* o) {
+                if (PyCode_Check(o)) {
+                    extractDottedGlobalAccessesFromCode((PyCodeObject*)o, outSequences);
+                }
+            });
         }
 
         static void extractNamesFromCode(PyCodeObject* code, std::set<PyObject*>& outNames) {
@@ -1163,24 +1268,10 @@ public:
 
             res += ShaHash(1);
 
-            if (!mFunctionUsedGlobals) {
-                populateUsedGlobals();
-            }
-
-            std::map<std::string, ShaHash> globals;
-            iterate(mFunctionUsedGlobals, [&](PyObject* globalName) {
-                PyObject* val = PyDict_GetItem(mFunctionUsedGlobals, globalName);
-                if (val && PyUnicode_Check(globalName)) {
-                    std::string globalNameStr(PyUnicode_AsUTF8(globalName));
-
-                    globals[globalNameStr] = MutuallyRecursiveTypeGroup::pyObjectShaHash(val, groupHead);
-                }
+            visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
+                res += ShaHash(name);
+                res += MutuallyRecursiveTypeGroup::pyObjectShaHash(val, groupHead);
             });
-
-            for (auto nameAndHash: globals) {
-                res += ShaHash(nameAndHash.first);
-                res += nameAndHash.second;
-            }
 
             res += ShaHash(1);
 

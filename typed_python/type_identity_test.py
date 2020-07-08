@@ -19,11 +19,14 @@ from typed_python import (
     Entrypoint, Class, Member, Final, TypeFunction, SerializationContext
 )
 
+import typed_python
+
 from typed_python.hash import Hash
 
 from typed_python._types import (
     prepareArgumentToBePassedToCompiler,
-    recursiveTypeGroup
+    recursiveTypeGroup,
+    getCodeGlobalDotAccesses
 )
 
 
@@ -476,3 +479,16 @@ def test_hash_stability():
     )
 
     assert idHash == idHashDeserialized
+
+
+def test_dot_accesses():
+    def f():
+        return typed_python._types
+
+    assert getCodeGlobalDotAccesses(f.__code__) == [['typed_python', '_types']]
+
+    def f2():
+        typed_python
+        return typed_python._types
+
+    assert getCodeGlobalDotAccesses(f2.__code__) == [['typed_python'], ['typed_python', '_types']]

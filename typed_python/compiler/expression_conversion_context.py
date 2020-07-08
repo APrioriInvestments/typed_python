@@ -1131,6 +1131,7 @@ class ExpressionConversionContext(object):
             overload.name,
             overload.functionCode,
             overload.realizedGlobals,
+            overload.functionGlobals,
             list(overload.closureVarLookups),
             [a.expr_type for a in closureArgs]
             + [a.expr_type for a in concreteArgs],

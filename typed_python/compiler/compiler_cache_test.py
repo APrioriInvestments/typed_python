@@ -14,6 +14,7 @@
 
 import tempfile
 import os
+import pytest
 from typed_python.test_util import evaluateExprInFreshProcess
 
 MAIN_MODULE = """
@@ -23,6 +24,7 @@ def f(x):
 """
 
 
+@pytest.mark.skipif('sys.platform=="darwin"')
 def test_compiler_cache_populates():
     with tempfile.TemporaryDirectory() as compilerCacheDir:
         assert evaluateExprInFreshProcess({'x.py': MAIN_MODULE}, 'x.f(10)', compilerCacheDir) == 11
@@ -35,6 +37,7 @@ def test_compiler_cache_populates():
         assert len(os.listdir(compilerCacheDir)) == 2
 
 
+@pytest.mark.skipif('sys.platform=="darwin"')
 def test_compiler_cache_can_handle_conflicting_versions_of_the_same_code():
     with tempfile.TemporaryDirectory() as compilerCacheDir:
         assert evaluateExprInFreshProcess({'x.py': MAIN_MODULE}, 'x.f(10)', compilerCacheDir) == 11
@@ -47,6 +50,7 @@ def test_compiler_cache_can_handle_conflicting_versions_of_the_same_code():
         assert len(os.listdir(compilerCacheDir)) == 2
 
 
+@pytest.mark.skipif('sys.platform=="darwin"')
 def test_compiler_cache_can_detect_invalidation_through_modules():
     xmodule = "\n".join([
         "def f(x):",
@@ -73,6 +77,7 @@ def test_compiler_cache_can_detect_invalidation_through_modules():
         assert len(os.listdir(compilerCacheDir)) == 2
 
 
+@pytest.mark.skipif('sys.platform=="darwin"')
 def test_compiler_cache_robust_to_irrelevant_module_changes():
     xmodule = "\n".join([
         "# this is a comment",
@@ -97,6 +102,7 @@ def test_compiler_cache_robust_to_irrelevant_module_changes():
         assert len(os.listdir(compilerCacheDir)) == 1
 
 
+@pytest.mark.skipif('sys.platform=="darwin"')
 def test_compiler_cache_understands_type_changes():
     xmodule = "\n".join([
         "G = Dict(int, int)({1: 2})",
@@ -127,3 +133,32 @@ def test_compiler_cache_understands_type_changes():
         # this forces a recompile
         assert evaluateExprInFreshProcess(VERSION3, 'y.g(1)', compilerCacheDir) == 2.5
         assert len(os.listdir(compilerCacheDir)) == 2
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_understands_granular_module_accesses():
+    xmodule = "\n".join([
+        "@Entrypoint",
+        "def f(x):",
+        "    return x + 1",
+        "@Entrypoint",
+        "def g(x):",
+        "    return x * 100",
+    ])
+    ymodule = "\n".join([
+        "import x",
+        "@Entrypoint",
+        "def g(arg):",
+        "    return x.f(arg)",
+    ])
+
+    VERSION1 = {'x.py': xmodule, 'y.py': ymodule}
+    VERSION2 = {'x.py': xmodule.replace("100", "200"), 'y.py': ymodule}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        assert evaluateExprInFreshProcess(VERSION1, 'y.g(1)', compilerCacheDir, printComments=True) == 2
+        assert len(os.listdir(compilerCacheDir)) == 1
+
+        # no recompilation necessary
+        assert evaluateExprInFreshProcess(VERSION2, 'y.g(1)', compilerCacheDir, printComments=True) == 2
+        assert len(os.listdir(compilerCacheDir)) == 1

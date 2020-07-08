@@ -792,7 +792,7 @@ class ExpressionFunctionConversionContext(ConversionContextBase):
     """Helper function for converting a single python function given some input and output types"""
 
     def __init__(self, converter, name, identity, input_types, generator, outputType=None, alwaysRaises=False):
-        super().__init__(converter, name, identity, input_types, outputType, [f'a{i}' for i in range(len(input_types))], [], {})
+        super().__init__(converter, name, identity, input_types, outputType, [f'a{i}' for i in range(len(input_types))], [], {}, {})
 
         self._generator = generator
         self.variablesBound = set(self.funcArgNames)

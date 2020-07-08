@@ -405,6 +405,44 @@ PyObject *getNextUnlinkedClassMethodDispatch(PyObject* nullValue, PyObject* args
     });
 }
 
+PyObject *getCodeGlobalDotAccesses(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {"codeObject", NULL};
+
+    PyObject* pyCodeObject;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist, &pyCodeObject)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        if (!PyCode_Check(pyCodeObject)) {
+            throw std::runtime_error("codeObject must be a code object");
+        }
+
+        PyObjectHolder res(PyList_New(0));
+
+        std::vector<std::vector<PyObject*> > v;
+
+        Function::Overload::extractDottedGlobalAccessesFromCode(
+            (PyCodeObject*)pyCodeObject,
+            v
+        );
+
+        for (auto& seq: v) {
+            PyObjectStealer lst(PyList_New(0));
+
+            for (auto i: seq) {
+                PyList_Append(lst, i);
+            }
+
+            PyList_Append(res, lst);
+        }
+
+        return res;
+    });
+}
+
+
 PyObject *getClassMethodDispatchSignature(PyObject* nullValue, PyObject* args, PyObject* kwargs)
 {
     static const char *kwlist[] = {"interfaceClass", "implementingClass", "slot", NULL};
@@ -2265,6 +2303,7 @@ static PyMethodDef module_methods[] = {
     {"copy", (PyCFunction)copyRefTo, METH_VARARGS, NULL},
     {"refTo", (PyCFunction)refTo, METH_VARARGS, NULL},
     {"getTypePointer", (PyCFunction)getTypePointer, METH_VARARGS, NULL},
+    {"getCodeGlobalDotAccesses", (PyCFunction)getCodeGlobalDotAccesses, METH_VARARGS | METH_KEYWORDS, NULL},
     {"_vtablePointer", (PyCFunction)getVTablePointer, METH_VARARGS, NULL},
     {"allocateClassMethodDispatch", (PyCFunction)allocateClassMethodDispatch, METH_VARARGS | METH_KEYWORDS, NULL},
     {"getNextUnlinkedClassMethodDispatch", (PyCFunction)getNextUnlinkedClassMethodDispatch, METH_VARARGS | METH_KEYWORDS, NULL},

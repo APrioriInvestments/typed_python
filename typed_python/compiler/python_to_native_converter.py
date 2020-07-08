@@ -16,7 +16,7 @@ import types
 import logging
 
 from typed_python.hash import Hash
-
+from types import ModuleType
 import typed_python.python_ast as python_ast
 import typed_python._types as _types
 import typed_python.compiler
@@ -123,6 +123,9 @@ class PythonToNativeConverter(object):
 
         # all link names for which we have a definition.
         self._allDefinedNames = set()
+
+        # all names we loaded from the cache
+        self._allCachedNames = set()
 
         self._link_name_for_identity = {}
         self._definitions = {}
@@ -458,6 +461,10 @@ class PythonToNativeConverter(object):
             if not identity:
                 return
 
+            linkName = self._link_name_for_identity[identity]
+            if linkName in self._allCachedNames:
+                continue
+
             functionConverter = self._inflight_function_conversions[identity]
 
             hasDefinitionBeforeConversion = identity in self._inflight_definitions
@@ -614,6 +621,35 @@ class PythonToNativeConverter(object):
 
         return Hash(_types.identityHash(hashable))
 
+    def hashGlobals(self, funcGlobals, code):
+        """Hash a given piece of code's accesses to funcGlobals.
+
+        We're trying to make sure that if we have a reference to module 'x'
+        in our globals, but we only ever use 'x' by writing 'x.f' or 'x.g', then
+        we shouldn't depend on the entirety of the definition of 'x'.
+        """
+
+        res = Hash.from_integer(0)
+
+        for dotSeq in _types.getCodeGlobalDotAccesses(code):
+            res += self.hashDotSeq(dotSeq, funcGlobals)
+
+        return res
+
+    def hashDotSeq(self, dotSeq, funcGlobals):
+        if not dotSeq or dotSeq[0] not in funcGlobals:
+            return Hash.from_integer(0)
+
+        item = funcGlobals[dotSeq[0]]
+
+        if not isinstance(item, ModuleType):
+            return Hash.from_string(dotSeq[0]) + self.hashObjectToIdentity(item)
+
+        if not hasattr(item, dotSeq[1]):
+            return Hash.from_integer(0)
+
+        return Hash.from_string(dotSeq[0] + "." + dotSeq[1]) + self.hashObjectToIdentity(getattr(item, dotSeq[1]))
+
     def convert(
         self,
         funcName,
@@ -658,11 +694,11 @@ class PythonToNativeConverter(object):
             + self.hashObjectToIdentity((
                 funcCode,
                 funcName,
-                funcGlobals,
                 input_types,
                 output_type,
                 closureVars
-            ))
+            )) +
+            self.hashGlobals(funcGlobals, funcCode)
         )
         assert not identityHash.isPoison()
 
@@ -686,6 +722,7 @@ class PythonToNativeConverter(object):
 
                     self._allDefinedNames.update(newTypedCallTargets)
                     self._allDefinedNames.update(newNativeFunctionTypes)
+                    self._allCachedNames.update(newNativeFunctionTypes)
 
         if identity not in self._identifier_to_pyfunc:
             self._identifier_to_pyfunc[identity] = (
