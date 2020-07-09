@@ -47,11 +47,13 @@ public:
         }
 
         for (auto& typeAndList: m_pointersNeedingDecref) {
-            typeAndList.first->check([&](auto& concreteType) {
-                for (auto ptr: typeAndList.second) {
-                    concreteType.destroy((instance_ptr)&ptr);
-                }
-            });
+            if (typeAndList.first) {
+                typeAndList.first->check([&](auto& concreteType) {
+                    for (auto ptr: typeAndList.second) {
+                        concreteType.destroy((instance_ptr)&ptr);
+                    }
+                });
+            }
         }
 
         for (auto p: m_pyObjectsNeedingDecref) {
@@ -282,6 +284,18 @@ public:
         }
 
         return std::pair<uint32_t, bool>(it->second, false);
+    }
+
+    bool isAlreadyCached(PyObject* t) {
+        return m_idToPointerCache.find((void*)t) != m_idToPointerCache.end();
+    }
+
+    int32_t memoFor(PyObject* t) {
+        auto it = m_idToPointerCache.find(t);
+        if (it != m_idToPointerCache.end()) {
+            return it->second;
+        }
+        return -1;
     }
 
     void finalize() {

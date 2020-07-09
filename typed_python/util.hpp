@@ -121,6 +121,30 @@ public:
         return (PyTypeObject*)m_ptr;
     }
 
+    bool operator<(const PyObjectHolder& other) const {
+        return m_ptr < other.m_ptr;
+    }
+
+    bool operator>(const PyObjectHolder& other) const {
+        return m_ptr > other.m_ptr;
+    }
+
+    bool operator==(const PyObjectHolder& other) const {
+        return m_ptr == other.m_ptr;
+    }
+
+    bool operator<(PyObject* other) const {
+        return m_ptr < other;
+    }
+
+    bool operator>(PyObject* other) const {
+        return m_ptr > other;
+    }
+
+    bool operator==(PyObject* other) const {
+        return m_ptr == other;
+    }
+
     PyObject* operator->() const {
         return m_ptr;
     }

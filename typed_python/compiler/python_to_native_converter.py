@@ -128,6 +128,7 @@ class PythonToNativeConverter(object):
         self._allCachedNames = set()
 
         self._link_name_for_identity = {}
+        self._identity_for_link_name = {}
         self._definitions = {}
         self._targets = {}
         self._inflight_definitions = {}
@@ -181,9 +182,12 @@ class PythonToNativeConverter(object):
         externallyUsed = set()
 
         for funcName in targets:
-            for dep in self._dependencies.getNamesDependedOn(funcName):
-                if dep not in targets:
-                    externallyUsed.add(dep)
+            ident = self._identity_for_link_name.get(funcName)
+            if ident is not None:
+                for dep in self._dependencies.getNamesDependedOn(ident):
+                    depLN = self._link_name_for_identity.get(dep)
+                    if depLN not in targets:
+                        externallyUsed.add(depLN)
 
         binary = self.llvmCompiler.buildSharedObject(targets)
 
@@ -247,6 +251,30 @@ class PythonToNativeConverter(object):
         else:
             return None
 
+    def defineLinkName(self, identity, linkName):
+        if identity in self._link_name_for_identity:
+            assert self._link_name_for_identity[identity] == linkName
+            assert self._identity_for_link_name[linkName] == identity
+        else:
+            self._link_name_for_identity[identity] = linkName
+            self._identity_for_link_name[linkName] = identity
+
+        if linkName not in self._allDefinedNames:
+            self._allDefinedNames.add(linkName)
+
+            if self.compilerCache:
+                if self.compilerCache.hasSymbol(linkName):
+                    newTypedCallTargets, newNativeFunctionTypes = self.compilerCache.loadForSymbol(linkName)
+
+                    self._targets.update(newTypedCallTargets)
+                    self.llvmCompiler.markExternal(newNativeFunctionTypes)
+
+                    self._allDefinedNames.update(newNativeFunctionTypes)
+                    self._allCachedNames.update(newNativeFunctionTypes)
+
+            return True
+        return False
+
     def defineNonPythonFunction(self, name, identityTuple, context, callback=None):
         """Define a non-python generating function (if we haven't defined it before already)
 
@@ -261,6 +289,8 @@ class PythonToNativeConverter(object):
         identity = self.hashObjectToIdentity(identityTuple).hexdigest
         linkName = self.identityHashToLinkerName(name, identity, "runtime.")
 
+        self.defineLinkName(identity, linkName)
+
         if self._currentlyConverting is not None:
             self._dependencies.addEdge(self._currentlyConverting, identity)
         else:
@@ -269,11 +299,9 @@ class PythonToNativeConverter(object):
         if callback is not None:
             self.installLinktimeHook(identity, callback)
 
-        if linkName in self._allDefinedNames:
+        if linkName in self._targets:
             return self._targets.get(linkName)
 
-        self._allDefinedNames.add(linkName)
-        self._link_name_for_identity[identity] = linkName
         self._inflight_function_conversions[identity] = context
 
         if context.knownOutputType() is not None or context.alwaysRaises():
@@ -313,7 +341,10 @@ class PythonToNativeConverter(object):
         input_types = [typeWrapper(x) for x in input_types]
 
         identity = (
-            Hash.from_integer(2) + self.hashObjectToIdentity(identity)
+            Hash.from_integer(2) +
+            self.hashObjectToIdentity(identity) +
+            self.hashObjectToIdentity(output_type) +
+            self.hashObjectToIdentity(input_types)
         ).hexdigest
 
         return self.defineNonPythonFunction(
@@ -448,6 +479,7 @@ class PythonToNativeConverter(object):
         )
 
         self._link_name_for_identity[identifier] = linkName
+        self._identity_for_link_name[linkName] = identifier
         self._allDefinedNames.add(linkName)
 
         self._definitions[linkName] = definition
@@ -485,7 +517,8 @@ class PythonToNativeConverter(object):
                         if name in self._targets:
                             self._targets.pop(name)
                         self._allDefinedNames.discard(name)
-                        self._link_name_for_identity.pop(i)
+                        ln = self._link_name_for_identity.pop(i)
+                        self._identity_for_link_name.pop(ln)
 
                     self._dependencies.dropNode(i)
 
@@ -550,7 +583,7 @@ class PythonToNativeConverter(object):
         # we are compiling the function 'name' in 'implementingClass' to be installed when
         # viewing an instance of 'implementingClass' as 'interfaceClass' that's function
         # 'name' called with signature '(*argTypeTuple, **kwargTypeTuple) -> retType'
-        assert ClassWrapper.compileMethodInstantiation(
+        res = ClassWrapper.compileMethodInstantiation(
             self,
             interfaceClass,
             implementingClass,
@@ -560,6 +593,8 @@ class PythonToNativeConverter(object):
             kwargTypeTuple,
             callback=installOverload
         )
+
+        assert res
 
         return True
 
@@ -584,6 +619,7 @@ class PythonToNativeConverter(object):
             overload.functionCode,
             overload.realizedGlobals,
             overload.functionGlobals,
+            overload.funcGlobalsInCells,
             list(overload.closureVarLookups),
             realizedInputWrappers,
             overload.returnType,
@@ -621,7 +657,7 @@ class PythonToNativeConverter(object):
 
         return Hash(_types.identityHash(hashable))
 
-    def hashGlobals(self, funcGlobals, code):
+    def hashGlobals(self, funcGlobals, code, funcGlobalsFromCells):
         """Hash a given piece of code's accesses to funcGlobals.
 
         We're trying to make sure that if we have a reference to module 'x'
@@ -634,6 +670,9 @@ class PythonToNativeConverter(object):
         for dotSeq in _types.getCodeGlobalDotAccesses(code):
             res += self.hashDotSeq(dotSeq, funcGlobals)
 
+        for globalName in funcGlobalsFromCells:
+            res += self.hashDotSeq(globalName, funcGlobals)
+
         return res
 
     def hashDotSeq(self, dotSeq, funcGlobals):
@@ -642,7 +681,7 @@ class PythonToNativeConverter(object):
 
         item = funcGlobals[dotSeq[0]]
 
-        if not isinstance(item, ModuleType):
+        if not isinstance(item, ModuleType) or len(dotSeq) == 1:
             return Hash.from_string(dotSeq[0]) + self.hashObjectToIdentity(item)
 
         if not hasattr(item, dotSeq[1]):
@@ -656,6 +695,7 @@ class PythonToNativeConverter(object):
         funcCode,
         funcGlobals,
         funcGlobalsRaw,
+        funcGlobalsFromCells,
         closureVars,
         input_types,
         output_type,
@@ -673,6 +713,8 @@ class PythonToNativeConverter(object):
             funcGlobals - the globals object from the relevant function
             funcGlobalsRaw - the original globals object (with no merging or filtering done)
                 which we use to figure out the location of global variables that are not in cells.
+            funcGlobalsFromCells - a list of the names that are globals that are actually accessed
+                as cells.
             input_types - a type for each free variable in the function closure, and
                 then again for each input argument
             output_type - the output type of the function, if known. if this is None,
@@ -698,8 +740,9 @@ class PythonToNativeConverter(object):
                 output_type,
                 closureVars
             )) +
-            self.hashGlobals(funcGlobals, funcCode)
+            self.hashGlobals(funcGlobals, funcCode, funcGlobalsFromCells)
         )
+
         assert not identityHash.isPoison()
 
         identity = identityHash.hexdigest
@@ -709,20 +752,7 @@ class PythonToNativeConverter(object):
 
         name = self.identityHashToLinkerName(funcName, identity)
 
-        if name not in self._allDefinedNames:
-            self._link_name_for_identity[identity] = name
-            self._allDefinedNames.add(name)
-
-            if self.compilerCache:
-                if self.compilerCache.hasSymbol(name):
-                    newTypedCallTargets, newNativeFunctionTypes = self.compilerCache.loadForSymbol(name)
-
-                    self._targets.update(newTypedCallTargets)
-                    self.llvmCompiler.markExternal(newNativeFunctionTypes)
-
-                    self._allDefinedNames.update(newTypedCallTargets)
-                    self._allDefinedNames.update(newNativeFunctionTypes)
-                    self._allCachedNames.update(newNativeFunctionTypes)
+        self.defineLinkName(identity, name)
 
         if identity not in self._identifier_to_pyfunc:
             self._identifier_to_pyfunc[identity] = (

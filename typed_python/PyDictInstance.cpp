@@ -601,7 +601,7 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
         instance_ptr lookupKey;
         Instance key;
 
-        if (itemType == keyType) {
+        if (Type::typesEquivalent(itemType, keyType)) {
             PyInstance *item_w = (PyInstance*)(PyObject*)item;
             lookupKey = item_w->dataPtr();
             i = self->type()->lookupValueByKey(self->dataPtr(), item_w->dataPtr());
@@ -689,7 +689,7 @@ PyObject* PyDictInstance::pop(PyObject* o, PyObject* args) {
         Instance key;
         instance_ptr keyPtr;
 
-        if (itemType == keyType) {
+        if (Type::typesEquivalent(itemType, keyType)) {
             PyInstance *item_w = (PyInstance*)(PyObject*)item;
             keyPtr = item_w->dataPtr();
         } else {

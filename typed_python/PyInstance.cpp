@@ -114,7 +114,7 @@ bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, bool is
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
-    if (argType && argType == t) {
+    if (argType && Type::typesEquivalent(argType, t)) {
         return true;
     }
 
@@ -146,7 +146,10 @@ void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt
             argTypeToUse = ((RefTo*)argTypeToUse)->getEltType();
         }
 
-        if (argTypeToUse && (eltType == argTypeToUse || (argTypeToUse->isSubclassOf(eltType) && cat != Type::TypeCategory::catClass))) {
+        if (argTypeToUse && (
+                Type::typesEquivalent(argTypeToUse, eltType)
+                || (argTypeToUse->isSubclassOf(eltType) && cat != Type::TypeCategory::catClass)
+        )) {
             // it's already the right kind of instance. Note that we disallow classes in this
             // case because when child class C masquerades as class B, it needs to have a different
             // class dispatch offset encoded in it and we don't want to accidentally allow the wrong

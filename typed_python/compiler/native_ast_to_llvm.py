@@ -657,6 +657,8 @@ class FunctionConverter:
                     var_arg=target.varargs
                 )
 
+                assert target.name not in self.converter._function_definitions, target.name
+
                 self.external_function_references[target.name] = (
                     llvmlite.ir.Function(self.module, func_type, target.name)
                 )

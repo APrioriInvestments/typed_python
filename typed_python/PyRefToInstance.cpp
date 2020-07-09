@@ -151,7 +151,7 @@ int PyRefToInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) 
 
     instance_ptr heldClassBody = *(instance_ptr*)dataPtr();
 
-    if (eltType == attrType) {
+    if (Type::typesEquivalent(eltType, attrType)) {
         PyInstance* item_w = (PyInstance*)attrVal;
 
         clsType->setAttribute(heldClassBody, i, item_w->dataPtr());

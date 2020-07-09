@@ -530,3 +530,17 @@ class TestListOfCompilation(unittest.TestCase):
         rc2 = _types.refcount(aTup)
 
         self.assertEqual(rc2, rc1 - 10)
+
+    def test_list_resize_recompile(self):
+        lst = ListOf(int)()
+
+        @Entrypoint
+        def r1(lst):
+            lst.resize(10)
+
+        @Entrypoint
+        def r2(lst):
+            lst.resize(10, 10)
+
+        r1(lst)
+        r2(lst)

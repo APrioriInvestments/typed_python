@@ -27,12 +27,12 @@ public:
         Type* argType = typeAndPtr.first;
         instance_ptr argDataPtr = typeAndPtr.second;
 
-        if (argType && argType == eltType) {
+        if (argType && Type::typesEquivalent(argType, eltType)) {
             eltType->getBaseType()->copy_constructor(tgt, argDataPtr);
             return;
         }
 
-        if (argType && argType == eltType->getBaseType()) {
+        if (argType && Type::typesEquivalent(argType, eltType->getBaseType())) {
             eltType->getBaseType()->copy_constructor(tgt, argDataPtr);
             return;
         }
@@ -55,11 +55,11 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* eltType, PyObject* pyRepresentation, bool isExplicit) {
         Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
-        if (argType && argType == eltType) {
+        if (argType && Type::typesEquivalent(argType, eltType)) {
             return true;
         }
 
-        if (argType && argType == eltType->getBaseType()) {
+        if (argType && Type::typesEquivalent(argType, eltType->getBaseType())) {
             return true;
         }
 

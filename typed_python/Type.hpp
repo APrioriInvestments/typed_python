@@ -145,6 +145,18 @@ public:
         return m_typeCategory == catNamedTuple;
     }
 
+    bool isFunction() const {
+        return m_typeCategory == catFunction;
+    }
+
+    bool isClass() const {
+        return m_typeCategory == catClass;
+    }
+
+    bool isForward() const {
+        return m_typeCategory == catForward;
+    }
+
     bool isRecursive() {
         return getRecursiveTypeGroupMembers().size() != 1;
     }
@@ -372,13 +384,34 @@ public:
         return m_base;
     }
 
-    //this checks _strict_ subclass. X is not a subclass of itself.
-    bool isSubclassOf(Type* otherType) {
-        if (otherType == this) {
+    // are these types equivalent up to identity? This should be
+    // preferred over t1 == t2 for comparing types in cases where
+    // we don't need _exact_ identity equiality, because there are
+    // some pathways where the identical type object can get created
+    // (usually through deserialization)
+    static bool typesEquivalent(Type* t1, Type* t2) {
+        if (t1 == t2) {
+            return true;
+        }
+
+        if (!t1 || !t2) {
             return false;
         }
 
-        if (otherType == m_base) {
+        if (t1->m_typeCategory != t2->m_typeCategory) {
+            return false;
+        }
+
+        return t1->identityHash() == t2->identityHash();
+    }
+
+    //this checks _strict_ subclass. X is not a subclass of itself.
+    bool isSubclassOf(Type* otherType) {
+        if (Type::typesEquivalent(otherType, this)) {
+            return false;
+        }
+
+        if (Type::typesEquivalent(otherType, m_base)) {
             return true;
         }
 
@@ -667,6 +700,10 @@ public:
     void setRecursiveTypeGroup(MutuallyRecursiveTypeGroup* group, int32_t index) {
         mTypeGroup = group;
         mRecursiveTypeGroupIndex = index;
+    }
+
+    int64_t getRecursiveTypeGroupIndex() const {
+        return mRecursiveTypeGroupIndex;
     }
 
     // subtype-specific calculation

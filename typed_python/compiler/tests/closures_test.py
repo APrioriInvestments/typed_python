@@ -23,7 +23,7 @@ from typed_python import (
 )
 
 from typed_python.compiler.runtime import RuntimeEventVisitor, Entrypoint
-from typed_python._types import refcount
+from typed_python._types import refcount, identityHash
 from typed_python.test_util import currentMemUsageMb
 
 
@@ -204,6 +204,8 @@ class TestCompilingClosures(unittest.TestCase):
 
         c1 = makeAppender(aList1)
         c2 = makeAppender(aList2)
+
+        assert identityHash(type(c1)) == identityHash(type(c2))
 
         self.assertEqual(type(c1), type(c2))
 
@@ -811,17 +813,19 @@ class TestCompilingClosures(unittest.TestCase):
 
     def test_closure_bound_in_class(self):
         def makeClass(i):
-            def f():
+            def fExternal():
                 return i
 
             class C(Class, Final):
                 def f(self):
-                    return f()
+                    return fExternal()
 
             return C
 
         C1 = makeClass(1)
         C2 = makeClass(2)
+
+        assert identityHash(C1.f) != identityHash(C2.f)
 
         @Entrypoint
         def callF(c):

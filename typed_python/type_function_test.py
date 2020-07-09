@@ -89,9 +89,9 @@ class TypeFunctionTest(unittest.TestCase):
     def test_can_serialize_type_functions(self):
         @TypeFunction
         def List(T):
-            ListT = Forward("ListT")
+            ListT = Forward("ListOf(T)")
             return ListT.define(Alternative(
-                "List",
+                "ListOf(T)",
                 Node={"head": T, "tail": ListT},
                 Empty={}
             ))

@@ -640,8 +640,6 @@ public:
                 m_mro.push_back(cls);
                 m_ancestor_to_mro_index[cls] = m_mro.size() - 1;
 
-                m_bases_as_set.insert(cls);
-
                 for (auto b: cls->getBases()) {
                     visit(b);
                 }
@@ -782,9 +780,14 @@ public:
         }
     }
 
-
     bool isSubclassOfConcrete(Type* otherType) {
-        return m_bases_as_set.find((HeldClass*)otherType) != m_bases_as_set.end();
+        for (auto t: m_mro) {
+            if (Type::typesEquivalent(t, otherType)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     VTable* getVTable() const {
@@ -834,8 +837,6 @@ private:
     std::set<HeldClass*> m_implementors; //all classes that implement this interface
 
     std::unordered_map<HeldClass*, int> m_ancestor_to_mro_index;
-
-    std::unordered_set<HeldClass*> m_bases_as_set;
 
     VTable* m_vtable;
 

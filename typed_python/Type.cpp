@@ -149,7 +149,7 @@ bool Type::isBinaryCompatibleWith(Type* other) {
 }
 
 Maybe Type::canConstructFrom(Type* otherType, bool isExplicit) {
-    if (otherType == this) {
+    if (Type::typesEquivalent(otherType, this)) {
         return Maybe::True;
     }
 

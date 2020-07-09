@@ -230,6 +230,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                 overload.functionCode,
                 overload.realizedGlobals,
                 overload.functionGlobals,
+                list(overload.funcGlobalsInCells),
                 list(overload.closureVarLookups),
                 [typeWrapper(self.closurePathToCellType(path, closureType)) for path in overload.closureVarLookups.values()]
                 + [a.expr_type for a in argsToPass],
@@ -430,6 +431,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                             o.functionCode,
                             o.realizedGlobals,
                             o.functionGlobals,
+                            list(o.funcGlobalsInCells),
                             list(o.closureVarLookups),
                             [typeWrapper(PythonTypedFunctionWrapper.closurePathToCellType(path, func.ClosureType))
                              for path in o.closureVarLookups.values()] + actualArgTypes,

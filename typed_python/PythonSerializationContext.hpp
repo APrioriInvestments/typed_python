@@ -90,11 +90,6 @@ public:
             MEMO = 0, //a varint encoding the ID of the object in the memo stream.
                       //if this memo has been defined already in the stream, no other
                       //fields should be present in the stream.
-            NATIVE_TYPE = 1, //an encoded native type.
-            RECURSIVE_NATIVE_TYPE = 17, //a recursive encoded native type.
-            TYPE_HASH = 19, // the sha-hash of a recursive type
-            OBJECT_HASH = 20, // the sha-hash of a globally-identified object, such as a
-                              // class defined in a type function
             NATIVE_INSTANCE = 2, //field 0 is the type, field 1 is the data.
             OBJECT_NAME = 3, //a string encoding the name of the object in the current codebase
             OBJECT_TYPEANDDICT = 4, //an object where the object's python type is encoded as
@@ -111,7 +106,12 @@ public:
             UNICODE = 14, //the object is a BYTES encoding a utf8-encoded string
             BYTES = 15, //the object is a BYTES encoding actual the actual bytes
             FROZENSET = 16, //the object is a frozenset with items encoded by index
-            CELL = 18, //the object is a cell object
+            CELL = 17, //the object is a cell object
+            NATIVE_TYPE = 18, //a native type, which will consist of a number in the group
+                              //and a recursive type group
+            RECURSIVE_OBJECT = 19, //a global object that's got a sha-hash. for example,
+                                   //a class defined in a TypeFunction. this will consist of
+                                   //an index and a recursive type group.
         };
     };
 
@@ -119,10 +119,10 @@ public:
             mContextObj(typeSetObj),
             mCompressionEnabled(false)
     {
-        setCompressionEnabled();
+        setFlags();
     }
 
-    void setCompressionEnabled();
+    void setFlags();
 
     bool isCompressionEnabled() const {
         return mCompressionEnabled;
@@ -142,7 +142,7 @@ public:
 
     void serializeNativeType(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const;
 
-    void serializeNativeTypeInner(Type* nativeType, SerializationBuffer& b) const;
+    void serializeNativeTypeInner(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const;
 
     void serializeClassMembers(const std::vector<std::tuple<std::string, Type*, Instance> >& members, SerializationBuffer& b, int fieldNumber) const;
 
@@ -158,23 +158,29 @@ public:
 
     void deserializeClassFunDict(std::map<std::string, Function*>& dict, DeserializationBuffer& b, int wireType) const;
 
-    void deserializeClassClassMemberDict(std::map<std::string, PyObject*>& dict, DeserializationBuffer& b, int wireType) const;
+    void deserializeClassClassMemberDict(std::map<std::string, PyObjectHolder>& dict, DeserializationBuffer& b, int wireType) const;
 
-    Type* deserializeNativeTypeInner(DeserializationBuffer& b, size_t wireType, int32_t memo) const;
+    Type* deserializeNativeTypeInner(DeserializationBuffer& b, size_t wireType, bool actuallyProduceResult) const;
 
     Instance deserializeNativeInstance(DeserializationBuffer& b, size_t wireType) const;
 
     virtual PyObject* deserializePythonObject(DeserializationBuffer& b, size_t wireType) const;
 
-    Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType) const;
+    Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType, bool insistResolved=false) const;
 
-    Type* deserializeNativeTypeFromRepresentation(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
+    PyObject* deserializeRecursiveObject(DeserializationBuffer& b, size_t wireType) const;
+
+    void serializeMutuallyRecursiveTypeGroup(MutuallyRecursiveTypeGroup* group, SerializationBuffer& b, size_t fieldNumber) const;
+
+    MutuallyRecursiveTypeGroup* deserializeMutuallyRecursiveTypeGroup(DeserializationBuffer& b, size_t inWireType) const;
 
     PyObject* deserializePythonObjectFromName(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
 
     PyObject* deserializePythonObjectFromTypeAndDict(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
 
     PyObject* deserializePythonObjectFromRepresentation(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
+
+    std::string getNameForPyObj(PyObject* o) const;
 
 private:
     template<class Factory_Fn, class SetItem_Fn>
@@ -212,4 +218,6 @@ private:
     PyObject* mContextObj;
 
     bool mCompressionEnabled;
+
+    bool mInternalizeTypeGroups;
 };

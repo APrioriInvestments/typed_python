@@ -32,6 +32,7 @@ import pprint
 import tempfile
 import typed_python.dummy_test_module as dummy_test_module
 
+from typed_python.compiler.native_ast import Expression, NamedCallTarget
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
@@ -1177,6 +1178,25 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+1)
 
+    def test_deserialize_class_doesnt_leak(self):
+        class C(Class, Final):
+            x = Member(int)
+
+            def f(self, x=10):
+                return 10
+
+        x = SerializationContext()
+
+        msg = x.serialize(C)
+        x.deserialize(msg)
+
+        usage = currentMemUsageMb()
+
+        for passIx in range(1000):
+            x.deserialize(msg)
+
+        self.assertLess(currentMemUsageMb(), usage+.5)
+
     def test_serialize_named_tuples_with_extra_fields(self):
         T1 = NamedTuple(x=int)
         T2 = NamedTuple(x=int, y=float, z=str)
@@ -1825,3 +1845,94 @@ class TypesSerializationTest(unittest.TestCase):
 
         # C and 'f' are mutually recursive
         sc.deserialize(sc.serialize(C))
+
+    def test_serialize_cell_type(self):
+        sc = SerializationContext().withoutInternalizingTypeGroups()
+
+        def f():
+            return sc
+
+        cellType = type(f.__closure__[0])
+
+        assert sc.deserialize(sc.serialize(cellType)) is cellType
+
+    def test_serialize_self_referencing_class(self):
+        sc = SerializationContext().withoutCompression().withoutInternalizingTypeGroups()
+
+        def g(x):
+            return 10
+
+        @TypeFunction
+        def C(T):
+            class C_(Class, Final):
+                @Entrypoint
+                def s(self):
+                    return C_
+
+                @Entrypoint
+                def g(self):
+                    return g(10)
+
+            return C_
+
+        C1 = C(int)
+        C2 = sc.deserialize(sc.serialize(C1))
+
+        c1 = C1()
+        c2 = C2()
+
+        assert c2.g() == 10
+        assert c2.s() is C2
+
+        # this should dispatch but we can't assume which compiled version
+        # of the code we'll get, so we cant check identity of C2
+        assert c1.g() == 10
+
+    def test_serialize_self_referencing_class_through_tuple(self):
+        sc = SerializationContext().withoutCompression().withoutInternalizingTypeGroups()
+
+        def g(x):
+            return 10
+
+        @TypeFunction
+        def C(T):
+            class C_(Class, Final):
+                @Function
+                def s(self):
+                    return tup[0]
+
+                @Function
+                def g(self):
+                    return g(10)
+
+            # this fails because when we serliaze mutually recursive python objects
+            # we don't understand all the kinds of objects we can walk
+            tup = (C_, 10)
+
+            return C_
+
+        C1 = C(int)
+        C2 = sc.deserialize(sc.serialize(C1))
+
+        c1 = C1()
+        c2 = C2()
+
+        assert c2.g() == 10
+        assert c2.s() is C2
+
+        assert c1.g() == 10
+        assert c1.s() is C1
+
+    def test_names_of_builtin_alternatives(self):
+        sc = SerializationContext().withoutCompression().withoutInternalizingTypeGroups()
+
+        assert sc.nameForObject(Expression) is not None
+        assert sc.nameForObject(Expression.Load) is not None
+
+        assert b'Store' not in sc.serialize(Expression)
+        assert b'Store' not in sc.serialize(Expression.Load)
+
+        sc.deserialize(sc.serialize(Expression))
+        sc.deserialize(sc.serialize(Expression.Load))
+
+        sc.deserialize(sc.serialize(NamedCallTarget))

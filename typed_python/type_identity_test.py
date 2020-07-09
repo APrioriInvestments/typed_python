@@ -54,8 +54,12 @@ def checkHash(filesToWrite, expression):
     return Hash(evaluateExprInFreshProcess(filesToWrite, f"identityHash({expression})"))
 
 
-def returnSerializedValue(filesToWrite, expression):
-    return evaluateExprInFreshProcess(filesToWrite, f"SerializationContext({{}}).serialize({expression})")
+def returnSerializedValue(filesToWrite, expression, printComments=False):
+    return evaluateExprInFreshProcess(
+        filesToWrite,
+        f"SerializationContext({{}}).serialize({expression})",
+        printComments=printComments
+    )
 
 
 def test_identity_of_register_types():
@@ -144,7 +148,7 @@ def test_mutually_recursive_group_basic():
     X = Forward("X")
     X = X.define(TupleOf(OneOf(int, X)))
 
-    assert recursiveTypeGroup(X) == [OneOf(int, X), X]
+    assert recursiveTypeGroup(X) == [X, OneOf(int, X)]
 
 
 def test_mutually_recursive_group_through_functions_in_closure():
@@ -398,6 +402,12 @@ def S():
             return self.x+y
     return SomeRandomClass
 
+def RecursiveClass():
+    class RecursiveClass(Class, Final):
+        def f(self, y):
+            return RecursiveClass
+    return RecursiveClass
+
 def MakeA():
     return Alternative("A", A1={})
 
@@ -471,7 +481,7 @@ def test_hash_stability():
     }, 'identityHash(x.NamedCallTarget)')
     ser = returnSerializedValue({
         'x.py': 'from typed_python.compiler.native_ast import NamedCallTarget\n'
-    }, 'x.NamedCallTarget')
+    }, 'x.NamedCallTarget', printComments=True)
 
     idHashDeserialized = evaluateExprInFreshProcess(
         MODULE,
@@ -479,6 +489,16 @@ def test_hash_stability():
     )
 
     assert idHash == idHashDeserialized
+
+
+def test_deserialize_external_recursive_class():
+    ser = returnSerializedValue(MODULE, 'x.RecursiveClass()')
+
+    # this shouldn't throw
+    evaluateExprInFreshProcess(
+        MODULE,
+        f'x.deserializeAndReturnHash({repr(ser)})'
+    )
 
 
 def test_dot_accesses():

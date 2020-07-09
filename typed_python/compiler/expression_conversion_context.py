@@ -1087,15 +1087,19 @@ class ExpressionConversionContext(object):
 
         funcGlobals = dict(f.__globals__)
 
+        globalsInCells = []
+
         if f.__closure__:
             for i in range(len(f.__closure__)):
                 funcGlobals[f.__code__.co_freevars[i]] = f.__closure__[i].cell_contents
+                globalsInCells.append(f.__code__.co_freevars[i])
 
         call_target = self.functionContext.converter.convert(
             f.__name__,
             f.__code__,
             funcGlobals,
             f.__globals__,
+            globalsInCells,
             [],
             [a.expr_type for a in concreteArgs],
             returnTypeOverload
@@ -1132,6 +1136,7 @@ class ExpressionConversionContext(object):
             overload.functionCode,
             overload.realizedGlobals,
             overload.functionGlobals,
+            list(overload.funcGlobalsInCells),
             list(overload.closureVarLookups),
             [a.expr_type for a in closureArgs]
             + [a.expr_type for a in concreteArgs],

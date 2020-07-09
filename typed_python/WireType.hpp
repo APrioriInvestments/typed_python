@@ -45,4 +45,3 @@ inline void assertNonemptyCompoundWireType(size_t found) {
         throw std::runtime_error("Invalid wire type encountered.");
     }
 }
-

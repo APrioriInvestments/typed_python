@@ -16,40 +16,6 @@
 
 #include "MutuallyRecursiveTypeGroup.hpp"
 
-
-ShaHash TypeOrPyobj::identityHash() {
-    if (mType) {
-        return mType->identityHash();
-    }
-
-    return MutuallyRecursiveTypeGroup::pyObjectShaHash(mPyObj, nullptr);
-}
-
-std::string TypeOrPyobj::name() {
-    if (mType) {
-        return "<Type " + mType->name() + " of cat " + Type::categoryToString(mType->getTypeCategory()) + ">";
-    }
-
-    if (mPyObj) {
-        std::string lexical = MutuallyRecursiveTypeGroup::pyObjectSortName(mPyObj);
-        if (lexical != "<UNNAMED>") {
-            return "<PyObj named " + lexical + ">";
-        }
-
-        PyObjectStealer repr(PyObject_Repr(mPyObj));
-
-        if (repr) {
-            return "<PyObj of type " + std::string(mPyObj->ob_type->tp_name) +
-                " with repr " + std::string(PyUnicode_AsUTF8(repr)).substr(0, 50) + ">";
-            decref(repr);
-        }
-
-        return "<PyObj of type " + std::string(mPyObj->ob_type->tp_name) + ">";
-    }
-
-    throw std::runtime_error("Invalid TypeOrPyobj encountered.");
-}
-
 /*******
     This function defines  generic visitor pattern for looking inside of a Type or a PyObject to see
       which pieces of are visible to the compiler. We try to hold this all in one place so that we can
@@ -282,11 +248,8 @@ void visitCompilerVisibleTypesAndPyobjects(
 
             for (long k = 0; k < PyTuple_Size(f->func_closure); k++) {
                 PyObject* o = PyTuple_GetItem(f->func_closure, k);
-                if (o && PyCell_Check(o) && PyCell_Get(o)) {
-                    hashVisit(ShaHash(1));
-                    visit(PyCell_Get(o));
-                } else {
-                    hashVisit(ShaHash(0));
+                if (o && PyCell_Check(o)) {
+                    visit(o);
                 }
             }
         } else {
@@ -394,11 +357,23 @@ void visitCompilerVisibleTypesAndPyobjects(
         return;
     }
 
+    if (PyCell_Check(obj.pyobj())) {
+        hashVisit(ShaHash(11));
+
+        if (PyCell_Get(obj.pyobj())) {
+            hashVisit(ShaHash(1));
+            visit(PyCell_Get(obj.pyobj()));
+        } else {
+            hashVisit(ShaHash(0));
+        }
+        return;
+    }
+
     if (PyObject_HasAttrString(obj.pyobj(), "__dict__")) {
         PyObjectStealer dict(PyObject_GetAttrString(obj.pyobj(), "__dict__"));
 
         if (dict) {
-            hashVisit(ShaHash(11));
+            hashVisit(ShaHash(12));
 
             visit((PyObject*)obj.pyobj()->ob_type);
 
@@ -410,6 +385,17 @@ void visitCompilerVisibleTypesAndPyobjects(
     visit((PyObject*)obj.pyobj()->ob_type);
 }
 
+
+MutuallyRecursiveTypeGroup::MutuallyRecursiveTypeGroup(ShaHash hash) :
+    mAnyPyObjectsIncorrectlyOrdered(false),
+    mHash(hash)
+{
+    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+
+    if (mHashToGroup.find(mHash) == mHashToGroup.end()) {
+        mHashToGroup[mHash] = this;
+    }
+}
 
 //static
 void MutuallyRecursiveTypeGroup::visibleFrom(TypeOrPyobj root, std::vector<TypeOrPyobj>& outReachable) {
@@ -457,6 +443,44 @@ std::string MutuallyRecursiveTypeGroup::pyObjectSortName(PyObject* o) {
     return "<UNNAMED>";
 }
 
+int32_t MutuallyRecursiveTypeGroup::indexOfObjectInThisGroup(PyObject* o) {
+    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+
+    auto it = mPythonObjectTypeGroups.find(o);
+    if (it != mPythonObjectTypeGroups.end()) {
+        if (it->second.first == this) {
+            return it->second.second;
+        }
+        return -1;
+    }
+
+    if (!PyType_Check(o)) {
+        return -1;
+    }
+
+    Type* nt = PyInstance::extractTypeFrom((PyTypeObject*)o);
+    if (!nt) {
+        return -1;
+    }
+
+    if (nt->getRecursiveTypeGroup() == this) {
+        return nt->getRecursiveTypeGroupIndex();
+    }
+
+    return -1;
+}
+
+std::string MutuallyRecursiveTypeGroup::repr() {
+    std::ostringstream s;
+    s << "group with hash " << hash().digestAsHexString() << ":\n";
+
+    for (auto& ixAndObj: mIndexToObject) {
+        s << "  " << ixAndObj.first << " -> " << ixAndObj.second.name() << "\n";
+    }
+
+    return s.str();
+}
+
 // these types can all see each other through their references, either
 // through the compiler, or just through normal type references. We need to
 // pick a 'first' type, which we can do by picking the first type to be defined
@@ -489,6 +513,12 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
     for (long k = 0; k < 2; k++) {
         for (auto& t: types) {
             ShaHash newHash;
+
+            if (t.type()) {
+                newHash = ShaHash(t.type()->name());
+            } else {
+                newHash = ShaHash(std::string(t.pyobj()->ob_type->tp_name));
+            }
 
             visitCompilerVisibleTypesAndPyobjects(
                 t,
@@ -608,6 +638,19 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
     group->hash();
 }
 
+
+MutuallyRecursiveTypeGroup* MutuallyRecursiveTypeGroup::getGroupFromHash(ShaHash hash) {
+    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+
+    auto it = mHashToGroup.find(hash);
+    if (it == mHashToGroup.end()) {
+        return nullptr;
+    }
+
+    return it->second;
+}
+
+
 void MutuallyRecursiveTypeGroup::computeHash() {
     if (mAnyPyObjectsIncorrectlyOrdered) {
         mHash = ShaHash::poison();
@@ -637,6 +680,12 @@ void MutuallyRecursiveTypeGroup::computeHash() {
     }
 
     mHash = wholeGroupHash;
+
+    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+
+    if (mHashToGroup.find(mHash) == mHashToGroup.end()) {
+        mHashToGroup[mHash] = this;
+    }
 }
 
 // find strongly-connected groups of python objects and Type objects (as far as the
@@ -933,10 +982,14 @@ ShaHash MutuallyRecursiveTypeGroup::pyObjectShaHash(PyObject* h, MutuallyRecursi
 }
 
 // static
-std::pair<MutuallyRecursiveTypeGroup*, int> MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(PyObject* o) {
+std::pair<MutuallyRecursiveTypeGroup*, int> MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(PyObject* o, bool constructIfNotInGroup) {
     auto it = mPythonObjectTypeGroups.find(o);
     if (it != mPythonObjectTypeGroups.end()) {
         return it->second;
+    }
+
+    if (!constructIfNotInGroup) {
+        return {nullptr, false};
     }
 
     constructRecursiveTypeGroup(o);
@@ -1352,3 +1405,6 @@ std::map<ShaHash, Type*> MutuallyRecursiveTypeGroup::mHashToType;
 
 //static
 std::map<ShaHash, PyObject*> MutuallyRecursiveTypeGroup::mHashToObject;
+
+//static
+std::map<ShaHash, MutuallyRecursiveTypeGroup*> MutuallyRecursiveTypeGroup::mHashToGroup;

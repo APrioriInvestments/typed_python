@@ -870,7 +870,7 @@ void PyListOfInstance::constructFromPythonArgumentsConcrete(ListOfType* t, uint8
         PyObject* arg = PyTuple_GetItem(args, 0);
         Type* argType = extractTypeFrom(arg->ob_type);
 
-        if (argType == t) {
+        if (Type::typesEquivalent(argType, t)) {
             //following python semantics, this needs to produce a new object
             //that's a copy of the original list. We can't just incref it and return
             //the original object because it has state.

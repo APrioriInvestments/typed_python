@@ -23,7 +23,9 @@ Class* PyClassInstance::type() {
 bool PyClassInstance::pyValCouldBeOfTypeConcrete(Class* type, PyObject* pyRepresentation, bool isExplicit) {
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
-    return argType && ((argType == type) || argType->isSubclassOf(type));
+    return argType && (
+        (Type::typesEquivalent(argType, type) || argType->isSubclassOf(type))
+    );
 }
 
 PyObject* PyClassInstance::extractPythonObjectConcrete(Type* eltType, instance_ptr data) {
@@ -120,7 +122,7 @@ int PyClassInstance::classInstanceSetAttributeFromPyObject(Class* cls, instance_
 
     Type* attrType = extractTypeFrom(attrVal->ob_type);
 
-    if (eltType == attrType) {
+    if (Type::typesEquivalent(eltType, attrType)) {
         PyInstance* item_w = (PyInstance*)attrVal;
 
         cls->setAttribute(data, i, item_w->dataPtr());

@@ -52,38 +52,6 @@ public:
         for (auto p: m_pyobj_needs_decref) {
             decref(p);
         }
-
-        // if we're unwinding a PythonExceptionSet, we can't have this
-        // code run because it'll undo the error state.
-        if (!PyErr_Occurred()) {
-            for (auto& tAndPresumedHash: mTypesToHash) {
-                Type* t = tAndPresumedHash.first;
-                if (t->getTypeCategory() == Type::catForward) {
-                    t = ((Forward*)t)->getTarget();
-
-                    if (!t) {
-                        throw std::runtime_error("Somehow we deserialized an unresolved forward");
-                    }
-                }
-
-                if (t->identityHash() != tAndPresumedHash.second) {
-                    std::cout << "WARNING: hash for " << t->name() << " not stable: "
-                        << " promised " << tAndPresumedHash.second.digestAsHexString()
-                        << " but given " << t->identityHash().digestAsHexString() << " \n";
-                }
-            }
-
-            for (auto& oAndPresumedHash: mObjectToHash) {
-                if (MutuallyRecursiveTypeGroup::pyObjectShaHash(oAndPresumedHash.first, nullptr)
-                            != oAndPresumedHash.second) {
-                    std::cout << "WARNING: hash for py object not stable: "
-                        << MutuallyRecursiveTypeGroup::pyObjectShaHash(oAndPresumedHash.first, nullptr).digestAsHexString()
-                        << " vs " << oAndPresumedHash.second.digestAsHexString() << "\n";
-                }
-
-                decref(oAndPresumedHash.first);
-            }
-        }
     }
 
     DeserializationBuffer(const DeserializationBuffer&) = delete;
@@ -275,7 +243,6 @@ public:
 
         while (true) {
             auto fieldAndWiretype = readFieldNumberAndWireType();
-
 
             if (fieldAndWiretype.second == WireType::END_COMPOUND) {
                 return;
@@ -536,17 +503,6 @@ public:
         return *ptr;
     }
 
-    // mark this type to be hashed when we're done with deserialization. This
-    // forces the type into the hash memo, so that if we deserialize a second time,
-    // we'll get the type we just deserialized.
-    void addTypeToHash(Type* t, ShaHash expectedHash) {
-        mTypesToHash.push_back({t, expectedHash});
-    }
-
-    void addObjectToHash(PyObject* t, ShaHash expectedHash) {
-        mObjectToHash.push_back({incref(t), expectedHash});
-    }
-
 private:
     bool decompress() {
         if (!m_context.isCompressionEnabled()) {
@@ -622,8 +578,4 @@ private:
     std::map<Type*, std::vector<void*> > m_needs_decref;
 
     std::vector<PyObject*> m_pyobj_needs_decref;
-
-    std::vector<std::pair<Type*, ShaHash> > mTypesToHash;
-
-    std::vector<std::pair<PyObject*, ShaHash> > mObjectToHash;
 };

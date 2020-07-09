@@ -51,18 +51,33 @@ def astToCodeObject(ast, freevars):
     ).__code__
 
 
-DEFAUL_TNAME_TO_OVERRIDE = {
+def capture(x):
+    return lambda: x
+
+
+CellType = type(capture(10).__closure__[0])
+
+
+DEFAULT_NAME_TO_OVERRIDE = {
     ".builtin.lock": LockType,
     ".builtin.rlock": RLock,
+    ".builtin.cell": CellType
 }
 
 
 class SerializationContext(object):
     """Represents a collection of types with well-specified names that we can use to serialize objects."""
-    def __init__(self, nameToObjectOverride=None, compressionEnabled=True, encodeLineInformationForCode=True, objectToNameOverride=None):
+    def __init__(
+        self,
+        nameToObjectOverride=None,
+        compressionEnabled=True,
+        encodeLineInformationForCode=True,
+        objectToNameOverride=None,
+        internalizeTypeGroups=True
+    ):
         super().__init__()
 
-        self.nameToObjectOverride = dict(nameToObjectOverride or DEFAUL_TNAME_TO_OVERRIDE)
+        self.nameToObjectOverride = dict(nameToObjectOverride or DEFAULT_NAME_TO_OVERRIDE)
         self.objectToNameOverride = (
             dict(objectToNameOverride)
             if objectToNameOverride is not None else
@@ -70,6 +85,7 @@ class SerializationContext(object):
         )
         self.compressionEnabled = compressionEnabled
         self.encodeLineInformationForCode = encodeLineInformationForCode
+        self.internalizeTypeGroups = internalizeTypeGroups
 
     def compress(self, bytes):
         if self.compressionEnabled:
@@ -84,6 +100,23 @@ class SerializationContext(object):
         else:
             return bytes
 
+    def withoutInternalizingTypeGroups(self):
+        """Make sure we fully deserialize types.
+
+        This means we don't place them into the main type memo
+        by identityHash, which is really only useful for testing.
+        """
+        if not self.internalizeTypeGroups:
+            return self
+
+        return SerializationContext(
+            nameToObjectOverride=self.nameToObjectOverride,
+            compressionEnabled=self.compressionEnabled,
+            encodeLineInformationForCode=self.encodeLineInformationForCode,
+            objectToNameOverride=self.objectToNameOverride,
+            internalizeTypeGroups=False
+        )
+
     def withoutLineInfoEncoded(self):
         if not self.encodeLineInformationForCode:
             return self
@@ -92,7 +125,8 @@ class SerializationContext(object):
             nameToObjectOverride=self.nameToObjectOverride,
             compressionEnabled=self.compressionEnabled,
             encodeLineInformationForCode=False,
-            objectToNameOverride=self.objectToNameOverride
+            objectToNameOverride=self.objectToNameOverride,
+            internalizeTypeGroups=self.internalizeTypeGroups
         )
 
     def withoutCompression(self):
@@ -103,7 +137,8 @@ class SerializationContext(object):
             nameToObjectOverride=self.nameToObjectOverride,
             compressionEnabled=False,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
-            objectToNameOverride=self.objectToNameOverride
+            objectToNameOverride=self.objectToNameOverride,
+            internalizeTypeGroups=self.internalizeTypeGroups
         )
 
     def withCompression(self):
@@ -114,13 +149,19 @@ class SerializationContext(object):
             nameToObjectOverride=self.nameToObjectOverride,
             compressionEnabled=True,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
-            objectToNameOverride=self.objectToNameOverride
+            objectToNameOverride=self.objectToNameOverride,
+            internalizeTypeGroups=self.internalizeTypeGroups
         )
 
     def nameForObject(self, t):
         ''' Return a name(string) for an input object t, or None if not found. '''
         if id(t) in self.objectToNameOverride:
             return self.objectToNameOverride[id(t)]
+
+        if isinstance(t, type) and hasattr(t, '__typed_python_category__') and t.__typed_python_category__ == 'ConcreteAlternative':
+            tName = self.nameForObject(t.Alternative)
+            if tName is not None:
+                return ".alt." + tName + ":" + str(t.Index)
 
         if isinstance(t, ConcreteTypeFunction):
             name = t._concreteTypeFunction.__module__ + "." + t._concreteTypeFunction.__name__
@@ -188,6 +229,19 @@ class SerializationContext(object):
             if res is not None:
                 return type(res)
             return None
+
+        if name.startswith(".alt."):
+            altName, altIndex = name[5:].rsplit(":")
+            try:
+                altIndex = int(altIndex)
+            except ValueError:
+                return None
+
+            alt = self.objectFromName(altName)
+            if alt is None:
+                return None
+
+            return alt.__typed_python_alternatives__[altIndex]
 
         if name.startswith(".fun_in_class."):
             items = name[14:].split(".")

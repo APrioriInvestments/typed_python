@@ -465,7 +465,7 @@ public:
         static FunctionArg deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
             std::string name;
             Type* typeFilterOrNull = nullptr;
-            PyObject* defaultValue = nullptr;
+            PyObjectHolder defaultValue;
             bool isStarArg = false;
             bool isKwarg = false;
 
@@ -478,12 +478,7 @@ public:
                     typeFilterOrNull = context.deserializeNativeType(buffer, wireType);
                 }
                 else if (fieldNumber == 2) {
-                    //TODO: worry about whether this leak is important. the deserialize returns
-                    //an object with a refcount that we own, which we then place in an object
-                    //that will never destroy it. this is moot because the current framework
-                    //never destroys any of these objects. But we should be aware that repeatedly
-                    //deserializing the same object will produce memory leaks.
-                    defaultValue = context.deserializePythonObject(buffer, wireType);
+                    defaultValue.steal(context.deserializePythonObject(buffer, wireType));
                 }
                 else if (fieldNumber == 3) {
                     assertWireTypesEqual(wireType, WireType::VARINT);
@@ -521,7 +516,7 @@ public:
     private:
         std::string m_name;
         Type* m_typeFilter;
-        PyObject* m_defaultValue;
+        PyObjectHolder m_defaultValue;
         bool m_isStarArg;
         bool m_isKwarg;
     };
@@ -578,7 +573,6 @@ public:
         ) :
                 mFunctionCode(pyFuncCode),
                 mFunctionGlobals(pyFuncGlobals),
-                mFunctionUsedGlobals(nullptr),
                 mFunctionDefaults(pyFuncDefaults),
                 mFunctionAnnotations(pyFuncAnnotations),
                 mFunctionGlobalsInCells(pyFuncGlobalsInCells),
@@ -622,7 +616,6 @@ public:
 
             mFunctionCode = other.mFunctionCode;
             mFunctionGlobals = other.mFunctionGlobals;
-            mFunctionUsedGlobals = other.mFunctionUsedGlobals;
             mFunctionDefaults = other.mFunctionDefaults;
             mFunctionAnnotations = other.mFunctionAnnotations;
 
@@ -809,9 +802,7 @@ public:
                     );
                 }
 
-                if (PyCell_Get(cell)) {
-                    visitor(PyCell_GET(cell));
-                }
+                visitor(cell);
             }
 
             visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
@@ -939,13 +930,6 @@ public:
             return mFunctionGlobals;
         }
 
-        PyObject* getFunctionUsedGlobals() const {
-            if (!mFunctionUsedGlobals) {
-                populateUsedGlobals();
-            }
-            return mFunctionUsedGlobals;
-        }
-
         const std::map<std::string, PyObject*> getFunctionGlobalsInCells() const {
             return mFunctionGlobalsInCells;
         }
@@ -1022,9 +1006,14 @@ public:
             });
         }
 
-        void populateUsedGlobals() const {
+        void setGlobals(PyObject* globals) {
+            decref(mFunctionGlobals);
+            mFunctionGlobals = incref(globals);
+        }
+
+        PyObject* getUsedGlobals() const {
             // restrict the globals to contain only the values it references.
-            mFunctionUsedGlobals = PyDict_New();
+            PyObject* result = PyDict_New();
 
             std::set<PyObject*> allNames;
             extractNamesFromCode((PyCodeObject*)mFunctionCode, allNames);
@@ -1041,7 +1030,7 @@ public:
                         }
 
                         if (res) {
-                            if (PyDict_SetItem(mFunctionUsedGlobals, name, PyDict_GetItem(mFunctionGlobals, name))) {
+                            if (PyDict_SetItem(result, name, PyDict_GetItem(mFunctionGlobals, name))) {
                                 throw PythonExceptionSet();
                             }
                         }
@@ -1051,8 +1040,10 @@ public:
 
             PyObject* builtins = PyDict_GetItemString(mFunctionGlobals, "__builtins__");
             if (builtins) {
-                PyDict_SetItemString(mFunctionUsedGlobals, "__builtins__", builtins);
+                PyDict_SetItemString(result, "__builtins__", builtins);
             }
+
+            return result;
         }
 
         // create a new function object for this closure (or cache it
@@ -1065,7 +1056,6 @@ public:
 
             mFunctionCode = other.mFunctionCode;
             mFunctionGlobals = other.mFunctionGlobals;
-            mFunctionUsedGlobals = other.mFunctionUsedGlobals;
             mFunctionDefaults = other.mFunctionDefaults;
             mFunctionAnnotations = other.mFunctionAnnotations;
 
@@ -1093,15 +1083,10 @@ public:
 
             context.serializePythonObject(mFunctionCode, buffer, 0);
 
-            if (!mFunctionUsedGlobals) {
-                populateUsedGlobals();
-            }
-
-            context.serializePythonObject(mFunctionUsedGlobals, buffer, 1);
-
             if (mFunctionDefaults) {
                 context.serializePythonObject(mFunctionDefaults, buffer, 2);
             }
+
             if (mFunctionAnnotations) {
                 context.serializePythonObject(mFunctionAnnotations, buffer, 3);
             }
@@ -1147,28 +1132,28 @@ public:
 
         template<class serialization_context_t, class buf_t>
         static Overload deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
-            PyObject* functionCode = nullptr;
-            PyObject* functionGlobals = nullptr;
-            PyObject* functionAnnotations = nullptr;
-            PyObject* functionDefaults = nullptr;
+            PyObjectHolder functionCode;
+            PyObjectHolder functionGlobals;
+            PyObjectHolder functionAnnotations;
+            PyObjectHolder functionDefaults;
             std::vector<std::string> closureVarnames;
-            std::map<std::string, PyObject*> functionGlobalsInCells;
+            std::map<std::string, PyObjectHolder> functionGlobalsInCells;
+            std::map<std::string, PyObject*> functionGlobalsInCellsRaw;
             std::map<std::string, ClosureVariableBinding> closureBindings;
             Type* returnType = nullptr;
             std::vector<FunctionArg> args;
 
+            functionGlobals.steal(PyDict_New());
+
             buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
                 if (fieldNumber == 0) {
-                    functionCode = context.deserializePythonObject(buffer, wireType);
-                }
-                else if (fieldNumber == 1) {
-                    functionGlobals = context.deserializePythonObject(buffer, wireType);
+                    functionCode.steal(context.deserializePythonObject(buffer, wireType));
                 }
                 else if (fieldNumber == 2) {
-                    functionDefaults = context.deserializePythonObject(buffer, wireType);
+                    functionDefaults.steal(context.deserializePythonObject(buffer, wireType));
                 }
                 else if (fieldNumber == 3) {
-                    functionAnnotations = context.deserializePythonObject(buffer, wireType);
+                    functionAnnotations.steal(context.deserializePythonObject(buffer, wireType));
                 }
                 else if (fieldNumber == 4) {
                     buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
@@ -1186,7 +1171,8 @@ public:
                             if (last == "") {
                                 throw std::runtime_error("Corrupt Function closure encountered");
                             }
-                            functionGlobalsInCells[last] = context.deserializePythonObject(buffer, wireType);
+                            functionGlobalsInCells[last].steal(context.deserializePythonObject(buffer, wireType));
+                            functionGlobalsInCellsRaw[last] = functionGlobalsInCells[last];
                             last = "";
                         }
                     });
@@ -1217,7 +1203,7 @@ public:
                 functionGlobals,
                 functionDefaults,
                 functionAnnotations,
-                functionGlobalsInCells,
+                functionGlobalsInCellsRaw,
                 closureVarnames,
                 closureBindings,
                 returnType,
@@ -1228,7 +1214,6 @@ public:
         void increfAllPyObjects() const {
             incref(mFunctionCode);
             incref(mFunctionGlobals);
-            incref(mFunctionUsedGlobals);
             incref(mFunctionDefaults);
             incref(mFunctionAnnotations);
 
@@ -1240,7 +1225,6 @@ public:
         void decrefAllPyObjects() {
             decref(mFunctionCode);
             decref(mFunctionGlobals);
-            decref(mFunctionUsedGlobals);
             decref(mFunctionDefaults);
             decref(mFunctionAnnotations);
 
@@ -1285,12 +1269,10 @@ public:
                     );
                 }
 
-                if (PyCell_Get(cell)) {
-                    res += MutuallyRecursiveTypeGroup::pyObjectShaHash(
-                        PyCell_GET(cell),
-                        groupHead
-                    );
-                }
+                res += MutuallyRecursiveTypeGroup::pyObjectShaHash(
+                    cell,
+                    groupHead
+                );
             }
 
             return res;
@@ -1300,13 +1282,6 @@ public:
         PyObject* mFunctionCode;
 
         PyObject* mFunctionGlobals;
-
-        // a cached dict containing the subset of 'globals' that we actually
-        // use. we can't calculate this when the function is first created because
-        // at that moment we can't know all the future values in the globals that
-        // the function may need. So instead, we assume that upon first use of this
-        // variable (at serialization time) all such values exist.
-        mutable PyObject* mFunctionUsedGlobals;
 
         // globals that are stored in cells. This happens when class objects
         // are defined inside of function scopes. We assume that anything in their

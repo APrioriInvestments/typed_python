@@ -455,6 +455,7 @@ NumericConstant = NumericConstant.define(Alternative(
     Boolean={"value": bool},
     None_={},
     Float={"value": float},
+    Complex={"real": float, "imag": float},
     Unknown={}
 ))
 
@@ -608,7 +609,8 @@ numericConverters = {
     int: lambda x: NumericConstant.Int(value=x),
     bool: lambda x: NumericConstant.Boolean(value=x),
     type(None): lambda x: NumericConstant.None_(),
-    float: lambda x: NumericConstant.Float(value=x)
+    float: lambda x: NumericConstant.Float(value=x),
+    complex: lambda x: NumericConstant.Complex(real=x.real, imag=x.imag)
 }
 
 
@@ -787,6 +789,10 @@ def convertAlgebraicToPyAst_(pyAst):
             return ast.NameConstant(value=True if pyAst.n.value else False)
         if pyAst.n.matches.None_:
             return ast.NameConstant(value=None)
+        if pyAst.n.matches.Complex:
+            return ast.Num(n=complex(pyAst.n.real, pyAst.n.imag))
+        if pyAst.n.matches.Unknown:
+            raise Exception(f"Unknown constant: {pyAst.filename}:{pyAst.line_number}")
         return ast.Num(n=pyAst.n.value)
 
     if type(pyAst) in reverseConverters:
@@ -994,7 +1000,8 @@ def cacheAstForCode(code, pyAst):
 
     assert len(funcDefs) == len(codeConstants), (
         f"Expected {len(funcDefs)} func defs to cover the "
-        f"{len(codeConstants)} code constants we found."
+        f"{len(codeConstants)} code constants we found in "
+        f"{code.co_name} in {code.co_filename}:{code.co_firstlineno}"
     )
 
     for i in range(len(funcDefs)):
