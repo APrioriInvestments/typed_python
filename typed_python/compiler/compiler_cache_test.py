@@ -156,9 +156,106 @@ def test_compiler_cache_understands_granular_module_accesses():
     VERSION2 = {'x.py': xmodule.replace("100", "200"), 'y.py': ymodule}
 
     with tempfile.TemporaryDirectory() as compilerCacheDir:
-        assert evaluateExprInFreshProcess(VERSION1, 'y.g(1)', compilerCacheDir, printComments=True) == 2
+        assert evaluateExprInFreshProcess(VERSION1, 'y.g(1)', compilerCacheDir) == 2
         assert len(os.listdir(compilerCacheDir)) == 1
 
         # no recompilation necessary
-        assert evaluateExprInFreshProcess(VERSION2, 'y.g(1)', compilerCacheDir, printComments=True) == 2
+        assert evaluateExprInFreshProcess(VERSION2, 'y.g(1)', compilerCacheDir) == 2
         assert len(os.listdir(compilerCacheDir)) == 1
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_load_dependent_modules():
+    xmodule = "\n".join([
+        "@Entrypoint",
+        "def f(x):",
+        "    return x + 1"
+    ])
+
+    xmodule_cont = "\n".join([
+        "@Entrypoint",
+        "def g(x):",
+        "    return f(x)"
+    ])
+
+    VERSION1 = {'x.py': xmodule}
+    VERSION2 = {'x.py': xmodule + "\n" + xmodule_cont}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        # add an item to the cache
+        assert evaluateExprInFreshProcess(VERSION1, 'x.f(1)', compilerCacheDir) == 2
+        assert len(os.listdir(compilerCacheDir)) == 1
+
+        # add a dependent function
+        assert evaluateExprInFreshProcess(VERSION2, 'x.g(1)', compilerCacheDir) == 2
+        assert len(os.listdir(compilerCacheDir)) == 2
+
+        # we should be able to load correctly
+        assert evaluateExprInFreshProcess(VERSION2, 'x.g(1)', compilerCacheDir) == 2
+        assert len(os.listdir(compilerCacheDir)) == 2
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_reference_existing_function_twice():
+    xmodule = "\n".join([
+        "@Entrypoint",
+        "def f(x):",
+        "    return x + 1"
+    ])
+
+    xmodule_cont = "\n".join([
+        "@Entrypoint",
+        "def g1(x):",
+        "    return f(x)",
+        "@Entrypoint",
+        "def g2(x):",
+        "    return f(x)",
+        "@Entrypoint",
+        "def g(x):",
+        "    return g1(x) + g2(x)"
+    ])
+
+    VERSION1 = {'x.py': xmodule}
+    VERSION2 = {'x.py': xmodule + "\n" + xmodule_cont}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        assert evaluateExprInFreshProcess(VERSION1, 'x.f(1)', compilerCacheDir) == 2
+        assert len(os.listdir(compilerCacheDir)) == 1
+
+        # add some content and nothing recompiles
+        assert evaluateExprInFreshProcess(VERSION2, 'x.f(1)', compilerCacheDir) == 2
+        assert len(os.listdir(compilerCacheDir)) == 1
+
+        # recompiles with 'g1' and 'g2' referencing 'f'
+        assert evaluateExprInFreshProcess(VERSION2, 'x.g(1)', compilerCacheDir) == 4
+        assert len(os.listdir(compilerCacheDir)) == 2
+
+        # can load it
+        assert evaluateExprInFreshProcess(VERSION2, 'x.g(1)', compilerCacheDir) == 4
+        assert len(os.listdir(compilerCacheDir)) == 2
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_handles_class_destructors_correctly():
+    xmodule = "\n".join([
+        "class C(Class, Final):",
+        "    def __init__(self, x):",
+        "        self.x=x",
+        "    x = Member(int)",
+        "@Entrypoint",
+        "def f(x):",
+        "    return C(x).x",
+        "@Entrypoint",
+        "def g(x):",
+        "    return C(x).x",
+    ])
+
+    VERSION = {'x.py': xmodule}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        assert evaluateExprInFreshProcess(VERSION, 'x.f(1)', compilerCacheDir) == 1
+        assert len(os.listdir(compilerCacheDir)) == 1
+
+        # we can reuse the class destructor from the first time around
+        assert evaluateExprInFreshProcess(VERSION, 'x.g(1)', compilerCacheDir) == 1
+        assert len(os.listdir(compilerCacheDir)) == 2

@@ -398,6 +398,12 @@ def S():
             return self.x+y
     return SomeRandomClass
 
+def RecursiveClass():
+    class RecursiveClass(Class, Final):
+        def f(self, y):
+            return RecursiveClass
+    return RecursiveClass
+
 def MakeA():
     return Alternative("A", A1={})
 
@@ -479,6 +485,16 @@ def test_hash_stability():
     )
 
     assert idHash == idHashDeserialized
+
+
+def test_deserialize_external_recursive_class():
+    ser = returnSerializedValue(MODULE, 'x.RecursiveClass()')
+
+    # this shouldn't throw
+    evaluateExprInFreshProcess(
+        MODULE,
+        f'x.deserializeAndReturnHash({repr(ser)})'
+    )
 
 
 def test_dot_accesses():

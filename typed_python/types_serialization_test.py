@@ -1177,6 +1177,25 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+1)
 
+    def test_deserialize_class_doesnt_leak(self):
+        class C(Class, Final):
+            x = Member(int)
+
+            def f(self, x=10):
+                return 10
+
+        x = SerializationContext()
+
+        msg = x.serialize(C)
+        x.deserialize(msg)
+
+        usage = currentMemUsageMb()
+
+        for passIx in range(1000):
+            x.deserialize(msg)
+
+        self.assertLess(currentMemUsageMb(), usage+.5)
+
     def test_serialize_named_tuples_with_extra_fields(self):
         T1 = NamedTuple(x=int)
         T2 = NamedTuple(x=int, y=float, z=str)
@@ -1825,3 +1844,24 @@ class TypesSerializationTest(unittest.TestCase):
 
         # C and 'f' are mutually recursive
         sc.deserialize(sc.serialize(C))
+
+    def test_serialize_self_referencing_class(self):
+        sc = SerializationContext().withoutCompression()
+
+        def g(x):
+            return 10
+
+        @TypeFunction
+        def C(T):
+            class C_(Class, Final):
+                @Entrypoint
+                def s(self):
+                    return C_
+
+                @Entrypoint
+                def g(self):
+                    return g(10)
+
+            return C_
+
+        assert sc.deserialize(sc.serialize(C(int).s))

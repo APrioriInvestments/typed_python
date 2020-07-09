@@ -119,6 +119,7 @@ class SerializationContext(object):
 
     def nameForObject(self, t):
         ''' Return a name(string) for an input object t, or None if not found. '''
+        print(repr(t)[:150])
         if id(t) in self.objectToNameOverride:
             return self.objectToNameOverride[id(t)]
 

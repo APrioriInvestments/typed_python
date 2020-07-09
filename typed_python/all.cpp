@@ -54,6 +54,8 @@ compile the entire group all at once.
 #include "OneOfType.cpp"
 #include "PythonObjectOfTypeType.cpp"
 #include "PythonSerializationContext.cpp"
+#include "PythonSerializationContext_serialization.cpp"
+#include "PythonSerializationContext_deserialization.cpp"
 #include "PythonSubclassType.cpp"
 #include "StringType.cpp"
 #include "TupleOrListOfType.cpp"
@@ -63,3 +65,4 @@ compile the entire group all at once.
 #include "SerializationBuffer.cpp"
 #include "Sha1.cpp"
 #include "MutuallyRecursiveTypeGroup.cpp"
+#include "TypeOrPyobj.cpp"

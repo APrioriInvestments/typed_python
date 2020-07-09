@@ -669,6 +669,10 @@ public:
         mRecursiveTypeGroupIndex = index;
     }
 
+    int64_t getRecursiveTypeGroupIndex() const {
+        return mRecursiveTypeGroupIndex;
+    }
+
     // subtype-specific calculation
     ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
         return ShaHash(1, m_typeCategory);

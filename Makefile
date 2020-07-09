@@ -17,7 +17,7 @@ TP_SRC_PATH ?= typed_python
 TP_BUILD_PATH ?= build/temp.linux-x86_64-3.6/typed_python
 TP_LIB_PATH ?= build/lib.linux-x86_64-3.6/typed_python
 
-CPP_FLAGS = -std=c++14  -O2  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
+CPP_FLAGS = -std=c++14  -O0  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
             -fstack-protector-strong  -D_FORTIFY_SOURCE=2  -fPIC            \
             -Wno-terminate -Wno-bool-compare \
             -Wno-cpp \

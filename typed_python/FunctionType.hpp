@@ -465,7 +465,7 @@ public:
         static FunctionArg deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
             std::string name;
             Type* typeFilterOrNull = nullptr;
-            PyObject* defaultValue = nullptr;
+            PyObjectHolder defaultValue;
             bool isStarArg = false;
             bool isKwarg = false;
 
@@ -478,12 +478,7 @@ public:
                     typeFilterOrNull = context.deserializeNativeType(buffer, wireType);
                 }
                 else if (fieldNumber == 2) {
-                    //TODO: worry about whether this leak is important. the deserialize returns
-                    //an object with a refcount that we own, which we then place in an object
-                    //that will never destroy it. this is moot because the current framework
-                    //never destroys any of these objects. But we should be aware that repeatedly
-                    //deserializing the same object will produce memory leaks.
-                    defaultValue = context.deserializePythonObject(buffer, wireType);
+                    defaultValue.steal(context.deserializePythonObject(buffer, wireType));
                 }
                 else if (fieldNumber == 3) {
                     assertWireTypesEqual(wireType, WireType::VARINT);
@@ -521,7 +516,7 @@ public:
     private:
         std::string m_name;
         Type* m_typeFilter;
-        PyObject* m_defaultValue;
+        PyObjectHolder m_defaultValue;
         bool m_isStarArg;
         bool m_isKwarg;
     };
@@ -1147,28 +1142,29 @@ public:
 
         template<class serialization_context_t, class buf_t>
         static Overload deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
-            PyObject* functionCode = nullptr;
-            PyObject* functionGlobals = nullptr;
-            PyObject* functionAnnotations = nullptr;
-            PyObject* functionDefaults = nullptr;
+            PyObjectHolder functionCode;
+            PyObjectHolder functionGlobals;
+            PyObjectHolder functionAnnotations;
+            PyObjectHolder functionDefaults;
             std::vector<std::string> closureVarnames;
-            std::map<std::string, PyObject*> functionGlobalsInCells;
+            std::map<std::string, PyObjectHolder> functionGlobalsInCells;
+            std::map<std::string, PyObject*> functionGlobalsInCellsRaw;
             std::map<std::string, ClosureVariableBinding> closureBindings;
             Type* returnType = nullptr;
             std::vector<FunctionArg> args;
 
             buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
                 if (fieldNumber == 0) {
-                    functionCode = context.deserializePythonObject(buffer, wireType);
+                    functionCode.steal(context.deserializePythonObject(buffer, wireType));
                 }
                 else if (fieldNumber == 1) {
-                    functionGlobals = context.deserializePythonObject(buffer, wireType);
+                    functionGlobals.steal(context.deserializePythonObject(buffer, wireType));
                 }
                 else if (fieldNumber == 2) {
-                    functionDefaults = context.deserializePythonObject(buffer, wireType);
+                    functionDefaults.steal(context.deserializePythonObject(buffer, wireType));
                 }
                 else if (fieldNumber == 3) {
-                    functionAnnotations = context.deserializePythonObject(buffer, wireType);
+                    functionAnnotations.steal(context.deserializePythonObject(buffer, wireType));
                 }
                 else if (fieldNumber == 4) {
                     buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
@@ -1186,7 +1182,8 @@ public:
                             if (last == "") {
                                 throw std::runtime_error("Corrupt Function closure encountered");
                             }
-                            functionGlobalsInCells[last] = context.deserializePythonObject(buffer, wireType);
+                            functionGlobalsInCells[last].steal(context.deserializePythonObject(buffer, wireType));
+                            functionGlobalsInCellsRaw[last] = functionGlobalsInCells[last];
                             last = "";
                         }
                     });
@@ -1217,7 +1214,7 @@ public:
                 functionGlobals,
                 functionDefaults,
                 functionAnnotations,
-                functionGlobalsInCells,
+                functionGlobalsInCellsRaw,
                 closureVarnames,
                 closureBindings,
                 returnType,

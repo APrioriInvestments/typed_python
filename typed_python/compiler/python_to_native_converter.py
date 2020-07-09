@@ -128,6 +128,7 @@ class PythonToNativeConverter(object):
         self._allCachedNames = set()
 
         self._link_name_for_identity = {}
+        self._identity_for_link_name = {}
         self._definitions = {}
         self._targets = {}
         self._inflight_definitions = {}
@@ -181,9 +182,12 @@ class PythonToNativeConverter(object):
         externallyUsed = set()
 
         for funcName in targets:
-            for dep in self._dependencies.getNamesDependedOn(funcName):
-                if dep not in targets:
-                    externallyUsed.add(dep)
+            ident = self._identity_for_link_name.get(funcName)
+            if ident is not None:
+                for dep in self._dependencies.getNamesDependedOn(ident):
+                    depLN = self._link_name_for_identity.get(dep)
+                    if depLN not in targets:
+                        externallyUsed.add(depLN)
 
         binary = self.llvmCompiler.buildSharedObject(targets)
 
@@ -247,6 +251,30 @@ class PythonToNativeConverter(object):
         else:
             return None
 
+    def defineLinkName(self, identity, linkName):
+        if identity in self._link_name_for_identity:
+            assert self._link_name_for_identity[identity] == linkName
+            assert self._identity_for_link_name[linkName] == identity
+        else:
+            self._link_name_for_identity[identity] = linkName
+            self._identity_for_link_name[linkName] = identity
+
+        if linkName not in self._allDefinedNames:
+            self._allDefinedNames.add(linkName)
+
+            if self.compilerCache:
+                if self.compilerCache.hasSymbol(linkName):
+                    newTypedCallTargets, newNativeFunctionTypes = self.compilerCache.loadForSymbol(linkName)
+
+                    self._targets.update(newTypedCallTargets)
+                    self.llvmCompiler.markExternal(newNativeFunctionTypes)
+
+                    self._allDefinedNames.update(newNativeFunctionTypes)
+                    self._allCachedNames.update(newNativeFunctionTypes)
+
+            return True
+        return False
+
     def defineNonPythonFunction(self, name, identityTuple, context, callback=None):
         """Define a non-python generating function (if we haven't defined it before already)
 
@@ -261,19 +289,19 @@ class PythonToNativeConverter(object):
         identity = self.hashObjectToIdentity(identityTuple).hexdigest
         linkName = self.identityHashToLinkerName(name, identity, "runtime.")
 
+        self.defineLinkName(identity, linkName)
+
         if self._currentlyConverting is not None:
             self._dependencies.addEdge(self._currentlyConverting, identity)
         else:
             self._dependencies.addRoot(identity)
 
+        if linkName in self._targets:
+            return self._targets.get(linkName)
+
         if callback is not None:
             self.installLinktimeHook(identity, callback)
 
-        if linkName in self._allDefinedNames:
-            return self._targets.get(linkName)
-
-        self._allDefinedNames.add(linkName)
-        self._link_name_for_identity[identity] = linkName
         self._inflight_function_conversions[identity] = context
 
         if context.knownOutputType() is not None or context.alwaysRaises():
@@ -313,7 +341,10 @@ class PythonToNativeConverter(object):
         input_types = [typeWrapper(x) for x in input_types]
 
         identity = (
-            Hash.from_integer(2) + self.hashObjectToIdentity(identity)
+            Hash.from_integer(2) +
+            self.hashObjectToIdentity(identity) +
+            self.hashObjectToIdentity(output_type) +
+            self.hashObjectToIdentity(input_types)
         ).hexdigest
 
         return self.defineNonPythonFunction(
@@ -448,6 +479,7 @@ class PythonToNativeConverter(object):
         )
 
         self._link_name_for_identity[identifier] = linkName
+        self._identity_for_link_name[linkName] = identifier
         self._allDefinedNames.add(linkName)
 
         self._definitions[linkName] = definition
@@ -485,7 +517,8 @@ class PythonToNativeConverter(object):
                         if name in self._targets:
                             self._targets.pop(name)
                         self._allDefinedNames.discard(name)
-                        self._link_name_for_identity.pop(i)
+                        ln = self._link_name_for_identity.pop(i)
+                        self._identity_for_link_name.pop(ln)
 
                     self._dependencies.dropNode(i)
 
@@ -591,6 +624,9 @@ class PythonToNativeConverter(object):
         )
 
     def hashObjectToIdentity(self, hashable):
+        from typed_python import SerializationContext
+        SerializationContext().deserialize(SerializationContext().serialize(hashable))
+
         if isinstance(hashable, Hash):
             return hashable
 
@@ -709,20 +745,7 @@ class PythonToNativeConverter(object):
 
         name = self.identityHashToLinkerName(funcName, identity)
 
-        if name not in self._allDefinedNames:
-            self._link_name_for_identity[identity] = name
-            self._allDefinedNames.add(name)
-
-            if self.compilerCache:
-                if self.compilerCache.hasSymbol(name):
-                    newTypedCallTargets, newNativeFunctionTypes = self.compilerCache.loadForSymbol(name)
-
-                    self._targets.update(newTypedCallTargets)
-                    self.llvmCompiler.markExternal(newNativeFunctionTypes)
-
-                    self._allDefinedNames.update(newTypedCallTargets)
-                    self._allDefinedNames.update(newNativeFunctionTypes)
-                    self._allCachedNames.update(newNativeFunctionTypes)
+        self.defineLinkName(identity, name)
 
         if identity not in self._identifier_to_pyfunc:
             self._identifier_to_pyfunc[identity] = (

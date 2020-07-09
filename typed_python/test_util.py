@@ -124,6 +124,7 @@ def evaluateExprInFreshProcess(filesToWrite, expression, compilerCacheDir=None, 
         ]
 
         env = dict(os.environ)
+
         if compilerCacheDir:
             env["TP_COMPILER_CACHE"] = compilerCacheDir
 
@@ -131,6 +132,7 @@ def evaluateExprInFreshProcess(filesToWrite, expression, compilerCacheDir=None, 
             output = subprocess.check_output(
                 [
                     sys.executable,
+                    "-u",
                     "-c",
                     "".join(f"import {modname};" for modname in namesToImport) + (
                         f"import pickle;"

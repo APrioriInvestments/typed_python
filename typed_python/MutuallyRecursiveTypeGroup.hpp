@@ -26,6 +26,8 @@ public:
     MutuallyRecursiveTypeGroup() : mAnyPyObjectsIncorrectlyOrdered(false)
     {}
 
+    MutuallyRecursiveTypeGroup(ShaHash hash);
+
     ShaHash hash() {
         if (mHash == ShaHash()) {
             computeHash();
@@ -36,6 +38,10 @@ public:
 
     const std::map<int32_t, TypeOrPyobj>& getIndexToObject() const {
         return mIndexToObject;
+    }
+
+    void setIndexToObject(int32_t index, TypeOrPyobj obj) {
+        mIndexToObject.insert({index, obj});
     }
 
     static ShaHash pyObjectShaHash(PyObject* h, MutuallyRecursiveTypeGroup* groupHead);
@@ -52,7 +58,13 @@ public:
 
     static std::string pyObjectSortName(PyObject* o);
 
+    static MutuallyRecursiveTypeGroup* getGroupFromHash(ShaHash h);
+
     static std::pair<MutuallyRecursiveTypeGroup*, int> pyObjectGroupHeadAndIndex(PyObject* o);
+
+    // is this object in this group? If this is a native type, we'll unpack it and check that.
+    // returns -1 if its not.
+    int32_t indexOfObjectInThisGroup(PyObject* o);
 
     static bool pyObjectGloballyIdentifiable(PyObject* h);
 
@@ -80,6 +92,8 @@ private:
 
     // for each python object that's in a type group, the group and index within the group
     static std::unordered_map<PyObject*, std::pair<MutuallyRecursiveTypeGroup*, int> > mPythonObjectTypeGroups;
+
+    static std::map<ShaHash, MutuallyRecursiveTypeGroup*> mHashToGroup;
 
     // for each python object where we have a hash
     static std::unordered_map<PyObject*, ShaHash> mPythonObjectShaHashes;

@@ -117,6 +117,9 @@ public:
         return mPyObj;
     }
 
+    // return type(), or check if pyobj is a Type and if so unwrap it.
+    Type* typeOrPyobjAsType() const;
+
 private:
     Type* mType;
     PyObject* mPyObj;
