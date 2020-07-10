@@ -321,12 +321,20 @@ class IntWrapper(ArithmeticTypeWrapper):
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:
+            if left.isConstant:
+                return context.constant(not left.constantValue)
             return context.pushPod(bool, left.nonref_expr.logical_not())
         if op.matches.Invert:
+            if left.isConstant:
+                return context.constant(~left.constantValue)
             return context.pushPod(self, left.nonref_expr.bitwise_not())
         if op.matches.USub:
+            if left.isConstant:
+                return context.constant(-left.constantValue)
             return context.pushPod(self, left.nonref_expr.negate())
         if op.matches.UAdd:
+            if left.isConstant:
+                return context.constant(left.constantValue)
             return context.pushPod(self, left.nonref_expr)
 
         return super().convert_unary_op(context, left, op)
@@ -550,6 +558,8 @@ class BoolWrapper(ArithmeticTypeWrapper):
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:
+            if left.isConstant:
+                return context.constant(not left.constantValue)
             return context.pushPod(bool, left.nonref_expr.logical_not())
 
         return super().convert_unary_op(context, left, op)
@@ -730,10 +740,16 @@ class FloatWrapper(ArithmeticTypeWrapper):
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:
+            if left.isConstant:
+                return context.constant(not left.constantValue)
             return context.pushPod(bool, left.nonref_expr.eq(self.getNativeLayoutType().zero()))
         if op.matches.USub:
+            if left.isConstant:
+                return context.constant(-left.constantValue)
             return context.pushPod(self, left.nonref_expr.negate())
         if op.matches.UAdd:
+            if left.isConstant:
+                return context.constant(left.constantValue)
             return context.pushPod(self, left.nonref_expr)
 
         return super().convert_unary_op(context, left, op)

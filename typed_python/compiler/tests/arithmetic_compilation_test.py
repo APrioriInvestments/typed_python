@@ -16,10 +16,9 @@ import operator
 import sys
 from math import isfinite, trunc, floor, ceil, nan, inf
 from typed_python import (
-    OneOf,
-    Int8, Int16, Int32,
+    OneOf, ListOf, Tuple, Compiled, makeNamedTuple,
+    Int8, Int16, Int32, Float32,
     UInt8, UInt16, UInt32, UInt64,
-    Float32, Compiled, makeNamedTuple, ListOf
 )
 from typed_python.type_promotion import (
     computeArithmeticBinaryResultType, isSignedInt, isUnsignedInt, bitness
@@ -676,3 +675,52 @@ class TestArithmeticCompilation(unittest.TestCase):
             return res
 
         format(1, 2, 3, 4)
+
+    def test_unary_ops_on_constants(self):
+        @Entrypoint
+        def sliceAtPositiveZero(x):
+            return x[+0]
+
+        self.assertIs(sliceAtPositiveZero.resultTypeFor(Tuple(int, float)).interpreterTypeRepresentation, int)
+
+        @Entrypoint
+        def sliceAtNegativeZero(x):
+            return x[-0]
+
+        self.assertIs(sliceAtNegativeZero.resultTypeFor(Tuple(int, float)).interpreterTypeRepresentation, int)
+
+        @Entrypoint
+        def sliceAtInvertZero(x):
+            return x[~0]
+
+        self.assertIs(sliceAtInvertZero.resultTypeFor(Tuple(int, float)).interpreterTypeRepresentation, float)
+
+        @Entrypoint
+        def sliceAtNotZero(x):
+            return x[int(not 0)]
+
+        self.assertIs(sliceAtNotZero.resultTypeFor(Tuple(int, float)).interpreterTypeRepresentation, float)
+
+        @Entrypoint
+        def sliceAtPositiveZeroFloat(x):
+            return x[int(+0.0)]
+
+        self.assertIs(sliceAtPositiveZeroFloat.resultTypeFor(Tuple(int, float)).interpreterTypeRepresentation, int)
+
+        @Entrypoint
+        def sliceAtNegativeZeroFloat(x):
+            return x[int(-0.0)]
+
+        self.assertIs(sliceAtNegativeZeroFloat.resultTypeFor(Tuple(int, float)).interpreterTypeRepresentation, int)
+
+        @Entrypoint
+        def sliceAtNotZeroFloat(x):
+            return x[int(not 0.0)]
+
+        self.assertIs(sliceAtNotZeroFloat.resultTypeFor(Tuple(int, float)).interpreterTypeRepresentation, float)
+
+        @Entrypoint
+        def sliceAtNotFalse(x):
+            return x[int(not False)]
+
+        self.assertIs(sliceAtNotZeroFloat.resultTypeFor(Tuple(int, float)).interpreterTypeRepresentation, float)
