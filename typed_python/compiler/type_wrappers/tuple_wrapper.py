@@ -276,7 +276,7 @@ class TupleWrapper(Wrapper):
         result = context.allocateUninitializedSlot(self.unionType)
         with context.switch(
             index.nonref_expr,
-            range(len(self.subTypeWrappers)),
+            range(-len(self.subTypeWrappers), len(self.subTypeWrappers)),
             True
         ) as indicesAndContexts:
             for i, subcontext in indicesAndContexts:
