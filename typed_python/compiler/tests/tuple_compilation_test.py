@@ -14,7 +14,7 @@
 
 from typed_python import (
     Tuple, NamedTuple, Class, Member, ListOf, Compiled,
-    Final, Forward
+    Final, Forward, Function, OneOf
 )
 import typed_python._types as _types
 import unittest
@@ -275,3 +275,33 @@ class TestTupleCompilation(unittest.TestCase):
                 check(lambda: t1 >= t2)
                 check(lambda: t1 == t2)
                 check(lambda: t1 != t2)
+
+    def test_negative_indexing(self):
+        @Entrypoint
+        def sliceAt(tup, ix):
+            return tup[ix]
+
+        @Entrypoint
+        def sliceAtOne(tup):
+            return tup[1]
+
+        @Entrypoint
+        def sliceAtMinusOne(tup):
+            return tup[-1]
+
+        class A(Class):
+            pass
+
+        class B(Class):
+            pass
+
+        tup = Tuple(A, B)([A(), B()])
+
+        self.assertEqual(sliceAtMinusOne(tup), sliceAtOne(tup))
+        self.assertEqual(sliceAt(tup, -2), sliceAt(tup, 0))
+        with self.assertRaises(IndexError):
+            sliceAt(tup, -3)
+
+        self.assertIs(sliceAtMinusOne.resultTypeFor(type(tup)).interpreterTypeRepresentation, B)
+
+        self.assertIs(Function(lambda tup: sliceAt(tup, -2)).resultTypeFor(type(tup)).interpreterTypeRepresentation, OneOf(A, B))
