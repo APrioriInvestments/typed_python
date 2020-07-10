@@ -260,15 +260,15 @@ class TupleWrapper(Wrapper):
 
         # if the argument is a constant, we can be very precise about what type
         # we're going to get out of the indexing operation
-        if index.expr.matches.Constant:
-            if index.expr.val.matches.Int:
-                indexVal = index.expr.val.val
+        if index.isConstant:
+            indexVal = index.constantValue
+            assert isinstance(indexVal, int)
 
-                if indexVal >= - len(self.subTypeWrappers) and indexVal < len(self.subTypeWrappers):
-                    if indexVal < 0:
-                        indexVal += len(self.subTypeWrappers)
+            if indexVal >= - len(self.subTypeWrappers) and indexVal < len(self.subTypeWrappers):
+                if indexVal < 0:
+                    indexVal += len(self.subTypeWrappers)
 
-                    return self.refAs(context, expr, indexVal)
+                return self.refAs(context, expr, indexVal)
 
         index = index.convert_to_type(int)
         if index is None:
