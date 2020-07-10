@@ -110,9 +110,9 @@ public:
             const std::vector<Class*>& bases,
             bool isFinal,
             const std::vector<std::tuple<std::string, Type*, Instance> >& members,
-            const std::map<std::string, Function*>& memberFunctions,
-            const std::map<std::string, Function*>& staticFunctions,
-            const std::map<std::string, Function*>& propertyFunctions,
+            const std::map<std::string, Type*>& memberFunctions,
+            const std::map<std::string, Type*>& staticFunctions,
+            const std::map<std::string, Type*>& propertyFunctions,
             const std::map<std::string, PyObject*>& classMembers
             )
     {
@@ -362,11 +362,11 @@ public:
         return m_heldClass->getMembers();
     }
 
-    const std::map<std::string, Function*>& getMemberFunctions() const {
+    const std::map<std::string, Type*>& getMemberFunctions() const {
         return m_heldClass->getMemberFunctions();
     }
 
-    const std::map<std::string, Function*>& getStaticFunctions() const {
+    const std::map<std::string, Type*>& getStaticFunctions() const {
         return m_heldClass->getStaticFunctions();
     }
 
@@ -374,7 +374,7 @@ public:
         return m_heldClass->getClassMembers();
     }
 
-    const std::map<std::string, Function*>& getPropertyFunctions() const {
+    const std::map<std::string, Type*>& getPropertyFunctions() const {
         return m_heldClass->getPropertyFunctions();
     }
 
@@ -382,11 +382,11 @@ public:
         return m_heldClass->getOwnMembers();
     }
 
-    const std::map<std::string, Function*>& getOwnMemberFunctions() const {
+    const std::map<std::string, Type*>& getOwnMemberFunctions() const {
         return m_heldClass->getOwnMemberFunctions();
     }
 
-    const std::map<std::string, Function*>& getOwnStaticFunctions() const {
+    const std::map<std::string, Type*>& getOwnStaticFunctions() const {
         return m_heldClass->getOwnStaticFunctions();
     }
 
@@ -394,7 +394,7 @@ public:
         return m_heldClass->getOwnClassMembers();
     }
 
-    const std::map<std::string, Function*>& getOwnPropertyFunctions() const {
+    const std::map<std::string, Type*>& getOwnPropertyFunctions() const {
         return m_heldClass->getOwnPropertyFunctions();
     }
 

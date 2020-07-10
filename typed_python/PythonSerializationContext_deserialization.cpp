@@ -449,7 +449,7 @@ void PythonSerializationContext::deserializeClassMembers(
 }
 
 void PythonSerializationContext::deserializeClassFunDict(
-    std::map<std::string, Function*>& dict,
+    std::map<std::string, Type*>& dict,
     DeserializationBuffer& b,
     int inWireType
 ) const {
@@ -475,21 +475,7 @@ void PythonSerializationContext::deserializeClassFunDict(
             throw std::runtime_error("Corrupt function definition when deserializing class: no name");
         }
 
-        if (fun->getTypeCategory() == Type::TypeCategory::catForward && !((Forward*)fun)->getTarget()) {
-            throw std::runtime_error(
-                "Corrupt function definition when deserializing class: function is an untargeted forward."
-            );
-        }
-
-        if (fun->getTypeCategory() != Type::TypeCategory::catFunction) {
-            throw std::runtime_error(
-                "Corrupt function definition when deserializing class fun "
-                + name + ": not a function: "
-                + fun->name() + ". category=" + Type::categoryToString(fun->getTypeCategory())
-            );
-        }
-
-        dict[name] = (Function*)fun;
+        dict[name] = fun;
     });
 }
 
@@ -583,9 +569,13 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             groupHash = ShaHash::fromDigest(b.readStringObject());
             hasGroupHash = true;
 
-            // check if a group exists with this hash. If so, we'll consume our objects
-            // but we'll just drop them on the floor because we don't really need them.
-            outGroup = MutuallyRecursiveTypeGroup::getGroupFromHash(groupHash);
+            std::cout << "START DESERIALIZING " << groupHash.digestAsHexString() << "\n";
+
+            if (mInternalizeTypeGroups) {
+                // check if a group exists with this hash. If so, we'll consume our objects
+                // but we'll just drop them on the floor because we don't really need them.
+                outGroup = MutuallyRecursiveTypeGroup::getGroupFromHash(groupHash);
+            }
 
             if (memo != -1 && outGroup) {
                 b.addCachedPointer(memo, (void*)outGroup, nullptr);
@@ -608,6 +598,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
 
             // consume each sub object
             b.consumeCompoundMessage(wireType, [&](size_t indexInGroup, size_t subWireType) {
+                std::cout << "READ HEADER IN " << groupHash.digestAsHexString() << ": " << indexInGroup << "\n";
                 int32_t kind = -1;
                 PyObjectHolder rep0;
                 PyObjectHolder rep1;
@@ -760,6 +751,8 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             }
 
             b.consumeCompoundMessage(wireType, [&](size_t indexInGroup, size_t subWireType) {
+                std::cout << "READ BODY IN " << groupHash.digestAsHexString() << ": " << indexInGroup << "\n";
+
                 if (indicesWrittenAsObjectAndRep.find(indexInGroup) != indicesWrittenAsObjectAndRep.end()) {
                     PyObjectStealer state(deserializePythonObject(b, subWireType));
                     if (!state) {
@@ -809,17 +802,22 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                         if (!state) {
                             throw PythonExceptionSet();
                         }
-                        if (!PyDict_Check(state)) {
-                            throw std::runtime_error("Expected object state to be a dict.");
-                        }
 
                         if (actuallyBuildGroup) {
                             if (!indicesWithSerializedBodies[indexInGroup]) {
                                 throw std::runtime_error("Somehow indicesWithSerializedBodies[indexInGroup] is empty");
                             }
 
-                            if (PyObject_GenericSetDict(indicesWithSerializedBodies[indexInGroup], state, nullptr) == -1) {
-                                throw PythonExceptionSet();
+                            if (PyCell_Check(indicesWithSerializedBodies[indexInGroup])) {
+                                PyCell_Set(indicesWithSerializedBodies[indexInGroup], state);
+                            } else {
+                                if (!PyDict_Check(state)) {
+                                    throw std::runtime_error("Expected object state to be a dict.");
+                                }
+
+                                if (PyObject_GenericSetDict(indicesWithSerializedBodies[indexInGroup], state, nullptr) == -1) {
+                                    throw PythonExceptionSet();
+                                }
                             }
                         }
                     }
@@ -860,7 +858,13 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
     if (actuallyBuildGroup) {
         for (auto indexAndType: indicesOfNativeTypes) {
             if (indexAndType.second->getTypeCategory() == Type::TypeCategory::catForward) {
-                throw std::runtime_error("We failed to resolve a forward deserializing " + groupHash.digestAsHexString());
+                if (!((Forward*)indexAndType.second)->getTarget()) {
+                    for (auto ixAndThing: outGroup->getIndexToObject()) {
+                        std::cout << ixAndThing.first << " -> " << ixAndThing.second.name() << "\n";
+                    }
+
+                    throw std::runtime_error("We failed to resolve a forward deserializing " + groupHash.digestAsHexString());
+                }
             }
         }
     }
@@ -1069,9 +1073,12 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
                 resultType = target;
             } else
             if (insistResolved) {
+                std::cout << "NOT RESOLVED: " << resultType->name() << " in " << group->hash().digestAsHexString() << "\n";
+
                 for (auto ixAndThing: group->getIndexToObject()) {
                     std::cout << ixAndThing.first << " -> " << ixAndThing.second.name() << "\n";
                 }
+                asm("int3");
                 // by the time we get back to the object layer, everything should be resolved.
                 // we're supposed to guarantee this by deserializing the native types
                 // first and then deserializing the python objects
@@ -1170,7 +1177,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
     std::vector<Class*> classBases;
     bool classIsFinal = false;
     std::vector<std::pair<std::string, NamedTuple*> > alternativeMembers;
-    std::map<std::string, Function*> classMethods, classStatics, classPropertyFunctions;
+    std::map<std::string, Type*> classMethods, classStatics, classPropertyFunctions;
     std::map<std::string, PyObjectHolder> classClassMembers;
     std::vector<std::tuple<std::string, Type*, Instance> > classMembers;
 

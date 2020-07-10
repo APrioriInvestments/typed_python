@@ -282,7 +282,7 @@ Alternative* Alternative::Make(
                             std::string name,
                             std::string moduleName,
                             const std::vector<std::pair<std::string, NamedTuple*> >& types,
-                            const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
+                            const std::map<std::string, Type*>& methods //methods preclude us from being in the memo
                             ) {
     return new Alternative(name, moduleName, types, methods);
 }

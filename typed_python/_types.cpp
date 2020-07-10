@@ -1010,9 +1010,9 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    std::map<std::string, Function*> memberFuncs;
-    std::map<std::string, Function*> staticFuncs;
-    std::map<std::string, Function*> propertyFuncs;
+    std::map<std::string, Type*> memberFuncs;
+    std::map<std::string, Type*> staticFuncs;
+    std::map<std::string, Type*> propertyFuncs;
 
     for (auto mf: memberFunctions) {
         if (mf.second->getTypeCategory() != Type::TypeCategory::catFunction) {
@@ -2194,7 +2194,7 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
 
     std::vector<std::pair<std::string, NamedTuple*> > definitions;
 
-    std::map<std::string, Function*> functions;
+    std::map<std::string, Type*> functions;
 
     PyObject *key, *value;
     Py_ssize_t pos = 0;

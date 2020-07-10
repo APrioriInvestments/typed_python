@@ -42,7 +42,7 @@ from typed_python import (
     Forward, Final, Function, Entrypoint, TypeFunction
 )
 
-from typed_python._types import refcount, isRecursive, identityHash
+from typed_python._types import refcount, isRecursive, identityHash, recursiveTypeGroup
 
 module_level_testfun = dummy_test_module.testfunction
 
@@ -1846,9 +1846,9 @@ class TypesSerializationTest(unittest.TestCase):
         sc.deserialize(sc.serialize(C))
 
     def test_serialize_self_referencing_class(self):
-        sc = SerializationContext().withoutCompression()
+        sc = SerializationContext().withoutCompression().withoutInternalizingTypeGroups()
 
-        def g(x):
+        def gExternal(x):
             return 10
 
         @TypeFunction
@@ -1860,8 +1860,10 @@ class TypesSerializationTest(unittest.TestCase):
 
                 @Entrypoint
                 def g(self):
-                    return g(10)
+                    return gExternal(10)
 
             return C_
 
-        assert sc.deserialize(sc.serialize(C(int).s))
+        ob = type(C(int).s)
+
+        assert sc.deserialize(sc.serialize(ob))

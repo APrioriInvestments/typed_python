@@ -197,6 +197,14 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
     return std::make_pair(true, incref(result));
 }
 
+std::pair<bool, PyObject*> PyFunctionInstance::tryToCall(const Type* f, instance_ptr closure, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
+    if (f->getTypeCategory() != Type::TypeCategory::catFunction) {
+        return {false, nullptr};
+    }
+
+    return tryToCall((Function*)f, closure, arg0, arg1, arg2);
+}
+
 std::pair<bool, PyObject*> PyFunctionInstance::tryToCall(const Function* f, instance_ptr closure, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
     PyObjectStealer argTuple(
         (arg0 && arg1 && arg2) ?

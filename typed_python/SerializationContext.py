@@ -59,7 +59,14 @@ DEFAUL_TNAME_TO_OVERRIDE = {
 
 class SerializationContext(object):
     """Represents a collection of types with well-specified names that we can use to serialize objects."""
-    def __init__(self, nameToObjectOverride=None, compressionEnabled=True, encodeLineInformationForCode=True, objectToNameOverride=None):
+    def __init__(
+        self,
+        nameToObjectOverride=None,
+        compressionEnabled=True,
+        encodeLineInformationForCode=True,
+        objectToNameOverride=None,
+        internalizeTypeGroups=True
+    ):
         super().__init__()
 
         self.nameToObjectOverride = dict(nameToObjectOverride or DEFAUL_TNAME_TO_OVERRIDE)
@@ -70,6 +77,7 @@ class SerializationContext(object):
         )
         self.compressionEnabled = compressionEnabled
         self.encodeLineInformationForCode = encodeLineInformationForCode
+        self.internalizeTypeGroups = internalizeTypeGroups
 
     def compress(self, bytes):
         if self.compressionEnabled:
@@ -84,6 +92,23 @@ class SerializationContext(object):
         else:
             return bytes
 
+    def withoutInternalizingTypeGroups(self):
+        """Make sure we fully deserialize types.
+
+        This means we don't place them into the main type memo
+        by identityHash, which is really only useful for testing.
+        """
+        if not self.internalizeTypeGroups:
+            return self
+
+        return SerializationContext(
+            nameToObjectOverride=self.nameToObjectOverride,
+            compressionEnabled=self.compressionEnabled,
+            encodeLineInformationForCode=False,
+            objectToNameOverride=self.objectToNameOverride,
+            internalizeTypeGroups=False
+        )
+
     def withoutLineInfoEncoded(self):
         if not self.encodeLineInformationForCode:
             return self
@@ -92,7 +117,8 @@ class SerializationContext(object):
             nameToObjectOverride=self.nameToObjectOverride,
             compressionEnabled=self.compressionEnabled,
             encodeLineInformationForCode=False,
-            objectToNameOverride=self.objectToNameOverride
+            objectToNameOverride=self.objectToNameOverride,
+            internalizeTypeGroups=self.internalizeTypeGroups
         )
 
     def withoutCompression(self):
@@ -103,7 +129,8 @@ class SerializationContext(object):
             nameToObjectOverride=self.nameToObjectOverride,
             compressionEnabled=False,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
-            objectToNameOverride=self.objectToNameOverride
+            objectToNameOverride=self.objectToNameOverride,
+            internalizeTypeGroups=self.internalizeTypeGroups
         )
 
     def withCompression(self):
@@ -114,12 +141,12 @@ class SerializationContext(object):
             nameToObjectOverride=self.nameToObjectOverride,
             compressionEnabled=True,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
-            objectToNameOverride=self.objectToNameOverride
+            objectToNameOverride=self.objectToNameOverride,
+            internalizeTypeGroups=self.internalizeTypeGroups
         )
 
     def nameForObject(self, t):
         ''' Return a name(string) for an input object t, or None if not found. '''
-        print(repr(t)[:150])
         if id(t) in self.objectToNameOverride:
             return self.objectToNameOverride[id(t)]
 

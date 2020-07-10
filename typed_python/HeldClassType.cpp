@@ -252,9 +252,9 @@ HeldClass* HeldClass::Make(
     const std::vector<HeldClass*>& bases,
     bool isFinal,
     const std::vector<std::tuple<std::string, Type*, Instance> >& members,
-    const std::map<std::string, Function*>& memberFunctions,
-    const std::map<std::string, Function*>& staticFunctions,
-    const std::map<std::string, Function*>& propertyFunctions,
+    const std::map<std::string, Type*>& memberFunctions,
+    const std::map<std::string, Type*>& staticFunctions,
+    const std::map<std::string, Type*>& propertyFunctions,
     const std::map<std::string, PyObject*>& classMembers
 ) {
     //we only allow one base class to have members because we want native code to be
@@ -277,13 +277,15 @@ HeldClass* HeldClass::Make(
 
     if (!isFinal) {
         for (auto nameAndMemberFunc: memberFunctions) {
-            for (auto overload: nameAndMemberFunc.second->getOverloads()) {
-                if (!overload.getReturnType()) {
-                    throw std::runtime_error("Overload of " + inName + "." + nameAndMemberFunc.first
-                        + " has no return type, but the class is not marked final, so the compiler"
-                        + " won't have a return type defined for this method. Either add an '-> object' annotation"
-                        + " to the method, or mark the class Final (so that the compiler can apply type inference directly)"
-                    );
+            if (nameAndMemberFunc.second->getTypeCategory() == Type::TypeCategory::catFunction) {
+                for (auto overload: ((Function*)nameAndMemberFunc.second)->getOverloads()) {
+                    if (!overload.getReturnType()) {
+                        throw std::runtime_error("Overload of " + inName + "." + nameAndMemberFunc.first
+                            + " has no return type, but the class is not marked final, so the compiler"
+                            + " won't have a return type defined for this method. Either add an '-> object' annotation"
+                            + " to the method, or mark the class Final (so that the compiler can apply type inference directly)"
+                        );
+                    }
                 }
             }
         }
@@ -303,8 +305,6 @@ HeldClass* HeldClass::Make(
     // we do these outside of the constructor so that if they throw we
     // don't destroy the HeldClass type object (and just leak it instead) because
     // we need to ensure we never delete Type objects.
-    result->initializeMRO();
-
     result->endOfConstructorInitialization();
 
     return result;

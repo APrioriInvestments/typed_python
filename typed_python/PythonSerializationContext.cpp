@@ -19,7 +19,7 @@
 #include "PyInstance.hpp"
 #include "MutuallyRecursiveTypeGroup.hpp"
 
-void PythonSerializationContext::setCompressionEnabled() {
+void PythonSerializationContext::setFlags() {
     PyEnsureGilAcquired acquireTheGil;
 
     PyObjectStealer isEnabled(PyObject_GetAttrString(mContextObj, "compressionEnabled"));
@@ -29,6 +29,14 @@ void PythonSerializationContext::setCompressionEnabled() {
     }
 
     mCompressionEnabled = ((PyObject*)isEnabled) == Py_True;
+
+    PyObjectStealer internalize(PyObject_GetAttrString(mContextObj, "internalizeTypeGroups"));
+
+    if (!isEnabled) {
+        throw PythonExceptionSet();
+    }
+
+    mInternalizeTypeGroups = ((PyObject*)internalize) == Py_True;
 }
 
 std::shared_ptr<ByteBuffer> PythonSerializationContext::compress(uint8_t* begin, uint8_t* end) const {

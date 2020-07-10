@@ -41,7 +41,12 @@ public:
     }
 
     void setIndexToObject(int32_t index, TypeOrPyobj obj) {
-        mIndexToObject.insert({index, obj});
+        auto it = mIndexToObject.find(index);
+        if (it != mIndexToObject.end()) {
+            it->second = obj;
+        } else {
+            mIndexToObject.insert({index, obj});
+        }
     }
 
     static ShaHash pyObjectShaHash(PyObject* h, MutuallyRecursiveTypeGroup* groupHead);
@@ -60,7 +65,10 @@ public:
 
     static MutuallyRecursiveTypeGroup* getGroupFromHash(ShaHash h);
 
-    static std::pair<MutuallyRecursiveTypeGroup*, int> pyObjectGroupHeadAndIndex(PyObject* o);
+    static std::pair<MutuallyRecursiveTypeGroup*, int> pyObjectGroupHeadAndIndex(
+        PyObject* o,
+        bool constructIfNotInGroup=true
+    );
 
     // is this object in this group? If this is a native type, we'll unpack it and check that.
     // returns -1 if its not.

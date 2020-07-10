@@ -263,7 +263,11 @@ std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name,
         return std::make_pair(false, (PyObject*)nullptr);
     }
 
-    Function* method = it->second;
+    if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+        return std::make_pair(false, (PyObject*)nullptr);
+    }
+
+    Function* method = (Function*)it->second;
 
     int argCount = 1;
     if (arg0) {
@@ -348,7 +352,11 @@ void PyClassInstance::constructFromPythonArgumentsConcrete(Class* classT, uint8_
         return;
     }
 
-    Function* initMethod = it->second;
+    if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+        throw std::runtime_error("__init__ was not a function object.");
+    }
+
+    Function* initMethod = (Function*)it->second;
 
     PyObjectStealer selfAsObject(
         PyInstance::initialize(classT, [&](instance_ptr selfData) {
@@ -508,14 +516,7 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
             defined++;
 
         if (!defined || !defined->ml_name) {
-            if (p.second->getClosureType()->bytecount()) {
-                std::cout << "WARNING: invalid class member " << classT->name() << p.first << " had a nonempty closure.\n";
-            } else {
-                if (p.second->bytecount()) {
-                    throw std::runtime_error("Somehow, a Class got a function with a closure type.");
-                }
-                PyDict_SetItemString(pyType->tp_dict, p.first.c_str(), PyInstance::initialize(p.second, [&](instance_ptr) {}));
-            }
+            PyDict_SetItemString(pyType->tp_dict, p.first.c_str(), PyInstance::initialize(p.second, [&](instance_ptr) {}));
         }
     }
 
@@ -554,13 +555,6 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
     PyDict_SetItemString(pyType->tp_dict, "ClassMembers", classMembers);
 
     for (auto nameAndObj: classT->getStaticFunctions()) {
-        if (nameAndObj.second->getClosureType()->bytecount()) {
-            throw std::runtime_error(
-                "Somehow, " + classT->name() + "."
-                + nameAndObj.first + " has a populated closure."
-            );
-        }
-
         PyDict_SetItemString(
             pyType->tp_dict,
             nameAndObj.first.c_str(),
@@ -645,8 +639,17 @@ PyObject* PyClassInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
             );
         throw PythonExceptionSet();
     }
-    // else
-    Function* method = it->second;
+
+    if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "'%s' object is not callable because '__call__' is not a function object",
+            type()->name().c_str()
+            );
+        throw PythonExceptionSet();
+    }
+
+    Function* method = (Function*)it->second;
 
     auto res = PyFunctionInstance::tryToCallAnyOverload(method, nullptr, (PyObject*)this, args, kwargs);
 

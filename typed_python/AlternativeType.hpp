@@ -32,7 +32,7 @@ public:
     Alternative(std::string name,
                 std::string moduleName,
                 const std::vector<std::pair<std::string, NamedTuple*> >& subtypes,
-                const std::map<std::string, Function*>& methods
+                const std::map<std::string, Type*>& methods
                 ) :
             Type(TypeCategory::catAlternative),
             m_default_construction_ix(0),
@@ -80,9 +80,7 @@ public:
         }
 
         for (auto& method_pair: m_methods) {
-            Type* t = (Type*)method_pair.second;
-            visitor(t);
-            assert(t == method_pair.second);
+            visitor(method_pair.second);
         }
     }
 
@@ -154,7 +152,7 @@ public:
                         std::string name,
                         std::string moduleName,
                         const std::vector<std::pair<std::string, NamedTuple*> >& types,
-                        const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
+                        const std::map<std::string, Type*>& methods //methods preclude us from being in the memo
                         );
 
     Alternative* renamed(std::string newName) {
@@ -175,7 +173,7 @@ public:
 
     Type* pickConcreteSubclassConcrete(instance_ptr data);
 
-    const std::map<std::string, Function*>& getMethods() const {
+    const std::map<std::string, Type*>& getMethods() const {
         return m_methods;
     }
 
@@ -199,7 +197,7 @@ private:
 
     std::vector<Type*> m_subtypes_concrete;
 
-    std::map<std::string, Function*> m_methods;
+    std::map<std::string, Type*> m_methods;
 
     std::map<std::string, int> m_arg_positions;
 

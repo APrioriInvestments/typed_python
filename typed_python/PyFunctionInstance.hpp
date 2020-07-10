@@ -30,6 +30,8 @@ public:
 
     static void copyConstructFromPythonInstanceConcrete(modeled_type* type, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
 
+    static std::pair<bool, PyObject*> tryToCall(const Type* f, instance_ptr functionClosure, PyObject* arg0=nullptr, PyObject* arg1=nullptr, PyObject* arg2=nullptr);
+
     static std::pair<bool, PyObject*> tryToCall(const Function* f, instance_ptr functionClosure, PyObject* arg0=nullptr, PyObject* arg1=nullptr, PyObject* arg2=nullptr);
 
     static std::pair<bool, PyObject*> tryToCallAnyOverload(const Function* f, instance_ptr functionClosure, PyObject* self, PyObject* args, PyObject* kwargs);

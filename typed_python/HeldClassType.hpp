@@ -284,9 +284,9 @@ public:
           const std::vector<HeldClass*>& baseClasses,
           bool isFinal,
           const std::vector<std::tuple<std::string, Type*, Instance> >& members,
-          const std::map<std::string, Function*>& memberFunctions,
-          const std::map<std::string, Function*>& staticFunctions,
-          const std::map<std::string, Function*>& propertyFunctions,
+          const std::map<std::string, Type*>& memberFunctions,
+          const std::map<std::string, Type*>& staticFunctions,
+          const std::map<std::string, Type*>& propertyFunctions,
           const std::map<std::string, PyObject*>& classMembers
           ) :
             Type(catHeldClass),
@@ -377,37 +377,25 @@ public:
             visitor(std::get<1>(o));
         }
         for (auto& o: m_own_memberFunctions) {
-            Type* t = std::get<1>(o);
-            visitor(t);
-            assert(t == std::get<1>(o));
+            visitor(std::get<1>(o));
         }
         for (auto& o: m_own_staticFunctions) {
-            Type* t = std::get<1>(o);
-            visitor(t);
-            assert(t == std::get<1>(o));
+            visitor(std::get<1>(o));
         }
         for (auto& o: m_own_propertyFunctions) {
-            Type* t = std::get<1>(o);
-            visitor(t);
-            assert(t == std::get<1>(o));
+            visitor(std::get<1>(o));
         }
         for (auto& o: m_members) {
             visitor(std::get<1>(o));
         }
         for (auto& o: m_memberFunctions) {
-            Type* t = std::get<1>(o);
-            visitor(t);
-            assert(t == std::get<1>(o));
+            visitor(std::get<1>(o));
         }
         for (auto& o: m_staticFunctions) {
-            Type* t = std::get<1>(o);
-            visitor(t);
-            assert(t == std::get<1>(o));
+            visitor(std::get<1>(o));
         }
         for (auto& o: m_propertyFunctions) {
-            Type* t = std::get<1>(o);
-            visitor(t);
-            assert(t == std::get<1>(o));
+            visitor(std::get<1>(o));
         }
     }
 
@@ -425,9 +413,9 @@ public:
         const std::vector<HeldClass*>& bases,
         bool isFinal,
         const std::vector<std::tuple<std::string, Type*, Instance> >& members,
-        const std::map<std::string, Function*>& memberFunctions,
-        const std::map<std::string, Function*>& staticFunctions,
-        const std::map<std::string, Function*>& propertyFunctions,
+        const std::map<std::string, Type*>& memberFunctions,
+        const std::map<std::string, Type*>& staticFunctions,
+        const std::map<std::string, Type*>& propertyFunctions,
         const std::map<std::string, PyObject*>& classMembers
     );
 
@@ -582,11 +570,11 @@ public:
         return it->second;
     }
 
-    const std::map<std::string, Function*>& getMemberFunctions() const {
+    const std::map<std::string, Type*>& getMemberFunctions() const {
         return m_memberFunctions;
     }
 
-    const std::map<std::string, Function*>& getStaticFunctions() const {
+    const std::map<std::string, Type*>& getStaticFunctions() const {
         return m_staticFunctions;
     }
 
@@ -594,15 +582,15 @@ public:
         return m_classMembers;
     }
 
-    const std::map<std::string, Function*>& getPropertyFunctions() const {
+    const std::map<std::string, Type*>& getPropertyFunctions() const {
         return m_propertyFunctions;
     }
 
-    const std::map<std::string, Function*>& getOwnMemberFunctions() const {
+    const std::map<std::string, Type*>& getOwnMemberFunctions() const {
         return m_own_memberFunctions;
     }
 
-    const std::map<std::string, Function*>& getOwnStaticFunctions() const {
+    const std::map<std::string, Type*>& getOwnStaticFunctions() const {
         return m_own_staticFunctions;
     }
 
@@ -610,7 +598,7 @@ public:
         return m_own_classMembers;
     }
 
-    const std::map<std::string, Function*>& getOwnPropertyFunctions() const {
+    const std::map<std::string, Type*>& getOwnPropertyFunctions() const {
         return m_own_propertyFunctions;
     }
 
@@ -741,12 +729,19 @@ public:
         return result;
     }
 
+    static Function* toFunction(Type* f) {
+        if (f->getTypeCategory() != Type::TypeCategory::catFunction) {
+            throw std::runtime_error("HeldClass received " + f->name() + " which is not a function.");
+        }
+        return ((Function*)f);
+    }
+
     // given some function defininitions by name, add them to a target dictionary.
     // if the function is new just add it. Otherwise merge it in to the existing set
     // of method specializations.
     static void mergeInto(
-            std::map<std::string, Function*>& target,
-            const std::map<std::string, Function*>& source
+            std::map<std::string, Type*>& target,
+            const std::map<std::string, Type*>& source
             )
     {
         for (auto nameAndFunc: source) {
@@ -762,8 +757,8 @@ public:
                 // _more_ precise than the base class, so that we can ensure that when we
                 // compile the child class to masquerade as the base class we are able
                 // to comply with the return-type assumptions made by callers.
-                for (auto childOverload: target[nameAndFunc.first]->getOverloads()) {
-                    for (auto baseOverload: nameAndFunc.second->getOverloads()) {
+                for (auto childOverload: toFunction(target[nameAndFunc.first])->getOverloads()) {
+                    for (auto baseOverload: toFunction(nameAndFunc.second)->getOverloads()) {
                         if (!childOverload.disjointFrom(baseOverload)) {
                             if (childOverload.getReturnType() != baseOverload.getReturnType()) {
                                 // we should really be checking for 'coverage' but for now we just
@@ -777,7 +772,8 @@ public:
                         }
                     }
                 }
-                target[nameAndFunc.first] = Function::merge(target[nameAndFunc.first], nameAndFunc.second);
+
+                target[nameAndFunc.first] = Function::merge(toFunction(target[nameAndFunc.first]), toFunction(nameAndFunc.second));
             }
         }
     }
@@ -819,6 +815,11 @@ public:
     // instead of a T
     BoundMethod* getMemberFunctionMethodType(const char* attr, bool forHeld);
 
+    void _forwardTypesAreResolved() {
+        initializeMRO();
+        _updateAfterForwardTypesChanged();
+    }
+
 private:
     std::vector<size_t> m_byte_offsets;
 
@@ -848,22 +849,22 @@ private:
     //the members we
     std::vector<std::tuple<std::string, Type*, Instance> > m_members;
 
-    std::map<std::string, Function*> m_memberFunctions;
+    std::map<std::string, Type*> m_memberFunctions;
 
-    std::map<std::string, Function*> m_staticFunctions;
+    std::map<std::string, Type*> m_staticFunctions;
 
-    std::map<std::string, Function*> m_propertyFunctions;
+    std::map<std::string, Type*> m_propertyFunctions;
 
     std::map<std::string, PyObject*> m_classMembers;
 
     // the original members we were provided with
     std::vector<std::tuple<std::string, Type*, Instance> > m_own_members;
 
-    std::map<std::string, Function*> m_own_memberFunctions;
+    std::map<std::string, Type*> m_own_memberFunctions;
 
-    std::map<std::string, Function*> m_own_staticFunctions;
+    std::map<std::string, Type*> m_own_staticFunctions;
 
-    std::map<std::string, Function*> m_own_propertyFunctions;
+    std::map<std::string, Type*> m_own_propertyFunctions;
 
     std::map<std::string, PyObject*> m_own_classMembers;
 

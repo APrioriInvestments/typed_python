@@ -804,9 +804,7 @@ public:
                     );
                 }
 
-                if (PyCell_Get(cell)) {
-                    visitor(PyCell_GET(cell));
-                }
+                visitor(cell);
             }
 
             visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {

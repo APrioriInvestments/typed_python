@@ -145,7 +145,11 @@ public:
             auto it = c->getMemberFunctions().find(m_funcName);
 
             if (it != c->getMemberFunctions().end()) {
-                return it->second;
+                if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+                    return nullptr;
+                }
+
+                return (Function*)it->second;
             }
 
             return nullptr;
@@ -157,7 +161,11 @@ public:
             auto it = c->getMemberFunctions().find(m_funcName);
 
             if (it != c->getMemberFunctions().end()) {
-                return it->second;
+                if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+                    return nullptr;
+                }
+
+                return (Function*)it->second;
             }
 
             return nullptr;
@@ -169,7 +177,11 @@ public:
             auto it = c->getMemberFunctions().find(m_funcName);
 
             if (it != c->getMemberFunctions().end()) {
-                return it->second;
+                if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+                    return nullptr;
+                }
+
+                return (Function*)it->second;
             }
 
             return nullptr;
@@ -188,7 +200,11 @@ public:
             auto it = a->getMethods().find(m_funcName);
 
             if (it != a->getMethods().end()) {
-                return it->second;
+                if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+                    return nullptr;
+                }
+
+                return (Function*)it->second;
             }
 
             return nullptr;

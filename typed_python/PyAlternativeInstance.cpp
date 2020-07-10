@@ -154,9 +154,13 @@ PyObject* PyAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const
 
     if (it != toCheck->getMethods().end()) {
         return translateExceptionToPyObject([&]() {
+            if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+                throw std::runtime_error(std::string(attrName) + " is not a function object.");
+            }
+
             PyObjectStealer funcObj(
-                it->second->getOverloads()[0].buildFunctionObj(
-                    it->second->getClosureType(),
+                ((Function*)it->second)->getOverloads()[0].buildFunctionObj(
+                    ((Function*)it->second)->getClosureType(),
                     nullptr
                 )
             );
@@ -218,9 +222,13 @@ PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrNam
     auto it = toCheck->getMethods().find(attrName);
     if (it != toCheck->getMethods().end()) {
         return translateExceptionToPyObject([&]() {
+            if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+                throw std::runtime_error(std::string(attrName) + " is not a function object.");
+            }
+
             PyObjectStealer funcObj(
-                it->second->getOverloads()[0].buildFunctionObj(
-                    it->second->getClosureType(),
+                ((Function*)it->second)->getOverloads()[0].buildFunctionObj(
+                    ((Function*)it->second)->getClosureType(),
                     nullptr
                 )
             );
@@ -391,8 +399,18 @@ PyObject* PyConcreteAlternativeInstance::tp_call_concrete(PyObject* args, PyObje
             );
         throw PythonExceptionSet();
     }
+
+    if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "'%s' object is not callable because '__call__' is not a function object",
+            type()->name().c_str()
+            );
+        throw PythonExceptionSet();
+    }
+
     // else
-    Function* f = it->second;
+    Function* f = (Function*)it->second;
     auto res = PyFunctionInstance::tryToCallAnyOverload(f, nullptr, (PyObject*)this, args, kwargs);
     if (res.first) {
         return res.second;
@@ -419,7 +437,11 @@ std::pair<bool, PyObject*> PyConcreteAlternativeInstance::callMethod(const char*
         return std::make_pair(false, (PyObject*)nullptr);
     }
 
-    Function* method = it->second;
+    if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+        return {false, nullptr};
+    }
+
+    Function* method = (Function*)it->second;
 
     int argCount = 1;
     if (arg0) {

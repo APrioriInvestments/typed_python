@@ -240,6 +240,10 @@ void Type::forwardTypesAreResolved() {
     if (mTypeRep) {
         updateTypeRepForType(this, mTypeRep);
     }
+
+    this->check([&](auto& subtype) {
+        subtype._forwardTypesAreResolved();
+    });
 }
 
 void Type::forwardResolvedTo(Forward* forward, Type* resolvedTo) {

@@ -513,6 +513,8 @@ public:
     // below us.
     void forwardTypesAreResolved();
 
+    void _forwardTypesAreResolved() {}
+
     void buildMutuallyRecursiveTypeCycle();
 
     // called after each type has initialized its internals

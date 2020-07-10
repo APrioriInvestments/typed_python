@@ -82,7 +82,11 @@ PyObject* PyRefToInstance::tp_getattr_concrete(PyObject* pyAttrName, const char*
     {
         auto it = clsType->getPropertyFunctions().find(attrName);
         if (it != clsType->getPropertyFunctions().end()) {
-            auto res = PyFunctionInstance::tryToCall(it->second, nullptr, (PyObject*)this);
+            if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+                throw std::runtime_error(std::string("Attribute ") + attrName + " is not a function");
+            }
+
+            auto res = PyFunctionInstance::tryToCall((Function*)it->second, nullptr, (PyObject*)this);
             if (res.first) {
                 return res.second;
             }
@@ -199,7 +203,11 @@ std::pair<bool, PyObject*> PyRefToInstance::callMemberFunction(const char* name,
         return std::make_pair(false, (PyObject*)nullptr);
     }
 
-    Function* method = it->second;
+    if (it->second->getTypeCategory() != Type::TypeCategory::catFunction) {
+        return std::make_pair(false, (PyObject*)nullptr);
+    }
+
+    Function* method = (Function*)it->second;
 
     int argCount = 1;
     if (arg0) {

@@ -119,10 +119,10 @@ public:
             mContextObj(typeSetObj),
             mCompressionEnabled(false)
     {
-        setCompressionEnabled();
+        setFlags();
     }
 
-    void setCompressionEnabled();
+    void setFlags();
 
     bool isCompressionEnabled() const {
         return mCompressionEnabled;
@@ -148,7 +148,7 @@ public:
 
     void serializeAlternativeMembers(const std::vector<std::pair<std::string, NamedTuple*> >& members, SerializationBuffer& b, int fieldNumber) const;
 
-    void serializeClassFunDict(const std::map<std::string, Function*>& dict, SerializationBuffer& b, int fieldNumber) const;
+    void serializeClassFunDict(const std::map<std::string, Type*>& dict, SerializationBuffer& b, int fieldNumber) const;
 
     void serializeClassClassMemberDict(const std::map<std::string, PyObject*>& dict, SerializationBuffer& b, int fieldNumber) const;
 
@@ -156,7 +156,7 @@ public:
 
     void deserializeClassMembers(std::vector<std::tuple<std::string, Type*, Instance> >& members, DeserializationBuffer& b, int wireType) const;
 
-    void deserializeClassFunDict(std::map<std::string, Function*>& dict, DeserializationBuffer& b, int wireType) const;
+    void deserializeClassFunDict(std::map<std::string, Type*>& dict, DeserializationBuffer& b, int wireType) const;
 
     void deserializeClassClassMemberDict(std::map<std::string, PyObjectHolder>& dict, DeserializationBuffer& b, int wireType) const;
 
@@ -218,4 +218,6 @@ private:
     PyObject* mContextObj;
 
     bool mCompressionEnabled;
+
+    bool mInternalizeTypeGroups;
 };
