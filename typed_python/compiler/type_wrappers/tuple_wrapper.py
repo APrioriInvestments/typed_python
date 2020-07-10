@@ -270,7 +270,6 @@ class TupleWrapper(Wrapper):
 
                 return self.refAs(context, expr, indexVal)
 
-        index = index.convert_to_type(int)
         if index is None:
             return None
 
