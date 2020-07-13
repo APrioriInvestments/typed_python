@@ -25,9 +25,13 @@ from typed_python.type_function import ConcreteTypeFunction
 from types import FunctionType, ModuleType, CodeType, BuiltinFunctionType
 from _thread import LockType, RLock
 import numpy
+import sys
 import datetime
 import lz4.frame
 import importlib
+
+
+_badModuleCache = set()
 
 
 def createEmptyFunction(ast):
@@ -253,8 +257,15 @@ class SerializationContext(object):
             moduleName = ".".join(items[:-2])
 
             try:
-                module = importlib.import_module(moduleName)
+                if moduleName in sys.modules:
+                    module = sys.modules[moduleName]
+                else:
+                    if moduleName in _badModuleCache:
+                        return None
+
+                    module = importlib.import_module(moduleName)
             except ImportError:
+                _badModuleCache.add(moduleName)
                 return None
 
             clsObj = getattr(module, classname, None)
@@ -274,8 +285,14 @@ class SerializationContext(object):
 
         if name.startswith(".modules."):
             try:
+                if name[9:] in _badModuleCache:
+                    return None
+
+                if name[9:] in sys.modules:
+                    return sys.modules[name[9:]]
                 return importlib.import_module(name[9:])
             except ImportError:
+                _badModuleCache.add(moduleName)
                 return None
 
         names = name.rsplit(".", 1)

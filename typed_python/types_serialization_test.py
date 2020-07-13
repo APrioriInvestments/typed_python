@@ -1777,10 +1777,14 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_methods_on_named_classes(self):
         sc = SerializationContext()
 
-        self.assertIs(
-            ModuleLevelNormalClass.method,
-            sc.deserialize(sc.serialize(ModuleLevelNormalClass.method))
-        )
+        m1 = ModuleLevelNormalClass.method
+        m2 = sc.deserialize(sc.serialize(m1))
+
+        assert sc.nameForObject(m1) is not None
+
+        print(m1, m2)
+
+        self.assertIs(m1, m2)
 
     def test_serialize_entrypointed_modulelevel_functions(self):
         sc = SerializationContext()
