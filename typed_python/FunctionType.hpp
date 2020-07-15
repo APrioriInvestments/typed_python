@@ -968,11 +968,13 @@ public:
             const uint8_t LOAD_GLOBAL = 116;
             const uint8_t DELETE_GLOBAL = 98;
             const uint8_t STORE_GLOBAL = 97;
+            const uint8_t LOAD_METHOD = 160;
+
 
             std::vector<PyObject*> curDotSequence;
             for (long ix = 0; ix < opcodeCount; ix++) {
                 // if we're loading an attr on an existing sequence, just make it bigger
-                if (opcodeFor(ix) == LOAD_ATTR && curDotSequence.size()) {
+                if ((opcodeFor(ix) == LOAD_ATTR || opcodeFor(ix) == LOAD_METHOD) && curDotSequence.size()) {
                     curDotSequence.push_back(PyTuple_GetItem(code->co_names, opcodeTargetFor(ix)));
                 } else if (curDotSequence.size()) {
                     // any other operation should flush the buffer

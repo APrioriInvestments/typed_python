@@ -512,3 +512,11 @@ def test_dot_accesses():
         return typed_python._types
 
     assert getCodeGlobalDotAccesses(f2.__code__) == [['typed_python'], ['typed_python', '_types']]
+
+    def f3():
+        return typed_python.f()
+
+    import dis
+    dis.dis(f3)
+
+    assert getCodeGlobalDotAccesses(f3.__code__) == [['typed_python', 'f']]
