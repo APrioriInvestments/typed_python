@@ -246,3 +246,27 @@ class TypeFunctionTest(unittest.TestCase):
         TFInt = SerializationContext().deserialize(SerializationContext().serialize(TF(int)))
 
         assert TFInt(x=20).x == 20
+
+    def test_classes_binding_methods_with_closures(self):
+        def makeF(boundvalue):
+            def f():
+                return boundvalue
+            return f
+
+        def makeFClass(x):
+            f = makeF(x)
+
+            class T(Class, Final):
+                def classF(self):
+                    return f()
+
+            return T
+
+        @Entrypoint
+        def callIt(T):
+            return T().classF()
+
+        self.assertEqual(callIt(makeFClass(10)), 10)
+        self.assertEqual(callIt(makeFClass(20)), 20)
+        self.assertEqual(callIt(makeFClass((1, 2))), (1, 2))
+        self.assertEqual(callIt(makeFClass((1, 3))), (1, 3))

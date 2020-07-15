@@ -664,7 +664,7 @@ class PythonToNativeConverter(object):
             res += self.hashDotSeq(dotSeq, funcGlobals)
 
         for globalName in funcGlobalsFromCells:
-            res += self.hashDotSeq(globalName, funcGlobals)
+            res += self.hashDotSeq([globalName], funcGlobals)
 
         return res
 
