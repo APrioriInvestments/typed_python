@@ -92,6 +92,8 @@ pyOpToUnaryCallTarget = {
 }
 
 
+throwNullPtr = externalCallTarget("np_throwNullPtr", Void)
+
 free = externalCallTarget("free", Void, UInt8Ptr)
 malloc = externalCallTarget("malloc", UInt8Ptr, Int64)
 realloc = externalCallTarget("realloc", UInt8Ptr, UInt8Ptr, Int64)

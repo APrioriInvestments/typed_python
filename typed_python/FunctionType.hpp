@@ -805,16 +805,20 @@ public:
                 visitor(cell);
             }
 
-            visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
+            _visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
                 visitor(val);
             });
         }
 
         template<class visitor_type>
-        void visitCompilerVisibleGlobals(const visitor_type& visitor) {
+        static void visitCompilerVisibleGlobals(
+            const visitor_type& visitor,
+            PyCodeObject* code,
+            PyObject* globals
+        ) {
             std::vector<std::vector<PyObject*> > dotAccesses;
 
-            extractDottedGlobalAccessesFromCode((PyCodeObject*)mFunctionCode, dotAccesses);
+            extractDottedGlobalAccessesFromCode(code, dotAccesses);
 
             auto visitSequence = [&](const std::vector<PyObject*>& sequence) {
                 PyObjectHolder curObj;
@@ -829,7 +833,7 @@ public:
 
                     if (!curObj) {
                         // this is a lookup in the global dict
-                        curObj.set(PyDict_GetItem(mFunctionGlobals, name));
+                        curObj.set(PyDict_GetItem(globals, name));
                         if (!curObj) {
                             // this is an invalid global lookup, which is OK. no need to hash anything.
                             PyErr_Clear();
@@ -860,6 +864,11 @@ public:
             for (auto& sequence: dotAccesses) {
                 visitSequence(sequence);
             }
+        }
+
+        template<class visitor_type>
+        void _visitCompilerVisibleGlobals(const visitor_type& visitor) {
+            visitCompilerVisibleGlobals(visitor, (PyCodeObject*)mFunctionCode, mFunctionGlobals);
         }
 
         template<class visitor_type>
@@ -1252,7 +1261,7 @@ public:
 
             res += ShaHash(1);
 
-            visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
+            _visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
                 res += ShaHash(name);
                 res += MutuallyRecursiveTypeGroup::pyObjectShaHash(val, groupHead);
             });

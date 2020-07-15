@@ -210,6 +210,18 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
         return;
     }
 
+    //give the plugin a chance to convert the instance to something else
+    PyObjectStealer representation(PyObject_CallMethod(mContextObj, "representationFor", "(O)", o));
+    if (!representation) {
+        throw PythonExceptionSet();
+    }
+
+    if (representation != Py_None) {
+        b.writeUnsignedVarintObject(FieldNumbers::MEMO, b.cachePointer(o).first);
+        serializePythonObjectRepresentation(representation, b, FieldNumbers::OBJECT_REPRESENTATION);
+        return;
+    }
+
     // we don't write a memo here
     if (PyType_Check(o)) {
         auto groupAndIndex = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(o);
@@ -222,17 +234,6 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
     }
 
     b.writeUnsignedVarintObject(FieldNumbers::MEMO, b.cachePointer(o).first);
-
-    //give the plugin a chance to convert the instance to something else
-    PyObjectStealer representation(PyObject_CallMethod(mContextObj, "representationFor", "(O)", o));
-    if (!representation) {
-        throw PythonExceptionSet();
-    }
-
-    if (representation != Py_None) {
-        serializePythonObjectRepresentation(representation, b);
-        return;
-    }
 
     //check whether this is a type derived from a serializable native type, which we don't support
     if (PyLong_Check(o)) {
@@ -286,7 +287,7 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
     b.writeEndCompound();
 }
 
-void PythonSerializationContext::serializePythonObjectRepresentation(PyObject* representation, SerializationBuffer& b) const {
+void PythonSerializationContext::serializePythonObjectRepresentation(PyObject* representation, SerializationBuffer& b, size_t fieldNumber) const {
     PyEnsureGilAcquired acquireTheGil;
 
     if (!PyTuple_Check(representation) || PyTuple_Size(representation) != 3) {
@@ -300,7 +301,7 @@ void PythonSerializationContext::serializePythonObjectRepresentation(PyObject* r
     PyObjectHolder rep1(PyTuple_GetItem(representation, 1));
     PyObjectHolder rep2(PyTuple_GetItem(representation, 2));
 
-    b.writeBeginCompound(FieldNumbers::OBJECT_REPRESENTATION);
+    b.writeBeginCompound(fieldNumber);
     serializePythonObject(rep0, b, 0);
     serializePythonObject(rep1, b, 1);
     serializePythonObject(rep2, b, 2);
@@ -353,10 +354,24 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
         b.writeUnsignedVarintObject(0, 2);
         b.writeStringObject(1, name);
     } else {
-        // this is a member of a recursive type group
-        b.writeUnsignedVarintObject(0, 3);
-        serializeMutuallyRecursiveTypeGroup(nativeType->getRecursiveTypeGroup(), b, 1);
-        b.writeUnsignedVarintObject(2, nativeType->getRecursiveTypeGroupIndex());
+        //give the plugin a chance to convert the instance to something else
+        PyObjectStealer representation(
+            PyObject_CallMethod(mContextObj, "representationFor", "(O)", (PyObject*)PyInstance::typeObj(nativeType))
+        );
+
+        if (!representation) {
+            throw PythonExceptionSet();
+        }
+
+        if (representation != Py_None) {
+            b.writeUnsignedVarintObject(0, 3);
+            serializePythonObjectRepresentation(representation, b, 1);
+        } else {
+            // this is a member of a recursive type group
+            b.writeUnsignedVarintObject(0, 4);
+            serializeMutuallyRecursiveTypeGroup(nativeType->getRecursiveTypeGroup(), b, 1);
+            b.writeUnsignedVarintObject(2, nativeType->getRecursiveTypeGroupIndex());
+        }
     }
 
     b.writeEndCompound();

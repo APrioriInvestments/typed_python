@@ -998,6 +998,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
 
     MutuallyRecursiveTypeGroup* group = nullptr;
     std::string name;
+    PyObjectHolder typeFromRep;
     int32_t indexInGroup = -1;
     int32_t kind = -1;
     int32_t which = -1;
@@ -1025,9 +1026,12 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             name = b.readStringObject();
         } else
         if (kind == 3 && fieldNumber == 1) {
+            typeFromRep.steal(deserializePythonObjectFromRepresentation(b, wireType, -1));
+        } else
+        if (kind == 4 && fieldNumber == 1) {
             group = deserializeMutuallyRecursiveTypeGroup(b, wireType);
         } else
-        if (kind == 3 && fieldNumber == 2) {
+        if (kind == 4 && fieldNumber == 2) {
             assertWireTypesEqual(wireType, WireType::VARINT);
             indexInGroup = b.readUnsignedVarint();
         } else {
@@ -1120,6 +1124,24 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
     }
 
     if (kind == 3) {
+        if (!typeFromRep) {
+            throw std::runtime_error("We expected a named type from a type representation");
+        }
+
+        if (!PyType_Check(typeFromRep)) {
+            throw std::runtime_error("We the type representation to produce a type object");
+        }
+
+        Type* nativeType = PyInstance::extractTypeFrom(typeFromRep);
+
+        if (!nativeType) {
+            throw std::runtime_error("We the type representation to produce a typed_python Type* object.");
+        }
+
+        return nativeType;
+    }
+
+    if (kind == 4) {
         if (!group || indexInGroup == -1) {
             throw std::runtime_error("Corrupt native type: missing group or group index");
         }

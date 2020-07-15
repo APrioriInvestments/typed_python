@@ -1070,6 +1070,10 @@ extern "C" {
         return floorresult;
     }
 
+    void np_throwNullPtr() {
+        throw (void*)nullptr;
+    }
+
     // attempt to initialize 'tgt' of type 'tp' with data from 'obj'. Returns true if we
     // are able to do so.
     bool np_runtime_pyobj_to_typed(PythonObjectOfType::layout_type *layout, instance_ptr tgt, Type* tp, bool isExplicit) {

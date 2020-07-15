@@ -11,7 +11,6 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-
 from typed_python._types import serialize, deserialize, Type, Alternative, NamedTuple
 from typed_python import _types
 
@@ -21,7 +20,7 @@ from typed_python.python_ast import (
     evaluateFunctionDefWithLocalsInCells
 )
 from typed_python.hash import sha_hash
-from typed_python.type_function import ConcreteTypeFunction
+from typed_python.type_function import ConcreteTypeFunction, reconstructTypeFunctionType, isTypeFunctionType
 from types import FunctionType, ModuleType, CodeType, BuiltinFunctionType
 from _thread import LockType, RLock
 import numpy
@@ -337,6 +336,19 @@ class SerializationContext(object):
             @return a representation object or None
         '''
         if isinstance(inst, type):
+            # only serialize Class and Alternative objects from type functions.
+            # otherwise, we'll end up changing how we serialize things like 'int',
+            # if they ever make their way into a type function.
+            if getattr(inst, '__typed_python_category__', None) in ('Class', 'Alternative'):
+                funcArgsAndKwargs = isTypeFunctionType(inst)
+
+                if funcArgsAndKwargs is not None:
+                    typeFunc = funcArgsAndKwargs[0]
+                    # we can't use this methodology for type funcs that are not named because
+                    # they have a memo inside them
+                    if self.nameForObject(typeFunc) is not None:
+                        return (reconstructTypeFunctionType, funcArgsAndKwargs, reconstructTypeFunctionType)
+
             if (
                 # is this a regular python class
                 not issubclass(inst, Type)
@@ -435,6 +447,9 @@ class SerializationContext(object):
         return None
 
     def setInstanceStateFromRepresentation(self, instance, representation):
+        if representation is reconstructTypeFunctionType:
+            return True
+
         if isinstance(instance, property):
             return True
 

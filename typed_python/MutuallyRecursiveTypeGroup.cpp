@@ -16,6 +16,57 @@
 
 #include "MutuallyRecursiveTypeGroup.hpp"
 
+bool isCanonicalName(std::string name) {
+    // this is the list of standard library modules in python 3.8
+    static std::set<string> canonicalPythonModuleNames({
+        "abc", "aifc", "antigravity", "argparse", "ast", "asynchat", "asyncio", "asyncore",
+        "base64", "bdb", "binhex", "bisect", "_bootlocale", "bz2", "calendar", "cgi", "cgitb",
+        "chunk", "cmd", "codecs", "codeop", "code", "collections", "_collections_abc",
+        "colorsys", "_compat_pickle", "compileall", "_compression", "concurrent",
+        "configparser", "contextlib", "contextvars", "copy", "copyreg", "cProfile", "crypt",
+        "csv", "ctypes", "curses", "dataclasses", "datetime", "dbm", "decimal", "difflib",
+        "dis", "distutils", "doctest", "dummy_threading", "_dummy_thread", "email",
+        "encodings", "ensurepip", "enum", "filecmp", "fileinput", "fnmatch", "formatter",
+        "fractions", "ftplib", "functools", "__future__", "genericpath", "getopt", "getpass",
+        "gettext", "glob", "gzip", "hashlib", "heapq", "hmac", "html", "http", "idlelib",
+        "imaplib", "imghdr", "importlib", "imp", "inspect", "io", "ipaddress", "json",
+        "keyword", "lib2to3", "linecache", "locale", "logging", "lzma", "mailbox", "mailcap",
+        "marshal",
+        "_markupbase", "mimetypes", "modulefinder", "msilib", "multiprocessing", "netrc",
+        "nntplib", "ntpath", "nturl2path", "numbers", "opcode", "operator", "optparse", "os",
+        "_osx_support", "pathlib", "pdb", "pickle", "pickletools", "pipes", "pkgutil",
+        "platform", "plistlib", "poplib", "posixpath", "pprint", "profile", "pstats", "pty",
+        "_py_abc", "pyclbr", "py_compile", "_pydecimal", "pydoc_data", "pydoc", "_pyio",
+        "queue", "quopri", "random", "reprlib", "re", "rlcompleter", "runpy", "sched",
+        "secrets", "selectors", "shelve", "shlex", "shutil", "signal", "_sitebuiltins",
+        "site-packages", "site", "smtpd", "smtplib", "sndhdr", "socket", "socketserver",
+        "sqlite3", "sre_compile", "sre_constants", "sre_parse", "ssl", "statistics", "stat",
+        "stringprep", "string", "_strptime", "struct", "subprocess", "sunau", "symbol",
+        "symtable", "sysconfig", "tabnanny", "tarfile", "telnetlib", "tempfile", "test",
+        "textwrap", "this", "_threading_local", "threading", "timeit", "tkinter", "tokenize",
+        "token", "traceback", "tracemalloc", "trace", "tty", "turtledemo", "turtle", "types",
+        "typing", "unittest", "urllib", "uuid", "uu", "venv", "warnings", "wave", "weakref",
+        "_weakrefset", "webbrowser", "wsgiref", "xdrlib", "xml", "xmlrpc", "zipapp",
+        "zipfile", "zipimport",
+
+        // and some standard ones we might commonly install
+        "numpy", "pandas", "scipy", "pytest", "_pytest", "typed_python", "llvmlite",
+        "requests", "redis", "websockets", "boto3", "py", "xdist", "pytest_jsonreport",
+        "pytest_metadata", "flask", "flaky", "coverage", "pyasn1"
+    });
+
+    std::string moduleNameRoot;
+
+    int posOfDot = name.find(".");
+    if (posOfDot != std::string::npos) {
+        moduleNameRoot = name.substr(0, posOfDot);
+    } else {
+        moduleNameRoot = name;
+    }
+
+    return canonicalPythonModuleNames.find(moduleNameRoot) != canonicalPythonModuleNames.end();
+}
+
 /*******
     This function defines  generic visitor pattern for looking inside of a Type or a PyObject to see
       which pieces of are visible to the compiler. We try to hold this all in one place so that we can
@@ -128,55 +179,8 @@ void visitCompilerVisibleTypesAndPyobjects(
                         // system module
                         std::string moduleName = PyUnicode_AsUTF8(name);
 
-                        // this is the list of standard library modules in python 3.8
-                        static std::set<string> canonicalPythonModuleNames({
-                            "abc", "aifc", "antigravity", "argparse", "ast", "asynchat", "asyncio", "asyncore",
-                            "base64", "bdb", "binhex", "bisect", "_bootlocale", "bz2", "calendar", "cgi", "cgitb",
-                            "chunk", "cmd", "codecs", "codeop", "code", "collections", "_collections_abc",
-                            "colorsys", "_compat_pickle", "compileall", "_compression", "concurrent",
-                            "configparser", "contextlib", "contextvars", "copy", "copyreg", "cProfile", "crypt",
-                            "csv", "ctypes", "curses", "dataclasses", "datetime", "dbm", "decimal", "difflib",
-                            "dis", "distutils", "doctest", "dummy_threading", "_dummy_thread", "email",
-                            "encodings", "ensurepip", "enum", "filecmp", "fileinput", "fnmatch", "formatter",
-                            "fractions", "ftplib", "functools", "__future__", "genericpath", "getopt", "getpass",
-                            "gettext", "glob", "gzip", "hashlib", "heapq", "hmac", "html", "http", "idlelib",
-                            "imaplib", "imghdr", "importlib", "imp", "inspect", "io", "ipaddress", "json",
-                            "keyword", "lib2to3", "linecache", "locale", "logging", "lzma", "mailbox", "mailcap",
-                            "marshal",
-                            "_markupbase", "mimetypes", "modulefinder", "msilib", "multiprocessing", "netrc",
-                            "nntplib", "ntpath", "nturl2path", "numbers", "opcode", "operator", "optparse", "os",
-                            "_osx_support", "pathlib", "pdb", "pickle", "pickletools", "pipes", "pkgutil",
-                            "platform", "plistlib", "poplib", "posixpath", "pprint", "profile", "pstats", "pty",
-                            "_py_abc", "pyclbr", "py_compile", "_pydecimal", "pydoc_data", "pydoc", "_pyio",
-                            "queue", "quopri", "random", "reprlib", "re", "rlcompleter", "runpy", "sched",
-                            "secrets", "selectors", "shelve", "shlex", "shutil", "signal", "_sitebuiltins",
-                            "site-packages", "site", "smtpd", "smtplib", "sndhdr", "socket", "socketserver",
-                            "sqlite3", "sre_compile", "sre_constants", "sre_parse", "ssl", "statistics", "stat",
-                            "stringprep", "string", "_strptime", "struct", "subprocess", "sunau", "symbol",
-                            "symtable", "sysconfig", "tabnanny", "tarfile", "telnetlib", "tempfile", "test",
-                            "textwrap", "this", "_threading_local", "threading", "timeit", "tkinter", "tokenize",
-                            "token", "traceback", "tracemalloc", "trace", "tty", "turtledemo", "turtle", "types",
-                            "typing", "unittest", "urllib", "uuid", "uu", "venv", "warnings", "wave", "weakref",
-                            "_weakrefset", "webbrowser", "wsgiref", "xdrlib", "xml", "xmlrpc", "zipapp",
-                            "zipfile", "zipimport",
-
-                            // and some standard ones we might commonly install
-                            "numpy", "pandas", "scipy", "pytest", "_pytest", "typed_python", "llvmlite",
-                            "requests", "redis", "websockets", "boto3", "py", "xdist", "pytest_jsonreport",
-                            "pytest_metadata", "flask", "flaky", "coverage"
-                        });
-
-                        std::string moduleNameRoot;
-
-                        int posOfDot = moduleName.find(".");
-                        if (posOfDot != std::string::npos) {
-                            moduleNameRoot = moduleName.substr(0, posOfDot);
-                        } else {
-                            moduleNameRoot = moduleName;
-                        }
-
                         //exclude modules that shouldn't change underneath us.
-                        if (canonicalPythonModuleNames.find(moduleNameRoot) != canonicalPythonModuleNames.end()) {
+                        if (isCanonicalName(moduleName)) {
                             hashVisit(ShaHash(12));
                             nameVisit(moduleName);
                             return;
@@ -198,7 +202,7 @@ void visitCompilerVisibleTypesAndPyobjects(
         std::string moduleName = std::string(PyUnicode_AsUTF8(PyObject_GetAttrString(obj.pyobj(), "__module__")));
         std::string clsName = std::string(PyUnicode_AsUTF8(PyObject_GetAttrString(obj.pyobj(), "__name__")));
 
-        if (moduleName.substr(0, 13) == "typed_python." || obj.pyobj()->ob_type == &PyCFunction_Type) {
+        if (isCanonicalName(moduleName) || obj.pyobj()->ob_type == &PyCFunction_Type) {
             hashVisit(ShaHash(2));
             nameVisit(moduleName + "|" + clsName);
             return;
@@ -266,22 +270,16 @@ void visitCompilerVisibleTypesAndPyobjects(
         hashVisit(ShaHash(1));
 
         if (f->func_globals && PyDict_Check(f->func_globals)) {
-            std::set<std::string> names;
 
-            // recursively walk through the code object and see which globals it reads from.
-            // we'll assume it reads from all of its locals.
-            MutuallyRecursiveTypeGroup::extractNamesFromCode((PyCodeObject*)f->func_code, names);
+            std::vector<std::vector<PyObject*> > dotAccesses;
 
-            for (auto name: names) {
-                PyObject* val(PyDict_GetItemString(f->func_globals, name.c_str()));
-
-                if (!val) {
-                    PyErr_Clear();
-                } else {
-                    namedVisitor(name, val);
-                }
-            }
+            Function::Overload::visitCompilerVisibleGlobals(
+                namedVisitor,
+                (PyCodeObject*)f->func_code,
+                f->func_globals
+            );
         }
+
         hashVisit(ShaHash(0));
         return;
     }
@@ -636,6 +634,16 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
     }
 
     group->hash();
+
+    /*
+    std::cout << "NEW GROUP: " << group->hash().digestAsHexString() << "\n";
+
+    for (auto typeAndOrder: ordering) {
+        TypeOrPyobj t = typeAndOrder.first;
+
+        std::cout << "   " << typeAndOrder.second << " = " << t.name() << "\n";
+    }
+    */
 }
 
 
@@ -709,8 +717,8 @@ public:
         );
 
         mGroupOutboundEdges.push_back(
-            std::shared_ptr<std::set<TypeOrPyobj> >(
-                new std::set<TypeOrPyobj>()
+            std::shared_ptr<std::vector<TypeOrPyobj> >(
+                new std::vector<TypeOrPyobj>()
             )
         );
 
@@ -723,12 +731,12 @@ public:
             [&](std::string o) {},
             [&](TypeOrPyobj o) {
                 if (MutuallyRecursiveTypeGroup::objectIsUnassigned(o)) {
-                    mGroupOutboundEdges.back()->insert(o);
+                    mGroupOutboundEdges.back()->push_back(o);
                 }
             },
             [&](std::string name, PyObject* o) {
                 if (MutuallyRecursiveTypeGroup::objectIsUnassigned(o)) {
-                    mGroupOutboundEdges.back()->insert(o);
+                    mGroupOutboundEdges.back()->push_back(o);
                 }
             },
             [&]() {}
@@ -754,8 +762,8 @@ public:
             mGroupOutboundEdges.pop_back();
         } else {
             // pop an outbound edge and see where does it go?
-            TypeOrPyobj o = *mGroupOutboundEdges.back()->begin();
-            mGroupOutboundEdges.back()->erase(o);
+            TypeOrPyobj o = mGroupOutboundEdges.back()->back();
+            mGroupOutboundEdges.back()->pop_back();
 
             if (!MutuallyRecursiveTypeGroup::objectIsUnassigned(o)) {
                 return;
@@ -774,7 +782,9 @@ public:
                     mGroups.pop_back();
 
                     mGroupOutboundEdges[mGroupOutboundEdges.size() - 2]->insert(
-                        mGroupOutboundEdges.back()->begin(), mGroupOutboundEdges.back()->end()
+                        mGroupOutboundEdges[mGroupOutboundEdges.size() - 2]->end(),
+                        mGroupOutboundEdges.back()->begin(),
+                        mGroupOutboundEdges.back()->end()
                     );
                     mGroupOutboundEdges.pop_back();
                 }
@@ -795,7 +805,7 @@ private:
     std::vector<std::shared_ptr<std::set<TypeOrPyobj> > > mGroups;
 
     // for each group, the set of things it reaches out to
-    std::vector<std::shared_ptr<std::set<TypeOrPyobj> > > mGroupOutboundEdges;
+    std::vector<std::shared_ptr<std::vector<TypeOrPyobj> > > mGroupOutboundEdges;
 };
 
 bool MutuallyRecursiveTypeGroup::objectIsUnassigned(TypeOrPyobj obj) {
@@ -886,27 +896,6 @@ bool MutuallyRecursiveTypeGroup::pyObjectGloballyIdentifiable(PyObject* h) {
     }
 
     return false;
-}
-
-
-// static
-void MutuallyRecursiveTypeGroup::extractNamesFromCode(PyCodeObject* code, std::set<std::string>& outNames) {
-    if (!PyCode_Check(code)) {
-        return;
-    }
-
-    auto adder = [&](PyObject* o) {
-        if (PyUnicode_Check(o)) {
-            outNames.insert(PyUnicode_AsUTF8(o));
-        }
-    };
-
-    iterate(code->co_names, adder);
-    iterate(code->co_consts, [&](PyObject* o) {
-        if (PyCode_Check(o)) {
-            extractNamesFromCode((PyCodeObject*)o, outNames);
-        }
-    });
 }
 
 

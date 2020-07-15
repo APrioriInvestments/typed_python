@@ -136,6 +136,27 @@ def test_compiler_cache_understands_type_changes():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_handles_exceptions_properly():
+    xmodule = "\n".join([
+        "@Entrypoint",
+        "def f(x):",
+        "    raise Exception('boo')",
+        "def g(x):",
+        "    try:",
+        "        f(x)",
+        "    except Exception:",
+        "        import traceback",
+        "        return traceback.format_exc()"
+    ])
+
+    VERSION1 = {'x.py': xmodule}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        assert 'boo' in (evaluateExprInFreshProcess(VERSION1, 'x.g(1)', compilerCacheDir))
+        assert 'boo' in (evaluateExprInFreshProcess(VERSION1, 'x.g(1)', compilerCacheDir))
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
 def test_compiler_cache_understands_granular_module_accesses():
     xmodule = "\n".join([
         "@Entrypoint",

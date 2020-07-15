@@ -227,3 +227,22 @@ class TypeFunctionTest(unittest.TestCase):
             callIt(g, 10)
 
         assert Runtime.singleton().timesCompiled - timesCompiled < 10
+
+    def test_module_level_type_function_name(self):
+        assert SerializationContext().nameForObject(TfLevelMethod) is not None
+
+    def test_deserialize_type_functions_usable(self):
+        @TypeFunction
+        def TF(T):
+            class TF(Class):
+                x = Member(T)
+
+            return TF
+
+        TF2 = SerializationContext().deserialize(SerializationContext().serialize(TF))
+
+        assert TF2(int)(x=20).x == 20
+
+        TFInt = SerializationContext().deserialize(SerializationContext().serialize(TF(int)))
+
+        assert TFInt(x=20).x == 20

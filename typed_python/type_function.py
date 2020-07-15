@@ -111,7 +111,10 @@ class ConcreteTypeFunction(object):
 
                 self._memoForKey[key] = resultType
 
-                _type_to_typefunction[resultType] = (self, key)
+                _type_to_typefunction.pop(forward)
+
+                if resultType not in _type_to_typefunction:
+                    _type_to_typefunction[resultType] = (self, key)
 
                 return resultType
             except Exception as e:

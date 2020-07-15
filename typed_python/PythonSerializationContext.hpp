@@ -138,7 +138,7 @@ public:
 
     void serializePythonObjectNamedOrAsObj(PyObject* o, SerializationBuffer& b) const;
 
-    void serializePythonObjectRepresentation(PyObject* o, SerializationBuffer& b) const;
+    void serializePythonObjectRepresentation(PyObject* o, SerializationBuffer& b, size_t fieldNumber) const;
 
     void serializeNativeType(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const;
 

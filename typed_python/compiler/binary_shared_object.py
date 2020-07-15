@@ -76,7 +76,7 @@ class BinarySharedObject:
                 o_file.write(o_file_contents)
 
             subprocess.check_call(
-                ["ld", "-shared", "-fPIC", os.path.join(tf, "module.o"), "-o", os.path.join(tf, "module.so")]
+                ["g++", "-shared", "-shared-libgcc", "-fPIC", os.path.join(tf, "module.o"), "-o", os.path.join(tf, "module.so")]
             )
 
             with open(os.path.join(tf, "module.so"), "rb") as so_file:

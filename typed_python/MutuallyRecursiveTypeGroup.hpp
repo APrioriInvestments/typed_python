@@ -61,8 +61,6 @@ public:
 
     static ShaHash pyCodeObjectShaHash(PyCodeObject* co, MutuallyRecursiveTypeGroup* groupHead);
 
-    static void extractNamesFromCode(PyCodeObject* co, std::set<std::string>& outNames);
-
     static std::string pyObjectSortName(PyObject* o);
 
     static MutuallyRecursiveTypeGroup* getGroupFromHash(ShaHash h);
