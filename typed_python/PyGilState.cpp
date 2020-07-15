@@ -50,6 +50,8 @@ PyEnsureGilAcquired::~PyEnsureGilAcquired() {
 
 void assertHoldingTheGil() {
     if (curPyThreadState) {
+        asm("int3");
+        std::cout << "WARNING: assertHoldingTheGil() is failing.\n";
         throw std::runtime_error("We're not holding the gil!");
     }
 }

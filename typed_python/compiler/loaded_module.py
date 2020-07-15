@@ -68,6 +68,17 @@ class LoadedModule:
             elif meta.matches.PointerToTypedPythonObjectAsMemberOfDict:
                 pointers[i].cast(meta.type).initialize(meta.sourceDict[meta.name])
 
+            elif meta.matches.ClassMethodDispatchSlot:
+                pointers[i].cast(int).initialize(
+                    _types.allocateClassMethodDispatch(
+                        meta.clsType,
+                        meta.methodName,
+                        meta.retType,
+                        meta.argTupleType,
+                        meta.kwargTupleType
+                    )
+                )
+
             elif meta.matches.IdOfPyObject:
                 pointers[i].cast(int).initialize(id(meta.value))
 

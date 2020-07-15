@@ -216,7 +216,14 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
         throw PythonExceptionSet();
     }
 
-    if (representation != Py_None) {
+    bool representationIsPythonTypeObject = (
+        PyType_Check(o)
+        && PyTuple_Check(representation)
+        && PyTuple_Size(representation) > 1
+        && PyTuple_GetItem(representation, 0) == (PyObject*)&PyType_Type
+    );
+
+    if (representation != Py_None && !representationIsPythonTypeObject) {
         b.writeUnsignedVarintObject(FieldNumbers::MEMO, b.cachePointer(o).first);
         serializePythonObjectRepresentation(representation, b, FieldNumbers::OBJECT_REPRESENTATION);
         return;

@@ -275,8 +275,34 @@ def test_compiler_cache_handles_class_destructors_correctly():
 
     with tempfile.TemporaryDirectory() as compilerCacheDir:
         assert evaluateExprInFreshProcess(VERSION, 'x.f(1)', compilerCacheDir) == 1
-        assert len(os.listdir(compilerCacheDir)) == 1
+        assert len(os.listdir(compilerCacheDir)) == 2
 
         # we can reuse the class destructor from the first time around
         assert evaluateExprInFreshProcess(VERSION, 'x.g(1)', compilerCacheDir) == 1
+        assert len(os.listdir(compilerCacheDir)) == 3
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_handles_classes():
+    xmodule = "\n".join([
+        "class C(Class):",
+        "    def __init__(self, x):",
+        "        self.x=x",
+        "    x = Member(int)",
+        "@Entrypoint",
+        "def f(x):",
+        "    return C(x).x",
+        "@Entrypoint",
+        "def g(x):",
+        "    return C(x).x",
+    ])
+
+    VERSION = {'x.py': xmodule}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        assert evaluateExprInFreshProcess(VERSION, 'x.f(1)', compilerCacheDir) == 1
         assert len(os.listdir(compilerCacheDir)) == 2
+
+        # we can reuse the class destructor from the first time around
+        assert evaluateExprInFreshProcess(VERSION, 'x.g(1)', compilerCacheDir) == 1
+        assert len(os.listdir(compilerCacheDir)) == 3

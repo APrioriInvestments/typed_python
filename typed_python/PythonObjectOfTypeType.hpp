@@ -83,6 +83,7 @@ public:
         getHandlePtr(self)->refcount--;
 
         if (getHandlePtr(self)->refcount == 0) {
+            PyEnsureGilAcquired getTheGil;
             decref(getPyObj(self));
             free(*(layout_type**)self);
         }

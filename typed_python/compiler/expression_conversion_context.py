@@ -107,6 +107,23 @@ class ExpressionConversionContext(object):
             )
         ).load()
 
+    def allocateClassMethodDispatchSlot(self, clsType, methodName, retType, argTupleType, kwargTupleType):
+        identHash = self.converter.hashObjectToIdentity(
+            (clsType, methodName, retType, argTupleType, kwargTupleType)
+        )
+
+        return native_ast.Expression.GlobalVariable(
+            name="class_dispatch_slot_" + identHash.hexdigest,
+            type=native_ast.Int64,
+            metadata=GlobalVariableMetadata.ClassMethodDispatchSlot(
+                clsType=clsType,
+                methodName=methodName,
+                retType=retType,
+                argTupleType=argTupleType,
+                kwargTupleType=kwargTupleType
+            )
+        ).load()
+
     def constantTypedPythonObject(self, x, owningGlobalScopeAndName=None):
         wrapper = typeWrapper(type(x))
 

@@ -1611,7 +1611,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
     def test_defining_float_doesnt_allow_implicit_conversion(self):
         aList = ListOf(float)()
 
-        class C(Class):
+        class C(Class, Final):
             def __float__(self):
                 return 1.0
 
@@ -1627,7 +1627,8 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         @Compiled
         def tryToAppend(aList: ListOf(float)):
-            aList.append(C())
+            c = C()
+            aList.append(c)
 
         with self.assertRaisesRegex(TypeError, "Can't convert from type C to type float"):
             tryToAppend(aList)

@@ -33,7 +33,14 @@ GlobalVariableMetadata = Alternative(
     PointerToTypedPythonObjectAsMemberOfDict=dict(
         sourceDict=object, name=str, type=type
     ),
-    ClassVtable=dict(value=type)
+    ClassVtable=dict(value=type),
+    ClassMethodDispatchSlot=dict(
+        clsType=object,
+        methodName=str,
+        retType=object,
+        argTupleType=object,
+        kwargTupleType=object
+    )
 )
 
 

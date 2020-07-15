@@ -242,10 +242,3 @@ void Class::assign(instance_ptr self, instance_ptr other) {
         free(old);
     }
 }
-
-// static entrypoint to be able to destroy classes by looking up their vtable
-void destroyClassInstance(instance_ptr self) {
-    Class::layout& layout = *Class::instanceToLayout(self);
-
-    layout.vtable->mType->destroy((instance_ptr)layout.data);
-}

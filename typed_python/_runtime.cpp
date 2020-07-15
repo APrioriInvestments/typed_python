@@ -13,33 +13,58 @@
 
 #include <pythread.h>
 
+PyObject* getRuntimeSingleton() {
+    assertHoldingTheGil();
+
+    static PyObject* runtimeModule = PyImport_ImportModule("typed_python.compiler.runtime");
+
+    if (!runtimeModule) {
+        if (!PyErr_Occurred()) {
+            PyErr_Format(PyExc_RuntimeError, "Internal error: couldn't find typed_python.compiler.runtime");
+        }
+        throw PythonExceptionSet();
+    }
+
+    static PyObject* runtimeClass = PyObject_GetAttrString(runtimeModule, "Runtime");
+
+    if (!runtimeClass) {
+        if (!PyErr_Occurred()) {
+            PyErr_Format(PyExc_RuntimeError, "Internal error: couldn't find typed_python.compiler.runtime.Runtime");
+        }
+        throw PythonExceptionSet();
+    }
+
+    static PyObject* singleton = PyObject_CallMethod(runtimeClass, "singleton", "");
+
+    if (!singleton) {
+        if (!PyErr_Occurred()) {
+            PyErr_Format(
+                PyExc_RuntimeError,
+                "Internal error: couldn't call typed_python.compiler.runtime.Runtime.singleton"
+            );
+        }
+        throw PythonExceptionSet();
+    }
+
+    return singleton;
+}
+
 // Note: extern C identifiers are distinguished only up to 32 characters
 // nativepython_runtime_12345678901
 extern "C" {
     void np_compileClassDispatch(ClassDispatchTable* classDispatchTable, int slot) {
         PyEnsureGilAcquired getTheGil;
 
-        static PyObject* runtimeModule = PyImport_ImportModule("typed_python.compiler.runtime");
+        // check if there is an error already in place
+        PyObject *existingErrorTypePtr, *existingErrorValuePtr, *existingErrorTracebackPtr;
+        PyErr_Fetch(&existingErrorTypePtr, &existingErrorValuePtr, &existingErrorTracebackPtr);
+        PyObjectHolder existingErrorType, existingErrorValue, existingErrorTraceback;
 
-        if (!runtimeModule) {
-            throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime");
-        }
+        existingErrorType.steal(existingErrorTypePtr);
+        existingErrorValue.steal(existingErrorValuePtr);
+        existingErrorTraceback.steal(existingErrorTracebackPtr);
 
-        PyObject* runtimeClass = PyObject_GetAttrString(runtimeModule, "Runtime");
-
-        if (!runtimeClass) {
-            throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime.Runtime");
-        }
-
-        PyObject* singleton = PyObject_CallMethod(runtimeClass, "singleton", "");
-
-        if (!singleton) {
-            if (PyErr_Occurred()) {
-                PyErr_Clear();
-            }
-
-            throw std::runtime_error("Internal error: couldn't call typed_python.compiler.runtime.Runtime.singleton");
-        }
+        PyObject* singleton = getRuntimeSingleton();
 
         PyObjectStealer res(
             PyObject_CallMethod(
@@ -53,42 +78,46 @@ extern "C" {
         );
 
         if (!res) {
+            if (existingErrorType) {
+                // we were unwinding an exception already. Now we'll replace it with the new one.
+                return;
+            }
+
             throw PythonExceptionSet();
         }
 
         if (!classDispatchTable->get(slot)) {
+            // here, we have to throw so we don't try to call the empty pointer.
             PyErr_Format(
                 PyExc_TypeError,
                 "Failed to populate the classDispatchTable"
             );
             throw PythonExceptionSet();
         }
+
+        if (existingErrorType) {
+            //reset the error code
+            existingErrorType.extract();
+            existingErrorValue.extract();
+            existingErrorTraceback.extract();
+
+            PyErr_Restore(existingErrorTypePtr, existingErrorValuePtr, existingErrorTracebackPtr);
+        }
     }
 
     void np_compileClassDestructor(VTable* vtable) {
         PyEnsureGilAcquired getTheGil;
 
-        static PyObject* runtimeModule = PyImport_ImportModule("typed_python.compiler.runtime");
+        // check if there is an error already in place
+        PyObject *existingErrorTypePtr, *existingErrorValuePtr, *existingErrorTracebackPtr;
+        PyErr_Fetch(&existingErrorTypePtr, &existingErrorValuePtr, &existingErrorTracebackPtr);
+        PyObjectHolder existingErrorType, existingErrorValue, existingErrorTraceback;
 
-        if (!runtimeModule) {
-            throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime");
-        }
+        existingErrorType.steal(existingErrorTypePtr);
+        existingErrorValue.steal(existingErrorValuePtr);
+        existingErrorTraceback.steal(existingErrorTracebackPtr);
 
-        PyObject* runtimeClass = PyObject_GetAttrString(runtimeModule, "Runtime");
-
-        if (!runtimeClass) {
-            throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime.Runtime");
-        }
-
-        PyObject* singleton = PyObject_CallMethod(runtimeClass, "singleton", "");
-
-        if (!singleton) {
-            if (PyErr_Occurred()) {
-                PyErr_Clear();
-            }
-
-            throw std::runtime_error("Internal error: couldn't call typed_python.compiler.runtime.Runtime.singleton");
-        }
+        PyObject* singleton = getRuntimeSingleton();
 
         PyObjectStealer res(
             PyObject_CallMethod(
@@ -100,6 +129,11 @@ extern "C" {
         );
 
         if (!res) {
+            if (existingErrorType) {
+                // we were unwinding an exception already. Now we'll replace it with the new one.
+                return;
+            }
+
             throw PythonExceptionSet();
         }
 
@@ -109,6 +143,15 @@ extern "C" {
                 "Failed to populate the destructor"
             );
             throw PythonExceptionSet();
+        }
+
+        if (existingErrorType) {
+            //reset the error code
+            existingErrorType.extract();
+            existingErrorValue.extract();
+            existingErrorTraceback.extract();
+
+            PyErr_Restore(existingErrorTypePtr, existingErrorValuePtr, existingErrorTracebackPtr);
         }
     }
 

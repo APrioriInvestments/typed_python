@@ -39,8 +39,6 @@ typedef std::pair<std::string, function_call_signature_type> method_call_signatu
 
 typedef void* untyped_function_ptr;
 
-void destroyClassInstance(instance_ptr classInstDestroy);
-
 class ConstCharPtrsAreEqual {
 public:
     bool operator()(const char* x, const char* y) const {
@@ -164,6 +162,10 @@ public:
             throw std::runtime_error("Tried to define a function pointer in a VTable.ClassDispatchTable to be null.");
         }
 
+        if (mFuncPtrs[index] == ptr) {
+            return;
+        }
+
         auto it = mIndicesNeedingDefinition.find(index);
         if (it == mIndicesNeedingDefinition.end()) {
             throw std::runtime_error("Tried to define a function pointer in a VTable.ClassDispatchTable twice.");
@@ -236,7 +238,7 @@ class VTable {
 public:
     VTable(HeldClass* inClass) :
         mType(inClass),
-        mCompiledDestructorFun((destructor_fun_type)destroyClassInstance),
+        mCompiledDestructorFun(nullptr),
         mDispatchTables(nullptr)
     {
     }
@@ -256,7 +258,7 @@ public:
         if (mCompiledDestructorFun == fun) {
             return;
         }
-        if (mCompiledDestructorFun && mCompiledDestructorFun != (destructor_fun_type)destroyClassInstance) {
+        if (mCompiledDestructorFun) {
             throw std::runtime_error("Can't change the compiled destructor!");
         }
 

@@ -39,8 +39,11 @@ def isPrimeLC(x):
 
 class TestMap(unittest.TestCase):
     def test_pmap_correct(self):
+        def addOne(x):
+            return x + 1
+
         self.assertEqual(
-            pmap(ListOf(int)([1, 2, 3]), lambda x: x + 1, int),
+            pmap(ListOf(int)([1, 2, 3]), addOne, int),
             [2, 3, 4]
         )
 

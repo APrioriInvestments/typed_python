@@ -572,7 +572,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         retType = overload.returnType or typeWrapper(object).typeRepresentation
 
         # each entrypoint generates a slot we could call.
-        dispatchSlot = _types.allocateClassMethodDispatch(self.typeRepresentation, methodName, retType, argTupleType, kwargTupleType)
+        dispatchSlot = context.allocateClassMethodDispatchSlot(self.typeRepresentation, methodName, retType, argTupleType, kwargTupleType)
 
         classDispatchTable = self.classDispatchTable(instance)
 
@@ -636,7 +636,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         retType = overload.returnType or object
 
         # each entrypoint generates a slot we could call.
-        dispatchSlot = _types.allocateClassMethodDispatch(self.typeRepresentation, methodName, retType, argTupleType, kwargTupleType)
+        dispatchSlot = context.allocateClassMethodDispatchSlot(self.typeRepresentation, methodName, retType, argTupleType, kwargTupleType)
 
         classDispatchTable = self.classDispatchTable(instance)
 

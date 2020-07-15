@@ -20,8 +20,6 @@
 
 class Instance;
 
-void destroyClassInstance(instance_ptr self);
-
 class VTable;
 
 typedef VTable* vtable_ptr;

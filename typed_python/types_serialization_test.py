@@ -1457,6 +1457,19 @@ class TypesSerializationTest(unittest.TestCase):
         assert B2().f() is B2
         assert B().f() is B2
 
+    def test_serialize_unnamed_typed_classes_retains_identity(self):
+        sc = SerializationContext()
+
+        class B(Class):
+            def f(self) -> object:
+                return B
+
+        B2 = sc.deserialize(sc.serialize(B))
+
+        assert B2 is B
+        assert B2().f() is B2
+        assert B().f() is B2
+
     def test_serialize_lambda_preserves_identity_hash(self):
         sc = SerializationContext()
 
