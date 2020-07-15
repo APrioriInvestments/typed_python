@@ -16,6 +16,102 @@
 // Note: extern C identifiers are distinguished only up to 32 characters
 // nativepython_runtime_12345678901
 extern "C" {
+    void np_compileClassDispatch(ClassDispatchTable* classDispatchTable, int slot) {
+        PyEnsureGilAcquired getTheGil;
+
+        static PyObject* runtimeModule = PyImport_ImportModule("typed_python.compiler.runtime");
+
+        if (!runtimeModule) {
+            throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime");
+        }
+
+        PyObject* runtimeClass = PyObject_GetAttrString(runtimeModule, "Runtime");
+
+        if (!runtimeClass) {
+            throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime.Runtime");
+        }
+
+        PyObject* singleton = PyObject_CallMethod(runtimeClass, "singleton", "");
+
+        if (!singleton) {
+            if (PyErr_Occurred()) {
+                PyErr_Clear();
+            }
+
+            throw std::runtime_error("Internal error: couldn't call typed_python.compiler.runtime.Runtime.singleton");
+        }
+
+        PyObjectStealer res(
+            PyObject_CallMethod(
+                singleton,
+                "compileClassDispatch",
+                "OOl",
+                PyInstance::typeObj(classDispatchTable->getInterfaceClass()->getClassType()),
+                PyInstance::typeObj(classDispatchTable->getImplementingClass()->getClassType()),
+                (uint64_t)slot
+            )
+        );
+
+        if (!res) {
+            throw PythonExceptionSet();
+        }
+
+        if (!classDispatchTable->get(slot)) {
+            PyErr_Format(
+                PyExc_TypeError,
+                "Failed to populate the classDispatchTable"
+            );
+            throw PythonExceptionSet();
+        }
+    }
+
+    void np_compileClassDestructor(VTable* vtable) {
+        PyEnsureGilAcquired getTheGil;
+
+        static PyObject* runtimeModule = PyImport_ImportModule("typed_python.compiler.runtime");
+
+        if (!runtimeModule) {
+            throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime");
+        }
+
+        PyObject* runtimeClass = PyObject_GetAttrString(runtimeModule, "Runtime");
+
+        if (!runtimeClass) {
+            throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime.Runtime");
+        }
+
+        PyObject* singleton = PyObject_CallMethod(runtimeClass, "singleton", "");
+
+        if (!singleton) {
+            if (PyErr_Occurred()) {
+                PyErr_Clear();
+            }
+
+            throw std::runtime_error("Internal error: couldn't call typed_python.compiler.runtime.Runtime.singleton");
+        }
+
+        PyObjectStealer res(
+            PyObject_CallMethod(
+                singleton,
+                "compileClassDestructor",
+                "O",
+                PyInstance::typeObj(vtable->mType->getClassType())
+            )
+        );
+
+        if (!res) {
+            throw PythonExceptionSet();
+        }
+
+        if (!vtable->mCompiledDestructorFun) {
+            PyErr_Format(
+                PyExc_TypeError,
+                "Failed to populate the destructor"
+            );
+            throw PythonExceptionSet();
+        }
+    }
+
     void np_raiseAttributeErr(uint8_t* attributeName) {
         PyEnsureGilAcquired getTheGil;
 

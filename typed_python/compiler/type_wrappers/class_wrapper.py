@@ -242,21 +242,37 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         return self.layoutType
 
     def on_refcount_zero(self, context, instance):
-        def installDestructorFun(funcPtr):
-            _types.installClassDestructor(self.typeRepresentation, funcPtr.fp)
+        vtablePtr = (
+            self.get_layout_pointer(instance.nonref_expr)
+            .ElementPtrIntegers(0, 1)
+            .load()
+        )
 
-        context.converter.defineNativeFunction(
+        destructorPtr = (
+            vtablePtr
+            .ElementPtrIntegers(0, 1)
+            .load()
+        )
+
+        with context.ifelse(destructorPtr.cast(native_ast.Int64)) as (ifTrue, ifFalse):
+            with ifFalse:
+                # we have an empty slot. We need to compile it
+                context.pushEffect(
+                    runtime_functions.compileClassDestructor.call(
+                        vtablePtr.cast(native_ast.VoidPtr)
+                    )
+                )
+
+        return native_ast.CallTarget.Pointer(destructorPtr).call(instance.expr.cast(native_ast.VoidPtr))
+
+    def compileDestructor(self, converter):
+        return converter.defineNativeFunction(
             "destructor_" + str(self.typeRepresentation),
             ('destructor', self),
             [self],
             typeWrapper(type(None)),
-            self.generateNativeDestructorFunction,
-            callback=installDestructorFun
+            self.generateNativeDestructorFunction
         )
-
-        return native_ast.CallTarget.Pointer(
-            expr=self.get_layout_pointer(instance.nonref_expr).ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 1).load()
-        ).call(instance.expr.cast(native_ast.VoidPtr))
 
     def generateNativeDestructorFunction(self, context, out, instance):
         for i in range(len(self.typeRepresentation.MemberTypes)):
@@ -626,10 +642,15 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         funcPtr = classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
 
-        if context.functionContext.converter.generateDebugChecks:
-            with context.ifelse(funcPtr.cast(native_ast.Int64)) as (ifTrue, ifFalse):
-                with ifFalse:
-                    context.pushException(TypeError, "EMPTY SLOT")
+        with context.ifelse(funcPtr.cast(native_ast.Int64)) as (ifTrue, ifFalse):
+            with ifFalse:
+                # we have an empty slot. We need to compile it
+                context.pushEffect(
+                    runtime_functions.compileClassDispatch.call(
+                        classDispatchTable.cast(native_ast.VoidPtr),
+                        dispatchSlot
+                    )
+                )
 
         convertedArgs = [instance]
 
@@ -662,7 +683,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
     @staticmethod
     def compileMethodInstantiation(
         converter, interfaceClass, implementingClass,
-        methodName, retType, argTypeTuple, kwargTypeTuple, callback
+        methodName, retType, argTypeTuple, kwargTypeTuple
     ):
         """Compile a concrete method instantiation.
 
@@ -680,8 +701,6 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                 to the function
             kwargTypeTuple - (NamedTuple) - a NamedTuple type containing the types of the
                 keyword arguments to thiis function.
-            callback - the callback to pass to 'convert' so that we can install the compiled
-                function pointer in the class vtable at link time.
         """
         # these are the types that we actually know from the signature
         argTypes = [typeWrapper(implementingClass)] + [typeWrapper(x) for x in argTypeTuple.ElementTypes]
@@ -697,9 +716,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         assert bytecount(pyImpl.ClosureType) == 0, "Class methods should have empty closures."
 
-        typeWrapper(pyImpl).compileCall(converter, retType, argTypes, kwargTypes, callback, False)
-
-        return True
+        return typeWrapper(pyImpl).compileCall(converter, retType, argTypes, kwargTypes, False)
 
     def convert_set_attribute(self, context, instance, attribute, value):
         if value is not None:

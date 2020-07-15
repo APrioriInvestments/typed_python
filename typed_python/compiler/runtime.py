@@ -19,7 +19,6 @@ import typed_python.compiler.python_to_native_converter as python_to_native_conv
 import typed_python.compiler.llvm_compiler as llvm_compiler
 import typed_python
 from typed_python.compiler.compiler_cache import CompilerCache
-from typed_python.compiler.native_function_pointer import NativeFunctionPointer
 from typed_python.type_function import ConcreteTypeFunction
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
@@ -133,18 +132,6 @@ class Runtime:
     def removeEventVisitor(self, visitor: RuntimeEventVisitor):
         self.converter.removeVisitor(visitor)
 
-    def _collectLinktimeHooks(self):
-        while True:
-            identityAndCallback = self.converter.popLinktimeHook()
-            if identityAndCallback is None:
-                return
-
-            identity, callback = identityAndCallback
-
-            name = self.converter.identityToName(identity)
-
-            callback(self.functionPointerByName(name))
-
     @staticmethod
     def passingTypeForValue(arg):
         if isinstance(arg, types.FunctionType):
@@ -247,7 +234,7 @@ class Runtime:
 
             self.converter.buildAndLinkNewModule()
 
-            fp = self.functionPointerByName(wrappingCallTargetName)
+            fp = self.converter.functionPointerByName(wrappingCallTargetName)
 
             overload._installNativePointer(
                 fp.fp,
@@ -255,26 +242,19 @@ class Runtime:
                 [i.typeRepresentation for i in callTarget.input_types]
             )
 
-            self._collectLinktimeHooks()
-
             return callTarget
 
-    def functionPointerByName(self, linkerName) -> NativeFunctionPointer:
-        """Find a NativeFunctionPointer for a given link-time name.
+    def compileClassDispatch(self, interfaceClass, implementingClass, slotIndex):
+        with self.lock:
+            self.converter.compileSingleClassDispatch(interfaceClass, implementingClass, slotIndex)
 
-        Args:
-            linkerName (str) - the name of the compiled symbol we want
+        return True
 
-        Returns:
-            a NativeFunctionPointer or None
-        """
-        if self.compilerCache is None:
-            # the llvm compiler holds it all
-            return self.llvm_compiler.function_pointer_by_name(linkerName)
-        else:
-            # the llvm compiler is just building shared objects, but the
-            # compiler cache has all the pointers.
-            return self.compilerCache.function_pointer_by_name(linkerName)
+    def compileClassDestructor(self, cls):
+        with self.lock:
+            self.converter.compileClassDestructor(cls)
+
+        return True
 
     def resultTypeForCall(self, funcObj, argTypes, kwargTypes):
         """Determine the result of calling funcObj with things of type 'argTypes' and 'kwargTypes'

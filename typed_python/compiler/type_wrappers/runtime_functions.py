@@ -94,6 +94,9 @@ pyOpToUnaryCallTarget = {
 
 throwNullPtr = externalCallTarget("np_throwNullPtr", Void)
 
+compileClassDispatch = externalCallTarget("np_compileClassDispatch", Void, Void.pointer(), Int64)
+compileClassDestructor = externalCallTarget("np_compileClassDestructor", Void, Void.pointer())
+
 free = externalCallTarget("free", Void, UInt8Ptr)
 malloc = externalCallTarget("malloc", UInt8Ptr, Int64)
 realloc = externalCallTarget("realloc", UInt8Ptr, UInt8Ptr, Int64)

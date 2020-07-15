@@ -234,8 +234,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                 list(overload.closureVarLookups),
                 [typeWrapper(self.closurePathToCellType(path, closureType)) for path in overload.closureVarLookups.values()]
                 + [a.expr_type for a in argsToPass],
-                overload.returnType,
-                callback=None
+                overload.returnType
             )
 
             if not singleConvertedOverload:
@@ -269,7 +268,6 @@ class PythonTypedFunctionWrapper(Wrapper):
             None,
             argTypes,
             kwargTypes,
-            None,
             True
         )
 
@@ -314,7 +312,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                 return typeWrapper(overloadArg.typeFilter)
             return argType
 
-    def compileCall(self, converter, returnType, argTypes, kwargTypes, callback, provideClosureArgument):
+    def compileCall(self, converter, returnType, argTypes, kwargTypes, provideClosureArgument):
         """Compile this function being called with a particular signature.
 
         Args:
@@ -324,8 +322,6 @@ class PythonTypedFunctionWrapper(Wrapper):
                 we're passing.
             kwargTypes - (Dict(str, wrapper)) a the actual concrete type wrappers for the keyword
                 arguments we're passing.
-            callback - the callback to pass to 'convert' so that we can install the compiled
-                function pointer in the class vtable at link time.
             provideClosureArgument - if True, then the first argument is of our closure type.
                 If false, then our closure type must be empty, and no argument for it is provided.
         Returns:
@@ -356,8 +352,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             returnType,
             lambda context, outputVar, *args: (
                 self.generateMethodImplementation(context, returnType, args, argNames, provideClosureArgument)
-            ),
-            callback=callback
+            )
         )
 
     @staticmethod

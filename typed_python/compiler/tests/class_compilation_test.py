@@ -22,7 +22,7 @@ from typed_python import (
     Float32, Final, PointerTo, makeNamedTuple, Compiled, Function, Held, Value
 )
 import typed_python._types as _types
-from typed_python.compiler.runtime import Entrypoint, Runtime
+from typed_python.compiler.runtime import Entrypoint, Runtime, CountCompilationsVisitor
 
 
 def resultType(f, **kwargs):
@@ -1972,3 +1972,44 @@ class TestClassCompilationCompilation(unittest.TestCase):
             return C()
 
         assert callIt().t is float
+
+    def test_can_compile_against_base_class_and_pass_child(self):
+        class C(Class):
+            t = Member(float)
+
+            def f(self) -> float:
+                return self.t
+
+        class B(C):
+            def f(self) -> float:
+                return self.t + 1.0
+
+        @Entrypoint
+        def f(x: ListOf(C)):
+            res = 0.0
+            for i in x:
+                res += i.f()
+            return res
+
+        assert f(ListOf(C)([C(t=10)])) == 10
+
+        with CountCompilationsVisitor() as c:
+            # the 'B' present here should trigger compilation and linking
+            assert f(ListOf(C)([C(t=10), B(t=11)])) == 22
+
+        assert c.count == 1
+
+        with CountCompilationsVisitor() as c:
+            assert f(ListOf(C)([C(t=10), B(t=11)])) == 22
+
+        assert c.count == 0
+
+        @Entrypoint
+        def clearList(x: ListOf(C)):
+            x.clear()
+
+        aList = ListOf(C)([C(t=10), B(t=11)])
+        theB = aList[1]
+        assert _types.refcount(theB) == 2
+        clearList(aList)
+        assert _types.refcount(theB) == 1

@@ -450,6 +450,11 @@ class ExpressionConversionContext(object):
 
         self.pushEffect(native_ast.Expression.ActivatesTeardown(slot.expr.name))
 
+    def pushStackSlot(self, nativeType):
+        varname = self.functionContext.allocateStackVarname()
+
+        return native_ast.Expression.StackSlot(name=varname, type=nativeType)
+
     def push(self, type, callback, wantsTeardown=True):
         """Allocate a stackvariable of type 'type' and pass it to 'callback' which should return
         a native_ast.Expression or TypedExpression(None) initializing it.

@@ -200,6 +200,10 @@ public:
 
     void allocateUpcastDispatchTables();
 
+    untyped_function_ptr get(size_t slot) {
+        return mFuncPtrs[slot];
+    }
+
 private:
     // the class actually represented by this instance
     HeldClass* mImplementingClass;

@@ -21,6 +21,7 @@ import typed_python.python_ast as python_ast
 import typed_python._types as _types
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
+from typed_python.compiler.native_function_pointer import NativeFunctionPointer
 from sortedcontainers import SortedSet
 from typed_python.compiler.directed_graph import DirectedGraph
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
@@ -139,7 +140,6 @@ class PythonToNativeConverter(object):
         # function names that have been defined but not yet compiled
         self._new_native_functions = set()
 
-        self._linktimeHooks = []
         self._visitors = []
 
         # the identity of the function we're currently evaluating.
@@ -241,16 +241,6 @@ class PythonToNativeConverter(object):
             body,
         )
 
-    def installLinktimeHook(self, identity, callback):
-        """Call 'callback' with the native function pointer for 'identity' after compilation has finished."""
-        self._linktimeHooks.append((identity, callback))
-
-    def popLinktimeHook(self):
-        if self._linktimeHooks:
-            return self._linktimeHooks.pop()
-        else:
-            return None
-
     def defineLinkName(self, identity, linkName):
         if identity in self._link_name_for_identity:
             assert self._link_name_for_identity[identity] == linkName
@@ -275,14 +265,12 @@ class PythonToNativeConverter(object):
             return True
         return False
 
-    def defineNonPythonFunction(self, name, identityTuple, context, callback=None):
+    def defineNonPythonFunction(self, name, identityTuple, context):
         """Define a non-python generating function (if we haven't defined it before already)
 
             name - the name to actually give the function.
             identityTuple - a unique (sha)hashable tuple
             context - a FunctionConvertsionContext lookalike
-            callback - a function taking a function pointer that gets called after codegen
-                to allow us to install this function pointer.
 
         returns a TypedCallTarget, or None if it's not known yet
         """
@@ -295,9 +283,6 @@ class PythonToNativeConverter(object):
             self._dependencies.addEdge(self._currentlyConverting, identity)
         else:
             self._dependencies.addRoot(identity)
-
-        if callback is not None:
-            self.installLinktimeHook(identity, callback)
 
         if linkName in self._targets:
             return self._targets.get(linkName)
@@ -320,7 +305,7 @@ class PythonToNativeConverter(object):
 
         return self._targets.get(linkName)
 
-    def defineNativeFunction(self, name, identity, input_types, output_type, generatingFunction, callback=None):
+    def defineNativeFunction(self, name, identity, input_types, output_type, generatingFunction):
         """Define a native function if we haven't defined it before already.
 
             name - the name to actually give the function.
@@ -332,8 +317,6 @@ class PythonToNativeConverter(object):
                 if it's not pass-by-value (or None if it is), and a bunch of TypedExpressions
                 and produce code that always ends in a terminal expression, (or if it's pass by value,
                 flows off the end of the function)
-            callback - a function taking a function pointer that gets called after codegen
-                to allow us to install this function pointer.
 
         returns a TypedCallTarget. 'generatingFunction' may call this recursively if it wants.
         """
@@ -352,8 +335,7 @@ class PythonToNativeConverter(object):
             identity,
             NativeFunctionConversionContext(
                 self, input_types, output_type, generatingFunction, identity
-            ),
-            callback
+            )
         )
 
     def getTypedCallTarget(self, name, input_types, output_type, alwaysRaises=False):
@@ -524,7 +506,6 @@ class PythonToNativeConverter(object):
 
                 self._inflight_function_conversions.clear()
                 self._inflight_definitions.clear()
-                self._linktimeHooks.clear()
                 raise
             finally:
                 self._currentlyConverting = None
@@ -555,48 +536,60 @@ class PythonToNativeConverter(object):
             if dirtyUpstream:
                 self._dependencies.functionReturnSignatureChanged(identity)
 
-            # when we define an entrypoint to a class, we actually need to compile
-            # a version of that function for every override of that function as well.
-            # typed_python keeps track of all the entries in all class vtables that
-            # need pointers (we generate one dispatch entry for each class that implements
-            # a function that gets triggered in a base class). As we resolve inflight
-            # functions, we trigger compilation on each of the individual instantiations
-            # we receive.
-            while self.compileClassDispatch():
-                pass
-
-    def compileClassDispatch(self):
-        dispatch = _types.getNextUnlinkedClassMethodDispatch()
-
-        if dispatch is None:
-            return False
-
-        interfaceClass, implementingClass, slotIndex = dispatch
-
+    def compileSingleClassDispatch(self, interfaceClass, implementingClass, slotIndex):
         name, retType, argTypeTuple, kwargTypeTuple = _types.getClassMethodDispatchSignature(interfaceClass, implementingClass, slotIndex)
-
-        # generate a callback that takes the linked function pointer and jams
-        # it into the relevant slot in the vtable once it's produced
-        def installOverload(fp):
-            _types.installClassMethodDispatch(interfaceClass, implementingClass, slotIndex, fp.fp)
 
         # we are compiling the function 'name' in 'implementingClass' to be installed when
         # viewing an instance of 'implementingClass' as 'interfaceClass' that's function
         # 'name' called with signature '(*argTypeTuple, **kwargTypeTuple) -> retType'
-        res = ClassWrapper.compileMethodInstantiation(
+        typedCallTarget = ClassWrapper.compileMethodInstantiation(
             self,
             interfaceClass,
             implementingClass,
             name,
             retType,
             argTypeTuple,
-            kwargTypeTuple,
-            callback=installOverload
+            kwargTypeTuple
         )
 
-        assert res
+        assert typedCallTarget is not None
 
-        return True
+        self.buildAndLinkNewModule()
+
+        fp = self.functionPointerByName(typedCallTarget.name)
+
+        if fp is None:
+            raise Exception(f"Couldn't find a function pointer for {typedCallTarget.name}")
+
+        _types.installClassMethodDispatch(interfaceClass, implementingClass, slotIndex, fp.fp)
+
+    def compileClassDestructor(self, cls):
+        typedCallTarget = typeWrapper(cls).compileDestructor(self)
+
+        assert typedCallTarget is not None
+
+        self.buildAndLinkNewModule()
+
+        fp = self.functionPointerByName(typedCallTarget.name)
+
+        _types.installClassDestructor(cls, fp.fp)
+
+    def functionPointerByName(self, linkerName) -> NativeFunctionPointer:
+        """Find a NativeFunctionPointer for a given link-time name.
+
+        Args:
+            linkerName (str) - the name of the compiled symbol we want
+
+        Returns:
+            a NativeFunctionPointer or None
+        """
+        if self.compilerCache is None:
+            # the llvm compiler holds it all
+            return self.llvmCompiler.function_pointer_by_name(linkerName)
+        else:
+            # the llvm compiler is just building shared objects, but the
+            # compiler cache has all the pointers.
+            return self.compilerCache.function_pointer_by_name(linkerName)
 
     def convertTypedFunctionCall(self, functionType, overloadIx, inputWrappers, assertIsRoot=False):
         overload = functionType.overloads[overloadIx]
@@ -700,7 +693,6 @@ class PythonToNativeConverter(object):
         input_types,
         output_type,
         assertIsRoot=False,
-        callback=None,
     ):
         """Convert a single pure python function using args of 'input_types'.
 
@@ -722,8 +714,6 @@ class PythonToNativeConverter(object):
                 If not None, then we will produce this type or throw an exception.
             assertIsRoot - if True, then assert that no other functions are using
                 the converter right now.
-            callback - if not None, then a function that gets called back with the
-                function pointer to the compiled function when it's known.
         """
         assert isinstance(funcName, str)
         assert isinstance(funcCode, types.CodeType)
@@ -746,9 +736,6 @@ class PythonToNativeConverter(object):
         assert not identityHash.isPoison()
 
         identity = identityHash.hexdigest
-
-        if callback is not None:
-            self.installLinktimeHook(identity, callback)
 
         name = self.identityHashToLinkerName(funcName, identity)
 
