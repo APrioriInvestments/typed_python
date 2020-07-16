@@ -76,7 +76,8 @@ class SerializationContext(object):
         compressionEnabled=True,
         encodeLineInformationForCode=True,
         objectToNameOverride=None,
-        internalizeTypeGroups=True
+        internalizeTypeGroups=True,
+        serializeFunctionsAsNonAst=False
     ):
         super().__init__()
 
@@ -89,6 +90,7 @@ class SerializationContext(object):
         self.compressionEnabled = compressionEnabled
         self.encodeLineInformationForCode = encodeLineInformationForCode
         self.internalizeTypeGroups = internalizeTypeGroups
+        self.serializeFunctionsAsNonAst = serializeFunctionsAsNonAst
 
     def compress(self, bytes):
         if self.compressionEnabled:
@@ -102,6 +104,23 @@ class SerializationContext(object):
             return lz4.frame.decompress(bytes)
         else:
             return bytes
+
+    def withoutFunctionsSerializedAsNonAst(self):
+        """Just serialize a function's code, not its AST (from source).
+
+        this means we can't deserialize it, but is good for hashing.
+        """
+        if self.serializeFunctionsAsNonAst:
+            return self
+
+        return SerializationContext(
+            nameToObjectOverride=self.nameToObjectOverride,
+            compressionEnabled=self.compressionEnabled,
+            encodeLineInformationForCode=self.encodeLineInformationForCode,
+            objectToNameOverride=self.objectToNameOverride,
+            internalizeTypeGroups=self.internalizeTypeGroups,
+            serializeFunctionsAsNonAst=True
+        )
 
     def withoutInternalizingTypeGroups(self):
         """Make sure we fully deserialize types.
@@ -117,7 +136,8 @@ class SerializationContext(object):
             compressionEnabled=self.compressionEnabled,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=False
+            internalizeTypeGroups=False,
+            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst
         )
 
     def withoutLineInfoEncoded(self):
@@ -129,7 +149,8 @@ class SerializationContext(object):
             compressionEnabled=self.compressionEnabled,
             encodeLineInformationForCode=False,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups
+            internalizeTypeGroups=self.internalizeTypeGroups,
+            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst
         )
 
     def withoutCompression(self):
@@ -141,7 +162,8 @@ class SerializationContext(object):
             compressionEnabled=False,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups
+            internalizeTypeGroups=self.internalizeTypeGroups,
+            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst
         )
 
     def withCompression(self):
@@ -153,7 +175,8 @@ class SerializationContext(object):
             compressionEnabled=True,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups
+            internalizeTypeGroups=self.internalizeTypeGroups,
+            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst
         )
 
     def nameForObject(self, t):
@@ -214,6 +237,9 @@ class SerializationContext(object):
                 mname = getattr(t, "__typed_python_module__", None)
                 if self.objectFromName(mname + "." + fname) is t:
                     return mname + "." + fname
+
+            if getattr(t, "__typed_python_category__", None) == 'Value':
+                return None
 
             if hasattr(t, "__module__"):
                 mname = getattr(t, "__module__", None)
@@ -291,7 +317,7 @@ class SerializationContext(object):
                     return sys.modules[name[9:]]
                 return importlib.import_module(name[9:])
             except ImportError:
-                _badModuleCache.add(moduleName)
+                _badModuleCache.add(name[9:])
                 return None
 
         names = name.rsplit(".", 1)
@@ -299,11 +325,21 @@ class SerializationContext(object):
         if len(names) != 2:
             return None
 
-        module, objName = name.rsplit(".", 1)
+        moduleName, objName = name.rsplit(".", 1)
 
         try:
-            return getattr(importlib.import_module(module), objName, None)
+            if moduleName in _badModuleCache:
+                return None
+
+            if moduleName in sys.modules:
+                module = sys.modules[moduleName]
+            else:
+                module = importlib.import_module(moduleName)
+
+            return getattr(module, objName, None)
+
         except ImportError:
+            _badModuleCache.add(moduleName)
             return None
 
     def sha_hash(self, o):
@@ -401,9 +437,18 @@ class SerializationContext(object):
             return inst.__reduce__() + (None,)
 
         if isinstance(inst, CodeType):
-            pyast = convertFunctionToAlgebraicPyAst(inst, keepLineInformation=self.encodeLineInformationForCode)
+            if self.serializeFunctionsAsNonAst:
+                # serialize only enough to hash this
+                return (
+                    astToCodeObject,
+                    (inst.co_freevars, inst.co_code, inst.co_names, inst.co_consts, inst.co_varnames, inst.co_filename,
+                     inst.co_firstlineno if self.encodeLineInformationForCode else None),
+                    None
+                )
+            else:
+                pyast = convertFunctionToAlgebraicPyAst(inst, keepLineInformation=self.encodeLineInformationForCode)
 
-            return (astToCodeObject, (pyast, inst.co_freevars), {})
+                return (astToCodeObject, (pyast, inst.co_freevars), {})
 
         if isinstance(inst, FunctionType):
             representation = {}

@@ -1953,3 +1953,8 @@ class TypesSerializationTest(unittest.TestCase):
         sc.deserialize(sc.serialize(Expression.Load))
 
         sc.deserialize(sc.serialize(NamedCallTarget))
+
+    def test_badly_named_module_works(self):
+        sc = SerializationContext()
+
+        assert sc.objectFromName(".modules.NOT.A.REAL.MODULE") is None
