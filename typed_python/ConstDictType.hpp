@@ -20,6 +20,7 @@
 #include "ReprAccumulator.hpp"
 
 class ConstDictType : public Type {
+public:
     class layout {
     public:
         std::atomic<int64_t> refcount;
@@ -30,7 +31,6 @@ class ConstDictType : public Type {
         uint8_t data[];
     };
 
-public:
     ConstDictType(Type* key, Type* value) :
             Type(TypeCategory::catConstDict),
             m_key(key),
