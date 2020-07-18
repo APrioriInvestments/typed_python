@@ -110,9 +110,18 @@ def _typedPythonTypeToTypeWrapper(t):
 
     if not hasattr(t, '__typed_python_category__'):
         t = TypeFor(t)
-        assert hasattr(t, '__typed_python_category__'), t
 
     assert isinstance(t, type), t
+
+    if not hasattr(t, '__typed_python_category__'):
+        # this is will be a PythonObjectOfType, but we never actually return such an object
+        # to the interpreter
+        if t is threading.RLock:
+            t = _thread.RLock
+        elif t is threading.Lock:
+            t = _thread.LockType
+
+        return PythonObjectOfTypeWrapper(t)
 
     if t.__typed_python_category__ == "Class":
         return ClassWrapper(t)
@@ -161,14 +170,6 @@ def _typedPythonTypeToTypeWrapper(t):
 
     if t.__typed_python_category__ == "TypedCell":
         return TypedCellWrapper(t)
-
-    if t.__typed_python_category__ == "PythonObjectOfType":
-        if t is threading.RLock:
-            t = _thread.RLock
-        elif t is threading.Lock:
-            t = _thread.LockType
-
-        return PythonObjectOfTypeWrapper(t)
 
     if t.__typed_python_category__ == "Value":
         if type(t.Value) in _concreteWrappers or type(t.Value) in (str, int, float, bool):

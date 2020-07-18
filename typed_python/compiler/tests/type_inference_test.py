@@ -14,7 +14,7 @@
 
 from typed_python import (
     Function, OneOf, Alternative,
-    Value, ListOf, NotCompiled
+    Value, ListOf, NotCompiled, TupleOf
 )
 from typed_python.compiler.runtime import Entrypoint
 import unittest
@@ -137,7 +137,7 @@ class TestTypeInference(unittest.TestCase):
             return b[x]
 
         self.assertEqual(f.resultTypeFor(ListOf(str), int).typeRepresentation, str)
-        self.assertEqual(g.resultTypeFor(object, int).typeRepresentation.PyType, object)
+        self.assertEqual(g.resultTypeFor(object, int).typeRepresentation, object)
 
     def test_infer_conditional_eval_exception(self):
         @Function
@@ -209,4 +209,42 @@ class TestTypeInference(unittest.TestCase):
             # currently, we can't compile this
             return [x for x in range(10)][0]
 
-        self.assertEqual(f2.resultTypeFor().typeRepresentation.PyType, object)
+        self.assertEqual(f2.resultTypeFor().typeRepresentation, object)
+
+    def test_compiler_can_see_through_explicitly_constructed_typed_tuples(self):
+        @Entrypoint
+        def returnTupElts(x):
+            return TupleOf(int)((1, 2, 3 + x))[2]
+
+        assert returnTupElts.resultTypeFor(int).typeRepresentation == int
+
+    def test_compiler_can_see_through_untyped_tuples(self):
+        @Entrypoint
+        def returnTupElts(x):
+            return (1, 2.2, 3 + x)[2]
+
+        assert returnTupElts.resultTypeFor(int).typeRepresentation == int
+
+    def test_compiler_can_merge_like_untyped_tuples(self):
+        @Entrypoint
+        def returnTupElts(x):
+            if x > 10:
+                aTup = (1, 2.2, 3 + x)
+            else:
+                aTup = (1, 2.2, 3 + x + x)
+
+            return aTup[2]
+
+        assert returnTupElts.resultTypeFor(int).typeRepresentation == int
+
+    def test_compiler_can_converts_unlike_untyped_tuples_to_object(self):
+        @Entrypoint
+        def returnTupElts(x):
+            if x > 10:
+                aTup = (1, 2.2, 3 + x)
+            else:
+                aTup = (1, "2.2", 3 + x + x)
+
+            return aTup
+
+        assert returnTupElts.resultTypeFor(int).typeRepresentation is tuple

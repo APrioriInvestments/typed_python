@@ -1104,7 +1104,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
 
         Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)(PyObject*)namedObj);
         if (!nativeType) {
-            throw std::runtime_error("Expected " + name + " to name a native type");
+            nativeType = PythonObjectOfType::Make(namedObj);
         }
 
         if (nativeType->getTypeCategory() == Type::TypeCategory::catForward) {

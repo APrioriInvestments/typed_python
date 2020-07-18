@@ -37,12 +37,7 @@ def toInterpreterType(setOfTypes):
     if res is None:
         return None
 
-    res = res.interpreterTypeRepresentation
-
-    if issubclass(res, typed_python.PythonObjectOfType):
-        return res.PyType
-
-    return res
+    return res.interpreterTypeRepresentation
 
 
 class RuntimeEventVisitor:

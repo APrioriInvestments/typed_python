@@ -1782,18 +1782,24 @@ class ExpressionConversionContext(object):
             return aList
 
         if ast.matches.Tuple:
-            # While constructing, it is a list, so we can append to it.
-            aTuple = self.constant(list).convert_call([], {})
+            # return a masquerading Tuple object
+            tupArgs = []
 
             for e in ast.elts:
-                eVal = self.convert_expression_ast(e)
-                if eVal is None:
+                tupArgs.append(self.convert_expression_ast(e))
+                if tupArgs[-1] is None:
                     return None
 
-                aTuple.convert_method_call("append", (eVal,), {})
+            tupType = Tuple(*[x.expr_type.typeRepresentation for x in tupArgs])
 
-            # Now it becomes a tuple.
-            return self.constant(tuple).convert_call([aTuple], {})
+            instance = typeWrapper(tupType).createFromArgs(self, tupArgs)
+
+            if instance is None:
+                return None
+
+            return instance.changeType(
+                TypedTupleMasqueradingAsTuple(tupType)
+            )
 
         if ast.matches.Set:
             aSet = self.constant(set).convert_call([], {})

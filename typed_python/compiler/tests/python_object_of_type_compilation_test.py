@@ -46,7 +46,7 @@ class AClassWithBool(Class, Final):
 
 class TestPythonObjectOfTypeCompilation(unittest.TestCase):
     def test_typeWrapper_for_object(self):
-        self.assertIs(typedPythonTypeToTypeWrapper(object).typeRepresentation.PyType, object)
+        self.assertIs(typedPythonTypeToTypeWrapper(object).typeRepresentation, object)
 
     def test_can_pass_object_in_and_out(self):
         @Compiled

@@ -1068,6 +1068,9 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
     if (inType->getTypeCategory() == ::Type::TypeCategory::catNone) {
         return Py_None->ob_type;
     }
+    if (inType->getTypeCategory() == ::Type::TypeCategory::catPythonObjectOfType) {
+        return ((PythonObjectOfType*)inType)->pyType();
+    }
 
     static std::map<Type*, NativeTypeWrapper*> types;
 

@@ -513,24 +513,30 @@ class ConversionContextBase(object):
             self.markTypesAreUnstable()
             return
 
-        existingType = self._varname_to_type[varname].typeRepresentation
-
-        if existingType == new_type.typeRepresentation:
+        if self._varname_to_type[varname] == new_type:
             return
 
+        existingTypeWrapper = self._varname_to_type[varname]
+
+        existingType = existingTypeWrapper.interpreterTypeRepresentation
+
+        # check if this is entirely subsumed by an existing OneOf
         if issubclass(existingType, OneOf):
-            if new_type.typeRepresentation in existingType.Types:
+            if new_type.interpreterTypeRepresentation in existingType.Types:
                 return
 
-            if issubclass(new_type.typeRepresentation, OneOf):
-                if all(x in existingType.Types for x in new_type.typeRepresentation.Types):
+            if issubclass(new_type.interpreterTypeRepresentation, OneOf):
+                if all(x in existingType.Types for x in new_type.interpreterTypeRepresentation.Types):
                     return
 
-        final_type = OneOf(new_type.typeRepresentation, existingType)
+        if existingType == new_type.interpreterTypeRepresentation:
+            final_type = typeWrapper(new_type.interpreterTypeRepresentation)
+        else:
+            final_type = typeWrapper(OneOf(new_type.interpreterTypeRepresentation, existingType))
 
-        self.markTypesAreUnstable()
-
-        self._varname_to_type[varname] = typeWrapper(final_type)
+        if final_type != existingTypeWrapper:
+            self.markTypesAreUnstable()
+            self._varname_to_type[varname] = final_type
 
     def closureDestructor(self, variableStates):
         if not issubclass(self.closureType, Class):

@@ -27,7 +27,7 @@ from typed_python._types import (
     Forward, TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict,
     Alternative, Value, serialize, deserialize, serializeStream, deserializeStream,
     PointerTo, RefTo, Dict, validateSerializedObject, validateSerializedObjectStream, decodeSerializedObject,
-    getOrSetTypeResolver, Set, Class, Type, PythonObjectOfType, BoundMethod,
+    getOrSetTypeResolver, Set, Class, Type, BoundMethod,
     TypedCell, pointerTo, refTo, copy, identityHash
 )
 import typed_python._types as _types

@@ -45,7 +45,7 @@ class TypesMetadataTest(unittest.TestCase):
         self.assertEqual(TupleOf(float).ElementType, float)
         self.assertEqual(TupleOf(OneOf(10, 20)).ElementType, OneOf(10, 20))
 
-        self.assertEqual(TupleOf(object).ElementType.__typed_python_category__, "PythonObjectOfType")
+        self.assertEqual(TupleOf(object).ElementType, object)
         self.assertEqual(TupleOf(10).ElementType.__typed_python_category__, "Value")
 
     def test_tuple(self):

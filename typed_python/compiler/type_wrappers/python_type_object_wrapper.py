@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 import typed_python.compiler
-from typed_python import Type, PythonObjectOfType
+from typed_python import Type
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
@@ -33,21 +33,6 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
 
     def convert_str_cast(self, context, instance):
         return context.constant(str(self.typeRepresentation.Value))
-
-    @staticmethod
-    def typedPythonTypeToRegularType(typeRep):
-        """Unwrap a typed_python type back to the normal python representation.
-
-        For things where typed_python has its own internal representation,
-        like int <-> int, we convert back to normal python values.
-        """
-        # internally, we track int, bool, float, and str as int, bool, float, etc.
-        # but that's now how python programs would see them. So, we have to convert
-        # to the python object representation of those objects.
-        if isinstance(typeRep, type) and issubclass(typeRep, PythonObjectOfType):
-            return typeRep.PyType
-
-        return typeRep
 
     @Wrapper.unwrapOneOfAndValue
     def convert_call_on_container_expression(self, context, inst, argExpr):
@@ -71,11 +56,9 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
                     type
                 )
             else:
-                typeRep = self.typedPythonTypeToRegularType(argtype.interpreterTypeRepresentation)
-
                 res = typed_python.compiler.python_object_representation.pythonObjectRepresentation(
                     context,
-                    typeRep
+                    argtype.interpreterTypeRepresentation
                 )
 
             return res

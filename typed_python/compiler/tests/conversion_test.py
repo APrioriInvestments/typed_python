@@ -22,8 +22,8 @@ from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBui
 
 from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
-    _types, Compiled, Member, Final, PythonObjectOfType, isCompiled, ConstDict,
-    makeNamedTuple, UInt32, Int32
+    _types, Compiled, Member, Final, isCompiled, ConstDict,
+    makeNamedTuple, UInt32, Int32, Type
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
@@ -1069,7 +1069,7 @@ class TestCompilationStructures(unittest.TestCase):
         def callF():
             return f(1, "a b c".split())
 
-        self.assertEqual(callF.resultTypeFor().interpreterTypeRepresentation.PyType, list)
+        self.assertEqual(callF.resultTypeFor().interpreterTypeRepresentation, list)
 
     def test_star_args_type(self):
         def f(*args):
@@ -1300,7 +1300,7 @@ class TestCompilationStructures(unittest.TestCase):
     def test_method_not_returning_returns_none(self):
         class NoPythonObjectTypes(RuntimeEventVisitor):
             def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variableTypes):
-                assert not issubclass(outputType.typeRepresentation, PythonObjectOfType)
+                assert issubclass(outputType.typeRepresentation, Type)
 
         class C(Class, Final):
             def f(self, l, i, y: int):

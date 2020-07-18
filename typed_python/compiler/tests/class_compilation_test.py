@@ -700,7 +700,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         def fFinal(x):
             return BaseClassFinal().f(x)
 
-        self.assertEqual(f.resultTypeFor(OneOf(int, float)).typeRepresentation.PyType, object)
+        self.assertEqual(f.resultTypeFor(OneOf(int, float)).typeRepresentation, object)
         self.assertEqual(fFinal.resultTypeFor(OneOf(int, float)).typeRepresentation, OneOf(float, int))
 
     def test_classes_with_lots_of_members(self):
