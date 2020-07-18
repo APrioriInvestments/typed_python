@@ -818,3 +818,15 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             return C()
 
         self.assertTrue(isinstance(makeAC(), C))
+
+    def test_reverse_comparision_ops(self):
+        @Entrypoint
+        def ltOI(x: object, y: int):
+            return x < y
+
+        @Entrypoint
+        def ltIO(x: int, y: object):
+            return x < y
+
+        assert ltOI(1, 2) == ltIO(1, 2)
+        assert ltOI(2, 1) == ltIO(2, 1)

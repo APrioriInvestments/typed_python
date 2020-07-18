@@ -18,7 +18,6 @@ import typed_python.compiler.native_ast as native_ast
 import typed_python.python_ast as python_ast
 import typed_python.compiler
 
-
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
@@ -167,8 +166,7 @@ class MinMaxWrapper(Wrapper):
             no_more_kwargs(**kwargs)
             return context.call_py_function(self.i_call, (args[0],), {})
 
-        # this algorithm generates O(n) in code size and does O(n) copies
-        if len(args) >= 2 and len(args) > _MINMAX_SPACE_VS_COPY_THRESHOLD and 'key' in kwargs:
+        if len(args) >= 2 and 'key' in kwargs:
             outT = OneOfWrapper.mergeTypes([a.expr_type.typeRepresentation for a in args]).typeRepresentation
             selected = context.allocateUninitializedSlot(outT)
             selected.convert_copy_initialize(args[0].convert_to_type(outT))
@@ -203,6 +201,9 @@ class MinMaxWrapper(Wrapper):
                 cond = typeWrapper(keyT).convert_bin_op(context, selected_key, self.comparison_op1, keys[i], False)
                 if cond is None:
                     return None
+                cond = cond.convert_to_type(bool)
+                if cond is None:
+                    return None
                 with context.ifelse(cond.nonref_expr) as (ifTrue, ifFalse):
                     with ifTrue:
                         selected.convert_copy_initialize(args[i].convert_to_type(outT))
@@ -210,103 +211,31 @@ class MinMaxWrapper(Wrapper):
 
             return selected
 
-        # this algorithm generates O(n) in code size and does O(n) copies
-        if len(args) >= 2 and len(args) > _MINMAX_SPACE_VS_COPY_THRESHOLD and not kwargs:
-            outT = OneOfWrapper.mergeTypes([a.expr_type.typeRepresentation for a in args]).typeRepresentation
-            selected = context.allocateUninitializedSlot(outT)
-            selected.convert_copy_initialize(args[0].convert_to_type(outT))
-            context.markUninitializedSlotInitialized(selected)
-
-            for i in range(1, len(args)):
-                cond = typeWrapper(outT).convert_bin_op(context, selected, self.comparison_op1, args[i], False)
-                if cond is None:
-                    return None
-                with context.ifelse(cond.nonref_expr) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        selected.convert_copy_initialize(args[i].convert_to_type(outT))
-
-            return selected
-
-        # this algorithm generates O(n^2) in code size and does only one copy
-        if len(args) >= 2 and 'key' in kwargs:
-            outT = OneOfWrapper.mergeTypes([a.expr_type.typeRepresentation for a in args]).typeRepresentation
-            selected = context.allocateUninitializedSlot(outT)
-
-            key_f = kwargs['key']
-            del kwargs['key']
-            no_more_kwargs(**kwargs)
-
-            # determine key type
-            keyT = None
-            for i in range(len(args)):
-                k = key_f.expr_type.convert_call(context, None, (args[i],), {})
-                if k is None:
-                    return None
-                if keyT is None:
-                    keyT = k.expr_type.typeRepresentation
-                else:
-                    keyT = OneOfWrapper.mergeTypes([keyT, k.expr_type.typeRepresentation]).typeRepresentation
-
-            # evaluate key for each arg
-            keys = []
-            for i in range(len(args)):
-                keys.append(context.allocateUninitializedSlot(keyT))
-                keys[i].convert_copy_initialize(key_f.expr_type.convert_call(context, None, (args[i],), {}))
-                context.markUninitializedSlotInitialized(keys[i])
-
-            # returns False to abort this attempt
-            def comparison_tree(j, k):
-                cond = keys[k].expr_type.convert_bin_op(context, keys[k], self.comparison_op2, keys[j], False)
-                if cond is None:
-                    return False
-                with context.ifelse(cond.nonref_expr) as (ifTrue, ifFalse):
-                    if j + 1 == k:
-                        with ifTrue:
-                            selected.convert_copy_initialize(args[j].convert_to_type(outT))
-                        with ifFalse:
-                            selected.convert_copy_initialize(args[k].convert_to_type(outT))
-                    else:
-                        with ifTrue:
-                            if not comparison_tree(j, k-1):
-                                return False
-                        with ifFalse:
-                            if not comparison_tree(j+1, k):
-                                return False
-                return True
-
-            if not comparison_tree(0, len(args) - 1):
-                return None
-            context.markUninitializedSlotInitialized(selected)
-            return selected
-
-        # this algorithm generates O(n^2) in code size and does only one copy
         if len(args) >= 2 and not kwargs:
             outT = OneOfWrapper.mergeTypes([a.expr_type.typeRepresentation for a in args]).typeRepresentation
             selected = context.allocateUninitializedSlot(outT)
 
-            # returns False to abort this attempt
-            def comparison_tree(j, k):
-                cond = args[k].expr_type.convert_bin_op(context, args[k], self.comparison_op2, args[j], False)
-                if cond is None:
-                    return False
-                with context.ifelse(cond.nonref_expr) as (ifTrue, ifFalse):
-                    if j + 1 == k:
-                        with ifTrue:
-                            selected.convert_copy_initialize(args[j].convert_to_type(outT))
-                        with ifFalse:
-                            selected.convert_copy_initialize(args[k].convert_to_type(outT))
-                    else:
-                        with ifTrue:
-                            if not comparison_tree(j, k-1):
-                                return False
-                        with ifFalse:
-                            if not comparison_tree(j+1, k):
-                                return False
-                return True
+            for i in range(len(args)):
+                convertedArg = args[i].convert_to_type(outT)
+                if convertedArg is None:
+                    return None
 
-            if not comparison_tree(0, len(args) - 1):
-                return None
-            context.markUninitializedSlotInitialized(selected)
+                if i == 0:
+                    selected.convert_copy_initialize(convertedArg)
+                    context.markUninitializedSlotInitialized(selected)
+                else:
+                    cond = typeWrapper(outT).convert_bin_op(context, selected, self.comparison_op1, convertedArg, False)
+                    if cond is None:
+                        return None
+
+                    cond = cond.convert_to_type(bool)
+                    if cond is None:
+                        return None
+
+                    with context.ifelse(cond.nonref_expr) as (ifTrue, ifFalse):
+                        with ifTrue:
+                            selected.convert_assign(convertedArg)
+
             return selected
 
         return super().convert_call(context, expr, args, kwargs)

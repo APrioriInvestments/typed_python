@@ -449,3 +449,37 @@ class TestBuiltinCompilation(unittest.TestCase):
         i_max_default(v, d)
         i_max_key(v, k)
         i_max_key_default(v, k, d)
+
+    def test_min_max_with_object(self):
+        @Entrypoint
+        def minOI(x: object, y: int):
+            return min(x, y)
+
+        @Entrypoint
+        def minIO(x: int, y: object):
+            return min(x, y)
+
+        @Entrypoint
+        def minOO(x: object, y: object):
+            return min(x, y)
+
+        @Entrypoint
+        def maxOI(x: object, y: int):
+            return max(x, y)
+
+        @Entrypoint
+        def maxIO(x: int, y: object):
+            return max(x, y)
+
+        @Entrypoint
+        def maxOO(x: object, y: object):
+            return max(x, y)
+
+        for x in range(3):
+            for y in range(3):
+                assert minOI(x, y) == min(x, y)
+                assert minIO(x, y) == min(x, y)
+                assert minOO(x, y) == min(x, y)
+                assert maxOI(x, y) == max(x, y)
+                assert maxIO(x, y) == max(x, y)
+                assert maxOO(x, y) == max(x, y)
