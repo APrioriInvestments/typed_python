@@ -709,7 +709,11 @@ extern "C" {
             }
             decref(prevType);
             decref(prevTraceback);
-            PyErr_Restore((PyObject*)incref(layout->pyObj->ob_type), incref(layout->pyObj), nullptr);
+
+            PyErr_SetObject(
+                (PyObject*)layout->pyObj->ob_type,
+                layout->pyObj
+            );
         }
         else {
             if (!prevValue) {
@@ -784,28 +788,49 @@ extern "C" {
     void np_fetch_exception_tuple(instance_ptr inst) {
         PyEnsureGilAcquired getTheGil;
 
+        static Type* return_type = Tuple::Make({
+            PythonObjectOfType::AnyPyObject(),
+            PythonObjectOfType::AnyPyObject(),
+            PythonObjectOfType::AnyPyObject()
+        });
+
         PyObject* type;
         PyObject* value;
         PyObject* traceback;
         PyErr_Fetch(&type, &value, &traceback);
-        if (!value) {
-            return;
-        }
-        PyErr_NormalizeException(&type, &value, &traceback);
-        if (traceback) {
-            PyException_SetTraceback(value, traceback);
+
+        if (type && value) {
+            PyErr_NormalizeException(&type, &value, &traceback);
+            if (traceback) {
+                PyException_SetTraceback(value, traceback);
+            }
         }
 
-        PyObject* p = PyTuple_New(3);
+        PyObjectStealer p(PyTuple_New(3));
         PyTuple_SetItem(p, 0, type ? type : incref(Py_None));
         PyTuple_SetItem(p, 1, value ? value : incref(Py_None));
         PyTuple_SetItem(p, 2, traceback ? traceback : incref(Py_None));
 
-        Type* return_type = Tuple::Make({PythonObjectOfType::AnyPyObject(), PythonObjectOfType::AnyPyObject(), PythonObjectOfType::AnyPyObject()});
         PyInstance::copyConstructFromPythonInstance(return_type, inst, p, true);
 
         // Since we've caught it, need to save it as the most recently caught exception.
         PyErr_SetExcInfo(type, value, traceback);
+    }
+
+    void np_raise_exception_tuple(
+        // this should be a pointer to a Tuple(object, object, object), as returned by
+        // fetch_exception_tuple
+        PythonObjectOfType::layout_type** tuple
+    ) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyErr_Restore(
+            incref(tuple[0]->pyObj),
+            incref(tuple[1]->pyObj),
+            incref(tuple[2]->pyObj)
+        );
+
+        throw PythonExceptionSet();
     }
 
    bool np_match_exception(PyObject* exc) {

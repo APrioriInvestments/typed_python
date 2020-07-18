@@ -86,12 +86,18 @@ public:
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
-        throw std::runtime_error("Can't serialize Pointers");
+        if (dereference(self) == nullptr) {
+            buffer.writeUnsignedVarintObject(fieldNumber, 0);
+            return;
+        }
+
+        throw std::runtime_error("Can't serialize populated Pointers");
     }
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
-        throw std::runtime_error("Can't deserialize Pointers");
+        buffer.readUnsignedVarint();
+        dereference(self) = nullptr;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isRepr) {
@@ -125,8 +131,8 @@ public:
         *(void**)self = nullptr;
     }
 
-    instance_ptr dereference(instance_ptr self) {
-        return (instance_ptr)*(void**)self;
+    instance_ptr& dereference(instance_ptr self) {
+        return *(instance_ptr*)self;
     }
 
     void destroy(instance_ptr self)  {

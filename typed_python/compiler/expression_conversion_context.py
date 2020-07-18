@@ -1280,11 +1280,13 @@ class ExpressionConversionContext(object):
     def pushExceptionObject(self, exceptionObject, clear_exc=False):
         if exceptionObject is None:
             exceptionObject = self.zero(object)
+
         nativeExpr = (
             runtime_functions.initialize_exception.call(
                 exceptionObject.nonref_expr.cast(native_ast.VoidPtr)
             )
         )
+
         if clear_exc:
             nativeExpr = nativeExpr >> runtime_functions.clear_exc_info.call()
 

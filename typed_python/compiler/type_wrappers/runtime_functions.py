@@ -280,6 +280,12 @@ fetch_exception_tuple = externalCallTarget(
     Void.pointer()
 )
 
+raise_exception_tuple = externalCallTarget(
+    "np_raise_exception_tuple",
+    Void,
+    Void.pointer()
+)
+
 builtin_pyobj_by_name = externalCallTarget(
     "np_builtin_pyobj_by_name",
     Void.pointer(),

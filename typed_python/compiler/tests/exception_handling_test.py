@@ -12,6 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import pytest
+import traceback
+
 from typed_python import Entrypoint, ListOf, NotCompiled, _types
 
 
@@ -118,4 +121,69 @@ def test_exceptions_from_not_compiled():
 
 
 def test_can_rethrow_in_compiled_code():
-    pass
+    def throws():
+        raise Exception("something to throw")
+
+    aList = ListOf(str)()
+
+    @Entrypoint
+    def f():
+        try:
+            throws()
+        except Exception as e:
+            aList.append(str(e))
+            raise
+
+    with pytest.raises(Exception):
+        f()
+
+    assert aList == ["something to throw"]
+
+
+def test_raise_non_exception_in_compiled_code():
+    @Entrypoint
+    def throw(x):
+        raise x
+
+    with pytest.raises(TypeError):
+        throw(10)
+
+    with pytest.raises(TypeError):
+        throw(None)
+
+
+def test_can_capture_exception_and_rethrow():
+    def throws():
+        raise Exception("From 'throws'")
+
+    def g():
+        try:
+            throws()
+        except Exception as e:
+            return e
+
+    def rethrow(tup):
+        raise tup
+
+    def f():
+        tup = g()
+        rethrow(tup)
+
+    def getStringTraceback(toCall):
+        stringTb = None
+
+        try:
+            toCall()
+        except Exception:
+            stringTb = traceback.format_exc()
+
+        return stringTb
+
+    # make sure we can see 'g', which is where this came from. This is
+    # just how python works - when you raise an Exception with an existing
+    # traceback, python just keeps adding on to it
+    stringTb = getStringTraceback(f)
+    assert 'in g' in stringTb
+
+    # verify the compiler is the same
+    assert getStringTraceback(f) == getStringTraceback(Entrypoint(f))

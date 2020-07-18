@@ -161,7 +161,11 @@ class PointerToWrapper(Wrapper):
                 return context.pushVoid()
 
             if len(args) == 1:
-                context.pushReference(self.typeRepresentation.ElementType, instance.nonref_expr).convert_copy_initialize(args[0])
+                val = args[0].convert_to_type(self.typeRepresentation.ElementType)
+                if val is None:
+                    return None
+
+                context.pushReference(self.typeRepresentation.ElementType, instance.nonref_expr).convert_copy_initialize(val)
                 return context.pushVoid()
 
         if methodname == "get":

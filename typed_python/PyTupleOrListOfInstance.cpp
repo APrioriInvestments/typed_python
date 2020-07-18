@@ -671,7 +671,7 @@ PyObject* PyListOfInstance::listResize(PyObject* o, PyObject* args) {
             } else {
                 if (!self_w->type()->getEltType()->is_default_constructible()) {
                     PyErr_SetString(PyExc_TypeError, "Cannot increase the size of this list without an object to copy in because the"
-                        " element type is not copy-constructible");
+                        " element type is not default-constructible");
                     return NULL;
                 }
 

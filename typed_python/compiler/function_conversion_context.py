@@ -1580,11 +1580,19 @@ class FunctionConversionContext(ConversionContextBase):
             else:
                 toThrow = expr_context.convert_expression_ast(ast.exc)
 
+                if toThrow is None:
+                    return None
+
+                toThrow = toThrow.convert_to_type(object)
+                if toThrow is None:
+                    return None
+
             if ast.cause is None:
                 expr_context.pushExceptionObject(toThrow)
             else:
                 excCause = expr_context.convert_expression_ast(ast.cause)
                 expr_context.pushExceptionObjectWithCause(toThrow, excCause)
+
             return expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast), False
 
         if ast.matches.Delete:

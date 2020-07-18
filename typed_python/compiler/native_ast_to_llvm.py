@@ -893,6 +893,9 @@ class FunctionConverter:
                 else:
                     return TypedLLVMValue(self.builder.uitofp(lhs.llvm_value, target_type), expr.to_type)
 
+            else:
+                raise Exception(f"Invalid cast: {lhs.native_type} to {expr.to_type}")
+
         if expr.matches.Return:
             if expr.blockName is not None:
                 # assert expr.arg is None, expr.arg

@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Tuple, Compiled, Entrypoint
+from typed_python import ListOf, Tuple, Compiled, Entrypoint, Class, Member, Final
 import typed_python._types as _types
 import unittest
 
@@ -119,3 +119,41 @@ class TestPointerToCompilation(unittest.TestCase):
 
         self.assertEqual(f(), 3)
         self.assertEqual(Entrypoint(f)(), 3)
+
+    def test_initialize_with_unlike_type(self):
+        def f(T, v):
+            x = ListOf(T)()
+            x.reserve(1)
+            x.pointerUnsafe(0).initialize(v)
+            x.setSizeUnsafe(1)
+            return x
+
+        self.assertEqual(f(int, 2.5), Entrypoint(f)(int, 2.5))
+
+    def test_initialize_with_class_without_default_init(self):
+        def f(T, v):
+            x = ListOf(T)()
+            x.reserve(1)
+            x.pointerUnsafe(0).initialize(v)
+            x.setSizeUnsafe(1)
+            return x
+
+        class C(Class, Final):
+            x = Member(int)
+
+            def __init__(self, x):
+                self.x = x
+
+            def __eq__(self, other):
+                if type(self) != type(other):
+                    return False
+                return self.x == other.x
+
+        self.assertEqual(f(C, C(2.5)), Entrypoint(f)(C, C(2.5)))
+
+        # you can't copy-initialize a C with an int. you have to actively call it
+        with self.assertRaisesRegex(Exception, "Couldn't initialize type C from int"):
+            Entrypoint(f)(C, 2)
+
+        with self.assertRaisesRegex(Exception, "Couldn't initialize type C from int"):
+            f(C, 2)

@@ -19,7 +19,7 @@ We require operations to be compilable for this to work.
 """
 
 import threading
-from typed_python import Class, Final, Member, ListOf, TypeFunction, Tuple, NotCompiled, Entrypoint
+from typed_python import Class, Final, Member, ListOf, TypeFunction, Tuple, NotCompiled, Entrypoint, PointerTo
 from typed_python.typed_queue import TypedQueue
 import os
 
@@ -35,22 +35,33 @@ work_queue = TypedQueue(Tuple(Job, int))()
 
 
 @TypeFunction
-def ListJob(ListT, FuncT, OutT):
+def ListJob(InputT, FuncT, OutT):
     class ListJob(Job, Final):
         OutputType = OutT
 
-        outputQueue = Member(TypedQueue(Tuple(OutT, int)))
-        inputList = Member(ListT)
+        outputQueue = Member(TypedQueue(int))
+        exceptionQueue = Member(TypedQueue(Tuple(int, object)))
+        inputPtr = Member(PointerTo(InputT))
+        isInitializedPtr = Member(PointerTo(bool))
+        outputPtr = Member(PointerTo(OutT))
         f = Member(FuncT)
 
-        def __init__(self, inputList, f):
-            self.inputList = inputList
+        def __init__(self, inputPtr, f, outputPtr, isInitializedPtr):
+            self.inputPtr = inputPtr
+            self.outputPtr = outputPtr
+            self.isInitializedPtr = isInitializedPtr
+            self.outputQueue = TypedQueue(int)()
+            self.exceptionQueue = TypedQueue(Tuple(int, object))()
             self.f = f
-            self.outputQueue = TypedQueue(Tuple(OutT, int))()
 
         def execute(self, i: int) -> None:
-            output = Tuple(OutT, int)((self.f(self.inputList[i]), i))
-            self.outputQueue.put(output)
+            try:
+                (self.outputPtr + i).initialize(self.f(self.inputPtr[i]))
+                self.isInitializedPtr[i] = True
+            except Exception as e:
+                self.exceptionQueue.put(Tuple(int, object)((i, e)))
+
+            self.outputQueue.put(i)
 
     return ListJob
 
@@ -76,20 +87,61 @@ def ensureThreads():
 
 @Entrypoint
 def pmap(lst, f, OutT):
+    """Apply 'f' to every element of 'lst' in parallel.
+
+    Args:
+        lst - a ListOf of some type
+        f - a function from lst.ElementType to OutT
+        OutT - the result type
+    """
     ensureThreads()
 
-    job = ListJob(type(lst), type(f), OutT)(lst, f)
+    # make a list of objects but don't initialize any of them.
+    # some objects don't have default constructors and we want to
+    # still be able to pmap them.
+    res = ListOf(OutT)()
+    res.reserve(len(lst))
 
+    # track which objects are initialized
+    isInitialized = ListOf(bool)()
+    isInitialized.resize(len(lst))
+
+    # create the 'job'
+    job = ListJob(lst.ElementType, type(f), OutT)(
+        lst.pointerUnsafe(0),
+        f,
+        res.pointerUnsafe(0),
+        isInitialized.pointerUnsafe(0)
+    )
+
+    # fill out the work queue
     for i in range(len(lst)):
         tup = Tuple(Job, int)((job, i))
         work_queue.put(tup)
 
-    results = job.outputQueue.getMany(len(lst), len(lst))
+    # block until the work queue is complete
+    job.outputQueue.getMany(len(lst), len(lst))
 
-    res = ListOf(type(job).OutputType)()
-    res.resize(len(results))
+    # check if any of our threads excepted, and if so
+    # raise the earliest one in the sequence.
+    exceptionObj = None
+    minI = len(lst)
 
-    for resTup in results:
-        res[resTup[1]] = resTup[0]
+    while job.exceptionQueue:
+        i, eo = job.exceptionQueue.get()
+        if i < minI:
+            minI = i
+            exceptionObj = eo
+
+    if exceptionObj is not None:
+        # if we're raising, we need to clean up our
+        # temporary storage
+        for i in range(len(lst)):
+            if isInitialized[i]:
+                res.pointerUnsafe(i).destroy()
+
+        raise exceptionObj
+
+    res.setSizeUnsafe(len(lst))
 
     return res

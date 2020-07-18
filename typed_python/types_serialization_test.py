@@ -40,7 +40,7 @@ from typed_python import (
     Member, ConstDict, Alternative, serialize, deserialize,
     Dict, Set, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject,
-    Forward, Final, Function, Entrypoint, TypeFunction
+    Forward, Final, Function, Entrypoint, TypeFunction, PointerTo
 )
 
 from typed_python._types import refcount, isRecursive, identityHash
@@ -1958,3 +1958,11 @@ class TypesSerializationTest(unittest.TestCase):
         sc = SerializationContext()
 
         assert sc.objectFromName(".modules.NOT.A.REAL.MODULE") is None
+
+    def test_can_serialize_nullptrs(self):
+        x = PointerTo(int)()
+
+        sc = SerializationContext()
+
+        assert sc.deserialize(sc.serialize(type(x))) == type(x)
+        assert sc.deserialize(sc.serialize(x)) == x
