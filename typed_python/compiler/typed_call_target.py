@@ -23,6 +23,8 @@ class TypedCallTarget(object):
         assert isinstance(output_type, Wrapper) or output_type is None
         assert isinstance(named_call_target, native_ast.NamedCallTarget)
 
+        assert named_call_target.name != "throws"
+
         # if we know _ahead of time_ that this will always throw an exception
         self.alwaysRaises = alwaysRaises
 

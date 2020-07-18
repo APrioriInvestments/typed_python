@@ -31,7 +31,13 @@ Float32 = native_ast.Float32
 Void = native_ast.Void
 
 
-def externalCallTarget(name, output, *inputs, varargs=False, intrinsic=False):
+def externalCallTarget(name, output, *inputs, varargs=False, intrinsic=False, canThrow=False):
+    """Create an object that lets us call C functions.
+
+    Note that 'canThrow' really indicates whether we should use llvm 'invoke' instead
+    of 'call'. If you set canThrow to false, and you throw from the C function, you'll
+    walk up the stack to the exception handler above the call site.
+    """
     return native_ast.CallTarget.Named(
         target=native_ast.NamedCallTarget(
             name=name,
@@ -40,7 +46,7 @@ def externalCallTarget(name, output, *inputs, varargs=False, intrinsic=False):
             external=True,
             varargs=varargs,
             intrinsic=intrinsic,
-            can_throw=False
+            can_throw=canThrow
         )
     )
 
@@ -51,6 +57,7 @@ def binaryPyobjCallTarget(name):
         Void.pointer(),
         Void.pointer(),
         Void.pointer(),
+        canThrow=True
     )
 
 
@@ -58,7 +65,8 @@ def unaryPyobjCallTarget(name, retType=Void.pointer()):
     return externalCallTarget(
         name,
         retType,
-        Void.pointer()
+        Void.pointer(),
+        canThrow=True
     )
 
 
@@ -293,7 +301,8 @@ mod_uint64_uint64 = externalCallTarget(
 mod_float64_float64 = externalCallTarget(
     "nativepython_runtime_mod_float64_float64",
     Float64,
-    Float64, Float64
+    Float64, Float64,
+    canThrow=True
 )
 
 pow_int64_int64 = externalCallTarget(
@@ -360,14 +369,16 @@ call_pyobj = externalCallTarget(
     "nativepython_runtime_call_pyobj",
     Void.pointer(),
     Void.pointer(),
-    varargs=True
+    varargs=True,
+    canThrow=True
 )
 
 call_func_as_pyobj = externalCallTarget(
     "nativepython_runtime_call_func_as_pyobj",
     Void.pointer(),
     Void.pointer(),
-    varargs=True
+    varargs=True,
+    canThrow=True
 )
 
 get_pyobj_None = externalCallTarget(
@@ -386,6 +397,7 @@ np_repr = externalCallTarget(
     Void.pointer(),
     Void.pointer(),
     Void.pointer(),
+    canThrow=True
 )
 
 np_str = externalCallTarget(
@@ -393,19 +405,22 @@ np_str = externalCallTarget(
     Void.pointer(),
     Void.pointer(),
     Void.pointer(),
+    canThrow=True
 )
 
 pyobj_len = externalCallTarget(
     "nativepython_pyobj_len",
     Int64,
-    Void.pointer()
+    Void.pointer(),
+    canThrow=True
 )
 
 getattr_pyobj = externalCallTarget(
     "nativepython_runtime_getattr_pyobj",
     Void.pointer(),
     Void.pointer(),
-    UInt8Ptr
+    UInt8Ptr,
+    canThrow=True
 )
 
 setattr_pyobj = externalCallTarget(
@@ -413,21 +428,24 @@ setattr_pyobj = externalCallTarget(
     Void,
     Void.pointer(),
     UInt8Ptr,
-    Void.pointer()
+    Void.pointer(),
+    canThrow=True
 )
 
 delitem_pyobj = externalCallTarget(
     "nativepython_runtime_delitem_pyobj",
     Void,
     Void.pointer(),
-    Void.pointer()
+    Void.pointer(),
+    canThrow=True
 )
 
 getitem_pyobj = externalCallTarget(
     "nativepython_runtime_getitem_pyobj",
     Void.pointer(),
     Void.pointer(),
-    Void.pointer()
+    Void.pointer(),
+    canThrow=True
 )
 
 setitem_pyobj = externalCallTarget(
@@ -435,7 +453,8 @@ setitem_pyobj = externalCallTarget(
     Void,
     Void.pointer(),
     Void.pointer(),
-    Void.pointer()
+    Void.pointer(),
+    canThrow=True
 )
 
 pyobj_to_typed = externalCallTarget(
@@ -444,7 +463,8 @@ pyobj_to_typed = externalCallTarget(
     Void.pointer(),
     Void.pointer(),
     Void.pointer(),
-    Bool
+    Bool,
+    canThrow=True
 )
 
 add_traceback = externalCallTarget(
@@ -495,13 +515,15 @@ class_cmp = externalCallTarget(
 string_chr_int64 = externalCallTarget(
     "nativepython_runtime_string_chr",
     Void.pointer(),
-    Int64
+    Int64,
+    canThrow=True
 )
 
 string_ord = externalCallTarget(
     "nativepython_runtime_string_ord",
     Int64,
-    Void.pointer()
+    Void.pointer(),
+    canThrow=True
 )
 
 string_getslice_int64 = externalCallTarget(
@@ -714,13 +736,15 @@ float32_to_string = externalCallTarget(
 float64_to_int = externalCallTarget(
     "nativepython_float64_to_int",
     Int64,
-    Float64
+    Float64,
+    canThrow=True
 )
 
 float32_to_int = externalCallTarget(
     "nativepython_float32_to_int",
     Int64,
-    Float32
+    Float32,
+    canThrow=True
 )
 
 bool_to_string = externalCallTarget(
@@ -916,27 +940,32 @@ pyobj_to_bytes = externalCallTarget(
 str_to_int64 = externalCallTarget(
     "np_str_to_int64",
     Int64,
-    Void.pointer()
+    Void.pointer(),
+    canThrow=True
 )
 
 str_to_float64 = externalCallTarget(
     "np_str_to_float64",
     Float64,
-    Void.pointer()
+    Void.pointer(),
+    canThrow=True
 )
 
 bytes_to_int64 = externalCallTarget(
     "np_bytes_to_int64",
     Int64,
-    Void.pointer()
+    Void.pointer(),
+    canThrow=True
 )
 
 bytes_to_float64 = externalCallTarget(
     "np_bytes_to_float64",
     Float64,
-    Void.pointer()
+    Void.pointer(),
+    canThrow=True
 )
 
+# sets the python exception state to an exception of type
 raise_exception_fastpath = externalCallTarget(
     "np_raise_exception_fastpath",
     Void,

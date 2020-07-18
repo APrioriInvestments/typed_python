@@ -1101,8 +1101,12 @@ extern "C" {
         if (l == 0.0) {
             return 0.0;
         }
+
         if (r == 0.0) {
-            throw std::runtime_error("mod by 0.0");
+            PyEnsureGilAcquired acquireTheGil;
+
+            PyErr_Format(PyExc_ZeroDivisionError, "float modulo");
+            throw PythonExceptionSet();
         }
 
         double mod = fmod(l, r);
@@ -2040,6 +2044,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
+    // set the python exception state, but don't actually throw.
     void np_raise_exception_fastpath(const char* message, const char* exceptionTypeName) {
         PyEnsureGilAcquired getTheGil;
 
@@ -2047,7 +2052,7 @@ extern "C" {
 
         PyObject* excType = PyObject_GetAttrString(module, exceptionTypeName);
         if (!excType) {
-            throw PythonExceptionSet();
+            return;
         }
 
         PyErr_SetString(excType, message);

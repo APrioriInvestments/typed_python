@@ -503,7 +503,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
             r2 = compiled(v)
             self.assertEqual(r1, r2)
 
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ValueError):
             compiled([0.1, 0.2, 0.3, "abc"])
 
         with self.assertRaises(TypeError):
