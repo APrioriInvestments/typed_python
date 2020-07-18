@@ -101,6 +101,7 @@ compileClassDestructor = externalCallTarget("np_compileClassDestructor", Void, V
 
 free = externalCallTarget("free", Void, UInt8Ptr)
 malloc = externalCallTarget("malloc", UInt8Ptr, Int64)
+
 realloc = externalCallTarget("realloc", UInt8Ptr, UInt8Ptr, Int64)
 memcpy = externalCallTarget("memcpy", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 memmove = externalCallTarget("memmove", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
@@ -567,6 +568,12 @@ string_join = externalCallTarget(
 
 string_split = externalCallTarget(
     "nativepython_runtime_string_split",
+    Void.pointer(),
+    Void.pointer(), Void.pointer(), Int64
+)
+
+bytes_split = externalCallTarget(
+    "nativepython_runtime_bytes_split",
     Void.pointer(),
     Void.pointer(), Void.pointer(), Int64
 )

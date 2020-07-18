@@ -29,12 +29,6 @@ class NamedTupleMasqueradingAsDict(MasqueradeWrapper):
     def interpreterTypeRepresentation(self):
         return dict
 
-    def convert_mutable_masquerade_to_untyped_type(self):
-        return typeWrapper(dict)
-
-    def convert_mutable_masquerade_to_untyped(self, context, instance):
-        return self.convert_masquerade_to_untyped(context, instance)
-
     def convert_masquerade_to_untyped(self, context, instance):
         emptyDict = context.constant(dict).convert_call([], {})
 

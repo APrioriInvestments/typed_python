@@ -73,6 +73,11 @@ public:
     //return an increffed bytes object containing a pointer to the requisite bytes
     static layout* createFromPtr(const char* data, int64_t len);
 
+    // split 'bytesLayout' depositing results into a ListOf<Bytes> in 'outList'
+    // if 'sep' is nullptr, split on whitespace
+    // max is the maximum number of splits. If its -1, then split as many times as is necessary
+    static void split(ListOfType::layout *outList, layout* bytesLayout, layout* sep, int64_t max);
+
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}
 
@@ -107,4 +112,8 @@ public:
     void copy_constructor(instance_ptr self, instance_ptr other);
 
     void assign(instance_ptr self, instance_ptr other);
+
+    static bool to_int64(layout* s, int64_t* value);
+
+    static bool to_float64(layout* s, double* value);
 };

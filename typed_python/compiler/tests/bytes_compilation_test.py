@@ -13,6 +13,9 @@
 #   limitations under the License.
 
 from typed_python import Compiled, Entrypoint, ListOf
+from typed_python.test_util import compilerPerformanceComparison
+import flaky
+
 import unittest
 import time
 
@@ -200,3 +203,52 @@ class TestBytesCompilation(unittest.TestCase):
         addConstants(1000000)
         # llvm should recognize that this is just 'N' and so it should take no time.
         self.assertLess(time.time() - t0, 1e-4)
+
+    def test_bytes_split(self):
+        def split(someBytes, *args):
+            return someBytes.split(*args)
+
+        compiledSplit = Entrypoint(split)
+
+        for args in [
+            (b'asdf',),
+            (b'asdf', b'blahblah'),
+            (b'asdf', b'a'),
+            (b'asdf', b's'),
+            (b'asdf', b'K'),
+            (b'asdf', b's', 0),
+            (b'a aaa bababa a',),
+            (b'a aaa bababa a', b'b'),
+            (b'a aaa bababa a', b'b', 1),
+            (b'a aaa bababa a', b'b', 2),
+            (b'a aaa bababa a', b'b', 3),
+            (b'a aaa bababa a', b'b', 4),
+            (b'a aaa bababa a', b'b', 5),
+            (b'a aaa bababa a', b'a', 5),
+            (b'a aaa bababa a', b'K', 5),
+        ]:
+            assert split(*args) == compiledSplit(*args)
+
+    @flaky.flaky(max_runs=3, min_passes=1)
+    def test_bytes_split_perf(self):
+        def splitAndCount(s: bytes, sep: bytes, times: int):
+            res = 0
+
+            for i in range(times):
+                res += len(s.split(sep))
+
+            return res
+
+        compiled, uncompiled = compilerPerformanceComparison(splitAndCount, (b"a,") * 100, b",", 100000)
+
+        # our string split function is about 6 times slower than python. Mostly due to memory management
+        # issues.
+        print(uncompiled / compiled, " times faster in compiler")
+
+        Entrypoint(splitAndCount)((b"a,") * 100, b",", 1000000)
+
+        self.assertTrue(
+            compiled < uncompiled * 10,
+            f"Expected compiled time {compiled} to be not much slower than uncompiled time {uncompiled}. "
+            f"Compiler was {compiled / uncompiled} times slower."
+        )

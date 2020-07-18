@@ -487,6 +487,18 @@ extern "C" {
         StringType::join(outString, separator, toJoin);
     }
 
+    ListOfType::layout* nativepython_runtime_bytes_split(BytesType::layout* l, BytesType::layout* sep, int64_t max) {
+        static ListOfType* listOfBytesT = ListOfType::Make(BytesType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfBytesT->constructor((instance_ptr)&outList);
+
+        BytesType::split(outList, l, sep, max);
+
+        return outList;
+    }
+
     ListOfType::layout* nativepython_runtime_string_split(StringType::layout* l, StringType::layout* sep, int64_t max) {
         static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
 
@@ -1910,38 +1922,29 @@ extern "C" {
         }
     }
 
-    int64_t np_bytes_to_int64(BytesType::layout* l) {
-        PyEnsureGilAcquired getTheGil;
-
-        PyObject* str_obj = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, l->data, l->bytecount);
-        if (!str_obj) {
+    int64_t np_bytes_to_int64(BytesType::layout* s) {
+        int64_t ret = 0;
+        if (BytesType::to_int64(s, &ret)) {
+            return ret;
+        }
+        else {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_SetString(PyExc_ValueError, "'invalid literal for int() with base 10");
             throw PythonExceptionSet();
         }
-        PyObject *long_obj = PyLong_FromUnicodeObject(str_obj, 10);
-        decref(str_obj);
-        if (!long_obj) {
-            throw PythonExceptionSet();
-        }
-        long ret = PyLong_AsLong(long_obj);
-        decref(long_obj);
-        return ret;
     }
 
-    double np_bytes_to_float64(BytesType::layout* l) {
-        PyEnsureGilAcquired getTheGil;
-
-        PyObject* str_obj = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, l->data, l->bytecount);
-        if (!str_obj) {
+    double np_bytes_to_float64(BytesType::layout* s) {
+        double ret = 0;
+        if (BytesType::to_float64(s, &ret)) {
+            return ret;
+        }
+        else {
+            PyEnsureGilAcquired getTheGil;
+            std::string asString(s->data, s->data + s->bytecount);
+            PyErr_Format(PyExc_ValueError, "could not convert string to float: '%s'", asString.c_str());
             throw PythonExceptionSet();
         }
-        PyObject *float_obj = PyFloat_FromString(str_obj);
-        decref(str_obj);
-        if (!float_obj) {
-            throw PythonExceptionSet();
-        }
-        double ret = PyFloat_AsDouble(float_obj);
-        decref(float_obj);
-        return ret;
     }
 
     double np_pyobj_to_float64(PythonObjectOfType::layout_type* obj) {

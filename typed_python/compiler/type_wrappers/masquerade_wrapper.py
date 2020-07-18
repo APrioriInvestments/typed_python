@@ -36,12 +36,6 @@ class MasqueradeWrapper(Wrapper):
     def getNativeLayoutType(self):
         return typeWrapper(self.typeRepresentation).getNativeLayoutType()
 
-    def convert_mutable_masquerade_to_untyped_type(self):
-        raise NotImplementedError("Subclasses implement")
-
-    def convert_mutable_masquerade_to_untyped(self, context, instance):
-        raise NotImplementedError("Subclasses implement")
-
     def convert_masquerade_to_untyped(self, context, instance):
         raise NotImplementedError("Subclasses implement")
 
@@ -88,61 +82,61 @@ class MasqueradeWrapper(Wrapper):
         return instance.convert_masquerade_to_untyped().convert_next()
 
     def convert_attribute(self, context, instance, attribute):
-        return instance.convert_masquerade_to_untyped().convert_attribute(attribute)
+        return instance.convert_masquerade_to_typed().convert_attribute(attribute)
 
     def convert_set_attribute(self, context, instance, attribute, value):
-        return instance.convert_masquerade_to_untyped().convert_set_attribute(attribute, value)
+        return instance.convert_masquerade_to_typed().convert_set_attribute(attribute, value)
 
     def convert_delitem(self, context, instance, item):
-        return instance.convert_masquerade_to_untyped().convert_delitem(item)
+        return instance.convert_masquerade_to_typed().convert_delitem(item)
 
     def convert_getitem(self, context, instance, item):
-        return instance.convert_masquerade_to_untyped().convert_getitem(item)
+        return instance.convert_masquerade_to_typed().convert_getitem(item)
 
     def convert_getslice(self, context, instance, lower, upper, step):
-        return instance.convert_masquerade_to_untyped().convert_getslice(lower, upper, step)
+        return instance.convert_masquerade_to_typed().convert_getslice(lower, upper, step)
 
     def convert_setitem(self, context, instance, index, value):
-        return instance.convert_masquerade_to_untyped().convert_setitem(index, value)
+        return instance.convert_masquerade_to_typed().convert_setitem(index, value)
 
     def convert_call(self, context, instance, args, kwargs):
         return instance.convert_masquerade_to_untyped().convert_call(args, kwargs)
 
     def convert_len(self, context, instance):
-        return instance.convert_masquerade_to_untyped().convert_len()
+        return instance.convert_masquerade_to_typed().convert_len()
 
     def convert_hash(self, context, instance):
-        return instance.convert_masquerade_to_untyped().convert_hash()
+        return instance.convert_masquerade_to_typed().convert_hash()
 
     def convert_abs(self, context, instance):
-        return instance.convert_masquerade_to_untyped().convert_abs()
+        return instance.convert_masquerade_to_typed().convert_abs()
 
     def can_cast_to_primitive(self, context, instance, primitiveType):
         return typeWrapper(self.interpreterTypeRepresentation).can_cast_to_primitive(context, instance, primitiveType)
 
     def convert_bool_cast(self, context, instance):
-        return instance.convert_masquerade_to_untyped().convert_bool_cast()
+        return instance.convert_masquerade_to_typed().convert_bool_cast()
 
     def convert_int_cast(self, context, instance):
-        return instance.convert_masquerade_to_untyped().convert_int_cast()
+        return instance.convert_masquerade_to_typed().convert_int_cast()
 
     def convert_float_cast(self, context, instance):
-        return instance.convert_masquerade_to_untyped().convert_float_cast()
+        return instance.convert_masquerade_to_typed().convert_float_cast()
 
     def convert_str_cast(self, context, instance):
-        return instance.convert_masquerade_to_untyped().convert_str_cast()
+        return instance.convert_masquerade_to_typed().convert_str_cast()
 
     def convert_bytes_cast(self, context, instance):
-        return instance.convert_masquerade_to_untyped().convert_bytes_cast()
+        return instance.convert_masquerade_to_typed().convert_bytes_cast()
 
     def convert_builtin(self, f, context, instance, a1=None):
-        return instance.convert_masquerade_to_untyped().convert_builtin(f, a1)
+        return instance.convert_masquerade_to_typed().convert_builtin(f, a1)
 
     def convert_repr(self, context, instance):
-        return instance.convert_masquerade_to_untyped().convert_repr()
+        return instance.convert_masquerade_to_typed().convert_repr()
 
     def convert_unary_op(self, context, instance, op):
-        return instance.convert_masquerade_to_untyped().convert_unary_op(op)
+        return instance.convert_masquerade_to_typed().convert_unary_op(op)
 
     def _can_convert_to_type(self, otherType, explicit):
         return typeWrapper(self.interpreterTypeRepresentation)._can_convert_to_type(otherType, explicit)
@@ -172,10 +166,10 @@ class MasqueradeWrapper(Wrapper):
         assert False, "this should never be called"
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        return instance.convert_masquerade_to_untyped().convert_method_call(methodname, args, kwargs)
+        return instance.convert_masquerade_to_typed().convert_method_call(methodname, args, kwargs)
 
     def convert_context_manager_enter(self, context, instance):
-        return instance.convert_masquerade_to_untyped().convert_context_manager_enter()
+        return instance.convert_masquerade_to_typed().convert_context_manager_enter()
 
     def convert_context_manager_exit(self, context, instance, args):
-        return instance.convert_masquerade_to_untyped().convert_context_manager_exit(args)
+        return instance.convert_masquerade_to_typed().convert_context_manager_exit(args)

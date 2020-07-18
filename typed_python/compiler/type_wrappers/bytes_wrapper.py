@@ -15,9 +15,11 @@
 from typed_python import sha_hash
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
+from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import TypedListMasqueradingAsList
 
-from typed_python import Int32
+from typed_python import Int32, ListOf
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -184,6 +186,46 @@ class BytesWrapper(RefcountedWrapper):
                 ).add(native_ast.const_int_expr(8))
             ).load().cast(native_ast.Int64)
         )
+
+    def convert_attribute(self, context, instance, attr):
+        if attr in ("split",):
+            return instance.changeType(BoundMethodWrapper.Make(self, attr))
+
+        return super().convert_attribute(context, instance, attr)
+
+    def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if kwargs:
+            return super().convert_method_call(context, instance, methodname, args, kwargs)
+
+        if methodname == "split":
+            if len(args) == 0:
+                sepPtr = VoidPtr.zero()
+                maxCount = native_ast.const_int_expr(-1)
+            elif len(args) == 1 and args[0].expr_type.typeRepresentation == bytes:
+                sepPtr = args[0].nonref_expr.cast(VoidPtr)
+                maxCount = native_ast.const_int_expr(-1)
+            elif len(args) == 2 and (
+                args[0].expr_type.typeRepresentation == bytes
+                and args[1].expr_type.typeRepresentation == int
+            ):
+                sepPtr = args[0].nonref_expr.cast(VoidPtr)
+                maxCount = args[1].nonref_expr
+            else:
+                maxCount = None
+
+            if maxCount is not None:
+                return context.push(
+                    TypedListMasqueradingAsList(ListOf(bytes)),
+                    lambda outBytes: outBytes.expr.store(
+                        runtime_functions.bytes_split.call(
+                            instance.nonref_expr.cast(VoidPtr),
+                            sepPtr,
+                            maxCount
+                        ).cast(outBytes.expr_type.getNativeLayoutType())
+                    )
+                )
+
+        return context.pushException(AttributeError, methodname)
 
     def convert_len_native(self, expr):
         return native_ast.Expression.Branch(

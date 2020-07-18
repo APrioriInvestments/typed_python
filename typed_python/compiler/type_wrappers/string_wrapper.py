@@ -17,7 +17,7 @@ from typed_python.compiler.global_variable_definition import GlobalVariableMetad
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python import Int32, Float32
 from typed_python.type_promotion import isInteger
-from typed_python.compiler.type_wrappers.list_of_wrapper import MasqueradingListOfWrapper
+from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import TypedListMasqueradingAsList
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 
@@ -510,7 +510,7 @@ class StringWrapper(RefcountedWrapper):
         elif methodname == "split":
             if len(args) == 0:
                 return context.push(
-                    MasqueradingListOfWrapper(ListOf(str)),
+                    TypedListMasqueradingAsList(ListOf(str)),
                     lambda outStrings: outStrings.expr.store(
                         runtime_functions.string_split_2.call(
                             instance.nonref_expr.cast(VoidPtr)
@@ -519,7 +519,7 @@ class StringWrapper(RefcountedWrapper):
                 )
             elif len(args) == 1 and args[0].expr_type.typeRepresentation == str:
                 return context.push(
-                    MasqueradingListOfWrapper(ListOf(str)),
+                    TypedListMasqueradingAsList(ListOf(str)),
                     lambda outStrings: outStrings.expr.store(
                         runtime_functions.string_split_3.call(
                             instance.nonref_expr.cast(VoidPtr),
@@ -529,7 +529,7 @@ class StringWrapper(RefcountedWrapper):
                 )
             elif len(args) == 1 and args[0].expr_type.typeRepresentation == int:
                 return context.push(
-                    MasqueradingListOfWrapper(ListOf(str)),
+                    TypedListMasqueradingAsList(ListOf(str)),
                     lambda outStrings: outStrings.expr.store(
                         runtime_functions.string_split_3max.call(
                             instance.nonref_expr.cast(VoidPtr),
@@ -539,7 +539,7 @@ class StringWrapper(RefcountedWrapper):
                 )
             elif len(args) == 2 and args[0].expr_type.typeRepresentation == str and args[1].expr_type.typeRepresentation == int:
                 return context.push(
-                    MasqueradingListOfWrapper(ListOf(str)),
+                    TypedListMasqueradingAsList(ListOf(str)),
                     lambda outStrings: outStrings.expr.store(
                         runtime_functions.string_split.call(
                             instance.nonref_expr.cast(VoidPtr),

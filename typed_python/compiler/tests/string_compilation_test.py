@@ -14,6 +14,7 @@
 
 from typed_python import _types, ListOf, TupleOf, Dict, ConstDict, Compiled, Entrypoint, OneOf
 from typed_python.test_util import currentMemUsageMb, compilerPerformanceComparison
+from typed_python.compiler.runtime import PrintNewFunctionVisitor
 import unittest
 import time
 import flaky
@@ -760,3 +761,48 @@ class TestStringCompilation(unittest.TestCase):
             return x["bd"]
 
         doIt({'bd': 'yes'})
+
+    def test_iterate_list_of_strings(self):
+        @Entrypoint
+        def sumSplit(x: str):
+            res = 0
+            for i in x.split(","):
+                res += int(i)
+            return res
+
+        assert sumSplit("1") == 1
+        assert sumSplit("1,2") == 3
+
+    def test_can_split_result_of_split(self):
+        @Entrypoint
+        def sumSplit(x: str):
+            res = 0
+            for segment in x.split(","):
+                for i in segment.split("."):
+                    res += int(i)
+            return res
+
+        assert sumSplit("1") == 1
+        assert sumSplit("1.2,2") == 5
+
+    def test_can_index_into_result_of_split(self):
+        @Entrypoint
+        def sumSplit(x: str):
+            res = 0
+            for segment in x.split(","):
+                fields = segment.split(".")
+                field0 = fields[0]
+                res += int(field0)
+            return res
+
+        with PrintNewFunctionVisitor():
+            assert sumSplit("1") == 1
+
+        assert sumSplit("1.2,2") == 3
+
+    def test_call_int_on_object(self):
+        @Entrypoint
+        def f(x: object):
+            return int(x)
+
+        assert f("1") == 1

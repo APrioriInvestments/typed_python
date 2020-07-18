@@ -299,6 +299,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         return True
 
     def convert_bool_cast(self, context, e):
+        e = context.constant(bool).convert_call((e,), {})
         return context.pushPod(
             bool,
             runtime_functions.pyobj_to_bool.call(
@@ -307,6 +308,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         )
 
     def convert_int_cast(self, context, e):
+        e = context.constant(int).convert_call((e,), {})
         return context.pushPod(
             int,
             runtime_functions.pyobj_to_int64.call(
@@ -315,6 +317,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         )
 
     def convert_float_cast(self, context, e):
+        e = context.constant(float).convert_call((e,), {})
         return context.pushPod(
             float,
             runtime_functions.pyobj_to_float64.call(
@@ -323,6 +326,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         )
 
     def convert_bytes_cast(self, context, e):
+        e = context.constant(bytes).convert_call((e,), {})
         return context.push(
             bytes,
             lambda bytesOut:
@@ -334,6 +338,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         )
 
     def convert_str_cast(self, context, e):
+        e = context.constant(str).convert_call((e,), {})
         return context.push(
             str,
             lambda strOut:

@@ -505,27 +505,3 @@ class ListOfWrapper(TupleOrListOfWrapper):
             return args[0].convert_to_type(self, True)
 
         return super().convert_type_call(context, typeInst, args, kwargs)
-
-
-class MasqueradingListOfWrapper(ListOfWrapper):
-    # A 'ListOf' that's masquerading as a regular 'list'
-    def __str__(self):
-        return "Masquerading" + super().__str__()
-
-    @property
-    def interpreterTypeRepresentation(self):
-        return list
-
-    def convert_mutable_masquerade_to_untyped_type(self):
-        return typeWrapper(list)
-
-    def convert_mutable_masquerade_to_untyped(self, context, instance):
-        return context.constant(list).convert_call([instance], {}).changeType(
-            typeWrapper(list)
-        )
-
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        # Allow the typed form of the object to perform the conversion
-        e = e.changeType(typeWrapper(self.typeRepresentation))
-
-        return e.convert_to_type_with_target(targetVal, explicit)

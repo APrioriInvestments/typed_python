@@ -878,9 +878,6 @@ class ExpressionConversionContext(object):
 
             Otherwise, None, and an exception will have been generated.
         """
-        args = [a.convert_mutable_masquerade_to_untyped() for a in args]
-        kwargs = {k: v.convert_mutable_masquerade_to_untyped() for k, v in kwargs.items()}
-
         argsOrErr = self.mapFunctionArguments(functionOverload, args, kwargs)
 
         if isinstance(argsOrErr, str):
@@ -922,9 +919,6 @@ class ExpressionConversionContext(object):
 
             Otherwise, if the mapping cannot be done, return None.
         """
-        args = [a.convert_mutable_masquerade_to_untyped_type() for a in args]
-        kwargs = {k: v.convert_mutable_masquerade_to_untyped_type() for k, v in kwargs.items()}
-
         argsOrErr = ExpressionConversionContext.mapFunctionArguments(
             functionOverload,
             [i for i in range(len(args))],
@@ -984,9 +978,6 @@ class ExpressionConversionContext(object):
 
             Otherwise, None, and an exception will have been generated.
         """
-        args = [a.convert_mutable_masquerade_to_untyped_type() for a in args]
-        kwargs = {k: v.convert_mutable_masquerade_to_untyped_type() for k, v in kwargs.items()}
-
         argsOrErr = ExpressionConversionContext.mapFunctionArguments(functionOverload, args, kwargs)
 
         if isinstance(argsOrErr, str):

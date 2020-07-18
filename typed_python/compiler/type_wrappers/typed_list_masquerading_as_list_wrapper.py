@@ -12,34 +12,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import typed_python
-
 from typed_python.compiler.type_wrappers.masquerade_wrapper import MasqueradeWrapper
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
-
-class TypedTupleMasqueradingAsTuple(MasqueradeWrapper):
-    """Models a 'NamedTuple' that's masquerading as a 'dict' for use in **kwargs."""
-
+class TypedListMasqueradingAsList(MasqueradeWrapper):
     def __init__(self, typeRepresentation):
         super().__init__(typeRepresentation)
 
     @property
     def interpreterTypeRepresentation(self):
-        return tuple
+        return list
 
     def convert_masquerade_to_untyped(self, context, instance):
-        return context.constant(tuple).convert_call([instance], {}).changeType(tuple)
-
-    def convert_bool_cast(self, context, expr):
-        return expr.convert_masquerade_to_typed().convert_bool_cast()
-
-    def convert_int_cast(self, context, expr):
-        return expr.convert_masquerade_to_typed().convert_int_cast()
-
-    def convert_float_cast(self, context, expr):
-        return expr.convert_masquerade_to_typed().convert_float_cast()
-
-    def convert_getitem(self, context, instance, item):
-        return instance.convert_masquerade_to_typed().convert_getitem(item)
+        return context.constant(list).convert_call([instance], {}).changeType(list)

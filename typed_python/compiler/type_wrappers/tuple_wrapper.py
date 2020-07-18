@@ -455,10 +455,7 @@ class MasqueradingTupleWrapper(TupleWrapper):
     def interpreterTypeRepresentation(self):
         return tuple
 
-    def convert_mutable_masquerade_to_untyped_type(self):
-        return typeWrapper(tuple)
-
-    def convert_mutable_masquerade_to_untyped(self, context, instance):
+    def convert_masquerade_to_untyped(self, context, instance):
         return context.constant(tuple).convert_call([instance], {}).changeType(typeWrapper(tuple))
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
