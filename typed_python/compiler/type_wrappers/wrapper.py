@@ -149,15 +149,21 @@ class Wrapper(object):
 
     def convert_attribute(self, context, instance, attribute):
         """Produce code to access 'attribute' on an object represented by TypedExpression 'instance'."""
+        if isinstance(self.typeRepresentation, type) and hasattr(self.typeRepresentation, attribute):
+            return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+                context,
+                self.typeRepresentation
+            ).convert_attribute(attribute)
+
         return context.pushException(
             AttributeError,
-            "%s object has no attribute %s" % (self, attribute)
+            "%s object has no attribute '%s'" % (self, attribute)
         )
 
     def convert_set_attribute(self, context, instance, attribute, value):
         return context.pushException(
             AttributeError,
-            "%s object has no attribute %s" % (self, attribute)
+            "%s object has no attribute '%s'" % (self, attribute)
         )
 
     def convert_delitem(self, context, instance, item):

@@ -81,7 +81,7 @@ class AlternativeWrapperMixin(ClassOrAlternativeWrapperMixin):
 
     def convert_method_call(self, context, instance, methodName, args, kwargs):
         if methodName not in self.typeRepresentation.__typed_python_methods__:
-            context.pushException(AttributeError, "Object has no attribute %s" % methodName)
+            context.pushException(AttributeError, "Object has no attribute '%s'" % methodName)
             return
 
         funcType = typeWrapper(self.typeRepresentation.__typed_python_methods__[methodName])
@@ -257,7 +257,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
         if len(validIndices) == 1:
             with context.ifelse(instance.nonref_expr.ElementPtrIntegers(0, 1).load().neq(validIndices[0])) as (then, otherwise):
                 with then:
-                    context.pushException(AttributeError, "Object has no attribute %s" % attribute)
+                    context.pushException(AttributeError, "Object has no attribute '%s'" % attribute)
             return self.refAs(context, instance, validIndices[0]).convert_attribute(attribute)
         else:
             outputType = OneOfWrapper.mergeTypes(possibleTypes)

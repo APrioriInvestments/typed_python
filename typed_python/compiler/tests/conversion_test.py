@@ -2881,3 +2881,11 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(
             check(), Entrypoint(check)()
         )
+
+    def test_compiler_can_see_type_members_of_instances(self):
+        @Entrypoint
+        def eltTypeOf(x):
+            return x.ElementType
+
+        assert eltTypeOf(ListOf(int)) == int
+        assert eltTypeOf(ListOf(int)()) == int

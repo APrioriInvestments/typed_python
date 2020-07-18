@@ -81,7 +81,10 @@ class PythonFreeObjectWrapper(Wrapper):
         try:
             attrVal = getattr(self.typeRepresentation.Value, attribute)
         except Exception:
-            return instance.convert_to_type(object).convert_attribute(attribute)
+            return context.pushException(
+                AttributeError,
+                "%s object has no attribute '%s'" % (self.typeRepresentation, attribute)
+            )
 
         return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
             context,
