@@ -44,22 +44,27 @@ def ListJob(InputT, FuncT, OutT):
         inputPtr = Member(PointerTo(InputT))
         isInitializedPtr = Member(PointerTo(bool))
         outputPtr = Member(PointerTo(OutT))
+        jobGranularity = Member(int)
+        maxIndex = Member(int)
         f = Member(FuncT)
 
-        def __init__(self, inputPtr, f, outputPtr, isInitializedPtr):
+        def __init__(self, inputPtr, f, outputPtr, isInitializedPtr, jobGranularity, maxIndex):
             self.inputPtr = inputPtr
             self.outputPtr = outputPtr
             self.isInitializedPtr = isInitializedPtr
             self.outputQueue = TypedQueue(int)()
             self.exceptionQueue = TypedQueue(Tuple(int, object))()
+            self.jobGranularity = jobGranularity
+            self.maxIndex = maxIndex
             self.f = f
 
         def execute(self, i: int) -> None:
             try:
-                (self.outputPtr + i).initialize(self.f(self.inputPtr[i]))
-                self.isInitializedPtr[i] = True
+                for jobIx in range(i * self.jobGranularity, min(self.maxIndex, (i + 1) * self.jobGranularity)):
+                    (self.outputPtr + jobIx).initialize(self.f(self.inputPtr[jobIx]))
+                    self.isInitializedPtr[jobIx] = True
             except Exception as e:
-                self.exceptionQueue.put(Tuple(int, object)((i, e)))
+                self.exceptionQueue.put(Tuple(int, object)((jobIx, e)))
 
             self.outputQueue.put(i)
 
@@ -93,8 +98,15 @@ def pmap(lst, f, OutT):
         lst - a ListOf of some type
         f - a function from lst.ElementType to OutT
         OutT - the result type
+        jobGranularity - how many items we should dispatch at once.
+            If you have very small tasks, you'll spend far more time
+            locking and unlocking the queue than you will actually
+            doing work. If None, this will pick something that tries to
+            avoid creating too many jobs
     """
     ensureThreads()
+
+    jobGranularity = max(1, len(lst) // (int(os.cpu_count()) * 30))
 
     # make a list of objects but don't initialize any of them.
     # some objects don't have default constructors and we want to
@@ -111,16 +123,20 @@ def pmap(lst, f, OutT):
         lst.pointerUnsafe(0),
         f,
         res.pointerUnsafe(0),
-        isInitialized.pointerUnsafe(0)
+        isInitialized.pointerUnsafe(0),
+        jobGranularity,
+        len(lst)
     )
 
     # fill out the work queue
-    for i in range(len(lst)):
+    jobCount = len(lst) // jobGranularity
+
+    for i in range(jobCount):
         tup = Tuple(Job, int)((job, i))
         work_queue.put(tup)
 
     # block until the work queue is complete
-    job.outputQueue.getMany(len(lst), len(lst))
+    job.outputQueue.getMany(jobCount, jobCount)
 
     # check if any of our threads excepted, and if so
     # raise the earliest one in the sequence.
