@@ -311,8 +311,10 @@ class TupleWrapper(Wrapper):
         return [self.refAs(context, expr, i) for i in range(len(self.subTypeWrappers))]
 
     def convert_type_call(self, context, typeInst, args, kwargs):
-        context.pushException(TypeError, f"Can't initialize {self.typeRepresentation} with this signature")
-        return
+        if len(args) == 1 and not kwargs:
+            return args[0].convert_to_type(self)
+
+        return context.pushException(TypeError, f"Can't initialize {self.typeRepresentation} with this signature")
 
     def convert_type_call_on_container_expression(self, context, typeInst, argExpr):
         if not (argExpr.matches.Tuple or argExpr.matches.List):

@@ -14,7 +14,7 @@
 
 from typed_python import (
     Function, OneOf, Alternative,
-    Value, ListOf, NotCompiled, TupleOf
+    Value, ListOf, NotCompiled, TupleOf, Tuple
 )
 from typed_python.compiler.runtime import Entrypoint
 import unittest
@@ -248,3 +248,12 @@ class TestTypeInference(unittest.TestCase):
             return aTup
 
         assert returnTupElts.resultTypeFor(int).typeRepresentation is tuple
+
+    def test_tuple_as_variable_traces_properly(self):
+        @Entrypoint
+        def returnTupElts(x):
+            aTup = (1, 2, x)
+
+            return Tuple(int, int, float)(aTup)
+
+        assert returnTupElts.resultTypeFor(float).typeRepresentation is Tuple(int, int, float)

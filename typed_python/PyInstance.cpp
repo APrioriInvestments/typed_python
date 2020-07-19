@@ -37,7 +37,6 @@
 #include "PyNoneInstance.hpp"
 #include "PyRegisterTypeInstance.hpp"
 #include "PyValueInstance.hpp"
-#include "PyValueInstance.hpp"
 #include "PyPythonSubclassInstance.hpp"
 #include "PyPythonObjectOfTypeInstance.hpp"
 #include "PyOneOfInstance.hpp"
