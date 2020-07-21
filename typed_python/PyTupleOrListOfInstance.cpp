@@ -737,7 +737,7 @@ PyObject* PyListOfInstance::listPop(PyObject* o, PyObject* args) {
 
 PyObject* PyListOfInstance::listTranspose(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) != 0) {
-        PyErr_SetString(PyExc_TypeError, "ListOf.trasnpose takes zero arguments");
+        PyErr_SetString(PyExc_TypeError, "ListOf.transpose takes zero arguments");
         return NULL;
     }
 

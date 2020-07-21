@@ -483,8 +483,12 @@ extern "C" {
         return StringType::find(l, sub, start, l ? l->pointcount : 0);
     }
 
-    void nativepython_runtime_string_join(StringType::layout** outString, StringType::layout* separator, ListOfType::layout* toJoin) {
-        StringType::join(outString, separator, toJoin);
+    void nativepython_runtime_bytes_join(BytesType::layout** out, BytesType::layout* separator, ListOfType::layout* toJoin) {
+        BytesType::join(out, separator, toJoin);
+    }
+
+    void nativepython_runtime_string_join(StringType::layout** out, StringType::layout* separator, ListOfType::layout* toJoin) {
+        StringType::join(out, separator, toJoin);
     }
 
     ListOfType::layout* nativepython_runtime_bytes_split(BytesType::layout* l, BytesType::layout* sep, int64_t max) {
@@ -495,6 +499,30 @@ extern "C" {
         listOfBytesT->constructor((instance_ptr)&outList);
 
         BytesType::split(outList, l, sep, max);
+
+        return outList;
+    }
+
+    ListOfType::layout* nativepython_runtime_bytes_rsplit(BytesType::layout* l, BytesType::layout* sep, int64_t max) {
+        static ListOfType* listOfBytesT = ListOfType::Make(BytesType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfBytesT->constructor((instance_ptr)&outList);
+
+        BytesType::rsplit(outList, l, sep, max);
+
+        return outList;
+    }
+
+    ListOfType::layout* nativepython_runtime_bytes_splitlines(BytesType::layout* l, bool keepends) {
+        static ListOfType* listOfBytesT = ListOfType::Make(BytesType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfBytesT->constructor((instance_ptr)&outList);
+
+        BytesType::splitlines(outList, l, keepends);
 
         return outList;
     }
@@ -591,6 +619,10 @@ extern "C" {
         return StringType::getitem(lhs, index);
     }
 
+    StringType::layout* nativepython_runtime_string_mult(StringType::layout* lhs, int64_t rhs) {
+        return StringType::mult(lhs, rhs);
+    }
+
     StringType::layout* nativepython_runtime_string_chr(int64_t code) {
         if (code < 0 || code > 0x10ffff) {
             PyEnsureGilAcquired getTheGil;
@@ -668,6 +700,90 @@ extern "C" {
 
     BytesType::layout* nativepython_runtime_bytes_from_ptr_and_len(const char* utf8_str, int64_t len) {
         return BytesType::createFromPtr(utf8_str, len);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_lower(BytesType::layout* l) {
+        return BytesType::lower(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_upper(BytesType::layout* l) {
+        return BytesType::upper(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_capitalize(BytesType::layout* l) {
+        return BytesType::capitalize(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_swapcase(BytesType::layout* l) {
+        return BytesType::swapcase(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_title(BytesType::layout* l) {
+        return BytesType::title(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_strip(BytesType::layout* l, bool fromLeft, bool fromRight) {
+        return BytesType::strip(l, true, nullptr, fromLeft, fromRight);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_strip2(BytesType::layout* l, BytesType::layout* values, bool fromLeft, bool fromRight) {
+        return BytesType::strip(l, false, values, fromLeft, fromRight);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_mult(BytesType::layout* lhs, int64_t rhs) {
+        return BytesType::mult(lhs, rhs);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_replace(
+            BytesType::layout* l,
+            BytesType::layout* old,
+            BytesType::layout* the_new,
+            int64_t count
+    ) {
+        return BytesType::replace(l, old, the_new, count);
+    }
+
+    StringType::layout* nativepython_runtime_bytes_decode(
+            BytesType::layout* l,
+            StringType::layout* encoding,
+            StringType::layout* errors
+    ) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* b = PyInstance::extractPythonObject((instance_ptr)&l, BytesType::Make());
+        if (!b) {
+            throw PythonExceptionSet();
+        }
+
+        char* utf8_encoding = encoding ? strdup(StringType::Make()->toUtf8String((instance_ptr)&encoding).c_str()) : 0;
+        const char* utf8_errors = errors ? StringType::Make()->toUtf8String((instance_ptr)&errors).c_str() : 0;
+        PyObject* s = PyUnicode_FromEncodedObject(b, utf8_encoding, utf8_errors);
+        free(utf8_encoding);
+        decref(b);
+        if (!s) {
+            throw PythonExceptionSet();
+        }
+
+        StringType::layout* ret = 0;
+        PyInstance::copyConstructFromPythonInstance(StringType::Make(), (instance_ptr)&ret, s, true);
+        decref(s);
+
+        return ret;
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_translate(
+            BytesType::layout* l,
+            BytesType::layout* table,
+            BytesType::layout* to_delete
+    ) {
+        return BytesType::translate(l, table, to_delete);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_maketrans(
+            BytesType::layout* from,
+            BytesType::layout* to
+    ) {
+        return BytesType::maketrans(from, to);
     }
 
     PythonObjectOfType::layout_type* nativepython_runtime_create_pyobj(PyObject* p) {
