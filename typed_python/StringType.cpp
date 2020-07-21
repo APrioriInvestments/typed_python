@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -101,34 +101,42 @@ StringType::layout* StringType::concatenate(layout* lhs, layout* rhs) {
     return new_layout;
 }
 
-StringType::layout* StringType::lower(layout *l) {
-    if (!l) {
-        return l;
-    }
-
-    int64_t new_byteCount = sizeof(layout) + l->pointcount * l->bytes_per_codepoint;
-    layout* new_layout = (layout*)malloc(new_byteCount);
+// Apply a PyUnicode_* function to each point of a string
+template<class T, class pyunicode_fn>
+inline StringType::layout* unicode_generic(pyunicode_fn& operation, T* data, StringType::layout* l)
+{
+    int32_t allocated_points = l->pointcount;
+    int64_t new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+    StringType::layout* new_layout = (StringType::layout*)malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
-    new_layout->pointcount = l->pointcount;
+    int32_t new_pointcount = l->pointcount;
 
-    if (l->bytes_per_codepoint == 1) {
-        for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->pointcount; src < end; ) {
-            *dest++ = (uint8_t)tolower(*src++);
+    Py_UCS4 buf[7];
+    int k = 0;
+    int32_t increment = 8; // large enough to hold any result from a single character
+    for (T* src = data, *end = src + l->pointcount; src < end; ) {
+        int n = operation((Py_UCS4)(*src++), buf);
+        if (n > 1) {
+            new_pointcount += n - 1;
+            if (new_pointcount > allocated_points) {
+                allocated_points += increment;
+                increment = (increment * 3) / 2;
+                new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+                new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+            }
+        }
+        for (int j = 0; j < n; j++) {
+            ((T*)(new_layout->data))[k++] = (T)buf[j];
         }
     }
-    else if (l->bytes_per_codepoint == 2) {
-        for (uint16_t *src = (uint16_t *)l->data, *dest = (uint16_t *)new_layout->data, *end = src + l->pointcount; src < end; ) {
-            *dest++ = (uint16_t)towlower(*src++);
-        }
+    if (allocated_points > new_pointcount) {
+        allocated_points = new_pointcount;
+        new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+        new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
     }
-    else if (l->bytes_per_codepoint == 4) {
-        for (uint32_t *src = (uint32_t *)l->data, *dest = (uint32_t *)new_layout->data, *end = src + l->pointcount; src < end; ) {
-            *dest++ = (uint32_t)towlower(*src++);
-        }
-    }
-
+    new_layout->pointcount = new_pointcount;
     return new_layout;
 }
 
@@ -137,30 +145,285 @@ StringType::layout* StringType::upper(layout *l) {
         return l;
     }
 
-    int64_t new_byteCount = sizeof(layout) + l->pointcount * l->bytes_per_codepoint;
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    if (l->bytes_per_codepoint == 1) {
+        return unicode_generic(_PyUnicode_ToUpperFull, (uint8_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        return unicode_generic(_PyUnicode_ToUpperFull, (uint16_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        return unicode_generic(_PyUnicode_ToUpperFull, (uint32_t*)(l->data), l);
+    }
+    return 0; // error
+}
+
+StringType::layout* StringType::lower(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    if (l->bytes_per_codepoint == 1) {
+        return unicode_generic(_PyUnicode_ToLowerFull, (uint8_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        return unicode_generic(_PyUnicode_ToLowerFull, (uint16_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        return unicode_generic(_PyUnicode_ToLowerFull, (uint32_t*)(l->data), l);
+    }
+    return 0; // error
+}
+
+StringType::layout* StringType::casefold(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    if (l->bytes_per_codepoint == 1) {
+        return unicode_generic(_PyUnicode_ToFoldedFull, (uint8_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        return unicode_generic(_PyUnicode_ToFoldedFull, (uint16_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        return unicode_generic(_PyUnicode_ToFoldedFull, (uint32_t*)(l->data), l);
+    }
+    return 0; // error
+}
+
+template<class T>
+inline StringType::layout* capitalize_generic(T* data, StringType::layout* l)
+{
+    int32_t allocated_points = l->pointcount;
+    int64_t new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+    StringType::layout* new_layout = (StringType::layout*)malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
-    new_layout->pointcount = l->pointcount;
+    int32_t new_pointcount = l->pointcount;
+
+    Py_UCS4 buf[7];
+    int k = 0;
+    int32_t increment = 8; // large enough to hold any result from a single character
+    for (T* src = data, *end = src + l->pointcount; src < end; ) {
+        int n = (src == data)
+                ? _PyUnicode_ToUpperFull((Py_UCS4)(*src++), buf)
+                : _PyUnicode_ToLowerFull((Py_UCS4)(*src++), buf);
+        if (n > 1) {
+            new_pointcount += n - 1;
+            if (new_pointcount > allocated_points) {
+                allocated_points += increment;
+                increment = (increment * 3) / 2;
+                new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+                new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+            }
+        }
+        for (int j = 0; j < n; j++) {
+            ((T*)(new_layout->data))[k++] = (T)buf[j];
+        }
+    }
+    if (allocated_points > new_pointcount) {
+        allocated_points = new_pointcount;
+        new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+        new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+    }
+    new_layout->pointcount = new_pointcount;
+    return new_layout;
+}
+
+StringType::layout* StringType::capitalize(layout *l) {
+    if (!l) {
+        return l;
+    }
 
     if (l->bytes_per_codepoint == 1) {
-        for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->pointcount; src < end; ) {
-            *dest++ = (uint8_t)toupper(*src++);
-        }
+        return capitalize_generic((uint8_t*)(l->data), l);
     }
     else if (l->bytes_per_codepoint == 2) {
-        for (uint16_t *src = (uint16_t *)l->data, *dest = (uint16_t *)new_layout->data, *end = src + l->pointcount; src < end; ) {
-            *dest++ = (uint16_t)towupper(*src++);
-        }
+        return capitalize_generic((uint16_t*)(l->data), l);
     }
     else if (l->bytes_per_codepoint == 4) {
-        for (uint32_t *src = (uint32_t *)l->data, *dest = (uint32_t *)new_layout->data, *end = src + l->pointcount; src < end; ) {
-            *dest++ = (uint32_t)towupper(*src++);
+        return capitalize_generic((uint32_t*)(l->data), l);
+    }
+    return 0; // error
+}
+
+template<class T>
+inline void swapcase_generic(T* src, uint32_t pointcount, T* dest) {
+    for (T* end = src + pointcount; src < end; ) {
+        T c = *src++;
+        if (iswlower(c))
+            *dest++ = (T)towupper(c);
+        else if (iswupper(c))
+            *dest++ = (T)towlower(c);
+        else
+            *dest++ = c;
+    }
+}
+
+template<class T>
+inline StringType::layout* swapcase_generic(T* data, StringType::layout* l)
+{
+    int32_t allocated_points = l->pointcount;
+    int64_t new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+    StringType::layout* new_layout = (StringType::layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
+    int32_t new_pointcount = l->pointcount;
+
+    Py_UCS4 buf[7];
+    int k = 0;
+    int32_t increment = 8; // large enough to hold any result from a single character
+    for (T* src = data, *end = src + l->pointcount; src < end; ) {
+        bool make_upper = _PyUnicode_IsLowercase(*src);
+        bool just_copy = !make_upper && !_PyUnicode_IsUppercase(*src);
+        if (just_copy) {
+            ((T*)(new_layout->data))[k++] = *src++;
+            continue;
+        }
+        int n = make_upper
+                ? _PyUnicode_ToUpperFull((Py_UCS4)(*src++), buf)
+                : _PyUnicode_ToLowerFull((Py_UCS4)(*src++), buf);
+        if (n > 1) {
+            new_pointcount += n - 1;
+            if (new_pointcount > allocated_points) {
+                allocated_points += increment;
+                increment = (increment * 3) / 2;
+                new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+                new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+            }
+        }
+        for (int j = 0; j < n; j++) {
+            ((T*)(new_layout->data))[k++] = (T)buf[j];
         }
     }
-
+    if (allocated_points > new_pointcount) {
+        allocated_points = new_pointcount;
+        new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+        new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+    }
+    new_layout->pointcount = new_pointcount;
     return new_layout;
+}
+
+StringType::layout* StringType::swapcase(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    if (l->bytes_per_codepoint == 1) {
+        return swapcase_generic((uint8_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        return swapcase_generic((uint16_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        return swapcase_generic((uint32_t*)(l->data), l);
+    }
+    return 0; // error
+}
+
+template<class T>
+inline void title_generic(T* src, uint32_t pointcount, T* dest) {
+    bool word = false;
+    for (T* end = src + pointcount; src < end; ) {
+        T c = *src++;
+        if (word) {
+            if (iswalpha(c)) {
+                *dest++ = (T)towlower(c);
+            } else {
+                *dest++ = c;
+                word = false;
+            }
+        } else {
+            if (iswalpha(c)) {
+                *dest++ = (T)towupper(c);
+                word = true;
+            } else {
+                *dest++ = c;
+            }
+        }
+    }
+}
+
+template<class T>
+inline StringType::layout* title_generic(T* data, StringType::layout* l)
+{
+    int32_t allocated_points = l->pointcount;
+    int64_t new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+    StringType::layout* new_layout = (StringType::layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
+    int32_t new_pointcount = l->pointcount;
+
+    Py_UCS4 buf[7];
+    int k = 0;
+    bool word = false;
+    int32_t increment = 8; // large enough to hold any result from a single character
+    for (T* src = data, *end = src + l->pointcount; src < end; ) {
+        Py_UCS4 c = (Py_UCS4)(*src);
+        bool make_lower = false;
+        bool make_title = false;
+        if (word) {
+            if (_PyUnicode_IsAlpha(c))  {
+                make_lower = true;
+            }
+            else {
+                word = false;
+            }
+        }
+        else {
+            if (_PyUnicode_IsAlpha(c))  {
+                make_title = true;
+                word = true;
+            }
+        }
+        if (!make_lower && !make_title) {
+            ((T*)(new_layout->data))[k++] = *src++;
+            continue;
+        }
+        int n = make_title
+                ? _PyUnicode_ToTitleFull((Py_UCS4)(*src++), buf)
+                : _PyUnicode_ToLowerFull((Py_UCS4)(*src++), buf);
+        if (n > 1) {
+            new_pointcount += n - 1;
+            if (new_pointcount > allocated_points) {
+                allocated_points += increment;
+                increment = (increment * 3) / 2;
+                new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+                new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+            }
+        }
+        for (int j = 0; j < n; j++) {
+            ((T*)(new_layout->data))[k++] = (T)buf[j];
+        }
+    }
+    if (allocated_points > new_pointcount) {
+        allocated_points = new_pointcount;
+        new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+        new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+    }
+    new_layout->pointcount = new_pointcount;
+    return new_layout;
+}
+
+StringType::layout* StringType::title(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    if (l->bytes_per_codepoint == 1) {
+        return title_generic((uint8_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        return title_generic((uint16_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        return title_generic((uint32_t*)(l->data), l);
+    }
+    return 0; // error
 }
 
 uint32_t StringType::getpoint(layout *l, uint64_t i) {
@@ -227,59 +490,118 @@ int64_t StringType::find(layout *l, layout *sub, int64_t start, int64_t stop) {
     return -1;
 }
 
-void StringType::split_3(ListOfType::layout* outList, layout* l, int64_t max) {
-    if (!outList)
-        throw std::invalid_argument("missing return argument");
-
-    static ListOfType* listofstring = ListOfType::Make(StringType::Make());
-    listofstring->resize((instance_ptr)&outList, 0, 0);
-
-    if (!l || !l->pointcount)
-        ;
-    else if (max == 0) {
-        // unexpected standard behavior:
-        //   "   abc   ".split(maxsplit=0) = "abc   "  *** not "abc" nor "   abc   " ***
-        int64_t cur = 0;
-        while (cur < l->pointcount && uprops[getpoint(l, cur)] & Uprops_SPACE)
-            cur++;
-        layout* remainder = getsubstr(l, cur, l->pointcount);
-        listofstring->append((instance_ptr)&outList, (instance_ptr)&remainder);
-        destroyStatic((instance_ptr)&remainder);
+int64_t StringType::rfind(layout *l, layout *sub, int64_t start, int64_t stop) {
+    if (!l || !l->pointcount) {
+        if (!sub || !sub->pointcount)
+            return start > 0 ? -1 : 0;
+        return -1;
     }
-    else {
-        int64_t cur = 0;
-        int64_t count = 0;
-        while (cur < l->pointcount) {
-            int64_t match = cur;
-            while (!(uprops[getpoint(l, match)] & Uprops_SPACE)) {
-                match++;
-                if (match >= l->pointcount) {
-                    match = -1;
-                    break;
-                }
+    if (start < 0) {
+        start += l->pointcount;
+        if (start < 0) start = 0;
+    }
+    if (stop < 0) {
+        stop += l->pointcount;
+        if (stop < 0) stop = 0;
+    }
+    if (stop < start || start > l->pointcount)
+        return -1;
+    if (stop > l->pointcount)
+        stop = l->pointcount;
+    if (!sub || !sub->pointcount)
+        return stop;
+
+    stop -= (sub->pointcount - 1);
+
+    if (start < 0 || stop < 0 || start >= stop || sub->pointcount > l->pointcount || start > l->pointcount - sub->pointcount)
+        return -1;
+
+    if (l->bytes_per_codepoint == 1 and sub->bytes_per_codepoint == 1 && sub->pointcount == 1) {
+        const uint8_t* lPtr = (const uint8_t*)l->data;
+        const uint8_t subChar = sub->data[0];
+
+        for (int64_t i = stop - 1; i >= start; i--) {
+            if (lPtr[i] == subChar) {
+                return i;
             }
-            if (match < 0)
+        }
+        return -1;
+    }
+
+    for (int64_t i = stop - 1; i >= start; i--) {
+        bool match = true;
+        for (int64_t j = 0; j < sub->pointcount; j++) {
+            if (getpoint(l, i+j) != getpoint(sub, j)) {
+                match = false;
                 break;
-            if (cur != match) {
-                layout* piece = getsubstr(l, cur, match);
-                listofstring->append((instance_ptr)&outList, (instance_ptr)&piece);
-                destroyStatic((instance_ptr)&piece);
+            }
+        }
+        if (match) {
+            return i;
+            }
+    }
+
+    return -1;
+}
+
+int64_t StringType::count(layout *l, layout *sub, int64_t start, int64_t stop) {
+    int64_t count = 0;
+
+    if (!l || !l->pointcount) {
+        return 0;
+    }
+    if (start < 0) {
+        start += l->pointcount;
+        if (start < 0) start = 0;
+    }
+    if (stop < 0) {
+        stop += l->pointcount;
+        if (stop < 0) stop = 0;
+    }
+    if (stop < start || start > l->pointcount) {
+        return 0;
+    }
+    if (stop > l->pointcount) {
+        stop = l->pointcount;
+    }
+    if (!sub || !sub->pointcount) {
+        if (start > l->pointcount) return 0;
+        count = stop - start + 1;
+        return count >= 0 ? count : 0;
+    }
+
+    stop -= (sub->pointcount - 1);
+
+    if (start < 0 || stop < 0 || start >= stop || sub->pointcount > l->pointcount || start > l->pointcount - sub->pointcount)
+        return 0;
+
+    if (l->bytes_per_codepoint == 1 and sub->bytes_per_codepoint == 1 && sub->pointcount == 1) {
+        const uint8_t* lPtr = (const uint8_t*)l->data;
+        const uint8_t subChar = sub->data[0];
+
+        for (int64_t i = start; i < stop; i++) {
+            if (lPtr[i] == subChar) {
                 count++;
             }
-            cur = match + 1;
-            if (max >= 0 && count >= max)
-                break;
         }
-        while (cur < l->pointcount && uprops[getpoint(l, cur)] & Uprops_SPACE)
-            cur++;
-        if (cur < l->pointcount) {
-            layout* remainder = getsubstr(l, cur, l->pointcount);
-            listofstring->append((instance_ptr)&outList, (instance_ptr)&remainder);
-            destroyStatic((instance_ptr)&remainder);
+        return count;
+    }
+
+    for (int64_t i = start; i < stop; i++) {
+        bool match = true;
+        for (int64_t j = 0; j < sub->pointcount; j++) {
+            if (getpoint(l, i+j) != getpoint(sub, j)) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            count++;
+            i += sub->pointcount - 1;
         }
     }
-    // to force a refcount error, uncomment the line below
-    //listofstring->copy_constructor((instance_ptr)&outList, (instance_ptr)&outList);
+
+    return count;
 }
 
 void StringType::split(ListOfType::layout* outList, layout* l, layout* sep, int64_t max) {
@@ -289,80 +611,189 @@ void StringType::split(ListOfType::layout* outList, layout* l, layout* sep, int6
     static ListOfType* listofstring = ListOfType::Make(StringType::Make());
     listofstring->resize((instance_ptr)&outList, 0, 0);
 
-    if (!sep || !sep->pointcount) {
-        throw std::invalid_argument("ValueError: empty separator");
-    }
-    else if (!l || !l->pointcount || max == 0) {
-        listofstring->append((instance_ptr)&outList, (instance_ptr)&l);
-    }
-    else if (l->bytes_per_codepoint == 1 and sep->bytes_per_codepoint == 1 and sep->pointcount == 1) {
-        int64_t cur = 0;
-        int64_t count = 0;
+    int64_t sep_bytes_per_codepoint = sep ? sep->bytes_per_codepoint : 1;
+    int64_t sep_pointcount = sep ? sep->pointcount : 1;
 
-        listofstring->reserve((instance_ptr)&outList, 10);
-
-        uint8_t* lData = (uint8_t*)l->data;
-        uint8_t sepChar = *(uint8_t*)sep->data;
-
-        while (cur < l->pointcount) {
-            int64_t match = cur;
-
-            while (match < l->pointcount && lData[match] != sepChar) {
-                match++;
-            }
-
-            if (match >= l->pointcount) {
-                break;
-            }
-
-            layout* piece = getsubstr(l, cur, match);
-
-            if (outList->count == outList->reserved) {
-                listofstring->reserve((instance_ptr)&outList, outList->reserved * 1.5);
-            }
-
-            ((layout**)outList->data)[outList->count++] = piece;
-
-            cur = match + 1;
-
-            count++;
-
-            if (max >= 0 && count >= max)
-                break;
+    if (!l || !l->pointcount) {
+        if (sep && sep->pointcount) {
+            listofstring->append((instance_ptr)&outList, (instance_ptr)&l);
         }
-        layout* remainder = getsubstr(l, cur, l->pointcount);
-        listofstring->append((instance_ptr)&outList, (instance_ptr)&remainder);
-        destroyStatic((instance_ptr)&remainder);
+        return;
     }
-    else {
-        int64_t cur = 0;
-        int64_t count = 0;
+    int64_t cur = 0;
+    int64_t count = 0;
 
-        listofstring->reserve((instance_ptr)&outList, 10);
+    listofstring->reserve((instance_ptr)&outList, 10);
 
-        while (cur < l->pointcount) {
-            int64_t match = find(l, sep, cur, l->pointcount);
-            if (match < 0)
-                break;
+    while ((count < max || max < 0) && cur < l->pointcount) {
+        int64_t match = cur;
 
+        if (sep && l->bytes_per_codepoint == 1 && sep_bytes_per_codepoint == 1 && sep_pointcount == 1) {
+            while (match < l->pointcount && l->data[match] != sep->data[0]) match++;
+        } else if (sep) {
+            match = find(l, sep, cur, l->pointcount);
+            if (match == -1) match = l->pointcount;
+        } else {
+            while (match < l->pointcount && !(uprops[getpoint(l, match)] & Uprops_SPACE)) match++;
+        }
+        if (match >= l->pointcount) break;
+
+        if (sep || match != cur) {
             layout* piece = getsubstr(l, cur, match);
-
             if (outList->count == outList->reserved) {
                 listofstring->reserve((instance_ptr)&outList, outList->reserved * 1.5);
             }
-
             ((layout**)outList->data)[outList->count++] = piece;
 
-            cur = match + sep->pointcount;
+            cur = match + sep_pointcount;
+
             count++;
             if (max >= 0 && count >= max)
                 break;
         }
+        else if (!sep) {
+            cur++;
+        }
+    }
+    if (!sep) {
+        while (cur < l->pointcount && (uprops[getpoint(l, cur)] & Uprops_SPACE)) {
+            cur++;
+        }
+    }
+    if (sep || cur < l->pointcount || max == 0) {
         layout* remainder = getsubstr(l, cur, l->pointcount);
-        listofstring->append((instance_ptr)&outList, (instance_ptr)&remainder);
-        destroyStatic((instance_ptr)&remainder);
+        if (outList->count == outList->reserved) {
+            listofstring->reserve((instance_ptr)&outList, outList->reserved + 1);
+        }
+        ((layout**)outList->data)[outList->count++] = remainder;
     }
 }
+
+void StringType::rsplit(ListOfType::layout* outList, layout* l, layout* sep, int64_t max) {
+    if (!outList)
+        throw std::invalid_argument("missing return argument");
+
+    static ListOfType* listofstring = ListOfType::Make(StringType::Make());
+    listofstring->resize((instance_ptr)&outList, 0, 0);
+
+    int64_t sep_bytes_per_codepoint = sep ? sep->bytes_per_codepoint : 1;
+    int64_t sep_pointcount = sep ? sep->pointcount : 1;
+
+    if (!l || !l->pointcount) {
+        if (sep && sep->pointcount) {
+            listofstring->append((instance_ptr)&outList, (instance_ptr)&l);
+        }
+        return;
+    }
+    int64_t cur = l->pointcount - 1;
+    int64_t count = 0;
+
+    listofstring->reserve((instance_ptr)&outList, 10);
+
+    while ((count < max || max < 0) && cur >= 0) {
+        int64_t match = cur;
+
+        if (sep && l->bytes_per_codepoint == 1 && sep_bytes_per_codepoint == 1 && sep_pointcount == 1) {
+            while (match >= 0 && l->data[match] != sep->data[0]) match--;
+        } else if (sep) {
+            match = rfind(l, sep, 0, cur + 1);
+            if (match != -1) match += sep_pointcount - 1;
+        } else {
+            while (match >= 0 && !(uprops[getpoint(l, match)] & Uprops_SPACE)) match--;
+        }
+        if (match < 0) break;
+
+        if (sep || match != cur) {
+            layout* piece = getsubstr(l, match + 1, cur + 1);
+            if (outList->count == outList->reserved) {
+                listofstring->reserve((instance_ptr)&outList, outList->reserved * 1.5);
+            }
+            ((layout**)outList->data)[outList->count++] = piece;
+
+            cur = match - sep_pointcount;
+
+            count++;
+            if (max >= 0 && count >= max)
+                break;
+        }
+        else if (!sep) {
+            cur--;
+        }
+    }
+    if (!sep) {
+        while (cur >= 0 && (uprops[getpoint(l, cur)] & Uprops_SPACE)) {
+            cur--;
+        }
+    }
+    if (sep || cur >= 0 || max == 0) {
+        layout* remainder = getsubstr(l, 0, cur + 1);
+        if (outList->count == outList->reserved) {
+            listofstring->reserve((instance_ptr)&outList, outList->reserved + 1);
+        }
+        ((layout**)outList->data)[outList->count++] = remainder;
+    }
+    listofstring->reverse((instance_ptr)&outList);
+}
+
+bool linebreak(int32_t c) {
+    // the two-character line break '\r\n' must be handled outside of this function
+    return c == '\n' || c == '\r'
+    || c == 0x0B || c == 0x0C
+    || c == 0x1C || c == 0x1D || c == 0x1E
+    || c == 0x85 || c == 0x2028 || c == 0x2029;
+}
+
+/* static */
+// assumes outList was initialized to an empty list before calling
+void StringType::splitlines(ListOfType::layout *outList, layout* in, bool keepends) {
+    static ListOfType* listOfString = ListOfType::Make(StringType::Make());
+
+    int64_t cur = 0;
+
+    listOfString->reserve((instance_ptr)&outList, 10);
+
+    int64_t inLen = in ? in->pointcount : 0;
+    int sepLen = 0;
+
+    while (cur < inLen) {
+        int64_t match = cur;
+
+        while (match < inLen && !linebreak(getpoint(in, match))) {
+            match++;
+        }
+        sepLen = 0;
+        if (match < inLen) {
+            if (getpoint(in, match) == '\r' && match + 1 < inLen && getpoint(in, match+1) == '\n') {
+                sepLen = 2;
+            }
+            else {
+                sepLen = 1;
+            }
+        }
+
+        if (match + sepLen > inLen) {
+            break;
+        }
+
+        layout* piece = getsubstr(in, cur, match + (keepends ? sepLen : 0));
+
+        if (outList->count == outList->reserved) {
+            listOfString->reserve((instance_ptr)&outList, outList->reserved * 1.5);
+        }
+
+        ((layout**)outList->data)[outList->count++] = piece;
+        cur = match + sepLen;
+    }
+    if (inLen != cur) {
+        layout* remainder = getsubstr(in, cur, inLen);
+        if (outList->count == outList->reserved) {
+            listOfString->reserve((instance_ptr)&outList, outList->reserved + 1);
+        }
+        listOfString->append((instance_ptr)&outList, (instance_ptr)&remainder);
+        ((layout**)outList->data)[outList->count++] = remainder;
+    }
+}
+
 
 bool StringType::isalpha(layout *l) {
     if (!l || !l->pointcount)
@@ -619,7 +1050,7 @@ StringType::layout* StringType::getsubstr(layout* l, int64_t start, int64_t stop
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
     new_layout->pointcount = datalength;
 
-    memcpy(new_layout->data, l->data + start * l->bytes_per_codepoint, datalength);
+    memcpy(new_layout->data, l->data + start * l->bytes_per_codepoint, datasize);
 
     return new_layout;
 }
@@ -690,7 +1121,7 @@ int64_t StringType::bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int
             utf8Str++;
         } else if (utf8Str[0] >> 5 == 0b110) {
             length -= 1;
-            utf8Str+=2;
+            utf8Str += 2;
             bytes_per_codepoint = std::max<int64_t>(2, bytes_per_codepoint);
         } else if (utf8Str[0] >> 4 == 0b1110) {
             length -= 1;
@@ -698,7 +1129,7 @@ int64_t StringType::bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int
             bytes_per_codepoint = std::max<int64_t>(2, bytes_per_codepoint);
         } else if (utf8Str[0] >> 3 == 0b11110) {
             length -= 1;
-            utf8Str+=4;
+            utf8Str += 4;
             bytes_per_codepoint = std::max<int64_t>(4, bytes_per_codepoint);
         } else {
             throw std::runtime_error("Improperly formatted unicode string.");
@@ -930,6 +1361,60 @@ char StringType::cmpStatic(layout* left, layout* right) {
     return 0;
 }
 
+char StringType::cmpStatic(layout* left, uint8_t* right_data, int right_pointcount, int right_bytes_per_codepoint) {
+    if ( !left && !right ) {
+        return 0;
+    }
+    if ( !left && right ) {
+        return -1;
+    }
+    if ( left && !right ) {
+        return 1;
+    }
+
+    int bytesPerLeft = left->bytes_per_codepoint;
+    int bytesPerRight = right_bytes_per_codepoint;
+    int commonCount = std::min(left->pointcount, right_pointcount);
+
+    char res = 0;
+
+    if (bytesPerLeft == 1 && bytesPerRight == 1) {
+        res = byteCompare(left->data, right_data, bytesPerLeft * commonCount);
+    } else if (bytesPerLeft == 1 && bytesPerRight == 2) {
+        res = typedArrayCompare((uint8_t*)left->data, (uint16_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 1 && bytesPerRight == 4) {
+        res = typedArrayCompare((uint8_t*)left->data, (uint32_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 2 && bytesPerRight == 1) {
+        res = typedArrayCompare((uint16_t*)left->data, (uint8_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 2 && bytesPerRight == 2) {
+        res = typedArrayCompare((uint16_t*)left->data, (uint16_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 2 && bytesPerRight == 4) {
+        res = typedArrayCompare((uint16_t*)left->data, (uint32_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 4 && bytesPerRight == 1) {
+        res = typedArrayCompare((uint32_t*)left->data, (uint8_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 4 && bytesPerRight == 2) {
+        res = typedArrayCompare((uint32_t*)left->data, (uint16_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 4 && bytesPerRight == 4) {
+        res = typedArrayCompare((uint32_t*)left->data, (uint32_t*)right_data, commonCount);
+    } else {
+        throw std::runtime_error("Nonsensical bytes-per-codepoint");
+    }
+
+    if (res) {
+        return res;
+    }
+
+    if (left->pointcount < right_pointcount) {
+        return -1;
+    }
+
+    if (left->pointcount > right_pointcount) {
+        return 1;
+    }
+
+    return 0;
+}
+
 void StringType::constructor(instance_ptr self, int64_t bytes_per_codepoint, int64_t count, const char* data) const {
     if (count == 0) {
         *(layout**)self = nullptr;
@@ -959,32 +1444,49 @@ void StringType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
 
     stream << "\"";
 
-    //as if it were bytes, which is totally wrong...
-    long bytes = count(self);
-    uint8_t* base = eltPtr(self,0);
-
     static char hexDigits[] = "0123456789abcdef";
 
-    for (long k = 0; k < bytes;k++) {
-        if (base[k] == '"') {
+    layout *l = *(layout**)self;
+    for (int64_t i = 0; i < (l ? l->pointcount : 0); i++) {
+        uint64_t c = StringType::getpoint(l, i);
+        if (c == '"') {
             stream << "\\\"";
-        } else if (base[k] == '\\') {
+        } else if (c == '\\') {
             stream << "\\\\";
-        } else if (isprint(base[k])) {
-            stream << base[k];
-        } else {
-            if (base[k] == '\n') {
+        } else if (c <= 0x1F || c == 0x7F) {
+            if (c == '\n') {
                 stream << "\\n";
             } else
-            if (base[k] == '\r') {
+            if (c == '\r') {
                 stream << "\\r";
             } else
-            if (base[k] == '\t') {
+            if (c == '\t') {
                 stream << "\\t";
             } else {
-                stream << "\\x" << hexDigits[base[k] / 16] << hexDigits[base[k] % 16];
+                stream << "\\x" << hexDigits[c / 16] << hexDigits[c % 16];
             }
+        } else if (c < 0x80) {
+            stream << (char)c;
+        } else if (c < 0x800) {
+            stream << (char)(0xC0 | (c >> 6));
+            stream << (char)(0x80 | (c & 0x3F));
+        } else if (c < 0x10000) {
+            stream << (char)(0xE0 | (c >> 12));
+            stream << (char)(0x80 | ((c >> 6) & 0x3F));
+            stream << (char)(0x80 | (c & 0x3F));
+        } else if (c < 0x110000) {
+            stream << (char)(0xF0 | (c >> 18));
+            stream << (char)(0x80 | ((c >> 12) & 0x3F));
+            stream << (char)(0x80 | ((c >> 6) & 0x3F));
+            stream << (char)(0x80 | (c & 0x3F));
+        } else {
+            const uint32_t rc = 0xFFFD;
+            stream << (char)(0xF0 | (rc >> 18));
+            stream << (char)(0x80 | ((rc >> 12) & 0x3F));
+            stream << (char)(0x80 | ((rc >> 6) & 0x3F));
+            stream << (char)(0x80 | (rc & 0x3F));
         }
+
     }
 
     stream << "\"";
@@ -1341,4 +1843,27 @@ bool StringType::to_float64(StringType::layout* s, double* value) {
         *value = 0.0;
         return false;
     }
+}
+
+StringType::layout* StringType::mult(layout* lhs, int64_t rhs) {
+    if (!lhs) {
+        return lhs;
+    }
+    if (rhs <= 0)
+        return 0;
+    int64_t new_length = lhs->pointcount * rhs;
+    int64_t new_byteCount = sizeof(layout) + new_length * lhs->bytes_per_codepoint;
+
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = lhs->bytes_per_codepoint;
+    new_layout->pointcount = new_length;
+
+    int64_t old_size = lhs->pointcount * lhs->bytes_per_codepoint;
+    for (size_t i = 0; i < rhs; i++) {
+        memcpy(new_layout->data + i * old_size, lhs->data, old_size);
+    }
+
+    return new_layout;
 }

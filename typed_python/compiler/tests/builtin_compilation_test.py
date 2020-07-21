@@ -264,6 +264,23 @@ class TestBuiltinCompilation(unittest.TestCase):
                 self.assertEqual(r1, r2)
                 self.assertEqual(type(r1), type(r2))
 
+        def f_min3(*v):
+            return min(v, spuriousparam="x")
+
+        def f_max3(*v):
+            return min(v, spuriousparam="x")
+
+        def f_min4(*v):
+            return min(v, key=f_key2, spuriousparam="x")
+
+        def f_max4(*v):
+            return min(v, key=f_key2, spuriousparam="x")
+
+        for f in [f_min3, f_max3, f_min4, f_max4]:
+            v = [3, 1, 2]
+            with self.assertRaises(TypeError):
+                Entrypoint(f)(v)
+
     def test_min_max_iterable(self):
         def f_min(v):
             return min(v)

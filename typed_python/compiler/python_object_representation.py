@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -54,8 +54,8 @@ from typed_python.compiler.type_wrappers.math_wrappers import MathFunctionWrappe
 from typed_python.compiler.type_wrappers.builtin_wrappers import BuiltinWrapper
 from typed_python.compiler.type_wrappers.bytecount_wrapper import BytecountWrapper
 from typed_python.compiler.type_wrappers.arithmetic_wrapper import IntWrapper, FloatWrapper, BoolWrapper
-from typed_python.compiler.type_wrappers.string_wrapper import StringWrapper
-from typed_python.compiler.type_wrappers.bytes_wrapper import BytesWrapper
+from typed_python.compiler.type_wrappers.string_wrapper import StringWrapper, StringMaketransWrapper
+from typed_python.compiler.type_wrappers.bytes_wrapper import BytesWrapper, BytesMaketransWrapper
 from typed_python.compiler.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
 from typed_python.compiler.type_wrappers.abs_wrapper import AbsWrapper
 from typed_python.compiler.type_wrappers.min_max_wrapper import MinWrapper, MaxWrapper
@@ -218,6 +218,12 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
 
     if f is range:
         return TypedExpression(context, native_ast.nullExpr, _RangeWrapper, False)
+
+    if f is bytes.maketrans:
+        return TypedExpression(context, native_ast.nullExpr, BytesMaketransWrapper(), False)
+
+    if f is str.maketrans:
+        return TypedExpression(context, native_ast.nullExpr, StringMaketransWrapper(), False)
 
     if f is isinstance:
         return TypedExpression(context, native_ast.nullExpr, IsinstanceWrapper(), False)

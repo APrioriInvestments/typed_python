@@ -467,6 +467,23 @@ extern "C" {
         return StringType::upper(l);
     }
 
+    StringType::layout* nativepython_runtime_string_capitalize(StringType::layout* l) {
+        return StringType::capitalize(l);
+    }
+
+    StringType::layout* nativepython_runtime_string_casefold(StringType::layout* l) {
+        return StringType::casefold(l);
+    }
+
+    StringType::layout* nativepython_runtime_string_swapcase(StringType::layout* l) {
+        return StringType::swapcase(l);
+    }
+
+    StringType::layout* nativepython_runtime_string_title(StringType::layout* l) {
+        return StringType::title(l);
+    }
+
+
     StringType::layout* nativepython_runtime_string_strip(StringType::layout* l, bool fromLeft, bool fromRight) {
         return StringType::strip(l, fromLeft, fromRight);
     }
@@ -475,16 +492,44 @@ extern "C" {
         return StringType::find(l, sub, start, end);
     }
 
-    int64_t nativepython_runtime_string_find_2(StringType::layout* l, StringType::layout* sub) {
-        return StringType::find(l, sub, 0, l ? l->pointcount : 0);
+    int64_t nativepython_runtime_string_rfind(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+        return StringType::rfind(l, sub, start, end);
     }
 
-    int64_t nativepython_runtime_string_find_3(StringType::layout* l, StringType::layout* sub, int64_t start) {
-        return StringType::find(l, sub, start, l ? l->pointcount : 0);
+    int64_t nativepython_runtime_string_count(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+        return StringType::count(l, sub, start, end);
     }
 
-    void nativepython_runtime_string_join(StringType::layout** outString, StringType::layout* separator, ListOfType::layout* toJoin) {
-        StringType::join(outString, separator, toJoin);
+    int64_t nativepython_runtime_string_index(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+        int64_t ret =  StringType::find(l, sub, start, end);
+        if (ret == -1) {
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(
+                PyExc_ValueError, "substring not found"
+            );
+            throw PythonExceptionSet();
+        }
+        return ret;
+    }
+
+    int64_t nativepython_runtime_string_rindex(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+        int64_t ret =  StringType::rfind(l, sub, start, end);
+        if (ret == -1) {
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(
+                PyExc_ValueError, "substring not found"
+            );
+            throw PythonExceptionSet();
+        }
+        return ret;
+    }
+
+    void nativepython_runtime_bytes_join(BytesType::layout** out, BytesType::layout* separator, ListOfType::layout* toJoin) {
+        BytesType::join(out, separator, toJoin);
+    }
+
+    void nativepython_runtime_string_join(StringType::layout** out, StringType::layout* separator, ListOfType::layout* toJoin) {
+        StringType::join(out, separator, toJoin);
     }
 
     ListOfType::layout* nativepython_runtime_bytes_split(BytesType::layout* l, BytesType::layout* sep, int64_t max) {
@@ -499,18 +544,53 @@ extern "C" {
         return outList;
     }
 
+    ListOfType::layout* nativepython_runtime_bytes_rsplit(BytesType::layout* l, BytesType::layout* sep, int64_t max) {
+        static ListOfType* listOfBytesT = ListOfType::Make(BytesType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfBytesT->constructor((instance_ptr)&outList);
+
+        BytesType::rsplit(outList, l, sep, max);
+
+        return outList;
+    }
+
+    ListOfType::layout* nativepython_runtime_bytes_splitlines(BytesType::layout* l, bool keepends) {
+        static ListOfType* listOfBytesT = ListOfType::Make(BytesType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfBytesT->constructor((instance_ptr)&outList);
+
+        BytesType::splitlines(outList, l, keepends);
+
+        return outList;
+    }
+
     ListOfType::layout* nativepython_runtime_string_split(StringType::layout* l, StringType::layout* sep, int64_t max) {
         static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
 
         ListOfType::layout* outList;
 
         listOfStringT->constructor((instance_ptr)&outList);
-
         StringType::split(outList, l, sep, max);
 
         return outList;
     }
 
+    ListOfType::layout* nativepython_runtime_string_rsplit(StringType::layout* l, StringType::layout* sep, int64_t max) {
+        static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfStringT->constructor((instance_ptr)&outList);
+
+        StringType::rsplit(outList, l, sep, max);
+
+        return outList;
+    }
+/*
     ListOfType::layout* nativepython_runtime_string_split_2(StringType::layout* l) {
         static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
 
@@ -546,6 +626,19 @@ extern "C" {
 
         return outList;
     }
+    */
+
+    ListOfType::layout* nativepython_runtime_string_splitlines(StringType::layout* l, bool keepends) {
+        static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfStringT->constructor((instance_ptr)&outList);
+
+        StringType::splitlines(outList, l, keepends);
+
+        return outList;
+    }
 
     bool nativepython_runtime_string_isalpha(StringType::layout* l) {
         return StringType::isalpha(l);
@@ -561,6 +654,23 @@ extern "C" {
 
     bool nativepython_runtime_string_isdigit(StringType::layout* l) {
         return StringType::isdigit(l);
+    }
+
+    bool nativepython_runtime_string_isidentifier(StringType::layout* l) {
+        // Not bothering to implement this myself...
+        PyEnsureGilAcquired getTheGil;
+        PyObject* s = PyInstance::extractPythonObject((instance_ptr)&l, StringType::Make());
+        if (!s) {
+            throw PythonExceptionSet();
+        }
+
+        int ret = PyUnicode_IsIdentifier(s);
+        decref(s);
+        if (ret == -1) {
+            throw PythonExceptionSet();
+        }
+
+        return ret;
     }
 
     bool nativepython_runtime_string_islower(StringType::layout* l) {
@@ -589,6 +699,10 @@ extern "C" {
 
     StringType::layout* nativepython_runtime_string_getitem_int64(StringType::layout* lhs, int64_t index) {
         return StringType::getitem(lhs, index);
+    }
+
+    StringType::layout* nativepython_runtime_string_mult(StringType::layout* lhs, int64_t rhs) {
+        return StringType::mult(lhs, rhs);
     }
 
     StringType::layout* nativepython_runtime_string_chr(int64_t code) {
@@ -668,6 +782,237 @@ extern "C" {
 
     BytesType::layout* nativepython_runtime_bytes_from_ptr_and_len(const char* utf8_str, int64_t len) {
         return BytesType::createFromPtr(utf8_str, len);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_lower(BytesType::layout* l) {
+        return BytesType::lower(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_upper(BytesType::layout* l) {
+        return BytesType::upper(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_capitalize(BytesType::layout* l) {
+        return BytesType::capitalize(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_swapcase(BytesType::layout* l) {
+        return BytesType::swapcase(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_title(BytesType::layout* l) {
+        return BytesType::title(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_strip(BytesType::layout* l, bool fromLeft, bool fromRight) {
+        return BytesType::strip(l, true, nullptr, fromLeft, fromRight);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_strip2(BytesType::layout* l, BytesType::layout* values, bool fromLeft, bool fromRight) {
+        return BytesType::strip(l, false, values, fromLeft, fromRight);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_mult(BytesType::layout* lhs, int64_t rhs) {
+        return BytesType::mult(lhs, rhs);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_replace(
+            BytesType::layout* l,
+            BytesType::layout* old,
+            BytesType::layout* the_new,
+            int64_t count
+    ) {
+        return BytesType::replace(l, old, the_new, count);
+    }
+
+    enum Codec { CODEC_UNKNOWN = 0, CODEC_UTF8 };
+    Codec CodecFromStr(const char *s) {
+        if (!s || !strcmp(s, "utf-8")
+                || !strcmp(s, "utf_8")
+                || !strcmp(s, "utf8")) {
+            return CODEC_UTF8;
+        }
+        return CODEC_UNKNOWN;
+    }
+
+    enum ErrHandler { ERH_UNKNOWN = 0, ERH_STRICT = 1, ERH_IGNORE = 2, ERH_REPLACE = 3 };
+    ErrHandler ErrHandlerFromStr(const char *s) {
+        if (!s || !strcmp(s, "strict")) {
+            return ERH_STRICT;
+        } else if (!strcmp(s, "ignore")) {
+            return ERH_IGNORE;
+        } else if (!strcmp(s, "replace")) {
+            return ERH_IGNORE;
+        } else {
+            return ERH_UNKNOWN;
+        }
+    }
+
+    StringType::layout* nativepython_runtime_bytes_decode(
+            BytesType::layout* l,
+            StringType::layout* encoding,
+            StringType::layout* errors
+    ) {
+        const char* c_encoding = 0;
+        std::string sEncoding;
+        if (encoding) {
+            sEncoding = StringType::Make()->toUtf8String((instance_ptr)&encoding);
+            c_encoding = sEncoding.c_str();
+        }
+
+        const char* c_errors = 0;
+        std::string sErrors;
+        if (errors) {
+            sErrors = StringType::Make()->toUtf8String((instance_ptr)&errors);
+            c_errors = sErrors.c_str();
+        }
+
+        Codec codec = CodecFromStr(c_encoding);
+        if (codec) {
+            ErrHandler errhandler = ErrHandlerFromStr(c_errors);
+            if (errhandler) {
+                if (codec == CODEC_UTF8) {
+                    uint8_t* data = l ? (uint8_t*)(l->data) : 0;
+                    // TODO: combine countUtf8Codepoints and createFromUtf8 into a single function with a single loop
+                    size_t pointCount = l ? StringType::countUtf8Codepoints(data, l->bytecount) : 0;
+                    return StringType::createFromUtf8((const char*)data, pointCount);
+                }
+            }
+        }
+
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* b = PyInstance::extractPythonObject((instance_ptr)&l, BytesType::Make());
+        if (!b) {
+            throw PythonExceptionSet();
+        }
+
+        PyObject* s = PyUnicode_FromEncodedObject(b, c_encoding, c_errors);
+        decref(b);
+        if (!s) {
+            throw PythonExceptionSet();
+        }
+
+        StringType::layout* ret = 0;
+        PyInstance::copyConstructFromPythonInstance(StringType::Make(), (instance_ptr)&ret, s, true);
+        decref(s);
+
+        return ret;
+    }
+
+
+    BytesType::layout* encodeUtf8(StringType::layout *l, ErrHandler err) {
+        int64_t max_ret_bytes_per_codepoint = l ? (l->bytes_per_codepoint < 4 ? l->bytes_per_codepoint + 1 : 4) : 0;
+        int64_t max_ret_size = l ? l->pointcount * max_ret_bytes_per_codepoint : 0;
+
+        BytesType::layout* out = (BytesType::layout*)malloc(sizeof(BytesType::layout) + max_ret_size);
+        out->refcount = 1;
+        out->hash_cache = -1;
+        out->bytecount = 0;
+        if (!l || !l->pointcount) return out;
+
+        int64_t cur = 0;
+        for (int64_t i = 0; i < l->pointcount; i++) {
+            uint32_t c = StringType::getpoint(l, i);
+            if (c < 0x80) {
+                out->data[cur++] = (uint8_t)c;
+            } else if (c < 0x800) {
+                out->data[cur++] = 0xC0 | (c >> 6);
+                out->data[cur++] = 0x80 | (c & 0x3F);
+            } else if (c < 0x10000) {
+                out->data[cur++] = 0xE0 | (c >> 12);
+                out->data[cur++] = 0x80 | ((c >> 6) & 0x3F);
+                out->data[cur++] = 0x80 | (c & 0x3F);
+            } else if (c < 0x110000) {
+                out->data[cur++] = 0xF0 | (c >> 18);
+                out->data[cur++] = 0x80 | ((c >> 12) & 0x3F);
+                out->data[cur++] = 0x80 | ((c >> 6) & 0x3F);
+                out->data[cur++] = 0x80 | (c & 0x3F);
+            } else if (err == ERH_REPLACE) {
+                const uint32_t rc = 0xFFFD;
+                out->data[cur++] = 0xE0 | (rc >> 12);
+                out->data[cur++] = 0x80 | ((rc >> 6) & 0x3F);
+                out->data[cur++] = 0x80 | (rc & 0x3F);
+            } else if (err == ERH_STRICT) {
+                PyEnsureGilAcquired getTheGil;
+                PyErr_Format(
+                    PyExc_UnicodeError,
+                    "illegal Unicode character"
+                    );
+                throw PythonExceptionSet();
+            } // else err == ERH_IGNORE
+        }
+
+        out->bytecount = cur;
+        if (out->bytecount < max_ret_size) {
+            out = (BytesType::layout*)realloc(out, sizeof(BytesType::layout) + out->bytecount);
+        }
+
+        return out;
+    }
+
+    BytesType::layout* nativepython_runtime_str_encode(
+            StringType::layout* l,
+            StringType::layout* encoding,
+            StringType::layout* errors
+    ) {
+        const char* c_encoding = 0;
+        std::string sEncoding;
+        if (encoding) {
+            sEncoding = StringType::Make()->toUtf8String((instance_ptr)&encoding);
+            c_encoding = sEncoding.c_str();
+        }
+
+        const char* c_errors = 0;
+        std::string sErrors;
+        if (errors) {
+            sErrors = StringType::Make()->toUtf8String((instance_ptr)&errors);
+            c_errors = sErrors.c_str();
+        }
+
+        Codec codec = CodecFromStr(c_encoding);
+        if (codec) {
+            ErrHandler errhandler = ErrHandlerFromStr(c_errors);
+            if (errhandler) {
+                if (codec == CODEC_UTF8) {
+                    return encodeUtf8(l, errhandler);
+                }
+            }
+        }
+
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* s = PyInstance::extractPythonObject((instance_ptr)&l, StringType::Make());
+        if (!s) {
+            throw PythonExceptionSet();
+        }
+
+        PyObject* b = PyUnicode_AsEncodedString(s, c_encoding, c_errors);
+        decref(s);
+        if (!b) {
+            throw PythonExceptionSet();
+        }
+
+        BytesType::layout* ret = 0;
+        PyInstance::copyConstructFromPythonInstance(BytesType::Make(), (instance_ptr)&ret, b, true);
+        decref(b);
+
+        return ret;
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_translate(
+            BytesType::layout* l,
+            BytesType::layout* table,
+            BytesType::layout* to_delete
+    ) {
+        return BytesType::translate(l, table, to_delete);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_maketrans(
+            BytesType::layout* from,
+            BytesType::layout* to
+    ) {
+        return BytesType::maketrans(from, to);
     }
 
     PythonObjectOfType::layout_type* nativepython_runtime_create_pyobj(PyObject* p) {
@@ -944,7 +1289,11 @@ extern "C" {
     uint64_t nativepython_pyobj_len(PythonObjectOfType::layout_type* layout) {
         PyEnsureGilAcquired getTheGil;
 
-        return PyObject_Length(layout->pyObj);
+        int ret = PyObject_Length(layout->pyObj);
+        if (ret == -1) {
+            throw PythonExceptionSet();
+        }
+        return ret;
     }
 
     // call a Function object from the interpreter
@@ -1143,8 +1492,10 @@ extern "C" {
     }
 
     double nativepython_runtime_pow_float64_float64(double l, double r) {
-        if (l == 0.0 && r < 0.0) {
+        if (l == 0.0 && r < 0.0)
+        {
             PyEnsureGilAcquired acquireTheGil;
+
             PyErr_Format(PyExc_ZeroDivisionError, "0.0 cannot be raised to a negative power");
             throw PythonExceptionSet();
         }
@@ -1190,7 +1541,7 @@ extern "C" {
 
         if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
             PyEnsureGilAcquired acquireTheGil;
-            PyErr_Format(PyExc_ValueError, "shift count too large");
+            PyErr_Format(PyExc_OverflowError, "shift count too large");
             throw PythonExceptionSet();
         }
 
@@ -1201,7 +1552,7 @@ extern "C" {
     uint64_t nativepython_runtime_lshift_uint64_uint64(uint64_t l, uint64_t r) {
         if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
             PyEnsureGilAcquired acquireTheGil;
-            PyErr_Format(PyExc_ValueError, "shift count too large");
+            PyErr_Format(PyExc_OverflowError, "shift count too large");
             throw PythonExceptionSet();
         }
         return l << r;
@@ -1211,7 +1562,7 @@ extern "C" {
     uint64_t nativepython_runtime_rshift_uint64_uint64(uint64_t l, uint64_t r) {
         if (r > SSIZE_MAX) {
             PyEnsureGilAcquired acquireTheGil;
-            PyErr_Format(PyExc_ValueError, "shift count too large");
+            PyErr_Format(PyExc_OverflowError, "shift count too large");
             throw PythonExceptionSet();
         }
         if (r == 0)
@@ -1230,7 +1581,7 @@ extern "C" {
         }
         if (r > SSIZE_MAX) {
             PyEnsureGilAcquired acquireTheGil;
-            PyErr_Format(PyExc_ValueError, "shift count too large");
+            PyErr_Format(PyExc_OverflowError, "shift count too large");
             throw PythonExceptionSet();
         }
         if (r == 0)
@@ -1249,7 +1600,7 @@ extern "C" {
     int64_t nativepython_runtime_floordiv_int64_int64(int64_t l, int64_t r) {
         if (r == 0) {
             PyEnsureGilAcquired acquireTheGil;
-            PyErr_Format(PyExc_ZeroDivisionError, "integer division or modulo by zero");
+            PyErr_Format(PyExc_ZeroDivisionError, "integer floordiv by zero");
             throw PythonExceptionSet();
         }
         if (l < 0 && l == -l && r == -1) {
@@ -1268,7 +1619,7 @@ extern "C" {
     double nativepython_runtime_floordiv_float64_float64(double l, double r) {
         if (r == 0.0) {
             PyEnsureGilAcquired acquireTheGil;
-            PyErr_Format(PyExc_ZeroDivisionError, "integer division or modulo by zero");
+            PyErr_Format(PyExc_ZeroDivisionError, "floating point floordiv by zero");
             throw PythonExceptionSet();
         }
 

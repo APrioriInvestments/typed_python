@@ -73,11 +73,6 @@ public:
     //return an increffed bytes object containing a pointer to the requisite bytes
     static layout* createFromPtr(const char* data, int64_t len);
 
-    // split 'bytesLayout' depositing results into a ListOf<Bytes> in 'outList'
-    // if 'sep' is nullptr, split on whitespace
-    // max is the maximum number of splits. If its -1, then split as many times as is necessary
-    static void split(ListOfType::layout *outList, layout* bytesLayout, layout* sep, int64_t max);
-
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}
 
@@ -116,4 +111,24 @@ public:
     static bool to_int64(layout* s, int64_t* value);
 
     static bool to_float64(layout* s, double* value);
+
+    // split 'bytesLayout' depositing results into a ListOf<Bytes> in 'outList'
+    // if 'sep' is nullptr, split on whitespace
+    // max is the maximum number of splits. If its -1, then split as many times as is necessary
+    static void split(ListOfType::layout *outList, layout* bytesLayout, layout* sep, int64_t max);
+    static void rsplit(ListOfType::layout *outList, layout* bytesLayout, layout* sep, int64_t max);
+    static void splitlines(ListOfType::layout *outList, layout* bytesLayout, bool keepends);
+
+    static void join(BytesType::layout **out, BytesType::layout *separator, ListOfType::layout *toJoin);
+
+    static layout* mult(layout* lhs, int64_t rhs);
+    static layout* lower(layout* l);
+    static layout* upper(layout* l);
+    static layout* capitalize(layout* l);
+    static layout* swapcase(layout* l);
+    static layout* title(layout* l);
+    static layout* strip(layout* l, bool whiteSpace, layout* values, bool fromLeft=true, bool fromRight=true);
+    static layout* replace(layout* l, layout* old, layout* the_new, int64_t count);
+    static layout* translate(layout* l, layout* table, layout* to_delete);
+    static layout* maketrans(layout* from, layout* to);
 };

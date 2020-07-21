@@ -14,8 +14,9 @@
 
 from typed_python import sha_hash
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
+from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python import Int32, Float32
+from typed_python import Int32, Float32, TupleOf, Tuple, Dict, OneOf
 from typed_python.type_promotion import isInteger
 from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import TypedListMasqueradingAsList
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -51,7 +52,63 @@ def strJoinIterable(sep, iterable):
 
 
 def strStartswith(s, prefix):
+    if not prefix:
+        return True
     return s[:len(prefix)] == prefix
+
+
+def strRangeStartswith(s, prefix, start, end):
+    if start > len(s):
+        return False
+    if start < 0:
+        start += len(s)
+        if start < 0:
+            start = 0
+    if end < 0:
+        end += len(s)
+        if end < 0:
+            end = 0
+    if not prefix:
+        return start <= 0 or end >= start
+    if end < start + len(prefix):
+        return False
+    return s[start:start + len(prefix)] == prefix
+
+
+def strStartswithTuple(s, prefixtuple):
+    for prefix in prefixtuple:
+        t = type(prefix)
+        if t is not object and t is not str:
+            raise TypeError(f"tuple for startswith must only contain str, not {t}")
+        if not prefix:
+            return True
+        if s[:len(prefix)] == prefix:
+            return True
+    return False
+
+
+def strRangeStartswithTuple(s, prefixtuple, start, end):
+    if start > len(s):
+        return False
+    if start < 0:
+        start += len(s)
+        if start < 0:
+            start = 0
+    if end < 0:
+        end += len(s)
+        if end < 0:
+            end = 0
+    for prefix in prefixtuple:
+        t = type(prefix)
+        if t is not object and t is not str:
+            raise TypeError(f"tuple for startswith must only contain str, not {t}")
+        if not prefix:
+            return start <= 0 or end >= start
+        if end < start + len(prefix):
+            continue
+        if s[start:start + len(prefix)] == prefix:
+            return True
+    return False
 
 
 def strEndswith(s, suffix):
@@ -61,14 +118,80 @@ def strEndswith(s, suffix):
     return s[-len(suffix):] == suffix
 
 
+def strRangeEndswith(s, suffix, start, end):
+    if start > len(s):
+        return False
+    if end > len(s):
+        end = len(s)
+    if start < 0:
+        start += len(s)
+        if start < 0:
+            start = 0
+    if end < 0:
+        end += len(s)
+        if end < 0:
+            end = 0
+    if not suffix:
+        return start <= 0 or end >= start
+    if start > end - len(suffix):
+        return False
+
+    return s[end - len(suffix):end] == suffix
+
+
+def strEndswithTuple(s, suffixtuple):
+    for suffix in suffixtuple:
+        t = type(suffix)
+        if t is not object and t is not str:
+            raise TypeError(f"tuple for endswith must only contain str, not {t}")
+        if not suffix:
+            return True
+        if s[-len(suffix):] == suffix:
+            return True
+    return False
+
+
+def strRangeEndswithTuple(s, suffixtuple, start, end):
+    if start > len(s):
+        return False
+    if end > len(s):
+        end = len(s)
+    if start < 0:
+        start += len(s)
+        if start < 0:
+            start = 0
+    if end < 0:
+        end += len(s)
+        if end < 0:
+            end = 0
+    for suffix in suffixtuple:
+        t = type(suffix)
+        if t is not object and t is not str:
+            raise TypeError(f"tuple for endswith must only contain str, not {t}")
+        if not suffix:
+            if start <= 0 or end >= start:
+                return True
+            else:
+                continue
+        if start > end - len(suffix):
+            continue
+        if s[end - len(suffix):end] == suffix:
+            return True
+    return False
+
+
 def strReplace(s, old, new, maxCount):
-    if maxCount == 0:
+    if maxCount == 0 or (maxCount >= 0 and len(s) == 0 and len(old) == 0):
         return s
 
     accumulator = ListOf(str)()
 
     pos = 0
     seen = 0
+    inc = 0 if len(old) else 1
+    if len(old) == 0:
+        accumulator.append('')
+        seen += 1
 
     while True:
         if maxCount >= 0 and seen >= maxCount:
@@ -76,8 +199,8 @@ def strReplace(s, old, new, maxCount):
         else:
             nextLoc = s.find(old, pos)
 
-        if nextLoc >= 0:
-            accumulator.append(s[pos:nextLoc])
+        if nextLoc >= 0 and nextLoc < len(s):
+            accumulator.append(s[pos:nextLoc + inc])
 
             if len(old):
                 pos = nextLoc + len(old)
@@ -90,6 +213,128 @@ def strReplace(s, old, new, maxCount):
             return new.join(accumulator)
 
 
+def strPartition(x: str, sep):
+    if len(sep) == 0:
+        raise ValueError("empty separator")
+
+    pos = x.find(sep)
+    if pos == -1:
+        return Tuple(str, str, str)((x, '', ''))
+    return Tuple(str, str, str)((x[0:pos], sep, x[pos+len(sep):]))
+
+
+def strRpartition(x, sep):
+    if len(sep) == 0:
+        raise ValueError("empty separator")
+
+    pos = x.rfind(sep)
+    if pos == -1:
+        return Tuple(str, str, str)(('', '', x))
+    return Tuple(str, str, str)((x[0:pos], sep, x[pos+len(sep):]))
+
+
+def strCenter(x, width, fill):
+    if width <= len(x):
+        return x
+
+    left = (width - len(x)) // 2
+    right = (width - len(x)) - left
+    return fill * left + x + fill * right
+
+
+def strLjust(x, width, fill):
+    if width <= len(x):
+        return x
+
+    return x + fill * (width - len(x))
+
+
+def strRjust(x, width, fill):
+    if width <= len(x):
+        return x
+
+    return fill * (width - len(x)) + x
+
+
+def strExpandtabs(x, tabsize):
+    accumulator = ListOf(str)()
+
+    col = 0  # column mod tabsize, not necessarily actual column
+    last = 0
+    for i in range(len(x)):
+        c = x[i]
+        if c == '\t':
+            accumulator.append(x[last:i])
+            spaces = tabsize - (col % tabsize) if tabsize > 0 else 0
+            accumulator.append(' ' * spaces)
+            last = i + 1
+            col = 0
+        elif c == '\n' or c == '\r':
+            col = 0
+        else:
+            col += 1
+    accumulator.append(x[last:])
+    return ''.join(accumulator)
+
+
+def strZfill(x, width):
+    accumulator = ListOf(str)()
+
+    sign = False
+    if len(x):
+        c = x[0]
+        if c == '+' or c == '-':
+            accumulator.append(x[0:1])
+            sign = True
+
+    fill = width - len(x)
+    if fill > 0:
+        accumulator.append('0' * fill)
+
+    accumulator.append(x[1:] if sign else x)
+
+    return ''.join(accumulator)
+
+
+def strTranslate(x, table):
+    accumulator = ListOf(str)()
+    for c in x:
+        t = c
+        try:
+            t = table.__getitem__(ord(c))
+        except LookupError:
+            pass
+        if t is not None:
+            accumulator.append(t)
+    return ''.join(accumulator)
+
+
+def strMaketransFromDict(x: Dict(OneOf(int, str), OneOf(int, str, None))) -> Dict(int, OneOf(int, str, None)):
+    # The line below is somehow necessary.  Without it, 'isinstance' type inference fails for elements of the dict key.
+    x = Dict(OneOf(int, str), OneOf(int, str, None))(x)  # this shouldn't be necessary, but it is
+    ret = Dict(int, OneOf(int, str, None))()
+    for c in x:
+        if isinstance(c, str):
+            if len(c) != 1:
+                raise ValueError("string keys in translate table must be of length 1")
+            ret[ord(c)] = x[c]
+        else:
+            ret[c] = x[c]
+    return ret
+
+
+def strMaketransFromStr(x: str, y: str, z: OneOf(str, None)) -> Dict(int, OneOf(int, None)):
+    if len(x) != len(y):
+        raise ValueError("the first two maketrans arguments must have equal length")
+    ret = Dict(int, OneOf(int, None))()
+    for i in range(len(x)):
+        ret[ord(x[i])] = ord(y[i])
+    if z is not None:
+        for c in z:
+            ret[ord(c)] = None
+    return ret
+
+
 class StringWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -100,6 +345,9 @@ class StringWrapper(RefcountedWrapper):
 
         self.layoutType = native_ast.Type.Struct(element_types=(
             ('refcount', native_ast.Int64),
+            ('hash_cache', native_ast.Int32),
+            ('pointcount', native_ast.Int32),
+            ('bytes_per_codepoint', native_ast.Int32),
             ('data', native_ast.UInt8)
         ), name='StringLayout').pointer()
 
@@ -109,6 +357,32 @@ class StringWrapper(RefcountedWrapper):
 
         if len(args) == 1 and not kwargs:
             return args[0].convert_str_cast()
+
+        if 1 <= len(args) <= 3:
+            if len(args) >= 2:
+                arg1 = args[1]
+            elif 'encoding' in kwargs:
+                arg1 = kwargs['encoding']
+            else:
+                arg1 = None
+
+            if len(args) >= 3:
+                arg2 = args[2]
+            elif 'errors' in kwargs:
+                arg2 = kwargs['errors']
+            else:
+                arg2 = None
+
+            return context.push(
+                str,
+                lambda ref: ref.expr.store(
+                    runtime_functions.bytes_decode.call(
+                        args[0].nonref_expr.cast(VoidPtr),
+                        (arg1 if arg1 is not None else context.constant(0)).nonref_expr.cast(VoidPtr),
+                        (arg2 if arg2 is not None else context.constant(0)).nonref_expr.cast(VoidPtr),
+                    ).cast(self.layoutType)
+                )
+            )
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
@@ -136,6 +410,20 @@ class StringWrapper(RefcountedWrapper):
         return False
 
     def convert_bin_op(self, context, left, op, right, inplace):
+        if op.matches.Mult and isInteger(right.expr_type.typeRepresentation):
+            if left.isConstant and right.isConstant:
+                return context.constant(left.constantValue * right.constantValue)
+
+            return context.push(
+                str,
+                lambda strRef: strRef.expr.store(
+                    runtime_functions.string_mult.call(
+                        left.nonref_expr.cast(VoidPtr),
+                        right.nonref_expr
+                    ).cast(self.layoutType)
+                )
+            )
+
         if right.expr_type == left.expr_type:
             if op.matches.Eq or op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.GtE or op.matches.Gt:
                 if op.matches.Eq:
@@ -236,6 +524,9 @@ class StringWrapper(RefcountedWrapper):
 
     def convert_builtin(self, f, context, expr, a1=None):
         if a1 is None and f is ord:
+            if expr.isConstant:
+                return context.constant(ord(expr.constantValue))
+
             return context.pushPod(
                 int,
                 runtime_functions.string_ord.call(
@@ -312,13 +603,22 @@ class StringWrapper(RefcountedWrapper):
             )
         )
 
+    def convert_getitem_unsafe(self, context, expr, item):
+        return context.push(
+            str,
+            lambda strRef: strRef.expr.store(
+                runtime_functions.string_getitem_int64.call(
+                    expr.nonref_expr.cast(native_ast.VoidPtr), item.nonref_expr
+                ).cast(self.layoutType)
+            )
+        )
+
     def convert_len_native(self, expr):
         return native_ast.Expression.Branch(
             cond=expr,
             false=native_ast.const_int_expr(0),
             true=(
-                expr.ElementPtrIntegers(0, 1).ElementPtrIntegers(4)
-                .cast(native_ast.Int32.pointer()).load().cast(native_ast.Int64)
+                expr.ElementPtrIntegers(0, 2).load().cast(native_ast.Int64)
             )
         )
 
@@ -346,6 +646,7 @@ class StringWrapper(RefcountedWrapper):
         isalnum=runtime_functions.string_isalnum,
         isdecimal=runtime_functions.string_isdecimal,
         isdigit=runtime_functions.string_isdigit,
+        isidentifier=runtime_functions.string_isidentifier,
         islower=runtime_functions.string_islower,
         isnumeric=runtime_functions.string_isnumeric,
         isprintable=runtime_functions.string_isprintable,
@@ -357,30 +658,54 @@ class StringWrapper(RefcountedWrapper):
     _str_methods = dict(
         lower=runtime_functions.string_lower,
         upper=runtime_functions.string_upper,
+        capitalize=runtime_functions.string_capitalize,
+        casefold=runtime_functions.string_casefold,
+        swapcase=runtime_functions.string_swapcase,
+        title=runtime_functions.string_title,
     )
 
+    _find_methods = dict(
+        find=runtime_functions.string_find,
+        rfind=runtime_functions.string_rfind,
+        index=runtime_functions.string_index,
+        rindex=runtime_functions.string_rindex,
+        count=runtime_functions.string_count,
+    )
+
+    _methods = ['split', 'rsplit', 'splitlines', 'join', 'partition', 'rpartition',
+                'strip', 'rstrip', 'lstrip', 'startswith', 'endswith', 'replace',
+                "translate", "maketrans",
+                '__iter__', 'encode', 'center', 'ljust', 'rjust', 'expandtabs', 'splitlines', 'zfill'] \
+        + list(_bool_methods) + list(_str_methods) + list(_find_methods)
+
     def convert_attribute(self, context, instance, attr):
-        if (
-            attr in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace")
-            or attr in self._str_methods
-            or attr in self._bool_methods
-        ):
+        if attr in self._methods:
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        if not (methodname in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace")
-                or methodname in self._str_methods or methodname in self._bool_methods):
+        if methodname not in self._methods:
             return context.pushException(AttributeError, methodname)
 
-        if kwargs:
-            return super().convert_method_call(context, instance, methodname, args, kwargs)
+        if methodname == "__iter__" and not args and not kwargs:
+            res = context.push(
+                _StringIteratorWrapper,
+                lambda instance:
+                instance.expr.ElementPtrIntegers(0, 0).store(-1)
+            )
 
-        if methodname in ['strip', 'lstrip', 'rstrip']:
+            context.pushReference(
+                self,
+                res.expr.ElementPtrIntegers(0, 1)
+            ).convert_copy_initialize(instance)
+
+            return res
+
+        if methodname in ['strip', 'lstrip', 'rstrip'] and not kwargs:
             fromLeft = methodname in ['strip', 'lstrip']
             fromRight = methodname in ['strip', 'rstrip']
-            if len(args) == 0:
+            if len(args) == 0 and not kwargs:
                 return context.push(
                     str,
                     lambda strRef: strRef.expr.store(
@@ -392,7 +717,7 @@ class StringWrapper(RefcountedWrapper):
                     )
                 )
 
-        elif methodname in self._str_methods:
+        if methodname in self._str_methods and not kwargs:
             if len(args) == 0:
                 return context.push(
                     str,
@@ -402,7 +727,8 @@ class StringWrapper(RefcountedWrapper):
                         ).cast(self.layoutType)
                     )
                 )
-        elif methodname in self._bool_methods:
+
+        if methodname in self._bool_methods and not kwargs:
             if len(args) == 0:
                 return context.push(
                     bool,
@@ -412,29 +738,73 @@ class StringWrapper(RefcountedWrapper):
                         )
                     )
                 )
-        elif methodname == "startswith":
-            if len(args) == 1:
-                if args[0].expr_type != self:
-                    context.pushException(
-                        TypeError,
-                        "startswith first arg must be str (tuple of str not supported yet)"
+        if methodname in self._find_methods and 1 <= len(args) <= 3 and not kwargs:
+            arg1 = context.constant(0) if len(args) <= 1 else args[1].nonref_expr
+            arg2 = self.convert_len(context, instance) if len(args) <= 2 else args[2].nonref_expr
+            return context.push(
+                int,
+                lambda iRef: iRef.expr.store(
+                    self._find_methods[methodname].call(
+                        instance.nonref_expr.cast(VoidPtr),
+                        args[0].nonref_expr.cast(VoidPtr),
+                        arg1,
+                        arg2
                     )
-                    return
+                )
+            )
 
-                return context.call_py_function(strStartswith, (instance, args[0]), {})
-
-        elif methodname == "endswith":
+        if methodname == "translate" and not kwargs:
             if len(args) == 1:
-                if args[0].expr_type != self:
-                    context.pushException(
-                        TypeError,
-                        "endswith first arg must be str (tuple of str not supported yet)"
-                    )
-                    return
+                return context.call_py_function(strTranslate, (instance, args[0]), {})
 
-                return context.call_py_function(strEndswith, (instance, args[0]), {})
+        if methodname == 'maketrans' and not kwargs:
+            if len(args) == 1:
+                return context.call_py_function(strMaketransFromDict, (args[0], ), {})
+            if 2 <= len(args) <= 3:
+                if len(args) == 3:
+                    arg2 = args[2]
+                else:
+                    arg2 = context.constant(None)
+                return context.call_py_function(strMaketransFromStr, (args[0], args[1], arg2), {})
 
-        elif methodname == "replace":
+        if methodname in ["startswith", "endswith"] and not kwargs:
+            if len(args) >= 1 and len(args) <= 3:
+                sw = (methodname == "startswith")
+                t = args[0].expr_type
+                if len(args) == 1:
+                    if t == self:
+                        return context.call_py_function(strStartswith if sw else strEndswith,
+                                                        (instance, args[0]), {})
+                    if t.typeRepresentation == tuple or t is typeWrapper(TupleOf(str)):
+                        return context.call_py_function(strStartswithTuple if sw else strEndswithTuple,
+                                                        (instance, args[0]), {})
+                else:
+                    if len(args) == 3:
+                        arg1 = args[1]
+                        arg2 = args[2]
+                    elif len(args) == 2:
+                        arg1 = args[1]
+                        arg2 = self.convert_len(context, instance)
+
+                    if t == self:
+                        return context.call_py_function(strRangeStartswith if sw else strRangeEndswith,
+                                                        (instance, args[0], arg1, arg2), {})
+                    if t.typeRepresentation == tuple or t is typeWrapper(TupleOf(str)):
+                        return context.call_py_function(strRangeStartswithTuple if sw else strRangeEndswithTuple,
+                                                        (instance, args[0], arg1, arg2), {})
+
+                return context.pushException(
+                    TypeError,
+                    f"{'starts' if sw else 'ends'}with first arg must be str or a tuple of str, not {t}"
+                )
+
+        if methodname == 'expandtabs' and len(args) == 1 and not kwargs:
+            arg0type = args[0].expr_type.typeRepresentation
+            if arg0type != int:
+                return context.pushException(TypeError, f"an integer is required, not '{arg0type}'")
+            return context.call_py_function(strExpandtabs, (instance, args[0]), {})
+
+        if methodname == "replace" and not kwargs:
             if len(args) in [2, 3]:
                 for i in [0, 1]:
                     if args[i].expr_type != self:
@@ -456,41 +826,7 @@ class StringWrapper(RefcountedWrapper):
                 else:
                     return context.call_py_function(strReplace, (instance, args[0], args[1], args[2]), {})
 
-        elif methodname == "find":
-            if len(args) == 1:
-                return context.push(
-                    int,
-                    lambda iRef: iRef.expr.store(
-                        runtime_functions.string_find_2.call(
-                            instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr.cast(VoidPtr)
-                        )
-                    )
-                )
-            elif len(args) == 2:
-                return context.push(
-                    int,
-                    lambda iRef: iRef.expr.store(
-                        runtime_functions.string_find_3.call(
-                            instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr.cast(VoidPtr),
-                            args[1].nonref_expr
-                        )
-                    )
-                )
-            elif len(args) == 3:
-                return context.push(
-                    int,
-                    lambda iRef: iRef.expr.store(
-                        runtime_functions.string_find.call(
-                            instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr.cast(VoidPtr),
-                            args[1].nonref_expr,
-                            args[2].nonref_expr
-                        )
-                    )
-                )
-        elif methodname == "join":
+        if methodname == "join" and not kwargs:
             if len(args) == 1:
                 # we need to pass the list of strings
                 separator = instance
@@ -507,47 +843,128 @@ class StringWrapper(RefcountedWrapper):
                     )
                 else:
                     return context.call_py_function(strJoinIterable, (separator, itemsToJoin), {})
-        elif methodname == "split":
+
+        if methodname in ['split', 'rsplit'] and not kwargs:
             if len(args) == 0:
+                sepPtr = VoidPtr.zero()
+                maxCount = native_ast.const_int_expr(-1)
+            elif len(args) in [1, 2] and args[0].expr_type.typeRepresentation in [str, type(None)]:
+                if args[0].expr_type == typeWrapper(None):
+                    sepPtr = VoidPtr.zero()
+                else:
+                    sepPtr = args[0].nonref_expr.cast(VoidPtr)
+                    sepLen = args[0].convert_len()
+                    if sepLen is None:
+                        return None
+                    with context.ifelse(sepLen.nonref_expr.eq(0)) as (ifTrue, ifFalse):
+                        with ifTrue:
+                            context.pushException(ValueError, "empty separator")
+
+                if len(args) == 2:
+                    maxCount = args[1].toInt64()
+                    if maxCount is None:
+                        return None
+                else:
+                    maxCount = native_ast.const_int_expr(-1)
+            else:
+                maxCount = None
+
+            if maxCount is not None:
+                fn = runtime_functions.string_split if methodname == 'split' else runtime_functions.string_rsplit
                 return context.push(
                     TypedListMasqueradingAsList(ListOf(str)),
-                    lambda outStrings: outStrings.expr.store(
-                        runtime_functions.string_split_2.call(
-                            instance.nonref_expr.cast(VoidPtr)
-                        ).cast(outStrings.expr_type.getNativeLayoutType())
-                    )
-                )
-            elif len(args) == 1 and args[0].expr_type.typeRepresentation == str:
-                return context.push(
-                    TypedListMasqueradingAsList(ListOf(str)),
-                    lambda outStrings: outStrings.expr.store(
-                        runtime_functions.string_split_3.call(
+                    lambda out: out.expr.store(
+                        fn.call(
                             instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr.cast(VoidPtr)
-                        ).cast(outStrings.expr_type.getNativeLayoutType())
+                            sepPtr,
+                            maxCount
+                        ).cast(out.expr_type.getNativeLayoutType())
                     )
                 )
-            elif len(args) == 1 and args[0].expr_type.typeRepresentation == int:
+        if methodname == 'splitlines' and not kwargs:
+            if len(args) == 0:
+                arg0 = context.constant(False)
+            elif len(args) == 1:
+                arg0 = args[0].toBool()
+                if arg0 is None:
+                    return None
+
+            return context.push(
+                TypedListMasqueradingAsList(ListOf(str)),
+                lambda out: out.expr.store(
+                    runtime_functions.string_splitlines.call(
+                        instance.nonref_expr.cast(VoidPtr),
+                        arg0
+                    ).cast(out.expr_type.getNativeLayoutType())
+                )
+            )
+        if methodname == 'encode':
+            if 0 <= len(args) <= 2:
+                if len(args) >= 1:
+                    arg0 = args[0]
+                elif 'encoding' in kwargs:
+                    arg0 = kwargs['encoding']
+                else:
+                    arg0 = None
+
+                if len(args) >= 2:
+                    arg1 = args[1]
+                elif 'errors' in kwargs:
+                    arg1 = kwargs['errors']
+                else:
+                    arg1 = None
+
                 return context.push(
-                    TypedListMasqueradingAsList(ListOf(str)),
-                    lambda outStrings: outStrings.expr.store(
-                        runtime_functions.string_split_3max.call(
+                    bytes,
+                    lambda ref: ref.expr.store(
+                        runtime_functions.str_encode.call(
                             instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr
-                        ).cast(outStrings.expr_type.getNativeLayoutType())
+                            (arg0 if arg0 is not None else context.constant(0)).nonref_expr.cast(VoidPtr),
+                            (arg1 if arg1 is not None else context.constant(0)).nonref_expr.cast(VoidPtr),
+                        ).cast(typeWrapper(bytes).layoutType)
                     )
                 )
-            elif len(args) == 2 and args[0].expr_type.typeRepresentation == str and args[1].expr_type.typeRepresentation == int:
-                return context.push(
-                    TypedListMasqueradingAsList(ListOf(str)),
-                    lambda outStrings: outStrings.expr.store(
-                        runtime_functions.string_split.call(
-                            instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr.cast(VoidPtr),
-                            args[1].nonref_expr
-                        ).cast(outStrings.expr_type.getNativeLayoutType())
-                    )
-                )
+
+        if methodname in ['partition', 'rpartition'] and len(args) == 1 and not kwargs:
+            arg0type = args[0].expr_type.typeRepresentation
+            if arg0type != str:
+                context.pushException(TypeError, f"must be str, not '{arg0type}'")
+            py_f = strPartition if methodname == 'partition' else strRpartition
+            return context.call_py_function(py_f, (instance, args[0]), {})
+
+        if methodname in ['center', 'ljust', 'rjust']:
+            if len(args) in [1, 2]:
+                arg0 = args[0].toInt64()
+                if arg0 is None:
+                    return None
+
+                if len(args) == 2:
+                    arg1 = args[1]
+                    arg1type = arg1.expr_type.typeRepresentation
+                    if arg1type != str:
+                        context.pushException(TypeError, f"{methodname}() the fill character must be a unicode character, not {arg1type}")
+                    arg1len = arg1.convert_len()
+                    if arg1len is None:
+                        return None
+                    with context.ifelse(arg1len.nonref_expr.eq(1)) as (ifTrue, ifFalse):
+                        with ifFalse:
+                            context.pushException(
+                                TypeError,
+                                f"{methodname}() the fill character must be exactly one character long"
+                            )
+                else:
+                    arg1 = context.constant(' ')
+
+            py_f = strCenter if methodname == 'center' else \
+                strLjust if methodname == 'ljust' else \
+                strRjust if methodname == 'rjust' else None
+            return context.call_py_function(py_f, (instance, arg0, arg1), {})
+
+        if methodname == 'zfill' and len(args) == 1 and not kwargs:
+            arg0 = args[0].toInt64()
+            if arg0 is None:
+                return None
+            return context.call_py_function(strZfill, (instance, arg0), {})
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
@@ -583,3 +1000,100 @@ class StringWrapper(RefcountedWrapper):
                 return context.pushException(type(e), *e.args)
 
         return context.pushPod(float, runtime_functions.str_to_float64.call(expr.nonref_expr.cast(VoidPtr)))
+
+    def get_iteration_expressions(self, context, expr):
+        if expr.isConstant:
+            return [context.constant(expr.constantValue[i]) for i in range(len(expr.constantValue))]
+        else:
+            return None
+
+
+class StringIteratorWrapper(Wrapper):
+    is_pod = False
+    is_empty = False
+    is_pass_by_ref = True
+
+    def __init__(self):
+        super().__init__((str, "iterator"))
+
+    def getNativeLayoutType(self):
+        return native_ast.Type.Struct(
+            element_types=(("pos", native_ast.Int64), ("str", typeWrapper(str).getNativeLayoutType())),
+            name="str_iterator"
+        )
+
+    def convert_next(self, context, inst):
+        context.pushEffect(
+            inst.expr.ElementPtrIntegers(0, 0).store(
+                inst.expr.ElementPtrIntegers(0, 0).load().add(1)
+            )
+        )
+        self_len = self.refAs(context, inst, 1).convert_len()
+        canContinue = context.pushPod(
+            bool,
+            inst.expr.ElementPtrIntegers(0, 0).load().lt(self_len.nonref_expr)
+        )
+
+        nextIx = context.pushReference(int, inst.expr.ElementPtrIntegers(0, 0))
+        return self.iteratedItemForReference(context, inst, nextIx), canContinue
+
+    def refAs(self, context, expr, which):
+        assert expr.expr_type == self
+
+        if which == 0:
+            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
+
+        if which == 1:
+            return context.pushReference(
+                str,
+                expr.expr
+                    .ElementPtrIntegers(0, 1)
+                    .cast(typeWrapper(str).getNativeLayoutType().pointer())
+            )
+
+    def iteratedItemForReference(self, context, expr, ixExpr):
+        return typeWrapper(str).convert_getitem_unsafe(
+            context,
+            self.refAs(context, expr, 1),
+            ixExpr
+        ).heldToRef()
+
+    def convert_assign(self, context, expr, other):
+        assert expr.isReference
+
+        for i in range(2):
+            self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
+
+    def convert_copy_initialize(self, context, expr, other):
+        for i in range(2):
+            self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
+
+    def convert_destroy(self, context, expr):
+        self.refAs(context, expr, 1).convert_destroy()
+
+
+_StringIteratorWrapper = StringIteratorWrapper()
+
+
+class StringMaketransWrapper(Wrapper):
+    is_pod = True
+    is_empty = False
+    is_pass_by_ref = False
+
+    def __init__(self):
+        super().__init__(str.maketrans)
+
+    def getNativeLayoutType(self):
+        return native_ast.Type.Void()
+
+    def convert_call(self, context, expr, args, kwargs):
+        if not kwargs:
+            static_str_instance = StringWrapper().constant(context, '')
+            if len(args) == 1:
+                return static_str_instance.convert_method_call("maketrans", (args[0],), {})
+            elif len(args) == 2:
+                return static_str_instance.convert_method_call("maketrans", (args[0], args[1]), {})
+            elif len(args) == 3:
+                return static_str_instance.convert_method_call("maketrans", (args[0], args[1], args[2]), {})
+
+        return super().convert_call(context, expr, args, kwargs)

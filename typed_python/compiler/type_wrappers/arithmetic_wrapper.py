@@ -306,6 +306,9 @@ class IntWrapper(ArithmeticTypeWrapper):
 
     def convert_builtin(self, f, context, expr, a1=None):
         if f is chr and a1 is None:
+            if expr.isConstant:
+                return context.constant(chr(expr.constantValue))
+
             return context.push(
                 str,
                 lambda strRef: strRef.expr.store(

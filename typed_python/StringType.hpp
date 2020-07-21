@@ -62,6 +62,10 @@ public:
 
     //return an increffed uppercase conversion layout of l
     static layout* upper(layout *l);
+    static layout* capitalize(layout* l);
+    static layout* casefold(layout* l);
+    static layout* swapcase(layout* l);
+    static layout* title(layout* l);
 
     static layout* strip(layout *l, bool fromLeft=true, bool fromRight=true);
 
@@ -71,13 +75,16 @@ public:
 
     //return the lowest index in the string where substring sub is found within l[start, end]
     static int64_t find(layout* l, layout* sub, int64_t start, int64_t end);
+    static int64_t rfind(layout* l, layout* sub, int64_t start, int64_t end);
+    static int64_t count(layout* l, layout* sub, int64_t start, int64_t end);
     static void split(ListOfType::layout *outList, layout* l, layout* sep, int64_t max);
-    static void split_3(ListOfType::layout *outList, layout* l, int64_t max);
+    static void rsplit(ListOfType::layout *outList, layout* l, layout* sep, int64_t max);
+    static void splitlines(ListOfType::layout *outList, layout* l, bool keepends);
 
     /**
-     * It should behave like outString = separator.join(toJoin).
+     * It should behave like out = separator.join(toJoin).
      */
-    static void join(StringType::layout **outString, StringType::layout *separator, ListOfType::layout *toJoin);
+    static void join(StringType::layout **out, StringType::layout *separator, ListOfType::layout *toJoin);
 
     static bool isalpha(layout *l);
     static bool isalnum(layout *l);
@@ -89,6 +96,8 @@ public:
     static bool isspace(layout *l);
     static bool istitle(layout *l);
     static bool isupper(layout *l);
+
+    static layout* mult(layout* lhs, int64_t rhs);
 
     //return an increffed string containing the one codepoint at 'offset'. this function
     //will correctly map negative indices, but performs no other boundschecking.
@@ -141,6 +150,9 @@ public:
     }
 
     std::string toUtf8String(instance_ptr self) {
+        if (!self)
+            return std::string();
+
         std::vector<uint8_t> data;
 
         if (bytes_per_codepoint(self) == 1) {
@@ -214,6 +226,7 @@ public:
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
     static char cmpStatic(layout* left, layout* right);
+    static char cmpStatic(layout* left, uint8_t* right_data, int right_pointcount, int right_bytes_per_codepoint);
 
     static bool cmpStaticEq(layout* left, layout* right);
 

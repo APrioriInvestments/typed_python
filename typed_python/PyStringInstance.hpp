@@ -23,7 +23,10 @@ public:
     typedef StringType modeled_type;
 
     static void copyConstructFromPythonInstanceConcrete(StringType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+
         if (PyUnicode_Check(pyRepresentation)) {
+            if (PyUnicode_READY(pyRepresentation) == -1) throw PythonExceptionSet();
+
             auto kind = PyUnicode_KIND(pyRepresentation);
             assert(
                 kind == PyUnicode_1BYTE_KIND ||
@@ -72,8 +75,15 @@ public:
         int bytesPer = kind == PyUnicode_1BYTE_KIND ? 1 :
             kind == PyUnicode_2BYTE_KIND ? 2 : 4;
 
-        if (bytesPer != t->bytes_per_codepoint(self)) {
-            return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+        int bytesPerCodepoint = t->bytes_per_codepoint(self);
+
+        if (bytesPer != bytesPerCodepoint) {
+            uint8_t* data =
+                kind == PyUnicode_1BYTE_KIND ? (uint8_t*)PyUnicode_1BYTE_DATA(other) :
+                kind == PyUnicode_2BYTE_KIND ? (uint8_t*)PyUnicode_2BYTE_DATA(other) :
+                                               (uint8_t*)PyUnicode_4BYTE_DATA(other);
+            int res = StringType::cmpStatic(*(StringType::layout**)self, data, PyUnicode_GET_LENGTH(other), bytesPer);
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, res);
         }
 
         if (PyUnicode_GET_LENGTH(other) < t->count(self)) {

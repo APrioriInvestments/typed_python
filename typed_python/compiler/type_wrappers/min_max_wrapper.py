@@ -122,9 +122,11 @@ def i_max_key_default(v, key_f, default):
     return ret
 
 
-def no_more_kwargs(**kwargs):
+def no_more_kwargs(context, **kwargs):
     for e in kwargs:
-        raise TypeError(f"'{e}' is an invalid keyword argument for this function")
+        context.pushException(TypeError, f"'{e}' is an invalid keyword argument for this function")
+        # just need to generate the first exception
+        break
 
 
 class MinMaxWrapper(Wrapper):
@@ -144,7 +146,8 @@ class MinMaxWrapper(Wrapper):
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
-    def convert_call(self, context, expr, args, kwargs):
+    def convert_call(self, context, expr, args, kwargs0):
+        kwargs = kwargs0.copy()
         # iterable case
         if len(args) == 1:
             if 'key' in kwargs:
@@ -153,17 +156,17 @@ class MinMaxWrapper(Wrapper):
                 if 'default' in kwargs:
                     default = kwargs['default']
                     del kwargs['default']
-                    no_more_kwargs(**kwargs)
+                    no_more_kwargs(context, **kwargs)
                     return context.call_py_function(self.i_key_default_call, (args[0], key_f, default), {})
                 else:
-                    no_more_kwargs(**kwargs)
+                    no_more_kwargs(context, **kwargs)
                     return context.call_py_function(self.i_key_call, (args[0], key_f), {})
             if 'default' in kwargs:
                 default = kwargs['default']
                 del kwargs['default']
-                no_more_kwargs(**kwargs)
+                no_more_kwargs(context, **kwargs)
                 return context.call_py_function(self.i_default_call, (args[0], default), {})
-            no_more_kwargs(**kwargs)
+            no_more_kwargs(context, **kwargs)
             return context.call_py_function(self.i_call, (args[0],), {})
 
         if len(args) >= 2 and 'key' in kwargs:
@@ -174,7 +177,7 @@ class MinMaxWrapper(Wrapper):
 
             key_f = kwargs['key']
             del kwargs['key']
-            no_more_kwargs(**kwargs)
+            no_more_kwargs(context, **kwargs)
 
             # determine key type
             keyT = None
@@ -201,7 +204,7 @@ class MinMaxWrapper(Wrapper):
                 cond = typeWrapper(keyT).convert_bin_op(context, selected_key, self.comparison_op1, keys[i], False)
                 if cond is None:
                     return None
-                cond = cond.convert_to_type(bool)
+                cond = cond.toBool()
                 if cond is None:
                     return None
                 with context.ifelse(cond.nonref_expr) as (ifTrue, ifFalse):
@@ -228,7 +231,7 @@ class MinMaxWrapper(Wrapper):
                     if cond is None:
                         return None
 
-                    cond = cond.convert_to_type(bool)
+                    cond = cond.toBool()
                     if cond is None:
                         return None
 

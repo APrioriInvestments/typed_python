@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -97,76 +97,274 @@ char BytesType::cmpStatic(layout* left, layout* right) {
 }
 
 /* static */
-void BytesType::split(ListOfType::layout *outList, layout* bytesLayout, layout* sep, int64_t max) {
-    static ListOfType* listOfBytes = ListOfType::Make(StringType::Make());
+// assumes outList was initialized to an empty list before calling
+// x.split() with no parameters is not the same thing as x.split(b' ')
+// x.split() combines successive matches (of whitespace) into a single match
+void BytesType::split(ListOfType::layout *outList, layout* in, layout* sep, int64_t max) {
+    static ListOfType* listOfBytes = ListOfType::Make(BytesType::Make());
 
     int64_t cur = 0;
     int64_t count = 0;
 
     listOfBytes->reserve((instance_ptr)&outList, 10);
 
-    uint8_t* bytesData = (uint8_t*)bytesLayout->data;
+    uint8_t* inData = in ? (uint8_t*)in->data : nullptr;
+    int64_t inLen = in ? in->bytecount : 0;
     uint8_t sepChar = sep ? *(uint8_t*)sep->data : 0;
     uint8_t* sepDat = sep ? (uint8_t*)sep->data : 0;
     int64_t sepLen = sep ? sep->bytecount : 1;
 
     if (max == 0) {
-        layout* remainder = createFromPtr((const char*)bytesData, bytesLayout->bytecount);
-        listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
-        destroyStatic((instance_ptr)&remainder);
+        if (!sep) {
+            while (cur < inLen && std::isspace(inData[cur])) cur++;
+        }
+        if (cur != inLen) {
+            layout* remainder = createFromPtr((const char*)inData + cur, inLen - cur);
+            listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
+            destroyStatic((instance_ptr)&remainder);
+        }
         return;
     }
 
-    while (cur < bytesLayout->bytecount) {
+    while (cur < inLen) {
         int64_t match = cur;
 
         if (sep) {
             if (sepLen == 1) {
-                while (match < bytesLayout->bytecount && bytesData[match] != sepChar) {
+                while (match < inLen && inData[match] != sepChar) {
                     match++;
                 }
             } else {
-                while (match + sepLen <= bytesLayout->bytecount && strncmp((const char*)bytesData, (const char*)sepDat, match)) {
+                while (match + sepLen <= inLen && memcmp((const char*)inData + match, (const char*)sepDat, sepLen)) {
                     match++;
                 }
             }
         } else {
-            while (match < bytesLayout->bytecount && (
-                    bytesData[match] != '\n'
-                &&  bytesData[match] != '\r'
-                &&  bytesData[match] != '\t'
-                &&  bytesData[match] != ' '
-                &&  bytesData[match] != '\b'
-                &&  bytesData[match] != '\f'
-                )
-            ) {
+            while (match < inLen && !isspace(inData[match])) {
                 match++;
             }
         }
 
-        if (match + sepLen > bytesLayout->bytecount) {
+        if (match + sepLen > inLen) {
             break;
         }
 
-        layout* piece = createFromPtr((const char*)bytesData + cur, match - cur);
+        if (sep || match != cur) {
+            layout* piece = createFromPtr((const char*)inData + cur, match - cur);
+
+            if (outList->count == outList->reserved) {
+                listOfBytes->reserve((instance_ptr)&outList, outList->reserved * 1.5);
+            }
+
+            ((layout**)outList->data)[outList->count++] = piece;
+            cur = match + sepLen;
+            count++;
+            if (max >= 0 && count >= max)
+                break;
+        }
+        else if (!sep) {
+            cur++;
+        }
+    }
+//    if (!sep) {
+//        while (cur < inLen && std::isspace(inData[cur])) cur++;
+//    }
+    if (sep || inLen != cur) {
+        layout* remainder = createFromPtr((const char*)inData + cur, inLen - cur);
+        listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
+        destroyStatic((instance_ptr)&remainder);
+    }
+}
+
+/* static */
+// assumes outList was initialized to an empty list before calling
+void BytesType::rsplit(ListOfType::layout *outList, layout* in, layout* sep, int64_t max) {
+    static ListOfType* listOfBytes = ListOfType::Make(BytesType::Make());
+
+    listOfBytes->reserve((instance_ptr)&outList, 10);
+
+    uint8_t* inData = in ? (uint8_t*)in->data : nullptr;
+    int64_t inLen = in ? in->bytecount : 0;
+    uint8_t sepChar = sep ? *(uint8_t*)sep->data : 0;
+    uint8_t* sepDat = sep ? (uint8_t*)sep->data : 0;
+    int64_t sepLen = sep ? sep->bytecount : 1;
+
+    int64_t cur = inLen - 1;
+    int64_t count = 0;
+
+    if (max == 0) {
+        if (!sep) {
+            while (cur >= 0 && std::isspace(inData[cur])) cur--;
+        }
+        if (cur >= 0) {
+            layout* remainder = createFromPtr((const char*)inData, cur + 1);
+            listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
+            destroyStatic((instance_ptr)&remainder);
+        }
+        return;
+    }
+
+    while (cur >= 0) {
+        int64_t match = cur;
+
+        if (sep) {
+            if (sepLen == 1) {
+                while (match >= 0 && inData[match] != sepChar) {
+                    match--;
+                }
+            } else {
+                while (match - sepLen + 1 >= 0 && memcmp((const char*)inData + match - sepLen + 1, (const char*)sepDat, sepLen)) {
+                    match--;
+                }
+            }
+        } else {
+            while (match >= 0 && (
+                    inData[match] != '\n'
+                &&  inData[match] != '\r'
+                &&  inData[match] != '\t'
+                &&  inData[match] != ' '
+                &&  inData[match] != '\x0B'  // note: \x0B is whitespace, but \b is not whitespace
+                &&  inData[match] != '\f'
+                )
+            ) {
+                match--;
+            }
+        }
+
+        if (match - sepLen + 1 < 0) {
+            break;
+        }
+
+        if (sep || match != cur) {
+            layout* piece = createFromPtr((const char*)inData + match + 1, cur - match);
+
+            if (outList->count == outList->reserved) {
+                listOfBytes->reserve((instance_ptr)&outList, outList->reserved * 1.5);
+            }
+
+            ((layout**)outList->data)[outList->count++] = piece;
+            cur = match - sepLen;
+            count++;
+            if (max >= 0 && count >= max) break;
+        }
+        else if (!sep) {
+            cur--;
+        }
+    }
+    if (sep || cur != -1) {
+        layout* remainder = createFromPtr((const char*)inData, cur + 1);
+        listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
+        destroyStatic((instance_ptr)&remainder);
+    }
+    listOfBytes->reverse((instance_ptr)&outList);
+}
+
+/* static */
+// assumes outList was initialized to an empty list before calling
+void BytesType::splitlines(ListOfType::layout *outList, layout* in, bool keepends) {
+    static ListOfType* listOfBytes = ListOfType::Make(BytesType::Make());
+
+    int64_t cur = 0;
+
+    listOfBytes->reserve((instance_ptr)&outList, 10);
+
+    uint8_t* inData = in ? (uint8_t*)in->data : nullptr;
+    int64_t inLen = in ? in->bytecount : 0;
+    int sepLen = 0;
+
+    while (cur < inLen) {
+        int64_t match = cur;
+
+        while (match < inLen && inData[match] != '\n' &&  inData[match] != '\r') {
+            match++;
+        }
+        sepLen = 0;
+        if (match < inLen) {
+            if (inData[match] == '\r' && match + 1 < inLen && inData[match+1] == '\n') {
+                sepLen = 2;
+            }
+            else {
+                sepLen = 1;
+            }
+        }
+
+        if (match + sepLen > inLen) {
+            break;
+        }
+
+        layout* piece = createFromPtr((const char*)inData + cur, match - cur + (keepends ? sepLen : 0));
 
         if (outList->count == outList->reserved) {
             listOfBytes->reserve((instance_ptr)&outList, outList->reserved * 1.5);
         }
 
         ((layout**)outList->data)[outList->count++] = piece;
-
         cur = match + sepLen;
-
-        count++;
-
-        if (max >= 0 && count >= max)
-            break;
     }
-    layout* remainder = createFromPtr((const char*)bytesData + cur, bytesLayout->bytecount - cur);
-    listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
-    destroyStatic((instance_ptr)&remainder);
+    if (inLen != cur) {
+        layout* remainder = createFromPtr((const char*)inData + cur, inLen - cur);
+        listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
+        destroyStatic((instance_ptr)&remainder);
+    }
 }
+
+void BytesType::join(BytesType::layout **out, BytesType::layout *separator, ListOfType::layout *toJoin) {
+    if (!out)
+        throw std::invalid_argument("missing return argument");
+
+    BytesType::Make()->constructor((instance_ptr)out);
+
+    // return empty bytes when there is nothing to join
+    if (toJoin->count == 0)
+    {
+        return;
+    }
+
+    static ListOfType *listOfBytesType = ListOfType::Make(BytesType::Make());
+    int total_bytes = 0;
+
+    for (int64_t i = 0; i < toJoin->count; i++)
+    {
+        instance_ptr item = listOfBytesType->eltPtr(toJoin, i);
+        BytesType::layout** itemLayout = (BytesType::layout**)item;
+        if (*itemLayout != nullptr) {
+            total_bytes += (*itemLayout)->bytecount;
+        }
+    }
+
+    // add the separators size
+    if (separator != nullptr)
+    {
+        total_bytes += separator->bytecount * (toJoin->count - 1);
+    }
+
+    // add all the parts together
+    *out = (layout*)malloc(sizeof(layout) + total_bytes);
+    (*out)->hash_cache = -1;
+    (*out)->refcount = 1;
+    (*out)->bytecount = total_bytes;
+
+    // position in the output data array
+    int position = 0;
+
+    for (int64_t i = 0; i < toJoin->count; i++)
+    {
+        instance_ptr instptr_item = listOfBytesType->eltPtr(toJoin, i);
+        BytesType::layout* item = *(BytesType::layout**)instptr_item;
+        if (item != nullptr)
+        {
+            memcpy((*out)->data + position, item->data, item->bytecount);
+            position += item->bytecount;
+        }
+
+        if (separator != nullptr && i != toJoin->count - 1)
+        {
+            memcpy((*out)->data + position, separator->data, separator->bytecount);
+            position += separator->bytecount;
+        }
+    }
+}
+
 
 BytesType::layout* BytesType::concatenate(layout* lhs, layout* rhs) {
     if (!rhs && !lhs) {
@@ -502,4 +700,314 @@ bool BytesType::to_float64(BytesType::layout* b, double* value) {
         *value = 0.0;
         return false;
     }
+}
+
+BytesType::layout* BytesType::lower(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + l->bytecount;
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = l->bytecount;
+
+    for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->bytecount; src < end; ) {
+        *dest++ = (uint8_t)tolower(*src++);
+    }
+    return new_layout;
+}
+
+BytesType::layout* BytesType::upper(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + l->bytecount;
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = l->bytecount;
+
+    for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->bytecount; src < end; ) {
+        *dest++ = (uint8_t)toupper(*src++);
+    }
+    return new_layout;
+}
+
+BytesType::layout* BytesType::capitalize(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + l->bytecount;
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = l->bytecount;
+
+    uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->bytecount;
+    if (l->bytecount) {
+        *dest++ = (uint8_t)toupper(*src++);
+        while (src < end) {
+            *dest++ = (uint8_t)tolower(*src++);
+        }
+    }
+    return new_layout;
+}
+
+BytesType::layout* BytesType::swapcase(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + l->bytecount;
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = l->bytecount;
+
+    for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->bytecount; src < end; ) {
+        uint8_t c = *src++;
+        if (islower(c))
+            *dest++ = (uint8_t)toupper(c);
+        else if (isupper(c))
+            *dest++ = (uint8_t)tolower(c);
+        else
+            *dest++ = c;
+    }
+    return new_layout;
+}
+
+BytesType::layout* BytesType::title(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + l->bytecount;
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = l->bytecount;
+
+    bool word = false;
+    for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->bytecount; src < end; ) {
+        uint8_t c = *src++;
+        if (word) {
+            if (isalpha(c)) {
+                *dest++ = (uint8_t)tolower(c);
+            } else {
+                *dest++ = c;
+                word = false;
+            }
+        } else {
+            if (isalpha(c)) {
+                *dest++ = (uint8_t)toupper(c);
+                word = true;
+            } else {
+                *dest++ = c;
+            }
+        }
+    }
+    return new_layout;
+}
+
+bool matchchar(uint8_t v, bool whiteSpace, BytesType::layout* values) {
+    if (whiteSpace) return isspace(v);
+
+    if (!values) return false;
+
+    for (int i = 0; i < values->bytecount; i++) {
+        if (v == values->data[i]) return true;
+    }
+    return false;
+}
+
+BytesType::layout* BytesType::strip(layout* l, bool whiteSpace, layout* values, bool fromLeft, bool fromRight) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t leftPos = 0;
+    int64_t rightPos = l->bytecount;
+
+    uint8_t* dataPtr = l->data;
+
+    if (fromLeft) {
+        while (leftPos < rightPos && matchchar(dataPtr[leftPos], whiteSpace, values)) {
+            leftPos++;
+        }
+    }
+
+    if (fromRight) {
+        while (leftPos < rightPos && matchchar(dataPtr[rightPos-1], whiteSpace, values)) {
+            rightPos--;
+        }
+    }
+
+    if (leftPos == rightPos) {
+        return nullptr;
+    }
+
+    if (leftPos == 0 && rightPos == l->bytecount) {
+        l->refcount++;
+        return l;
+    }
+
+    size_t datalength = rightPos - leftPos;
+    layout* new_layout = (layout*)malloc(sizeof(layout) + datalength);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = datalength;
+
+    memcpy(new_layout->data, l->data + leftPos, datalength);
+
+    return new_layout;
+}
+
+BytesType::layout* BytesType::mult(layout* lhs, int64_t rhs) {
+    if (!lhs) {
+        return lhs;
+    }
+    if (rhs <= 0)
+        return 0;
+    int64_t new_length = lhs->bytecount * rhs;
+    int64_t new_byteCount = sizeof(layout) + new_length;
+
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = new_length;
+
+    for (size_t i = 0; i < rhs; i++) {
+        memcpy(new_layout->data + i * lhs->bytecount, lhs->data, lhs->bytecount);
+    }
+
+    return new_layout;
+}
+
+// This 'replace' is slightly faster (5%) than 'bytes_replace' in bytes_wrapper.py.
+// However, this 'replace' needs better memory management.
+// Some notable special cases:
+// 'aa'.replace('','z') = 'zazaz'
+// 'aa'.replace('','z', 5) = 'aa'
+// 'aa'.replace('','z', -1) = 'zazaz'
+// ''.replace('','z') = 'z'
+// ''.replace('','z', 5) = ''
+// ''.replace('','z', -1) = 'z'
+BytesType::layout* BytesType::replace(layout* l, layout* old, layout* repl, int64_t count) {
+    if (!l) {
+        if (old || !repl || count >= 0)
+            return 0;
+        layout *new_layout = (layout*)malloc(sizeof(layout) + repl->bytecount);
+        new_layout->refcount = 1;
+        new_layout->hash_cache = -1;
+        new_layout->bytecount = repl->bytecount;
+        memcpy(new_layout->data, repl->data, repl->bytecount);
+        return new_layout;
+    }
+
+    int64_t c = 0;
+    size_t repl_len = repl ? repl->bytecount : 0;
+    size_t old_len = old ? old->bytecount : 0;
+    size_t max_matches = old_len ? l->bytecount / old_len : l->bytecount + 1;
+    size_t max_increase = repl_len > old_len ? max_matches * (repl_len - old_len) : 0;
+    size_t new_layout_size = sizeof(layout) + l->bytecount + max_increase;
+    layout* new_layout = (layout*)malloc(new_layout_size);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = l->bytecount;
+
+    if ((!old_len && !repl_len) || old_len > l->bytecount || count == 0) {
+         memcpy(new_layout->data, l->data, l->bytecount);
+         return new_layout;
+    }
+
+    uint8_t* src = l->data;
+    uint8_t* dst = new_layout->data;
+    uint8_t* end_scan = l->data + l->bytecount - old_len + 1;
+    uint8_t* end_src = l->data + l->bytecount;
+    while (src < end_scan) {
+        if (!old_len || 0 == memcmp(src, old->data, old_len)) {
+            if (repl) {
+                memcpy(dst, repl->data, repl_len);
+                dst += repl_len;
+            }
+            if (!old_len) {
+                *dst++ = *src++;
+            }
+            else {
+                src += old_len;
+            }
+            new_layout->bytecount += repl_len - old_len;
+            if (count > 0 && ++c >= count) break;
+        }
+        else {
+            *dst++ = *src++;
+        }
+    }
+    if (src < end_src) memcpy(dst, src, end_src - src);
+
+    if (sizeof(layout) + new_layout->bytecount < new_layout_size) {
+        new_layout = (layout*)realloc(new_layout, sizeof(layout) + new_layout->bytecount);
+    }
+    return new_layout;
+}
+
+
+BytesType::layout* BytesType::translate(layout* l, layout* table, layout* to_delete) {
+    if (!l) return 0;
+
+    if (table && table->bytecount != 256) {
+        throw std::invalid_argument("translation table must be 256 characters long");
+    }
+
+    layout *new_layout = (layout*)malloc(sizeof(layout) + l->bytecount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+
+    uint8_t* dst = new_layout->data;
+    for (int i = 0; i < l->bytecount; i++) {
+        uint8_t c = l->data[i];
+        if (to_delete) {
+            bool delete_this = false;
+            for (int j = 0; j < to_delete->bytecount; j++)
+                if (c == to_delete->data[j]) {
+                    delete_this = true;
+                    break;
+                }
+            if (delete_this) continue;
+        }
+        if (table)
+            *dst++ = table->data[c];
+        else
+            *dst++ = c;
+    }
+    new_layout->bytecount = dst - new_layout->data;
+
+    // might have shrunk
+    if (new_layout->bytecount < l->bytecount) {
+        new_layout = (layout*)realloc(new_layout, sizeof(layout) + new_layout->bytecount);
+    }
+    return new_layout;
+}
+
+// assumes len(from) == len(to) checked before calling
+BytesType::layout* BytesType::maketrans(layout* from, layout* to) {
+    const int table_size = 256;
+    layout* new_layout = (layout*)malloc(sizeof(layout) + table_size);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = table_size;
+
+    for (int i = 0; i < table_size; i++) {
+        new_layout->data[i] = i;
+    }
+
+    for (int j = 0; j < (from ? from->bytecount : 0); j++) {
+        new_layout->data[from->data[j]] = to->data[j];
+    }
+
+    return new_layout;
 }
