@@ -544,6 +544,12 @@ string_getitem_int64 = externalCallTarget(
     Void.pointer(), Int64
 )
 
+string_mult = externalCallTarget(
+    "nativepython_runtime_string_mult",
+    Void.pointer(),
+    Void.pointer(), Int64
+)
+
 string_from_utf8_and_len = externalCallTarget(
     "nativepython_runtime_string_from_utf8_and_len",
     Void.pointer(),
@@ -596,12 +602,6 @@ string_join = externalCallTarget(
 
 string_split = externalCallTarget(
     "nativepython_runtime_string_split",
-    Void.pointer(),
-    Void.pointer(), Void.pointer(), Int64
-)
-
-bytes_split = externalCallTarget(
-    "nativepython_runtime_bytes_split",
     Void.pointer(),
     Void.pointer(), Void.pointer(), Int64
 )
@@ -707,6 +707,117 @@ bytes_from_ptr_and_len = externalCallTarget(
     "nativepython_runtime_bytes_from_ptr_and_len",
     Void.pointer(),
     UInt8Ptr, Int64
+)
+
+bytes_join = externalCallTarget(
+    "nativepython_runtime_bytes_join",
+    Void,
+    Void.pointer(), Void.pointer(), Void.pointer()
+)
+
+bytes_split = externalCallTarget(
+    "nativepython_runtime_bytes_split",
+    Void.pointer(),
+    Void.pointer(), Void.pointer(), Int64
+)
+
+bytes_rsplit = externalCallTarget(
+    "nativepython_runtime_bytes_rsplit",
+    Void.pointer(),
+    Void.pointer(), Void.pointer(), Int64
+)
+
+bytes_lower = externalCallTarget(
+    "nativepython_runtime_bytes_lower",
+    Void.pointer(),
+    Void.pointer()
+)
+
+bytes_upper = externalCallTarget(
+    "nativepython_runtime_bytes_upper",
+    Void.pointer(),
+    Void.pointer()
+)
+
+bytes_capitalize = externalCallTarget(
+    "nativepython_runtime_bytes_capitalize",
+    Void.pointer(),
+    Void.pointer()
+)
+
+bytes_swapcase = externalCallTarget(
+    "nativepython_runtime_bytes_swapcase",
+    Void.pointer(),
+    Void.pointer()
+)
+
+bytes_title = externalCallTarget(
+    "nativepython_runtime_bytes_title",
+    Void.pointer(),
+    Void.pointer()
+)
+
+bytes_splitlines = externalCallTarget(
+    "nativepython_runtime_bytes_splitlines",
+    Void.pointer(),
+    Void.pointer(),
+    Bool
+)
+
+bytes_strip = externalCallTarget(
+    "nativepython_runtime_bytes_strip",
+    Void.pointer(),
+    Void.pointer(),
+    Bool,
+    Bool
+)
+
+bytes_strip2 = externalCallTarget(
+    "nativepython_runtime_bytes_strip2",
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+    Bool,
+    Bool
+)
+
+bytes_mult = externalCallTarget(
+    "nativepython_runtime_bytes_mult",
+    Void.pointer(),
+    Void.pointer(),
+    Int64
+)
+
+bytes_replace = externalCallTarget(
+    "nativepython_runtime_bytes_replace",
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+    Int64
+)
+
+bytes_decode = externalCallTarget(
+    "nativepython_runtime_bytes_decode",
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer()
+)
+
+bytes_translate = externalCallTarget(
+    "nativepython_runtime_bytes_translate",
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer()
+)
+
+bytes_maketrans = externalCallTarget(
+    "nativepython_runtime_bytes_maketrans",
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer()
 )
 
 print_string = externalCallTarget(

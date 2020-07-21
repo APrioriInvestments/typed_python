@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -263,6 +263,23 @@ void TupleOrListOfType::reserve(instance_ptr self, size_t target) {
     self_layout->reserved = target;
 }
 
+void TupleOrListOfType::reverse(instance_ptr self) {
+    layout_ptr& self_layout = *(layout_ptr*)self;
+    if (!self_layout || self_layout->count <= 1) return;
+
+    long elt_size = getEltType()->bytecount();
+
+    // swap memory without caring what the elements are
+    uint8_t* swap = (uint8_t*)malloc(elt_size);
+    for (long k = 0; k < self_layout->count / 2; k++) {
+        uint8_t* ptr1 = (uint8_t*)eltPtr(self_layout, k);
+        uint8_t* ptr2 = (uint8_t*)eltPtr(self_layout, self_layout->count - 1 - k);
+        memcpy(swap, ptr1, elt_size);
+        memcpy(ptr1, ptr2, elt_size);
+        memcpy(ptr2, swap, elt_size);
+    }
+    free(swap);
+}
 
 //static
 void ListOfType::copyListObject(instance_ptr target, instance_ptr src) {

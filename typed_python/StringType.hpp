@@ -75,9 +75,9 @@ public:
     static void split_3(ListOfType::layout *outList, layout* l, int64_t max);
 
     /**
-     * It should behave like outString = separator.join(toJoin).
+     * It should behave like out = separator.join(toJoin).
      */
-    static void join(StringType::layout **outString, StringType::layout *separator, ListOfType::layout *toJoin);
+    static void join(StringType::layout **out, StringType::layout *separator, ListOfType::layout *toJoin);
 
     static bool isalpha(layout *l);
     static bool isalnum(layout *l);
@@ -89,6 +89,8 @@ public:
     static bool isspace(layout *l);
     static bool istitle(layout *l);
     static bool isupper(layout *l);
+
+    static layout* mult(layout* lhs, int64_t rhs);
 
     //return an increffed string containing the one codepoint at 'offset'. this function
     //will correctly map negative indices, but performs no other boundschecking.

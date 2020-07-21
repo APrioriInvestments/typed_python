@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -191,8 +191,6 @@ class TestStringCompilation(unittest.TestCase):
         def replace(x: str, y: str, z: str):
             return x.replace(y, z)
 
-        replaceCompiled = Compiled(replace)
-
         def replace2(x: str, y: str, z: str, i: int):
             return x.replace(y, z, i)
 
@@ -200,17 +198,17 @@ class TestStringCompilation(unittest.TestCase):
         replace2Compiled = Compiled(replace2)
 
         strings = [""]
-        for _ in range(6):
-            for s in ["ab"]:
-                strings = [x + s for x in strings]
+        for _ in range(2):
+            for s in ["ab", "c", "ba"*100]:
+                strings += [x + s for x in strings]
 
         for s1 in strings:
             for s2 in strings:
                 for s3 in strings:
-                    self.assertEqual(replace(s1, s2, s3), replaceCompiled(s1, s2, s3))
+                    self.assertEqual(replace(s1, s2, s3), replaceCompiled(s1, s2, s3), (s1, s2, s3))
 
                     for i in [-1, 0, 1, 2]:
-                        self.assertEqual(replace2(s1, s2, s3, i), replace2Compiled(s1, s2, s3, i))
+                        self.assertEqual(replace2(s1, s2, s3, i), replace2Compiled(s1, s2, s3, i), (s1, s2, s3, i))
 
     def test_string_getitem_slice(self):
         def getitem1(x: str, y: int):
@@ -806,3 +804,48 @@ class TestStringCompilation(unittest.TestCase):
             return int(x)
 
         assert f("1") == 1
+
+    def test_string_iteration(self):
+        def iter(x: str):
+            r = ListOf(str)()
+            for a in x:
+                r.append(a)
+            return r
+
+        def iter_constant():
+            r = ListOf(str)()
+            for a in "constant":
+                r.append(a)
+            return r
+
+        def contains_space(x: str):
+            for c in x:
+                if c == ' ':
+                    return True
+            return False
+
+        r1 = iter_constant()
+        r2 = Compiled(iter_constant)()
+        self.assertEqual(type(r1), type(r2))
+        self.assertEqual(r1, r2)
+
+        for v in ['whatever', 'o', '']:
+            r1 = iter(v)
+            r2 = Compiled(iter)(v)
+            self.assertEqual(type(r1), type(r2))
+            self.assertEqual(r1, r2)
+
+        for v in ['', 'a', ' ', 'abc ', 'x'*1000+' '+'x'*1000, 'y'*1000]:
+            r1 = contains_space(v)
+            r2 = Compiled(contains_space)(v)
+            self.assertEqual(r1, r2)
+
+    def test_string_mult(self):
+        def f_mult(x, n):
+            return x * n
+
+        v = "XyZ"
+        for n in [1, 5, 100, 0, -1]:
+            r1 = f_mult(v, n)
+            r2 = Entrypoint(f_mult)(v, n)
+            self.assertEqual(r1, r2)
