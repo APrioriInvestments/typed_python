@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -13,6 +13,8 @@
 #   limitations under the License.
 
 from typed_python import Compiled, Entrypoint, ListOf
+from typed_python.compiler.type_wrappers.bytes_wrapper import bytes_isalnum, bytes_isalpha, \
+    bytes_isdigit, bytes_islower, bytes_isspace, bytes_istitle, bytes_isupper
 from typed_python.test_util import compilerPerformanceComparison
 import flaky
 
@@ -252,3 +254,92 @@ class TestBytesCompilation(unittest.TestCase):
             f"Expected compiled time {compiled} to be not much slower than uncompiled time {uncompiled}. "
             f"Compiler was {compiled / uncompiled} times slower."
         )
+
+    def test_bytes_iteration(self):
+        def iter(x: bytes):
+            r = ListOf(int)()
+            for a in x:
+                r.append(a)
+            return r
+
+        def iter_constant():
+            r = ListOf(int)()
+            for a in b'constant':
+                r.append(a)
+            return r
+
+        def contains_space(x: bytes):
+            for i in x:
+                if i == 32:
+                    return True
+            return False
+
+        def f_index(x: bytes, i: int):
+            return x[i]
+
+        r1 = iter_constant()
+        r2 = Compiled(iter_constant)()
+        self.assertEqual(type(r1), type(r2))
+        self.assertEqual(r1, r2)
+
+        for v in [b'whatever', b'o', b'']:
+            r1 = iter(v)
+            r2 = Compiled(iter)(v)
+            self.assertEqual(type(r1), type(r2))
+            self.assertEqual(r1, r2)
+
+        for v in [b'', b'a', b' ', b'abc ', b'x' * 1000 + b' ' + b'x' * 1000, b'y' * 1000]:
+            r1 = contains_space(v)
+            r2 = Compiled(contains_space)(v)
+            self.assertEqual(r1, r2)
+
+    def test_bytes_bool_fns(self):
+        def f_isalnum(x):
+            return x.isalnum()
+
+        def f_isalpha(x):
+            return x.isalpha()
+
+        def f_isdigit(x):
+            return x.isdigit()
+
+        def f_islower(x):
+            return x.islower()
+
+        def f_isspace(x):
+            return x.isspace()
+
+        def f_istitle(x):
+            return x.istitle()
+
+        def f_isupper(x):
+            return x.isupper()
+
+        cases = [b'abc' + bytes([i]) + b'abc' for i in range(256)]
+        cases += [b'ABC' + bytes([i]) + b'ABC' for i in range(256)]
+        cases += [b'123' + bytes([i]) for i in range(256)]
+        cases += [b'  \t\r\n\f' + bytes([i]) for i in range(256)]
+        cases += [bytes([i]) + b'123' for i in range(256)]
+        cases += [bytes([i]) + b'   'for i in range(256)]
+        cases += [b'', b'A' * 1000, b'9' * 1000]
+        cases += [b'Title Case', b'NotTitleCase']
+        for f in [f_isalnum, f_isalpha, f_isdigit, f_islower, f_isspace, f_istitle, f_isupper]:
+            for v in cases:
+                r1 = f(v)
+                r2 = Entrypoint(f)(v)
+                if r1 != r2:
+                    print("mismatch")
+                self.assertEqual(r1, r2, v)
+
+    def test_bytes_internal(self):
+        """
+        test functions that are never called directly, to improve codecov coverage
+        """
+        v = b'a1A'
+        self.assertEqual(bytes_isalnum(v), v.isalnum())
+        self.assertEqual(bytes_isalpha(v), v.isalpha())
+        self.assertEqual(bytes_isdigit(v), v.isdigit())
+        self.assertEqual(bytes_islower(v), v.islower())
+        self.assertEqual(bytes_isspace(v), v.isspace())
+        self.assertEqual(bytes_istitle(v), v.istitle())
+        self.assertEqual(bytes_isupper(v), v.isupper())

@@ -14,6 +14,7 @@
 
 from typed_python import sha_hash
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
+from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python import Int32, Float32
 from typed_python.type_promotion import isInteger
@@ -312,6 +313,16 @@ class StringWrapper(RefcountedWrapper):
             )
         )
 
+    def convert_getitem_unsafe(self, context, expr, item):
+        return context.push(
+            str,
+            lambda strRef: strRef.expr.store(
+                runtime_functions.string_getitem_int64.call(
+                    expr.nonref_expr.cast(native_ast.VoidPtr), item.nonref_expr
+                ).cast(self.layoutType)
+            )
+        )
+
     def convert_len_native(self, expr):
         return native_ast.Expression.Branch(
             cond=expr,
@@ -361,7 +372,7 @@ class StringWrapper(RefcountedWrapper):
 
     def convert_attribute(self, context, instance, attr):
         if (
-            attr in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace")
+            attr in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace", "__iter__")
             or attr in self._str_methods
             or attr in self._bool_methods
         ):
@@ -370,12 +381,26 @@ class StringWrapper(RefcountedWrapper):
         return super().convert_attribute(context, instance, attr)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        if not (methodname in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace")
+        if not (methodname in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace", "__iter__")
                 or methodname in self._str_methods or methodname in self._bool_methods):
             return context.pushException(AttributeError, methodname)
 
         if kwargs:
             return super().convert_method_call(context, instance, methodname, args, kwargs)
+
+        if methodname == "__iter__" and not args and not kwargs:
+            res = context.push(
+                _StringIteratorWrapper,
+                lambda instance:
+                instance.expr.ElementPtrIntegers(0, 0).store(-1)
+            )
+
+            context.pushReference(
+                self,
+                res.expr.ElementPtrIntegers(0, 1)
+            ).convert_copy_initialize(instance)
+
+            return res
 
         if methodname in ['strip', 'lstrip', 'rstrip']:
             fromLeft = methodname in ['strip', 'lstrip']
@@ -583,3 +608,76 @@ class StringWrapper(RefcountedWrapper):
                 return context.pushException(type(e), *e.args)
 
         return context.pushPod(float, runtime_functions.str_to_float64.call(expr.nonref_expr.cast(VoidPtr)))
+
+    def get_iteration_expressions(self, context, expr):
+        if expr.isConstant:
+            return [context.constant(expr.constantValue[i]) for i in range(len(expr.constantValue))]
+        else:
+            return None
+
+
+class StringIteratorWrapper(Wrapper):
+    is_pod = False
+    is_empty = False
+    is_pass_by_ref = True
+
+    def __init__(self):
+        super().__init__((str, "iterator"))
+
+    def getNativeLayoutType(self):
+        return native_ast.Type.Struct(
+            element_types=(("pos", native_ast.Int64), ("str", typeWrapper(str).getNativeLayoutType())),
+            name="str_iterator"
+        )
+
+    def convert_next(self, context, inst):
+        context.pushEffect(
+            inst.expr.ElementPtrIntegers(0, 0).store(
+                inst.expr.ElementPtrIntegers(0, 0).load().add(1)
+            )
+        )
+        self_len = self.refAs(context, inst, 1).convert_len()
+        canContinue = context.pushPod(
+            bool,
+            inst.expr.ElementPtrIntegers(0, 0).load().lt(self_len.nonref_expr)
+        )
+
+        nextIx = context.pushReference(int, inst.expr.ElementPtrIntegers(0, 0))
+        return self.iteratedItemForReference(context, inst, nextIx), canContinue
+
+    def refAs(self, context, expr, which):
+        assert expr.expr_type == self
+
+        if which == 0:
+            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
+
+        if which == 1:
+            return context.pushReference(
+                str,
+                expr.expr
+                    .ElementPtrIntegers(0, 1)
+                    .cast(typeWrapper(str).getNativeLayoutType().pointer())
+            )
+
+    def iteratedItemForReference(self, context, expr, ixExpr):
+        return typeWrapper(str).convert_getitem_unsafe(
+            context,
+            self.refAs(context, expr, 1),
+            ixExpr
+        ).heldToRef()
+
+    def convert_assign(self, context, expr, other):
+        assert expr.isReference
+
+        for i in range(2):
+            self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
+
+    def convert_copy_initialize(self, context, expr, other):
+        for i in range(2):
+            self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
+
+    def convert_destroy(self, context, expr):
+        self.refAs(context, expr, 1).convert_destroy()
+
+
+_StringIteratorWrapper = StringIteratorWrapper()
