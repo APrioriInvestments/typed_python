@@ -116,4 +116,8 @@ public:
     static bool to_int64(layout* s, int64_t* value);
 
     static bool to_float64(layout* s, double* value);
+
+    static layout* lower(layout* l);
+    static layout* upper(layout* l);
+    static layout* strip(layout* l, bool whiteSpace, layout* values, bool fromLeft=true, bool fromRight=true);
 };

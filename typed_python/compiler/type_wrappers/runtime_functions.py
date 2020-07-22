@@ -709,6 +709,35 @@ bytes_from_ptr_and_len = externalCallTarget(
     UInt8Ptr, Int64
 )
 
+bytes_lower = externalCallTarget(
+    "nativepython_runtime_bytes_lower",
+    Void.pointer(),
+    Void.pointer()
+)
+
+bytes_upper = externalCallTarget(
+    "nativepython_runtime_bytes_upper",
+    Void.pointer(),
+    Void.pointer()
+)
+
+bytes_strip = externalCallTarget(
+    "nativepython_runtime_bytes_strip",
+    Void.pointer(),
+    Void.pointer(),
+    Bool,
+    Bool
+)
+
+bytes_strip2 = externalCallTarget(
+    "nativepython_runtime_bytes_strip2",
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+    Bool,
+    Bool
+)
+
 print_string = externalCallTarget(
     "nativepython_print_string",
     Void,

@@ -104,6 +104,28 @@ def bytes_isupper(x):
     return found_upper
 
 
+def bytes_startswith(x, prefix):
+    if len(x) < len(prefix):
+        return False
+    index = 0
+    for i in prefix:
+        if x[index] != i:
+            return False
+        index += 1
+    return True
+
+
+def bytes_endswith(x, suffix):
+    index = len(x) - len(suffix)
+    if index < 0:
+        return False
+    for i in suffix:
+        if x[index] != i:
+            return False
+        index += 1
+    return True
+
+
 class BytesWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -264,6 +286,7 @@ class BytesWrapper(RefcountedWrapper):
             ).load().cast(native_ast.Int64)
         )
 
+    # these map to py functions
     _bool_methods = dict(
         isalnum=bytes_isalnum,
         isalpha=bytes_isalpha,
@@ -271,10 +294,14 @@ class BytesWrapper(RefcountedWrapper):
         islower=bytes_islower,
         isspace=bytes_isspace,
         istitle=bytes_istitle,
-        isupper=bytes_isupper,
+        isupper=bytes_isupper
     )
 
-    _bytes_methods = dict()
+    # these map to c++ functions
+    _bytes_methods = dict(
+        lower=runtime_functions.bytes_lower,
+        upper=runtime_functions.bytes_upper
+    )
 
     def convert_attribute(self, context, instance, attr):
         if (
@@ -306,6 +333,49 @@ class BytesWrapper(RefcountedWrapper):
 
         if methodname in self._bool_methods and not args and not kwargs:
             return context.call_py_function(self._bool_methods[methodname], (instance,), {})
+
+        if methodname in self._bytes_methods and not args and not kwargs:
+            return context.push(
+                bytes,
+                lambda strRef: strRef.expr.store(
+                    self._bytes_methods[methodname].call(
+                        instance.nonref_expr.cast(VoidPtr)
+                    ).cast(self.layoutType)
+                )
+            )
+
+        if methodname in ['strip', 'lstrip', 'rstrip']:
+            fromLeft = methodname in ['strip', 'lstrip']
+            fromRight = methodname in ['strip', 'rstrip']
+            if len(args) == 0:
+                return context.push(
+                    bytes,
+                    lambda strRef: strRef.expr.store(
+                        runtime_functions.bytes_strip.call(
+                            instance.nonref_expr.cast(VoidPtr),
+                            native_ast.const_bool_expr(fromLeft),
+                            native_ast.const_bool_expr(fromRight)
+                        ).cast(self.layoutType)
+                    )
+                )
+            elif len(args) == 1:
+                return context.push(
+                    bytes,
+                    lambda strRef: strRef.expr.store(
+                        runtime_functions.bytes_strip2.call(
+                            instance.nonref_expr.cast(VoidPtr),
+                            args[0].nonref_expr.cast(VoidPtr),
+                            native_ast.const_bool_expr(fromLeft),
+                            native_ast.const_bool_expr(fromRight)
+                        ).cast(self.layoutType)
+                    )
+                )
+
+        if methodname == "startswith" and len(args) == 1 and not kwargs:
+            return context.call_py_function(bytes_startswith, (instance, args[0]), {})
+
+        if methodname == "endswith" and len(args) == 1 and not kwargs:
+            return context.call_py_function(bytes_endswith, (instance, args[0]), {})
 
         if methodname == "split":
             if len(args) == 0:

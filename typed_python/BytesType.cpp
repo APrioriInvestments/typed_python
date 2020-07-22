@@ -503,3 +503,94 @@ bool BytesType::to_float64(BytesType::layout* b, double* value) {
         return false;
     }
 }
+
+BytesType::layout* BytesType::lower(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + l->bytecount;
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = l->bytecount;
+
+    for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->bytecount; src < end; ) {
+        *dest++ = (uint8_t)tolower(*src++);
+    }
+
+    return new_layout;
+}
+
+BytesType::layout* BytesType::upper(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + l->bytecount;
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = l->bytecount;
+
+    for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->bytecount; src < end; ) {
+        *dest++ = (uint8_t)toupper(*src++);
+    }
+
+    return new_layout;
+}
+
+
+bool matchchar(uint8_t v, bool whiteSpace, BytesType::layout* values) {
+    if (whiteSpace) return isspace(v);
+
+    if (!values) return false;
+
+    for (int i = 0; i < values->bytecount; i++) {
+        if (v == values->data[i]) return true;
+    }
+    return false;
+}
+
+
+BytesType::layout* BytesType::strip(layout* l, bool whiteSpace, layout* values, bool fromLeft, bool fromRight) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t leftPos = 0;
+    int64_t rightPos = l->bytecount;
+
+    uint8_t* dataPtr = l->data;
+
+    if (fromLeft) {
+        while (leftPos < rightPos && matchchar(dataPtr[leftPos], whiteSpace, values)) {
+            leftPos++;
+        }
+    }
+
+    if (fromRight) {
+        while (leftPos < rightPos && matchchar(dataPtr[rightPos-1], whiteSpace, values)) {
+            rightPos--;
+        }
+    }
+
+    if (leftPos == rightPos) {
+        return nullptr;
+    }
+
+    if (leftPos == 0 && rightPos == l->bytecount) {
+        l->refcount++;
+        return l;
+    }
+
+    size_t datalength = rightPos - leftPos;
+    layout* new_layout = (layout*)malloc(sizeof(layout) + datalength);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = datalength;
+
+    memcpy(new_layout->data, l->data + leftPos, datalength);
+
+    return new_layout;
+}

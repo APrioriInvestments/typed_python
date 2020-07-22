@@ -670,6 +670,22 @@ extern "C" {
         return BytesType::createFromPtr(utf8_str, len);
     }
 
+    BytesType::layout* nativepython_runtime_bytes_lower(BytesType::layout* l) {
+        return BytesType::lower(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_upper(BytesType::layout* l) {
+        return BytesType::upper(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_strip(BytesType::layout* l, bool fromLeft, bool fromRight) {
+        return BytesType::strip(l, true, nullptr, fromLeft, fromRight);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_strip2(BytesType::layout* l, BytesType::layout* values, bool fromLeft, bool fromRight) {
+        return BytesType::strip(l, false, values, fromLeft, fromRight);
+    }
+
     PythonObjectOfType::layout_type* nativepython_runtime_create_pyobj(PyObject* p) {
         PyEnsureGilAcquired getTheGil;
         return PythonObjectOfType::createLayout(p);

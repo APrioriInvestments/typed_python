@@ -327,13 +327,77 @@ class TestBytesCompilation(unittest.TestCase):
             for v in cases:
                 r1 = f(v)
                 r2 = Entrypoint(f)(v)
-                if r1 != r2:
-                    print("mismatch")
-                self.assertEqual(r1, r2, v)
+                self.assertEqual(r1, r2, (f, v))
 
-    def test_bytes_internal(self):
+    def test_bytes_startswith_endswith(self):
+        def f_startswith(x, y):
+            return x.startswith(y)
+
+        def f_endswith(x, y):
+            return x.endswith(y)
+
+        xcases = [b'abaabaaabaaaaabaaaabaaabaabab', b'']
+        ycases = [b'a', b'ab', b'ba', b'abaabaaabaaaaabaaaabaaabaabab', b'abaabaaabaaaaabaaaabaaabaababa', b'']
+        for f in [f_startswith, f_endswith]:
+            for x in xcases:
+                for y in ycases:
+                    r1 = f(x, y)
+                    r2 = Entrypoint(f)(x, y)
+                    self.assertEqual(r1, r2, (f, x, y))
+
+    def test_bytes_lower_upper(self):
+        def f_lower(x):
+            return x.lower()
+
+        def f_upper(x):
+            return x.upper()
+
+        cases = [b'abc'*10, b'ABC'*10, b'aBc'*10, b'1@=.,']
+        for f in [f_lower, f_upper]:
+            for v in cases:
+                r1 = f(v)
+                r2 = Entrypoint(f)(v)
+                self.assertEqual(r1, r2, (f, v))
+
+    def test_bytes_strip(self):
+        def f_strip(x):
+            return x.strip()
+
+        def f_lstrip(x):
+            return x.lstrip()
+
+        def f_rstrip(x):
+            return x.rstrip()
+
+        pieces = [b'', b' ', b'\t\n', b'abc']
+        cases = [a + b + c for a in pieces for b in pieces for c in pieces]
+
+        for f in [f_strip, f_lstrip, f_rstrip]:
+            for v in cases:
+                r1 = f(v)
+                r2 = Entrypoint(f)(v)
+                self.assertEqual(r1, r2, (f, v))
+
+        def f_strip2(x, y):
+            return x.strip(y)
+
+        def f_lstrip2(x, y):
+            return x.lstrip(y)
+
+        def f_rstrip2(x, y):
+            return x.rstrip(y)
+
+        for f in [f_strip2, f_lstrip2, f_rstrip2]:
+            for y in [b'', b'a', b'ab', b'Z']:
+                for v in cases:
+                    r1 = f(v, y)
+                    r2 = Entrypoint(f)(v, y)
+                    self.assertEqual(r1, r2, (f, v, y))
+
+    def test_bytes_internal_fns(self):
         """
-        test functions that are never called directly, to improve codecov coverage
+        These are functions that are normally not called directly.
+        They are called here in order to improve codecov coverage.
         """
         v = b'a1A'
         self.assertEqual(bytes_isalnum(v), v.isalnum())
