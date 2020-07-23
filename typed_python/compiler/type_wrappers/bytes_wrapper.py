@@ -21,6 +21,7 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import TypedListMasqueradingAsList
 
 from typed_python import UInt8, Int32, ListOf
+from typed_python.type_promotion import isInteger
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -124,6 +125,205 @@ def bytes_endswith(x, suffix):
             return False
         index += 1
     return True
+
+
+# sub is a bytes-like object
+def bytes_count(x, sub, start, end):
+    if start < 0:
+        start += len(x)
+    if start < 0:
+        start = 0
+    if end < 0:
+        end += len(x)
+    if end < 0:
+        end = 0
+    if end > len(x):
+        end = len(x)
+
+    len_sub = len(sub)
+    if len_sub == 0:
+        if start > len(x):
+            return 0
+        count = end - start + 1
+        if count < 0:
+            count = 0
+        return count
+
+    count = 0
+    index = start
+    while index < end - len_sub + 1:
+        subindex = 0
+        while subindex < len_sub:
+            if x[index+subindex] != sub[subindex]:
+                break
+            subindex += 1
+            if subindex == len_sub:
+                count += 1
+                index += len_sub - 1
+        index += 1
+    return count
+
+
+# sub is an integer
+def bytes_count_single(x, sub, start, end):
+    if sub < 0 or sub > 255:
+        raise ValueError("byte must be in range(0, 256)")
+    if start < 0:
+        start += len(x)
+    if start < 0:
+        start = 0
+    if end < 0:
+        end += len(x)
+    if end < 0:
+        end = 0
+    if end > len(x):
+        end = len(x)
+
+    count = 0
+    index = start
+    while index < end:
+        if x[index] == sub:
+            count += 1
+        index += 1
+    return count
+
+
+# sub is a bytes-like object
+def bytes_find(x, sub, start, end):
+    if start < 0:
+        start += len(x)
+    if start < 0:
+        start = 0
+    if end < 0:
+        end += len(x)
+    if end < 0:
+        end = 0
+    if end > len(x):
+        end = len(x)
+
+    len_sub = len(sub)
+    if len_sub == 0:
+        if start > len(x) or start > end:
+            return -1
+        return start
+
+    index = start
+    while index < end - len_sub + 1:
+        subindex = 0
+        while subindex < len_sub:
+            if x[index+subindex] != sub[subindex]:
+                break
+            subindex += 1
+            if subindex == len_sub:
+                return index
+        index += 1
+    return -1
+
+
+# sub is an integer
+def bytes_find_single(x, sub, start, end):
+    if sub < 0 or sub > 255:
+        raise ValueError("byte must be in range(0, 256)")
+    if start < 0:
+        start += len(x)
+    if start < 0:
+        start = 0
+    if end < 0:
+        end += len(x)
+    if end < 0:
+        end = 0
+    if end > len(x):
+        end = len(x)
+
+    index = start
+    while index < end:
+        if x[index] == sub:
+            return index
+        index += 1
+    return -1
+
+
+# sub is a bytes-like object
+def bytes_rfind(x, sub, start, end):
+    if start < 0:
+        start += len(x)
+    if start < 0:
+        start = 0
+    if end < 0:
+        end += len(x)
+    if end < 0:
+        end = 0
+    if end > len(x):
+        end = len(x)
+
+    len_sub = len(sub)
+    if len_sub == 0:
+        if start > len(x) or start > end:
+            return -1
+        return end
+
+    index = end - len_sub
+    while index >= start:
+        subindex = 0
+        while subindex < len_sub:
+            if x[index+subindex] != sub[subindex]:
+                break
+            subindex += 1
+            if subindex == len_sub:
+                return index
+        index -= 1
+    return -1
+
+
+# sub is an integer
+def bytes_rfind_single(x, sub, start, end):
+    if sub < 0 or sub > 255:
+        raise ValueError("byte must be in range(0, 256)")
+    if start < 0:
+        start += len(x)
+    if start < 0:
+        start = 0
+    if end < 0:
+        end += len(x)
+    if end < 0:
+        end = 0
+    if end > len(x):
+        end = len(x)
+
+    index = end - 1
+    while index >= start:
+        if x[index] == sub:
+            return index
+        index -= 1
+    return -1
+
+
+def bytes_index(x, sub, start, end):
+    ret = bytes_find(x, sub, start, end)
+    if ret == -1:
+        raise ValueError("subsection not found")
+    return ret
+
+
+def bytes_index_single(x, sub, start, end):
+    ret = bytes_find_single(x, sub, start, end)
+    if ret == -1:
+        raise ValueError("subsection not found")
+    return ret
+
+
+def bytes_rindex(x, sub, start, end):
+    ret = bytes_rfind(x, sub, start, end)
+    if ret == -1:
+        raise ValueError("subsection not found")
+    return ret
+
+
+def bytes_rindex_single(x, sub, start, end):
+    ret = bytes_rfind_single(x, sub, start, end)
+    if ret == -1:
+        raise ValueError("subsection not found")
+    return ret
 
 
 class BytesWrapper(RefcountedWrapper):
@@ -297,6 +497,15 @@ class BytesWrapper(RefcountedWrapper):
         isupper=bytes_isupper
     )
 
+    # these map to py functions
+    _find_methods = dict(
+        count=(bytes_count, bytes_count_single),
+        find=(bytes_find, bytes_find_single),
+        rfind=(bytes_rfind, bytes_rfind_single),
+        index=(bytes_index, bytes_index_single),
+        rindex=(bytes_rindex, bytes_rindex_single),
+    )
+
     # these map to c++ functions
     _bytes_methods = dict(
         lower=runtime_functions.bytes_lower,
@@ -305,8 +514,9 @@ class BytesWrapper(RefcountedWrapper):
 
     def convert_attribute(self, context, instance, attr):
         if (
-                attr in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace", "__iter__")
+                attr in ("split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace", "__iter__")
                 or attr in self._bytes_methods
+                or attr in self._find_methods
                 or attr in self._bool_methods
         ):
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
@@ -376,6 +586,25 @@ class BytesWrapper(RefcountedWrapper):
 
         if methodname == "endswith" and len(args) == 1 and not kwargs:
             return context.call_py_function(bytes_endswith, (instance, args[0]), {})
+        if methodname == "endswith" and len(args) == 1 and not kwargs:
+            return context.call_py_function(bytes_endswith, (instance, args[0]), {})
+
+        if methodname in self._find_methods and 1 <= len(args) <= 3 and not kwargs:
+            if len(args) == 3:
+                start = args[1]
+                end = args[2]
+            elif len(args) == 2:
+                start = args[1]
+                end = self.convert_len(context, instance)
+            elif len(args) == 1:
+                start = context.constant(0)
+                end = self.convert_len(context, instance)
+
+            if isInteger(args[0].expr_type.typeRepresentation):
+                py_f = self._find_methods[methodname][1]
+            else:
+                py_f = self._find_methods[methodname][0]
+            return context.call_py_function(py_f, (instance, args[0], start, end), {})
 
         if methodname == "split":
             if len(args) == 0:

@@ -394,6 +394,115 @@ class TestBytesCompilation(unittest.TestCase):
                     r2 = Entrypoint(f)(v, y)
                     self.assertEqual(r1, r2, (f, v, y))
 
+    def test_bytes_count(self):
+        def f_count(x, sub):
+            return x.count(sub)
+
+        def f_count2(x, sub, start):
+            return x.count(sub, start)
+
+        def f_count3(x, sub, start, end):
+            return x.count(sub, start, end)
+
+        cases = [b'ababcab', b'ababcabcab', b'aabbabbbaaabbaaba']
+        subs = [b'a', b'ab', b'ba', b'abc', b'']
+        for v in cases:
+            for sub in subs:
+                f = f_count
+                r1 = f(v, sub)
+                r2 = Entrypoint(f)(v, sub)
+                self.assertEqual(r1, r2, (v, sub))
+
+                for start in range(-10, 11, 2):
+                    f = f_count2
+                    r1 = f(v, sub, start)
+                    r2 = Entrypoint(f)(v, sub, start)
+                    self.assertEqual(r1, r2, (v, sub, start))
+                    for end in range(-10, 11, 2):
+                        f = f_count3
+                        r1 = f(v, sub, start, end)
+                        r2 = Entrypoint(f)(v, sub, start, end)
+                        self.assertEqual(r1, r2, (v, sub, start, end))
+
+    def test_bytes_find(self):
+        def f_find(x, sub):
+            return x.find(sub)
+
+        def f_find2(x, sub, start):
+            return x.find(sub, start)
+
+        def f_find3(x, sub, start, end):
+            return x.find(sub, start, end)
+
+        def f_rfind(x, sub):
+            return x.rfind(sub)
+
+        def f_rfind2(x, sub, start):
+            return x.rfind(sub, start)
+
+        def f_rfind3(x, sub, start, end):
+            return x.rfind(sub, start, end)
+
+        def f_index(x, sub):
+            return x.index(sub)
+
+        def f_index2(x, sub, start):
+            return x.index(sub, start)
+
+        def f_index3(x, sub, start, end):
+            return x.index(sub, start, end)
+
+        def f_rindex(x, sub):
+            return x.rindex(sub)
+
+        def f_rindex2(x, sub, start):
+            return x.rindex(sub, start)
+
+        def f_rindex3(x, sub, start, end):
+            return x.rindex(sub, start, end)
+
+        cases = [b'ababcab', b'ababcabcab', b'aabbabbbaaabbaaba']
+        subs = [97, 98, b'a', b'c', b'X', b'ab', b'ba', b'abc', b'']
+        for v in cases:
+            for sub in subs:
+                for f in [f_find, f_rfind]:
+                    r1 = f(v, sub)
+                    r2 = Entrypoint(f)(v, sub)
+                    self.assertEqual(r1, r2, (f, v, sub))
+                    g = f_index if f == f_find else f_rindex
+                    if r1 != -1:
+                        r3 = Entrypoint(g)(v, sub)
+                        self.assertEqual(r1, r3, (g, v, sub))
+                    else:
+                        with self.assertRaises(ValueError):
+                            Entrypoint(g)(v, sub)
+
+                for start in range(-10, 11, 2):
+                    for f in [f_find2, f_rfind2]:
+                        r1 = f(v, sub, start)
+                        r2 = Entrypoint(f)(v, sub, start)
+                        self.assertEqual(r1, r2, (f, v, sub, start))
+                        g = f_index2 if f == f_find2 else f_rindex2
+                        if r1 != -1:
+                            r3 = Entrypoint(g)(v, sub, start)
+                            self.assertEqual(r1, r3, (g, v, sub, start))
+                        else:
+                            with self.assertRaises(ValueError):
+                                Entrypoint(g)(v, sub, start)
+                    for end in range(-10, 11, 2):
+                        for f in [f_find3, f_rfind3]:
+                            r1 = f(v, sub, start, end)
+                            r2 = Entrypoint(f)(v, sub, start, end)
+                            self.assertEqual(r1, r2, (f, v, sub, start, end))
+
+                            g = f_index3 if f == f_find3 else f_rindex3
+                            if r1 != -1:
+                                r3 = Entrypoint(g)(v, sub, start, end)
+                                self.assertEqual(r1, r3, (g, v, sub, start, end))
+                            else:
+                                with self.assertRaises(ValueError):
+                                    Entrypoint(g)(v, sub, start, end)
+
     def test_bytes_internal_fns(self):
         """
         These are functions that are normally not called directly.
