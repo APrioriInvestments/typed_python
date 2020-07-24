@@ -63,13 +63,17 @@ def strEndswith(s, suffix):
 
 
 def strReplace(s, old, new, maxCount):
-    if maxCount == 0:
+    if maxCount == 0 or (maxCount >= 0 and len(s) == 0 and len(old) == 0):
         return s
 
     accumulator = ListOf(str)()
 
     pos = 0
     seen = 0
+    inc = 0 if len(old) else 1
+    if len(old) == 0:
+        accumulator.append('')
+        seen += 1
 
     while True:
         if maxCount >= 0 and seen >= maxCount:
@@ -77,8 +81,8 @@ def strReplace(s, old, new, maxCount):
         else:
             nextLoc = s.find(old, pos)
 
-        if nextLoc >= 0:
-            accumulator.append(s[pos:nextLoc])
+        if nextLoc >= 0 and nextLoc < len(s):
+            accumulator.append(s[pos:nextLoc + inc])
 
             if len(old):
                 pos = nextLoc + len(old)
@@ -137,6 +141,20 @@ class StringWrapper(RefcountedWrapper):
         return False
 
     def convert_bin_op(self, context, left, op, right, inplace):
+        if op.matches.Mult and isInteger(right.expr_type.typeRepresentation):
+            if left.isConstant and right.isConstant:
+                return context.constant(left.constantValue * right.constantValue)
+
+            return context.push(
+                str,
+                lambda strRef: strRef.expr.store(
+                    runtime_functions.string_mult.call(
+                        left.nonref_expr.cast(VoidPtr),
+                        right.nonref_expr
+                    ).cast(self.layoutType)
+                )
+            )
+
         if right.expr_type == left.expr_type:
             if op.matches.Eq or op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.GtE or op.matches.Gt:
                 if op.matches.Eq:
@@ -237,6 +255,9 @@ class StringWrapper(RefcountedWrapper):
 
     def convert_builtin(self, f, context, expr, a1=None):
         if a1 is None and f is ord:
+            if expr.isConstant:
+                return context.constant(ord(expr.constantValue))
+
             return context.pushPod(
                 int,
                 runtime_functions.string_ord.call(

@@ -28,7 +28,60 @@ import typed_python.compiler
 
 from typed_python.compiler.native_ast import VoidPtr
 
+
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+def bytesJoinIterable(sep, iterable):
+    """Converts the iterable container to list of bytes objects and call sep.join(iterable).
+
+    If any of the values in the container is not bytes type, an exception is thrown.
+
+    :param sep: string to separate the items
+    :param iterable: iterable container with strings only
+    :return: string with joined values
+    """
+    items = ListOf(bytes)()
+
+    for item in iterable:
+        if isinstance(item, bytes):
+            items.append(item)
+        else:
+            raise TypeError("expected str instance")
+    return sep.join(items)
+
+
+def bytes_replace(x, old, new, maxCount):
+    if maxCount == 0 or (maxCount >= 0 and len(x) == 0 and len(old) == 0):
+        return x
+
+    accumulator = ListOf(bytes)()
+
+    pos = 0
+    seen = 0
+    inc = 0 if len(old) else 1
+    if len(old) == 0:
+        accumulator.append('')
+        seen += 1
+
+    while True:
+        if maxCount >= 0 and seen >= maxCount:
+            nextLoc = -1
+        else:
+            nextLoc = x.find(old, pos)
+
+        if nextLoc >= 0 and nextLoc < len(x):
+            accumulator.append(x[pos:nextLoc + inc])
+
+            if len(old):
+                pos = nextLoc + len(old)
+            else:
+                pos += 1
+
+            seen += 1
+        else:
+            accumulator.append(x[pos:])
+            return new.join(accumulator)
 
 
 def bytes_isalnum(x):
@@ -357,6 +410,20 @@ class BytesWrapper(RefcountedWrapper):
         return super().convert_builtin(f, context, expr, a1)
 
     def convert_bin_op(self, context, left, op, right, inplace):
+        if op.matches.Mult and isInteger(right.expr_type.typeRepresentation):
+            if left.isConstant and right.isConstant:
+                return context.constant(left.constantValue * right.constantValue)
+
+            return context.push(
+                bytes,
+                lambda bytesRef: bytesRef.expr.store(
+                    runtime_functions.bytes_mult.call(
+                        left.nonref_expr.cast(VoidPtr),
+                        right.nonref_expr
+                    ).cast(self.layoutType)
+                )
+            )
+
         if right.expr_type == left.expr_type:
             if op.matches.Eq or op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.GtE or op.matches.Gt:
                 if left.isConstant and right.isConstant:
@@ -410,6 +477,15 @@ class BytesWrapper(RefcountedWrapper):
                         bool,
                         cmp_res.nonref_expr.gte(0)
                     )
+
+            if op.matches.In:
+                if left.isConstant and right.isConstant:
+                    return context.constant(left.constantValue in right.constantValue)
+
+                find_converted = right.convert_method_call("find", (left,), {})
+                if find_converted is None:
+                    return None
+                return find_converted >= 0
 
             if op.matches.Add:
                 if left.isConstant and right.isConstant:
@@ -560,7 +636,7 @@ class BytesWrapper(RefcountedWrapper):
             if len(args) == 0:
                 return context.push(
                     bytes,
-                    lambda strRef: strRef.expr.store(
+                    lambda bytesRef: bytesRef.expr.store(
                         runtime_functions.bytes_strip.call(
                             instance.nonref_expr.cast(VoidPtr),
                             native_ast.const_bool_expr(fromLeft),
@@ -571,7 +647,7 @@ class BytesWrapper(RefcountedWrapper):
             elif len(args) == 1:
                 return context.push(
                     bytes,
-                    lambda strRef: strRef.expr.store(
+                    lambda bytesRef: bytesRef.expr.store(
                         runtime_functions.bytes_strip2.call(
                             instance.nonref_expr.cast(VoidPtr),
                             args[0].nonref_expr.cast(VoidPtr),
@@ -583,9 +659,6 @@ class BytesWrapper(RefcountedWrapper):
 
         if methodname == "startswith" and len(args) == 1 and not kwargs:
             return context.call_py_function(bytes_startswith, (instance, args[0]), {})
-
-        if methodname == "endswith" and len(args) == 1 and not kwargs:
-            return context.call_py_function(bytes_endswith, (instance, args[0]), {})
         if methodname == "endswith" and len(args) == 1 and not kwargs:
             return context.call_py_function(bytes_endswith, (instance, args[0]), {})
 
@@ -605,6 +678,50 @@ class BytesWrapper(RefcountedWrapper):
             else:
                 py_f = self._find_methods[methodname][0]
             return context.call_py_function(py_f, (instance, args[0], start, end), {})
+
+        if methodname == "replace":
+            if len(args) == 2:
+                return context.push(
+                    bytes,
+                    lambda bytesRef: bytesRef.expr.store(
+                        runtime_functions.bytes_replace.call(
+                            instance.nonref_expr.cast(VoidPtr),
+                            args[0].nonref_expr.cast(VoidPtr),
+                            args[1].nonref_expr.cast(VoidPtr),
+                            native_ast.const_int_expr(-1)
+                        ).cast(self.layoutType)
+                    )
+                )
+            elif len(args) == 3:
+                return context.push(
+                    bytes,
+                    lambda bytesRef: bytesRef.expr.store(
+                        runtime_functions.bytes_replace.call(
+                            instance.nonref_expr.cast(VoidPtr),
+                            args[0].nonref_expr.cast(VoidPtr),
+                            args[1].nonref_expr.cast(VoidPtr),
+                            args[2].nonref_expr
+                        ).cast(self.layoutType)
+                    )
+                )
+
+        if methodname == "join":
+            if len(args) == 1:
+                # we need to pass the list of bytes objects
+                separator = instance
+                itemsToJoin = args[0]
+
+                if itemsToJoin.expr_type.typeRepresentation is ListOf(bytes):
+                    return context.push(
+                        bytes,
+                        lambda out: runtime_functions.bytes_join.call(
+                            out.expr.cast(VoidPtr),
+                            separator.nonref_expr.cast(VoidPtr),
+                            itemsToJoin.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                else:
+                    return context.call_py_function(bytesJoinIterable, (separator, itemsToJoin), {})
 
         if methodname == "split":
             if len(args) == 0:

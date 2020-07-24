@@ -483,8 +483,12 @@ extern "C" {
         return StringType::find(l, sub, start, l ? l->pointcount : 0);
     }
 
-    void nativepython_runtime_string_join(StringType::layout** outString, StringType::layout* separator, ListOfType::layout* toJoin) {
-        StringType::join(outString, separator, toJoin);
+    void nativepython_runtime_bytes_join(BytesType::layout** out, BytesType::layout* separator, ListOfType::layout* toJoin) {
+        BytesType::join(out, separator, toJoin);
+    }
+
+    void nativepython_runtime_string_join(StringType::layout** out, StringType::layout* separator, ListOfType::layout* toJoin) {
+        StringType::join(out, separator, toJoin);
     }
 
     ListOfType::layout* nativepython_runtime_bytes_split(BytesType::layout* l, BytesType::layout* sep, int64_t max) {
@@ -591,6 +595,10 @@ extern "C" {
         return StringType::getitem(lhs, index);
     }
 
+    StringType::layout* nativepython_runtime_string_mult(StringType::layout* lhs, int64_t rhs) {
+        return StringType::mult(lhs, rhs);
+    }
+
     StringType::layout* nativepython_runtime_string_chr(int64_t code) {
         if (code < 0 || code > 0x10ffff) {
             PyEnsureGilAcquired getTheGil;
@@ -684,6 +692,19 @@ extern "C" {
 
     BytesType::layout* nativepython_runtime_bytes_strip2(BytesType::layout* l, BytesType::layout* values, bool fromLeft, bool fromRight) {
         return BytesType::strip(l, false, values, fromLeft, fromRight);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_mult(BytesType::layout* lhs, int64_t rhs) {
+        return BytesType::mult(lhs, rhs);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_replace(
+            BytesType::layout* l,
+            BytesType::layout* old,
+            BytesType::layout* the_new,
+            int64_t count
+    ) {
+        return BytesType::replace(l, old, the_new, count);
     }
 
     PythonObjectOfType::layout_type* nativepython_runtime_create_pyobj(PyObject* p) {

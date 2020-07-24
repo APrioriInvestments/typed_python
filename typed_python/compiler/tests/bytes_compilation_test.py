@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Compiled, Entrypoint, ListOf
+from typed_python import Compiled, Entrypoint, ListOf, TupleOf, Dict, ConstDict
 from typed_python.compiler.type_wrappers.bytes_wrapper import bytes_isalnum, bytes_isalpha, \
     bytes_isdigit, bytes_islower, bytes_isspace, bytes_istitle, bytes_isupper
 from typed_python.test_util import compilerPerformanceComparison
@@ -502,6 +502,145 @@ class TestBytesCompilation(unittest.TestCase):
                             else:
                                 with self.assertRaises(ValueError):
                                     Entrypoint(g)(v, sub, start, end)
+
+    def test_bytes_mult(self):
+        def f_mult(x, n):
+            return x * n
+
+        v = b'XyZ'
+        for n in [1, 5, 100, 0, -1]:
+            r1 = f_mult(v, n)
+            r2 = Entrypoint(f_mult)(v, n)
+            self.assertEqual(r1, r2, n)
+
+    def test_bytes_contains_bytes(self):
+        @Entrypoint
+        def f_contains(x, y):
+            return x in y
+
+        @Entrypoint
+        def f_not_contains(x, y):
+            return x not in y
+
+        self.assertTrue(f_contains(b'a', b'asfd'))
+        self.assertFalse(f_contains(b'b', b'asfd'))
+        self.assertFalse(f_contains(b'b', ListOf(bytes)([b'asfd'])))
+        self.assertTrue(f_contains(b'asdf', ListOf(bytes)([b'asdf'])))
+
+        self.assertFalse(f_not_contains(b'a', b'asfd'))
+        self.assertTrue(f_not_contains(b'b', b'asfd'))
+        self.assertTrue(f_not_contains(b'b', ListOf(bytes)([b'asfd'])))
+        self.assertFalse(f_not_contains(b'asdf', ListOf(bytes)([b'asdf'])))
+
+    def test_bytes_replace(self):
+        def replace(x: bytes, y: bytes, z: bytes):
+            return x.replace(y, z)
+
+        def replace2(x: bytes, y: bytes, z: bytes, i: int):
+            return x.replace(y, z, i)
+
+        replaceCompiled = Compiled(replace)
+        replace2Compiled = Compiled(replace2)
+
+        values = [b'']
+        for _ in range(2):
+            for y in [b'ab', b'c', b'ba' * 100]:
+                values += [x + y for x in values]
+
+        for s1 in values:
+            for s2 in values:
+                for s3 in values:
+                    r1 = replace(s1, s2, s3)
+                    r2 = replaceCompiled(s1, s2, s3)
+                    self.assertEqual(r1, r2)
+
+                    for i in [-1, 0, 1, 2]:
+                        r1 = replace2(s1, s2, s3, i)
+                        r2 = replace2Compiled(s1, s2, s3, i)
+                        self.assertEqual(replace2(s1, s2, s3, i), replace2Compiled(s1, s2, s3, i))
+
+    def validate_joining_bytes(self, function, make_obj):
+        # Test data, the fields are: description, separator, items, expected output
+        test_data = [
+            ["simple data",
+             b",", [b"1", b"2", b"3"], b"1,2,3"],
+
+            ["longer separator",
+             b"---", [b"1", b"2", b"3"], b"1---2---3"],
+
+            ["longer items",
+             b"---", [b"aaa", b"bb", b"c"], b"aaa---bb---c"],
+
+            ["empty separator",
+             b"", [b"1", b"2", b"3"], b"123"],
+
+            ["everything empty",
+             b"", [], b""],
+
+            ["empty list",
+             b"a", [], b""],
+
+            ["empty bytes in the items",
+             b"--", [b"", b"1", b"3"], b"--1--3"],
+
+            ["blank bytes in the items",
+             b"--", [b" ", b"1", b"3"], b" --1--3"],
+        ]
+
+        for description, separator, items, expected in test_data:
+            res = function(separator, make_obj(items))
+            self.assertEqual(expected, res, description)
+
+    def test_bytes_join_for_tuple_of_bytes(self):
+        # test passing tuple of bytes
+        @Compiled
+        def f(sep: bytes, items: TupleOf(bytes)) -> bytes:
+            return sep.join(items)
+
+        self.validate_joining_bytes(f, lambda items: TupleOf(bytes)(items))
+
+    def test_bytes_join_for_list_of_bytes(self):
+        # test passing list of bytes
+        @Compiled
+        def f(sep: bytes, items: ListOf(bytes)) -> bytes:
+            return sep.join(items)
+
+        self.validate_joining_bytes(f, lambda items: ListOf(bytes)(items))
+
+    def test_bytes_join_for_dict_of_bytes(self):
+        # test passing list of bytes
+        @Compiled
+        def f(sep: bytes, items: Dict(bytes, bytes)) -> bytes:
+            return sep.join(items)
+
+        self.validate_joining_bytes(f, lambda items: Dict(bytes, bytes)({i: b"a" for i in items}))
+
+    def test_bytes_join_for_const_dict_of_bytes(self):
+        # test passing list of bytes
+        @Compiled
+        def f(sep: bytes, items: ConstDict(bytes, bytes)) -> bytes:
+            return sep.join(items)
+
+        self.validate_joining_bytes(f, lambda items: ConstDict(bytes, bytes)({i: b"a" for i in items}))
+
+    def test_bytes_join_for_bad_types(self):
+        """bytes.join supports only joining iterables of bytes."""
+
+        # test passing tuple of ints
+        @Compiled
+        def f_tup_int(sep: bytes, items: TupleOf(int)) -> bytes:
+            return sep.join(items)
+
+        with self.assertRaisesRegex(TypeError, ""):
+            f_tup_int(b",", ListOf(int)([1, 2, 3]))
+
+        # test passing list of other types than bytes
+        @Compiled
+        def f_int(sep: bytes, items: ListOf(str)) -> bytes:
+            return sep.join(items)
+
+        with self.assertRaisesRegex(TypeError, ""):
+            f_int(b",", ListOf(int)(["1", "2", "3"]))
 
     def test_bytes_internal_fns(self):
         """
