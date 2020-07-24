@@ -707,6 +707,34 @@ extern "C" {
         return BytesType::replace(l, old, the_new, count);
     }
 
+    StringType::layout* nativepython_runtime_bytes_decode(
+            BytesType::layout* l,
+            StringType::layout* encoding,
+            StringType::layout* errors
+    ) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* b = PyInstance::extractPythonObject((instance_ptr)&l, BytesType::Make());
+        if (!b) {
+            throw PythonExceptionSet();
+        }
+
+        char* utf8_encoding = encoding ? strdup(StringType::Make()->toUtf8String((instance_ptr)&encoding).c_str()) : 0;
+        const char* utf8_errors = errors ? StringType::Make()->toUtf8String((instance_ptr)&errors).c_str() : 0;
+        PyObject* s = PyUnicode_FromEncodedObject(b, utf8_encoding, utf8_errors);
+        free(utf8_encoding);
+        decref(b);
+        if (!s) {
+            throw PythonExceptionSet();
+        }
+
+        StringType::layout* ret = 0;
+        PyInstance::copyConstructFromPythonInstance(StringType::Make(), (instance_ptr)&ret, s, true);
+        decref(s);
+
+        return ret;
+    }
+
     PythonObjectOfType::layout_type* nativepython_runtime_create_pyobj(PyObject* p) {
         PyEnsureGilAcquired getTheGil;
         return PythonObjectOfType::createLayout(p);

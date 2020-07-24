@@ -557,7 +557,7 @@ class TestBytesCompilation(unittest.TestCase):
                     for i in [-1, 0, 1, 2]:
                         r1 = replace2(s1, s2, s3, i)
                         r2 = replace2Compiled(s1, s2, s3, i)
-                        self.assertEqual(replace2(s1, s2, s3, i), replace2Compiled(s1, s2, s3, i))
+                        self.assertEqual(r1, r2, (s1, s2, s3, i))
 
     def validate_joining_bytes(self, function, make_obj):
         # Test data, the fields are: description, separator, items, expected output
@@ -641,6 +641,24 @@ class TestBytesCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, ""):
             f_int(b",", ListOf(int)(["1", "2", "3"]))
+
+    def test_bytes_decode(self):
+        def f_decode1(x, _i1, _i2):
+            return x.decode()
+
+        def f_decode2(x, enc, _i2):
+            return x.decode(enc)
+
+        def f_decode3(x, enc, err):
+            return x.decode(enc, err)
+
+        enc = "utf-8"
+        err = "strict"
+        for v in [b'quarter'*1000, b'25\xC2\xA2', b'\xE2\x82\xAC100', b'\xF0\x9F\x98\x80', b'']:
+            for f in [f_decode1, f_decode2, f_decode3]:
+                r1 = f(v, enc, err)
+                r2 = Entrypoint(f)(v, enc, err)
+                self.assertEqual(r1, r2)
 
     def test_bytes_internal_fns(self):
         """

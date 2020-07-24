@@ -61,7 +61,7 @@ def bytes_replace(x, old, new, maxCount):
     seen = 0
     inc = 0 if len(old) else 1
     if len(old) == 0:
-        accumulator.append('')
+        accumulator.append(b'')
         seen += 1
 
     while True:
@@ -513,6 +513,9 @@ class BytesWrapper(RefcountedWrapper):
         if lower is None and upper is not None:
             lower = context.constant(0)
 
+        if lower is not None and upper is None:
+            upper = expr.convert_len()
+
         lower = lower.toInt64()
         if lower is None:
             return
@@ -590,7 +593,7 @@ class BytesWrapper(RefcountedWrapper):
 
     def convert_attribute(self, context, instance, attr):
         if (
-                attr in ("split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace", "__iter__")
+                attr in ("decode", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace", "__iter__")
                 or attr in self._bytes_methods
                 or attr in self._find_methods
                 or attr in self._bool_methods
@@ -623,7 +626,7 @@ class BytesWrapper(RefcountedWrapper):
         if methodname in self._bytes_methods and not args and not kwargs:
             return context.push(
                 bytes,
-                lambda strRef: strRef.expr.store(
+                lambda ref: ref.expr.store(
                     self._bytes_methods[methodname].call(
                         instance.nonref_expr.cast(VoidPtr)
                     ).cast(self.layoutType)
@@ -636,7 +639,7 @@ class BytesWrapper(RefcountedWrapper):
             if len(args) == 0:
                 return context.push(
                     bytes,
-                    lambda bytesRef: bytesRef.expr.store(
+                    lambda ref: ref.expr.store(
                         runtime_functions.bytes_strip.call(
                             instance.nonref_expr.cast(VoidPtr),
                             native_ast.const_bool_expr(fromLeft),
@@ -647,7 +650,7 @@ class BytesWrapper(RefcountedWrapper):
             elif len(args) == 1:
                 return context.push(
                     bytes,
-                    lambda bytesRef: bytesRef.expr.store(
+                    lambda ref: ref.expr.store(
                         runtime_functions.bytes_strip2.call(
                             instance.nonref_expr.cast(VoidPtr),
                             args[0].nonref_expr.cast(VoidPtr),
@@ -680,7 +683,7 @@ class BytesWrapper(RefcountedWrapper):
             return context.call_py_function(py_f, (instance, args[0], start, end), {})
 
         if methodname == "replace":
-            if len(args) == 2:
+            if len(args) in [2, 3]:
                 return context.push(
                     bytes,
                     lambda bytesRef: bytesRef.expr.store(
@@ -688,22 +691,31 @@ class BytesWrapper(RefcountedWrapper):
                             instance.nonref_expr.cast(VoidPtr),
                             args[0].nonref_expr.cast(VoidPtr),
                             args[1].nonref_expr.cast(VoidPtr),
-                            native_ast.const_int_expr(-1)
+                            args[2].nonref_expr if len(args) == 3 else native_ast.const_int_expr(-1)
                         ).cast(self.layoutType)
                     )
                 )
-            elif len(args) == 3:
-                return context.push(
-                    bytes,
-                    lambda bytesRef: bytesRef.expr.store(
-                        runtime_functions.bytes_replace.call(
-                            instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr.cast(VoidPtr),
-                            args[1].nonref_expr.cast(VoidPtr),
-                            args[2].nonref_expr
-                        ).cast(self.layoutType)
-                    )
-                )
+        # if methodname == "replace":
+        #     if len(args) in [2, 3]:
+        #         for i in [0, 1]:
+        #             if args[i].expr_type != self:
+        #                 context.pushException(
+        #                     TypeError,
+        #                     f"replace() argument {i + 1} must be bytes"
+        #                 )
+        #                 return
+        #
+        #         if len(args) == 3 and args[2].expr_type.typeRepresentation != int:
+        #             context.pushException(
+        #                 TypeError,
+        #                 f"replace() argument 3 must be int, not {args[2].expr_type.typeRepresentation}"
+        #             )
+        #             return
+        #
+        #         if len(args) == 2:
+        #             return context.call_py_function(bytes_replace, (instance, args[0], args[1], context.constant(-1)), {})
+        #         else:
+        #             return context.call_py_function(bytes_replace, (instance, args[0], args[1], args[2]), {})
 
         if methodname == "join":
             if len(args) == 1:
@@ -751,6 +763,18 @@ class BytesWrapper(RefcountedWrapper):
                     )
                 )
 
+        if methodname == "decode":
+            if len(args) in [0, 1, 2]:
+                return context.push(
+                    str,
+                    lambda ref: ref.expr.store(
+                        runtime_functions.bytes_decode.call(
+                            instance.nonref_expr.cast(VoidPtr),
+                            (args[0] if len(args) >= 1 else context.constant(0)).nonref_expr.cast(VoidPtr),
+                            (args[1] if len(args) >= 2 else context.constant(0)).nonref_expr.cast(VoidPtr),
+                        ).cast(typeWrapper(str).layoutType)
+                    )
+                )
         return context.pushException(AttributeError, methodname)
 
     def convert_getitem_unsafe(self, context, expr, item):
