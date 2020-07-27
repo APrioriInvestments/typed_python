@@ -660,6 +660,98 @@ class TestBytesCompilation(unittest.TestCase):
                 r2 = Entrypoint(f)(v, enc, err)
                 self.assertEqual(r1, r2)
 
+    def test_bytes_translate(self):
+        def f_translate1(x, table):
+            return x.translate(table)
+
+        def f_translate2(x, table, to_delete):
+            return x.translate(table, to_delete)
+
+        def f_translate3(x, table, to_delete):
+            return x.translate(table, delete=to_delete)
+
+        t1 = b'0123456789abcdef'*16
+        t2 = b'ABCDEFGHIJKLMNOP'*16
+        t3 = bytes.maketrans(b'abc123', b'XYZijk')
+
+        for v in [b'Abc', b'1234\r\n\f\x00ABCDabcd'*256, b'']:
+            for t in [None, t1, t2, t3]:
+                r1 = f_translate1(v, t)
+                r2 = Entrypoint(f_translate1)(v, t)
+                self.assertEqual(r1, r2, (v, t))
+
+                for d in [b'a', b'Bb', b'']:
+                    r1 = f_translate2(v, t, d)
+                    r2 = Entrypoint(f_translate2)(v, t, d)
+                    self.assertEqual(r1, r2, (v, t, d))
+
+                    r1 = f_translate3(v, t, d)
+                    r2 = Entrypoint(f_translate3)(v, t, d)
+                    self.assertEqual(r1, r2, (v, t, d))
+
+        with self.assertRaises(ValueError):
+            Entrypoint(f_translate1)(b'Abc', b'too short')
+
+        with self.assertRaises(ValueError):
+            Entrypoint(f_translate1)(b'Abc', b'too long'*100)
+
+        with self.assertRaises(TypeError):
+            Entrypoint(f_translate1)(b'Abc', 'wrong type')
+
+    def test_bytes_partition(self):
+        def f_partition(x, sep):
+            return x.partition(sep)
+
+        def f_rpartition(x, sep):
+            return x.rpartition(sep)
+
+        for f in [f_partition, f_rpartition]:
+            for v in [b' beginning', b'end ', b'mid dle', b'engine', b'none', b'']:
+                for sep in [b' ', b'gin']:
+                    r1 = f(v, sep)
+                    r2 = Entrypoint(f)(v, sep)
+                    self.assertEqual(r1, r2, (f, v, sep))
+
+                with self.assertRaises(ValueError):
+                    Entrypoint(f)(v, b'')
+
+                with self.assertRaises(TypeError):
+                    Entrypoint(f)(v, 'abc')
+
+    def test_bytes_just(self):
+        def f_center(x, w, fill):
+            if fill == ' ':
+                return x.center(w)
+            else:
+                return x.center(w, fill)
+
+        def f_ljust(x, w, fill):
+            if fill == ' ':
+                return x.ljust(w)
+            else:
+                return x.ljust(w, fill)
+
+        def f_rjust(x, w, fill):
+            if fill == ' ':
+                return x.rjust(w)
+            else:
+                return x.rjust(w, fill)
+
+        for f in [f_center, f_ljust, f_rjust]:
+            for v in [b'short', b'long'*100, b'']:
+                for w in [0, 8, 16, 100]:
+                    for fill in [b' ', b'X']:
+                        r1 = f(v, w, fill)
+                        r2 = Entrypoint(f)(v, w, fill)
+                        self.assertEqual(r1, r2, (f, v, w, fill))
+
+                    with self.assertRaises(TypeError):
+                        Entrypoint(f)(v, w, b'22')
+                    with self.assertRaises(TypeError):
+                        Entrypoint(f)(v, w, b'')
+                    with self.assertRaises(TypeError):
+                        Entrypoint(f)(v, w, 'X')
+
     def test_bytes_internal_fns(self):
         """
         These are functions that are normally not called directly.

@@ -20,7 +20,7 @@ from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethod
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import TypedListMasqueradingAsList
 
-from typed_python import UInt8, Int32, ListOf
+from typed_python import UInt8, Int32, ListOf, Tuple
 from typed_python.type_promotion import isInteger
 
 import typed_python.compiler.native_ast as native_ast
@@ -379,6 +379,49 @@ def bytes_rindex_single(x, sub, start, end):
     return ret
 
 
+def bytes_partition(x, sep):
+    if len(sep) == 0:
+        raise ValueError("empty separator")
+
+    pos = x.find(sep)
+    if pos == -1:
+        return Tuple(bytes, bytes, bytes)((x, b'', b''))
+    return Tuple(bytes, bytes, bytes)((x[0:pos], sep, x[pos+len(sep):]))
+
+
+def bytes_rpartition(x, sep):
+    if len(sep) == 0:
+        raise ValueError("empty separator")
+
+    pos = x.rfind(sep)
+    if pos == -1:
+        return Tuple(bytes, bytes, bytes)((b'', b'', x))
+    return Tuple(bytes, bytes, bytes)((x[0:pos], sep, x[pos+len(sep):]))
+
+
+def bytes_center(x, width, fill):
+    if width <= len(x):
+        return x
+
+    left = (width - len(x)) // 2
+    right = (width - len(x)) - left
+    return fill * left + x + fill * right
+
+
+def bytes_ljust(x, width, fill):
+    if width <= len(x):
+        return x
+
+    return x + fill * (width - len(x))
+
+
+def bytes_rjust(x, width, fill):
+    if width <= len(x):
+        return x
+
+    return fill * (width - len(x)) + x
+
+
 class BytesWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -593,7 +636,9 @@ class BytesWrapper(RefcountedWrapper):
 
     def convert_attribute(self, context, instance, attr):
         if (
-                attr in ("decode", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace", "__iter__")
+                attr in ('decode', 'translate', 'split', 'join', 'partition', 'rpartition',
+                         'strip', 'rstrip', 'lstrip', 'startswith', 'endswith', 'replace',
+                         '__iter__', 'center', 'ljust', 'rjust')
                 or attr in self._bytes_methods
                 or attr in self._find_methods
                 or attr in self._bool_methods
@@ -603,10 +648,7 @@ class BytesWrapper(RefcountedWrapper):
         return super().convert_attribute(context, instance, attr)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        if kwargs:
-            return super().convert_method_call(context, instance, methodname, args, kwargs)
-
-        if methodname == "__iter__" and not args and not kwargs:
+        if methodname == '__iter__' and not args and not kwargs:
             res = context.push(
                 _BytesIteratorWrapper,
                 lambda instance:
@@ -636,7 +678,7 @@ class BytesWrapper(RefcountedWrapper):
         if methodname in ['strip', 'lstrip', 'rstrip']:
             fromLeft = methodname in ['strip', 'lstrip']
             fromRight = methodname in ['strip', 'rstrip']
-            if len(args) == 0:
+            if len(args) == 0 and not kwargs:
                 return context.push(
                     bytes,
                     lambda ref: ref.expr.store(
@@ -647,7 +689,7 @@ class BytesWrapper(RefcountedWrapper):
                         ).cast(self.layoutType)
                     )
                 )
-            elif len(args) == 1:
+            elif len(args) == 1 and not kwargs:
                 return context.push(
                     bytes,
                     lambda ref: ref.expr.store(
@@ -660,9 +702,9 @@ class BytesWrapper(RefcountedWrapper):
                     )
                 )
 
-        if methodname == "startswith" and len(args) == 1 and not kwargs:
+        if methodname == 'startswith' and len(args) == 1 and not kwargs:
             return context.call_py_function(bytes_startswith, (instance, args[0]), {})
-        if methodname == "endswith" and len(args) == 1 and not kwargs:
+        if methodname == 'endswith' and len(args) == 1 and not kwargs:
             return context.call_py_function(bytes_endswith, (instance, args[0]), {})
 
         if methodname in self._find_methods and 1 <= len(args) <= 3 and not kwargs:
@@ -682,7 +724,7 @@ class BytesWrapper(RefcountedWrapper):
                 py_f = self._find_methods[methodname][0]
             return context.call_py_function(py_f, (instance, args[0], start, end), {})
 
-        if methodname == "replace":
+        if methodname == 'replace' and not kwargs:
             if len(args) in [2, 3]:
                 return context.push(
                     bytes,
@@ -695,7 +737,7 @@ class BytesWrapper(RefcountedWrapper):
                         ).cast(self.layoutType)
                     )
                 )
-        # if methodname == "replace":
+        # if methodname == 'replace':
         #     if len(args) in [2, 3]:
         #         for i in [0, 1]:
         #             if args[i].expr_type != self:
@@ -717,7 +759,7 @@ class BytesWrapper(RefcountedWrapper):
         #         else:
         #             return context.call_py_function(bytes_replace, (instance, args[0], args[1], args[2]), {})
 
-        if methodname == "join":
+        if methodname == 'join' and not kwargs:
             if len(args) == 1:
                 # we need to pass the list of bytes objects
                 separator = instance
@@ -735,7 +777,7 @@ class BytesWrapper(RefcountedWrapper):
                 else:
                     return context.call_py_function(bytesJoinIterable, (separator, itemsToJoin), {})
 
-        if methodname == "split":
+        if methodname == 'split' and not kwargs:
             if len(args) == 0:
                 sepPtr = VoidPtr.zero()
                 maxCount = native_ast.const_int_expr(-1)
@@ -763,7 +805,7 @@ class BytesWrapper(RefcountedWrapper):
                     )
                 )
 
-        if methodname == "decode":
+        if methodname == 'decode' and not kwargs:
             if len(args) in [0, 1, 2]:
                 return context.push(
                     str,
@@ -775,6 +817,73 @@ class BytesWrapper(RefcountedWrapper):
                         ).cast(typeWrapper(str).layoutType)
                     )
                 )
+
+        if methodname == 'translate':
+            if len(args) in [1, 2]:
+                arg0isNone = args[0].expr_type == typeWrapper(None)
+                arg0 = args[0] if not arg0isNone else context.constant(0)
+                if 'delete' in kwargs and len(args) == 1:
+                    arg1 = kwargs['delete']
+                else:
+                    arg1 = args[1] if len(args) >= 2 else context.constant(0)
+
+                if not arg0isNone:
+                    arg0type = arg0.expr_type.typeRepresentation
+                    if arg0type != bytes:
+                        context.pushException(TypeError, f"a bytes-like object is required, not '{arg0type}'")
+                    arg0len = arg0.convert_len()
+                    if arg0len is None:
+                        return None
+                    with context.ifelse(arg0len.nonref_expr.eq(256)) as (ifTrue, ifFalse):
+                        with ifFalse:
+                            context.pushException(ValueError, "translation table must be 256 characters long")
+
+                return context.push(
+                    bytes,
+                    lambda ref: ref.expr.store(
+                        runtime_functions.bytes_translate.call(
+                            instance.nonref_expr.cast(VoidPtr),
+                            arg0.nonref_expr.cast(VoidPtr),
+                            arg1.nonref_expr.cast(VoidPtr),
+                        ).cast(self.layoutType)
+                    )
+                )
+
+        if methodname in ['partition', 'rpartition'] and len(args) == 1 and not kwargs:
+            arg0type = args[0].expr_type.typeRepresentation
+            if arg0type != bytes:
+                context.pushException(TypeError, f"a bytes-like object is required, not '{arg0type}'")
+            py_f = bytes_partition if methodname == 'partition' else bytes_rpartition
+            return context.call_py_function(py_f, (instance, args[0]), {})
+
+        if methodname in ['center', 'ljust', 'rjust']:
+            if len(args) in [1, 2]:
+                arg0 = args[0].convert_to_type(int)
+                if arg0 is None:
+                    return None
+
+                if len(args) == 2:
+                    arg1 = args[1]
+                    arg1type = arg1.expr_type.typeRepresentation
+                    if arg1type != bytes:
+                        context.pushException(TypeError, f"{methodname}() argument 2 must be a byte string of length 1, not '{arg1type}'")
+                    arg1len = arg1.convert_len()
+                    if arg1len is None:
+                        return None
+                    with context.ifelse(arg1len.nonref_expr.eq(1)) as (ifTrue, ifFalse):
+                        with ifFalse:
+                            context.pushException(
+                                TypeError,
+                                f"{methodname}() argument 2 must be a byte string of length 1, not '{arg1type}'"
+                            )
+                else:
+                    arg1 = context.constant(b' ')
+
+            py_f = bytes_center if methodname == 'center' else \
+                bytes_ljust if methodname == 'ljust' else \
+                bytes_rjust if methodname == 'rjust' else None
+            return context.call_py_function(py_f, (instance, arg0, arg1), {})
+
         return context.pushException(AttributeError, methodname)
 
     def convert_getitem_unsafe(self, context, expr, item):

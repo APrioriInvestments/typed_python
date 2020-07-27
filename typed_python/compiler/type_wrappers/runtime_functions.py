@@ -774,6 +774,14 @@ bytes_decode = externalCallTarget(
     Void.pointer()
 )
 
+bytes_translate = externalCallTarget(
+    "nativepython_runtime_bytes_translate",
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer()
+)
+
 print_string = externalCallTarget(
     "nativepython_print_string",
     Void,

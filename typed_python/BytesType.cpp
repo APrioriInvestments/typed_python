@@ -739,3 +739,41 @@ BytesType::layout* BytesType::replace(layout* l, layout* old, layout* repl, int6
     }
     return new_layout;
 }
+
+
+BytesType::layout* BytesType::translate(layout* l, layout* table, layout* to_delete) {
+    if (!l) return 0;
+
+    if (table && table->bytecount != 256) {
+        throw std::invalid_argument("translation table must be 256 characters long");
+    }
+
+    layout *new_layout = (layout*)malloc(sizeof(layout) + l->bytecount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+
+    uint8_t* dst = new_layout->data;
+    for (int i = 0; i < l->bytecount; i++) {
+        uint8_t c = l->data[i];
+        if (to_delete) {
+            bool delete_this = false;
+            for (int j = 0; j < to_delete->bytecount; j++)
+                if (c == to_delete->data[j]) {
+                    delete_this = true;
+                    break;
+                }
+            if (delete_this) continue;
+        }
+        if (table)
+            *dst++ = table->data[c];
+        else
+            *dst++ = c;
+    }
+    new_layout->bytecount = dst - new_layout->data;
+
+    // might have shrunk
+    if (new_layout->bytecount < l->bytecount) {
+        new_layout = (layout*)realloc(new_layout, sizeof(layout) + new_layout->bytecount);
+    }
+    return new_layout;
+}
