@@ -74,6 +74,12 @@ class ConcreteMacro(ConcreteTypeFunction):
         concreteTypeFunction = self.getConcreteTypeFunction()
         super().__init__(concreteTypeFunction)
 
+    def printCodeFor(self, *args, **kwargs):
+        constructor = self.concreteMacro(*args, **kwargs)
+        sourceText = getSourceText(constructor)
+        for line in sourceText:
+            print(line[:-1])
+
     def getConcreteTypeFunction(self):
         def concreteTypeFunction(*args, **kwargs):
             constructor = self.concreteMacro(*args, **kwargs)
