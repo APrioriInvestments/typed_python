@@ -721,6 +721,12 @@ bytes_split = externalCallTarget(
     Void.pointer(), Void.pointer(), Int64
 )
 
+bytes_rsplit = externalCallTarget(
+    "nativepython_runtime_bytes_rsplit",
+    Void.pointer(),
+    Void.pointer(), Void.pointer(), Int64
+)
+
 bytes_lower = externalCallTarget(
     "nativepython_runtime_bytes_lower",
     Void.pointer(),

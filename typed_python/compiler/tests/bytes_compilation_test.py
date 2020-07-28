@@ -210,16 +210,27 @@ class TestBytesCompilation(unittest.TestCase):
         def split(someBytes, *args):
             return someBytes.split(*args)
 
+        def rsplit(someBytes, *args):
+            return someBytes.rsplit(*args)
+
         compiledSplit = Entrypoint(split)
+        compiledRsplit = Entrypoint(rsplit)
 
         for args in [
+            (b'',),
+            (b'', b'a'),
+            (b'', b'ab'),
             (b'asdf',),
             (b'asdf', b'blahblah'),
             (b'asdf', b'a'),
             (b'asdf', b's'),
             (b'asdf', b'K'),
             (b'asdf', b's', 0),
+            (b'asdf', b's', -1),
             (b'a aaa bababa a',),
+            (b'a  aaa  bababa  a',),
+            (b'  a   ',),
+            (b' \t\n\r\x0b\f ',),
             (b'a aaa bababa a', b'b'),
             (b'a aaa bababa a', b'b', 1),
             (b'a aaa bababa a', b'b', 2),
@@ -227,9 +238,30 @@ class TestBytesCompilation(unittest.TestCase):
             (b'a aaa bababa a', b'b', 4),
             (b'a aaa bababa a', b'b', 5),
             (b'a aaa bababa a', b'a', 5),
+            (b'a aaa bababa a', b'a', 500),
             (b'a aaa bababa a', b'K', 5),
+            (b'A B\tC\nD\rE\x0bF\fG',),
+            (b'AxyBxyCxyxyxyDEFxyGxyxy', b'xy'),
+            (b'AxyBxy\x00CxyDEFxyGxy', b'xy'),
+            (b'A\x00B\x00C\x00DEF\x00G\x00', b'\x00'),
+            (b'A\x00BA\x00C', b'A\x00B'),
+            (b'A\x00b\x00C\x00DEF\x00G\x00', b'\x00b'),
+            (b'Ax\x00yBx\x00Cx\x00yDEFx\x00yGx\x00y', b'x\x00y')
         ]:
-            assert split(*args) == compiledSplit(*args)
+            self.assertEqual(split(*args), compiledSplit(*args), args)
+            self.assertEqual(rsplit(*args), compiledRsplit(*args), args)
+
+        with self.assertRaises(ValueError):
+            compiledSplit(b'', b'')
+
+        with self.assertRaises(ValueError):
+            compiledRsplit(b'', b'')
+
+        with self.assertRaises(ValueError):
+            compiledSplit(b'abc', b'')
+
+        with self.assertRaises(ValueError):
+            compiledRsplit(b'abc', b'')
 
     @flaky.flaky(max_runs=3, min_passes=1)
     def test_bytes_split_perf(self):
@@ -369,7 +401,7 @@ class TestBytesCompilation(unittest.TestCase):
         def f_rstrip(x):
             return x.rstrip()
 
-        pieces = [b'', b' ', b'\t\n', b'abc']
+        pieces = [b'', b' ', b'\t\n\r\x0B\f', b'abc']
         cases = [a + b + c for a in pieces for b in pieces for c in pieces]
 
         for f in [f_strip, f_lstrip, f_rstrip]:
@@ -706,8 +738,8 @@ class TestBytesCompilation(unittest.TestCase):
             return x.rpartition(sep)
 
         for f in [f_partition, f_rpartition]:
-            for v in [b' beginning', b'end ', b'mid dle', b'engine', b'none', b'']:
-                for sep in [b' ', b'gin']:
+            for v in [b' beginning', b'end ', b'mid dle', b'wind', b'spin', b'']:
+                for sep in [b' ', b'in']:
                     r1 = f(v, sep)
                     r2 = Entrypoint(f)(v, sep)
                     self.assertEqual(r1, r2, (f, v, sep))

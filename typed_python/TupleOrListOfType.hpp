@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -181,6 +181,8 @@ public:
     void assign(instance_ptr self, instance_ptr other);
 
     void reserve(instance_ptr self, size_t count);
+
+    void reverse(instance_ptr self);
 
 protected:
     Type* m_element_type;

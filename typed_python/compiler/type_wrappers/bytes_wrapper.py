@@ -636,7 +636,7 @@ class BytesWrapper(RefcountedWrapper):
 
     def convert_attribute(self, context, instance, attr):
         if (
-                attr in ('decode', 'translate', 'split', 'join', 'partition', 'rpartition',
+                attr in ('decode', 'translate', 'split', 'rsplit', 'join', 'partition', 'rpartition',
                          'strip', 'rstrip', 'lstrip', 'startswith', 'endswith', 'replace',
                          '__iter__', 'center', 'ljust', 'rjust')
                 or attr in self._bytes_methods
@@ -777,27 +777,34 @@ class BytesWrapper(RefcountedWrapper):
                 else:
                     return context.call_py_function(bytesJoinIterable, (separator, itemsToJoin), {})
 
-        if methodname == 'split' and not kwargs:
+        if methodname in ['split', 'rsplit'] and not kwargs:
             if len(args) == 0:
                 sepPtr = VoidPtr.zero()
                 maxCount = native_ast.const_int_expr(-1)
-            elif len(args) == 1 and args[0].expr_type.typeRepresentation == bytes:
+            elif len(args) in [1, 2] and args[0].expr_type.typeRepresentation == bytes:
                 sepPtr = args[0].nonref_expr.cast(VoidPtr)
-                maxCount = native_ast.const_int_expr(-1)
-            elif len(args) == 2 and (
-                args[0].expr_type.typeRepresentation == bytes
-                and args[1].expr_type.typeRepresentation == int
-            ):
-                sepPtr = args[0].nonref_expr.cast(VoidPtr)
-                maxCount = args[1].nonref_expr
+                sepLen = args[0].convert_len()
+                if sepLen is None:
+                    return None
+                with context.ifelse(sepLen.nonref_expr.eq(0)) as (ifTrue, ifFalse):
+                    with ifTrue:
+                        context.pushException(ValueError, "empty separator")
+
+                if len(args) == 2:
+                    maxCount = args[1].convert_to_type(int)
+                    if maxCount is None:
+                        return None
+                else:
+                    maxCount = native_ast.const_int_expr(-1)
             else:
                 maxCount = None
 
             if maxCount is not None:
+                fn = runtime_functions.bytes_split if methodname == 'split' else runtime_functions.bytes_rsplit
                 return context.push(
                     TypedListMasqueradingAsList(ListOf(bytes)),
                     lambda outBytes: outBytes.expr.store(
-                        runtime_functions.bytes_split.call(
+                        fn.call(
                             instance.nonref_expr.cast(VoidPtr),
                             sepPtr,
                             maxCount

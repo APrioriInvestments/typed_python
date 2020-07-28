@@ -116,6 +116,7 @@ public:
     // if 'sep' is nullptr, split on whitespace
     // max is the maximum number of splits. If its -1, then split as many times as is necessary
     static void split(ListOfType::layout *outList, layout* bytesLayout, layout* sep, int64_t max);
+    static void rsplit(ListOfType::layout *outList, layout* bytesLayout, layout* sep, int64_t max);
 
     static void join(BytesType::layout **out, BytesType::layout *separator, ListOfType::layout *toJoin);
 

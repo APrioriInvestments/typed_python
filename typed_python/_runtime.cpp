@@ -503,6 +503,18 @@ extern "C" {
         return outList;
     }
 
+    ListOfType::layout* nativepython_runtime_bytes_rsplit(BytesType::layout* l, BytesType::layout* sep, int64_t max) {
+        static ListOfType* listOfBytesT = ListOfType::Make(BytesType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfBytesT->constructor((instance_ptr)&outList);
+
+        BytesType::rsplit(outList, l, sep, max);
+
+        return outList;
+    }
+
     ListOfType::layout* nativepython_runtime_string_split(StringType::layout* l, StringType::layout* sep, int64_t max) {
         static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
 

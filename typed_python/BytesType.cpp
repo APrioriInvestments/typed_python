@@ -97,7 +97,10 @@ char BytesType::cmpStatic(layout* left, layout* right) {
 }
 
 /* static */
-void BytesType::split(ListOfType::layout *outList, layout* bytesLayout, layout* sep, int64_t max) {
+// assumes outList was initialized to an empty list before calling
+// x.split() with no parameters is not the same thing as x.split(b' \t\r\n\x0B\f')
+// x.split() combines successive matches (of whitespace) into a single match
+void BytesType::split(ListOfType::layout *outList, layout* in, layout* sep, int64_t max) {
     static ListOfType* listOfBytes = ListOfType::Make(BytesType::Make());
 
     int64_t cur = 0;
@@ -105,67 +108,148 @@ void BytesType::split(ListOfType::layout *outList, layout* bytesLayout, layout* 
 
     listOfBytes->reserve((instance_ptr)&outList, 10);
 
-    uint8_t* bytesData = (uint8_t*)bytesLayout->data;
+    uint8_t* inData = in ? (uint8_t*)in->data : nullptr;
+    int64_t inLen = in ? in->bytecount : 0;
     uint8_t sepChar = sep ? *(uint8_t*)sep->data : 0;
     uint8_t* sepDat = sep ? (uint8_t*)sep->data : 0;
     int64_t sepLen = sep ? sep->bytecount : 1;
 
     if (max == 0) {
-        layout* remainder = createFromPtr((const char*)bytesData, bytesLayout->bytecount);
+        layout* remainder = createFromPtr((const char*)inData, inLen);
         listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
         destroyStatic((instance_ptr)&remainder);
         return;
     }
 
-    while (cur < bytesLayout->bytecount) {
+    while (cur < inLen) {
         int64_t match = cur;
 
         if (sep) {
             if (sepLen == 1) {
-                while (match < bytesLayout->bytecount && bytesData[match] != sepChar) {
+                while (match < inLen && inData[match] != sepChar) {
                     match++;
                 }
             } else {
-                while (match + sepLen <= bytesLayout->bytecount && strncmp((const char*)bytesData, (const char*)sepDat, match)) {
+                while (match + sepLen <= inLen && memcmp((const char*)inData + match, (const char*)sepDat, sepLen)) {
                     match++;
                 }
             }
         } else {
-            while (match < bytesLayout->bytecount && (
-                    bytesData[match] != '\n'
-                &&  bytesData[match] != '\r'
-                &&  bytesData[match] != '\t'
-                &&  bytesData[match] != ' '
-                &&  bytesData[match] != '\b'
-                &&  bytesData[match] != '\f'
+            while (match < inLen && (
+                    inData[match] != '\n'
+                &&  inData[match] != '\r'
+                &&  inData[match] != '\t'
+                &&  inData[match] != ' '
+                &&  inData[match] != '\x0B'  // note: \x0B is whitespace, but \b is not whitespace
+                &&  inData[match] != '\f'
                 )
             ) {
                 match++;
             }
         }
 
-        if (match + sepLen > bytesLayout->bytecount) {
+        if (match + sepLen > inLen) {
             break;
         }
 
-        layout* piece = createFromPtr((const char*)bytesData + cur, match - cur);
+        if (sep || match != cur) {
+            layout* piece = createFromPtr((const char*)inData + cur, match - cur);
 
-        if (outList->count == outList->reserved) {
-            listOfBytes->reserve((instance_ptr)&outList, outList->reserved * 1.5);
+            if (outList->count == outList->reserved) {
+                listOfBytes->reserve((instance_ptr)&outList, outList->reserved * 1.5);
+            }
+
+            ((layout**)outList->data)[outList->count++] = piece;
+            cur = match + sepLen;
+            count++;
+            if (max >= 0 && count >= max)
+                break;
         }
-
-        ((layout**)outList->data)[outList->count++] = piece;
-
-        cur = match + sepLen;
-
-        count++;
-
-        if (max >= 0 && count >= max)
-            break;
+        else if (!sep)
+            cur++;
     }
-    layout* remainder = createFromPtr((const char*)bytesData + cur, bytesLayout->bytecount - cur);
-    listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
-    destroyStatic((instance_ptr)&remainder);
+    if (sep || inLen != cur) {
+        layout* remainder = createFromPtr((const char*)inData + cur, inLen - cur);
+        listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
+        destroyStatic((instance_ptr)&remainder);
+    }
+}
+
+/* static */
+// assumes outList was initialized to an empty list before calling
+void BytesType::rsplit(ListOfType::layout *outList, layout* in, layout* sep, int64_t max) {
+    static ListOfType* listOfBytes = ListOfType::Make(BytesType::Make());
+    int64_t cur = in ? in->bytecount - 1 : -1;
+    int64_t count = 0;
+
+    listOfBytes->reserve((instance_ptr)&outList, 10);
+
+    uint8_t* inData = in ? (uint8_t*)in->data : nullptr;
+    int64_t inLen = in ? in->bytecount : 0;
+    uint8_t sepChar = sep ? *(uint8_t*)sep->data : 0;
+    uint8_t* sepDat = sep ? (uint8_t*)sep->data : 0;
+    int64_t sepLen = sep ? sep->bytecount : 1;
+
+    if (max == 0) {
+        layout* remainder = createFromPtr((const char*)inData, inLen);
+        listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
+        destroyStatic((instance_ptr)&remainder);
+        return;
+    }
+
+    while (cur >= 0) {
+        int64_t match = cur;
+
+        if (sep) {
+            if (sepLen == 1) {
+                while (match >= 0 && inData[match] != sepChar) {
+                    match--;
+                }
+            } else {
+                while (match - sepLen + 1 >= 0 && memcmp((const char*)inData + match - sepLen + 1, (const char*)sepDat, sepLen)) {
+                    match--;
+                }
+            }
+        } else {
+            while (match >= 0 && (
+                    inData[match] != '\n'
+                &&  inData[match] != '\r'
+                &&  inData[match] != '\t'
+                &&  inData[match] != ' '
+                &&  inData[match] != '\x0B'  // note: \x0B is whitespace, but \b is not whitespace
+                &&  inData[match] != '\f'
+                )
+            ) {
+                match--;
+            }
+        }
+
+        if (match - sepLen + 1 < 0) {
+            break;
+        }
+
+        if (sep || match != cur) {
+            layout* piece = createFromPtr((const char*)inData + match + 1, cur - match);
+
+            if (outList->count == outList->reserved) {
+                listOfBytes->reserve((instance_ptr)&outList, outList->reserved * 1.5);
+            }
+
+            ((layout**)outList->data)[outList->count++] = piece;
+            cur = match - sepLen;
+            count++;
+            if (max >= 0 && count >= max) break;
+        }
+        else if (!sep) {
+            cur--;
+        }
+    }
+    if (sep || cur != -1) {
+        layout* remainder = createFromPtr((const char*)inData, cur + 1);
+        listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
+        destroyStatic((instance_ptr)&remainder);
+    }
+    listOfBytes->reverse((instance_ptr)&outList);
 }
 
 void BytesType::join(BytesType::layout **out, BytesType::layout *separator, ListOfType::layout *toJoin) {
