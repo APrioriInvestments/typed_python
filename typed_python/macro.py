@@ -21,54 +21,36 @@ def isValidVariableName(string):
 
 
 def checkFormat(constructor):
-    keyFormat = True
     if not isinstance(constructor, dict):
-        keyFormat = False
-    elif len(constructor) != 2:
-        keyFormat = False
+        raise MacroFormatError("A macro function must return a dict")
     elif "sourceText" not in constructor:
-        keyFormat = False
+        raise MacroFormatError("'sourceText' must be a key in your macro return dict")
     elif "locals" not in constructor:
-        keyFormat = False
-    if not keyFormat:
-        raise MacroFormatError(
-            "A macro function must return a dict with keys 'sourceText' and 'locals'"
-            " and no other keys"
-        )
+        raise MacroFormatError("'locals' must be a key in your macro return dict")
+    elif len(constructor) != 2:
+        raise MacroFormatError("The dict returned by a macro function must have no keys besides 'sourceText' and 'locals'")
 
-    textFormat = True
     sourceText = constructor["sourceText"]
     if not isinstance(sourceText, list):
-        textFormat = False
-    else:
-        if not len(sourceText):
-            textFormat = False
-        else:
-            returnLine = sourceText[-1]
-            if not returnLine[:7] == "return ":
-                textFormat = False
-        for line in sourceText:
-            if not isinstance(line, str):
-                textFormat = False
-    if not textFormat:
+        raise MacroFormatError("The source text returned by your macro must be a list")
+    elif not len(sourceText):
+        raise MacroFormatError("The source text list returned by your macro shouldn't be empty")
+    elif not sourceText[-1][:7] == "return ":
         raise MacroFormatError(
-            "The sourceText returned by a macro function must be a list of strings, the"
-            " last being equal to f\"return {X}\" for some string X"
+            f"The last line in the source text returned by your macro should be equal to "
+            + "'return ' + X for some valid variable name X, not {sourceText[-1]}"
         )
+    for i, line in enumerate(sourceText):
+        if not isinstance(line, str):
+            raise MacroFormatError(f"All the lines in the source text returned by you macro must be strings, see line {i}")
 
-    namespaceFormat = True
     namespace = constructor["locals"]
     if not isinstance(namespace, dict):
-        namespaceFormat = False
+        raise MacroFormatError("The namespace returned by your macro must be a dict")
     else:
         for key, value in namespace.items():
             if not isValidVariableName(key):
-                namespaceFormat = False
-    if not namespaceFormat:
-        raise MacroFormatError(
-            "The locals returned by a macro function must be a dict from valid variable "
-            "names to accessible variables"
-        )
+                raise MacroFormatError("The keys in the namespace returned by your macro must be valid variable names")
 
 
 def getSourceText(constructor):
