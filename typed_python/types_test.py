@@ -1075,7 +1075,7 @@ class NativeTypesTests(unittest.TestCase):
         t = ConstDict(str, str)
 
         t0 = time.time()
-        for i in range(100000):
+        for i in range(50000):
             t({str(k): str(k+1) for k in range(10)})
 
         elapsed = time.time() - t0
