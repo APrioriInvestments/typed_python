@@ -830,3 +830,10 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         assert ltOI(1, 2) == ltIO(1, 2)
         assert ltOI(2, 1) == ltIO(2, 1)
+
+    def test_call_type_object_from_interpreter(self):
+        @Entrypoint
+        def callIt(x: object):
+            return x()
+
+        assert callIt(Dict(int, int)) == Dict(int, int)()

@@ -14,9 +14,9 @@
 
 from typed_python import (
     TypeFunction, Class, Alternative, Member, SerializationContext,
-    Forward, ListOf, Final, isCompiled, Entrypoint, NotCompiled
+    Forward, ListOf, Final, isCompiled, Entrypoint, NotCompiled, Dict
 )
-from typed_python.compiler.runtime import Runtime
+from typed_python.compiler.runtime import Runtime, RuntimeEventVisitor
 
 import unittest
 
@@ -293,3 +293,28 @@ class TypeFunctionTest(unittest.TestCase):
         assert instantiateAndCall(C1) == 20.0
         assert instantiateAndCall(C2) == 30.0
         assert instantiateAndCall(C3) == 20.0
+
+    def test_call_type_function_with_constant(self):
+        class Visitor(RuntimeEventVisitor):
+            """Base class for a Visitor that gets to see what's going on in the runtime.
+
+            Clients should subclass this and pass it to 'addEventVisitor' in the runtime
+            to find out about events like function typing assignments.
+            """
+            def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variableTypes):
+                if funcName == "do":
+                    self.variableTypes = variableTypes
+
+        @TypeFunction
+        def buildDict(N):
+            return Dict(float, float)
+
+        @Entrypoint
+        def do():
+            T = buildDict(1)
+            return T()
+
+        with Visitor() as vis:
+            do()
+
+        assert vis.variableTypes['T'] is not object

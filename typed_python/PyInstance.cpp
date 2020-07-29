@@ -195,14 +195,14 @@ void PyInstance::constructFromPythonArguments(uint8_t* data, Type* t, PyObject* 
 }
 
 void PyInstance::constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, PyObject* args, PyObject* kwargs) {
-    if (kwargs == NULL && (args == NULL || PyTuple_Size(args) == 0)) {
+    if ((kwargs == NULL || PyDict_Size(kwargs) == 0) && (args == NULL || PyTuple_Size(args) == 0)) {
         if (t->is_default_constructible()) {
             t->constructor(data);
             return;
         }
     }
 
-    if ((kwargs == NULL || PyDict_Size(kwargs) == 0) && PyTuple_Size(args) == 1) {
+    if ((kwargs == NULL || PyDict_Size(kwargs) == 0) && (args && PyTuple_Size(args) == 1)) {
         PyObjectHolder argTuple(PyTuple_GetItem(args, 0));
 
         copyConstructFromPythonInstance(t, data, argTuple, true /* mark isExplicit */);

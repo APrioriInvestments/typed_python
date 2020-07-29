@@ -54,11 +54,17 @@ class PythonFreeObjectWrapper(Wrapper):
 
     def convert_call(self, context, left, args, kwargs):
         if not self.hasSideEffects:
-            if all([x.expr_type.is_compile_time_constant for x in list(args) + list(kwargs.values())]):
+            if all([x.expr_type.is_compile_time_constant or x.isConstant for x in list(args) + list(kwargs.values())]):
                 try:
+                    def getConstant(expr):
+                        if expr.isConstant:
+                            return expr.constantValue
+                        else:
+                            return expr.expr_type.getCompileTimeConstant()
+
                     value = self.typeRepresentation.Value(
-                        *[a.expr_type.getCompileTimeConstant() for a in args],
-                        **{k: v.expr_type.getCompileTimeConstant() for k, v in kwargs.items()}
+                        *[getConstant(a) for a in args],
+                        **{k: getConstant(v) for k, v in kwargs.items()}
                     )
 
                     res = typed_python.compiler.python_object_representation.pythonObjectRepresentation(
