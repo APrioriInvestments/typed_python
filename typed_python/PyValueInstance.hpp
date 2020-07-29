@@ -22,13 +22,31 @@ class PyValueInstance : public PyInstance {
 public:
     typedef Value modeled_type;
 
+    static bool pyObjectsEquivalent(PyObject* lhs, PyObject* rhs) {
+        if (lhs == rhs) {
+            return true;
+        }
+
+        if (PyType_Check(lhs) && PyType_Check(rhs)) {
+            Type* lhsType = PyInstance::extractTypeFrom((PyTypeObject*)lhs);
+            Type* rhsType = PyInstance::extractTypeFrom((PyTypeObject*)rhs);
+
+            if (lhsType && rhsType && Type::typesEquivalent(lhsType, rhsType)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     static void copyConstructFromPythonInstanceConcrete(Value* v, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         const Instance& elt = v->value();
 
         if (elt.type()->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType &&
-            ((PythonObjectOfType*)elt.type())->getPyObj(elt.data()) == pyRepresentation) {
+            pyObjectsEquivalent(((PythonObjectOfType*)elt.type())->getPyObj(elt.data()), pyRepresentation)) {
             return;
         }
+
         else if (compare_to_python(elt.type(), elt.data(), pyRepresentation, isExplicit ? false : true, Py_EQ)) {
             //it's the value we want
             return;
@@ -40,7 +58,9 @@ public:
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* valType, PyObject* pyRepresentation, bool isExplicit) {
         if (valType->value().type()->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
-            return ((PythonObjectOfType*)valType->value().type())->getPyObj(valType->value().data()) == pyRepresentation;
+            PyObject* ourObj = ((PythonObjectOfType*)valType->value().type())->getPyObj(valType->value().data());
+
+            return pyObjectsEquivalent(ourObj, pyRepresentation);
         }
 
         return compare_to_python(valType->value().type(), valType->value().data(), pyRepresentation, true, Py_EQ);

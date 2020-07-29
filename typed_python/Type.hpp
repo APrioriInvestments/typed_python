@@ -173,6 +173,10 @@ public:
         return m_typeCategory;
     }
 
+    std::string getTypeCategoryString() const {
+        return categoryToString(m_typeCategory);
+    }
+
     bool isComposite() const {
         return (
             m_typeCategory == catTuple ||

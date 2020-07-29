@@ -270,3 +270,26 @@ class TypeFunctionTest(unittest.TestCase):
         self.assertEqual(callIt(makeFClass(20)), 20)
         self.assertEqual(callIt(makeFClass((1, 2))), (1, 2))
         self.assertEqual(callIt(makeFClass((1, 3))), (1, 3))
+
+    def test_can_compile_function_taking_type_function_output_bound_to_function(self):
+        def makeMultiplier(val):
+            def f(x):
+                return x * val
+
+            class C(Class, Final):
+                def callIt(self, x):
+                    return f(x)
+
+            return C
+
+        C1 = makeMultiplier(2.0)
+        C2 = makeMultiplier(3.0)
+        C3 = makeMultiplier(2.0)
+
+        @Entrypoint
+        def instantiateAndCall(SomeCls):
+            return SomeCls().callIt(10)
+
+        assert instantiateAndCall(C1) == 20.0
+        assert instantiateAndCall(C2) == 30.0
+        assert instantiateAndCall(C3) == 20.0
