@@ -739,6 +739,31 @@ bytes_upper = externalCallTarget(
     Void.pointer()
 )
 
+bytes_capitalize = externalCallTarget(
+    "nativepython_runtime_bytes_capitalize",
+    Void.pointer(),
+    Void.pointer()
+)
+
+bytes_swapcase = externalCallTarget(
+    "nativepython_runtime_bytes_swapcase",
+    Void.pointer(),
+    Void.pointer()
+)
+
+bytes_title = externalCallTarget(
+    "nativepython_runtime_bytes_title",
+    Void.pointer(),
+    Void.pointer()
+)
+
+bytes_splitlines = externalCallTarget(
+    "nativepython_runtime_bytes_splitlines",
+    Void.pointer(),
+    Void.pointer(),
+    Bool
+)
+
 bytes_strip = externalCallTarget(
     "nativepython_runtime_bytes_strip",
     Void.pointer(),

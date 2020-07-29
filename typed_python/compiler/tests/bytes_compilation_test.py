@@ -377,15 +377,25 @@ class TestBytesCompilation(unittest.TestCase):
                     r2 = Entrypoint(f)(x, y)
                     self.assertEqual(r1, r2, (f, x, y))
 
-    def test_bytes_lower_upper(self):
+    def test_bytes_case(self):
         def f_lower(x):
             return x.lower()
 
         def f_upper(x):
             return x.upper()
 
-        cases = [b'abc'*10, b'ABC'*10, b'aBc'*10, b'1@=.,']
-        for f in [f_lower, f_upper]:
+        def f_capitalize(x):
+            return x.capitalize()
+
+        def f_swapcase(x):
+            return x.swapcase()
+
+        def f_title(x):
+            return x.title()
+
+        cases = [b'abc'*10, b'ABC'*10, b'aBc'*10, b'1@=.,z', b'']
+        cases += [x + b' ' + y for x in cases for y in cases]
+        for f in [f_lower, f_upper, f_capitalize, f_swapcase, f_title]:
             for v in cases:
                 r1 = f(v)
                 r2 = Entrypoint(f)(v)
@@ -783,6 +793,42 @@ class TestBytesCompilation(unittest.TestCase):
                         Entrypoint(f)(v, w, b'')
                     with self.assertRaises(TypeError):
                         Entrypoint(f)(v, w, 'X')
+
+    def test_bytes_tabs(self):
+        def f_expandtabs(x, t):
+            return x.expandtabs(t)
+
+        def f_splitlines(x, *a):
+            return x.splitlines(*a)
+
+        words = {b'one\ttwo\tthree', b'eleven\ttwelve\t', b'\tseveral words in a row\t', b'', b'\t', b'\n', b'\x00'}
+        words = words.union({x + y + z for x in words for y in words for z in words})
+        for v in words:
+            for t in [8, 3, 1, 0, -1]:
+                r1 = f_expandtabs(v, t)
+                r2 = Entrypoint(f_expandtabs)(v, t)
+                self.assertEqual(r1, r2, (v, t))
+
+        segments = {b'one\ntwo\rthree', b'\nseveral words on a line\r\n', b'', b'\t', b'\n', b'\r', b'\r\n', b'\n\r', b'\x00'}
+        segments = segments.union({x + y + z for x in segments for y in segments for z in segments})
+        for v in segments:
+            r1 = f_splitlines(v)
+            r2 = Entrypoint(f_splitlines)(v)
+            self.assertEqual(r1, r2, (v,))
+            for k in [True, False]:
+                r1 = f_splitlines(v, k)
+                r2 = Entrypoint(f_splitlines)(v, k)
+                self.assertEqual(r1, r2, (v, k))
+
+    def test_bytes_zfill(self):
+        def f_zfill(x, w):
+            return x.zfill(w)
+
+        for v in [b'123', b'-9876', b'+1', b'testing', b'+', b'-', b'']:
+            for w in [0, 1, 5, 10, 100, -1]:
+                r1 = f_zfill(v, w)
+                r2 = Entrypoint(f_zfill)(v, w)
+                self.assertEqual(r1, r2, (v, w))
 
     def test_bytes_internal_fns(self):
         """

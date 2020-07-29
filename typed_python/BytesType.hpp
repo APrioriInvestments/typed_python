@@ -117,12 +117,16 @@ public:
     // max is the maximum number of splits. If its -1, then split as many times as is necessary
     static void split(ListOfType::layout *outList, layout* bytesLayout, layout* sep, int64_t max);
     static void rsplit(ListOfType::layout *outList, layout* bytesLayout, layout* sep, int64_t max);
+    static void splitlines(ListOfType::layout *outList, layout* bytesLayout, bool keepends);
 
     static void join(BytesType::layout **out, BytesType::layout *separator, ListOfType::layout *toJoin);
 
     static layout* mult(layout* lhs, int64_t rhs);
     static layout* lower(layout* l);
     static layout* upper(layout* l);
+    static layout* capitalize(layout* l);
+    static layout* swapcase(layout* l);
+    static layout* title(layout* l);
     static layout* strip(layout* l, bool whiteSpace, layout* values, bool fromLeft=true, bool fromRight=true);
     static layout* replace(layout* l, layout* old, layout* the_new, int64_t count);
     static layout* translate(layout* l, layout* table, layout* to_delete);

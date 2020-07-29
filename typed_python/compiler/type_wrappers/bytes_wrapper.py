@@ -422,6 +422,46 @@ def bytes_rjust(x, width, fill):
     return fill * (width - len(x)) + x
 
 
+def bytes_expandtabs(x, tabsize):
+    accumulator = ListOf(bytes)()
+
+    col = 0  # column mod tabsize, not necessarily actual column
+    last = 0
+    for i in range(len(x)):
+        c = x[i]
+        if c == ord('\t'):
+            accumulator.append(x[last:i])
+            spaces = tabsize - (col % tabsize) if tabsize > 0 else 0
+            accumulator.append(b' ' * spaces)
+            last = i + 1
+            col = 0
+        elif c == ord('\n') or c == ord('\r'):
+            col = 0
+        else:
+            col += 1
+    accumulator.append(x[last:])
+    return b''.join(accumulator)
+
+
+def bytes_zfill(x, width):
+    accumulator = ListOf(bytes)()
+
+    sign = False
+    if len(x):
+        c = x[0]
+        if c == ord('+') or c == ord('-'):
+            accumulator.append(x[0:1])
+            sign = True
+
+    fill = width - len(x)
+    if fill > 0:
+        accumulator.append(b'0' * fill)
+
+    accumulator.append(x[1:] if sign else x)
+
+    return b''.join(accumulator)
+
+
 class BytesWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -631,14 +671,17 @@ class BytesWrapper(RefcountedWrapper):
     # these map to c++ functions
     _bytes_methods = dict(
         lower=runtime_functions.bytes_lower,
-        upper=runtime_functions.bytes_upper
+        upper=runtime_functions.bytes_upper,
+        capitalize=runtime_functions.bytes_capitalize,
+        swapcase=runtime_functions.bytes_swapcase,
+        title=runtime_functions.bytes_title,
     )
 
     def convert_attribute(self, context, instance, attr):
         if (
                 attr in ('decode', 'translate', 'split', 'rsplit', 'join', 'partition', 'rpartition',
                          'strip', 'rstrip', 'lstrip', 'startswith', 'endswith', 'replace',
-                         '__iter__', 'center', 'ljust', 'rjust')
+                         '__iter__', 'center', 'ljust', 'rjust', 'expandtabs', 'splitlines', 'zfill')
                 or attr in self._bytes_methods
                 or attr in self._find_methods
                 or attr in self._bool_methods
@@ -706,6 +749,11 @@ class BytesWrapper(RefcountedWrapper):
             return context.call_py_function(bytes_startswith, (instance, args[0]), {})
         if methodname == 'endswith' and len(args) == 1 and not kwargs:
             return context.call_py_function(bytes_endswith, (instance, args[0]), {})
+        if methodname == 'expandtabs' and len(args) == 1 and not kwargs:
+            arg0type = args[0].expr_type.typeRepresentation
+            if arg0type != int:
+                return context.pushException(TypeError, f"an integer is required, not '{arg0type}'")
+            return context.call_py_function(bytes_expandtabs, (instance, args[0]), {})
 
         if methodname in self._find_methods and 1 <= len(args) <= 3 and not kwargs:
             if len(args) == 3:
@@ -724,40 +772,40 @@ class BytesWrapper(RefcountedWrapper):
                 py_f = self._find_methods[methodname][0]
             return context.call_py_function(py_f, (instance, args[0], start, end), {})
 
-        if methodname == 'replace' and not kwargs:
-            if len(args) in [2, 3]:
-                return context.push(
-                    bytes,
-                    lambda bytesRef: bytesRef.expr.store(
-                        runtime_functions.bytes_replace.call(
-                            instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr.cast(VoidPtr),
-                            args[1].nonref_expr.cast(VoidPtr),
-                            args[2].nonref_expr if len(args) == 3 else native_ast.const_int_expr(-1)
-                        ).cast(self.layoutType)
-                    )
-                )
-        # if methodname == 'replace':
+        # if methodname == 'replace' and not kwargs:
         #     if len(args) in [2, 3]:
-        #         for i in [0, 1]:
-        #             if args[i].expr_type != self:
-        #                 context.pushException(
-        #                     TypeError,
-        #                     f"replace() argument {i + 1} must be bytes"
-        #                 )
-        #                 return
-        #
-        #         if len(args) == 3 and args[2].expr_type.typeRepresentation != int:
-        #             context.pushException(
-        #                 TypeError,
-        #                 f"replace() argument 3 must be int, not {args[2].expr_type.typeRepresentation}"
+        #         return context.push(
+        #             bytes,
+        #             lambda bytesRef: bytesRef.expr.store(
+        #                 runtime_functions.bytes_replace.call(
+        #                     instance.nonref_expr.cast(VoidPtr),
+        #                     args[0].nonref_expr.cast(VoidPtr),
+        #                     args[1].nonref_expr.cast(VoidPtr),
+        #                     args[2].nonref_expr if len(args) == 3 else native_ast.const_int_expr(-1)
+        #                 ).cast(self.layoutType)
         #             )
-        #             return
-        #
-        #         if len(args) == 2:
-        #             return context.call_py_function(bytes_replace, (instance, args[0], args[1], context.constant(-1)), {})
-        #         else:
-        #             return context.call_py_function(bytes_replace, (instance, args[0], args[1], args[2]), {})
+        #         )
+        if methodname == 'replace':
+            if len(args) in [2, 3]:
+                for i in [0, 1]:
+                    if args[i].expr_type != self:
+                        context.pushException(
+                            TypeError,
+                            f"replace() argument {i + 1} must be bytes"
+                        )
+                        return
+
+                if len(args) == 3 and args[2].expr_type.typeRepresentation != int:
+                    context.pushException(
+                        TypeError,
+                        f"replace() argument 3 must be int, not {args[2].expr_type.typeRepresentation}"
+                    )
+                    return
+
+                if len(args) == 2:
+                    return context.call_py_function(bytes_replace, (instance, args[0], args[1], context.constant(-1)), {})
+                else:
+                    return context.call_py_function(bytes_replace, (instance, args[0], args[1], args[2]), {})
 
         if methodname == 'join' and not kwargs:
             if len(args) == 1:
@@ -811,6 +859,24 @@ class BytesWrapper(RefcountedWrapper):
                         ).cast(outBytes.expr_type.getNativeLayoutType())
                     )
                 )
+
+        if methodname == 'splitlines' and not kwargs:
+            if len(args) == 0:
+                arg0 = context.constant(False)
+            elif len(args) == 1:
+                arg0 = args[0].convert_to_type(bool)
+                if arg0 is None:
+                    return None
+
+            return context.push(
+                TypedListMasqueradingAsList(ListOf(bytes)),
+                lambda out: out.expr.store(
+                    runtime_functions.bytes_splitlines.call(
+                        instance.nonref_expr.cast(VoidPtr),
+                        arg0
+                    ).cast(out.expr_type.getNativeLayoutType())
+                )
+            )
 
         if methodname == 'decode' and not kwargs:
             if len(args) in [0, 1, 2]:
@@ -890,6 +956,12 @@ class BytesWrapper(RefcountedWrapper):
                 bytes_ljust if methodname == 'ljust' else \
                 bytes_rjust if methodname == 'rjust' else None
             return context.call_py_function(py_f, (instance, arg0, arg1), {})
+
+        if methodname == 'zfill' and len(args) == 1 and not kwargs:
+            arg0 = args[0].convert_to_type(int)
+            if arg0 is None:
+                return None
+            return context.call_py_function(bytes_zfill, (instance, arg0), {})
 
         return context.pushException(AttributeError, methodname)
 

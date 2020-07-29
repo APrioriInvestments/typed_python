@@ -515,6 +515,18 @@ extern "C" {
         return outList;
     }
 
+    ListOfType::layout* nativepython_runtime_bytes_splitlines(BytesType::layout* l, bool keepends) {
+        static ListOfType* listOfBytesT = ListOfType::Make(BytesType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfBytesT->constructor((instance_ptr)&outList);
+
+        BytesType::splitlines(outList, l, keepends);
+
+        return outList;
+    }
+
     ListOfType::layout* nativepython_runtime_string_split(StringType::layout* l, StringType::layout* sep, int64_t max) {
         static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
 
@@ -696,6 +708,18 @@ extern "C" {
 
     BytesType::layout* nativepython_runtime_bytes_upper(BytesType::layout* l) {
         return BytesType::upper(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_capitalize(BytesType::layout* l) {
+        return BytesType::capitalize(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_swapcase(BytesType::layout* l) {
+        return BytesType::swapcase(l);
+    }
+
+    BytesType::layout* nativepython_runtime_bytes_title(BytesType::layout* l) {
+        return BytesType::title(l);
     }
 
     BytesType::layout* nativepython_runtime_bytes_strip(BytesType::layout* l, bool fromLeft, bool fromRight) {

@@ -252,6 +252,55 @@ void BytesType::rsplit(ListOfType::layout *outList, layout* in, layout* sep, int
     listOfBytes->reverse((instance_ptr)&outList);
 }
 
+/* static */
+// assumes outList was initialized to an empty list before calling
+void BytesType::splitlines(ListOfType::layout *outList, layout* in, bool keepends) {
+    static ListOfType* listOfBytes = ListOfType::Make(BytesType::Make());
+
+    int64_t cur = 0;
+
+    listOfBytes->reserve((instance_ptr)&outList, 10);
+
+    uint8_t* inData = in ? (uint8_t*)in->data : nullptr;
+    int64_t inLen = in ? in->bytecount : 0;
+    int sepLen = 0;
+
+    while (cur < inLen) {
+        int64_t match = cur;
+
+        while (match < inLen && inData[match] != '\n' &&  inData[match] != '\r') {
+            match++;
+        }
+        sepLen = 0;
+        if (match < inLen) {
+            if (inData[match] == '\r' && match + 1 < inLen && inData[match+1] == '\n') {
+                sepLen = 2;
+            }
+            else {
+                sepLen = 1;
+            }
+        }
+
+        if (match + sepLen > inLen) {
+            break;
+        }
+
+        layout* piece = createFromPtr((const char*)inData + cur, match - cur + (keepends ? sepLen : 0));
+
+        if (outList->count == outList->reserved) {
+            listOfBytes->reserve((instance_ptr)&outList, outList->reserved * 1.5);
+        }
+
+        ((layout**)outList->data)[outList->count++] = piece;
+        cur = match + sepLen;
+    }
+    if (inLen != cur) {
+        layout* remainder = createFromPtr((const char*)inData + cur, inLen - cur + (keepends ? sepLen : 0));
+        listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
+        destroyStatic((instance_ptr)&remainder);
+    }
+}
+
 void BytesType::join(BytesType::layout **out, BytesType::layout *separator, ListOfType::layout *toJoin) {
     if (!out)
         throw std::invalid_argument("missing return argument");
@@ -660,7 +709,6 @@ BytesType::layout* BytesType::lower(layout *l) {
     for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->bytecount; src < end; ) {
         *dest++ = (uint8_t)tolower(*src++);
     }
-
     return new_layout;
 }
 
@@ -678,10 +726,85 @@ BytesType::layout* BytesType::upper(layout *l) {
     for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->bytecount; src < end; ) {
         *dest++ = (uint8_t)toupper(*src++);
     }
-
     return new_layout;
 }
 
+BytesType::layout* BytesType::capitalize(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + l->bytecount;
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = l->bytecount;
+
+    uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->bytecount;
+    if (l->bytecount) {
+        *dest++ = (uint8_t)toupper(*src++);
+        while (src < end) {
+            *dest++ = (uint8_t)tolower(*src++);
+        }
+    }
+    return new_layout;
+}
+
+BytesType::layout* BytesType::swapcase(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + l->bytecount;
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = l->bytecount;
+
+    for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->bytecount; src < end; ) {
+        uint8_t c = *src++;
+        if (islower(c))
+            *dest++ = (uint8_t)toupper(c);
+        else if (isupper(c))
+            *dest++ = (uint8_t)tolower(c);
+        else
+            *dest++ = c;
+    }
+    return new_layout;
+}
+
+BytesType::layout* BytesType::title(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + l->bytecount;
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = l->bytecount;
+
+    bool word = false;
+    for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->bytecount; src < end; ) {
+        uint8_t c = *src++;
+        if (word) {
+            if (isalpha(c)) {
+                *dest++ = (uint8_t)tolower(c);
+            } else {
+                *dest++ = c;
+                word = false;
+            }
+        } else {
+            if (isalpha(c)) {
+                *dest++ = (uint8_t)toupper(c);
+                word = true;
+            } else {
+                *dest++ = c;
+            }
+        }
+    }
+    return new_layout;
+}
 
 bool matchchar(uint8_t v, bool whiteSpace, BytesType::layout* values) {
     if (whiteSpace) return isspace(v);
@@ -693,7 +816,6 @@ bool matchchar(uint8_t v, bool whiteSpace, BytesType::layout* values) {
     }
     return false;
 }
-
 
 BytesType::layout* BytesType::strip(layout* l, bool whiteSpace, layout* values, bool fromLeft, bool fromRight) {
     if (!l) {
