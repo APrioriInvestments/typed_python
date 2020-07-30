@@ -47,8 +47,8 @@ class Module:
         class Y:
             x = Member(OneOf(None, m.X))
 
-        # and finally freeze it so that you can't modify it.
-        m.freeze()
+        # and finally tp_freeze it so that you can't modify it.
+        m.tp_freeze()
     """
     def __init__(self, name):
         self._items = {}
@@ -82,7 +82,7 @@ class Module:
         self.__setattr__(cls.__name__, cls)
         return self.__getattr__(cls.__name__)
 
-    def freeze(self):
+    def tp_freeze(self):
         for moduleMember, typ in self._items.items():
             if getattr(typ, "__typed_python_category__", "") == "Forward":
                 raise Exception(f"{self.name}.{moduleMember} is not defined yet.")

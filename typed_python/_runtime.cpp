@@ -52,6 +52,18 @@ PyObject* getRuntimeSingleton() {
 // Note: extern C identifiers are distinguished only up to 32 characters
 // nativepython_runtime_12345678901
 extern "C" {
+    void* np_malloc(size_t bytes) {
+        return tp_malloc(bytes);
+    }
+
+    void np_free(void* p) {
+        tp_free(p);
+    }
+
+    void* np_realloc(void*p, size_t newSize) {
+        return tp_realloc(p, newSize);
+    }
+
     void np_compileClassDispatch(ClassDispatchTable* classDispatchTable, int slot) {
         PyEnsureGilAcquired getTheGil;
 
@@ -1396,7 +1408,7 @@ extern "C" {
     hash_table_layout* nativepython_tableCreate() {
         hash_table_layout* result;
 
-        result = (hash_table_layout*)malloc(sizeof(hash_table_layout));
+        result = (hash_table_layout*)tp_malloc(sizeof(hash_table_layout));
 
         new (result) hash_table_layout();
 

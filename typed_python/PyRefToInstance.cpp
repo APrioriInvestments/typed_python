@@ -165,14 +165,14 @@ int PyRefToInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) 
 
         return 0;
     } else {
-        instance_ptr tempObj = (instance_ptr)malloc(eltType->bytecount());
+        instance_ptr tempObj = (instance_ptr)tp_malloc(eltType->bytecount());
         try {
             copyConstructFromPythonInstance(eltType, tempObj, attrVal, true /* set isExplicit to True */ );
         } catch(PythonExceptionSet& e) {
-            free(tempObj);
+            tp_free(tempObj);
             return -1;
         } catch(std::exception& e) {
-            free(tempObj);
+            tp_free(tempObj);
             PyErr_SetString(PyExc_TypeError, e.what());
             return -1;
         }
@@ -180,7 +180,7 @@ int PyRefToInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) 
         clsType->setAttribute(heldClassBody, i, tempObj);
 
         eltType->destroy(tempObj);
-        free(tempObj);
+        tp_free(tempObj);
 
         return 0;
     }

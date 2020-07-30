@@ -31,7 +31,7 @@ StringType::layout* StringType::upgradeCodePoints(layout* lhs, int32_t newBytesP
 
     int64_t new_byteCount = sizeof(layout) + lhs->pointcount * newBytesPerCodepoint;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = newBytesPerCodepoint;
@@ -88,7 +88,7 @@ StringType::layout* StringType::concatenate(layout* lhs, layout* rhs) {
     //they're the same
     int64_t new_byteCount = sizeof(layout) + (rhs->pointcount + lhs->pointcount) * lhs->bytes_per_codepoint;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = lhs->bytes_per_codepoint;
@@ -107,7 +107,7 @@ StringType::layout* StringType::lower(layout *l) {
     }
 
     int64_t new_byteCount = sizeof(layout) + l->pointcount * l->bytes_per_codepoint;
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
@@ -138,7 +138,7 @@ StringType::layout* StringType::upper(layout *l) {
     }
 
     int64_t new_byteCount = sizeof(layout) + l->pointcount * l->bytes_per_codepoint;
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
@@ -507,7 +507,7 @@ StringType::layout* StringType::singleFromCodepoint(int64_t codePoint) {
 
     int64_t new_byteCount = sizeof(layout) + bytesPerCodepoint;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = bytesPerCodepoint;
@@ -566,7 +566,7 @@ StringType::layout* StringType::getitem(layout* lhs, int64_t offset) {
 
     int64_t new_byteCount = sizeof(layout) + 1 * lhs->bytes_per_codepoint;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = lhs->bytes_per_codepoint;
@@ -613,7 +613,7 @@ StringType::layout* StringType::getsubstr(layout* l, int64_t start, int64_t stop
     size_t datasize = datalength * l->bytes_per_codepoint;
     int64_t new_byteCount = sizeof(layout) + datasize;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
@@ -790,7 +790,7 @@ StringType::layout* StringType::createFromUtf8(const char* utfEncodedString, int
 
     int64_t new_byteCount = sizeof(layout) + length * bytes_per_codepoint;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = bytes_per_codepoint;
@@ -936,7 +936,7 @@ void StringType::constructor(instance_ptr self, int64_t bytes_per_codepoint, int
         return;
     }
 
-    (*(layout**)self) = (layout*)malloc(sizeof(layout) + count * bytes_per_codepoint);
+    (*(layout**)self) = (layout*)tp_malloc(sizeof(layout) + count * bytes_per_codepoint);
 
     (*(layout**)self)->bytes_per_codepoint = bytes_per_codepoint;
     (*(layout**)self)->pointcount = count;
@@ -1030,7 +1030,7 @@ void StringType::destroyStatic(instance_ptr self) {
     }
 
     if ((*(layout**)self)->refcount.fetch_sub(1) == 1) {
-        free((*(layout**)self));
+        tp_free((*(layout**)self));
     }
 }
 
@@ -1114,7 +1114,7 @@ void StringType::join(StringType::layout **outString, StringType::layout *separa
     }
 
     // add all the parts together
-    *outString = (layout *) malloc(sizeof(layout) + resultCodepoints * maxCodePoint);
+    *outString = (layout *) tp_malloc(sizeof(layout) + resultCodepoints * maxCodePoint);
     (*outString)->bytes_per_codepoint = maxCodePoint;
     (*outString)->hash_cache = -1;
     (*outString)->refcount = 1;

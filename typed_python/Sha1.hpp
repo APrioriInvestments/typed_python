@@ -136,7 +136,7 @@ int mbedtls_internal_sha1_process( mbedtls_sha1_context *ctx,
  * \brief          This function calculates the SHA-1 checksum of a buffer.
  *
  *                 The function allocates the context, performs the
- *                 calculation, and frees the context.
+ *                 calculation, and tp_frees the context.
  *
  *                 The SHA-1 result is calculated as
  *                 output = SHA-1(input buffer).

@@ -119,7 +119,7 @@ public:
             return;
         }
 
-        *(layout**)self = (layout*)malloc(
+        *(layout**)self = (layout*)tp_malloc(
             sizeof(layout) +
             m_subtypes[which].second->bytecount()
             );

@@ -44,7 +44,7 @@ bool isCanonicalName(std::string name) {
         "stringprep", "string", "_strptime", "struct", "subprocess", "sunau", "symbol",
         "symtable", "sysconfig", "tabnanny", "tarfile", "telnetlib", "tempfile", "test",
         "textwrap", "this", "_threading_local", "threading", "timeit", "tkinter", "tokenize",
-        "token", "traceback", "tracemalloc", "trace", "tty", "turtledemo", "turtle", "types",
+        "token", "traceback", "tracetp_malloc", "trace", "tty", "turtledemo", "turtle", "types",
         "typing", "unittest", "urllib", "uuid", "uu", "venv", "warnings", "wave", "weakref",
         "_weakrefset", "webbrowser", "wsgiref", "xdrlib", "xml", "xmlrpc", "zipapp",
         "zipfile", "zipimport",

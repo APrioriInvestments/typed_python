@@ -181,7 +181,7 @@ BytesType::layout* BytesType::concatenate(layout* lhs, layout* rhs) {
         return rhs;
     }
 
-    layout* new_layout = (layout*)malloc(sizeof(layout) + rhs->bytecount + lhs->bytecount);
+    layout* new_layout = (layout*)tp_malloc(sizeof(layout) + rhs->bytecount + lhs->bytecount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = lhs->bytecount + rhs->bytecount;
@@ -193,7 +193,7 @@ BytesType::layout* BytesType::concatenate(layout* lhs, layout* rhs) {
 }
 
 BytesType::layout* BytesType::createFromPtr(const char* data, int64_t length) {
-    layout* new_layout = (layout*)malloc(sizeof(layout) + length);
+    layout* new_layout = (layout*)tp_malloc(sizeof(layout) + length);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = length;
@@ -208,7 +208,7 @@ void BytesType::constructor(instance_ptr self, int64_t count, const char* data) 
         *(layout**)self = nullptr;
         return;
     }
-    (*(layout**)self) = (layout*)malloc(sizeof(layout) + count);
+    (*(layout**)self) = (layout*)tp_malloc(sizeof(layout) + count);
 
     (*(layout**)self)->bytecount = count;
     (*(layout**)self)->refcount = 1;
@@ -246,7 +246,7 @@ void BytesType::destroyStatic(instance_ptr self) {
     }
 
     if ((*(layout**)self)->refcount.fetch_sub(1) == 1) {
-        free((*(layout**)self));
+        tp_free((*(layout**)self));
     }
 }
 

@@ -188,8 +188,8 @@ class hash_table_layout {
         }
 
         items_reserved = count_so_far;
-        items_populated = (uint8_t*)realloc(items_populated, count_so_far);
-        items = (uint8_t*)realloc(items, count_so_far * item_size);
+        items_populated = (uint8_t*)tp_realloc(items_populated, count_so_far);
+        items = (uint8_t*)tp_realloc(items, count_so_far * item_size);
         top_item_slot = items_reserved;
 
         for (long k = 0; k < hash_table_size; k++) {
@@ -218,9 +218,9 @@ class hash_table_layout {
     int32_t allocateNewSlot(size_t item_size) {
         if (!items) {
             items_reserved = 4;
-            items = (uint8_t*)malloc(items_reserved * item_size);
+            items = (uint8_t*)tp_malloc(items_reserved * item_size);
             std::memset(items, 0, items_reserved * item_size);
-            items_populated = (uint8_t*)malloc(items_reserved);
+            items_populated = (uint8_t*)tp_malloc(items_reserved);
             std::memset(items_populated, 0, items_reserved);
             top_item_slot = 0;
             for (long k = 0; k < items_reserved; k++) {
@@ -231,8 +231,8 @@ class hash_table_layout {
         while (top_item_slot >= items_reserved) {
             size_t old_reserved = items_reserved;
             items_reserved = items_reserved * 1.25 + 1;
-            items = (uint8_t*)realloc(items, item_size * items_reserved);
-            items_populated = (uint8_t*)realloc(items_populated, items_reserved);
+            items = (uint8_t*)tp_realloc(items, item_size * items_reserved);
+            items_populated = (uint8_t*)tp_realloc(items_populated, items_reserved);
 
             for (long k = old_reserved; k < items_reserved; k++) {
                 items_populated[k] = 0;
@@ -295,7 +295,7 @@ class hash_table_layout {
 
     template <class copy_constructor_type>
     hash_table_layout* copyTable(size_t item_size, bool isPOD, const copy_constructor_type& copy_constructor) {
-        hash_table_layout* result = (hash_table_layout*)malloc(sizeof(hash_table_layout));
+        hash_table_layout* result = (hash_table_layout*)tp_malloc(sizeof(hash_table_layout));
         new (result) hash_table_layout;
 
         result->refcount = 1;
@@ -308,7 +308,7 @@ class hash_table_layout {
         result->hash_table_count = hash_table_count;
         result->hash_table_empty_slots = hash_table_empty_slots;
 
-        result->items = (uint8_t*)malloc(item_size * items_reserved);
+        result->items = (uint8_t*)tp_malloc(item_size * items_reserved);
         if (isPOD) {
             memcpy(result->items, items, item_size * items_reserved);
         }
@@ -320,13 +320,13 @@ class hash_table_layout {
              }
         }
 
-        result->items_populated = (uint8_t*)malloc(items_reserved);
+        result->items_populated = (uint8_t*)tp_malloc(items_reserved);
         memcpy(result->items_populated, items_populated, items_reserved);
 
-        result->hash_table_slots = (int32_t*)malloc(hash_table_size * sizeof(int32_t));
+        result->hash_table_slots = (int32_t*)tp_malloc(hash_table_size * sizeof(int32_t));
         memcpy(result->hash_table_slots, hash_table_slots, hash_table_size * sizeof(int32_t));
 
-        result->hash_table_hashes = (typed_python_hash_type*)malloc(hash_table_size * sizeof(typed_python_hash_type));
+        result->hash_table_hashes = (typed_python_hash_type*)tp_malloc(hash_table_size * sizeof(typed_python_hash_type));
         memcpy(result->hash_table_hashes, hash_table_hashes, hash_table_size * sizeof(typed_python_hash_type));
         return result;
     }
@@ -339,9 +339,9 @@ class hash_table_layout {
             }
             else
                 hash_table_size = 7;
-            hash_table_slots = (int32_t*)malloc(hash_table_size * sizeof(int32_t));
+            hash_table_slots = (int32_t*)tp_malloc(hash_table_size * sizeof(int32_t));
             setTo(hash_table_slots, EMPTY, hash_table_size);
-            hash_table_hashes = (typed_python_hash_type*)malloc(hash_table_size * sizeof(typed_python_hash_type));
+            hash_table_hashes = (typed_python_hash_type*)tp_malloc(hash_table_size * sizeof(typed_python_hash_type));
             setTo(hash_table_hashes, EMPTY, hash_table_size);
             hash_table_count = 0;
             hash_table_empty_slots = hash_table_size;
@@ -354,10 +354,10 @@ class hash_table_layout {
             // make sure the table's not too small
             hash_table_size = computeNextPrime(hash_table_count * 4 + 7);
 
-            hash_table_slots = (int32_t*)malloc(hash_table_size * sizeof(int32_t));
+            hash_table_slots = (int32_t*)tp_malloc(hash_table_size * sizeof(int32_t));
             setTo(hash_table_slots, EMPTY, hash_table_size);
             hash_table_hashes =
-              (typed_python_hash_type*)malloc(hash_table_size * sizeof(typed_python_hash_type));
+              (typed_python_hash_type*)tp_malloc(hash_table_size * sizeof(typed_python_hash_type));
             setTo(hash_table_hashes, EMPTY, hash_table_size);
             hash_table_count = 0;
             hash_table_empty_slots = hash_table_size;
@@ -368,8 +368,8 @@ class hash_table_layout {
                 }
             }
 
-            free(oldSlots);
-            free(oldHashes);
+            tp_free(oldSlots);
+            tp_free(oldHashes);
         }
     }
 
@@ -380,8 +380,8 @@ class hash_table_layout {
         }
 
         items_reserved = slotCount;
-        items_populated = (uint8_t*)malloc(slotCount);
-        items = (uint8_t*)malloc(slotCount * item_size);
+        items_populated = (uint8_t*)tp_malloc(slotCount);
+        items = (uint8_t*)tp_malloc(slotCount * item_size);
 
         for (long k = 0; k < items_reserved; k++) {
             items_populated[k] = true;
@@ -393,9 +393,9 @@ class hash_table_layout {
     template <class hash_fun_type>
     void buildHashTableAfterDeserialization(size_t item_size, const hash_fun_type& hash_fun) {
         hash_table_size = computeNextPrime(items_reserved * 2.5 + 7);
-        hash_table_slots = (int32_t*)malloc(hash_table_size * sizeof(int32_t));
+        hash_table_slots = (int32_t*)tp_malloc(hash_table_size * sizeof(int32_t));
         hash_table_hashes =
-          (typed_python_hash_type*)malloc(hash_table_size * sizeof(typed_python_hash_type));
+          (typed_python_hash_type*)tp_malloc(hash_table_size * sizeof(typed_python_hash_type));
         hash_table_count = 0;
         hash_table_empty_slots = hash_table_size;
 

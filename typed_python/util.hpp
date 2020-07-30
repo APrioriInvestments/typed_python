@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "memory.hpp"
 #include <Python.h>
 #include "PyGilState.hpp"
 #include <vector>

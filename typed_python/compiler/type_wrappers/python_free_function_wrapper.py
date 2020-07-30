@@ -16,7 +16,7 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
 
 
-class PythonFreeFunctionWrapper(Wrapper):
+class Pythontp_freeFunctionWrapper(Wrapper):
     is_pod = True
     is_empty = True
     is_pass_by_ref = False

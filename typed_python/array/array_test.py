@@ -117,7 +117,7 @@ def test_basic_matrix_ops():
 @flaky(max_runs=3, min_passes=1)
 def test_matrix_speed():
     # this test requires parallelism, and the machines we're using in travis
-    # don't always have free cores, so we get false negatives.
+    # don't always have tp_free cores, so we get false negatives.
     if os.environ.get('TRAVIS_CI', None) is not None:
         return
 

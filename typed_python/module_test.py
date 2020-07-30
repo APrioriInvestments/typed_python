@@ -52,17 +52,17 @@ class ModuleTest(unittest.TestCase):
         with self.assertRaises(AttributeError):
             m._int = int
 
-    def test_freezing_prevents_defining(self):
+    def test_tp_freezing_prevents_defining(self):
         m = Module("M")
         m.Int = int
 
-        m.freeze()
+        m.tp_freeze()
         with self.assertRaises(Exception):
             m.Float = float
 
-    def test_freezing_fails_if_undefined(self):
+    def test_tp_freezing_fails_if_undefined(self):
         m = Module("M")
         m.T = TupleOf(m.I)
 
         with self.assertRaisesRegex(Exception, "M.I is not defined yet"):
-            m.freeze()
+            m.tp_freeze()

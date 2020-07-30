@@ -131,11 +131,11 @@ class PreReservedTupleOrList(CompilableBuiltin):
                 self.tupleType,
                 lambda out:
                     out.expr.store(
-                        runtime_functions.malloc.call(native_ast.const_int_expr(28))
+                        runtime_functions.tp_malloc.call(native_ast.const_int_expr(28))
                             .cast(self.tupleTypeWrapper.getNativeLayoutType())
                     ) >>
                     out.expr.load().ElementPtrIntegers(0, 4).store(
-                        runtime_functions.malloc.call(
+                        runtime_functions.tp_malloc.call(
                             length.nonref_expr
                             .mul(native_ast.const_int_expr(self.underlyingWrapperType.getBytecount()))
                         ).cast(native_ast.UInt8Ptr)
@@ -254,10 +254,10 @@ class TupleOrListOfWrapper(RefcountedWrapper):
                 inst.convert_getitem_unsafe(i).convert_destroy()
 
         context.pushEffect(
-            runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 4).load())
+            runtime_functions.tp_free.call(inst.nonref_expr.ElementPtrIntegers(0, 4).load())
         )
         context.pushEffect(
-            runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
+            runtime_functions.tp_free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
         )
 
     def convert_bin_op(self, context, left, op, right, inplace):

@@ -127,7 +127,7 @@ class StringWrapper(RefcountedWrapper):
 
     def on_refcount_zero(self, context, instance):
         assert instance.isReference
-        return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
+        return runtime_functions.tp_free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
 
     def _can_convert_to_type(self, otherType, explicit):
         return otherType.typeRepresentation is bool or otherType == self

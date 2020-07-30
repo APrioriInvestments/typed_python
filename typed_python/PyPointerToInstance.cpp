@@ -67,14 +67,14 @@ PyObject* PyPointerToInstance::pointerSet(PyObject* o, PyObject* args) {
 
     instance_ptr target = (instance_ptr)*(void**)self_w->dataPtr();
 
-    instance_ptr tempObj = (instance_ptr)malloc(pointerT->getEltType()->bytecount());
+    instance_ptr tempObj = (instance_ptr)tp_malloc(pointerT->getEltType()->bytecount());
 
     try {
         PyObjectHolder arg0(PyTuple_GetItem(args,0));
 
         copyConstructFromPythonInstance(pointerT->getEltType(), tempObj, arg0);
     } catch(std::exception& e) {
-        free(tempObj);
+        tp_free(tempObj);
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
     } catch(PythonExceptionSet& e) {
@@ -83,7 +83,7 @@ PyObject* PyPointerToInstance::pointerSet(PyObject* o, PyObject* args) {
 
     pointerT->getEltType()->assign(target, tempObj);
     pointerT->getEltType()->destroy(tempObj);
-    free(tempObj);
+    tp_free(tempObj);
 
     return incref(Py_None);
 }

@@ -482,7 +482,7 @@ void ConstDictType::constructor(instance_ptr self, int64_t space, bool isPointer
 
     int bytesPer = isPointerTree ? m_bytes_per_key_subtree_pair : m_bytes_per_key_value_pair;
 
-    (*(layout**)self) = (layout*)malloc(sizeof(layout) + bytesPer * space);
+    (*(layout**)self) = (layout*)tp_malloc(sizeof(layout) + bytesPer * space);
 
     layout& record = **(layout**)self;
 
@@ -520,7 +520,7 @@ void ConstDictType::destroy(instance_ptr self) {
             });
         }
 
-        free((*(layout**)self));
+        tp_free((*(layout**)self));
     }
 }
 

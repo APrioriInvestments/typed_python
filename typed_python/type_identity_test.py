@@ -347,7 +347,7 @@ def makeAdder(x):
 """
 
 
-def test_checkHash_references_to_typed_free_objects():
+def test_checkHash_references_to_typed_tp_free_objects():
     contents1 = {"x.py": FUNCMAKER + "A = makeAdder(1)\ndef f(x):\n    return A(x)"}
     contents2 = {"x.py": FUNCMAKER + "A = makeAdder(2)\ndef f(x):\n    return A(x)"}
     contents3 = {"x.py": FUNCMAKER + "A = makeAdder(1.0)\ndef f(x):\n    return A(x)"}

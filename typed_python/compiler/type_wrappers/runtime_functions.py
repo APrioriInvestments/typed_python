@@ -107,10 +107,10 @@ throwNullPtr = externalCallTarget("np_throwNullPtr", Void)
 compileClassDispatch = externalCallTarget("np_compileClassDispatch", Void, Void.pointer(), Int64)
 compileClassDestructor = externalCallTarget("np_compileClassDestructor", Void, Void.pointer())
 
-free = externalCallTarget("free", Void, UInt8Ptr)
-malloc = externalCallTarget("malloc", UInt8Ptr, Int64)
+tp_free = externalCallTarget("np_free", Void, UInt8Ptr)
+tp_malloc = externalCallTarget("np_malloc", UInt8Ptr, Int64)
+tp_realloc = externalCallTarget("np_realloc", UInt8Ptr, UInt8Ptr, Int64)
 
-realloc = externalCallTarget("realloc", UInt8Ptr, UInt8Ptr, Int64)
 memcpy = externalCallTarget("memcpy", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 memmove = externalCallTarget("memmove", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 

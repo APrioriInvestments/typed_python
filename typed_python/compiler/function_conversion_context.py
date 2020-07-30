@@ -752,7 +752,7 @@ class ConversionContextBase(object):
         # rules and have it extract its closure
         return self.functionDefToClosurelessFunctionTypeCache[ast]
 
-    def freeVariableLookup(self, name):
+    def tp_freeVariableLookup(self, name):
         if self.isLocalVariable(name):
             return None
 
@@ -766,7 +766,7 @@ class ConversionContextBase(object):
 
     def restrictByCondition(self, variableStates, condition, result):
         if condition.matches.Call and condition.func.matches.Name and len(condition.args) == 2 and condition.args[0].matches.Name:
-            if self.freeVariableLookup(condition.func.id) is isinstance:
+            if self.tp_freeVariableLookup(condition.func.id) is isinstance:
                 context = ExpressionConversionContext(self, variableStates)
                 typeExpr = context.convert_expression_ast(condition.args[1])
 
@@ -854,10 +854,10 @@ class FunctionConversionContext(ConversionContextBase):
         # bound to the closure directly (in which case we don't even assign them to slots)
         self.variablesAssignedOnlyOnce = computeVariablesAssignedOnlyOnce(statements)
 
-        functionDefs, assignedLambdas, freeLambdas = extractFunctionDefs(statements)
+        functionDefs, assignedLambdas, tp_freeLambdas = extractFunctionDefs(statements)
 
         # the list of 'def' statements and 'Lambda' expressions. each one engenders a function type.
-        self.functionDefs = functionDefs + freeLambdas
+        self.functionDefs = functionDefs + tp_freeLambdas
 
         # all 'def' operations that are assigned exactly once. These defs are special
         # because we just assume that the binding is active without even evaluating the

@@ -25,7 +25,7 @@ from typed_python.compiler.type_wrappers.method_descriptor_wrapper import Method
 from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 from typed_python.compiler.type_wrappers.module_wrapper import ModuleWrapper
 from typed_python.compiler.type_wrappers.typed_cell_wrapper import TypedCellWrapper
-from typed_python.compiler.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
+from typed_python.compiler.type_wrappers.python_free_function_wrapper import Pythontp_freeFunctionWrapper
 from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from typed_python.compiler.type_wrappers.value_wrapper import ValueWrapper
@@ -289,7 +289,7 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
         return TypedExpression(
             context,
             native_ast.nullExpr,
-            PythonFreeFunctionWrapper(f),
+            Pythontp_freeFunctionWrapper(f),
             False
         )
 

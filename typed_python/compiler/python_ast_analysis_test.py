@@ -19,7 +19,7 @@ import unittest
 
 
 class TestPythonAstAnalysis(unittest.TestCase):
-    def freeVarCheck(self, func, readVars, assignedVars):
+    def tp_freeVarCheck(self, func, readVars, assignedVars):
         """Look at func's _body_ only, and compute which variables it reads and assigns."""
         pyast = python_ast.convertFunctionToAlgebraicPyAst(func)
 
@@ -34,17 +34,17 @@ class TestPythonAstAnalysis(unittest.TestCase):
             set(readVars)
         )
 
-    def test_free_vars_basic(self):
-        self.freeVarCheck(lambda: x, ['x'], [])  # noqa
-        self.freeVarCheck(lambda: x + y, ['x', 'y'], [])  # noqa
-        self.freeVarCheck(lambda: f(*args), ['f', 'args'], [])  # noqa
+    def test_tp_free_vars_basic(self):
+        self.tp_freeVarCheck(lambda: x, ['x'], [])  # noqa
+        self.tp_freeVarCheck(lambda: x + y, ['x', 'y'], [])  # noqa
+        self.tp_freeVarCheck(lambda: f(*args), ['f', 'args'], [])  # noqa
 
     def test_assignment_shows_up(self):
         def f():
             x = 10
             return x
 
-        self.freeVarCheck(f, ['x'], ['x'])
+        self.tp_freeVarCheck(f, ['x'], ['x'])
 
     def test_assigned_only_once(self):
         def f():
@@ -104,14 +104,14 @@ class TestPythonAstAnalysis(unittest.TestCase):
         def f():
             x, y = (1, 2)  # noqa
 
-        self.freeVarCheck(f, [], ['x', 'y'])
+        self.tp_freeVarCheck(f, [], ['x', 'y'])
 
     def test_for_loops(self):
         def f():
             for i in 10:
                 pass
 
-        self.freeVarCheck(f, [], ['i'])
+        self.tp_freeVarCheck(f, [], ['i'])
 
     def test_function_defs(self):
         def f():
@@ -121,7 +121,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
             def aFun2(*args, **kwargs):
                 return args + kwargs
 
-        self.freeVarCheck(f, ['y'], ['aFun', 'aFun2'])
+        self.tp_freeVarCheck(f, ['y'], ['aFun', 'aFun2'])
 
     def test_class_defs(self):
         def f():
@@ -132,4 +132,4 @@ class TestPythonAstAnalysis(unittest.TestCase):
                 def f(x):
                     return z  # noqa
 
-        self.freeVarCheck(f, ['z'], ['AClass'])
+        self.tp_freeVarCheck(f, ['z'], ['AClass'])

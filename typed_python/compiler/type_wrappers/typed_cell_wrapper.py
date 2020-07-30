@@ -58,7 +58,7 @@ class TypedCellWrapper(RefcountedWrapper):
     def convert_default_initialize(self, context, out):
         context.pushEffect(
             out.expr.store(
-                runtime_functions.malloc.call(
+                runtime_functions.tp_malloc.call(
                     native_ast.const_int_expr(
                         16 + typeWrapper(self.typeRepresentation.HeldType).getBytecount()
                     )
@@ -91,7 +91,7 @@ class TypedCellWrapper(RefcountedWrapper):
                 self.refHeld(inst).convert_destroy()
 
         context.pushEffect(
-            runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
+            runtime_functions.tp_free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
         )
 
     def refHeld(self, instance):

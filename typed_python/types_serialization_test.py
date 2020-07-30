@@ -1067,7 +1067,7 @@ class TypesSerializationTest(unittest.TestCase):
         sc = SerializationContext()
 
         # note that it matters that the 'module_level_testfun' is at the module level,
-        # because that induces a freevar in a list-comprehension code object
+        # because that induces a tp_freevar in a list-comprehension code object
         def f():
             return [module_level_testfun() for _ in range(1)][0]
 

@@ -110,13 +110,13 @@ public:
             return;
         }
 
-        self = (layout*)malloc(sizeof(layout));
+        self = (layout*)tp_malloc(sizeof(layout));
 
         self->count = count;
         self->refcount = 1;
         self->reserved = std::max<int32_t>(1, count);
         self->hash_cache = -1;
-        self->data = (uint8_t*)malloc(getEltType()->bytecount() * self->reserved);
+        self->data = (uint8_t*)tp_malloc(getEltType()->bytecount() * self->reserved);
 
         for (int64_t k = 0; k < count; k++) {
             try {
@@ -125,8 +125,8 @@ public:
                 for (long k2 = k-1; k2 >= 0; k2--) {
                     m_element_type->destroy(eltPtr(self,k2));
                 }
-                free(self->data);
-                free(self);
+                tp_free(self->data);
+                tp_free(self);
                 throw;
             }
         }
@@ -137,21 +137,21 @@ public:
     void constructorUnbounded(instance_ptr selfPtr, const sub_constructor& allocator) {
         layout_ptr& self = *(layout_ptr*)selfPtr;
 
-        self = (layout*)malloc(sizeof(layout));
+        self = (layout*)tp_malloc(sizeof(layout));
 
         self->count = 0;
         self->refcount = 1;
         self->reserved = 1;
         self->hash_cache = -1;
-        self->data = (uint8_t*)malloc(getEltType()->bytecount() * self->reserved);
+        self->data = (uint8_t*)tp_malloc(getEltType()->bytecount() * self->reserved);
 
         while(true) {
             try {
                 if (!allocator(eltPtr(self, self->count), self->count)) {
                     if (m_is_tuple && self->count == 0) {
                         //tuples need to be the nullptr
-                        free(self->data);
-                        free(self);
+                        tp_free(self->data);
+                        tp_free(self);
                         self = nullptr;
                     }
                     return;
@@ -165,8 +165,8 @@ public:
                 for (long k2 = (long)self->count-1; k2 >= 0; k2--) {
                     m_element_type->destroy(eltPtr(self,k2));
                 }
-                free(self->data);
-                free(self);
+                tp_free(self->data);
+                tp_free(self);
                 throw;
             }
         }

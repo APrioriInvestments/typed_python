@@ -707,7 +707,7 @@ class PythonToNativeConverter(object):
                 which we use to figure out the location of global variables that are not in cells.
             funcGlobalsFromCells - a list of the names that are globals that are actually accessed
                 as cells.
-            input_types - a type for each free variable in the function closure, and
+            input_types - a type for each tp_free variable in the function closure, and
                 then again for each input argument
             output_type - the output type of the function, if known. if this is None,
                 then we use type inference to produce the tightest type we can.

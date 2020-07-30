@@ -186,7 +186,7 @@ class ConstDictWrapperBase(RefcountedWrapper):
         assert instance.isReference
 
         if self.keyType.is_pod and self.valueType.is_pod:
-            return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
+            return runtime_functions.tp_free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
         else:
             return (
                 context.converter.defineNativeFunction(
@@ -205,7 +205,7 @@ class ConstDictWrapperBase(RefcountedWrapper):
             self.convert_getvalue_by_index_unsafe(context, inst, i).convert_destroy()
 
         context.pushEffect(
-            runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
+            runtime_functions.tp_free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
         )
 
 

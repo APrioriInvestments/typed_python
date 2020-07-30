@@ -950,7 +950,7 @@ PyTypeObject* PyInstance::allTypesBaseType() {
             .tp_init = 0,                               // initproc
             .tp_alloc = 0,                              // allocfunc
             .tp_new = 0,                                // newfunc
-            .tp_free = 0,                               // freefunc /* Low-level free-memory routine */
+            .tp_free = 0,                               // tp_freefunc /* Low-level tp_free-memory routine */
             .tp_is_gc = 0,                              // inquiry  /* For PyObject_IS_GC */
             .tp_bases = 0,                              // PyObject*
             .tp_mro = 0,                                // PyObject* /* method resolution order */
@@ -1020,7 +1020,7 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
             .tp_init = 0,                               // initproc
             .tp_alloc = 0,                              // allocfunc
             .tp_new = PyInstance::tp_new_type,          // newfunc
-            .tp_free = 0,                               // freefunc /* Low-level free-memory routine */
+            .tp_free = 0,                               // tp_freefunc /* Low-level tp_free-memory routine */
             .tp_is_gc = 0,                              // inquiry  /* For PyObject_IS_GC */
             .tp_bases = 0,                              // PyObject*
             .tp_mro = 0,                                // PyObject* /* method resolution order */
@@ -1130,7 +1130,7 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_init = 0,                               // initproc
             .tp_alloc = 0,                              // allocfunc
             .tp_new = PyInstance::tp_new,                // newfunc
-            .tp_free = 0,                               // freefunc /* Low-level free-memory routine */
+            .tp_free = 0,                               // tp_freefunc /* Low-level tp_free-memory routine */
             .tp_is_gc = 0,                              // inquiry  /* For PyObject_IS_GC */
             .tp_bases = 0,                              // PyObject*
             .tp_mro = 0,                                // PyObject* /* method resolution order */

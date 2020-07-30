@@ -229,7 +229,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
                 with subcontext:
                     self.refAs(context, instance, ix).convert_destroy()
 
-        context.pushEffect(runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr)))
+        context.pushEffect(runtime_functions.tp_free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr)))
 
     def convert_attribute(self, context, instance, attribute, nocheck=False):
         if attribute == 'matches':
@@ -390,7 +390,7 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
 
         context.pushEffect(
             out.expr.store(
-                runtime_functions.malloc.call(native_ast.const_int_expr(16 + self.underlyingLayout.getBytecount()))
+                runtime_functions.tp_malloc.call(native_ast.const_int_expr(16 + self.underlyingLayout.getBytecount()))
                     .cast(self.getNativeLayoutType())
             ) >>
             out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>  # refcount

@@ -43,7 +43,7 @@ public:
         PyEnsureGilAcquired acquireTheGil;
 
         if (m_buffer) {
-            free(m_buffer);
+            tp_free(m_buffer);
         }
 
         for (auto& typeAndList: m_pointersNeedingDecref) {
@@ -223,7 +223,7 @@ public:
         }
 
         m_reserved = new_reserved;
-        m_buffer = (uint8_t*)::realloc(m_buffer, m_reserved);
+        m_buffer = (uint8_t*)::tp_realloc(m_buffer, m_reserved);
     }
 
     const SerializationContext& getContext() const {

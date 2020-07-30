@@ -91,7 +91,7 @@ public:
             *(uint8_t*)self = m_which;
             s(self);
         } else {
-            *(layout**)self = (layout*)malloc(
+            *(layout**)self = (layout*)tp_malloc(
                 sizeof(layout) +
                 elementType()->bytecount()
                 );
@@ -102,7 +102,7 @@ public:
             try {
                 s(record.data);
             } catch(...) {
-                free(*(layout**)self);
+                tp_free(*(layout**)self);
                 throw;
             }
         }

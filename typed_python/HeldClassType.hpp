@@ -102,7 +102,7 @@ public:
         mFuncPtrsUsed = baseAsBase->mFuncPtrsUsed;
         mFuncPtrsAllocated = baseAsBase->mFuncPtrsAllocated;
 
-        mFuncPtrs = (untyped_function_ptr*)malloc(sizeof(untyped_function_ptr) * mFuncPtrsAllocated);
+        mFuncPtrs = (untyped_function_ptr*)tp_malloc(sizeof(untyped_function_ptr) * mFuncPtrsAllocated);
 
         for (long k = 0; k < mFuncPtrsUsed; k++) {
             mFuncPtrs[k] = nullptr;
@@ -132,7 +132,7 @@ public:
         // compiled code doesn't have to do that.
         if (mFuncPtrsUsed >= mFuncPtrsAllocated) {
             mFuncPtrsAllocated = (mFuncPtrsAllocated + 1) * 2;
-            untyped_function_ptr* newTable = (untyped_function_ptr*)malloc(sizeof(untyped_function_ptr) * mFuncPtrsAllocated);
+            untyped_function_ptr* newTable = (untyped_function_ptr*)tp_malloc(sizeof(untyped_function_ptr) * mFuncPtrsAllocated);
             for (long k = 0; k < mFuncPtrsUsed; k++) {
                 newTable[k] = mFuncPtrs[k];
             }

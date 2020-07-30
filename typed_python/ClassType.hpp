@@ -198,7 +198,7 @@ public:
 
                     initializeInstance(
                         self,
-                        (layout*)malloc(
+                        (layout*)tp_malloc(
                             sizeof(layout) + m_heldClass->bytecount()
                         ),
                         0
@@ -300,7 +300,7 @@ public:
     // 'initializer(instance_ptr memberData, int memberIx)' for each member
     template<class sub_constructor>
     void constructor(instance_ptr self, const sub_constructor& initializer) const {
-        initializeInstance(self, (layout*)malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
+        initializeInstance(self, (layout*)tp_malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
 
         layout& l = *instanceToLayout(self);
         l.refcount = 1;
@@ -309,7 +309,7 @@ public:
         try {
             m_heldClass->constructor(l.data, initializer);
         } catch (...) {
-            free(instanceToLayout(self));
+            tp_free(instanceToLayout(self));
         }
     }
 
@@ -317,7 +317,7 @@ public:
     // 'initializer(instance_ptr data)'
     template<class sub_constructor>
     void constructorInitializingHeld(instance_ptr self, const sub_constructor& initializer) const {
-        initializeInstance(self, (layout*)malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
+        initializeInstance(self, (layout*)tp_malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
 
         layout& l = *instanceToLayout(self);
         l.refcount = 1;
@@ -326,7 +326,7 @@ public:
         try {
             initializer(l.data);
         } catch (...) {
-            free(instanceToLayout(self));
+            tp_free(instanceToLayout(self));
         }
     }
 

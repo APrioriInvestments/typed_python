@@ -50,7 +50,7 @@ class BytesWrapper(RefcountedWrapper):
 
     def on_refcount_zero(self, context, instance):
         assert instance.isReference
-        return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
+        return runtime_functions.tp_free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
 
     def convert_builtin(self, f, context, expr, a1=None):
         if f is bytes and a1 is None:

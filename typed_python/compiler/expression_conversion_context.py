@@ -1075,7 +1075,7 @@ class ExpressionConversionContext(object):
         self.constant(print).convert_call(realArgs, {})
 
     def call_py_function(self, f, args, kwargs, returnTypeOverload=None):
-        """Call a 'free' python function 'f'.
+        """Call a 'tp_free' python function 'f'.
 
         The function will be memoized by its actual value. This means that
         different functions with the same code and closures but different

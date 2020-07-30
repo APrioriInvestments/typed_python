@@ -18,7 +18,7 @@
 #include "Instance.hpp"
 
 Instance::layout* Instance::allocateNoneLayout() {
-    layout* result = (layout*)malloc(sizeof(layout));
+    layout* result = (layout*)tp_malloc(sizeof(layout));
     result->refcount = 0;
     result->type = NoneType::Make();
 
@@ -76,12 +76,12 @@ Instance::Instance(const Instance& other) : mLayout(other.mLayout) {
 Instance::Instance(instance_ptr p, Type* t) : mLayout(nullptr) {
     t->assertForwardsResolvedSufficientlyToInstantiate();
 
-    layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
+    layout* l = (layout*)tp_malloc(sizeof(layout) + t->bytecount());
 
     try {
         t->copy_constructor(l->data, p);
     } catch(...) {
-        free(l);
+        tp_free(l);
         throw;
     }
 
@@ -94,7 +94,7 @@ Instance::Instance(instance_ptr p, Type* t) : mLayout(nullptr) {
 Instance::~Instance() {
     if (mLayout->refcount.fetch_sub(1) == 1) {
         mLayout->type->destroy(mLayout->data);
-        free(mLayout);
+        tp_free(mLayout);
     }
 }
 
@@ -103,7 +103,7 @@ Instance& Instance::operator=(const Instance& other) {
 
     if (mLayout->refcount.fetch_sub(1) == 1) {
         mLayout->type->destroy(mLayout->data);
-        free(mLayout);
+        tp_free(mLayout);
     }
 
     mLayout = other.mLayout;

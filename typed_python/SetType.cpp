@@ -89,7 +89,7 @@ int64_t SetType::refcount(instance_ptr self) const {
 }
 
 void SetType::constructor(instance_ptr self) {
-    (*(hash_table_layout**)self) = (hash_table_layout*)malloc(sizeof(hash_table_layout));
+    (*(hash_table_layout**)self) = (hash_table_layout*)tp_malloc(sizeof(hash_table_layout));
     hash_table_layout& record = **(hash_table_layout**)self;
     new (&record) hash_table_layout();
     record.refcount += 1;
@@ -105,11 +105,11 @@ void SetType::destroy(instance_ptr self) {
             }
         }
 
-        free(record.items);
-        free(record.items_populated);
-        free(record.hash_table_slots);
-        free(record.hash_table_hashes);
-        free(&record);
+        tp_free(record.items);
+        tp_free(record.items_populated);
+        tp_free(record.hash_table_slots);
+        tp_free(record.hash_table_hashes);
+        tp_free(&record);
     }
 }
 

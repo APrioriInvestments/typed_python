@@ -43,11 +43,11 @@ def createFunctionWithLocalsAndGlobals(code, globals):
     return _types.buildPyFunctionObject(code, globals, ())
 
 
-def astToCodeObject(ast, freevars):
+def astToCodeObject(ast, tp_freevars):
     return evaluateFunctionDefWithLocalsInCells(
         ast,
         globals={},
-        locals={var: None for var in freevars},
+        locals={var: None for var in tp_freevars},
         stripAnnotations=True
     ).__code__
 

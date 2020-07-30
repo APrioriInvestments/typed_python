@@ -520,6 +520,16 @@ PyObject *installClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObje
     });
 }
 
+PyObject* totalBytesAllocated(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+        return NULL;
+    }
+
+    return PyLong_FromLong(tp_total_bytes_allocated());
+}
+
 PyObject *prepareArgumentToBePassedToCompiler(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     static const char *kwlist[] = {"obj", NULL};
 
@@ -837,24 +847,24 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
         PyObject* closure = PyFunction_GetClosure(funcObj);
 
         if (closure) {
-            PyObjectStealer coFreevars(PyObject_GetAttrString(PyFunction_GetCode(funcObj), "co_freevars"));
+            PyObjectStealer cotp_freevars(PyObject_GetAttrString(PyFunction_GetCode(funcObj), "co_freevars"));
 
-            if (!coFreevars) {
+            if (!cotp_freevars) {
                 return NULL;
             }
 
-            if (!PyTuple_Check(coFreevars)) {
+            if (!PyTuple_Check(cotp_freevars)) {
                 PyErr_Format(PyExc_TypeError, "f.__code__.co_freevars was not a tuple");
                 return NULL;
             }
 
-            if (PyTuple_Size(coFreevars) != PyTuple_Size(closure)) {
+            if (PyTuple_Size(cotp_freevars) != PyTuple_Size(closure)) {
                 PyErr_Format(PyExc_TypeError, "f.__code__.co_freevars had a different number of elements than the closure");
                 return NULL;
             }
 
-            for (long ix = 0; ix < PyTuple_Size(coFreevars); ix++) {
-                PyObject* varname = PyTuple_GetItem(coFreevars, ix);
+            for (long ix = 0; ix < PyTuple_Size(cotp_freevars); ix++) {
+                PyObject* varname = PyTuple_GetItem(cotp_freevars, ix);
                 if (!PyUnicode_Check(varname)) {
                     PyErr_Format(PyExc_TypeError, "f.__code__.co_freevars was not all strings");
                     return NULL;
@@ -2325,6 +2335,7 @@ static PyMethodDef module_methods[] = {
     {"getDispatchIndexForType", (PyCFunction)getDispatchIndexForType, METH_VARARGS | METH_KEYWORDS, NULL},
     {"prepareArgumentToBePassedToCompiler", (PyCFunction)prepareArgumentToBePassedToCompiler, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setFunctionClosure", (PyCFunction)setFunctionClosure, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"totalBytesAllocated", (PyCFunction)totalBytesAllocated, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 

@@ -225,8 +225,8 @@ void TupleOrListOfType::destroy(instance_ptr selfPtr) {
 
     if (self->refcount.fetch_sub(1) == 1) {
         m_element_type->destroy(self->count, [&](int64_t k) {return eltPtr(self,k);});
-        free(self->data);
-        free(self);
+        tp_free(self->data);
+        tp_free(self);
     }
 }
 
@@ -259,7 +259,7 @@ void TupleOrListOfType::reserve(instance_ptr self, size_t target) {
         target = self_layout->count;
     }
 
-    self_layout->data = (uint8_t*)realloc(self_layout->data, getEltType()->bytecount() * target);
+    self_layout->data = (uint8_t*)tp_realloc(self_layout->data, getEltType()->bytecount() * target);
     self_layout->reserved = target;
 }
 
@@ -281,7 +281,7 @@ void ListOfType::append(instance_ptr self, instance_ptr other) {
     layout_ptr& self_layout = *(layout_ptr*)self;
 
     if (!self_layout) {
-        self_layout = (layout_ptr)malloc(sizeof(layout) + getEltType()->bytecount() * 1);
+        self_layout = (layout_ptr)tp_malloc(sizeof(layout) + getEltType()->bytecount() * 1);
 
         self_layout->count = 1;
         self_layout->refcount = 1;
@@ -292,7 +292,7 @@ void ListOfType::append(instance_ptr self, instance_ptr other) {
     } else {
         if (self_layout->count == self_layout->reserved) {
             int64_t new_reserved = self_layout->reserved * 1.25 + 1;
-            self_layout->data = (uint8_t*)realloc(self_layout->data, getEltType()->bytecount() * new_reserved);
+            self_layout->data = (uint8_t*)tp_realloc(self_layout->data, getEltType()->bytecount() * new_reserved);
             self_layout->reserved = new_reserved;
         }
 

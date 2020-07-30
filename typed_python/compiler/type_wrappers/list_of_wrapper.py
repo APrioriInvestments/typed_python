@@ -413,7 +413,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
         context.pushEffect(
             listInst.nonref_expr.ElementPtrIntegers(0, 4).store(
-                runtime_functions.realloc.call(
+                runtime_functions.tp_realloc.call(
                     listInst.nonref_expr.ElementPtrIntegers(0, 4).load(),
                     countInst.nonref_expr.mul(self.underlyingWrapperType.getBytecount())
                 )
@@ -441,14 +441,14 @@ class ListOfWrapper(TupleOrListOfWrapper):
     def createEmptyList(self, context, out):
         context.pushEffect(
             out.expr.store(
-                runtime_functions.malloc.call(28).cast(self.getNativeLayoutType())
+                runtime_functions.tp_malloc.call(28).cast(self.getNativeLayoutType())
             )
             >> out.nonref_expr.ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1))  # refcount
             >> out.nonref_expr.ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1))  # hash cache
             >> out.nonref_expr.ElementPtrIntegers(0, 2).store(native_ast.const_int32_expr(0))  # count
             >> out.nonref_expr.ElementPtrIntegers(0, 3).store(native_ast.const_int32_expr(1))  # reserved
             >> out.nonref_expr.ElementPtrIntegers(0, 4).store(
-                runtime_functions.malloc.call(self.underlyingWrapperType.getBytecount())
+                runtime_functions.tp_malloc.call(self.underlyingWrapperType.getBytecount())
             )  # data
         )
 

@@ -116,7 +116,7 @@ public:
     }
 
     void initializeHandleAt(instance_ptr data) {
-        getLayoutPtr(data) = (layout*)malloc(sizeof(layout) + mHeldType->bytecount());
+        getLayoutPtr(data) = (layout*)tp_malloc(sizeof(layout) + mHeldType->bytecount());
         getLayoutPtr(data)->refcount = 1;
         getLayoutPtr(data)->initialized = false;
     }
@@ -132,7 +132,7 @@ public:
             if (getLayoutPtr(self)->initialized) {
                 mHeldType->destroy(getLayoutPtr(self)->data);
             }
-            free(getLayoutPtr(self));
+            tp_free(getLayoutPtr(self));
         }
     }
 

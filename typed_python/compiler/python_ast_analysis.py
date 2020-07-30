@@ -208,7 +208,7 @@ def extractFunctionDefs(astNode):
     """
     functionDefs = []
     assignedLambdas = []
-    freeLambdas = []
+    tp_freeLambdas = []
 
     def visit(x):
         if isinstance(x, Statement):
@@ -231,14 +231,14 @@ def extractFunctionDefs(astNode):
 
         if isinstance(x, Expr):
             if x.matches.Lambda:
-                freeLambdas.append(x)
+                tp_freeLambdas.append(x)
                 return False
 
         return True
 
     visitPyAstChildren(astNode, visit)
 
-    return functionDefs, assignedLambdas, freeLambdas
+    return functionDefs, assignedLambdas, tp_freeLambdas
 
 
 def computeFunctionArgVariables(args: Arguments):
@@ -305,7 +305,7 @@ def computeReadVariables(astNode):
         x = 10
         return x
 
-    reads 'x' despite the fact that it is not 'free' in 'x' because it reads from the slot
+    reads 'x' despite the fact that it is not 'tp_free' in 'x' because it reads from the slot
     that contains 'x'
     """
     variables = set()

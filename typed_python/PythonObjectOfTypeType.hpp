@@ -40,7 +40,7 @@ public:
     // return a new layout with a refcount of 1, increffing the argument
     // before placing it in the layout.
     static layout_type* createLayout(PyObject* p, bool alsoIncref = true) {
-        layout_type* res = (layout_type*)malloc(sizeof(layout_type));
+        layout_type* res = (layout_type*)tp_malloc(sizeof(layout_type));
 
         if (alsoIncref) {
             incref(p);
@@ -53,7 +53,7 @@ public:
     }
 
     void initializeHandleAt(instance_ptr ptr, int refcount=1) {
-        ((layout_type**)ptr)[0] = (layout_type*)malloc(sizeof(layout_type));
+        ((layout_type**)ptr)[0] = (layout_type*)tp_malloc(sizeof(layout_type));
         ((layout_type**)ptr)[0]->pyObj = NULL;
         ((layout_type**)ptr)[0]->refcount = 1;
     }
@@ -75,7 +75,7 @@ public:
         if (p->refcount == 0) {
             PyEnsureGilAcquired getTheGil;
             decref(p->pyObj);
-            free(p);
+            tp_free(p);
         }
     }
 
@@ -85,7 +85,7 @@ public:
         if (getHandlePtr(self)->refcount == 0) {
             PyEnsureGilAcquired getTheGil;
             decref(getPyObj(self));
-            free(*(layout_type**)self);
+            tp_free(*(layout_type**)self);
         }
     }
 

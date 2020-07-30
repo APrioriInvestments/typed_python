@@ -248,7 +248,7 @@ void Alternative::destroy(instance_ptr self) {
 
     if (record.refcount.fetch_sub(1) == 1) {
         m_subtypes[record.which].second->destroy(record.data);
-        free(*(layout**)self);
+        tp_free(*(layout**)self);
     }
 }
 
