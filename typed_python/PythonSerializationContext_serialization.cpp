@@ -887,7 +887,7 @@ void PythonSerializationContext::serializeIterable(PyObject* o, SerializationBuf
     PyObjectStealer item(PyIter_Next(iter));
     while (item) {
         serializePythonObject(item, b, 0);
-        item.set(PyIter_Next(iter));
+        item.steal(PyIter_Next(iter));
     }
 
     b.writeEndCompound();

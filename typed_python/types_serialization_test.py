@@ -1178,6 +1178,16 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+1)
 
+    def test_serialize_array_doesnt_leak(self):
+        d = numpy.ones(1000000)
+        x = SerializationContext()
+
+        usage = currentMemUsageMb()
+        for _ in range(10):
+            x.deserialize(x.serialize(d))
+
+        self.assertLess(currentMemUsageMb(), usage+1)
+
     def test_deserialize_class_doesnt_leak(self):
         class C(Class, Final):
             x = Member(int)
