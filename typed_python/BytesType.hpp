@@ -130,4 +130,5 @@ public:
     static layout* strip(layout* l, bool whiteSpace, layout* values, bool fromLeft=true, bool fromRight=true);
     static layout* replace(layout* l, layout* old, layout* the_new, int64_t count);
     static layout* translate(layout* l, layout* table, layout* to_delete);
+    static layout* maketrans(layout* from, layout* to);
 };

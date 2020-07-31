@@ -813,6 +813,13 @@ bytes_translate = externalCallTarget(
     Void.pointer()
 )
 
+bytes_maketrans = externalCallTarget(
+    "nativepython_runtime_bytes_maketrans",
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer()
+)
+
 print_string = externalCallTarget(
     "nativepython_print_string",
     Void,

@@ -779,6 +779,13 @@ extern "C" {
         return BytesType::translate(l, table, to_delete);
     }
 
+    BytesType::layout* nativepython_runtime_bytes_maketrans(
+            BytesType::layout* from,
+            BytesType::layout* to
+    ) {
+        return BytesType::maketrans(from, to);
+    }
+
     PythonObjectOfType::layout_type* nativepython_runtime_create_pyobj(PyObject* p) {
         PyEnsureGilAcquired getTheGil;
         return PythonObjectOfType::createLayout(p);

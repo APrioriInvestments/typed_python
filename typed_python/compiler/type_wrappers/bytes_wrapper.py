@@ -462,6 +462,13 @@ def bytes_zfill(x, width):
     return b''.join(accumulator)
 
 
+def no_more_kwargs(context, **kwargs):
+    for e in kwargs:
+        context.pushException(TypeError, f"'{e}' is an invalid keyword argument for this function")
+        # just need to generate the first exception
+        break
+
+
 class BytesWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -679,7 +686,7 @@ class BytesWrapper(RefcountedWrapper):
 
     def convert_attribute(self, context, instance, attr):
         if (
-                attr in ('decode', 'translate', 'split', 'rsplit', 'join', 'partition', 'rpartition',
+                attr in ('decode', 'translate', 'maketrans', 'split', 'rsplit', 'join', 'partition', 'rpartition',
                          'strip', 'rstrip', 'lstrip', 'startswith', 'endswith', 'replace',
                          '__iter__', 'center', 'ljust', 'rjust', 'expandtabs', 'splitlines', 'zfill')
                 or attr in self._bytes_methods
@@ -690,7 +697,8 @@ class BytesWrapper(RefcountedWrapper):
 
         return super().convert_attribute(context, instance, attr)
 
-    def convert_method_call(self, context, instance, methodname, args, kwargs):
+    def convert_method_call(self, context, instance, methodname, args, kwargs0):
+        kwargs = kwargs0.copy()
         if methodname == '__iter__' and not args and not kwargs:
             res = context.push(
                 _BytesIteratorWrapper,
@@ -772,19 +780,31 @@ class BytesWrapper(RefcountedWrapper):
                 py_f = self._find_methods[methodname][0]
             return context.call_py_function(py_f, (instance, args[0], start, end), {})
 
-        # if methodname == 'replace' and not kwargs:
-        #     if len(args) in [2, 3]:
-        #         return context.push(
-        #             bytes,
-        #             lambda bytesRef: bytesRef.expr.store(
-        #                 runtime_functions.bytes_replace.call(
-        #                     instance.nonref_expr.cast(VoidPtr),
-        #                     args[0].nonref_expr.cast(VoidPtr),
-        #                     args[1].nonref_expr.cast(VoidPtr),
-        #                     args[2].nonref_expr if len(args) == 3 else native_ast.const_int_expr(-1)
-        #                 ).cast(self.layoutType)
-        #             )
-        #         )
+        if methodname == 'maketrans' and len(args) == 2 and not kwargs:
+            for i in [0, 1]:
+                if args[i].expr_type != self:
+                    context.pushException(
+                        TypeError,
+                        f"maketrans() argument {i + 1} must be bytes"
+                    )
+                    return
+            arg0len = args[0].convert_len()
+            arg1len = args[1].convert_len()
+            if arg0len is None or arg1len is None:
+                return None
+            with context.ifelse(arg0len.nonref_expr.eq(arg1len.nonref_expr)) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushException(ValueError, "maketrans arguments must have same length")
+            return context.push(
+                bytes,
+                lambda bytesRef: bytesRef.expr.store(
+                    runtime_functions.bytes_maketrans.call(
+                        args[0].nonref_expr.cast(VoidPtr),
+                        args[1].nonref_expr.cast(VoidPtr)
+                    ).cast(self.layoutType)
+                )
+            )
+
         if methodname == 'replace':
             if len(args) in [2, 3]:
                 for i in [0, 1]:
@@ -802,10 +822,19 @@ class BytesWrapper(RefcountedWrapper):
                     )
                     return
 
-                if len(args) == 2:
-                    return context.call_py_function(bytes_replace, (instance, args[0], args[1], context.constant(-1)), {})
-                else:
-                    return context.call_py_function(bytes_replace, (instance, args[0], args[1], args[2]), {})
+                arg2 = context.constant(-1) if len(args) == 2 else args[2]
+                return context.call_py_function(bytes_replace, (instance, args[0], args[1], arg2), {})
+                # return context.push(
+                #     bytes,
+                #     lambda bytesRef: bytesRef.expr.store(
+                #         runtime_functions.bytes_replace.call(
+                #             instance.nonref_expr.cast(VoidPtr),
+                #             args[0].nonref_expr.cast(VoidPtr),
+                #             args[1].nonref_expr.cast(VoidPtr),
+                #             args[2].nonref_expr if len(args) == 3 else native_ast.const_int_expr(-1)
+                #         ).cast(self.layoutType)
+                #     )
+                # )
 
         if methodname == 'join' and not kwargs:
             if len(args) == 1:
@@ -839,7 +868,7 @@ class BytesWrapper(RefcountedWrapper):
                         context.pushException(ValueError, "empty separator")
 
                 if len(args) == 2:
-                    maxCount = args[1].convert_to_type(int)
+                    maxCount = args[1].toInt64()
                     if maxCount is None:
                         return None
                 else:
@@ -864,7 +893,7 @@ class BytesWrapper(RefcountedWrapper):
             if len(args) == 0:
                 arg0 = context.constant(False)
             elif len(args) == 1:
-                arg0 = args[0].convert_to_type(bool)
+                arg0 = args[0].toBool()
                 if arg0 is None:
                     return None
 
@@ -897,6 +926,8 @@ class BytesWrapper(RefcountedWrapper):
                 arg0 = args[0] if not arg0isNone else context.constant(0)
                 if 'delete' in kwargs and len(args) == 1:
                     arg1 = kwargs['delete']
+                    del kwargs['delete']
+                    no_more_kwargs(context, **kwargs)
                 else:
                     arg1 = args[1] if len(args) >= 2 else context.constant(0)
 
@@ -931,7 +962,7 @@ class BytesWrapper(RefcountedWrapper):
 
         if methodname in ['center', 'ljust', 'rjust']:
             if len(args) in [1, 2]:
-                arg0 = args[0].convert_to_type(int)
+                arg0 = args[0].toInt64()
                 if arg0 is None:
                     return None
 
@@ -958,7 +989,7 @@ class BytesWrapper(RefcountedWrapper):
             return context.call_py_function(py_f, (instance, arg0, arg1), {})
 
         if methodname == 'zfill' and len(args) == 1 and not kwargs:
-            arg0 = args[0].convert_to_type(int)
+            arg0 = args[0].toInt64()
             if arg0 is None:
                 return None
             return context.call_py_function(bytes_zfill, (instance, arg0), {})
@@ -1104,3 +1135,21 @@ class BytesIteratorWrapper(Wrapper):
 
 
 _BytesIteratorWrapper = BytesIteratorWrapper()
+
+
+class BytesMaketransWrapper(Wrapper):
+    is_pod = True
+    is_empty = False
+    is_pass_by_ref = False
+
+    def __init__(self):
+        super().__init__(bytes.maketrans)
+
+    def getNativeLayoutType(self):
+        return native_ast.Type.Void()
+
+    def convert_call(self, context, expr, args, kwargs):
+        if len(args) == 2 and not kwargs:
+            return args[0].convert_method_call("maketrans", (args[0], args[1]), {})
+
+        return super().convert_call(context, expr, args, kwargs)

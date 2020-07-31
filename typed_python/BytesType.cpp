@@ -880,7 +880,9 @@ BytesType::layout* BytesType::mult(layout* lhs, int64_t rhs) {
     return new_layout;
 }
 
-// some notable special cases
+// This 'replace' is slightly faster (5%) than 'bytes_replace' in bytes_wrapper.py.
+// However, this 'replace' needs better memory management.
+// Some notable special cases:
 // 'aa'.replace('','z') = 'zazaz'
 // 'aa'.replace('','z', 5) = 'aa'
 // 'aa'.replace('','z', -1) = 'zazaz'
@@ -905,7 +907,7 @@ BytesType::layout* BytesType::replace(layout* l, layout* old, layout* repl, int6
     size_t max_matches = old_len ? l->bytecount / old_len : l->bytecount + 1;
     size_t max_increase = repl_len > old_len ? max_matches * (repl_len - old_len) : 0;
     size_t new_layout_size = sizeof(layout) + l->bytecount + max_increase;
-    layout* new_layout = (layout*)malloc(new_layout_size +32);
+    layout* new_layout = (layout*)malloc(new_layout_size);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = l->bytecount;
@@ -981,5 +983,24 @@ BytesType::layout* BytesType::translate(layout* l, layout* table, layout* to_del
     if (new_layout->bytecount < l->bytecount) {
         new_layout = (layout*)realloc(new_layout, sizeof(layout) + new_layout->bytecount);
     }
+    return new_layout;
+}
+
+// assumes len(from) == len(to) checked before calling
+BytesType::layout* BytesType::maketrans(layout* from, layout* to) {
+    const int table_size = 256;
+    layout* new_layout = (layout*)malloc(sizeof(layout) + table_size);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = table_size;
+
+    for (int i = 0; i < table_size; i++) {
+        new_layout->data[i] = i;
+    }
+
+    for (int j = 0; j < (from ? from->bytecount : 0); j++) {
+        new_layout->data[from->data[j]] = to->data[j];
+    }
+
     return new_layout;
 }

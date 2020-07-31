@@ -14,7 +14,11 @@
 
 from typed_python import Compiled, Entrypoint, ListOf, TupleOf, Dict, ConstDict
 from typed_python.compiler.type_wrappers.bytes_wrapper import bytes_isalnum, bytes_isalpha, \
-    bytes_isdigit, bytes_islower, bytes_isspace, bytes_istitle, bytes_isupper
+    bytes_isdigit, bytes_islower, bytes_isspace, bytes_istitle, bytes_isupper, bytes_replace, \
+    bytes_startswith, bytes_endswith, bytes_count, bytes_count_single, bytes_find, bytes_find_single, \
+    bytes_rfind, bytes_rfind_single, bytes_index, bytes_index_single, bytes_rindex, bytes_rindex_single, \
+    bytes_partition, bytes_rpartition, bytes_center, bytes_ljust, bytes_rjust, bytes_expandtabs, \
+    bytes_zfill
 from typed_python.test_util import compilerPerformanceComparison
 import flaky
 
@@ -29,6 +33,13 @@ someBytes = [
     b"\x00\x01",
     b"\x00\x01\x02\x00\x01",
 ]
+
+
+def result_or_exception(f, *p):
+    try:
+        return f(*p)
+    except Exception as e:
+        return type(e)
 
 
 class TestBytesCompilation(unittest.TestCase):
@@ -584,10 +595,10 @@ class TestBytesCompilation(unittest.TestCase):
         replaceCompiled = Compiled(replace)
         replace2Compiled = Compiled(replace2)
 
-        values = [b'']
+        values = {b'', b'ba', b'abc'}
         for _ in range(2):
-            for y in [b'ab', b'c', b'ba' * 100]:
-                values += [x + y for x in values]
+            for y in [b'ab', b'ba'*100]:
+                values = values.union({x + y for x in values})
 
         for s1 in values:
             for s2 in values:
@@ -694,13 +705,13 @@ class TestBytesCompilation(unittest.TestCase):
         def f_decode3(x, enc, err):
             return x.decode(enc, err)
 
-        enc = "utf-8"
-        err = "strict"
         for v in [b'quarter'*1000, b'25\xC2\xA2', b'\xE2\x82\xAC100', b'\xF0\x9F\x98\x80', b'']:
             for f in [f_decode1, f_decode2, f_decode3]:
-                r1 = f(v, enc, err)
-                r2 = Entrypoint(f)(v, enc, err)
-                self.assertEqual(r1, r2)
+                for enc in ["utf-8", "ascii", "cp863", "hz"]:
+                    for err in ["strict", "ignore", "replace"]:
+                        r1 = result_or_exception(f, v, enc, err)
+                        r2 = result_or_exception(Entrypoint(f), v, enc, err)
+                        self.assertEqual(r1, r2)
 
     def test_bytes_translate(self):
         def f_translate1(x, table):
@@ -739,6 +750,35 @@ class TestBytesCompilation(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             Entrypoint(f_translate1)(b'Abc', 'wrong type')
+
+        def f_maketrans1(x, y):
+            return b''.maketrans(x, y)
+
+        def f_maketrans2(x, y):
+            return bytes.maketrans(x, y)
+
+        def f_maketrans3(t, x, y):
+            return t.maketrans(x, y)  # convincing myself that I'm recognizing maketrans properly
+
+        cases = (
+            (b'', b''),
+            (b'abc123', b'XYZijk'),
+            (b' ', b'-'),
+            (b' '*500, b'-'*500),
+            (b'a', b'ab'),
+            (b'ab', b'a'),
+            (b'wrong', 'type '),
+            (b'wrong', 123),
+        )
+        for f in [f_maketrans1, f_maketrans2]:
+            for x, y in cases:
+                r1 = result_or_exception(f, x, y)
+                r2 = result_or_exception(Entrypoint(f), x, y)
+                self.assertEqual(r1, r2, (f, x, y))
+        for x, y in cases:
+            r1 = result_or_exception(f_maketrans3, bytes, x, y)
+            r2 = result_or_exception(Entrypoint(f_maketrans3), bytes, x, y)
+            self.assertEqual(r1, r2, (f_maketrans3, x, y))
 
     def test_bytes_partition(self):
         def f_partition(x, sep):
@@ -835,7 +875,7 @@ class TestBytesCompilation(unittest.TestCase):
         These are functions that are normally not called directly.
         They are called here in order to improve codecov coverage.
         """
-        v = b'a1A'
+        v = b'a1A\ta1A\n1A'
         self.assertEqual(bytes_isalnum(v), v.isalnum())
         self.assertEqual(bytes_isalpha(v), v.isalpha())
         self.assertEqual(bytes_isdigit(v), v.isdigit())
@@ -843,3 +883,24 @@ class TestBytesCompilation(unittest.TestCase):
         self.assertEqual(bytes_isspace(v), v.isspace())
         self.assertEqual(bytes_istitle(v), v.istitle())
         self.assertEqual(bytes_isupper(v), v.isupper())
+
+        self.assertEqual(bytes_replace(v, b'a', b'xyz', 1), v.replace(b'a', b'xyz', 1))
+        self.assertEqual(bytes_startswith(v, b'a'), v.startswith(b'a'))
+        self.assertEqual(bytes_endswith(v, b'A'), v.endswith(b'A'))
+        self.assertEqual(bytes_count(v, b'a1', 0, 10), v.count(b'a1', 0, 10))
+        self.assertEqual(bytes_count_single(v, 97, 0, 10), v.count(97, 0, 10))
+        self.assertEqual(bytes_find(v, b'a1', 0, 10), v.find(b'a1', 0, 10))
+        self.assertEqual(bytes_find_single(v, 97, 0, 10), v.find(97, 0, 10))
+        self.assertEqual(bytes_rfind(v, b'a1', 0, 10), v.rfind(b'a1', 0, 10))
+        self.assertEqual(bytes_rfind_single(v, 97, 0, 10), v.rfind(97, 0, 10))
+        self.assertEqual(bytes_index(v, b'a1', 0, 10), v.index(b'a1', 0, 10))
+        self.assertEqual(bytes_index_single(v, 97, 0, 10), v.index(97, 0, 10))
+        self.assertEqual(bytes_rindex(v, b'a1', 0, 10), v.rindex(b'a1', 0, 10))
+        self.assertEqual(bytes_rindex_single(v, 97, 0, 10), v.rindex(97, 0, 10))
+        self.assertEqual(bytes_partition(v, b'1'), v.partition(b'1'))
+        self.assertEqual(bytes_rpartition(v, b'1'), v.rpartition(b'1'))
+        self.assertEqual(bytes_center(v, 20, b'X'), v.center(20, b'X'))
+        self.assertEqual(bytes_rjust(v, 20, b'X'), v.rjust(20, b'X'))
+        self.assertEqual(bytes_ljust(v, 20, b'X'), v.ljust(20, b'X'))
+        self.assertEqual(bytes_expandtabs(v, 8), v.expandtabs(8))
+        self.assertEqual(bytes_zfill(v, 20), v.zfill(20))
