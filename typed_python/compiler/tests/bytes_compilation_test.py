@@ -13,7 +13,8 @@
 #   limitations under the License.
 
 from typed_python import Compiled, Entrypoint, ListOf, TupleOf, Dict, ConstDict
-from typed_python.compiler.type_wrappers.bytes_wrapper import bytes_isalnum, bytes_isalpha, \
+from typed_python.compiler.type_wrappers.bytes_wrapper import bytesJoinIterable, \
+    bytes_isalnum, bytes_isalpha, \
     bytes_isdigit, bytes_islower, bytes_isspace, bytes_istitle, bytes_isupper, bytes_replace, \
     bytes_startswith, bytes_endswith, bytes_count, bytes_count_single, bytes_find, bytes_find_single, \
     bytes_rfind, bytes_rfind_single, bytes_index, bytes_index_single, bytes_rindex, bytes_rindex_single, \
@@ -875,32 +876,58 @@ class TestBytesCompilation(unittest.TestCase):
         These are functions that are normally not called directly.
         They are called here in order to improve codecov coverage.
         """
-        v = b'a1A\ta1A\n1A'
-        self.assertEqual(bytes_isalnum(v), v.isalnum())
-        self.assertEqual(bytes_isalpha(v), v.isalpha())
-        self.assertEqual(bytes_isdigit(v), v.isdigit())
-        self.assertEqual(bytes_islower(v), v.islower())
-        self.assertEqual(bytes_isspace(v), v.isspace())
-        self.assertEqual(bytes_istitle(v), v.istitle())
-        self.assertEqual(bytes_isupper(v), v.isupper())
+        lst = [b'a', b'b', b'c']
+        sep = b','
+        self.assertEqual(bytesJoinIterable(sep, lst), sep.join(lst))
+        with self.assertRaises(TypeError):
+            bytesJoinIterable(sep, [b'a', 'b', b'c'])
 
+        for v in [b'', b'abc', b'ABC', b'123', b'a1A', b' \t\n', b'Abc', b'Abc Def']:
+            self.assertEqual(bytes_isalnum(v), v.isalnum())
+            self.assertEqual(bytes_isalpha(v), v.isalpha())
+            self.assertEqual(bytes_isdigit(v), v.isdigit())
+            self.assertEqual(bytes_islower(v), v.islower())
+            self.assertEqual(bytes_isspace(v), v.isspace())
+            self.assertEqual(bytes_istitle(v), v.istitle())
+            self.assertEqual(bytes_isupper(v), v.isupper())
+
+        v = b'a1A\ta1A\n1A'
         self.assertEqual(bytes_replace(v, b'a', b'xyz', 1), v.replace(b'a', b'xyz', 1))
+        self.assertEqual(bytes_replace(v, b'a', b'xyz', 0), v.replace(b'a', b'xyz', 0))
+        self.assertEqual(bytes_replace(v, b'', b'xyz', 2), v.replace(b'', b'xyz', 2))
         self.assertEqual(bytes_startswith(v, b'a'), v.startswith(b'a'))
+        self.assertEqual(bytes_startswith(v, b'A'), v.startswith(b'A'))
+        self.assertEqual(bytes_endswith(v, b'a'), v.endswith(b'a'))
         self.assertEqual(bytes_endswith(v, b'A'), v.endswith(b'A'))
-        self.assertEqual(bytes_count(v, b'a1', 0, 10), v.count(b'a1', 0, 10))
-        self.assertEqual(bytes_count_single(v, 97, 0, 10), v.count(97, 0, 10))
-        self.assertEqual(bytes_find(v, b'a1', 0, 10), v.find(b'a1', 0, 10))
-        self.assertEqual(bytes_find_single(v, 97, 0, 10), v.find(97, 0, 10))
-        self.assertEqual(bytes_rfind(v, b'a1', 0, 10), v.rfind(b'a1', 0, 10))
-        self.assertEqual(bytes_rfind_single(v, 97, 0, 10), v.rfind(97, 0, 10))
-        self.assertEqual(bytes_index(v, b'a1', 0, 10), v.index(b'a1', 0, 10))
-        self.assertEqual(bytes_index_single(v, 97, 0, 10), v.index(97, 0, 10))
-        self.assertEqual(bytes_rindex(v, b'a1', 0, 10), v.rindex(b'a1', 0, 10))
-        self.assertEqual(bytes_rindex_single(v, 97, 0, 10), v.rindex(97, 0, 10))
+        for start, end in [(0, 10), (-2, -1), (-20, 10), (0, -20)]:
+            self.assertEqual(bytes_count(v, b'a1', start, end), v.count(b'a1', start, end))
+            self.assertEqual(bytes_count(v, b'A1', start, end), v.count(b'A1', start, end))
+            self.assertEqual(bytes_count(v, b'', start, end), v.count(b'', start, end))
+            self.assertEqual(bytes_count_single(v, 97, start, end), v.count(97, start, end))
+            self.assertEqual(bytes_find(v, b'a1', start, end), v.find(b'a1', start, end))
+            self.assertEqual(bytes_find(v, b'A1', start, end), v.find(b'A1', start, end))
+            self.assertEqual(bytes_find(v, b'', start, end), v.find(b'', start, end))
+            self.assertEqual(bytes_find_single(v, 97, start, end), v.find(97, start, end))
+            self.assertEqual(bytes_rfind(v, b'a1', start, end), v.rfind(b'a1', start, end))
+            self.assertEqual(bytes_rfind(v, b'A1', start, end), v.rfind(b'A1', start, end))
+            self.assertEqual(bytes_rfind(v, b'', start, end), v.rfind(b'', start, end))
+            self.assertEqual(bytes_rfind_single(v, 97, start, end), v.rfind(97, start, end))
+            self.assertEqual(result_or_exception(bytes_index, v, b'a1', start, end), result_or_exception(v.index, b'a1', start, end))
+            self.assertEqual(result_or_exception(bytes_index, v, b'A1', start, end), result_or_exception(v.index, b'A1', start, end))
+            self.assertEqual(result_or_exception(bytes_index, v, b'', start, end), result_or_exception(v.index, b'', start, end))
+            self.assertEqual(result_or_exception(bytes_index_single, v, 97, start, end), result_or_exception(v.index, 97, start, end))
+            self.assertEqual(result_or_exception(bytes_rindex, v, b'a1', start, end), result_or_exception(v.rindex, b'a1', start, end))
+            self.assertEqual(result_or_exception(bytes_rindex, v, b'A1', start, end), result_or_exception(v.rindex, b'A1', start, end))
+            self.assertEqual(result_or_exception(bytes_rindex, v, b'', start, end), result_or_exception(v.rindex, b'', start, end))
+            self.assertEqual(result_or_exception(bytes_rindex_single, v, 97, start, end), result_or_exception(v.rindex, 97, start, end))
         self.assertEqual(bytes_partition(v, b'1'), v.partition(b'1'))
         self.assertEqual(bytes_rpartition(v, b'1'), v.rpartition(b'1'))
         self.assertEqual(bytes_center(v, 20, b'X'), v.center(20, b'X'))
+        self.assertEqual(bytes_center(v, 2, b'X'), v.center(2, b'X'))
         self.assertEqual(bytes_rjust(v, 20, b'X'), v.rjust(20, b'X'))
+        self.assertEqual(bytes_rjust(v, 2, b'X'), v.rjust(2, b'X'))
         self.assertEqual(bytes_ljust(v, 20, b'X'), v.ljust(20, b'X'))
+        self.assertEqual(bytes_ljust(v, 2, b'X'), v.ljust(2, b'X'))
         self.assertEqual(bytes_expandtabs(v, 8), v.expandtabs(8))
         self.assertEqual(bytes_zfill(v, 20), v.zfill(20))
+        self.assertEqual(bytes_zfill(b'+123', 20), b'+123'.zfill(20))
