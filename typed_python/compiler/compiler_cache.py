@@ -219,4 +219,7 @@ class CompilerCache:
         if moduleHash is None:
             raise Exception("Can't find a module for " + linkName)
 
+        if moduleHash not in self.loadedModules:
+            self.loadForSymbol(linkName)
+
         return self.loadedModules[moduleHash].functionPointers[linkName]
