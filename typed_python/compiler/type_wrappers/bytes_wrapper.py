@@ -88,7 +88,7 @@ def bytes_isalnum(x):
     if len(x) == 0:
         return False
     for i in x:
-        if i < ord('0') or (i > ord('9') and i < ord('A')) or (i > ord('Z') and i < ord('a')) or i > ord('z'):
+        if not (ord('0') <= i <= ord('9') or ord('A') <= i <= ord('Z') or ord('a') <= i <= ord('z')):
             return False
     return True
 
@@ -97,7 +97,7 @@ def bytes_isalpha(x):
     if len(x) == 0:
         return False
     for i in x:
-        if i < ord('A') or (i > ord('Z') and i < ord('a')) or i > ord('z'):
+        if not (ord('A') <= i <= ord('Z') or ord('a') <= i <= ord('z')):
             return False
     return True
 
@@ -106,7 +106,7 @@ def bytes_isdigit(x):
     if len(x) == 0:
         return False
     for i in x:
-        if i < ord('0') or i > ord('9'):
+        if not (ord('0') <= i <= ord('9')):
             return False
     return True
 
@@ -114,9 +114,9 @@ def bytes_isdigit(x):
 def bytes_islower(x):
     found_lower = False
     for i in x:
-        if i >= ord('a') and i <= ord('z'):
+        if ord('a') <= i <= ord('z'):
             found_lower = True
-        elif i >= ord('A') and i <= ord('Z'):
+        elif ord('A') <= i <= ord('Z'):
             return False
     return found_lower
 
@@ -136,8 +136,8 @@ def bytes_istitle(x):
     last_cased = False
     found_one = False
     for i in x:
-        upper = i >= ord('A') and i <= ord('Z')
-        lower = i >= ord('a') and i <= ord('z')
+        upper = ord('A') <= i <= ord('Z')
+        lower = ord('a') <= i <= ord('z')
         if upper and last_cased:
             return False
         if lower and not last_cased:
@@ -151,9 +151,9 @@ def bytes_istitle(x):
 def bytes_isupper(x):
     found_upper = False
     for i in x:
-        if i >= ord('A') and i <= ord('Z'):
+        if ord('A') <= i <= ord('Z'):
             found_upper = True
-        elif i >= ord('a') and i <= ord('z'):
+        elif ord('a') <= i <= ord('z'):
             return False
     return found_upper
 
