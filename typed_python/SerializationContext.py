@@ -464,7 +464,7 @@ class SerializationContext(object):
             if self.nameForObject(inst.__globals__) is not None:
                 globalsToUse = inst.__globals__
             else:
-                all_names = set()
+                all_names = set(['__builtins__'])
 
                 def walkCodeObject(code):
                     all_names.update(code.co_names)

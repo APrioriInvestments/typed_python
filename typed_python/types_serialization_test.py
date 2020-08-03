@@ -43,7 +43,7 @@ from typed_python import (
     Forward, Final, Function, Entrypoint, TypeFunction, PointerTo
 )
 
-from typed_python._types import refcount, isRecursive, identityHash
+from typed_python._types import refcount, isRecursive, identityHash, buildPyFunctionObject
 
 module_level_testfun = dummy_test_module.testfunction
 
@@ -1188,6 +1188,48 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+1)
 
+    def test_deserialize_set_doesnt_leak(self):
+        s = set(range(1000000))
+        x = SerializationContext()
+
+        x.deserialize(x.serialize(s))
+
+        usage = currentMemUsageMb()
+
+        for _ in range(10):
+            x.deserialize(x.serialize(s))
+            print(currentMemUsageMb())
+
+        self.assertLess(currentMemUsageMb(), usage+1)
+
+    def test_deserialize_tuple_doesnt_leak(self):
+        s = tuple(range(1000000))
+        x = SerializationContext()
+
+        x.deserialize(x.serialize(s))
+
+        usage = currentMemUsageMb()
+
+        for _ in range(10):
+            x.deserialize(x.serialize(s))
+            print(currentMemUsageMb())
+
+        self.assertLess(currentMemUsageMb(), usage+1)
+
+    def test_deserialize_list_doesnt_leak(self):
+        s = list(range(1000000))
+        x = SerializationContext()
+
+        x.deserialize(x.serialize(s))
+
+        usage = currentMemUsageMb()
+
+        for _ in range(10):
+            x.deserialize(x.serialize(s))
+            print(currentMemUsageMb())
+
+        self.assertLess(currentMemUsageMb(), usage+1)
+
     def test_deserialize_class_doesnt_leak(self):
         class C(Class, Final):
             x = Member(int)
@@ -1976,3 +2018,24 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert sc.deserialize(sc.serialize(type(x))) == type(x)
         assert sc.deserialize(sc.serialize(x)) == x
+
+    def test_can_serialize_nested_function_references(self):
+        sc = SerializationContext().withoutInternalizingTypeGroups()
+
+        def lenProxy(x):
+            return len(x)
+
+        otherGlobals = {'__builtins__': __builtins__}
+
+        lenProxyWithNonstandardGlobals = buildPyFunctionObject(
+            lenProxy.__code__,
+            otherGlobals,
+            ()
+        )
+
+        assert lenProxy("asdf") == 4
+        assert lenProxyWithNonstandardGlobals("asdf") == 4
+
+        lenProxyDeserialized = sc.deserialize(sc.serialize(lenProxyWithNonstandardGlobals))
+
+        assert lenProxyDeserialized("asdf") == 4
