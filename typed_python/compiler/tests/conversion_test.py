@@ -2889,3 +2889,53 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert eltTypeOf(ListOf(int)) == int
         assert eltTypeOf(ListOf(int)()) == int
+
+    def test_chained_comparisons(self):
+        def f1(x, y, z):
+            return x < y < z
+
+        def f2(x, y, z):
+            return x > y > z
+
+        def f3(x, y, z):
+            return x <= y < z
+
+        def f4(x, y, z):
+            return 1 <= x <= y <= 2 <= z
+
+        def f5(x, y, z):
+            return x < y > z
+
+        def f6(x, y, z):
+            return x > y < z
+
+        for f in [f1, f2, f3, f4, f5, f6]:
+            for x in range(3):
+                for y in range(3):
+                    for z in range(3):
+                        r1 = f(x, y, z)
+                        r2 = Entrypoint(f)(x, y, z)
+                        self.assertEqual(r1, r2)
+
+        # Now verify that each expression in the chained comparison is evaluated at most once
+        # and verify that normal short-circuit evaluation occurs.
+        def f7(w, x, y, z):
+            accumulator = []
+
+            def side_effect(x, accumulator):
+                accumulator.append(x)
+                return x
+
+            if side_effect(w, accumulator) < side_effect(x, accumulator) < side_effect(y, accumulator) < side_effect(z, accumulator):
+                return (True, accumulator)
+            else:
+                return (False, accumulator)
+
+        for w in range(4):
+            for x in range(4):
+                for y in range(4):
+                    for z in range(4):
+                        r1 = f7(w, x, y, z)
+                        r2 = Entrypoint(f7)(w, x, y, z)
+
+                        self.assertEqual(r1, r2)

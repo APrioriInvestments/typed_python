@@ -1677,20 +1677,41 @@ class ExpressionConversionContext(object):
             return lhs.convert_call(args, kwargs)
 
         if ast.matches.Compare:
-            assert len(ast.comparators) == 1, "multi-comparison not implemented yet"
-            assert len(ast.ops) == 1
+            if len(ast.ops) == 1:
+                lhs = self.convert_expression_ast(ast.left)
 
-            lhs = self.convert_expression_ast(ast.left)
+                if lhs is None:
+                    return None
 
-            if lhs is None:
-                return None
+                r = self.convert_expression_ast(ast.comparators[0])
 
-            r = self.convert_expression_ast(ast.comparators[0])
+                if r is None:
+                    return None
 
-            if r is None:
-                return None
+                return lhs.convert_bin_op(ast.ops[0], r)
+            else:
+                result = self.allocateUninitializedSlot(bool)
+                result.convert_copy_initialize(self.constant(True))
+                self.markUninitializedSlotInitialized(result)
+                left = self.convert_expression_ast(ast.left)
+                if left is None:
+                    return None
+                for i in range(len(ast.comparators)):
+                    with self.ifelse(result) as (ifTrue, ifFalse):
+                        with ifTrue:
+                            t = self.convert_expression_ast(ast.comparators[i])
+                            if t is None:
+                                return None
+                            right = self.allocateUninitializedSlot(t.expr_type.typeRepresentation)
+                            right.convert_copy_initialize(t)
+                            self.markUninitializedSlotInitialized(right)
+                            cond = left.convert_bin_op(ast.ops[i], right)
+                            if cond is None:
+                                return None
+                            result.convert_copy_initialize(cond)
+                            left = right
 
-            return lhs.convert_bin_op(ast.ops[0], r)
+                return result
 
         if ast.matches.IfExp:
             test = self.convert_expression_ast(ast.test)
