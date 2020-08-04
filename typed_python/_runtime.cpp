@@ -755,10 +755,10 @@ extern "C" {
             throw PythonExceptionSet();
         }
 
-        char* utf8_encoding = encoding ? strdup(StringType::Make()->toUtf8String((instance_ptr)&encoding).c_str()) : 0;
-        const char* utf8_errors = errors ? StringType::Make()->toUtf8String((instance_ptr)&errors).c_str() : 0;
-        PyObject* s = PyUnicode_FromEncodedObject(b, utf8_encoding, utf8_errors);
-        free(utf8_encoding);
+        char* c_encoding = encoding ? strdup(StringType::Make()->toUtf8String((instance_ptr)&encoding).c_str()) : 0;
+        const char* c_errors = errors ? StringType::Make()->toUtf8String((instance_ptr)&errors).c_str() : 0;
+        PyObject* s = PyUnicode_FromEncodedObject(b, c_encoding, c_errors);
+        free(c_encoding);
         decref(b);
         if (!s) {
             throw PythonExceptionSet();
@@ -767,6 +767,34 @@ extern "C" {
         StringType::layout* ret = 0;
         PyInstance::copyConstructFromPythonInstance(StringType::Make(), (instance_ptr)&ret, s, true);
         decref(s);
+
+        return ret;
+    }
+
+    BytesType::layout* nativepython_runtime_str_encode(
+            StringType::layout* l,
+            StringType::layout* encoding,
+            StringType::layout* errors
+    ) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* s = PyInstance::extractPythonObject((instance_ptr)&l, StringType::Make());
+        if (!s) {
+            throw PythonExceptionSet();
+        }
+
+        char* c_encoding = encoding ? strdup(StringType::Make()->toUtf8String((instance_ptr)&encoding).c_str()) : 0;
+        const char* c_errors = errors ? StringType::Make()->toUtf8String((instance_ptr)&errors).c_str() : 0;
+        PyObject* b = PyUnicode_AsEncodedString(s, c_encoding, c_errors);
+        free(c_encoding);
+        decref(s);
+        if (!b) {
+            throw PythonExceptionSet();
+        }
+
+        BytesType::layout* ret = 0;
+        PyInstance::copyConstructFromPythonInstance(BytesType::Make(), (instance_ptr)&ret, b, true);
+        decref(b);
 
         return ret;
     }

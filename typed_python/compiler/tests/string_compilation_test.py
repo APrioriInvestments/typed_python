@@ -849,3 +849,47 @@ class TestStringCompilation(unittest.TestCase):
             r1 = f_mult(v, n)
             r2 = Entrypoint(f_mult)(v, n)
             self.assertEqual(r1, r2)
+
+    def test_string_decode(self):
+        # various permutation of parameters (positional, keyword, missing)
+        def f_1(x, enc, err):
+            return str(x, enc, err)
+
+        def f_2(x, enc, err):
+            return str(x, encoding=enc, errors=err)
+
+        def f_3(x, enc, _err):
+            return (str(x, enc), str(x))
+
+        def f_4(x, enc, err):
+            return (str(x, encoding=enc), str(x, errors=err))
+
+        for v in [b'quarter'*1000, b'25\xC2\xA2', b'\xE2\x82\xAC100', b'\xF0\x9F\x98\x80', b'']:
+            for f in [f_1, f_2, f_3, f_4]:
+                for enc in ["utf-8", "utf-16", "ascii", "cp863", "hz"]:
+                    for err in ["strict", "ignore", "replace"]:
+                        r1 = callOrExceptType(f, v, enc, err)
+                        r2 = callOrExceptType(Entrypoint(f), v, enc, err)
+                        self.assertEqual(r1, r2)
+
+    def test_string_encode(self):
+        # various permutation of parameters (positional, keyword, missing)
+        def f_1(x, enc, err):
+            return x.encode(enc, err)
+
+        def f_2(x, enc, err):
+            return x.encode(encoding=enc, errors=err)
+
+        def f_3(x, enc, _err):
+            return (x.encode(enc), x.encode())
+
+        def f_4(x, enc, err):
+            return (x.encode(encoding=enc), (x.encode(errors=err)))
+
+        for v in ['quarter'*1000, '25¢', '€100', '汉字', '']:
+            for f in [f_1, f_2, f_3, f_4]:
+                for enc in ["utf-8", "utf-16", "ascii", "cp863", "hz"]:
+                    for err in ["strict", "ignore", "replace"]:
+                        r1 = callOrExceptType(f, v, enc, err)
+                        r2 = callOrExceptType(Entrypoint(f), v, enc, err)
+                        self.assertEqual(r1, r2)

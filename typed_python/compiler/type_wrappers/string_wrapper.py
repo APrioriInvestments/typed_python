@@ -105,6 +105,9 @@ class StringWrapper(RefcountedWrapper):
 
         self.layoutType = native_ast.Type.Struct(element_types=(
             ('refcount', native_ast.Int64),
+            ('hash_cache', native_ast.Int32),
+            ('pointcount', native_ast.Int32),
+            ('bytes_per_codepoint', native_ast.Int32),
             ('data', native_ast.UInt8)
         ), name='StringLayout').pointer()
 
@@ -114,6 +117,32 @@ class StringWrapper(RefcountedWrapper):
 
         if len(args) == 1 and not kwargs:
             return args[0].convert_str_cast()
+
+        if 1 <= len(args) <= 3:
+            if len(args) >= 2:
+                arg1 = args[1]
+            elif 'encoding' in kwargs:
+                arg1 = kwargs['encoding']
+            else:
+                arg1 = None
+
+            if len(args) >= 3:
+                arg2 = args[2]
+            elif 'errors' in kwargs:
+                arg2 = kwargs['errors']
+            else:
+                arg2 = None
+
+            return context.push(
+                str,
+                lambda ref: ref.expr.store(
+                    runtime_functions.bytes_decode.call(
+                        args[0].nonref_expr.cast(VoidPtr),
+                        (arg1 if arg1 is not None else context.constant(0)).nonref_expr.cast(VoidPtr),
+                        (arg2 if arg2 is not None else context.constant(0)).nonref_expr.cast(VoidPtr),
+                    ).cast(self.layoutType)
+                )
+            )
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
@@ -349,8 +378,7 @@ class StringWrapper(RefcountedWrapper):
             cond=expr,
             false=native_ast.const_int_expr(0),
             true=(
-                expr.ElementPtrIntegers(0, 1).ElementPtrIntegers(4)
-                .cast(native_ast.Int32.pointer()).load().cast(native_ast.Int64)
+                expr.ElementPtrIntegers(0, 2).load().cast(native_ast.Int64)
             )
         )
 
@@ -393,7 +421,8 @@ class StringWrapper(RefcountedWrapper):
 
     def convert_attribute(self, context, instance, attr):
         if (
-            attr in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace", "__iter__")
+            attr in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace",
+                     "__iter__", "encode")
             or attr in self._str_methods
             or attr in self._bool_methods
         ):
@@ -402,12 +431,10 @@ class StringWrapper(RefcountedWrapper):
         return super().convert_attribute(context, instance, attr)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        if not (methodname in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace", "__iter__")
+        if not (methodname in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace",
+                               "__iter__", "encode")
                 or methodname in self._str_methods or methodname in self._bool_methods):
             return context.pushException(AttributeError, methodname)
-
-        if kwargs:
-            return super().convert_method_call(context, instance, methodname, args, kwargs)
 
         if methodname == "__iter__" and not args and not kwargs:
             res = context.push(
@@ -423,10 +450,10 @@ class StringWrapper(RefcountedWrapper):
 
             return res
 
-        if methodname in ['strip', 'lstrip', 'rstrip']:
+        if methodname in ['strip', 'lstrip', 'rstrip'] and not kwargs:
             fromLeft = methodname in ['strip', 'lstrip']
             fromRight = methodname in ['strip', 'rstrip']
-            if len(args) == 0:
+            if len(args) == 0 and not kwargs:
                 return context.push(
                     str,
                     lambda strRef: strRef.expr.store(
@@ -438,7 +465,7 @@ class StringWrapper(RefcountedWrapper):
                     )
                 )
 
-        elif methodname in self._str_methods:
+        elif methodname in self._str_methods and not kwargs:
             if len(args) == 0:
                 return context.push(
                     str,
@@ -448,7 +475,7 @@ class StringWrapper(RefcountedWrapper):
                         ).cast(self.layoutType)
                     )
                 )
-        elif methodname in self._bool_methods:
+        elif methodname in self._bool_methods and not kwargs:
             if len(args) == 0:
                 return context.push(
                     bool,
@@ -458,7 +485,7 @@ class StringWrapper(RefcountedWrapper):
                         )
                     )
                 )
-        elif methodname == "startswith":
+        elif methodname == "startswith" and not kwargs:
             if len(args) == 1:
                 if args[0].expr_type != self:
                     context.pushException(
@@ -469,7 +496,7 @@ class StringWrapper(RefcountedWrapper):
 
                 return context.call_py_function(strStartswith, (instance, args[0]), {})
 
-        elif methodname == "endswith":
+        elif methodname == "endswith" and not kwargs:
             if len(args) == 1:
                 if args[0].expr_type != self:
                     context.pushException(
@@ -480,7 +507,7 @@ class StringWrapper(RefcountedWrapper):
 
                 return context.call_py_function(strEndswith, (instance, args[0]), {})
 
-        elif methodname == "replace":
+        elif methodname == "replace" and not kwargs:
             if len(args) in [2, 3]:
                 for i in [0, 1]:
                     if args[i].expr_type != self:
@@ -502,7 +529,7 @@ class StringWrapper(RefcountedWrapper):
                 else:
                     return context.call_py_function(strReplace, (instance, args[0], args[1], args[2]), {})
 
-        elif methodname == "find":
+        elif methodname == "find" and not kwargs:
             if len(args) == 1:
                 return context.push(
                     int,
@@ -536,7 +563,7 @@ class StringWrapper(RefcountedWrapper):
                         )
                     )
                 )
-        elif methodname == "join":
+        elif methodname == "join" and not kwargs:
             if len(args) == 1:
                 # we need to pass the list of strings
                 separator = instance
@@ -553,7 +580,7 @@ class StringWrapper(RefcountedWrapper):
                     )
                 else:
                     return context.call_py_function(strJoinIterable, (separator, itemsToJoin), {})
-        elif methodname == "split":
+        elif methodname == "split" and not kwargs:
             if len(args) == 0:
                 return context.push(
                     TypedListMasqueradingAsList(ListOf(str)),
@@ -592,6 +619,32 @@ class StringWrapper(RefcountedWrapper):
                             args[0].nonref_expr.cast(VoidPtr),
                             args[1].nonref_expr
                         ).cast(outStrings.expr_type.getNativeLayoutType())
+                    )
+                )
+        elif methodname == 'encode':
+            if 0 <= len(args) <= 2:
+                if len(args) >= 1:
+                    arg0 = args[0]
+                elif 'encoding' in kwargs:
+                    arg0 = kwargs['encoding']
+                else:
+                    arg0 = None
+
+                if len(args) >= 2:
+                    arg1 = args[1]
+                elif 'errors' in kwargs:
+                    arg1 = kwargs['errors']
+                else:
+                    arg1 = None
+
+                return context.push(
+                    bytes,
+                    lambda ref: ref.expr.store(
+                        runtime_functions.str_encode.call(
+                            instance.nonref_expr.cast(VoidPtr),
+                            (arg0 if arg0 is not None else context.constant(0)).nonref_expr.cast(VoidPtr),
+                            (arg1 if arg1 is not None else context.constant(0)).nonref_expr.cast(VoidPtr),
+                        ).cast(typeWrapper(bytes).layoutType)
                     )
                 )
 
