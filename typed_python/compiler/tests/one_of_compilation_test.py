@@ -363,25 +363,47 @@ class TestOneOfCompilation(unittest.TestCase):
 
         assert f("A") == "A"
 
+        with self.assertRaises(TypeError):
+            f("C")
+
+        with self.assertRaises(TypeError):
+            f(10)
+
+    def test_oneof_promotion(self):
+        @Entrypoint
+        def f(x: OneOf("A", "B")) -> str: # noqa
+            return x
+
+        assert f("A") == "A"
+        assert f("B") == "B"
+
+    def test_oneof_promotion_heterogeneous(self):
+        @Entrypoint
+        def f(x: OneOf("A", 10)) -> OneOf(str, int): # noqa
+            return x
+
+        assert f("A") == "A"
+        assert f(10) == 10
+
     def test_operations_on_oneof_values(self):
         @Entrypoint
-        def oneof_concat(x: OneOf('A', 'B')):
+        def oneof_concat(x: OneOf('A', 'B')): # noqa
             return x + x
 
         @Entrypoint
-        def oneof_getitem(x: OneOf('AB', 'CD'), i: int):
+        def oneof_getitem(x: OneOf('AB', 'CD'), i: int): # noqa
             return x[i]
 
         @Entrypoint
-        def oneof_ord(x: OneOf('A', 'B')):
+        def oneof_ord(x: OneOf('A', 'B')): # noqa
             return ord(x[0])
 
         @Entrypoint
-        def oneof_isalpha(x: OneOf('A', '1')):
+        def oneof_isalpha(x: OneOf('A', '1')): # noqa
             return x.isalpha()
 
         @Entrypoint
-        def oneof_abs(x: OneOf(123.4, -234.5)):
+        def oneof_abs(x: OneOf(123.4, -234.5)): # noqa
             return abs(x)
 
         @Entrypoint

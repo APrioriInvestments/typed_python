@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typed_python import OneOf
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
 
@@ -82,3 +83,12 @@ class ValueWrapper(Wrapper):
 
     def convert_abs(self, context, expr):
         return context.constant(self.typeRepresentation.Value).convert_abs()
+
+    def can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
+        return "Maybe"
+
+    def convert_to_type_with_target(self, context, expr, targetVal, explicit):
+        return context.constant(self.typeRepresentation.Value).convert_to_type_with_target(targetVal, explicit)
+
+    def convert_to_self_with_target(self, context, targetVal, otherExpr, explicit):
+        return context.constant(self.typeRepresentation.Value) == otherExpr
