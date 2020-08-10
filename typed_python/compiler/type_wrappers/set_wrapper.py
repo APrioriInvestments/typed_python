@@ -217,6 +217,13 @@ def set_not_equal(left, right):
     return len(left) != len(right) or not set_subset(right, left)
 
 
+def set_duplicate(s):
+    res = type(s)()
+    for item in s:
+        res.add(item)
+    return res
+
+
 class SetWrapperBase(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -658,6 +665,8 @@ class SetWrapper(SetWrapperBase):
             return context.push(self, lambda x: x.convert_default_initialize())
 
         if len(args) == 1 and not kwargs:
+            if args[0].expr_type == self:
+                return context.call_py_function(set_duplicate, (args[0],), {})
             return args[0].convert_to_type(self, True)
 
         return super().convert_type_call(context, typeInst, args, kwargs)

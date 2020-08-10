@@ -468,6 +468,32 @@ void PyDictInstance::mirrorTypeInformationIntoPyTypeConcrete(DictType* dictT, Py
     );
 }
 
+void PyDictInstance::constructFromPythonArgumentsConcrete(DictType* t, uint8_t* data, PyObject* args, PyObject* kwargs) {
+    if ((!kwargs || PyDict_Size(kwargs) == 0) && (args && PyTuple_Size(args) == 1)) {
+        PyObject* arg = PyTuple_GetItem(args, 0);
+        Type* argType = extractTypeFrom(arg->ob_type);
+
+        Type* valueType = t->valueType();
+
+        if (Type::typesEquivalent(argType, t)) {
+            //following python semantics, this needs to produce a new object
+            //that's a copy of the original dict. We can't just incref it and return
+            //the original object because it has state and we don't want the objects
+            //to alias each other
+            t->constructor(data);
+            t->visitKeyValuePairsAsSeparateArgs(
+                ((PyInstance*)arg)->dataPtr(),
+                [&](instance_ptr key, instance_ptr val) {
+                    valueType->copy_constructor(t->insertKey(data, key), val);
+                    return true;
+                }
+            );
+            return;
+        }
+    }
+
+    PyInstance::constructFromPythonArgumentsConcrete(t, data, args, kwargs);
+}
 
 void PyDictInstance::copyConstructFromPythonInstanceConcrete(DictType* dictType, instance_ptr dictTgt, PyObject* pyRepresentation, bool isExplicit) {
     if (PyDict_Check(pyRepresentation)) {

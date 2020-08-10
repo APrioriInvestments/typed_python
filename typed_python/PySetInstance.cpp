@@ -783,6 +783,31 @@ PyObject* PySetInstance::setUnion(PyObject* o, PyObject* args) {
     return (PyObject*)new_inst;
 }
 
+void PySetInstance::constructFromPythonArgumentsConcrete(SetType* t, uint8_t* data, PyObject* args, PyObject* kwargs) {
+    if ((!kwargs || PyDict_Size(kwargs) == 0) && (args && PyTuple_Size(args) == 1)) {
+        PyObject* arg = PyTuple_GetItem(args, 0);
+        Type* argType = extractTypeFrom(arg->ob_type);
+
+        if (Type::typesEquivalent(argType, t)) {
+            //following python semantics, this needs to produce a new object
+            //that's a copy of the original dict. We can't just incref it and return
+            //the original object because it has state and we don't want the objects
+            //to alias each other
+            t->constructor(data);
+            t->visitSetElements(
+                ((PyInstance*)arg)->dataPtr(),
+                [&](instance_ptr key) {
+                    t->insertKey(data, key);
+                    return true;
+                }
+            );
+            return;
+        }
+    }
+
+    PyInstance::constructFromPythonArgumentsConcrete(t, data, args, kwargs);
+}
+
 PyObject* PySetInstance::setIntersectionUpdate(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) == 0) {
         Py_RETURN_NONE;

@@ -868,7 +868,7 @@ PyMethodDef* PyListOfInstance::typeMethodsConcrete(Type* t) {
 }
 
 void PyListOfInstance::constructFromPythonArgumentsConcrete(ListOfType* t, uint8_t* data, PyObject* args, PyObject* kwargs) {
-    if (PyTuple_Size(args) == 1 && !kwargs) {
+    if ((!kwargs || PyDict_Size(kwargs) == 0) && (args && PyTuple_Size(args) == 1)) {
         PyObject* arg = PyTuple_GetItem(args, 0);
         Type* argType = extractTypeFrom(arg->ob_type);
 

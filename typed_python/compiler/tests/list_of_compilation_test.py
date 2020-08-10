@@ -544,3 +544,27 @@ class TestListOfCompilation(unittest.TestCase):
 
         r1(lst)
         r2(lst)
+
+    def test_listof_aliasing(self):
+        T = ListOf(int)
+
+        t1 = T()
+        t2 = T(t1)
+
+        t1.append(1)
+
+        assert len(t2) == 0
+
+    def test_listof_aliasing_compiled(self):
+        T = ListOf(int)
+
+        @Entrypoint
+        def dup(x):
+            return T(x)
+
+        t1 = T()
+        t2 = dup(t1)
+
+        t1.append(1)
+
+        assert len(t2) == 0

@@ -65,6 +65,15 @@ def dict_pop(dict, item, defaultValue):
     return res
 
 
+def dict_duplicate(d):
+    out = type(d)()
+
+    for k in d.items():
+        out[k[0]] = k[1]
+
+    return out
+
+
 class DictWrapperBase(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -494,7 +503,10 @@ class DictWrapper(DictWrapperBase):
             return context.push(self, lambda x: x.convert_default_initialize())
 
         if len(args) == 1 and not kwargs:
-            return args[0].convert_to_type(self, True)
+            if args[0].expr_type == self:
+                return context.call_py_function(dict_duplicate, (args[0],), {})
+            else:
+                return args[0].convert_to_type(self, True)
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 

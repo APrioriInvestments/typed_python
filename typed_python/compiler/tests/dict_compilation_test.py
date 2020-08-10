@@ -717,3 +717,29 @@ class TestDictCompilation(unittest.TestCase):
         delOne(aDict)
 
         assert _types.refcount(aListOf) == 1
+
+    def test_dict_aliasing(self):
+        T = Dict(int, int)
+
+        t1 = T()
+        t2 = T(t1)
+
+        t1[10] = 20
+
+        assert len(t2) == 0
+
+    def test_dict_aliasing_compiled(self):
+        T = Dict(int, int)
+
+        @Entrypoint
+        def dup(x):
+            return T(x)
+
+        assert dup.resultTypeFor(T).typeRepresentation == T
+
+        t1 = T()
+        t2 = dup(t1)
+
+        t1[10] = 20
+
+        assert len(t2) == 0

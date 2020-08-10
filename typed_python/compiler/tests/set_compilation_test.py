@@ -1061,3 +1061,29 @@ class TestSetCompilation(unittest.TestCase):
             f_set_t({t1, t2, t4})
         with self.assertRaises(TypeError):
             Entrypoint(f_set_t)({t1, t2, t4})
+
+    def test_set_aliasing(self):
+        T = Set(int)
+
+        t1 = T()
+        t2 = T(t1)
+
+        t1.add(10)
+
+        assert len(t2) == 0
+
+    def test_set_aliasing_compiled(self):
+        T = Set(int)
+
+        @Entrypoint
+        def dup(x):
+            return T(x)
+
+        assert dup.resultTypeFor(T).typeRepresentation == T
+
+        t1 = T()
+        t2 = dup(t1)
+
+        t1.add(10)
+
+        assert len(t2) == 0

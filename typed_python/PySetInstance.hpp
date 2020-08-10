@@ -50,6 +50,7 @@ class PySetInstance : public PyInstance {
     static void copyConstructFromPythonInstanceConcrete(SetType* setType, instance_ptr tgt,
                                                         PyObject* pyRepresentation,
                                                         bool isExplicit);
+    static void constructFromPythonArgumentsConcrete(SetType* t, uint8_t* data, PyObject* args, PyObject* kwargs);
     static void mirrorTypeInformationIntoPyTypeConcrete(SetType* setType, PyTypeObject* pyType);
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit);
     static bool compare_to_python_concrete(SetType* setT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
