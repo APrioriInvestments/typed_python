@@ -1182,11 +1182,14 @@ class TypesSerializationTest(unittest.TestCase):
         d = numpy.ones(1000000)
         x = SerializationContext()
 
+        x.deserialize(x.serialize(d))
+
         usage = currentMemUsageMb()
-        for _ in range(10):
+
+        for passIx in range(30):
             x.deserialize(x.serialize(d))
 
-        self.assertLess(currentMemUsageMb(), usage+1)
+        self.assertLess(currentMemUsageMb(), usage+2)
 
     def test_deserialize_set_doesnt_leak(self):
         s = set(range(1000000))
