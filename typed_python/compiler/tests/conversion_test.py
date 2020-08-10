@@ -2081,7 +2081,7 @@ class TestCompilationStructures(unittest.TestCase):
                 self.assertEqual(r3, r4, (a, b))
 
     def test_context_manager_refcounts(self):
-        class ContextManaer(Class, Final):
+        class ContextManager(Class, Final):
             def __enter__(self):
                 pass
 
@@ -2090,7 +2090,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         @Entrypoint
         def f(x):
-            with ContextManaer():
+            with ContextManager():
                 return x
 
         a = ListOf(int)()
