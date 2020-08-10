@@ -62,7 +62,8 @@ vtable_type = native_ast.Type.Struct(
         ('heldTypePtr', native_ast.VoidPtr),
         ('destructorFun', native_destructor_function_type),
         ('classDispatchTable', class_dispatch_table_type.pointer()),
-        ('initializationBitsBytecount', native_ast.Int64)
+        ('initializationBitsBytecount', native_ast.Int64),
+        ('instanceCount', native_ast.Int64)
     ],
     name="VTable"
 )
@@ -155,6 +156,12 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             .cast(native_ast.UInt64)
             .bitand(native_ast.const_uint64_expr(0xFFFFFFFFFFFF))  # 48 bits of 1s
             .cast(self.layoutType)
+        )
+
+    def vtableInstanceCountPtr(self, instance):
+        return (
+            self.get_layout_pointer(instance.nonref_expr)
+            .ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 4)
         )
 
     def classDispatchTable(self, instance):
@@ -282,6 +289,10 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                         context.pushEffect(
                             self.convert_attribute(context, instance, i, nocheck=True).convert_destroy()
                         )
+
+        context.pushEffect(
+            self.vtableInstanceCountPtr(instance).atomic_add(-1)
+        )
 
         context.pushEffect(runtime_functions.tp_free.call(self.get_layout_pointer(instance.nonref_expr).cast(native_ast.UInt8Ptr)))
 
@@ -794,6 +805,10 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>
             # store the vtable
             out.expr.load().ElementPtrIntegers(0, 1).store(self.vtableExpr)
+        )
+
+        context.pushEffect(
+            self.vtableInstanceCountPtr(out).atomic_add(1)
         )
 
         # clear bits of init flags

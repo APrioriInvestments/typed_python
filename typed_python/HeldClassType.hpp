@@ -239,7 +239,8 @@ public:
     VTable(HeldClass* inClass) :
         mType(inClass),
         mCompiledDestructorFun(nullptr),
-        mDispatchTables(nullptr)
+        mDispatchTables(nullptr),
+        mInstanceCount(0)
     {
     }
 
@@ -281,6 +282,8 @@ public:
     // members are in this particular layout, so that we know how far ahead to look in
     // the object when we are looking up a particular data member.
     int64_t mInitializationBitByteCount;
+
+    std::atomic<int64_t> mInstanceCount;
 };
 
 //a class held directly inside of another object
@@ -425,6 +428,13 @@ public:
     }
 
     bool _updateAfterForwardTypesChanged();
+
+    // get a list of all the HeldClass objects in the system.
+    // note that this is protected by the GIL
+    static std::vector<HeldClass*>& getAllHeldClasses() {
+        static std::vector<HeldClass*> res;
+        return res;
+    }
 
     static HeldClass* Make(
         std::string inName,

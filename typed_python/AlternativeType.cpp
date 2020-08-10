@@ -248,6 +248,7 @@ void Alternative::destroy(instance_ptr self) {
 
     if (record.refcount.fetch_sub(1) == 1) {
         m_subtypes[record.which].second->destroy(record.data);
+        ((ConcreteAlternative*)concreteSubtype(record.which))->instanceCount() -= 1;
         tp_free(*(layout**)self);
     }
 }
@@ -284,7 +285,13 @@ Alternative* Alternative::Make(
                             const std::vector<std::pair<std::string, NamedTuple*> >& types,
                             const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
                             ) {
-    return new Alternative(name, moduleName, types, methods);
+    Alternative* res = new Alternative(name, moduleName, types, methods);
+
+    PyEnsureGilAcquired getTheGil;
+
+    getAllAlternatives().push_back(res);
+
+    return res;
 }
 
 Type* Alternative::concreteSubtype(size_t which) {
@@ -321,4 +328,8 @@ void Alternative::constructor(instance_ptr self) {
     }
 
     m_default_construction_type->constructor(self);
+}
+
+void Alternative::incInstanceCount(ConcreteAlternative* alt) {
+    alt->instanceCount() += 1;
 }

@@ -307,5 +307,11 @@ HeldClass* HeldClass::Make(
 
     result->endOfConstructorInitialization();
 
+    {
+        PyEnsureGilAcquired getTheGil;
+
+        getAllHeldClasses().push_back(result);
+    }
+
     return result;
 }

@@ -2014,3 +2014,32 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert _types.refcount(theB) == 2
         clearList(aList)
         assert _types.refcount(theB) == 1
+
+    def test_instance_counts_of_classes(self):
+        class C(Class):
+            pass
+
+        cs = ListOf(C)()
+        cs.append(C())
+
+        assert _types.getTypeInstanceCount(C.HeldClass) == 1
+
+        cs.resize(0)
+
+        assert _types.getTypeInstanceCount(C.HeldClass) == 0
+
+        @Entrypoint
+        def addOne(t):
+            t.append(C())
+
+        @Entrypoint
+        def dropOne(t):
+            t.pop()
+
+        addOne(cs)
+
+        assert _types.getTypeInstanceCount(C.HeldClass) == 1
+
+        dropOne(cs)
+
+        assert _types.getTypeInstanceCount(C.HeldClass) == 0

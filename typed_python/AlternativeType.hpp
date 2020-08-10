@@ -129,8 +129,12 @@ public:
         record.refcount = 1;
         record.which = which;
 
+        incInstanceCount((ConcreteAlternative*)concreteSubtype(which));
+
         m_subtypes[which].second->deserialize(record.data, buffer, fieldAndWire.second);
     }
+
+    static void incInstanceCount(ConcreteAlternative* alt);
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
 
@@ -183,6 +187,13 @@ public:
 
     std::string moduleName() const {
         return m_moduleName;
+    }
+
+    // get a list of all the HeldClass objects in the system.
+    // note that this is protected by the GIL
+    static std::vector<Alternative*>& getAllAlternatives() {
+        static std::vector<Alternative*> res;
+        return res;
     }
 
 private:

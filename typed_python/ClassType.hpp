@@ -207,6 +207,7 @@ public:
                     layout& record = *instanceToLayout(self);
                     record.refcount = 2;
                     record.vtable = m_heldClass->getVTable();
+                    record.vtable->mInstanceCount += 1;
 
                     buffer.addCachedPointer(id, instanceToLayout(self), this);
 
@@ -305,11 +306,13 @@ public:
         layout& l = *instanceToLayout(self);
         l.refcount = 1;
         l.vtable = m_heldClass->getVTable();
+        l.vtable->mInstanceCount += 1;
 
         try {
             m_heldClass->constructor(l.data, initializer);
         } catch (...) {
             tp_free(instanceToLayout(self));
+            l.vtable->mInstanceCount -= 1;
         }
     }
 
@@ -322,11 +325,13 @@ public:
         layout& l = *instanceToLayout(self);
         l.refcount = 1;
         l.vtable = m_heldClass->getVTable();
+        l.vtable->mInstanceCount += 1;
 
         try {
             initializer(l.data);
         } catch (...) {
             tp_free(instanceToLayout(self));
+            l.vtable->mInstanceCount -= 1;
         }
     }
 

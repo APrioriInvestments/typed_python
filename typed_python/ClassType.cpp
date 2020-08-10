@@ -206,6 +206,7 @@ void Class::constructor(instance_ptr self, bool allowEmpty) {
     layout& l = *instanceToLayout(self);
     l.refcount = 1;
     l.vtable = m_heldClass->getVTable();
+    l.vtable->mInstanceCount += 1;
 
     m_heldClass->constructor(l.data);
 }
@@ -219,6 +220,7 @@ void Class::destroy(instance_ptr self) {
 
     if (l.refcount.fetch_sub(1) == 1) {
         l.vtable->mType->destroy(l.data);
+        l.vtable->mInstanceCount -= 1;
         tp_free(instanceToLayout(self));
     }
 }
@@ -239,6 +241,7 @@ void Class::assign(instance_ptr self, instance_ptr other) {
 
     if (old->refcount.fetch_sub(1) == 1) {
         old->vtable->mType->destroy(old->data);
+        old->vtable->mInstanceCount -= 1;
         tp_free(old);
     }
 }

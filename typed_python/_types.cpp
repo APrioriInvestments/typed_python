@@ -530,6 +530,38 @@ PyObject* totalBytesAllocated(PyObject* nullValue, PyObject* args, PyObject* kwa
     return PyLong_FromLong(tp_total_bytes_allocated());
 }
 
+PyObject* getAllHeldClasses(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+        return NULL;
+    }
+
+    PyObject* res = PyList_New(0);
+
+    for (auto c: HeldClass::getAllHeldClasses()) {
+        PyList_Append(res, (PyObject*)PyInstance::typeObj(c));
+    }
+
+    return res;
+}
+
+PyObject* getAllAlternatives(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+        return NULL;
+    }
+
+    PyObject* res = PyList_New(0);
+
+    for (auto c: Alternative::getAllAlternatives()) {
+        PyList_Append(res, (PyObject*)PyInstance::typeObj(c));
+    }
+
+    return res;
+}
+
 PyObject *prepareArgumentToBePassedToCompiler(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     static const char *kwlist[] = {"obj", NULL};
 
@@ -617,6 +649,35 @@ PyObject *installClassDestructor(PyObject* nullValue, PyObject* args, PyObject* 
         HeldClass* heldImplementing = ((Class*)implementingClass)->getHeldClass();
 
         heldImplementing->getVTable()->installDestructor((destructor_fun_type)funcPtr);
+
+        return incref(Py_None);
+    });
+}
+
+PyObject *getTypeInstanceCount(PyObject* nullValue, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {"typeObj", NULL};
+
+    PyObject* pyTypeObj;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist, &pyTypeObj)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(pyTypeObj);
+
+        if (!t) {
+            throw std::runtime_error("Expected 'typeObj' to be a Type");
+        }
+
+        if (t->getTypeCategory() == Type::TypeCategory::catHeldClass) {
+            return PyLong_FromLong(((HeldClass*)t)->getVTable()->mInstanceCount);
+        }
+
+        if (t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+            return PyLong_FromLong(((ConcreteAlternative*)t)->instanceCount());
+        }
 
         return incref(Py_None);
     });
@@ -2336,6 +2397,9 @@ static PyMethodDef module_methods[] = {
     {"prepareArgumentToBePassedToCompiler", (PyCFunction)prepareArgumentToBePassedToCompiler, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setFunctionClosure", (PyCFunction)setFunctionClosure, METH_VARARGS | METH_KEYWORDS, NULL},
     {"totalBytesAllocated", (PyCFunction)totalBytesAllocated, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"getAllHeldClasses", (PyCFunction)getAllHeldClasses, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"getAllAlternatives", (PyCFunction)getAllAlternatives, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"getTypeInstanceCount", (PyCFunction)getTypeInstanceCount, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 

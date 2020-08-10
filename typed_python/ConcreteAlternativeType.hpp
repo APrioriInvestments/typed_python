@@ -26,7 +26,8 @@ public:
     ConcreteAlternative(Alternative* m_alternative, int64_t which) :
             Type(TypeCategory::catConcreteAlternative),
             m_alternative(m_alternative),
-            m_which(which)
+            m_which(which),
+            mInstanceCount(0)
     {
         endOfConstructorInitialization(); // finish initializing the type object.
     }
@@ -99,10 +100,13 @@ public:
             layout& record = **(layout**)self;
             record.refcount = 1;
             record.which = m_which;
+            mInstanceCount += 1;
+
             try {
                 s(record.data);
             } catch(...) {
                 tp_free(*(layout**)self);
+                mInstanceCount -= 1;
                 throw;
             }
         }
@@ -138,8 +142,14 @@ public:
         return m_which;
     }
 
+    std::atomic<int64_t>& instanceCount() {
+        return mInstanceCount;
+    }
+
 private:
     Alternative* m_alternative;
 
     int64_t m_which;
+
+    mutable std::atomic<int64_t> mInstanceCount;
 };
