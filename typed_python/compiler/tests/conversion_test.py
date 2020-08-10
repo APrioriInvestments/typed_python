@@ -2080,6 +2080,37 @@ class TestCompilationStructures(unittest.TestCase):
                 self.assertEqual(r1, r2, (a, b))
                 self.assertEqual(r3, r4, (a, b))
 
+    def test_context_manager_refcounts(self):
+        class ContextManaer(Class, Final):
+            def __enter__(self):
+                pass
+
+            def __exit__(self, a, b, c):
+                pass
+
+        @Entrypoint
+        def f(x):
+            with ContextManaer():
+                return x
+
+        a = ListOf(int)()
+        assert _types.refcount(a) == 1
+        f(a)
+        assert _types.refcount(a) == 1
+
+    def test_try_finally_refcounts(self):
+        @Entrypoint
+        def f(x):
+            try:
+                return x
+            finally:
+                pass
+
+        a = ListOf(int)()
+        assert _types.refcount(a) == 1
+        f(a)
+        assert _types.refcount(a) == 1
+
     def test_context_manager_functionality(self):
 
         class ConMan1():

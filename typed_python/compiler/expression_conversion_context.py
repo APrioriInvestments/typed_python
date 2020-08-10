@@ -362,7 +362,7 @@ class ExpressionConversionContext(object):
             ExpressionIntermediate.Effect(expression)
         )
 
-    def pushReturnValue(self, expression, isMove=False, blockName=None):
+    def pushReturnValue(self, expression, isMove=False):
         """Push an expression returning 'expression' in the current function context.
 
         If 'isMove', then don't incref the result.
@@ -385,17 +385,12 @@ class ExpressionConversionContext(object):
                 returnTarget.convert_copy_initialize(expression)
 
             self.pushTerminal(
-                native_ast.Expression.Return(arg=None, blockName=blockName)
+                native_ast.Expression.Return(arg=None)
             )
         else:
-            if blockName is not None:
-                self.pushTerminal(
-                    native_ast.Expression.Return(arg=None, blockName=blockName)
-                )
-            else:
-                self.pushTerminal(
-                    native_ast.Expression.Return(arg=expression.nonref_expr)
-                )
+            self.pushTerminal(
+                native_ast.Expression.Return(arg=expression.nonref_expr)
+            )
 
     def pushTerminal(self, expression):
         """Push a native expression that does not return control flow."""

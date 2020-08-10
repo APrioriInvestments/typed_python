@@ -690,3 +690,30 @@ class TestDictCompilation(unittest.TestCase):
         self.assertEqual(dict_assign_and_modify_original(d, 'q', 'b'), {'a': 1, 'c': 5, 'q': 7})
         d = Dict(str, int)({'a': 1, 'b': 3, 'c': 5})
         self.assertEqual(dict_copy_and_modify_original(d, 'q', 'b'), {'a': 1, 'b': 3, 'c': 5})
+
+    def test_dict_del_refcounts(self):
+        T = Dict(int, ListOf(int))
+
+        aDict = T()
+
+        aListOf = ListOf(int)()
+
+        aDict[1] = aListOf
+
+        assert _types.refcount(aListOf) == 2
+
+        del aDict[1]
+
+        assert _types.refcount(aListOf) == 1
+
+        aDict[1] = aListOf
+
+        assert _types.refcount(aListOf) == 2
+
+        @Entrypoint
+        def delOne(d):
+            del d[1]
+
+        delOne(aDict)
+
+        assert _types.refcount(aListOf) == 1

@@ -18,6 +18,7 @@ import time
 import queue
 from typed_python.typed_queue import TypedQueue
 from typed_python import ListOf, Entrypoint, Tuple
+from typed_python._types import refcount
 
 
 class TypedQueueTests(unittest.TestCase):
@@ -195,3 +196,13 @@ class TypedQueueTests(unittest.TestCase):
                 q.put(Tuple(int, int)((i, i)))
 
         otherThread(q)
+
+    def test_typed_queue_refcounts(self):
+        x = TypedQueue(ListOf(int))()
+        a = ListOf(int)()
+
+        x.put(a)
+        x.peek()
+        x.get()
+
+        assert refcount(a) == 1

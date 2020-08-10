@@ -1164,13 +1164,24 @@ class FunctionConversionContext(ConversionContextBase):
 
             if return_to is not None:
                 if try_flow:
-                    subcontext.pushEffect(try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_RETURN)))
+                    subcontext.pushEffect(
+                        try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_RETURN))
+                    )
                 self.assignToLocalVariable(".return_value", e, variableStates)
                 subcontext.pushEffect(runtime_functions.clear_exc_info.call())
 
-            subcontext.pushReturnValue(e, blockName=return_to)
+                subcontext.pushTerminal(
+                    native_ast.Expression.Return(
+                        arg=None,
+                        blockName=return_to
+                    )
+                )
 
-            return subcontext.finalize(None, exceptionsTakeFrom=ast), False
+                return subcontext.finalize(None, exceptionsTakeFrom=ast), False
+            else:
+                subcontext.pushReturnValue(e)
+
+                return subcontext.finalize(None, exceptionsTakeFrom=ast), False
 
         if ast.matches.Expr:
             subcontext = ExpressionConversionContext(self, variableStates)
