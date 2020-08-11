@@ -2086,7 +2086,7 @@ class TestCompilationStructures(unittest.TestCase):
                 pass
 
             def __exit__(self, a, b, c):
-                pass
+                return True
 
         @Entrypoint
         def f(x):
@@ -2100,15 +2100,24 @@ class TestCompilationStructures(unittest.TestCase):
 
     def test_try_finally_refcounts(self):
         @Entrypoint
-        def f(x):
+        def f1(x):
             try:
                 return x
             finally:
                 pass
 
+        @Entrypoint
+        def f2(x):
+            try:
+                pass
+            finally:
+                return x
+
         a = ListOf(int)()
         assert _types.refcount(a) == 1
-        f(a)
+        f1(a)
+        assert _types.refcount(a) == 1
+        f2(a)
         assert _types.refcount(a) == 1
 
     def test_context_manager_functionality(self):
