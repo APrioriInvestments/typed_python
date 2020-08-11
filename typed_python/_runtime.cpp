@@ -771,20 +771,100 @@ extern "C" {
         return ret;
     }
 
+    enum Codec { CODEC_UNKNOWN = 0, CODEC_UTF8 };
+    Codec CodecFromStr(const char *s) {
+        if (!s || !strcmp(s, "utf-8")
+                || !strcmp(s, "utf_8")
+                || !strcmp(s, "utf8")) {
+            return CODEC_UTF8;
+        }
+        return CODEC_UNKNOWN;
+    }
+
+    enum ErrHandler { ERH_UNKNOWN = 0, ERH_STRICT = 1, ERH_IGNORE = 2, ERH_REPLACE = 3 };
+    ErrHandler ErrHandlerFromStr(const char *s) {
+        if (!s || !strcmp(s, "strict")) {
+            return ERH_STRICT;
+        } else if (!strcmp(s, "ignore")) {
+            return ERH_IGNORE;
+        } else if (!strcmp(s, "replace")) {
+            return ERH_IGNORE;
+        } else {
+            return ERH_UNKNOWN;
+        }
+    }
+
+BytesType::layout* encodeUtf8(StringType::layout *l, ErrHandler err) {
+        int64_t max_ret_bytes_per_codepoint = l ? (l->bytes_per_codepoint < 4 ? l->bytes_per_codepoint + 1 : 4) : 0;
+        int64_t max_ret_size = l ? l->pointcount * max_ret_bytes_per_codepoint : 0;
+
+        BytesType::layout* out = (BytesType::layout*)malloc(sizeof(BytesType::layout) + max_ret_size);
+        out->refcount = 1;
+        out->hash_cache = -1;
+        out->bytecount = 0;
+        if (!l || !l->pointcount) return out;
+
+        int64_t cur = 0;
+        for (int64_t i = 0; i < l->pointcount; i++) {
+            uint32_t c = StringType::getpoint(l, i);
+            if (c < 0x80) {
+                out->data[cur++] = (uint8_t)c;
+            } else if (c < 0x800) {
+                out->data[cur++] = 0xC0 | (c >> 6);
+                out->data[cur++] = 0x80 | (c & 0x3F);
+            } else if (c < 0x10000) {
+                out->data[cur++] = 0xE0 | (c >> 12);
+                out->data[cur++] = 0x80 | ((c >> 6) & 0x3F);
+                out->data[cur++] = 0x80 | (c & 0x3F);
+            } else if (c < 0x110000) {
+                out->data[cur++] = 0xF0 | (c >> 18);
+                out->data[cur++] = 0x80 | ((c >> 12) & 0x3F);
+                out->data[cur++] = 0x80 | ((c >> 6) & 0x3F);
+                out->data[cur++] = 0x80 | (c & 0x3F);
+            } else if (err == ERH_REPLACE) {
+                const uint32_t rc = 0xFFFD;
+                out->data[cur++] = 0xE0 | (rc >> 12);
+                out->data[cur++] = 0x80 | ((rc >> 6) & 0x3F);
+                out->data[cur++] = 0x80 | (rc & 0x3F);
+            } else if (err == ERH_STRICT) {
+                throw std::runtime_error("corrupt utf-8 codepoint");
+            } // else err == ERH_IGNORE
+        }
+
+        out->bytecount = cur;
+        if (out->bytecount < max_ret_size) {
+            out = (BytesType::layout*)realloc(out, sizeof(BytesType::layout) + out->bytecount);
+        }
+
+        return out;
+    }
+
     BytesType::layout* nativepython_runtime_str_encode(
             StringType::layout* l,
             StringType::layout* encoding,
             StringType::layout* errors
     ) {
+        char* c_encoding = encoding ? strdup(StringType::Make()->toUtf8String((instance_ptr)&encoding).c_str()) : 0;
+        const char* c_errors = errors ? StringType::Make()->toUtf8String((instance_ptr)&errors).c_str() : 0;
+        Codec codec = CodecFromStr(c_encoding);
+        if (codec) {
+            ErrHandler errhandler = ErrHandlerFromStr(c_errors);
+            if (errhandler) {
+                if (codec == CODEC_UTF8) {
+                    free(c_encoding);
+                    return encodeUtf8(l, errhandler);
+                }
+            }
+        }
+
         PyEnsureGilAcquired getTheGil;
 
         PyObject* s = PyInstance::extractPythonObject((instance_ptr)&l, StringType::Make());
         if (!s) {
+            free(c_encoding);
             throw PythonExceptionSet();
         }
 
-        char* c_encoding = encoding ? strdup(StringType::Make()->toUtf8String((instance_ptr)&encoding).c_str()) : 0;
-        const char* c_errors = errors ? StringType::Make()->toUtf8String((instance_ptr)&errors).c_str() : 0;
         PyObject* b = PyUnicode_AsEncodedString(s, c_encoding, c_errors);
         free(c_encoding);
         decref(s);

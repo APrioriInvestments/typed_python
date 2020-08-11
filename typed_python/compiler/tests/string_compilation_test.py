@@ -893,3 +893,57 @@ class TestStringCompilation(unittest.TestCase):
                         r1 = callOrExceptType(f, v, enc, err)
                         r2 = callOrExceptType(Entrypoint(f), v, enc, err)
                         self.assertEqual(r1, r2)
+
+    def test_string_codec_perf(self):
+        repeat = 500
+        s1 = ''.join([chr(i) for i in range(0, 0x10ffff, 13) if i < 0xD800 or i > 0xDFFF])
+        s2 = ''.join([chr(i) for i in range(1, 0x10ffff, 17) if i < 0xD800 or i > 0xDFFF])
+        s3 = ''.join([chr(i) for i in range(2, 0x10ffff, 11) if i < 0xD800 or i > 0xDFFF])
+        cases = [s1, s2, s3]
+        for i in [2**n for n in range(16)]:
+            cases += [s1[1:i], s2[1:i], s3[1:i]]
+        Cases = ListOf(str)(cases)
+
+        def f_endecode(s: str) -> bool:
+            # s2 = s.encode('utf-8', 'strict').decode('utf-8', 'strict')
+            s2 = s.encode('utf-8', 'strict')
+            return s == s2
+
+        def f_endecode2(cases: ListOf(str)) -> bool:
+            # s2 = s.encode('utf-8', 'strict').decode('utf-8', 'strict')
+            ret = True
+            for _ in range(1000):
+                for s in cases:
+                    s2 = s.encode('utf-8', 'strict')
+                    ret &= (s == s2)
+            return ret
+
+        verify = True
+        t0 = time.time()
+        for _ in range(repeat):
+            for v in cases:
+                verify &= f_endecode(v)
+        t1 = time.time()
+        print("baseline ", t1 - t0)
+        # self.assertTrue(verify)
+
+        c_endecode = Compiled(f_endecode)
+        verify = True
+        t2 = time.time()
+        for _ in range(repeat):
+            for v in Cases:
+                verify &= c_endecode(v)
+        t3 = time.time()
+        print("compiled ", t3 - t2)
+        # self.assertTrue(verify)
+
+        t0 = time.time()
+        f_endecode2(Cases)
+        t1 = time.time()
+        print("baseline2 ", t1 - t0)
+
+        c_endecode2 = Compiled(f_endecode2)
+        t2 = time.time()
+        c_endecode2(Cases)
+        t3 = time.time()
+        print("compiled2 ", t3 - t2)

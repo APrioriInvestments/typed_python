@@ -690,7 +690,7 @@ int64_t StringType::bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int
             utf8Str++;
         } else if (utf8Str[0] >> 5 == 0b110) {
             length -= 1;
-            utf8Str+=2;
+            utf8Str += 2;
             bytes_per_codepoint = std::max<int64_t>(2, bytes_per_codepoint);
         } else if (utf8Str[0] >> 4 == 0b1110) {
             length -= 1;
@@ -698,7 +698,7 @@ int64_t StringType::bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int
             bytes_per_codepoint = std::max<int64_t>(2, bytes_per_codepoint);
         } else if (utf8Str[0] >> 3 == 0b11110) {
             length -= 1;
-            utf8Str+=4;
+            utf8Str += 4;
             bytes_per_codepoint = std::max<int64_t>(4, bytes_per_codepoint);
         } else {
             throw std::runtime_error("Improperly formatted unicode string.");
@@ -1342,7 +1342,6 @@ bool StringType::to_float64(StringType::layout* s, double* value) {
         return false;
     }
 }
-
 
 StringType::layout* StringType::mult(layout* lhs, int64_t rhs) {
     if (!lhs) {
