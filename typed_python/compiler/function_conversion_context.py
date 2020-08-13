@@ -1168,7 +1168,14 @@ class FunctionConversionContext(ConversionContextBase):
                         try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_RETURN))
                     )
                 self.assignToLocalVariable(".return_value", e, variableStates)
-                subcontext.pushEffect(runtime_functions.clear_exc_info.call())
+
+                if False:  # self.isLocalVariable(".exception_occurred"):
+                    subcontext.pushEffect(
+                        native_ast.Expression.Branch(
+                            cond=self.localVariableExpression(".exception_occurred"),
+                            true=runtime_functions.clear_exc_info.call()
+                        )
+                    )
 
                 subcontext.pushTerminal(
                     native_ast.Expression.Return(
@@ -1299,7 +1306,7 @@ class FunctionConversionContext(ConversionContextBase):
             # .exception_occurred turns on once any exception occurs
             # .control_flow indicates the control flow instruction that is deferred until after the 'finally' block
             #   0=default, 1=unhandled exception, 2=break, 3=continue, 4=return
-            exception_occurred = native_ast.Expression.StackSlot(name=f".exception_occurred{ast.line_number}", type=native_ast.Bool)
+            exception_occurred = native_ast.Expression.StackSlot(name=f".exception_occurred", type=native_ast.Bool)
             control_flow = native_ast.Expression.StackSlot(name=f".control_flow{ast.line_number}", type=native_ast.Int64)
 
             body_context = ExpressionConversionContext(self, variableStates)
