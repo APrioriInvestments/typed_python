@@ -955,7 +955,13 @@ PyTypeObject* PyInstance::allTypesBaseType() {
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
             .tp_dealloc = PyInstance::tp_dealloc,       // destructor
-            .tp_print = 0,                              // printfunc
+
+            #if PY_MINOR_VERSION < 8
+            .tp_print = 0,                              // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
+            #else
+            .tp_vectorcall_offset = 0,                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
+            #endif
+
             .tp_getattr = 0,                            // getattrfunc
             .tp_setattr = 0,                            // setattrfunc
             .tp_as_async = 0,                           // PyAsyncMethods*
@@ -999,6 +1005,11 @@ PyTypeObject* PyInstance::allTypesBaseType() {
             .tp_del = 0,                                // destructor
             .tp_version_tag = 0,                        // unsigned int
             .tp_finalize = 0,                           // destructor
+
+            #if PY_MINOR_VERSION >= 8
+            .tp_vectorcall = 0,
+            .tp_print = 0,
+            #endif
         };
 
         PyType_Ready(result);
@@ -1025,7 +1036,13 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
             .tp_dealloc = PyInstance::tp_dealloc,       // destructor
+
+            #if PY_MINOR_VERSION < 8
             .tp_print = 0,                              // printfunc
+            #else
+            .tp_vectorcall_offset = 0,                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
+            #endif
+
             .tp_getattr = 0,                            // getattrfunc
             .tp_setattr = 0,                            // setattrfunc
             .tp_as_async = 0,                           // PyAsyncMethods*
@@ -1069,6 +1086,11 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
             .tp_del = 0,                                // destructor
             .tp_version_tag = 0,                        // unsigned int
             .tp_finalize = 0,                           // destructor
+
+            #if PY_MINOR_VERSION >= 8
+            .tp_vectorcall = 0,
+            .tp_print = 0,
+            #endif
             },
             category
         };
@@ -1125,7 +1147,13 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
             .tp_dealloc = PyInstance::tp_dealloc,       // destructor
+
+            #if PY_MINOR_VERSION < 8
             .tp_print = 0,                              // printfunc
+            #else
+            .tp_vectorcall_offset = 0,                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
+            #endif
+
             .tp_getattr = 0,                            // getattrfunc
             .tp_setattr = 0,                            // setattrfunc
             .tp_as_async = 0,                           // PyAsyncMethods*
@@ -1179,6 +1207,11 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_del = 0,                                // destructor
             .tp_version_tag = 0,                        // unsigned int
             .tp_finalize = 0,                           // destructor
+
+            #if PY_MINOR_VERSION >= 8
+            .tp_vectorcall = 0,
+            .tp_print = 0,
+            #endif
             },
         inType
     };
