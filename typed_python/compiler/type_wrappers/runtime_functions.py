@@ -473,6 +473,12 @@ pyobj_to_typed = externalCallTarget(
     canThrow=True
 )
 
+# trace_log =externalCallTarget(
+#     "np_trace_log",
+#     Void,
+#     Int64
+# )
+
 add_traceback = externalCallTarget(
     "np_add_traceback",
     Void,

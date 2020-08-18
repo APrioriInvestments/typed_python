@@ -788,11 +788,13 @@ extern "C" {
     void np_fetch_exception_tuple(instance_ptr inst) {
         PyEnsureGilAcquired getTheGil;
 
-        static Type* return_type = Tuple::Make({
-            PythonObjectOfType::AnyPyObject(),
-            PythonObjectOfType::AnyPyObject(),
-            PythonObjectOfType::AnyPyObject()
-        });
+        // Strangely, this statement segfaults when run within PyCharm.
+        // When I move this to "This works here" below, it no longer segfaults.
+        // static Type* return_type = Tuple::Make({
+        //     PythonObjectOfType::AnyPyObject(),
+        //     PythonObjectOfType::AnyPyObject(),
+        //     PythonObjectOfType::AnyPyObject()
+        // });
 
         PyObject* type;
         PyObject* value;
@@ -810,6 +812,13 @@ extern "C" {
         PyTuple_SetItem(p, 0, type ? type : incref(Py_None));
         PyTuple_SetItem(p, 1, value ? value : incref(Py_None));
         PyTuple_SetItem(p, 2, traceback ? traceback : incref(Py_None));
+
+        // This works here. (See comment above.)
+        static Type* return_type = Tuple::Make({
+            PythonObjectOfType::AnyPyObject(),
+            PythonObjectOfType::AnyPyObject(),
+            PythonObjectOfType::AnyPyObject()
+        });
 
         PyInstance::copyConstructFromPythonInstance(return_type, inst, p, true);
 
