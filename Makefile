@@ -110,7 +110,7 @@ clean:
 	echo "export PYTHONPATH=$(PWD)" >> $@
 
 $(VIRTUAL_ENV): $(PYTHON) .env
-	virtualenv $(VIRTUAL_ENV) --python=$(PYTHON)
+	$(PYTHON) -m venv $(VIRTUAL_ENV)
 
 $(TP_BUILD_PATH)/all.o: $(TP_SRC_PATH)/*.hpp $(TP_SRC_PATH)/*.cpp
 	$(CC) $(CPP_FLAGS) -c $(TP_SRC_PATH)/all.cpp $ -o $@
