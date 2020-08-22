@@ -14,6 +14,7 @@
 
 import time
 import traceback
+import threading
 import unittest
 from flaky import flaky
 import psutil
@@ -2920,3 +2921,33 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert eltTypeOf(ListOf(int)) == int
         assert eltTypeOf(ListOf(int)()) == int
+
+    def test_function_entrypoint_multithreaded(self):
+        def makeAFunction(x):
+            T = OneOf(None, x)
+
+            def aFunction() -> T:
+                return x
+
+            return aFunction
+
+        assert type(Function(makeAFunction('a'))) is type(Function(makeAFunction('a'))) # noqa
+        assert type(Function(makeAFunction('b'))) is not type(Function(makeAFunction('a'))) # noqa
+
+        for c in range(10000):
+            if c % 100 == 0:
+                print("PASS ", c)
+            overloads = []
+
+            def wrapFunction(f):
+                overloads.append(Function(f).overloads)
+
+            f = makeAFunction(str(c))
+            threads = [threading.Thread(target=wrapFunction, args=(f,)) for _ in range(2)]
+            for t in threads:
+                t.start()
+
+            for t in threads:
+                t.join(.1)
+
+            assert len(overloads) == 2
