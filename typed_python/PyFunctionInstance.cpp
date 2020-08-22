@@ -434,6 +434,15 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
         throw std::runtime_error("Internal error: couldn't find typed_python.internals.CellAccess");
     }
 
+    static PyObject* funcOverloadArg = PyObject_GetAttrString(internalsModule, "FunctionOverloadArg");
+
+    if (!funcOverloadArg) {
+        throw std::runtime_error("Internal error: couldn't find typed_python.internals.FunctionOverloadArg");
+    }
+
+
+
+
     PyObjectStealer overloadTuple(PyTuple_New(f->getOverloads().size()));
 
     for (long k = 0; k < f->getOverloads().size(); k++) {
@@ -475,48 +484,50 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
             PyDict_SetItemString(pyClosureVarsDict, nameAndClosureVar.first.c_str(), bindingObj);
         }
 
-        PyObjectStealer pyOverloadInst(
-            //PyObject_CallFunctionObjArgs is a macro, so we have to force all the 'stealers'
-            //to have type (PyObject*)
-            PyObject_CallFunctionObjArgs(
-                funcOverload,
-                typePtrToPyTypeRepresentation(f),
-                (PyObject*)pyIndex,
-                (PyObject*)overload.getFunctionCode(),
-                (PyObject*)overload.getFunctionGlobals(),
-                (PyObject*)pyGlobalCellDict,
-                (PyObject*)pyClosureVarsDict,
-                overload.getReturnType() ? (PyObject*)typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None,
-                NULL
-                )
+        PyObjectStealer emptyTup(PyTuple_New(0));
+        PyObjectStealer emptyDict(PyDict_New());
+
+        // note that we can't actually call into the Python interpreter during this call,
+        // because that can release the GIL and allow other threads to access our type
+        // object before it's done.
+        PyObjectStealer argsTup(PyTuple_New(f->getOverloads()[k].getArgs().size()));
+
+        for (long argIx = 0; argIx < f->getOverloads()[k].getArgs().size(); argIx++) {
+            auto arg = f->getOverloads()[k].getArgs()[argIx];
+
+            PyObjectStealer pyArgInst(
+                ((PyTypeObject*)funcOverloadArg)->tp_new((PyTypeObject*)funcOverloadArg, emptyTup, emptyDict)
             );
 
-        if (pyOverloadInst) {
-            for (auto arg: f->getOverloads()[k].getArgs()) {
-                PyObjectStealer res(
-                    PyObject_CallMethod(
-                        (PyObject*)pyOverloadInst,
-                        "addArg",
-                        "sOOOO",
-                        arg.getName().c_str(),
-                        arg.getDefaultValue() ? PyTuple_Pack(1, arg.getDefaultValue()) : Py_None,
-                        arg.getTypeFilter() ? (PyObject*)typePtrToPyTypeRepresentation(arg.getTypeFilter()) : Py_None,
-                        arg.getIsStarArg() ? Py_True : Py_False,
-                        arg.getIsKwarg() ? Py_True : Py_False
-                        )
-                    );
+            PyObjectStealer pyArgInstDict(PyObject_GenericGetDict(pyArgInst, nullptr));
 
-                if (!res) {
-                    PyErr_PrintEx(0);
-                }
-            }
+            PyObjectStealer pyName(PyUnicode_FromString(arg.getName().c_str()));
+            PyDict_SetItemString(pyArgInstDict, "name", pyName);
+            PyDict_SetItemString(pyArgInstDict, "defaultValue", arg.getDefaultValue() ? PyTuple_Pack(1, arg.getDefaultValue()) : Py_None);
+            PyDict_SetItemString(pyArgInstDict, "_typeFilter", arg.getTypeFilter() ? (PyObject*)typePtrToPyTypeRepresentation(arg.getTypeFilter()) : Py_None);
+            PyDict_SetItemString(pyArgInstDict, "isStarArg", arg.getIsStarArg() ? Py_True : Py_False);
+            PyDict_SetItemString(pyArgInstDict, "isKwarg", arg.getIsKwarg() ? Py_True : Py_False);
 
-            PyTuple_SetItem(overloadTuple, k, incref(pyOverloadInst));
-        } else {
-            std::cout << "WARNING: error creating a python function out of a Function instance:\n";
-            PyErr_PrintEx(0);
-            PyTuple_SetItem(overloadTuple, k, incref(Py_None));
+            PyTuple_SetItem(argsTup, argIx, incref(pyArgInst));
         }
+
+        PyObjectStealer pyOverloadInst(
+            ((PyTypeObject*)funcOverload)->tp_new((PyTypeObject*)funcOverload, emptyTup, emptyDict)
+        );
+
+        PyObjectStealer pyOverloadInstDict(PyObject_GenericGetDict(pyOverloadInst, nullptr));
+
+        PyDict_SetItemString(pyOverloadInstDict, "functionTypeObject", typePtrToPyTypeRepresentation(f));
+        PyDict_SetItemString(pyOverloadInstDict, "index", (PyObject*)pyIndex);
+        PyDict_SetItemString(pyOverloadInstDict, "closureVarLookups", (PyObject*)pyClosureVarsDict);
+        PyDict_SetItemString(pyOverloadInstDict, "functionCode", (PyObject*)overload.getFunctionCode());
+        PyDict_SetItemString(pyOverloadInstDict, "functionGlobals", (PyObject*)overload.getFunctionGlobals());
+        PyDict_SetItemString(pyOverloadInstDict, "funcGlobalsInCells", (PyObject*)pyGlobalCellDict);
+        PyDict_SetItemString(pyOverloadInstDict, "returnType", overload.getReturnType() ? (PyObject*)typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None);
+        PyDict_SetItemString(pyOverloadInstDict, "_realizedGlobals", Py_None);
+        PyDict_SetItemString(pyOverloadInstDict, "args", argsTup);
+
+        PyTuple_SetItem(overloadTuple, k, incref(pyOverloadInst));
     }
 
     return incref(overloadTuple);
@@ -564,8 +575,7 @@ std::string PyFunctionInstance::argTupleTypeDescription(PyObject* self, PyObject
 }
 
 void PyFunctionInstance::mirrorTypeInformationIntoPyTypeConcrete(Function* inType, PyTypeObject* pyType) {
-    //expose a list of overloads
-    PyObjectStealer overloads(createOverloadPyRepresentation(inType));
+    PyObjectHolder overloads(createOverloadPyRepresentation(inType));
 
     if (!overloads) {
         throw PythonExceptionSet();
