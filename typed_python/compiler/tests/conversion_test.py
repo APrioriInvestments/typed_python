@@ -63,10 +63,10 @@ def result_or_exception_tb(f, *p):
 
 
 def repeat_test(f, *a):
-    for i in range(300):
+    for i in range(2000):
         try:
             f(*a)
-        except Exception:
+        except Exception as e:  # noqa:F841
             pass
 
 
@@ -2430,6 +2430,52 @@ class TestCompilationStructures(unittest.TestCase):
                                         self.assertEqual(r1, r2, (a, b, c, d))
                                         self.assertEqual(t1, t2, (a, b, c, d))
 
+    def test_context_manager_perf2(self):
+        class CM():
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                return True
+
+        def f():
+            with CM():
+                raise NotImplementedError()
+
+        def repeat_a():
+            for i in range(1000):
+                try:
+                    f()
+                except Exception as e:  # noqa: F841
+                    pass
+            return 1/0
+
+        def repeat_b():
+            for i in range(1000):
+                try:
+                    Compiled(f)()
+                except Exception as e:  # noqa: F841
+                    pass
+            return 1/0
+
+        # repeat_a()
+        # produces ZeroDivisionError
+
+        repeat_b()
+        # NotImplementedError x 1000, then 'RecursionError: maximum recursion depth exceeded while calling a Python object',
+        # not ZeroDivisionError!
+        # if range(1000) is replaced with range(100), then just get ZeroDivisionError
+
+        return
+        # repeat_a(Compiled(with_cm_simple1))
+        # for _ in range(1000):
+        #      try:
+        #          Compiled(with_cm_simple1)
+        #      except Exception:
+        #          pass
+        ratio = 1 / 0
+        print(ratio)
+
     @pytest.mark.skip(reason="max recursion exceeeded - need to fix this")
     def test_context_manager_perf(self):
 
@@ -2469,8 +2515,12 @@ class TestCompilationStructures(unittest.TestCase):
                     raise NotImplementedError()
                 return self.c == 1
 
-        def with_cm_simple1(a, b, c, d) -> int:
+        def with_cm_simple0(a: int, b: int, c: int, d: int) -> int:
+            with ConMan1(a, b, c):
+                pass
+            return 2
 
+        def with_cm_simple1(a: int, b: int, c: int, d: int) -> int:
             with ConMan1(a, b, c):
                 if d == 1:
                     raise ZeroDivisionError()
@@ -2487,12 +2537,14 @@ class TestCompilationStructures(unittest.TestCase):
             return 2
 
         perf_test_cases = [
-            (with_cm_simple1, with_cm_simple2, (0, 0, 0, 0), 1.0),
-            (with_cm_simple1, with_cm_simple2, (0, 0, 0, 1), 1.0),
-            (with_cm_simple1, with_cm_simple2, (0, 0, 1, 0), 1.0),
-            (with_cm_simple1, with_cm_simple2, (0, 0, 1, 1), 1.0),
-            (with_cm_simple1, with_cm_simple2, (0, 1, 0, 0), 1.0),
-            (with_cm_simple1, with_cm_simple2, (1, 0, 0, 0), 1.0),
+            # (with_cm_simple0, Compiled(with_cm_simple0), (0, 0, 0, 0), 1.0),
+            (with_cm_simple1, Compiled(with_cm_simple1), (0, 0, 1, 1), 1.0),
+            # (with_cm_simple1, with_cm_simple2, (0, 0, 0, 0), 1.0),
+            # (with_cm_simple1, with_cm_simple2, (0, 0, 0, 1), 1.0),
+            # (with_cm_simple1, with_cm_simple2, (0, 0, 1, 0), 1.0),
+            # (with_cm_simple1, with_cm_simple2, (0, 0, 1, 1), 1.0),
+            # (with_cm_simple1, with_cm_simple2, (0, 1, 0, 0), 1.0),
+            # (with_cm_simple1, with_cm_simple2, (1, 0, 0, 0), 1.0),
         ]
 
         for f1, f2, a, limit in perf_test_cases:
@@ -2503,11 +2555,11 @@ class TestCompilationStructures(unittest.TestCase):
             m1 = psutil.Process().memory_info().rss / 1024
 
             # burn in the compiler
-            repeat_test_compiled(f2, *a)
+            repeat_test(f2, *a)
 
             m2 = psutil.Process().memory_info().rss / 1024
             t2 = time.time()
-            repeat_test_compiled(f2, *a)
+            repeat_test(f2, *a)
             t3 = time.time()
             m3 = psutil.Process().memory_info().rss / 1024
 

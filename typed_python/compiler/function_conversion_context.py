@@ -1659,9 +1659,7 @@ class FunctionConversionContext(ConversionContextBase):
             # finally:
             #     if not hit_except:
             #         exit(manager, None, None, None)
-            #             assert len(ast.items) == 1
 
-            # TODO: 'with' with multiple context managers
             # with A() as a, B() as b:
             #     SUITE
             #
