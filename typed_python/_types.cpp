@@ -1343,6 +1343,17 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
 }
 
 
+PyObject *setFunctionClosure(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "setFunctionClosure takes 2 positional arguments");
+        return NULL;
+    }
+
+    PyFunction_SetClosure(PyTuple_GetItem(args, 0), PyTuple_GetItem(args, 1));
+
+    return incref(Py_None);
+}
+
 PyObject *createPyCell(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "createPyCell takes 1 positional argument");
@@ -2313,6 +2324,7 @@ static PyMethodDef module_methods[] = {
     {"classGetDispatchIndex", (PyCFunction)classGetDispatchIndex, METH_VARARGS | METH_KEYWORDS, NULL},
     {"getDispatchIndexForType", (PyCFunction)getDispatchIndexForType, METH_VARARGS | METH_KEYWORDS, NULL},
     {"prepareArgumentToBePassedToCompiler", (PyCFunction)prepareArgumentToBePassedToCompiler, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"setFunctionClosure", (PyCFunction)setFunctionClosure, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 

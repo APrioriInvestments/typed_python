@@ -43,7 +43,7 @@ from typed_python import (
     Forward, Final, Function, Entrypoint, TypeFunction, PointerTo
 )
 
-from typed_python._types import refcount, isRecursive, identityHash, buildPyFunctionObject
+from typed_python._types import refcount, isRecursive, identityHash, buildPyFunctionObject, setFunctionClosure
 
 module_level_testfun = dummy_test_module.testfunction
 
@@ -2042,3 +2042,17 @@ class TypesSerializationTest(unittest.TestCase):
         lenProxyDeserialized = sc.deserialize(sc.serialize(lenProxyWithNonstandardGlobals))
 
         assert lenProxyDeserialized("asdf") == 4
+
+    def test_set_closure_doesnt_leak(self):
+        def makeFunWithClosure(x):
+            def f():
+                return x
+            return f
+
+        aFun = makeFunWithClosure(10)
+
+        mem = currentMemUsageMb()
+        for i in range(1000000):
+            setFunctionClosure(aFun, makeFunWithClosure(20).__closure__)
+
+        assert currentMemUsageMb() < mem + 1
