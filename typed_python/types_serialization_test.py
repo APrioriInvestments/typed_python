@@ -1191,6 +1191,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+2)
 
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_deserialize_set_doesnt_leak(self):
         s = set(range(1000000))
         x = SerializationContext()
@@ -1219,6 +1220,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+1)
 
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_deserialize_list_doesnt_leak(self):
         s = list(range(1000000))
         x = SerializationContext()
