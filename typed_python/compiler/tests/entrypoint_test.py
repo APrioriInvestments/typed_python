@@ -20,6 +20,7 @@ from typed_python._types import touchCompiledSpecializations
 from typed_python import Entrypoint, NotCompiled
 from typed_python.compiler.runtime import Runtime, RuntimeEventVisitor
 from flaky import flaky
+import pytest
 import traceback
 import threading
 import time
@@ -292,6 +293,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertTrue(.7 <= ratio <= 1.3, ratio)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_sequential_append_performance(self):
         @Entrypoint
         def cumSum1(x):

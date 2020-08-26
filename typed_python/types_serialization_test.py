@@ -1165,6 +1165,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(d2['recurses']['recurses']['hi'], 'bye')
 
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_serialize_dict_doesnt_leak(self):
         T = Dict(int, int)
         d = T({i: i+1 for i in range(100)})
@@ -1178,6 +1179,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+1)
 
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_serialize_array_doesnt_leak(self):
         d = numpy.ones(1000000)
         x = SerializationContext()
@@ -1191,6 +1193,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+2)
 
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_deserialize_set_doesnt_leak(self):
         s = set(range(1000000))
         x = SerializationContext()
@@ -1205,6 +1208,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+1)
 
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_deserialize_tuple_doesnt_leak(self):
         s = tuple(range(1000000))
         x = SerializationContext()
@@ -1219,6 +1223,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+1)
 
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_deserialize_list_doesnt_leak(self):
         s = list(range(1000000))
         x = SerializationContext()
@@ -1233,6 +1238,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+1)
 
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_deserialize_class_doesnt_leak(self):
         class C(Class, Final):
             x = Member(int)
@@ -2043,6 +2049,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert lenProxyDeserialized("asdf") == 4
 
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_set_closure_doesnt_leak(self):
         def makeFunWithClosure(x):
             def f():
