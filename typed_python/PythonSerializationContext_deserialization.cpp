@@ -118,7 +118,11 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
 
     if (memo != -1) {
         if (!b.lookupCachedPointer(memo)) {
-            throw std::runtime_error("FAILED to populate memo=" + format(memo));
+            if (result) {
+                throw std::runtime_error("FAILED to populate memo=" + format(memo));
+            } else {
+                throw std::runtime_error("FAILED: no result, and we had memo=" + format(memo));
+            }
         }
     }
 

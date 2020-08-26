@@ -37,12 +37,10 @@ def createEmptyFunction(ast):
     return evaluateFunctionPyAst(ast, stripAnnotations=True)
 
 
-def createFunctionWithLocalsAndGlobals(code, globals, closure):
+def createFunctionWithLocalsAndGlobals(code, globals):
     if globals is None:
         globals = {}
-    if closure is None:
-        closure = ()
-    return _types.buildPyFunctionObject(code, globals, closure)
+    return _types.buildPyFunctionObject(code, globals, ())
 
 
 def astToCodeObject(ast, freevars):
@@ -458,12 +456,15 @@ class SerializationContext(object):
             representation["annotations"] = inst.__annotations__
             representation["defaults"] = inst.__defaults__
             representation["kwdefaults"] = inst.__kwdefaults__
+            representation["closure"] = inst.__closure__
 
             globalsToUse = None
 
             if self.nameForObject(inst.__globals__) is not None:
                 globalsToUse = inst.__globals__
             else:
+                globalsToUse = {}
+
                 all_names = set(['__builtins__'])
 
                 def walkCodeObject(code):
@@ -475,16 +476,11 @@ class SerializationContext(object):
 
                 walkCodeObject(inst.__code__)
 
-                globalsToUse = {k: v for k, v in inst.__globals__.items() if k in all_names}
-
-            localsInCells = {}
-            for ix, x in enumerate(inst.__code__.co_freevars):
-                localsInCells[x] = inst.__closure__[ix].cell_contents
+                representation['globals'] = {k: v for k, v in inst.__globals__.items() if k in all_names}
 
             args = (
                 inst.__code__,
-                globalsToUse,
-                inst.__closure__
+                globalsToUse
             )
 
             return (createFunctionWithLocalsAndGlobals, args, representation)
@@ -539,6 +535,11 @@ class SerializationContext(object):
             instance.__annotations__ = representation.get('annotations', {})
             instance.__kwdefaults__ = representation.get('kwdefaults', {})
             instance.__defaults__ = representation.get('defaults', ())
+
+            if 'globals' in representation:
+                instance.__globals__.update(representation['globals'])
+
+            _types.setFunctionClosure(instance, representation['closure'])
 
             return True
 
