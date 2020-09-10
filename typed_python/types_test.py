@@ -6,7 +6,7 @@
 #
 #       http://www.apache.org/licenses/LICENSE-2.0
 #
-#   Unless required by applicable law or agreed to in writing, software
+#   Unless required by apBug fix to frontend display. plicable law or agreed to in writing, software
 #   distributed under the License is distributed on an "AS IS" BASIS,
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
@@ -25,15 +25,37 @@ import typed_python._types as _types
 from flaky import flaky
 from typed_python import (
     Value,
-    Int8, Int16, Int32,
-    UInt8, UInt16, UInt32, UInt64,
+    Int8,
+    Int16,
+    Int32,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
     Float32,
-    TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
-    ConstDict, Alternative, serialize, deserialize, Class,
-    TypeFilter, Function, Forward, Set, PointerTo, Entrypoint
+    TupleOf,
+    ListOf,
+    OneOf,
+    Tuple,
+    NamedTuple,
+    Dict,
+    ConstDict,
+    Alternative,
+    serialize,
+    deserialize,
+    Class,
+    TypeFilter,
+    Function,
+    Forward,
+    Set,
+    PointerTo,
+    Entrypoint,
 )
 from typed_python.type_promotion import (
-    computeArithmeticBinaryResultType, floatness, bitness, isSignedInt
+    computeArithmeticBinaryResultType,
+    floatness,
+    bitness,
+    isSignedInt,
 )
 from typed_python.test_util import currentMemUsageMb
 
@@ -77,17 +99,10 @@ def makeDict(d):
 
 def makeAlternative(severalDicts):
     types = list(
-        set(
-            tuple(
-                (k, typeFor(v)) for k, v in ntDict.items()
-            )
-            for ntDict in severalDicts
-        )
+        set(tuple((k, typeFor(v)) for k, v in ntDict.items()) for ntDict in severalDicts)
     )
 
-    alt = Alternative("Alt", **{
-        "a_%s" % i: dict(types[i]) for i in range(len(types))
-    })
+    alt = Alternative("Alt", **{"a_%s" % i: dict(types[i]) for i in range(len(types))})
 
     res = []
     for thing in severalDicts:
@@ -116,10 +131,28 @@ def choice(x):
 
 class RandomValueProducer:
     def __init__(self):
-        self.levels = {0: [b'1', b'', '2', '', 0, 1, 0.0, 1.0, None, False, True, "a ", "a string", "b string", "b str"]}
+        self.levels = {
+            0: [
+                b"1",
+                b"",
+                "2",
+                "",
+                0,
+                1,
+                0.0,
+                1.0,
+                None,
+                False,
+                True,
+                "a ",
+                "a string",
+                "b string",
+                "b str",
+            ]
+        }
 
     def addEvenly(self, levels, count):
-        for level in range(1, levels+1):
+        for level in range(1, levels + 1):
             self.addValues(level, count)
 
     def all(self):
@@ -168,9 +201,20 @@ class RandomValueProducer:
             return makeTupleOf(*[picker() for i in range(choice([0, 1, 2, 3, 4]))])
 
         def randomAlternative():
-            return makeAlternative([randomNamedTupleDict() for i in range(choice([1, 2, 3, 4]))])
+            return makeAlternative(
+                [randomNamedTupleDict() for i in range(choice([1, 2, 3, 4]))]
+            )
 
-        return choice([randomTuple, randomNamedTuple, randomDict, randomTupleOf, randomAlternative, picker])()
+        return choice(
+            [
+                randomTuple,
+                randomNamedTuple,
+                randomDict,
+                randomTupleOf,
+                randomAlternative,
+                picker,
+            ]
+        )()
 
     def pickRandomly(self):
         return choice(self.levels[choice(list(self.levels))])
@@ -178,20 +222,25 @@ class RandomValueProducer:
 
 class NativeTypesTests(unittest.TestCase):
     def test_refcount_bug_with_simple_string(self):
-        with self.assertRaisesRegex(TypeError, "^first argument to refcount '111' not a permitted Type$"):
+        with self.assertRaisesRegex(
+            TypeError, "^first argument to refcount '111' not a permitted Type$"
+        ):
             _types.refcount(111)
 
-        with self.assertRaisesRegex(TypeError, "^first argument to refcount 'aa' not a permitted Type$"):
-            _types.refcount('aa')
+        with self.assertRaisesRegex(
+            TypeError, "^first argument to refcount 'aa' not a permitted Type$"
+        ):
+            _types.refcount("aa")
 
     def check_expected_performance(self, elapsed, expected=1.0):
-        if os.environ.get('TRAVIS_CI', None) is not None:
+        if os.environ.get("TRAVIS_CI", None) is not None:
             expected = 2 * expected
 
         self.assertTrue(
             elapsed < expected,
-            "Slow Performance: expected to take {expected} sec, but took {elapsed}"
-            .format(expected=expected, elapsed=elapsed)
+            "Slow Performance: expected to take {expected} sec, but took {elapsed}".format(
+                expected=expected, elapsed=elapsed
+            ),
         )
 
     def test_object_binary_compatibility(self):
@@ -220,8 +269,8 @@ class NativeTypesTests(unittest.TestCase):
     def test_binary_compatibility_incompatible_alternatives(self):
         ibc = _types.isBinaryCompatible
 
-        A1 = Alternative("A1", X={'a': int}, Y={'b': float})
-        A2 = Alternative("A2", X={'a': int}, Y={'b': str})
+        A1 = Alternative("A1", X={"a": int}, Y={"b": float})
+        A2 = Alternative("A2", X={"a": int}, Y={"b": str})
 
         self.assertTrue(ibc(A1, A1.X))
         self.assertTrue(ibc(A1, A1.Y))
@@ -237,8 +286,8 @@ class NativeTypesTests(unittest.TestCase):
     def test_binary_compatibility_compatible_alternatives(self):
         ibc = _types.isBinaryCompatible
 
-        A1 = Alternative("A1", X={'a': int}, Y={'b': float})
-        A2 = Alternative("A2", X={'a': int}, Y={'b': float})
+        A1 = Alternative("A1", X={"a": int}, Y={"b": float})
+        A2 = Alternative("A2", X={"a": int}, Y={"b": float})
 
         self.assertTrue(ibc(A1.X, A2.X))
         self.assertTrue(ibc(A1.Y, A2.Y))
@@ -290,10 +339,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(tuple(i), (1, 2, 3))
 
         for x in range(10):
-            self.assertEqual(
-                tuple(tupleOfInt(tuple(range(x)))),
-                tuple(range(x))
-            )
+            self.assertEqual(tuple(tupleOfInt(tuple(range(x)))), tuple(range(x)))
 
         with self.assertRaisesRegex(AttributeError, "has no attribute 'x'"):
             tupleOfInt((1, 2, 3)).x = 2
@@ -336,28 +382,16 @@ class NativeTypesTests(unittest.TestCase):
         T = ConstDict(int, TupleOf(int))
 
         # we should be able to implicitly convert 'set' to a TupleOf
-        self.assertEqual(
-            T({1: set([2, 3])}),
-            T({1: [2, 3]})
-        )
+        self.assertEqual(T({1: set([2, 3])}), T({1: [2, 3]}))
 
     def test_const_dict_add_mappable(self):
         T = ConstDict(int, int)
 
-        self.assertEqual(
-            T({1: 2}) + {2: 3},
-            {1: 2, 2: 3}
-        )
+        self.assertEqual(T({1: 2}) + {2: 3}, {1: 2, 2: 3})
 
-        self.assertEqual(
-            T({1: 2}) + ConstDict(int, OneOf(int, None))({2: 3}),
-            {1: 2, 2: 3}
-        )
+        self.assertEqual(T({1: 2}) + ConstDict(int, OneOf(int, None))({2: 3}), {1: 2, 2: 3})
 
-        self.assertEqual(
-            T({1: 2}) + ConstDict(int, OneOf(int, None))({2: 3}),
-            {1: 2, 2: 3}
-        )
+        self.assertEqual(T({1: 2}) + ConstDict(int, OneOf(int, None))({2: 3}), {1: 2, 2: 3})
 
     def test_const_dict_add_mappable_with_exceptions(self):
         T = ConstDict(int, TupleOf(int))
@@ -383,7 +417,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(_types.refcount(to), 2)
 
     def test_one_of_alternative(self):
-        X = Alternative("X", V={'a': int})
+        X = Alternative("X", V={"a": int})
         Ox = OneOf(None, X)
 
         self.assertEqual(Ox(X.V(a=10)), X.V(a=10))
@@ -464,10 +498,13 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(x() is None, repr(x()))
 
     def test_tuple_of_various_things(self):
-        for thing, typeOfThing in [("hi", str), (b"somebytes", bytes),
-                                   (1.0, float), (2, int),
-                                   (None, type(None))
-                                   ]:
+        for thing, typeOfThing in [
+            ("hi", str),
+            (b"somebytes", bytes),
+            (1.0, float),
+            (2, int),
+            (None, type(None)),
+        ]:
             tupleType = TupleOf(typeOfThing)
             t = tupleType((thing,))
             self.assertTrue(type(t[0]) is typeOfThing)
@@ -510,6 +547,14 @@ class NativeTypesTests(unittest.TestCase):
 
         l3.append(23)
         self.assertEqual(l3, [10, 2, 3, 11, 10, 2, 3, 11, 23])
+
+    def test_resize_init(self):
+        class T(Class):
+            def __init__(self):
+                pass
+
+        l = ListOf(T)().resize(2)
+        self.assertEqual(len(l), 2)
 
     def test_list_resize(self):
         l1 = ListOf(TupleOf(int))()
@@ -614,22 +659,26 @@ class NativeTypesTests(unittest.TestCase):
 
         typedInts = t(ints)
 
-        self.assertEqual(len(serialize(t, typedInts)), len(ints) * 2 + 6)  # 3 bytes for extra flags
+        self.assertEqual(
+            len(serialize(t, typedInts)), len(ints) * 2 + 6
+        )  # 3 bytes for extra flags
         self.assertEqual(tuple(typedInts), ints)
 
     def test_tuple_of_one_of_multi(self):
         t = TupleOf(OneOf(int, bool))
 
-        someThings = tuple([100 + x % 5 if x % 17 != 0 else bool(x%19) for x in range(1000000)])
+        someThings = tuple(
+            [100 + x % 5 if x % 17 != 0 else bool(x % 19) for x in range(1000000)]
+        )
 
         typedThings = t(someThings)
 
         self.assertEqual(
             len(serialize(t, typedThings)),
-            sum(3 if isinstance(t, bool) else 4 for t in someThings) +
-            2 +  # two bytes for begin / end flags
-            2 +  # two bytes for the id
-            2    # two bytes for the size
+            sum(3 if isinstance(t, bool) else 4 for t in someThings)
+            + 2
+            + 2  # two bytes for begin / end flags
+            + 2,  # two bytes for the id  # two bytes for the size
         )
 
         self.assertEqual(tuple(typedThings), someThings)
@@ -736,7 +785,7 @@ class NativeTypesTests(unittest.TestCase):
             ["a", "b", "ab", "bb", "ba", "aaaaaaa", "", "asdf"],
             ["1", "2", "3", "12", "13", "23", "24", "123123", "0", ""],
             [b"a", b"b", b"ab", b"bb", b"ba", b"aaaaaaa", b"", b"asdf"],
-            [(1, 2), (1, 2, 3), (), (1, 1), (1,)]
+            [(1, 2), (1, 2, 3), (), (1, 1), (1,)],
         ]
 
         for ts in tgroups:
@@ -745,7 +794,7 @@ class NativeTypesTests(unittest.TestCase):
                     for t2 in ts:
                         self.assertTrue(
                             f(t1, t2) is f(t((t1,)), t((t2,))),
-                            (f, t1, t2, t((t1,)), t((t2,)), f(t1, t2), f(t((t1,)), t((t2,))))
+                            (f, t1, t2, t((t1,)), t((t2,)), f(t1, t2), f(t((t1,)), t((t2,)))),
                         )
 
     def test_const_dict(self):
@@ -753,43 +802,50 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(len(t()), 0)
         self.assertEqual(len(t({})), 0)
-        self.assertEqual(len(t({'a': 'b'})), 1)
-        self.assertEqual(t({'a': 'b'})['a'], 'b')
-        self.assertEqual(t({'a': 'b', 'b': 'c'})['b'], 'c')
+        self.assertEqual(len(t({"a": "b"})), 1)
+        self.assertEqual(t({"a": "b"})["a"], "b")
+        self.assertEqual(t({"a": "b", "b": "c"})["b"], "c")
 
-        self.assertTrue("a" in deserialize(t, serialize(t, t({'a': 'b'}))))
+        self.assertTrue("a" in deserialize(t, serialize(t, t({"a": "b"}))))
 
-        self.assertTrue("a" in deserialize(t, serialize(t, t({'a': 'b', 'b': 'c'}))))
-        self.assertTrue("a" in deserialize(t, serialize(t, t({'a': 'b', 'b': 'c', 'c': 'd'}))))
-        self.assertTrue("a" in deserialize(t, serialize(t, t({'a': 'b', 'b': 'c', 'c': 'd', 'd': 'e'}))))
-        self.assertTrue("c" in deserialize(t, serialize(t, t({'a': 'b', 'b': 'c', 'c': 'd', 'def': 'e'}))))
-        self.assertTrue("def" in deserialize(t, serialize(t, t({'a': 'b', 'b': 'c', 'c': 'd', 'def': 'e'}))))
+        self.assertTrue("a" in deserialize(t, serialize(t, t({"a": "b", "b": "c"}))))
+        self.assertTrue("a" in deserialize(t, serialize(t, t({"a": "b", "b": "c", "c": "d"}))))
+        self.assertTrue(
+            "a" in deserialize(t, serialize(t, t({"a": "b", "b": "c", "c": "d", "d": "e"})))
+        )
+        self.assertTrue(
+            "c" in deserialize(t, serialize(t, t({"a": "b", "b": "c", "c": "d", "def": "e"})))
+        )
+        self.assertTrue(
+            "def"
+            in deserialize(t, serialize(t, t({"a": "b", "b": "c", "c": "d", "def": "e"})))
+        )
 
     def test_const_dict_get(self):
-        a = ConstDict(str, str)({'a': 'b', 'c': 'd'})
+        a = ConstDict(str, str)({"a": "b", "c": "d"})
 
-        self.assertEqual(a.get('a'), 'b')
-        self.assertEqual(a.get('asdf'), None)
-        self.assertEqual(a.get('asdf', 20), 20)
+        self.assertEqual(a.get("a"), "b")
+        self.assertEqual(a.get("asdf"), None)
+        self.assertEqual(a.get("asdf", 20), 20)
 
     def test_const_dict_items_keys_and_values(self):
-        a = ConstDict(str, str)({'a': 'b', 'c': 'd'})
+        a = ConstDict(str, str)({"a": "b", "c": "d"})
 
-        self.assertEqual(sorted(a.items()), [('a', 'b'), ('c', 'd')])
-        self.assertEqual(sorted(a.keys()), ['a', 'c'])
-        self.assertEqual(sorted(a.values()), ['b', 'd'])
+        self.assertEqual(sorted(a.items()), [("a", "b"), ("c", "d")])
+        self.assertEqual(sorted(a.keys()), ["a", "c"])
+        self.assertEqual(sorted(a.values()), ["b", "d"])
 
     def test_empty_string(self):
-        a = ConstDict(str, str)({'a': ''})
+        a = ConstDict(str, str)({"a": ""})
 
-        print(a['a'])
+        print(a["a"])
 
     def test_dict_to_oneof(self):
         t = ConstDict(str, OneOf("A", "B", "ABCDEF"))
-        a = t({'a': 'A', 'b': 'ABCDEF'})
+        a = t({"a": "A", "b": "ABCDEF"})
 
-        self.assertEqual(a['a'], "A")
-        self.assertEqual(a['b'], "ABCDEF")
+        self.assertEqual(a["a"], "A")
+        self.assertEqual(a["b"], "ABCDEF")
 
         self.assertEqual(a, deserialize(t, serialize(t, a)))
 
@@ -886,7 +942,7 @@ class NativeTypesTests(unittest.TestCase):
         aDict = T({"hi": 10, "bye": 20})
 
         self.assertEqual(str(aDict.keys()), 'dict_keys(["hi", "bye"])')
-        self.assertEqual(str(aDict.values()), 'dict_values([10, 20])')
+        self.assertEqual(str(aDict.values()), "dict_values([10, 20])")
         self.assertEqual(str(aDict.items()), 'dict_items([("hi", 10), ("bye", 20)])')
 
         self.assertEqual(aDict.keys(), T({"hi": 10, "bye": 30}).keys())
@@ -904,15 +960,15 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             aDict.keys().setdefault("hi", 10)
         with self.assertRaises(TypeError):
-            aDict.keys()['hi']
+            aDict.keys()["hi"]
 
-        self.assertIn('hi', aDict.keys())
-        self.assertNotIn('boo', aDict.keys())
+        self.assertIn("hi", aDict.keys())
+        self.assertNotIn("boo", aDict.keys())
 
         with self.assertRaises(TypeError):
-            'hi' in aDict.items()
+            "hi" in aDict.items()
         with self.assertRaises(TypeError):
-            'hi' in aDict.values()
+            "hi" in aDict.values()
 
         self.assertIn(10, aDict.values())
         self.assertNotIn(11, aDict.values())
@@ -922,14 +978,14 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             10 in aDict.items()
 
-        self.assertIn(('hi', 10), aDict.items())
-        self.assertNotIn(('asdf', 10), aDict.items())
+        self.assertIn(("hi", 10), aDict.items())
+        self.assertNotIn(("asdf", 10), aDict.items())
 
         with self.assertRaises(TypeError):
-            ('hi', 10) in aDict.keys()
+            ("hi", 10) in aDict.keys()
 
         with self.assertRaises(TypeError):
-            ('hi', 10) in aDict.values()
+            ("hi", 10) in aDict.values()
 
         with self.assertRaises(Exception):
             aDict.keys().keys()
@@ -940,7 +996,7 @@ class NativeTypesTests(unittest.TestCase):
         aDict = T({"hi": 10, "bye": 20})
 
         self.assertEqual(str(aDict.keys()), 'const_dict_keys(["bye", "hi"])')
-        self.assertEqual(str(aDict.values()), 'const_dict_values([20, 10])')
+        self.assertEqual(str(aDict.values()), "const_dict_values([20, 10])")
         self.assertEqual(str(aDict.items()), 'const_dict_items([("bye", 20), ("hi", 10)])')
 
         self.assertEqual(aDict.keys(), T({"hi": 10, "bye": 30}).keys())
@@ -961,15 +1017,15 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             aDict.keys().items()
         with self.assertRaises(TypeError):
-            aDict.keys()['hi']
+            aDict.keys()["hi"]
 
-        self.assertIn('hi', aDict.keys())
-        self.assertNotIn('boo', aDict.keys())
+        self.assertIn("hi", aDict.keys())
+        self.assertNotIn("boo", aDict.keys())
 
         with self.assertRaises(TypeError):
-            'hi' in aDict.items()
+            "hi" in aDict.items()
         with self.assertRaises(TypeError):
-            'hi' in aDict.values()
+            "hi" in aDict.values()
 
         self.assertIn(10, aDict.values())
         self.assertNotIn(11, aDict.values())
@@ -979,14 +1035,14 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             10 in aDict.items()
 
-        self.assertIn(('hi', 10), aDict.items())
-        self.assertNotIn(('asdf', 10), aDict.items())
+        self.assertIn(("hi", 10), aDict.items())
+        self.assertNotIn(("asdf", 10), aDict.items())
 
         with self.assertRaises(TypeError):
-            ('hi', 10) in aDict.keys()
+            ("hi", 10) in aDict.keys()
 
         with self.assertRaises(TypeError):
-            ('hi', 10) in aDict.values()
+            ("hi", 10) in aDict.values()
 
         with self.assertRaises(Exception):
             aDict.keys().keys()
@@ -1001,12 +1057,14 @@ class NativeTypesTests(unittest.TestCase):
     def test_const_dict_comparison(self):
         t = ConstDict(str, str)
 
-        self.assertEqual(t({'a': 'b'}), t({'a': 'b'}))
-        self.assertLess(t({}), t({'a': 'b'}))
+        self.assertEqual(t({"a": "b"}), t({"a": "b"}))
+        self.assertLess(t({}), t({"a": "b"}))
 
     def test_const_dict_lookup(self):
-        for type_to_use, vals in [(int, list(range(20))),
-                                  (bytes, [b'1', b'2', b'3', b'4', b'5'])]:
+        for type_to_use, vals in [
+            (int, list(range(20))),
+            (bytes, [b"1", b"2", b"3", b"4", b"5"]),
+        ]:
             t = ConstDict(type_to_use, type_to_use)
 
             for _ in range(10):
@@ -1056,7 +1114,7 @@ class NativeTypesTests(unittest.TestCase):
     def test_dict_hash_perf(self):
         str_dict = ConstDict(str, str)
 
-        s = str_dict({'a' * 1000000: 'b' * 1000000})
+        s = str_dict({"a" * 1000000: "b" * 1000000})
 
         t0 = time.time()
         for k in range(1000000):
@@ -1076,7 +1134,7 @@ class NativeTypesTests(unittest.TestCase):
 
         t0 = time.time()
         for i in range(50000):
-            t({str(k): str(k+1) for k in range(10)})
+            t({str(k): str(k + 1) for k in range(10)})
 
         elapsed = time.time() - t0
         print("Took ", elapsed, " to do 1mm")
@@ -1088,7 +1146,7 @@ class NativeTypesTests(unittest.TestCase):
 
         t0 = time.time()
         for i in range(100000):
-            t({k: k+1 for k in range(10)})
+            t({k: k + 1 for k in range(10)})
 
         elapsed = time.time() - t0
         print("Took ", elapsed, " to do 1mm")
@@ -1097,41 +1155,34 @@ class NativeTypesTests(unittest.TestCase):
     def test_const_dict_iter_int(self):
         t = ConstDict(int, int)
 
-        aDict = t({k: k+1 for k in range(100)})
+        aDict = t({k: k + 1 for k in range(100)})
         for k in aDict:
-            self.assertEqual(aDict[k], k+1)
+            self.assertEqual(aDict[k], k + 1)
 
     def test_const_dict_iter_str(self):
         t = ConstDict(str, str)
 
-        aDict = t({str(k): str(k+1) for k in range(100)})
+        aDict = t({str(k): str(k + 1) for k in range(100)})
         for k in aDict:
-            self.assertEqual(aDict[str(k)], str(int(k)+1))
+            self.assertEqual(aDict[str(k)], str(int(k) + 1))
 
     def test_alternative_bytecounts(self):
-        alt = Alternative(
-            "Empty",
-            X={},
-            Y={}
-        )
+        alt = Alternative("Empty", X={}, Y={})
 
         self.assertEqual(_types.bytecount(alt), 1)
         self.assertEqual(_types.bytecount(alt.X), 1)
         self.assertEqual(_types.bytecount(alt.Y), 1)
 
     def test_alternatives_with_Bytes(self):
-        alt = Alternative(
-            "Alt",
-            x_0={'a': bytes}
-        )
-        self.assertEqual(alt.x_0(a=b''), alt.x_0(a=b''))
+        alt = Alternative("Alt", x_0={"a": bytes})
+        self.assertEqual(alt.x_0(a=b""), alt.x_0(a=b""))
 
     def test_alternatives_with_str_func(self):
         alt = Alternative(
             "Alt",
-            x_0={'a': bytes},
+            x_0={"a": bytes},
             f=lambda self: 1,
-            __str__=lambda self: "not_your_usual_str"
+            __str__=lambda self: "not_your_usual_str",
         )
 
         self.assertEqual(alt.x_0().f(), 1)
@@ -1139,10 +1190,7 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_alternatives_with_str_and_repr(self):
         A = Alternative(
-            "A",
-            X={},
-            __str__=lambda self: "alt_str",
-            __repr__=lambda self: "alt_repr"
+            "A", X={}, __str__=lambda self: "alt_str", __repr__=lambda self: "alt_repr"
         )
 
         self.assertEqual(str(A.X()), "alt_str")
@@ -1164,49 +1212,48 @@ class NativeTypesTests(unittest.TestCase):
         def A_delattr(s, n):
             A_attrs.pop(n, None)
 
-        A = Alternative("A", a={'a': int}, b={'b': str},
-                        __bool__=lambda self: self.matches.b,
-                        __str__=lambda self: "str",
-                        __repr__=lambda self: "repr",
-                        __call__=lambda self: "call",
-                        __len__=lambda self: 42,
-                        __contains__=lambda self, item: not not item,
-
-                        __add__=lambda lhs, rhs: A.b("add"),
-                        __sub__=lambda lhs, rhs: A.b("sub"),
-                        __mul__=lambda lhs, rhs: A.b("mul"),
-                        __matmul__=lambda lhs, rhs: A.b("matmul"),
-                        __truediv__=lambda lhs, rhs: A.b("truediv"),
-                        __floordiv__=lambda lhs, rhs: A.b("floordiv"),
-                        __divmod=lambda lhs, rhs: A.b("divmod"),
-                        __mod__=lambda lhs, rhs: A.b("mod"),
-                        __pow__=lambda lhs, rhs: A.b("pow"),
-                        __lshift__=lambda lhs, rhs: A.b("lshift"),
-                        __rshift__=lambda lhs, rhs: A.b("rshift"),
-                        __and__=lambda lhs, rhs: A.b("and"),
-                        __or__=lambda lhs, rhs: A.b("or"),
-                        __xor__=lambda lhs, rhs: A.b("xor"),
-
-                        __neg__=lambda self: A.b("neg"),
-                        __pos__=lambda self: A.b("pos"),
-                        __invert__=lambda self: A.b("invert"),
-
-                        __abs__=lambda self: A.b("abs"),
-                        __int__=lambda self: 123,
-                        __float__=lambda self: 234.5,
-                        __index__=lambda self: 124,
-                        __complex__=lambda self: complex(1, 2),
-                        __round__=lambda self: 6,
-                        __trunc__=lambda self: 7,
-                        __floor__=lambda self: 8,
-                        __ceil__=lambda self: 9,
-
-                        __bytes__=lambda self: b'bytes',
-                        __format__=lambda self, spec: "format",
-                        __getattr__=A_getattr,
-                        __setattr__=A_setattr,
-                        __delattr__=A_delattr,
-                        )
+        A = Alternative(
+            "A",
+            a={"a": int},
+            b={"b": str},
+            __bool__=lambda self: self.matches.b,
+            __str__=lambda self: "str",
+            __repr__=lambda self: "repr",
+            __call__=lambda self: "call",
+            __len__=lambda self: 42,
+            __contains__=lambda self, item: not not item,
+            __add__=lambda lhs, rhs: A.b("add"),
+            __sub__=lambda lhs, rhs: A.b("sub"),
+            __mul__=lambda lhs, rhs: A.b("mul"),
+            __matmul__=lambda lhs, rhs: A.b("matmul"),
+            __truediv__=lambda lhs, rhs: A.b("truediv"),
+            __floordiv__=lambda lhs, rhs: A.b("floordiv"),
+            __divmod=lambda lhs, rhs: A.b("divmod"),
+            __mod__=lambda lhs, rhs: A.b("mod"),
+            __pow__=lambda lhs, rhs: A.b("pow"),
+            __lshift__=lambda lhs, rhs: A.b("lshift"),
+            __rshift__=lambda lhs, rhs: A.b("rshift"),
+            __and__=lambda lhs, rhs: A.b("and"),
+            __or__=lambda lhs, rhs: A.b("or"),
+            __xor__=lambda lhs, rhs: A.b("xor"),
+            __neg__=lambda self: A.b("neg"),
+            __pos__=lambda self: A.b("pos"),
+            __invert__=lambda self: A.b("invert"),
+            __abs__=lambda self: A.b("abs"),
+            __int__=lambda self: 123,
+            __float__=lambda self: 234.5,
+            __index__=lambda self: 124,
+            __complex__=lambda self: complex(1, 2),
+            __round__=lambda self: 6,
+            __trunc__=lambda self: 7,
+            __floor__=lambda self: 8,
+            __ceil__=lambda self: 9,
+            __bytes__=lambda self: b"bytes",
+            __format__=lambda self, spec: "format",
+            __getattr__=A_getattr,
+            __setattr__=A_setattr,
+            __delattr__=A_delattr,
+        )
 
         self.assertEqual(A.a().__bool__(), False)
         self.assertEqual(bool(A.a()), False)
@@ -1266,7 +1313,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(int(A.a()), 123)
         self.assertEqual(float(A.a()), 234.5)
         self.assertEqual(range(1000)[1:A.a():2], range(1, 124, 2))
-        self.assertEqual(complex(A.a()), 1+2j)
+        self.assertEqual(complex(A.a()), 1 + 2j)
         self.assertEqual(round(A.a()), 6)
         self.assertEqual(math.trunc(A.a()), 7)
         self.assertEqual(math.floor(A.a()), 8)
@@ -1296,14 +1343,17 @@ class NativeTypesTests(unittest.TestCase):
             A2_items[i] = v
             return 0
 
-        A2 = Alternative("A2", a={'a': int}, b={'b': str},
-                         __getattribute__=A_getattr,
-                         __setattr__=A_setattr,
-                         __delattr__=A_delattr,
-                         __dir__=lambda self: list(A_attrs.keys()),
-                         __getitem__=lambda self, i: A2_items.get(i, i),
-                         __setitem__=A2_setitem
-                         )
+        A2 = Alternative(
+            "A2",
+            a={"a": int},
+            b={"b": str},
+            __getattribute__=A_getattr,
+            __setattr__=A_setattr,
+            __delattr__=A_delattr,
+            __dir__=lambda self: list(A_attrs.keys()),
+            __getitem__=lambda self, i: A2_items.get(i, i),
+            __setitem__=A2_setitem,
+        )
 
         self.assertEqual(A2.b().q, "changedvalue for q")
         A2.a().Name = "can change Name"
@@ -1314,8 +1364,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(A2.b()[123], 7)
 
     def test_alternative_iter(self):
-
-        class A_iter():
+        class A_iter:
             def __init__(self):
                 self._cur = 0
 
@@ -1328,7 +1377,7 @@ class NativeTypesTests(unittest.TestCase):
                 self._cur += 1
                 return self._cur
 
-        class A_reversed():
+        class A_reversed:
             def __init__(self):
                 self._cur = 11
 
@@ -1341,16 +1390,18 @@ class NativeTypesTests(unittest.TestCase):
                 self._cur -= 1
                 return self._cur
 
-        A = Alternative("A", a={'a': int}, b={'b': str},
-                        __iter__=lambda self: A_iter(),
-                        __reversed__=lambda self: A_reversed()
-                        )
+        A = Alternative(
+            "A",
+            a={"a": int},
+            b={"b": str},
+            __iter__=lambda self: A_iter(),
+            __reversed__=lambda self: A_reversed(),
+        )
         self.assertEqual([x for x in A.a()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         self.assertEqual([x for x in reversed(A.a())], [10, 9, 8, 7, 6, 5, 4, 3, 2, 1])
 
     def test_alternative_as_iterator(self):
-
-        class B_iter():
+        class B_iter:
             def __init__(self):
                 self._cur = 0
 
@@ -1364,13 +1415,10 @@ class NativeTypesTests(unittest.TestCase):
                 return self._cur
 
         x = B_iter()
-        Iterator = Alternative("B", a={'a': int},
-                               __iter__=lambda self: self,
-                               __next__=lambda self: x.__next__()
-                               )
-        A = Alternative("A", a={'a': int},
-                        __iter__=lambda self: Iterator.a()
-                        )
+        Iterator = Alternative(
+            "B", a={"a": int}, __iter__=lambda self: self, __next__=lambda self: x.__next__()
+        )
+        A = Alternative("A", a={"a": int}, __iter__=lambda self: Iterator.a())
         # this is a one-time iterator
         self.assertEqual([x for x in A.a()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         self.assertEqual([x for x in A.a()], [])
@@ -1388,10 +1436,7 @@ class NativeTypesTests(unittest.TestCase):
             depth -= 1
             return True
 
-        A = Alternative("A", a={'a': int}, b={'b': str},
-                        __enter__=A_enter,
-                        __exit__=A_exit
-                        )
+        A = Alternative("A", a={"a": int}, b={"b": str}, __enter__=A_enter, __exit__=A_exit)
 
         self.assertEqual(depth, 0)
         with A.a():
@@ -1401,11 +1446,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(depth, 0)
 
     def test_empty_alternatives(self):
-        a = Alternative(
-            "Alt",
-            A={},
-            B={}
-        )
+        a = Alternative("Alt", A={}, B={})
 
         self.assertEqual(a.A(), a.A())
         self.assertIsInstance(deserialize(a, serialize(a, a.A())), a.A)
@@ -1416,11 +1457,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertNotEqual(a.B(), a.A())
 
     def test_extracted_alternatives_have_correct_type(self):
-        Alt = Alternative(
-            "Alt",
-            A={},
-            B={}
-        )
+        Alt = Alternative("Alt", A={}, B={})
         tOfAlt = TupleOf(Alt)
 
         a = Alt.A()
@@ -1431,9 +1468,7 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_alternatives(self):
         alt = Alternative(
-            "Alt",
-            child_ints={'x': int, 'y': int},
-            child_strings={'x': str, 'y': str}
+            "Alt", child_ints={"x": int, "y": int}, child_strings={"x": str, "y": str}
         )
 
         self.assertTrue(issubclass(alt.child_ints, alt))
@@ -1462,13 +1497,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(empty.B(), empty.B())
         self.assertNotEqual(empty.A(), empty.B())
 
-        a = Alternative(
-            "X",
-            A={'a': int},
-            B={'b': int},
-            C={'c': str},
-            D={'d': bytes},
-        )
+        a = Alternative("X", A={"a": int}, B={"b": int}, C={"c": str}, D={"d": bytes},)
 
         self.assertEqual(a.A(a=10), a.A(a=10))
         self.assertNotEqual(a.A(a=10), a.A(a=11))
@@ -1479,27 +1508,32 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_alternatives_add_operator(self):
         alt = Alternative(
-            "Alt",
-            child_ints={'x': int, 'y': int},
-            __add__=lambda lhs, rhs: (lhs, rhs)
+            "Alt", child_ints={"x": int, "y": int}, __add__=lambda lhs, rhs: (lhs, rhs)
         )
 
         a = alt.child_ints(x=0, y=2)
 
-        self.assertEqual(a+a, (a, a))
+        self.assertEqual(a + a, (a, a))
 
     @flaky(max_runs=3, min_passes=1)
     def test_alternatives_radd_operator(self):
         alt = Alternative(
-            "Alt",
-            child_ints={'x': int, 'y': int},
-            __radd__=lambda lhs, rhs: "radd"
+            "Alt", child_ints={"x": int, "y": int}, __radd__=lambda lhs, rhs: "radd"
         )
 
         a = alt.child_ints(x=0, y=2)
 
-        values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
-                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"})]
+        values = [
+            1,
+            Int16(1),
+            UInt64(1),
+            1.234,
+            Float32(1.234),
+            True,
+            "abc",
+            ListOf(int)((1, 2)),
+            ConstDict(str, str)({"a": "1"}),
+        ]
         for v in values:
             self.assertEqual(v + a, "radd")
             with self.assertRaises(Exception):
@@ -1507,9 +1541,7 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_alternatives_perf(self):
         alt = Alternative(
-            "Alt",
-            child_ints={'x': int, 'y': int},
-            child_strings={'x': str, 'y': str}
+            "Alt", child_ints={"x": int, "y": int}, child_strings={"x": str, "y": str}
         )
 
         t0 = time.time()
@@ -1559,18 +1591,18 @@ class NativeTypesTests(unittest.TestCase):
         tups = [(1, 2, 3), (), ("2",), (b"2",), (1, 2, 3, "b"), (2,), (None,)]
 
         for tup1 in tups:
-            self.assertEqual( makeTuple(*tup1), tup1 )
+            self.assertEqual(makeTuple(*tup1), tup1)
 
             for tup2 in tups:
                 if tup1 != tup2:
-                    self.assertNotEqual( makeTuple(*tup1), tup2 )
+                    self.assertNotEqual(makeTuple(*tup1), tup2)
 
         for tup1 in tups:
-            self.assertEqual( makeTupleOf(*tup1), tup1 )
+            self.assertEqual(makeTupleOf(*tup1), tup1)
 
             for tup2 in tups:
                 if tup1 != tup2:
-                    self.assertNotEqual( makeTupleOf(*tup1), tup2 )
+                    self.assertNotEqual(makeTupleOf(*tup1), tup2)
 
     def test_add_tuple_of(self):
         tupleOfInt = TupleOf(int)
@@ -1579,13 +1611,13 @@ class NativeTypesTests(unittest.TestCase):
 
         for tup1 in tups:
             for tup2 in tups:
-                self.assertEqual(tupleOfInt(tup1) + tupleOfInt(tup2), tupleOfInt(tup1+tup2))
-                self.assertEqual(tupleOfInt(tup1) + tup2, tupleOfInt(tup1+tup2))
+                self.assertEqual(tupleOfInt(tup1) + tupleOfInt(tup2), tupleOfInt(tup1 + tup2))
+                self.assertEqual(tupleOfInt(tup1) + tup2, tupleOfInt(tup1 + tup2))
 
     def test_stringification_of_none(self):
         T = TupleOf(OneOf(None, str))
 
-        self.assertEqual(str(T([None, 'hi'])), '(None, "hi")')
+        self.assertEqual(str(T([None, "hi"])), '(None, "hi")')
 
     def test_slice_tuple_of(self):
         tupleOfInt = TupleOf(int)
@@ -1614,7 +1646,10 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(intDict({1: 2, 3: 4}) - (3,), intDict({1: 2}))
 
     def test_dictionary_addition_and_subtraction(self):
-        someDicts = [{i: choice([1, 2, 3, 4, 5]) for i in range(choice([4, 6, 10, 20]))} for _ in range(20)]
+        someDicts = [
+            {i: choice([1, 2, 3, 4, 5]) for i in range(choice([4, 6, 10, 20]))}
+            for _ in range(20)
+        ]
         intDict = ConstDict(int, int)
 
         for d1 in someDicts:
@@ -1629,7 +1664,7 @@ class NativeTypesTests(unittest.TestCase):
                 while len(res):
                     toRemove = []
 
-                    for i in range(choice(list(range(len(res))))+1):
+                    for i in range(choice(list(range(len(res)))) + 1):
                         key = choice(list(addResult))
                         del addResult[key]
                         toRemove.append(key)
@@ -1677,8 +1712,9 @@ class NativeTypesTests(unittest.TestCase):
             t0 = time.time()
 
             expectedBytecount = (
-                sum(varintBytecount(0) + varintBytecount(i) for i in ints) +
-                (varintBytecount(0) * 3) + varintBytecount(len(ints))
+                sum(varintBytecount(0) + varintBytecount(i) for i in ints)
+                + (varintBytecount(0) * 3)
+                + varintBytecount(len(ints))
             )
 
             self.assertEqual(len(serialize(TupleOf(int), ints)), expectedBytecount)
@@ -1709,7 +1745,7 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_roundtrip_tuple(self):
         T = Tuple(str, bool, str)
-        v = T(('1', False, ''))
+        v = T(("1", False, ""))
 
         v2 = deserialize(T, serialize(T, v))
 
@@ -1814,7 +1850,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertIsInstance(nt.y, NormalPySubclass)
 
     def test_construct_alternatives_with_positional_arguments(self):
-        a = Alternative("A", HasOne={'a': str}, HasTwo={'a': str, 'b': str})
+        a = Alternative("A", HasOne={"a": str}, HasTwo={"a": str, "b": str})
 
         with self.assertRaises(TypeError):
             a.HasTwo("hi")
@@ -1825,7 +1861,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(a.HasOne(hasOne), hasOne)
 
         with self.assertRaises(TypeError):
-            a.HasOne(a.HasTwo(a='1', b='b'))
+            a.HasOne(a.HasTwo(a="1", b="b"))
 
     def test_unsafe_pointers_to_list_internals(self):
         x = ListOf(int)()
@@ -1918,46 +1954,46 @@ class NativeTypesTests(unittest.TestCase):
     def test_list_and_tuple_conversion_to_numpy(self):
         for T in [ListOf(bool), TupleOf(bool)]:
             for arr in [
-                    numpy.array([]),
-                    numpy.array([0, 1, 2, 3, 4, 5]),
-                    numpy.array([0, 1, 2, 3, 4, 5], 'int32'),
-                    numpy.array([0, 1, 2, 3, 4, 5], 'int16'),
-                    numpy.array([0, 1, 2, 3, 4, 5], 'bool')
+                numpy.array([]),
+                numpy.array([0, 1, 2, 3, 4, 5]),
+                numpy.array([0, 1, 2, 3, 4, 5], "int32"),
+                numpy.array([0, 1, 2, 3, 4, 5], "int16"),
+                numpy.array([0, 1, 2, 3, 4, 5], "bool"),
             ]:
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), [bool(x) for x in arr.tolist()])
 
         for T in [ListOf(int), TupleOf(int)]:
             for arr in [
-                    numpy.array([]),
-                    numpy.array([1, 2, 3, 4, 5]),
-                    numpy.array([1, 2, 3, 4, 5], 'int32'),
-                    numpy.array([1, 2, 3, 4, 5], 'int16')
+                numpy.array([]),
+                numpy.array([1, 2, 3, 4, 5]),
+                numpy.array([1, 2, 3, 4, 5], "int32"),
+                numpy.array([1, 2, 3, 4, 5], "int16"),
             ]:
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), arr.tolist())
 
         for T in [ListOf(float), TupleOf(float)]:
             for arr in [
-                    numpy.array([]),
-                    numpy.array([1, 2, 3, 4, 5], 'float64'),
-                    numpy.array([1, 2, 3, 4, 5], 'float32')
+                numpy.array([]),
+                numpy.array([1, 2, 3, 4, 5], "float64"),
+                numpy.array([1, 2, 3, 4, 5], "float32"),
             ]:
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), arr.tolist())
 
-        self.assertEqual(str(ListOf(int)([1, 2, 3, 4]).toArray().dtype), 'int64')
-        self.assertEqual(str(ListOf(Int32)([1, 2, 3, 4]).toArray().dtype), 'int32')
-        self.assertEqual(str(ListOf(Int16)([1, 2, 3, 4]).toArray().dtype), 'int16')
-        self.assertEqual(str(ListOf(Int8)([1, 2, 3, 4]).toArray().dtype), 'int8')
+        self.assertEqual(str(ListOf(int)([1, 2, 3, 4]).toArray().dtype), "int64")
+        self.assertEqual(str(ListOf(Int32)([1, 2, 3, 4]).toArray().dtype), "int32")
+        self.assertEqual(str(ListOf(Int16)([1, 2, 3, 4]).toArray().dtype), "int16")
+        self.assertEqual(str(ListOf(Int8)([1, 2, 3, 4]).toArray().dtype), "int8")
 
-        self.assertEqual(str(ListOf(UInt64)([1, 2, 3, 4]).toArray().dtype), 'uint64')
-        self.assertEqual(str(ListOf(UInt32)([1, 2, 3, 4]).toArray().dtype), 'uint32')
-        self.assertEqual(str(ListOf(UInt16)([1, 2, 3, 4]).toArray().dtype), 'uint16')
-        self.assertEqual(str(ListOf(UInt8)([1, 2, 3, 4]).toArray().dtype), 'uint8')
+        self.assertEqual(str(ListOf(UInt64)([1, 2, 3, 4]).toArray().dtype), "uint64")
+        self.assertEqual(str(ListOf(UInt32)([1, 2, 3, 4]).toArray().dtype), "uint32")
+        self.assertEqual(str(ListOf(UInt16)([1, 2, 3, 4]).toArray().dtype), "uint16")
+        self.assertEqual(str(ListOf(UInt8)([1, 2, 3, 4]).toArray().dtype), "uint8")
 
-        self.assertEqual(str(ListOf(float)([1, 2, 3, 4]).toArray().dtype), 'float64')
-        self.assertEqual(str(ListOf(Float32)([1, 2, 3, 4]).toArray().dtype), 'float32')
+        self.assertEqual(str(ListOf(float)([1, 2, 3, 4]).toArray().dtype), "float64")
+        self.assertEqual(str(ListOf(Float32)([1, 2, 3, 4]).toArray().dtype), "float32")
 
     def test_list_of_equality(self):
         x = ListOf(int)([1, 2, 3, 4])
@@ -1967,23 +2003,15 @@ class NativeTypesTests(unittest.TestCase):
         self.assertNotEqual(x, y)
 
     def test_tuple_r_add(self):
-        self.assertEqual(
-            (1, 2, 4, 5, 6) + TupleOf(int)([1, 2]),
-            (1, 2, 4, 5, 6, 1, 2)
-        )
+        self.assertEqual((1, 2, 4, 5, 6) + TupleOf(int)([1, 2]), (1, 2, 4, 5, 6, 1, 2))
 
-        self.assertEqual(
-            [1, 2, 4, 5, 6] + TupleOf(int)([1, 2]),
-            (1, 2, 4, 5, 6, 1, 2)
-        )
+        self.assertEqual([1, 2, 4, 5, 6] + TupleOf(int)([1, 2]), (1, 2, 4, 5, 6, 1, 2))
 
         with self.assertRaises(TypeError):
             [1, 2, "hi", 5, 6] + TupleOf(int)([1, 2])
 
     def test_tuple_r_cmp(self):
-        self.assertEqual(
-            (1, 2, 3), TupleOf(int)([1, 2, 3])
-        )
+        self.assertEqual((1, 2, 3), TupleOf(int)([1, 2, 3]))
 
     def test_can_convert_numpy_scalars(self):
         self.assertEqual(OneOf(int, float)(numpy.int64(10)), 10)
@@ -2001,28 +2029,36 @@ class NativeTypesTests(unittest.TestCase):
             (UInt32, numpy.uint32),
             (UInt64, numpy.uint64),
             (Float32, numpy.float32),
-            (float, numpy.float64)
+            (float, numpy.float64),
         ]
 
         for ourType, numpyType in typeAndNumpyType:
             for candValue in [-1, 0, 1, 10, 100, 1000, 100000, 10000000, 10000000000]:
-                self.assertEqual(int(ourType(candValue)), int(numpyType(candValue)), (ourType, candValue))
-                self.assertEqual(float(ourType(candValue)), float(numpyType(candValue)), (ourType, candValue))
+                self.assertEqual(
+                    int(ourType(candValue)), int(numpyType(candValue)), (ourType, candValue)
+                )
+                self.assertEqual(
+                    float(ourType(candValue)),
+                    float(numpyType(candValue)),
+                    (ourType, candValue),
+                )
 
             for ourType2, numpyType2 in typeAndNumpyType:
-                zeroOrTwoFloatTypes = sum([1 if 'float' in str(t) else 0 for t in [numpyType, numpyType2]]) in [0, 2]
+                zeroOrTwoFloatTypes = sum(
+                    [1 if "float" in str(t) else 0 for t in [numpyType, numpyType2]]
+                ) in [0, 2]
 
                 if zeroOrTwoFloatTypes:
                     for candValue in [-1, 0, 1, 10, 100, 1000, 100000, 10000000, 10000000000]:
                         self.assertEqual(
                             int(ourType(ourType2(candValue))),
                             int(numpyType(numpyType2(candValue))),
-                            (ourType, ourType2, candValue)
+                            (ourType, ourType2, candValue),
                         )
                         self.assertEqual(
                             float(ourType(ourType2(candValue))),
                             float(numpyType(numpyType2(candValue))),
-                            (ourType, ourType2, candValue)
+                            (ourType, ourType2, candValue),
                         )
                 else:
                     # we convert from float to int as c++, which is different than numpy, which clips
@@ -2099,7 +2135,11 @@ class NativeTypesTests(unittest.TestCase):
 
                             proI1 = promotedType(T1(i1))
                             proI2 = promotedType(T2(i2))
-                            self.assertEqual(res, op(proI1, proI2), (res, op, T1, T2, promotedType, proI1, proI2))
+                            self.assertEqual(
+                                res,
+                                op(proI1, proI2),
+                                (res, op, T1, T2, promotedType, proI1, proI2),
+                            )
 
                 for op in [add, mul, div, sub, mod]:
                     for i1 in [-1, 0, 1, 2, 10]:
@@ -2116,7 +2156,9 @@ class NativeTypesTests(unittest.TestCase):
                                 res = op(T1(i1), T2(i2))
                                 promotedType = computeArithmeticBinaryResultType(T1, T2)
                                 if op in [div]:
-                                    promotedType = computeArithmeticBinaryResultType(promotedType, Float32)
+                                    promotedType = computeArithmeticBinaryResultType(
+                                        promotedType, Float32
+                                    )
 
                                 if promotedType is int:
                                     # in the compiler (and in our internals, ints are 64 bits)
@@ -2130,7 +2172,11 @@ class NativeTypesTests(unittest.TestCase):
                                 proI1 = promotedType(T1(i1))
                                 proI2 = promotedType(T2(i2))
                                 self.assertEqual(type(res), type(op(proI1, proI2)))
-                                self.assertEqual(res, op(proI1, proI2), (op.__name__, T1, T2, i1, i2, proI1, proI2))
+                                self.assertEqual(
+                                    res,
+                                    op(proI1, proI2),
+                                    (op.__name__, T1, T2, i1, i2, proI1, proI2),
+                                )
 
                 if not floatness(T1) and not floatness(T2):
                     for op in [bitand, bitor, bitxor]:
@@ -2139,12 +2185,21 @@ class NativeTypesTests(unittest.TestCase):
                         resType = {bool: bool, int: int, float: float}.get(resType, resType)
 
                         if T1 is bool and T2 is bool:
-                            self.assertEqual(resType, bool if op in (bitor, bitand, bitxor) else int if op is not div else float)
+                            self.assertEqual(
+                                resType,
+                                bool
+                                if op in (bitor, bitand, bitxor)
+                                else int
+                                if op is not div
+                                else float,
+                            )
                         else:
                             self.assertEqual(bitness(resType), max(bitness(T1), bitness(T2)))
 
                             if op is not div:
-                                self.assertEqual(isSignedInt(resType), isSignedInt(T1) or isSignedInt(T2))
+                                self.assertEqual(
+                                    isSignedInt(resType), isSignedInt(T1) or isSignedInt(T2)
+                                )
 
                             if bitness(T1) > 1 and bitness(T2) > 1:
                                 self.assertEqual(res, op(10, 10))
@@ -2182,8 +2237,8 @@ class NativeTypesTests(unittest.TestCase):
         n1 = N(x=1, y=2)
         n2 = N(x=1, y=3)
 
-        self.assertEqual(D({'a': n1}), D({'a': n1}))
-        self.assertNotEqual(D({'a': n1}), D({'a': n2}))
+        self.assertEqual(D({"a": n1}), D({"a": n1}))
+        self.assertNotEqual(D({"a": n1}), D({"a": n2}))
 
     def test_mutable_dict(self):
         T = Dict(int, int)
@@ -2227,7 +2282,7 @@ class NativeTypesTests(unittest.TestCase):
         for i in range(1000000):
             d[0] = i
             del d[0]
-        self.assertLess(currentMemUsageMb(), usage+1)
+        self.assertLess(currentMemUsageMb(), usage + 1)
 
     def test_mutable_dict_fuzz(self):
         native_d = Dict(int, int)()
@@ -2285,15 +2340,15 @@ class NativeTypesTests(unittest.TestCase):
                 d[i] = i + 1
 
     def test_mutable_dict_methods(self):
-        d = Dict(int, int)({i: i+1 for i in range(10)})
+        d = Dict(int, int)({i: i + 1 for i in range(10)})
 
         self.assertEqual(list(d.keys()), list(range(10)))
         self.assertEqual(list(d.values()), list(range(1, 11)))
-        self.assertEqual(list(d.items()), [(i, i+1) for i in range(10)])
+        self.assertEqual(list(d.items()), [(i, i + 1) for i in range(10)])
 
         for i in range(10):
-            self.assertEqual(d.get(i), i+1)
-            self.assertEqual(d.get(i, None), i+1)
+            self.assertEqual(d.get(i), i + 1)
+            self.assertEqual(d.get(i, None), i + 1)
 
         self.assertEqual(d.get(1000), None)
         self.assertEqual(d.get(1000, 123), 123)
@@ -2323,16 +2378,18 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(v2, "b")
         self.assertEqual(d[2], "b")
 
-        with self.assertRaisesRegex(TypeError, "Can't initialize a string from an instance of NoneType"):
+        with self.assertRaisesRegex(
+            TypeError, "Can't initialize a string from an instance of NoneType"
+        ):
             d.setdefault(3, None)
 
         self.assertEqual(d.setdefault(3), "")
 
     def test_mutable_dict_pop(self):
         d = Dict(int, str)()
-        d[1] = 'a'
+        d[1] = "a"
 
-        self.assertEqual(d.pop(1), 'a')
+        self.assertEqual(d.pop(1), "a")
         self.assertNotIn(1, d)
 
         with self.assertRaisesRegex(KeyError, "10"):
@@ -2424,7 +2481,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertFalse(isSimple(NamedTuple(x=C)))
 
         X = Forward("X")
-        X = X.define(Alternative("X", X={'x': X}, Y={'i': int}))
+        X = X.define(Alternative("X", X={"x": X}, Y={"i": int}))
         self.assertFalse(isSimple(X))
         self.assertFalse(isSimple(NamedTuple(x=X)))
 
@@ -2442,8 +2499,8 @@ class NativeTypesTests(unittest.TestCase):
         for d in [{1: 2}, {1: 2, 3: 4}]:
             self.assertEqual(Dict(int, int)(d), d)
 
-        self.assertNotEqual(Dict(int, int)({1: 2}), {'1': 2})
-        self.assertNotEqual(Dict(int, int)({1: 2}), {1: '2'})
+        self.assertNotEqual(Dict(int, int)({1: 2}), {"1": 2})
+        self.assertNotEqual(Dict(int, int)({1: 2}), {1: "2"})
         self.assertNotEqual(Dict(int, int)({1: 2}), {2: 3})
 
         self.assertNotEqual(Dict(int, int)({1: 2}), {1: 2.5})
@@ -2454,18 +2511,18 @@ class NativeTypesTests(unittest.TestCase):
     def test_const_dict_with_noncomparable_things(self):
         DictType = ConstDict(OneOf(int, str), int)
 
-        aDict = DictType({1: 100, 'hi': 200, 'bye': 300})
+        aDict = DictType({1: 100, "hi": 200, "bye": 300})
 
         self.assertEqual(aDict[1], 100)
-        self.assertEqual(aDict['hi'], 200)
+        self.assertEqual(aDict["hi"], 200)
 
     def test_const_dict_with_noncomparable_things_as_object(self):
         DictType = ConstDict(object, int)
 
-        aDict = DictType({1: 100, 'hi': 200, 'bye': 300})
+        aDict = DictType({1: 100, "hi": 200, "bye": 300})
 
         self.assertEqual(aDict[1], 100)
-        self.assertEqual(aDict['hi'], 200)
+        self.assertEqual(aDict["hi"], 200)
 
     def test_oneof_conversion(self):
         BrokenOutBool = OneOf(False, True, int)
@@ -2528,7 +2585,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(len(s), 0)
 
     def test_set_contains(self):
-        letters = ['a', 'b', 'c']
+        letters = ["a", "b", "c"]
         s1 = Set(str)()
         s2 = Set(str)()
         for c in letters:
@@ -2595,20 +2652,20 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(_types.refcount(i), 2)
         s.discard(i)
         self.assertEqual(_types.refcount(i), 1)
-        d['a'] = d['b'] = Set(TupleOf(int))((i,))
+        d["a"] = d["b"] = Set(TupleOf(int))((i,))
         self.assertEqual(_types.refcount(i), 2)
         d = None
         self.assertEqual(_types.refcount(i), 1)
         s.add(i)
         self.assertEqual(_types.refcount(i), 2)
         d = Dict(str, Set(TupleOf(int)))()
-        d['a'] = d['b'] = Set(TupleOf(int))((i,))
+        d["a"] = d["b"] = Set(TupleOf(int))((i,))
         self.assertEqual(_types.refcount(i), 3)
         s.clear()
         self.assertEqual(_types.refcount(i), 2)
-        del d['a']
+        del d["a"]
         self.assertEqual(_types.refcount(i), 2)
-        del d['b']
+        del d["b"]
         self.assertEqual(_types.refcount(i), 1)
         d = None
 
@@ -2653,15 +2710,15 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_set_equality(self):
         s = Set(str)()
-        s.add('hello')
+        s.add("hello")
         other_s = Set(str)()
-        other_s.add('world')
+        other_s.add("world")
         another_s = Set(str)()
-        another_s.add('hello')
-        self.assertEqual(set(s), set(['hello']))
-        self.assertEqual(s == 'hello', False)
+        another_s.add("hello")
+        self.assertEqual(set(s), set(["hello"]))
+        self.assertEqual(s == "hello", False)
         self.assertNotEqual(set(s), set(other_s))
-        self.assertEqual(s != 'hello', True)
+        self.assertEqual(s != "hello", True)
         self.assertEqual(s == other_s, False)
         self.assertEqual(s != other_s, True)
         self.assertEqual(s == another_s, True)
@@ -2671,7 +2728,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(s, s)
 
     def test_set_repr(self):
-        repr_s = '{1, 2, 3}'
+        repr_s = "{1, 2, 3}"
         s = Set(int)([1, 2, 3])
         self.assertEqual(repr(s), repr_s)
 
@@ -2703,12 +2760,12 @@ class NativeTypesTests(unittest.TestCase):
     def test_set_assign_from_existing_dict_key_nothrow(self):
         d = Dict(str, Set(int))()
         i = Set(int)()
-        d['a'] = i
-        d['a'] = i
-        d['a'] = Set(int)()
+        d["a"] = i
+        d["a"] = i
+        d["a"] = Set(int)()
 
     def test_set_uniquification(self):
-        word = 'simsalabim'
+        word = "simsalabim"
         s = Set(str)()
         for i in word:
             s.add(i)
@@ -2735,7 +2792,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertRaises(TypeError, s.copy, [])
 
     def test_set_construct_from_str(self):
-        word = 'symbolic'
+        word = "symbolic"
         s = Set(str)(word)
         self.assertEqual(len(s), 8)
         self.assertEqual(s == word, False)
@@ -2748,10 +2805,10 @@ class NativeTypesTests(unittest.TestCase):
     def test_set_ops_throws_diff_type(self):
         s = Set(int)([1])
         self.assertRaises(TypeError, s.union, 1.0)
-        self.assertRaises(TypeError, s.union, 'hello')
-        self.assertRaises(TypeError, s.union, ListOf(str)(['hello']))
+        self.assertRaises(TypeError, s.union, "hello")
+        self.assertRaises(TypeError, s.union, ListOf(str)(["hello"]))
         self.assertRaises(TypeError, s.union, [[]])
-        s = Set(str)('hello')
+        s = Set(str)("hello")
         self.assertRaises(TypeError, s.union, 1)
         self.assertRaises(TypeError, s.union, ListOf(int)([1]))
         self.assertRaises(TypeError, s.union, [[]])
@@ -2771,8 +2828,8 @@ class NativeTypesTests(unittest.TestCase):
         self.assertNotEqual(id(s), id(s2), id(k))
 
     def test_set_union(self):
-        word = 'symbolic'
-        word2 = 'word'
+        word = "symbolic"
+        word2 = "word"
         s = Set(str)(word)
         u = s.union(Set(str)(word2))
         self.assertEqual(s, Set(str)(word))
@@ -2785,24 +2842,24 @@ class NativeTypesTests(unittest.TestCase):
                 self.assertIn(c, u)
                 self.assertIn(c, s)
 
-        chars = 'abcd'
-        u = Set(str)('abcba').union(Set(str)('cdc'))
+        chars = "abcd"
+        u = Set(str)("abcba").union(Set(str)("cdc"))
         s = set(chars)
         _check(u, s, chars)
-        chars = 'abcefg'
-        u = Set(str)('abcba').union(Set(str)('efgfe'))
-        s = set('abcefg')
+        chars = "abcefg"
+        u = Set(str)("abcba").union(Set(str)("efgfe"))
+        s = set("abcefg")
         _check(u, s, chars)
-        chars = 'abc'
-        u = Set(str)('abcba').union(Set(str)('ccb'))
+        chars = "abc"
+        u = Set(str)("abcba").union(Set(str)("ccb"))
         s = set(chars)
         _check(u, s, chars)
-        chars = 'abcef'
-        u = Set(str)('abcba').union(Set(str)('ef'))
+        chars = "abcef"
+        u = Set(str)("abcba").union(Set(str)("ef"))
         s = set(chars)
         _check(u, s, chars)
-        chars = 'abcefg'
-        u = Set(str)('abcba').union(Set(str)('ef'), Set(str)('fg'))
+        chars = "abcefg"
+        u = Set(str)("abcba").union(Set(str)("ef"), Set(str)("fg"))
         s = set(chars)
         _check(u, s, chars)
 
@@ -2814,113 +2871,113 @@ class NativeTypesTests(unittest.TestCase):
         # operators require type matching; but methods accept iterables
         # methods accept any number of arguments, except symmetric_difference, which requires exactly one argument
 
-        self.assertEqual(S('abcba').union(), S('abc'))
-        self.assertEqual(S('abc').union(S('bcd')), S('abc') | S('bcd'))
+        self.assertEqual(S("abcba").union(), S("abc"))
+        self.assertEqual(S("abc").union(S("bcd")), S("abc") | S("bcd"))
         for C in set, list, tuple, ListOf(str), TupleOf(str), S:
-            self.assertEqual(S('abcba').union(C('cdc')), S('abcd'))
-            self.assertEqual(S('abcba').union(C('ef'), C('fg')), S('abcefg'))
+            self.assertEqual(S("abcba").union(C("cdc")), S("abcd"))
+            self.assertEqual(S("abcba").union(C("ef"), C("fg")), S("abcefg"))
             with self.assertRaises(TypeError):
-                S('abc').union(C([1, 2, 3]))
+                S("abc").union(C([1, 2, 3]))
             if C is not S:
                 with self.assertRaises(TypeError):
-                    S('abc') | C('bcd')
+                    S("abc") | C("bcd")
 
         # intersection
-        self.assertEqual(S('abcba').intersection(), S('abc'))
-        self.assertEqual(S('abc').intersection(S('bcd')), S('abc') & S('bcd'))
+        self.assertEqual(S("abcba").intersection(), S("abc"))
+        self.assertEqual(S("abc").intersection(S("bcd")), S("abc") & S("bcd"))
         for C in set, list, tuple, ListOf(str), TupleOf(str), S:
-            self.assertEqual(S('abcba').intersection(C('cdc')), S('cc'))
-            self.assertEqual(S('abcba').intersection(C('efgfe')), S(''))
-            self.assertEqual(S('abcba').intersection(C('ccb')), S('bc'))
-            self.assertEqual(S('abcba').intersection(C('ef')), S(''))
-            self.assertEqual(S('abcba').intersection(C('cbcf'), C('bag')), S('b'))
+            self.assertEqual(S("abcba").intersection(C("cdc")), S("cc"))
+            self.assertEqual(S("abcba").intersection(C("efgfe")), S(""))
+            self.assertEqual(S("abcba").intersection(C("ccb")), S("bc"))
+            self.assertEqual(S("abcba").intersection(C("ef")), S(""))
+            self.assertEqual(S("abcba").intersection(C("cbcf"), C("bag")), S("b"))
             with self.assertRaises(TypeError):
-                S('abc').intersection(C([1, 2, 3]))
+                S("abc").intersection(C([1, 2, 3]))
             if C is not S:
                 with self.assertRaises(TypeError):
-                    S('abc') & C('bcd')
+                    S("abc") & C("bcd")
 
         # difference
-        self.assertEqual(S('abcba').difference(), S('abc'))
-        self.assertEqual(S('abc').difference(S('bcd')), S('abc') - S('bcd'))
+        self.assertEqual(S("abcba").difference(), S("abc"))
+        self.assertEqual(S("abc").difference(S("bcd")), S("abc") - S("bcd"))
         for C in set, list, tuple, ListOf(str), TupleOf(str), S:
-            self.assertEqual(S('abcba').difference(C('cdc')), S('ab'))
-            self.assertEqual(S('abcba').difference(C('efgfe')), S('abc'))
-            self.assertEqual(S('abcba').difference(C('ccb')), S('a'))
-            self.assertEqual(S('abcba').difference(C('ef')), S('abc'))
-            self.assertEqual(S('abcba').difference(C('ef'), C('ag'), C('a')), S('bc'))
+            self.assertEqual(S("abcba").difference(C("cdc")), S("ab"))
+            self.assertEqual(S("abcba").difference(C("efgfe")), S("abc"))
+            self.assertEqual(S("abcba").difference(C("ccb")), S("a"))
+            self.assertEqual(S("abcba").difference(C("ef")), S("abc"))
+            self.assertEqual(S("abcba").difference(C("ef"), C("ag"), C("a")), S("bc"))
             with self.assertRaises(TypeError):
-                S('abc').difference(C([1, 2, 3]))
+                S("abc").difference(C([1, 2, 3]))
             if C is not S:
                 with self.assertRaises(TypeError):
-                    S('abc') - C('bcd')
+                    S("abc") - C("bcd")
 
         # symmetric difference
         with self.assertRaises(TypeError):
-            S('abcba').symmetric_difference()
-        self.assertEqual(S('abc').symmetric_difference(S('bcd')), S('abc') ^ S('bcd'))
+            S("abcba").symmetric_difference()
+        self.assertEqual(S("abc").symmetric_difference(S("bcd")), S("abc") ^ S("bcd"))
         for C in set, list, tuple, ListOf(str), TupleOf(str), S:
-            self.assertEqual(S('abcba').symmetric_difference(C('cdc')), S('abd'), C)
-            self.assertEqual(S('abcba').symmetric_difference(C('efgfe')), S('abcefg'), C)
-            self.assertEqual(S('abcba').symmetric_difference(C('ccb')), S('a'), C)
-            self.assertEqual(S('abcba').symmetric_difference(C('ef')), S('abcef'), C)
+            self.assertEqual(S("abcba").symmetric_difference(C("cdc")), S("abd"), C)
+            self.assertEqual(S("abcba").symmetric_difference(C("efgfe")), S("abcefg"), C)
+            self.assertEqual(S("abcba").symmetric_difference(C("ccb")), S("a"), C)
+            self.assertEqual(S("abcba").symmetric_difference(C("ef")), S("abcef"), C)
             with self.assertRaises(TypeError):
-                S('abc').symmetric_difference(C([1, 2, 3]))
+                S("abc").symmetric_difference(C([1, 2, 3]))
             if C is not S:
                 with self.assertRaises(TypeError):
-                    S('abc') ^ C('bcd')
+                    S("abc") ^ C("bcd")
         with self.assertRaises(TypeError):
-            S('abcba').symmetric_difference(set("cd"), set("ef"))
+            S("abcba").symmetric_difference(set("cd"), set("ef"))
 
         # subset
         for C in set, list, tuple, ListOf(str), TupleOf(str), S:
-            self.assertFalse(S('abcba').issubset(C('cdc')), C)
-            self.assertFalse(S('abcba').issubset(C('efgfe')), C)
-            self.assertTrue(S('abcba').issubset(C('abcdecad')), C)
-            self.assertFalse(S('abcba').issubset(C('ccb')), C)
+            self.assertFalse(S("abcba").issubset(C("cdc")), C)
+            self.assertFalse(S("abcba").issubset(C("efgfe")), C)
+            self.assertTrue(S("abcba").issubset(C("abcdecad")), C)
+            self.assertFalse(S("abcba").issubset(C("ccb")), C)
 
-        self.assertFalse(S('abcba') <= S('cdc'))
-        self.assertFalse(S('abcba') <= S('efgfe'))
-        self.assertTrue(S('abcba') <= S('abcdecad'))
-        self.assertFalse(S('abcba') <= S('ccb'))
-        self.assertTrue(S('abcba') <= S('abcc'))
+        self.assertFalse(S("abcba") <= S("cdc"))
+        self.assertFalse(S("abcba") <= S("efgfe"))
+        self.assertTrue(S("abcba") <= S("abcdecad"))
+        self.assertFalse(S("abcba") <= S("ccb"))
+        self.assertTrue(S("abcba") <= S("abcc"))
 
-        self.assertFalse(S('abcba') < S('cdc'))
-        self.assertFalse(S('abcba') < S('efgfe'))
-        self.assertTrue(S('abcba') < S('abcdecad'))
-        self.assertFalse(S('abcba') < S('ccb'))
-        self.assertFalse(S('abcba') < S('abcc'))
+        self.assertFalse(S("abcba") < S("cdc"))
+        self.assertFalse(S("abcba") < S("efgfe"))
+        self.assertTrue(S("abcba") < S("abcdecad"))
+        self.assertFalse(S("abcba") < S("ccb"))
+        self.assertFalse(S("abcba") < S("abcc"))
 
         # superset
         for C in set, list, tuple, ListOf(str), TupleOf(str), S:
-            self.assertFalse(S('abcba').issuperset(C('cdc')), C)
-            self.assertFalse(S('abcba').issuperset(C('efgfe')), C)
-            self.assertFalse(S('abcba').issuperset(C('abcdecad')), C)
-            self.assertTrue(S('abcba').issuperset(C('ccb')), C)
+            self.assertFalse(S("abcba").issuperset(C("cdc")), C)
+            self.assertFalse(S("abcba").issuperset(C("efgfe")), C)
+            self.assertFalse(S("abcba").issuperset(C("abcdecad")), C)
+            self.assertTrue(S("abcba").issuperset(C("ccb")), C)
 
-        self.assertFalse(S('abcba') >= S('cdc'))
-        self.assertFalse(S('abcba') >= S('efgfe'))
-        self.assertFalse(S('abcba') >= S('abcdecad'))
-        self.assertTrue(S('abcba') >= S('ccb'))
-        self.assertTrue(S('abcba') >= S('abcc'))
+        self.assertFalse(S("abcba") >= S("cdc"))
+        self.assertFalse(S("abcba") >= S("efgfe"))
+        self.assertFalse(S("abcba") >= S("abcdecad"))
+        self.assertTrue(S("abcba") >= S("ccb"))
+        self.assertTrue(S("abcba") >= S("abcc"))
 
-        self.assertFalse(S('abcba') > S('cdc'))
-        self.assertFalse(S('abcba') > S('efgfe'))
-        self.assertFalse(S('abcba') > S('abcdecad'))
-        self.assertTrue(S('abcba') > S('ccb'))
-        self.assertFalse(S('abcba') > S('abcc'))
+        self.assertFalse(S("abcba") > S("cdc"))
+        self.assertFalse(S("abcba") > S("efgfe"))
+        self.assertFalse(S("abcba") > S("abcdecad"))
+        self.assertTrue(S("abcba") > S("ccb"))
+        self.assertFalse(S("abcba") > S("abcc"))
 
         # disjoint
         for C in set, list, tuple, ListOf(str), TupleOf(str), S:
-            self.assertFalse(S('abcba').isdisjoint(C('cdc')), C)
-            self.assertTrue(S('abcba').isdisjoint(C('efgfe')), C)
-            self.assertFalse(S('abcba').isdisjoint(C('abcdecad')), C)
-            self.assertFalse(S('abcba').isdisjoint(C('ccb')), C)
+            self.assertFalse(S("abcba").isdisjoint(C("cdc")), C)
+            self.assertTrue(S("abcba").isdisjoint(C("efgfe")), C)
+            self.assertFalse(S("abcba").isdisjoint(C("abcdecad")), C)
+            self.assertFalse(S("abcba").isdisjoint(C("ccb")), C)
 
     def test_set_intersection(self):
-        word1 = 'symbolic'
-        word2 = 'words'
-        alphabet = 'abcdefghijklmnopqrstuvwxyz'
+        word1 = "symbolic"
+        word2 = "words"
+        alphabet = "abcdefghijklmnopqrstuvwxyz"
 
         s1 = Set(str)(word1)
         s2 = Set(str)(word2)
@@ -2939,9 +2996,9 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(_types.refcount(s1), 1)
 
     def test_set_difference(self):
-        word1 = 'symbolic'
-        word2 = 'symbolism'
-        alphabet = 'abcdefghijklmnopqrstuvwxyz'
+        word1 = "symbolic"
+        word2 = "symbolism"
+        alphabet = "abcdefghijklmnopqrstuvwxyz"
         s1 = Set(str)(word1)
         s2 = Set(str)(word2)
         i = s1.difference(s2)
@@ -2954,16 +3011,18 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(type(i), Set(str))
 
     def test_set_symmetric_difference(self):
-        word1 = 'symbolic'
-        word2 = 'symbolism'
-        alphabet = 'abcdefghijklmnopqrstuvwxyz'
+        word1 = "symbolic"
+        word2 = "symbolism"
+        alphabet = "abcdefghijklmnopqrstuvwxyz"
         s1 = Set(str)(word1)
         s2 = Set(str)(word2)
         i = s1.symmetric_difference(s2)
         i_operator = s1 ^ s2
         self.assertEqual(i, i_operator)
         for c in alphabet:
-            self.assertEqual(c in i, (c in word1 and c not in word2) or (c not in word1 and c in word2))
+            self.assertEqual(
+                c in i, (c in word1 and c not in word2) or (c not in word1 and c in word2)
+            )
 
         self.assertEqual(s1, Set(str)(word1))
         self.assertEqual(type(i), Set(str))
@@ -2983,7 +3042,7 @@ class NativeTypesTests(unittest.TestCase):
         tupleOfLists = listOfTuples.transpose()
 
         self.assertEqual(tupleOfLists.x, [1, 2])
-        self.assertEqual(tupleOfLists.y, ['hi', 'hihi'])
+        self.assertEqual(tupleOfLists.y, ["hi", "hihi"])
         self.assertEqual(tupleOfLists.z, [False, True])
 
     def test_const_dict_equality_with_python(self):
@@ -2998,24 +3057,37 @@ class NativeTypesTests(unittest.TestCase):
                 self.assertEqual(d1 == CD(d2), d1 == d2)
 
     def test_alternative_reverse_operators(self):
-        A = Alternative("A", a={'a': int}, b={'b': str},
-                        __radd__=lambda lhs, rhs: "radd",
-                        __rsub__=lambda lhs, rhs: "rsub",
-                        __rmul__=lambda lhs, rhs: "rmul",
-                        __rmatmul__=lambda lhs, rhs: "rmatmul",
-                        __rtruediv__=lambda lhs, rhs: "rtruediv",
-                        __rfloordiv__=lambda lhs, rhs: "rfloordiv",
-                        __rmod__=lambda lhs, rhs: "rmod",
-                        __rpow__=lambda lhs, rhs: "rpow",
-                        __rlshift__=lambda lhs, rhs: "rlshift",
-                        __rrshift__=lambda lhs, rhs: "rrshift",
-                        __rand__=lambda lhs, rhs: "rand",
-                        __rxor__=lambda lhs, rhs: "rxor",
-                        __ror__=lambda lhs, rhs: "ror"
-                        )
+        A = Alternative(
+            "A",
+            a={"a": int},
+            b={"b": str},
+            __radd__=lambda lhs, rhs: "radd",
+            __rsub__=lambda lhs, rhs: "rsub",
+            __rmul__=lambda lhs, rhs: "rmul",
+            __rmatmul__=lambda lhs, rhs: "rmatmul",
+            __rtruediv__=lambda lhs, rhs: "rtruediv",
+            __rfloordiv__=lambda lhs, rhs: "rfloordiv",
+            __rmod__=lambda lhs, rhs: "rmod",
+            __rpow__=lambda lhs, rhs: "rpow",
+            __rlshift__=lambda lhs, rhs: "rlshift",
+            __rrshift__=lambda lhs, rhs: "rrshift",
+            __rand__=lambda lhs, rhs: "rand",
+            __rxor__=lambda lhs, rhs: "rxor",
+            __ror__=lambda lhs, rhs: "ror",
+        )
 
-        values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
-                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"}), PointerTo(int)()]
+        values = [
+            1,
+            Int16(1),
+            UInt64(1),
+            1.234,
+            Float32(1.234),
+            True,
+            "abc",
+            ListOf(int)((1, 2)),
+            ConstDict(str, str)({"a": "1"}),
+            PointerTo(int)(),
+        ]
         for v in values:
             self.assertEqual(v + A.a(), "radd")
             self.assertEqual(v - A.a(), "rsub")
@@ -3059,21 +3131,24 @@ class NativeTypesTests(unittest.TestCase):
                 A.a() | v
 
     def test_alternative_missing_inplace_operators_fallback(self):
-        A = Alternative("A", a={'a': int}, b={'b': str},
-                        __add__=lambda self, other: "worked",
-                        __sub__=lambda self, other: "worked",
-                        __mul__=lambda self, other: "worked",
-                        __matmul__=lambda self, other: "worked",
-                        __truediv__=lambda self, other: "worked",
-                        __floordiv__=lambda self, other: "worked",
-                        __mod__=lambda self, other: "worked",
-                        __pow__=lambda self, other: "worked",
-                        __lshift__=lambda self, other: "worked",
-                        __rshift__=lambda self, other: "worked",
-                        __and__=lambda self, other: "worked",
-                        __or__=lambda self, other: "worked",
-                        __xor__=lambda self, other: "worked",
-                        )
+        A = Alternative(
+            "A",
+            a={"a": int},
+            b={"b": str},
+            __add__=lambda self, other: "worked",
+            __sub__=lambda self, other: "worked",
+            __mul__=lambda self, other: "worked",
+            __matmul__=lambda self, other: "worked",
+            __truediv__=lambda self, other: "worked",
+            __floordiv__=lambda self, other: "worked",
+            __mod__=lambda self, other: "worked",
+            __pow__=lambda self, other: "worked",
+            __lshift__=lambda self, other: "worked",
+            __rshift__=lambda self, other: "worked",
+            __and__=lambda self, other: "worked",
+            __or__=lambda self, other: "worked",
+            __xor__=lambda self, other: "worked",
+        )
 
         v = A.a()
         v += 10
@@ -3150,7 +3225,7 @@ class NativeTypesTests(unittest.TestCase):
             NamedTuple(x=int, y=float)((1, 2)),
             NamedTuple(x=int, y=float, z=float)((1, 2, 3)),
             NamedTuple(x=int, y=float)((2, 2)),
-            NamedTuple(x=int, y=float, z=int)((2, 2, 3))
+            NamedTuple(x=int, y=float, z=int)((2, 2, 3)),
         ]
 
         for t1 in things:
