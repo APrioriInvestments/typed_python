@@ -2772,6 +2772,30 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(callFunc(f1, 10.5), "10.5")
         self.assertEqual(callFunc(f2, 10.5), 10)
 
+    def test_code_with_nested_listcomp(self):
+        def call(x):
+            return [[(i, 0, 0) for i in y] for y in x]
+
+        ast = convertFunctionToAlgebraicPyAst(call)
+
+        evaluateFunctionDefWithLocalsInCells(ast, {'f': str}, {})
+
+    def test_code_with_nested_setcomp(self):
+        def call(x):
+            return {[(i, 0, 0) for i in y] for y in x}
+
+        ast = convertFunctionToAlgebraicPyAst(call)
+
+        evaluateFunctionDefWithLocalsInCells(ast, {'f': str}, {})
+
+    def test_code_with_nested_dictcomp(self):
+        def call(x):
+            return {0: [(i, 0, 0) for i in y] for y in x}
+
+        ast = convertFunctionToAlgebraicPyAst(call)
+
+        evaluateFunctionDefWithLocalsInCells(ast, {'f': str}, {})
+
     def test_closure_grabs_global_typed_object(self):
         def countIt(x):
             res = 0

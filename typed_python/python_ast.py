@@ -996,12 +996,23 @@ def cacheAstForCode(code, pyAst):
     else:
         funcDefs = extractFunctionDefsInOrder(pyAst.generators)
 
+        if pyAst.matches.ListComp or pyAst.matches.SetComp or pyAst.matches.GeneratorExp:
+            funcDefs = extractFunctionDefsInOrder(pyAst.elt) + funcDefs
+
+        if pyAst.matches.DictComp:
+            funcDefs = (
+                extractFunctionDefsInOrder(pyAst.key)
+                + extractFunctionDefsInOrder(pyAst.value)
+                + funcDefs
+            )
+
     _originalAstCache[code] = pyAst
 
     assert len(funcDefs) == len(codeConstants), (
         f"Expected {len(funcDefs)} func defs to cover the "
         f"{len(codeConstants)} code constants we found in "
         f"{code.co_name} in {code.co_filename}:{code.co_firstlineno}"
+        f" of type {type(pyAst)}"
     )
 
     for i in range(len(funcDefs)):
