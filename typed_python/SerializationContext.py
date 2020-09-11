@@ -90,6 +90,16 @@ class SerializationContext(object):
         self.internalizeTypeGroups = internalizeTypeGroups
         self.serializeFunctionsAsNonAst = serializeFunctionsAsNonAst
 
+    def addNamedObject(self, name, obj):
+        self.nameToObjectOverride[name] = obj
+        self.objectToNameOverride[id(obj)] = name
+
+    def dropNamedObject(self, name):
+        objId = id(self.nameToObjectOverride[name])
+
+        del self.nameToObjectOverride[name]
+        del self.objectToNameOverride[objId]
+
     def compress(self, bytes):
         if self.compressionEnabled:
             res = lz4.frame.compress(bytes)
