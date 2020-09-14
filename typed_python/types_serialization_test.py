@@ -2063,3 +2063,12 @@ class TypesSerializationTest(unittest.TestCase):
             setFunctionClosure(aFun, makeFunWithClosure(20).__closure__)
 
         assert currentMemUsageMb() < mem + 1
+
+    def test_serialize_without_line_info_doesnt_have_path(self):
+        def aFun():
+            return 10
+
+        sc = SerializationContext().withoutCompression().withoutLineInfoEncoded()
+
+        assert b'types_serialization_test' not in sc.serialize(aFun.__code__)
+        assert b'types_serialization_test' not in sc.serialize(aFun.__code__)

@@ -449,7 +449,8 @@ class SerializationContext(object):
                 # serialize only enough to hash this
                 return (
                     astToCodeObject,
-                    (inst.co_freevars, inst.co_code, inst.co_names, inst.co_consts, inst.co_varnames, inst.co_filename,
+                    (inst.co_freevars, inst.co_code, inst.co_names, inst.co_consts, inst.co_varnames,
+                     inst.co_filename if self.encodeLineInformationForCode else None,
                      inst.co_firstlineno if self.encodeLineInformationForCode else None),
                     None
                 )
