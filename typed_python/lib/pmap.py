@@ -131,6 +131,9 @@ def pmap(lst, f, OutT):
     # fill out the work queue
     jobCount = len(lst) // jobGranularity
 
+    if jobCount * jobGranularity < len(lst):
+        jobCount += 1
+
     for i in range(jobCount):
         tup = Tuple(Job, int)((job, i))
         work_queue.put(tup)

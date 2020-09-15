@@ -124,3 +124,13 @@ def test_pmap_with_uninitializable():
 
     with pytest.raises(TypeError, match="default initialize"):
         tryResize(someCs, 101)
+
+
+def test_pmap_with_lots_of_work():
+    def makesOne(x):
+        return 1
+
+    res = pmap(ListOf(int)(range(1299827)), makesOne, int)
+
+    for r in res:
+        assert r == 1
