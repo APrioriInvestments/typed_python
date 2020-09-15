@@ -1590,7 +1590,12 @@ Instance PyInstance::unwrapPyObjectToInstance(PyObject* inst, bool allowArbitrar
 
 // static
 Type* PyInstance::tryUnwrapPyInstanceToValueType(PyObject* typearg, bool allowArbitraryPyObjects) {
+    if (typearg == Py_None) {
+        return NoneType::Make();
+    }
+
     Type* nativeType = PyInstance::extractTypeFrom(typearg->ob_type);
+
     if (nativeType) {
         if (nativeType->getTypeCategory() == Type::TypeCategory::catClass) {
             return nullptr;

@@ -134,3 +134,16 @@ def test_pmap_with_lots_of_work():
 
     for r in res:
         assert r == 1
+
+
+def test_pmap_with_no_output():
+    aList = ListOf(int)()
+    aList.resize(100)
+
+    def setIt(x):
+        aList[x] = x
+
+    pmap(ListOf(int)(range(100)), setIt, None)
+
+    for i in range(100):
+        assert aList[i] == i

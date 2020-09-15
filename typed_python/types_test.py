@@ -577,6 +577,19 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             o(False)
 
+    def test_use_of_None(self):
+        o1 = OneOf(None, str)
+        o2 = OneOf(type(None), str)
+        assert o1.Types[0] == o2.Types[0] == type(None)  # noqa
+
+        p1 = PointerTo(None)
+        p2 = PointerTo(type(None))
+        assert p1.ElementType == p2.ElementType == type(None)  # noqa
+
+        s1 = Set(None)
+        s2 = Set(type(None))
+        assert s1.ElementType == s2.ElementType == type(None)  # noqa
+
     def test_ordering(self):
         # TODO: investigate and correct: with the ordering 1, True, the assertion o(True) is True fails
         o = OneOf(None, "hi", 1.5, True, 1, b"hi2")
