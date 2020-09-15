@@ -15,7 +15,8 @@
 import math
 
 from typed_python import (
-    Class, Member, ListOf, Final, TypeFunction, Tuple, Float32, Int32, NotCompiled
+    Class, Member, ListOf, Final, TypeFunction, Tuple, Float32, Int32, NotCompiled,
+    Entrypoint
 )
 
 from typed_python.array.fortran import axpy, gemv, gemm, getri, getrf
@@ -173,6 +174,7 @@ def Array(T):
         # operators
         #########################################
 
+        @Entrypoint
         def __matmul__(self, other: Array(T)) -> T:  # noqa
             if other.shape != self.shape:
                 raise Exception(f"Mismatched array sizes: {self.shape} != {other.shape}")
@@ -194,13 +196,16 @@ def Array(T):
         def __matmul__(self, other: Matrix(T)) -> Array(T):  # noqa
             return other.__rmatmul__(self)
 
+        @Entrypoint
         def _inplaceBinopCheck(self, other: T):
             pass
 
+        @Entrypoint  # noqa
         def _inplaceBinopCheck(self, other: Array(T)):  # noqa
             if other._shape != self._shape:
                 raise Exception("Mismatched array sizes.")
 
+        @Entrypoint
         def _inplaceBinop(self, other: Array(T), binaryFunc):
             p = self._vals.pointerUnsafe(self._offset)
             p2 = other._vals.pointerUnsafe(other._offset)
@@ -213,6 +218,7 @@ def Array(T):
 
             return self
 
+        @Entrypoint
         def _inplaceUnaryOp(self, f):
             p = self._vals.pointerUnsafe(self._offset)
 
@@ -220,6 +226,7 @@ def Array(T):
                 p.set(f(p.get()))
                 p += self._stride
 
+        @Entrypoint  # noqa
         def _inplaceBinop(self, other: T, binaryFunc):  # noqa
             p = self._vals.pointerUnsafe(self._offset)
 
@@ -228,9 +235,11 @@ def Array(T):
 
             return self
 
+        @Entrypoint
         def clone(self):
             return Array(T)(self.toList())
 
+        @Entrypoint
         def toList(self):
             newVals = ListOf(T)()
             newVals.reserve(self._shape)
@@ -245,6 +254,7 @@ def Array(T):
 
             return newVals
 
+        @Entrypoint
         @staticmethod
         def full(count: int, value: T):
             if count < 0:
@@ -254,6 +264,7 @@ def Array(T):
             res.resize(count, value)
             return Array(T)(res)
 
+        @Entrypoint
         def sum(self):
             res = T()
 
@@ -439,9 +450,11 @@ def Matrix(T):
         # operators
         #########################################
 
+        @Entrypoint
         def _inplaceBinopCheck(self, other: T) -> None:
             pass
 
+        @Entrypoint  # noqa
         def _inplaceBinopCheck(self, other: Matrix(T)) -> None:  # noqa
             if other.shape[0] != self.shape[0]:
                 raise Exception("Mismatched array sizes.")
@@ -449,6 +462,7 @@ def Matrix(T):
             if other.shape[1] != self.shape[1]:
                 raise Exception("Mismatched array sizes.")
 
+        @Entrypoint
         def _inplaceBinop(self, other: Matrix(T), binaryFunc):
             pSelf = self._vals.pointerUnsafe(self._offset)
             pOther = other._vals.pointerUnsafe(self._offset)
@@ -467,6 +481,7 @@ def Matrix(T):
 
             return self
 
+        @Entrypoint  # noqa
         def _inplaceBinop(self, other: T, binaryFunc):  # noqa
             pSelf = self._vals.pointerUnsafe(self._offset)
 
@@ -493,6 +508,7 @@ def Matrix(T):
 
                 p += self._stride[0]
 
+        @Entrypoint
         def toList(self):
             newVals = ListOf(T)()
             newVals.reserve(self._flatShape)
@@ -512,6 +528,7 @@ def Matrix(T):
 
             return newVals
 
+        @Entrypoint
         def clone(self):
             newVals = self.toList()
             return Matrix(T)(newVals, 0, Tuple(int, int)((self._shape[1], 1)), self._shape)
@@ -526,6 +543,7 @@ def Matrix(T):
 
             return Matrix(T)(res, 0, Tuple(int, int)((columns, 1)), Tuple(int, int)((rows, columns)))
 
+        @Entrypoint
         @staticmethod
         def make(rows: int, columns: int, f):
             if rows < 0 or columns < 0:
@@ -558,6 +576,7 @@ def Matrix(T):
 
             return Matrix_.full(rows, columns, 0.0)
 
+        @Entrypoint
         @staticmethod
         def identity(x: int):
             m = Matrix_.zeros(x, x)
@@ -577,6 +596,7 @@ def Matrix(T):
                 self._shape[1]
             )
 
+        @Entrypoint
         def __setitem__(self, i: int, val: Array(T)):
             # set a row of the matrix
             if i < 0 or i >= self._shape[0]:
