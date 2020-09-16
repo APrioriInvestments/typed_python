@@ -15,6 +15,7 @@
 from typed_python import _types, ListOf, TupleOf, Dict, ConstDict, Compiled, Entrypoint, OneOf
 from typed_python.test_util import currentMemUsageMb, compilerPerformanceComparison
 from typed_python.compiler.runtime import PrintNewFunctionVisitor
+import pytest
 import unittest
 import time
 import flaky
@@ -170,22 +171,88 @@ class TestStringCompilation(unittest.TestCase):
         for i in range(0, 0x10ffff + 1):
             self.assertEqual(ord(callChr(i)), i)
 
-    def test_string_start_and_endswith(self):
+    def test_string_startswith_endswith(self):
         def startswith(x: str, y: str):
             return x.startswith(y)
 
         def endswith(x: str, y: str):
             return x.endswith(y)
 
-        compiledSW = Compiled(startswith)
-        compiledEW = Compiled(endswith)
+        def startswith_range(x: str, y: str, start: int, end: int):
+            return x.startswith(y, start, end)
+
+        def endswith_range(x: str, y: str, start: int, end: int):
+            return x.endswith(y, start, end)
+
+        c_startswith = Compiled(startswith)
+        c_endswith = Compiled(endswith)
+        c_startswith_range = Compiled(startswith_range)
+        c_endswith_range = Compiled(endswith_range)
 
         strings = ["", "a", "ab", "b", "abc", "bc", "ac", "ab", "bc", "bca"]
 
         for s1 in strings:
             for s2 in strings:
-                self.assertEqual(startswith(s1, s2), compiledSW(s1, s2))
-                self.assertEqual(endswith(s1, s2), compiledEW(s1, s2))
+                self.assertEqual(startswith(s1, s2), c_startswith(s1, s2))
+                self.assertEqual(endswith(s1, s2), c_endswith(s1, s2))
+                for start in range(-5, 5):
+                    for end in range(-5, 5):
+                        self.assertEqual(
+                            startswith_range(s1, s2, start, end),
+                            c_startswith_range(s1, s2, start, end),
+                            (s1, s2, start, end)
+                        )
+                        self.assertEqual(
+                            endswith_range(s1, s2, start, end),
+                            c_endswith_range(s1, s2, start, end),
+                            (s1, s2, start, end)
+                        )
+
+    def test_string_tuple_startswith_endswith(self):
+        def startswith(x, y):
+            return x.startswith(y)
+
+        def endswith(x, y):
+            return x.endswith(y)
+
+        def startswith_range(x, y, start, end):
+            return x.startswith(y, start, end)
+
+        def endswith_range(x, y, start, end):
+            return x.endswith(y, start, end)
+
+        c_startswith = Entrypoint(startswith)
+        c_endswith = Entrypoint(endswith)
+        c_startswith_range = Entrypoint(startswith_range)
+        c_endswith_range = Entrypoint(endswith_range)
+
+        with self.assertRaises(TypeError):
+            c_startswith('abc', ['a', 'b'])
+
+        # TODO: raise TypeError in this case (currently, SystemError is raised)
+        # with self.assertRaises(TypeError):
+        #     c_startswith('abc', (1, 3))
+
+        strings = ["", "a", "ab", "b", "abc", "bc", "ac", "ab", "bc", "bca"]
+        tuples = [(a, b) for a in strings for b in strings]
+        for s in strings:
+            for t in tuples:
+                self.assertEqual(startswith(s, t), c_startswith(s, t))
+                self.assertEqual(startswith(s, t), c_startswith(s, TupleOf(str)(t)))
+                self.assertEqual(endswith(s, t), c_endswith(s, t))
+                self.assertEqual(endswith(s, t), c_endswith(s, TupleOf(str)(t)))
+                for start in range(-5, 5):
+                    for end in range(-5, 5):
+                        self.assertEqual(
+                            startswith_range(s, t, start, end),
+                            c_startswith_range(s, t, start, end),
+                            (s, t, start, end)
+                        )
+                        self.assertEqual(
+                            endswith_range(s, t, start, end),
+                            c_endswith_range(s, t, start, end),
+                            (s, t, start, end)
+                        )
 
     def test_string_replace(self):
         def replace(x: str, y: str, z: str):
@@ -894,6 +961,34 @@ class TestStringCompilation(unittest.TestCase):
                         r2 = callOrExceptType(Entrypoint(f), v, enc, err)
                         self.assertEqual(r1, r2)
 
+    @pytest.mark.skip(reason='not performant')
+    def test_string_codec(self):
+        s1 = ''.join([chr(i) for i in range(0, 0x10ffff, 13) if i < 0xD800 or i > 0xDFFF])
+        s2 = ''.join([chr(i) for i in range(1, 0x10ffff, 17) if i < 0xD800 or i > 0xDFFF])
+        s3 = ''.join([chr(i) for i in range(2, 0x10ffff, 11) if i < 0xD800 or i > 0xDFFF])
+        cases = [s1, s2, s3]
+        for i in [2 ** n for n in range(16)]:
+            cases += [s1[1:i], s2[1:i], s3[1:i]]
+
+        def f_encode(s: str) -> bytes:
+            return s.encode('utf-8', 'strict')
+
+        def f_decode(s: bytes) -> str:
+            return s.decode('utf-8', 'strict')
+
+        def f_endecode(s: str) -> bool:
+            s2 = s.encode('utf-8', 'strict').decode('utf-8', 'strict')
+            return s == s2
+
+        # c_encode = Compiled(f_encode)
+        # c_decode = Compiled(f_decode)
+        c_endecode = Compiled(f_endecode)
+
+        for v in cases:
+            self.assertTrue(f_endecode(v))
+            self.assertTrue(c_endecode(v))
+
+    @pytest.mark.skip(reason='not performant')
     def test_string_codec_perf(self):
         repeat = 500
         s1 = ''.join([chr(i) for i in range(0, 0x10ffff, 13) if i < 0xD800 or i > 0xDFFF])

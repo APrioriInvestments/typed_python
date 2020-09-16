@@ -743,34 +743,6 @@ extern "C" {
         return BytesType::replace(l, old, the_new, count);
     }
 
-    StringType::layout* nativepython_runtime_bytes_decode(
-            BytesType::layout* l,
-            StringType::layout* encoding,
-            StringType::layout* errors
-    ) {
-        PyEnsureGilAcquired getTheGil;
-
-        PyObject* b = PyInstance::extractPythonObject((instance_ptr)&l, BytesType::Make());
-        if (!b) {
-            throw PythonExceptionSet();
-        }
-
-        char* c_encoding = encoding ? strdup(StringType::Make()->toUtf8String((instance_ptr)&encoding).c_str()) : 0;
-        const char* c_errors = errors ? StringType::Make()->toUtf8String((instance_ptr)&errors).c_str() : 0;
-        PyObject* s = PyUnicode_FromEncodedObject(b, c_encoding, c_errors);
-        free(c_encoding);
-        decref(b);
-        if (!s) {
-            throw PythonExceptionSet();
-        }
-
-        StringType::layout* ret = 0;
-        PyInstance::copyConstructFromPythonInstance(StringType::Make(), (instance_ptr)&ret, s, true);
-        decref(s);
-
-        return ret;
-    }
-
     enum Codec { CODEC_UNKNOWN = 0, CODEC_UTF8 };
     Codec CodecFromStr(const char *s) {
         if (!s || !strcmp(s, "utf-8")
@@ -794,7 +766,51 @@ extern "C" {
         }
     }
 
-BytesType::layout* encodeUtf8(StringType::layout *l, ErrHandler err) {
+    StringType::layout* nativepython_runtime_bytes_decode(
+            BytesType::layout* l,
+            StringType::layout* encoding,
+            StringType::layout* errors
+    ) {
+        char* c_encoding = encoding ? strdup(StringType::Make()->toUtf8String((instance_ptr)&encoding).c_str()) : 0;
+        const char* c_errors = errors ? StringType::Make()->toUtf8String((instance_ptr)&errors).c_str() : 0;
+        Codec codec = CodecFromStr(c_encoding);
+        if (codec) {
+            ErrHandler errhandler = ErrHandlerFromStr(c_errors);
+            if (errhandler) {
+                if (codec == CODEC_UTF8) {
+                    free(c_encoding);
+                    uint8_t* data = l ? (uint8_t*)(l->data) : 0;
+                    // TODO: combine countUtf8Codepoints and createFromUtf8 into a single function with a single loop
+                    size_t pointCount = l ? StringType::countUtf8Codepoints(data, l->bytecount) : 0;
+                    return StringType::createFromUtf8((const char*)data, pointCount);
+                }
+            }
+        }
+
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* b = PyInstance::extractPythonObject((instance_ptr)&l, BytesType::Make());
+        if (!b) {
+            free(c_encoding);
+            throw PythonExceptionSet();
+        }
+
+        PyObject* s = PyUnicode_FromEncodedObject(b, c_encoding, c_errors);
+        free(c_encoding);
+        decref(b);
+        if (!s) {
+            throw PythonExceptionSet();
+        }
+
+        StringType::layout* ret = 0;
+        PyInstance::copyConstructFromPythonInstance(StringType::Make(), (instance_ptr)&ret, s, true);
+        decref(s);
+
+        return ret;
+    }
+
+
+    BytesType::layout* encodeUtf8(StringType::layout *l, ErrHandler err) {
         int64_t max_ret_bytes_per_codepoint = l ? (l->bytes_per_codepoint < 4 ? l->bytes_per_codepoint + 1 : 4) : 0;
         int64_t max_ret_size = l ? l->pointcount * max_ret_bytes_per_codepoint : 0;
 

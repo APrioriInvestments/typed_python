@@ -16,7 +16,7 @@ from typed_python import sha_hash
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python import Int32, Float32
+from typed_python import Int32, Float32, TupleOf
 from typed_python.type_promotion import isInteger
 from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import TypedListMasqueradingAsList
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -52,7 +52,63 @@ def strJoinIterable(sep, iterable):
 
 
 def strStartswith(s, prefix):
+    if not prefix:
+        return True
     return s[:len(prefix)] == prefix
+
+
+def strRangeStartswith(s, prefix, start, end):
+    if start > len(s):
+        return False
+    if start < 0:
+        start += len(s)
+        if start < 0:
+            start = 0
+    if end < 0:
+        end += len(s)
+        if end < 0:
+            end = 0
+    if not prefix:
+        return start <= 0 or end >= start
+    if end < start + len(prefix):
+        return False
+    return s[start:start + len(prefix)] == prefix
+
+
+def strStartswithTuple(s, prefixtuple):
+    for prefix in prefixtuple:
+        t = type(prefix)
+        if t is not object and t is not str:
+            raise TypeError(f"tuple for startswith must only contain str, not {t}")
+        if not prefix:
+            return True
+        if s[:len(prefix)] == prefix:
+            return True
+    return False
+
+
+def strRangeStartswithTuple(s, prefixtuple, start, end):
+    if start > len(s):
+        return False
+    if start < 0:
+        start += len(s)
+        if start < 0:
+            start = 0
+    if end < 0:
+        end += len(s)
+        if end < 0:
+            end = 0
+    for prefix in prefixtuple:
+        t = type(prefix)
+        if t is not object and t is not str:
+            raise TypeError(f"tuple for startswith must only contain str, not {t}")
+        if not prefix:
+            return start <= 0 or end >= start
+        if end < start + len(prefix):
+            continue
+        if s[start:start + len(prefix)] == prefix:
+            return True
+    return False
 
 
 def strEndswith(s, suffix):
@@ -60,6 +116,68 @@ def strEndswith(s, suffix):
         return True
 
     return s[-len(suffix):] == suffix
+
+
+def strRangeEndswith(s, suffix, start, end):
+    if start > len(s):
+        return False
+    if end > len(s):
+        end = len(s)
+    if start < 0:
+        start += len(s)
+        if start < 0:
+            start = 0
+    if end < 0:
+        end += len(s)
+        if end < 0:
+            end = 0
+    if not suffix:
+        return start <= 0 or end >= start
+    if start > end - len(suffix):
+        return False
+
+    return s[end - len(suffix):end] == suffix
+
+
+def strEndswithTuple(s, suffixtuple):
+    for suffix in suffixtuple:
+        t = type(suffix)
+        if t is not object and t is not str:
+            raise TypeError(f"tuple for endswith must only contain str, not {t}")
+        if not suffix:
+            return True
+        if s[-len(suffix):] == suffix:
+            return True
+    return False
+
+
+def strRangeEndswithTuple(s, suffixtuple, start, end):
+    if start > len(s):
+        return False
+    if end > len(s):
+        end = len(s)
+    if start < 0:
+        start += len(s)
+        if start < 0:
+            start = 0
+    if end < 0:
+        end += len(s)
+        if end < 0:
+            end = 0
+    for suffix in suffixtuple:
+        t = type(suffix)
+        if t is not object and t is not str:
+            raise TypeError(f"tuple for endswith must only contain str, not {t}")
+        if not suffix:
+            if start <= 0 or end >= start:
+                return True
+            else:
+                continue
+        if start > end - len(suffix):
+            continue
+        if s[end - len(suffix):end] == suffix:
+            return True
+    return False
 
 
 def strReplace(s, old, new, maxCount):
@@ -485,28 +603,36 @@ class StringWrapper(RefcountedWrapper):
                         )
                     )
                 )
-        elif methodname == "startswith" and not kwargs:
-            if len(args) == 1:
-                if args[0].expr_type != self:
-                    context.pushException(
-                        TypeError,
-                        "startswith first arg must be str (tuple of str not supported yet)"
-                    )
-                    return
+        elif methodname in ["startswith", "endswith"] and not kwargs:
+            if len(args) >= 1 and len(args) <= 3:
+                sw = (methodname == "startswith")
+                t = args[0].expr_type
+                if len(args) == 1:
+                    if t == self:
+                        return context.call_py_function(strStartswith if sw else strEndswith,
+                                                        (instance, args[0]), {})
+                    if t.typeRepresentation == tuple or t is typeWrapper(TupleOf(str)):
+                        return context.call_py_function(strStartswithTuple if sw else strEndswithTuple,
+                                                        (instance, args[0]), {})
+                else:
+                    if len(args) == 3:
+                        arg1 = args[1]
+                        arg2 = args[2]
+                    elif len(args) == 2:
+                        arg1 = args[1]
+                        arg2 = self.convert_len(context, instance)
 
-                return context.call_py_function(strStartswith, (instance, args[0]), {})
+                    if t == self:
+                        return context.call_py_function(strRangeStartswith if sw else strRangeEndswith,
+                                                        (instance, args[0], arg1, arg2), {})
+                    if t.typeRepresentation == tuple or t is typeWrapper(TupleOf(str)):
+                        return context.call_py_function(strRangeStartswithTuple if sw else strRangeEndswithTuple,
+                                                        (instance, args[0], arg1, arg2), {})
 
-        elif methodname == "endswith" and not kwargs:
-            if len(args) == 1:
-                if args[0].expr_type != self:
-                    context.pushException(
-                        TypeError,
-                        "endswith first arg must be str (tuple of str not supported yet)"
-                    )
-                    return
-
-                return context.call_py_function(strEndswith, (instance, args[0]), {})
-
+                return context.pushException(
+                    TypeError,
+                    f"{'starts' if sw else 'ends'}with first arg must be str or a tuple of str, not {t}"
+                )
         elif methodname == "replace" and not kwargs:
             if len(args) in [2, 3]:
                 for i in [0, 1]:
