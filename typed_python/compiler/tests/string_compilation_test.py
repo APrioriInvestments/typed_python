@@ -229,9 +229,8 @@ class TestStringCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             c_startswith('abc', ['a', 'b'])
 
-        # TODO: raise TypeError in this case (currently, SystemError is raised)
-        # with self.assertRaises(TypeError):
-        #     c_startswith('abc', (1, 3))
+        with self.assertRaises(TypeError):
+            c_startswith('abc', (1, 3))
 
         strings = ["", "a", "ab", "b", "abc", "bc", "ac", "ab", "bc", "bca"]
         tuples = [(a, b) for a in strings for b in strings]
@@ -959,7 +958,7 @@ class TestStringCompilation(unittest.TestCase):
                     for err in ["strict", "ignore", "replace"]:
                         r1 = callOrExceptType(f, v, enc, err)
                         r2 = callOrExceptType(Entrypoint(f), v, enc, err)
-                        self.assertEqual(r1, r2)
+                        self.assertEqual(r1, r2, (f, v, enc, err))
 
     @pytest.mark.skip(reason='not performant')
     def test_string_codec(self):

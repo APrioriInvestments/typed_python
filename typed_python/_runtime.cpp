@@ -771,14 +771,25 @@ extern "C" {
             StringType::layout* encoding,
             StringType::layout* errors
     ) {
-        char* c_encoding = encoding ? strdup(StringType::Make()->toUtf8String((instance_ptr)&encoding).c_str()) : 0;
-        const char* c_errors = errors ? StringType::Make()->toUtf8String((instance_ptr)&errors).c_str() : 0;
+        const char* c_encoding = 0;
+        std::string sEncoding;
+        if (encoding) {
+            sEncoding = StringType::Make()->toUtf8String((instance_ptr)&encoding);
+            c_encoding = sEncoding.c_str();
+        }
+
+        const char* c_errors = 0;
+        std::string sErrors;
+        if (errors) {
+            sErrors = StringType::Make()->toUtf8String((instance_ptr)&errors);
+            c_errors = sErrors.c_str();
+        }
+
         Codec codec = CodecFromStr(c_encoding);
         if (codec) {
             ErrHandler errhandler = ErrHandlerFromStr(c_errors);
             if (errhandler) {
                 if (codec == CODEC_UTF8) {
-                    free(c_encoding);
                     uint8_t* data = l ? (uint8_t*)(l->data) : 0;
                     // TODO: combine countUtf8Codepoints and createFromUtf8 into a single function with a single loop
                     size_t pointCount = l ? StringType::countUtf8Codepoints(data, l->bytecount) : 0;
@@ -791,12 +802,10 @@ extern "C" {
 
         PyObject* b = PyInstance::extractPythonObject((instance_ptr)&l, BytesType::Make());
         if (!b) {
-            free(c_encoding);
             throw PythonExceptionSet();
         }
 
         PyObject* s = PyUnicode_FromEncodedObject(b, c_encoding, c_errors);
-        free(c_encoding);
         decref(b);
         if (!s) {
             throw PythonExceptionSet();
@@ -860,14 +869,25 @@ extern "C" {
             StringType::layout* encoding,
             StringType::layout* errors
     ) {
-        char* c_encoding = encoding ? strdup(StringType::Make()->toUtf8String((instance_ptr)&encoding).c_str()) : 0;
-        const char* c_errors = errors ? StringType::Make()->toUtf8String((instance_ptr)&errors).c_str() : 0;
+        const char* c_encoding = 0;
+        std::string sEncoding;
+        if (encoding) {
+            sEncoding = StringType::Make()->toUtf8String((instance_ptr)&encoding);
+            c_encoding = sEncoding.c_str();
+        }
+
+        const char* c_errors = 0;
+        std::string sErrors;
+        if (errors) {
+            sErrors = StringType::Make()->toUtf8String((instance_ptr)&errors);
+            c_errors = sErrors.c_str();
+        }
+
         Codec codec = CodecFromStr(c_encoding);
         if (codec) {
             ErrHandler errhandler = ErrHandlerFromStr(c_errors);
             if (errhandler) {
                 if (codec == CODEC_UTF8) {
-                    free(c_encoding);
                     return encodeUtf8(l, errhandler);
                 }
             }
@@ -877,12 +897,10 @@ extern "C" {
 
         PyObject* s = PyInstance::extractPythonObject((instance_ptr)&l, StringType::Make());
         if (!s) {
-            free(c_encoding);
             throw PythonExceptionSet();
         }
 
         PyObject* b = PyUnicode_AsEncodedString(s, c_encoding, c_errors);
-        free(c_encoding);
         decref(s);
         if (!b) {
             throw PythonExceptionSet();
@@ -1184,7 +1202,11 @@ extern "C" {
     uint64_t nativepython_pyobj_len(PythonObjectOfType::layout_type* layout) {
         PyEnsureGilAcquired getTheGil;
 
-        return PyObject_Length(layout->pyObj);
+        int ret = PyObject_Length(layout->pyObj);
+        if (ret == -1) {
+            throw PythonExceptionSet();
+        }
+        return ret;
     }
 
     // call a Function object from the interpreter

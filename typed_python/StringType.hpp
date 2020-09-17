@@ -143,6 +143,9 @@ public:
     }
 
     std::string toUtf8String(instance_ptr self) {
+        if (!self)
+            return std::string();
+
         std::vector<uint8_t> data;
 
         if (bytes_per_codepoint(self) == 1) {
