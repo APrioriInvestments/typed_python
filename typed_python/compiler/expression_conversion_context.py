@@ -161,14 +161,27 @@ class ExpressionConversionContext(object):
             True
         )
 
-    def constantPyObject(self, x):
-        """Get a TypedExpression that represents a specific python object as 'object'.
-
-        We do this (at the moment) by encoding the pointer value directly in the generated
-        code. Later, when we want our compiled code to be reusable, we'll have to have
-        a secondary link stage for this.
-        """
+    def constantPyObject(self, x, owningGlobalScopeAndName=None):
+        """Get a TypedExpression that represents a specific python object as 'object'."""
         wrapper = typeWrapper(object)
+        meta = None
+
+        if owningGlobalScopeAndName:
+            # this object is visible as the member of a module. Instead of
+            # serializing it (and its state), we want to make sure we encode
+            # the object's location, so that the compiler cache can get the
+            # correct version of it.
+            globallyVisibleDict, name = owningGlobalScopeAndName
+
+            if SerializationContext().nameForObject(globallyVisibleDict) is not None:
+                meta = GlobalVariableMetadata.PointerToTypedPythonObjectAsMemberOfDict(
+                    sourceDict=globallyVisibleDict, name=name, type=object
+                )
+
+        if meta is None:
+            meta = GlobalVariableMetadata.PointerToPyObject(
+                value=x
+            )
 
         return TypedExpression(
             self,
@@ -178,9 +191,7 @@ class ExpressionConversionContext(object):
                 # uniquely identify it
                 name="py_object_" + str(id(x)),
                 type=native_ast.VoidPtr,
-                metadata=GlobalVariableMetadata.PointerToPyObject(
-                    value=x
-                )
+                metadata=meta
             ).cast(wrapper.getNativeLayoutType().pointer()),
             wrapper,
             True

@@ -332,7 +332,7 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
         # it's a typed python object at module level scope
         return context.constantTypedPythonObject(f, owningGlobalScopeAndName)
 
-    return TypedExpression(context, native_ast.nullExpr, PythonFreeObjectWrapper(f), False)
+    return context.constantPyObject(f, owningGlobalScopeAndName)
 
 
 def pythonObjectRepresentationType(f):

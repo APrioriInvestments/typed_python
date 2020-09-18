@@ -63,7 +63,11 @@ def pyAstFromText(text):
 
 def pyAstForCode(codeObject):
     sourceFile = codeObject.co_filename
-    sourceText = "".join(getLines(sourceFile))
+    sourceLines = getLines(sourceFile)
+    if sourceLines is None:
+        raise Exception(f"Couldn't get lines for source file {sourceFile} in {codeObject}")
+    sourceText = "".join(sourceLines)
+
     wholeFileAst = pyAstFromText(sourceText)
 
     defs = functionDefsOrLambdaAtLineNumber(wholeFileAst, codeObject.co_firstlineno)

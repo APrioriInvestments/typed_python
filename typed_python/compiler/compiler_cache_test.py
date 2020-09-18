@@ -306,3 +306,24 @@ def test_compiler_cache_handles_classes():
         # we can reuse the class destructor from the first time around
         assert evaluateExprInFreshProcess(VERSION, 'x.g(1)', compilerCacheDir) == 1
         assert len(os.listdir(compilerCacheDir)) == 3
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_handles_references_to_globals():
+    xmodule = "\n".join([
+        "aList = []",
+        "@Entrypoint",
+        "def f(x):",
+        "    aList.append(x)",
+        "    return aList",
+    ])
+
+    VERSION = {'x.py': xmodule}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        assert evaluateExprInFreshProcess(VERSION, 'x.f(1)', compilerCacheDir) == [1]
+        assert len(os.listdir(compilerCacheDir)) == 1
+
+        # we can reuse the class destructor from the first time around
+        assert evaluateExprInFreshProcess(VERSION, '(x.f(1), x.aList)', compilerCacheDir) == ([1], [1])
+        assert len(os.listdir(compilerCacheDir)) == 1
