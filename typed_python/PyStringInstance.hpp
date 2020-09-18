@@ -24,6 +24,8 @@ public:
 
     static void copyConstructFromPythonInstanceConcrete(StringType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         if (PyUnicode_Check(pyRepresentation)) {
+            if (PyUnicode_READY(pyRepresentation) == -1) throw PythonExceptionSet();
+
             auto kind = PyUnicode_KIND(pyRepresentation);
             assert(
                 kind == PyUnicode_1BYTE_KIND ||

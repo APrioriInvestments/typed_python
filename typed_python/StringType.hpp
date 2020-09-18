@@ -62,6 +62,10 @@ public:
 
     //return an increffed uppercase conversion layout of l
     static layout* upper(layout *l);
+    static layout* capitalize(layout* l);
+    static layout* casefold(layout* l);
+    static layout* swapcase(layout* l);
+    static layout* title(layout* l);
 
     static layout* strip(layout *l, bool fromLeft=true, bool fromRight=true);
 

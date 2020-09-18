@@ -213,6 +213,32 @@ def strReplace(s, old, new, maxCount):
             return new.join(accumulator)
 
 
+def str_find(x, sub, start, end):
+    if start < 0:
+        start += len(x)
+    if start < 0:
+        start = 0
+    if end < 0:
+        end += len(x)
+    if end < 0:
+        end = 0
+    if end > len(x):
+        end = len(x)
+
+    len_sub = len(sub)
+    if len_sub == 0:
+        if start > len(x) or start > end:
+            return -1
+        return start
+
+    index = start
+    while index < end - len_sub + 1:
+        if x[index:index + len_sub] == sub:
+            return index
+        index += 1
+    return -1
+
+
 class StringWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -524,6 +550,7 @@ class StringWrapper(RefcountedWrapper):
         isalnum=runtime_functions.string_isalnum,
         isdecimal=runtime_functions.string_isdecimal,
         isdigit=runtime_functions.string_isdigit,
+        isidentifier=runtime_functions.string_isidentifier,
         islower=runtime_functions.string_islower,
         isnumeric=runtime_functions.string_isnumeric,
         isprintable=runtime_functions.string_isprintable,
@@ -535,6 +562,10 @@ class StringWrapper(RefcountedWrapper):
     _str_methods = dict(
         lower=runtime_functions.string_lower,
         upper=runtime_functions.string_upper,
+        capitalize=runtime_functions.string_capitalize,
+        casefold=runtime_functions.string_casefold,
+        swapcase=runtime_functions.string_swapcase,
+        title=runtime_functions.string_title,
     )
 
     def convert_attribute(self, context, instance, attr):
@@ -654,6 +685,21 @@ class StringWrapper(RefcountedWrapper):
                     return context.call_py_function(strReplace, (instance, args[0], args[1], context.constant(-1)), {})
                 else:
                     return context.call_py_function(strReplace, (instance, args[0], args[1], args[2]), {})
+
+        # elif methodname == "find" and 1 <= len(args) <= 3 and not kwargs:
+        #     if len(args) == 3:
+        #         start = args[1]
+        #         end = args[2]
+        #     elif len(args) == 2:
+        #         start = args[1]
+        #         end = self.convert_len(context, instance)
+        #     elif len(args) == 1:
+        #         start = context.constant(0)
+        #         end = self.convert_len(context, instance)
+        #
+        #     #py_f = self._find_methods[methodname]
+        #     py_f = str_find
+        #     return context.call_py_function(py_f, (instance, args[0], start, end), {})
 
         elif methodname == "find" and not kwargs:
             if len(args) == 1:

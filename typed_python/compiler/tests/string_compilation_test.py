@@ -327,15 +327,22 @@ class TestStringCompilation(unittest.TestCase):
             "\u00CA\u00F1\u011A\u1E66\u3444\u1E67\u1EEA\1F04" * 10000,
             "XyZ\U0001D471",
             "XyZ\U0001D471" * 10000,
-            "\u007F\u0080\u0081\u07FF\u0800\u0801\uFFFF\U00010000\U00010001\U0010FFFF"
+            "\u007F\u0080\u0081\u07FF\u0800\u0801\uFFFF\U00010000\U00010001\U0010FFFF",
+            "ß",
+            "ﬁß",
+            "ß\u1EEa",
+            "ﬁß\u1EEa",
+            "ß\U0001D471",
+            "ﬁß\U0001D471",
+            "ßİŉǰΐΰևẖẗẘẙẚẞὐὒὔὖᾀᾁᾂᾃᾄᾅᾆᾇᾈᾉᾊᾋᾌᾍᾎᾏᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾞᾟᾠᾡᾢᾣᾤᾥᾦᾧᾨᾩᾪᾫᾬᾭᾮᾯᾲᾳᾴᾶᾷᾼῂῃῄῆῇῌῒΐῖῗῢΰῤῦῧῲῳῴῶῷῼﬀﬁﬂﬃﬄﬅﬆﬓﬔﬕﬖﬗ"
         ]
         for s in some_lu_strings:
-            self.assertEqual(c_lower(s), s.lower())
-            self.assertEqual(c_upper(s), s.upper())
+            self.assertEqual(c_lower(s), s.lower(), s)
+            self.assertEqual(c_upper(s), s.upper(), s)
 
         for s in some_lu_strings:
-            self.assertEqual(callOrExceptType(c_lower2, s, s), callOrExceptType(s.lower, s))
-            self.assertEqual(callOrExceptType(c_upper2, s, s), callOrExceptType(s.upper, s))
+            self.assertEqual(callOrExceptType(c_lower2, s, s), callOrExceptType(s.lower, s), s)
+            self.assertEqual(callOrExceptType(c_upper2, s, s), callOrExceptType(s.upper, s), s)
 
     def test_string_find(self):
 
@@ -405,6 +412,85 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(callOrExceptType(c_find_5, s, s, 0, 1, 2), callOrExceptType(s.find, s, 0, 1, 2))
             self.assertEqual(callOrExceptType(c_find_1, s), callOrExceptType(s.find))
 
+    def test_string_find2(self):
+        def f_find(x, sub):
+            return x.find(sub)
+
+        def f_find2(x, sub, start):
+            return x.find(sub, start)
+
+        def f_find3(x, sub, start, end):
+            return x.find(sub, start, end)
+
+        def f_rfind(x, sub):
+            return x.rfind(sub)
+
+        def f_rfind2(x, sub, start):
+            return x.rfind(sub, start)
+
+        def f_rfind3(x, sub, start, end):
+            return x.rfind(sub, start, end)
+
+        def f_index(x, sub):
+            return x.index(sub)
+
+        def f_index2(x, sub, start):
+            return x.index(sub, start)
+
+        def f_index3(x, sub, start, end):
+            return x.index(sub, start, end)
+
+        def f_rindex(x, sub):
+            return x.rindex(sub)
+
+        def f_rindex2(x, sub, start):
+            return x.rindex(sub, start)
+
+        def f_rindex3(x, sub, start, end):
+            return x.rindex(sub, start, end)
+
+        cases = [b'ababcab', b'ababcabcab', b'aabbabbbaaabbaaba']
+        subs = [97, 98, b'a', b'c', b'X', b'ab', b'ba', b'abc', b'']
+        for v in cases:
+            for sub in subs:
+                for f in [f_find]:  # [f_find, f_rfind]:
+                    r1 = f(v, sub)
+                    r2 = Entrypoint(f)(v, sub)
+                    self.assertEqual(r1, r2, (f, v, sub))
+                #     g = f_index if f == f_find else f_rindex
+                #     if r1 != -1:
+                #         r3 = Entrypoint(g)(v, sub)
+                #         self.assertEqual(r1, r3, (g, v, sub))
+                #     else:
+                #         with self.assertRaises(ValueError):
+                #             Entrypoint(g)(v, sub)
+                #
+                for start in range(-10, 11, 2):
+                    for f in [f_find2]:  # [f_find2, f_rfind2]:
+                        r1 = f(v, sub, start)
+                        r2 = Entrypoint(f)(v, sub, start)
+                        self.assertEqual(r1, r2, (f, v, sub, start))
+                #         g = f_index2 if f == f_find2 else f_rindex2
+                #         if r1 != -1:
+                #             r3 = Entrypoint(g)(v, sub, start)
+                #             self.assertEqual(r1, r3, (g, v, sub, start))
+                #         else:
+                #             with self.assertRaises(ValueError):
+                #                 Entrypoint(g)(v, sub, start)
+                    for end in range(-10, 11, 2):
+                        for f in [f_find3]:  # [f_find3, f_rfind3]:
+                            r1 = f(v, sub, start, end)
+                            r2 = Entrypoint(f)(v, sub, start, end)
+                            self.assertEqual(r1, r2, (f, v, sub, start, end))
+                #
+                #             g = f_index3 if f == f_find3 else f_rindex3
+                #             if r1 != -1:
+                #                 r3 = Entrypoint(g)(v, sub, start, end)
+                #                 self.assertEqual(r1, r3, (g, v, sub, start, end))
+                #             else:
+                #                 with self.assertRaises(ValueError):
+                #                     Entrypoint(g)(v, sub, start, end)
+
     def test_string_from_float(self):
         @Compiled
         def toString(f: float):
@@ -455,6 +541,10 @@ class TestStringCompilation(unittest.TestCase):
         def c_isupper(s: str):
             return s.isupper()
 
+        @Compiled
+        def c_isidentifier(s: str):
+            return s.isidentifier()
+
         def perform_comparison(s: str):
             self.assertEqual(c_isalpha(s), s.isalpha(), [hex(ord(c)) for c in s])
             self.assertEqual(c_isalnum(s), s.isalnum(), [hex(ord(c)) for c in s])
@@ -466,6 +556,7 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(c_isspace(s), s.isspace(), [hex(ord(c)) for c in s])
             self.assertEqual(c_istitle(s), s.istitle(), [hex(ord(c)) for c in s])
             self.assertEqual(c_isupper(s), s.isupper(), [hex(ord(c)) for c in s])
+            self.assertEqual(c_isidentifier(s), s.isidentifier(), [hex(ord(c)) for c in s])
 
         perform_comparison("")
         for i in range(0, 0x1000):
@@ -479,6 +570,7 @@ class TestStringCompilation(unittest.TestCase):
             perform_comparison(chr(i) + "/")
             perform_comparison(chr(i) + " ")
             perform_comparison(chr(i) + "\u01C5")
+            perform_comparison(chr(i) + "\u0FFF")
             perform_comparison(chr(i) + "\x00")
             perform_comparison(chr(i) + "\U00010401")
             perform_comparison(chr(i) + "\U00010428")
@@ -492,6 +584,45 @@ class TestStringCompilation(unittest.TestCase):
         ]
         for s in titlestrings:
             self.assertEqual(c_istitle(s), s.istitle(), s)
+
+    def test_string_case(self):
+        def f_lower(x):
+            return x.lower()
+
+        def f_upper(x):
+            return x.upper()
+
+        def f_capitalize(x):
+            return x.capitalize()
+
+        def f_swapcase(x):
+            return x.swapcase()
+
+        def f_title(x):
+            return x.title()
+
+        def f_casefold(x):
+            return x.casefold()
+
+        cases = [
+            'ﬁ',
+            'abc'*10,
+            '\xE1\u1F11c'*10,
+            'ABC'*10,
+            '\xC1\u1F19c'*10,
+            'aBc\u2D1E\U0001D73D\U0001D792'*10,
+            '1@=.,z中',
+            'straße',
+            'ﬁ',
+            '',
+            "ßİŉǰΐΰևẖẗẘẙẚẞὐὒὔὖᾀᾁᾂᾃᾄᾅᾆᾇᾈᾉᾊᾋᾌᾍᾎᾏᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾞᾟᾠᾡᾢᾣᾤᾥᾦᾧᾨᾩᾪᾫᾬᾭᾮᾯᾲᾳᾴᾶᾷᾼῂῃῄῆῇῌῒΐῖῗῢΰῤῦῧῲῳῴῶῷῼﬀﬁﬂﬃﬄﬅﬆﬓﬔﬕﬖﬗ",
+        ]
+        cases += [x + ' ' + y for x in cases for y in cases]
+        for f in [f_capitalize, f_lower, f_upper, f_capitalize, f_swapcase, f_title, f_casefold]:
+            for v in cases:
+                r1 = f(v)
+                r2 = Entrypoint(f)(v)
+                self.assertEqual(r1, r2, (f, v))
 
     def test_string_strip(self):
         @Compiled
@@ -510,6 +641,26 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(s.strip(), strip(s), s)
             self.assertEqual(s.rstrip(), rstrip(s), s)
             self.assertEqual(s.lstrip(), lstrip(s), s)
+
+    @pytest.mark.skip(reason='just for comparing performance when changing implementation')
+    def test_string_find_perf(self):
+        @Compiled
+        def c_find(c: str, s: str) -> int:
+            return c.find(s)
+
+        cases = ["ab" * 1000 + "c", 'x' * 2000 + 'yxx', "abc"*1000]
+        subs = ["ab", "abc", "xy", "ca"]
+        total = 0
+        t0 = time.time()
+        for _ in range(10000):
+            for c in cases:
+                for s in subs:
+                    total += c_find(c, s)
+        t1 = time.time()
+
+        print(total)
+        print(f"total time {t1-t0}")
+        self.assertTrue(False)
 
     @flaky.flaky(max_runs=3, min_passes=1)
     def test_string_strip_perf(self):

@@ -576,6 +576,30 @@ string_upper = externalCallTarget(
     Void.pointer()
 )
 
+string_capitalize = externalCallTarget(
+    "nativepython_runtime_string_capitalize",
+    Void.pointer(),
+    Void.pointer()
+)
+
+string_casefold = externalCallTarget(
+    "nativepython_runtime_string_casefold",
+    Void.pointer(),
+    Void.pointer()
+)
+
+string_swapcase = externalCallTarget(
+    "nativepython_runtime_string_swapcase",
+    Void.pointer(),
+    Void.pointer()
+)
+
+string_title = externalCallTarget(
+    "nativepython_runtime_string_title",
+    Void.pointer(),
+    Void.pointer()
+)
+
 string_find = externalCallTarget(
     "nativepython_runtime_string_find",
     Int64,
@@ -644,6 +668,12 @@ string_isdecimal = externalCallTarget(
 
 string_isdigit = externalCallTarget(
     "nativepython_runtime_string_isdigit",
+    Bool,
+    Void.pointer()
+)
+
+string_isidentifier = externalCallTarget(
+    "nativepython_runtime_string_isidentifier",
     Bool,
     Void.pointer()
 )

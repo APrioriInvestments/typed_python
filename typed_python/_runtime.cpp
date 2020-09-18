@@ -467,6 +467,23 @@ extern "C" {
         return StringType::upper(l);
     }
 
+    StringType::layout* nativepython_runtime_string_capitalize(StringType::layout* l) {
+        return StringType::capitalize(l);
+    }
+
+    StringType::layout* nativepython_runtime_string_casefold(StringType::layout* l) {
+        return StringType::casefold(l);
+    }
+
+    StringType::layout* nativepython_runtime_string_swapcase(StringType::layout* l) {
+        return StringType::swapcase(l);
+    }
+
+    StringType::layout* nativepython_runtime_string_title(StringType::layout* l) {
+        return StringType::title(l);
+    }
+
+
     StringType::layout* nativepython_runtime_string_strip(StringType::layout* l, bool fromLeft, bool fromRight) {
         return StringType::strip(l, fromLeft, fromRight);
     }
@@ -589,6 +606,23 @@ extern "C" {
 
     bool nativepython_runtime_string_isdigit(StringType::layout* l) {
         return StringType::isdigit(l);
+    }
+
+    bool nativepython_runtime_string_isidentifier(StringType::layout* l) {
+        // Not bothering to implement this myself...
+        PyEnsureGilAcquired getTheGil;
+        PyObject* s = PyInstance::extractPythonObject((instance_ptr)&l, StringType::Make());
+        if (!s) {
+            throw PythonExceptionSet();
+        }
+
+        int ret = PyUnicode_IsIdentifier(s);
+        decref(s);
+        if (ret == -1) {
+            throw PythonExceptionSet();
+        }
+
+        return ret;
     }
 
     bool nativepython_runtime_string_islower(StringType::layout* l) {

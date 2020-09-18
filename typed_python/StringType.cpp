@@ -101,34 +101,42 @@ StringType::layout* StringType::concatenate(layout* lhs, layout* rhs) {
     return new_layout;
 }
 
-StringType::layout* StringType::lower(layout *l) {
-    if (!l) {
-        return l;
-    }
-
-    int64_t new_byteCount = sizeof(layout) + l->pointcount * l->bytes_per_codepoint;
-    layout* new_layout = (layout*)malloc(new_byteCount);
+// Apply a PyUnicode_* function to each point of a string
+template<class T, class pyunicode_fn>
+inline StringType::layout* unicode_generic(pyunicode_fn& operation, T* data, StringType::layout* l)
+{
+    int32_t allocated_points = l->pointcount;
+    int64_t new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+    StringType::layout* new_layout = (StringType::layout*)malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
-    new_layout->pointcount = l->pointcount;
+    int32_t new_pointcount = l->pointcount;
 
-    if (l->bytes_per_codepoint == 1) {
-        for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->pointcount; src < end; ) {
-            *dest++ = (uint8_t)tolower(*src++);
+    Py_UCS4 buf[7];
+    int k = 0;
+    int32_t increment = 8; // large enough to hold any result from a single character
+    for (T* src = data, *end = src + l->pointcount; src < end; ) {
+        int n = operation((Py_UCS4)(*src++), buf);
+        if (n > 1) {
+            new_pointcount += n - 1;
+            if (new_pointcount > allocated_points) {
+                allocated_points += increment;
+                increment = (increment * 3) / 2;
+                new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+                new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+            }
+        }
+        for (int j = 0; j < n; j++) {
+            ((T*)(new_layout->data))[k++] = (T)buf[j];
         }
     }
-    else if (l->bytes_per_codepoint == 2) {
-        for (uint16_t *src = (uint16_t *)l->data, *dest = (uint16_t *)new_layout->data, *end = src + l->pointcount; src < end; ) {
-            *dest++ = (uint16_t)towlower(*src++);
-        }
+    if (allocated_points > new_pointcount) {
+        allocated_points = new_pointcount;
+        new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+        new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
     }
-    else if (l->bytes_per_codepoint == 4) {
-        for (uint32_t *src = (uint32_t *)l->data, *dest = (uint32_t *)new_layout->data, *end = src + l->pointcount; src < end; ) {
-            *dest++ = (uint32_t)towlower(*src++);
-        }
-    }
-
+    new_layout->pointcount = new_pointcount;
     return new_layout;
 }
 
@@ -137,30 +145,285 @@ StringType::layout* StringType::upper(layout *l) {
         return l;
     }
 
-    int64_t new_byteCount = sizeof(layout) + l->pointcount * l->bytes_per_codepoint;
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    if (l->bytes_per_codepoint == 1) {
+        return unicode_generic(_PyUnicode_ToUpperFull, (uint8_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        return unicode_generic(_PyUnicode_ToUpperFull, (uint16_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        return unicode_generic(_PyUnicode_ToUpperFull, (uint32_t*)(l->data), l);
+    }
+    return 0; // error
+}
+
+StringType::layout* StringType::lower(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    if (l->bytes_per_codepoint == 1) {
+        return unicode_generic(_PyUnicode_ToLowerFull, (uint8_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        return unicode_generic(_PyUnicode_ToLowerFull, (uint16_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        return unicode_generic(_PyUnicode_ToLowerFull, (uint32_t*)(l->data), l);
+    }
+    return 0; // error
+}
+
+StringType::layout* StringType::casefold(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    if (l->bytes_per_codepoint == 1) {
+        return unicode_generic(_PyUnicode_ToFoldedFull, (uint8_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        return unicode_generic(_PyUnicode_ToFoldedFull, (uint16_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        return unicode_generic(_PyUnicode_ToFoldedFull, (uint32_t*)(l->data), l);
+    }
+    return 0; // error
+}
+
+template<class T>
+inline StringType::layout* capitalize_generic(T* data, StringType::layout* l)
+{
+    int32_t allocated_points = l->pointcount;
+    int64_t new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+    StringType::layout* new_layout = (StringType::layout*)malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
-    new_layout->pointcount = l->pointcount;
+    int32_t new_pointcount = l->pointcount;
+
+    Py_UCS4 buf[7];
+    int k = 0;
+    int32_t increment = 8; // large enough to hold any result from a single character
+    for (T* src = data, *end = src + l->pointcount; src < end; ) {
+        int n = (src == data)
+                ? _PyUnicode_ToUpperFull((Py_UCS4)(*src++), buf)
+                : _PyUnicode_ToLowerFull((Py_UCS4)(*src++), buf);
+        if (n > 1) {
+            new_pointcount += n - 1;
+            if (new_pointcount > allocated_points) {
+                allocated_points += increment;
+                increment = (increment * 3) / 2;
+                new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+                new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+            }
+        }
+        for (int j = 0; j < n; j++) {
+            ((T*)(new_layout->data))[k++] = (T)buf[j];
+        }
+    }
+    if (allocated_points > new_pointcount) {
+        allocated_points = new_pointcount;
+        new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+        new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+    }
+    new_layout->pointcount = new_pointcount;
+    return new_layout;
+}
+
+StringType::layout* StringType::capitalize(layout *l) {
+    if (!l) {
+        return l;
+    }
 
     if (l->bytes_per_codepoint == 1) {
-        for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->pointcount; src < end; ) {
-            *dest++ = (uint8_t)toupper(*src++);
-        }
+        return capitalize_generic((uint8_t*)(l->data), l);
     }
     else if (l->bytes_per_codepoint == 2) {
-        for (uint16_t *src = (uint16_t *)l->data, *dest = (uint16_t *)new_layout->data, *end = src + l->pointcount; src < end; ) {
-            *dest++ = (uint16_t)towupper(*src++);
-        }
+        return capitalize_generic((uint16_t*)(l->data), l);
     }
     else if (l->bytes_per_codepoint == 4) {
-        for (uint32_t *src = (uint32_t *)l->data, *dest = (uint32_t *)new_layout->data, *end = src + l->pointcount; src < end; ) {
-            *dest++ = (uint32_t)towupper(*src++);
+        return capitalize_generic((uint32_t*)(l->data), l);
+    }
+    return 0; // error
+}
+
+template<class T>
+inline void swapcase_generic(T* src, uint32_t pointcount, T* dest) {
+    for (T* end = src + pointcount; src < end; ) {
+        T c = *src++;
+        if (iswlower(c))
+            *dest++ = (T)towupper(c);
+        else if (iswupper(c))
+            *dest++ = (T)towlower(c);
+        else
+            *dest++ = c;
+    }
+}
+
+template<class T>
+inline StringType::layout* swapcase_generic(T* data, StringType::layout* l)
+{
+    int32_t allocated_points = l->pointcount;
+    int64_t new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+    StringType::layout* new_layout = (StringType::layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
+    int32_t new_pointcount = l->pointcount;
+
+    Py_UCS4 buf[7];
+    int k = 0;
+    int32_t increment = 8; // large enough to hold any result from a single character
+    for (T* src = data, *end = src + l->pointcount; src < end; ) {
+        bool make_upper = _PyUnicode_IsLowercase(*src);
+        bool just_copy = !make_upper && !_PyUnicode_IsUppercase(*src);
+        if (just_copy) {
+            ((T*)(new_layout->data))[k++] = *src++;
+            continue;
+        }
+        int n = make_upper
+                ? _PyUnicode_ToUpperFull((Py_UCS4)(*src++), buf)
+                : _PyUnicode_ToLowerFull((Py_UCS4)(*src++), buf);
+        if (n > 1) {
+            new_pointcount += n - 1;
+            if (new_pointcount > allocated_points) {
+                allocated_points += increment;
+                increment = (increment * 3) / 2;
+                new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+                new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+            }
+        }
+        for (int j = 0; j < n; j++) {
+            ((T*)(new_layout->data))[k++] = (T)buf[j];
         }
     }
-
+    if (allocated_points > new_pointcount) {
+        allocated_points = new_pointcount;
+        new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+        new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+    }
+    new_layout->pointcount = new_pointcount;
     return new_layout;
+}
+
+StringType::layout* StringType::swapcase(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    if (l->bytes_per_codepoint == 1) {
+        return swapcase_generic((uint8_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        return swapcase_generic((uint16_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        return swapcase_generic((uint32_t*)(l->data), l);
+    }
+    return 0; // error
+}
+
+template<class T>
+inline void title_generic(T* src, uint32_t pointcount, T* dest) {
+    bool word = false;
+    for (T* end = src + pointcount; src < end; ) {
+        T c = *src++;
+        if (word) {
+            if (iswalpha(c)) {
+                *dest++ = (T)towlower(c);
+            } else {
+                *dest++ = c;
+                word = false;
+            }
+        } else {
+            if (iswalpha(c)) {
+                *dest++ = (T)towupper(c);
+                word = true;
+            } else {
+                *dest++ = c;
+            }
+        }
+    }
+}
+
+template<class T>
+inline StringType::layout* title_generic(T* data, StringType::layout* l)
+{
+    int32_t allocated_points = l->pointcount;
+    int64_t new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+    StringType::layout* new_layout = (StringType::layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
+    int32_t new_pointcount = l->pointcount;
+
+    Py_UCS4 buf[7];
+    int k = 0;
+    bool word = false;
+    int32_t increment = 8; // large enough to hold any result from a single character
+    for (T* src = data, *end = src + l->pointcount; src < end; ) {
+        Py_UCS4 c = (Py_UCS4)(*src);
+        bool make_lower = false;
+        bool make_title = false;
+        if (word) {
+            if (_PyUnicode_IsAlpha(c))  {
+                make_lower = true;
+            }
+            else {
+                word = false;
+            }
+        }
+        else {
+            if (_PyUnicode_IsAlpha(c))  {
+                make_title = true;
+                word = true;
+            }
+        }
+        if (!make_lower && !make_title) {
+            ((T*)(new_layout->data))[k++] = *src++;
+            continue;
+        }
+        int n = make_title
+                ? _PyUnicode_ToTitleFull((Py_UCS4)(*src++), buf)
+                : _PyUnicode_ToLowerFull((Py_UCS4)(*src++), buf);
+        if (n > 1) {
+            new_pointcount += n - 1;
+            if (new_pointcount > allocated_points) {
+                allocated_points += increment;
+                increment = (increment * 3) / 2;
+                new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+                new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+            }
+        }
+        for (int j = 0; j < n; j++) {
+            ((T*)(new_layout->data))[k++] = (T)buf[j];
+        }
+    }
+    if (allocated_points > new_pointcount) {
+        allocated_points = new_pointcount;
+        new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
+        new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+    }
+    new_layout->pointcount = new_pointcount;
+    return new_layout;
+}
+
+StringType::layout* StringType::title(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    if (l->bytes_per_codepoint == 1) {
+        return title_generic((uint8_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        return title_generic((uint16_t*)(l->data), l);
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        return title_generic((uint32_t*)(l->data), l);
+    }
+    return 0; // error
 }
 
 uint32_t StringType::getpoint(layout *l, uint64_t i) {
