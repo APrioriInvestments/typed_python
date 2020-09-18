@@ -62,12 +62,18 @@ class CompilerCache:
     def hasSymbol(self, linkName):
         return linkName in self.nameToModuleHash
 
+    def markModuleHashInvalid(self, hashstr):
+        with open(os.path.join(self.cacheDir, hashstr, "marked_invalid"), "w"):
+            pass
+
     def loadForSymbol(self, linkName):
         moduleHash = self.nameToModuleHash[linkName]
 
         nameToTypedCallTarget = {}
         nameToNativeFunctionType = {}
-        self.loadModuleByHash(moduleHash, nameToTypedCallTarget, nameToNativeFunctionType)
+
+        if not self.loadModuleByHash(moduleHash, nameToTypedCallTarget, nameToNativeFunctionType):
+            return None
 
         return nameToTypedCallTarget, nameToNativeFunctionType
 
@@ -83,26 +89,35 @@ class CompilerCache:
 
         targetDir = os.path.join(self.cacheDir, moduleHash)
 
-        # write the type manifest
-        with open(os.path.join(targetDir, "type_manifest.dat"), "rb") as f:
-            callTargets = SerializationContext().deserialize(f.read())
+        try:
+            with open(os.path.join(targetDir, "type_manifest.dat"), "rb") as f:
+                callTargets = SerializationContext().deserialize(f.read())
 
-        with open(os.path.join(targetDir, "globals_manifest.dat"), "rb") as f:
-            globalVarDefs = SerializationContext().deserialize(f.read())
+            with open(os.path.join(targetDir, "globals_manifest.dat"), "rb") as f:
+                globalVarDefs = SerializationContext().deserialize(f.read())
 
-        with open(os.path.join(targetDir, "native_type_manifest.dat"), "rb") as f:
-            functionNameToNativeType = SerializationContext().deserialize(f.read())
+            with open(os.path.join(targetDir, "native_type_manifest.dat"), "rb") as f:
+                functionNameToNativeType = SerializationContext().deserialize(f.read())
 
-        with open(os.path.join(targetDir, "submodules.dat"), "rb") as f:
-            submodules = SerializationContext().deserialize(f.read(), ListOf(str))
+            with open(os.path.join(targetDir, "submodules.dat"), "rb") as f:
+                submodules = SerializationContext().deserialize(f.read(), ListOf(str))
+        except Exception:
+            # this module is bad
+            self.markModuleHashInvalid(moduleHash)
+            return False
+
+        if not LoadedModule.validateGlobalVariables(globalVarDefs):
+            self.markModuleHashInvalid(moduleHash)
+            return False
 
         # load the submodules first
         for submodule in submodules:
-            self.loadModuleByHash(
+            if not self.loadModuleByHash(
                 submodule,
                 nameToTypedCallTarget,
                 nameToNativeFunctionType
-            )
+            ):
+                return False
 
         modulePath = os.path.join(targetDir, "module.so")
 
@@ -116,6 +131,8 @@ class CompilerCache:
 
         nameToTypedCallTarget.update(callTargets)
         nameToNativeFunctionType.update(functionNameToNativeType)
+
+        return True
 
     def addModule(self, binarySharedObject, nameToTypedCallTarget, linkDependencies):
         """Add new code to the compiler cache.
@@ -132,17 +149,26 @@ class CompilerCache:
         for name in linkDependencies:
             dependentHashes.add(self.nameToModuleHash[name])
 
-        path = self.writeModuleToDisk(binarySharedObject, nameToTypedCallTarget, dependentHashes)
+        path, hashToUse = self.writeModuleToDisk(binarySharedObject, nameToTypedCallTarget, dependentHashes)
 
-        self.loadedModules[binarySharedObject.hash.hexdigest] = (
+        self.loadedModules[hashToUse] = (
             binarySharedObject.loadFromPath(os.path.join(path, "module.so"))
         )
 
         for n in binarySharedObject.definedSymbols:
-            self.nameToModuleHash[n] = binarySharedObject.hash.hexdigest
+            self.nameToModuleHash[n] = hashToUse
 
     def loadNameManifestFromStoredModuleByHash(self, moduleHash):
         targetDir = os.path.join(self.cacheDir, moduleHash)
+
+        # ignore 'marked invalid'
+        if os.path.exists(os.path.join(targetDir, "marked_invalid")):
+            # just bail - don't try to read it now
+
+            # for the moment, we don't try to clean up the cache, because
+            # we can't be sure that some process is not still reading the
+            # old files.
+            return
 
         with open(os.path.join(targetDir, "name_manifest.dat"), "rb") as f:
             self.nameToModuleHash.update(
@@ -163,11 +189,14 @@ class CompilerCache:
         to interact with the compiler cache simultaneously without relying on
         individual file-level locking.
         """
-        targetDir = os.path.join(self.cacheDir, binarySharedObject.hash.hexdigest)
+        hashToUse = SerializationContext().sha_hash(str(uuid.uuid4())).hexdigest
 
-        if os.path.exists(targetDir):
-            # this already exists. we don't need to write anything
-            return targetDir
+        targetDir = os.path.join(
+            self.cacheDir,
+            hashToUse
+        )
+
+        assert not os.path.exists(targetDir)
 
         tempTargetDir = targetDir + "_" + str(uuid.uuid4())
         ensureDirExists(tempTargetDir)
@@ -180,7 +209,7 @@ class CompilerCache:
         # load the manifest every time, so we try to use compiled code to load it
         manifest = Dict(str, str)()
         for n in binarySharedObject.functionTypes:
-            manifest[n] = binarySharedObject.hash.hexdigest
+            manifest[n] = hashToUse
 
         with open(os.path.join(tempTargetDir, "name_manifest.dat"), "wb") as f:
             f.write(SerializationContext().serialize(manifest, Dict(str, str)))
@@ -212,7 +241,7 @@ class CompilerCache:
             else:
                 shutil.rmtree(tempTargetDir)
 
-        return targetDir
+        return targetDir, hashToUse
 
     def function_pointer_by_name(self, linkName):
         moduleHash = self.nameToModuleHash.get(linkName)

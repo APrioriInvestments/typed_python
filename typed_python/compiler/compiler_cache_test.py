@@ -327,3 +327,44 @@ def test_compiler_cache_handles_references_to_globals():
         # we can reuse the class destructor from the first time around
         assert evaluateExprInFreshProcess(VERSION, '(x.f(1), x.aList)', compilerCacheDir) == ([1], [1])
         assert len(os.listdir(compilerCacheDir)) == 1
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_handles_changed_types():
+    xmodule1 = "\n".join([
+        "@Entrypoint",
+        "def f(x):",
+        "    return x",
+        "aList=[]",
+        "@Entrypoint",
+        "def g1(x):",
+        "    return len(aList) + f(x)",
+    ])
+
+    xmodule2 = "\n".join([
+        "@Entrypoint",
+        "def f(x):",
+        "    return x",
+        "@Entrypoint",
+        "def g2(x):",
+        "    return f(x)",
+    ])
+
+    VERSION1 = {'x.py': xmodule1}
+    VERSION2 = {'x.py': xmodule2}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        assert evaluateExprInFreshProcess(VERSION1, 'x.g1(1)', compilerCacheDir) == 1
+        assert len(os.listdir(compilerCacheDir)) == 1
+
+        # if we try to use 'f', it should work even though we no longer have
+        # a defniition for 'g2'
+        assert evaluateExprInFreshProcess(VERSION2, 'x.f(1)', compilerCacheDir) == 1
+        assert len(os.listdir(compilerCacheDir)) == 2
+
+        badCt = 0
+        for subdir in os.listdir(compilerCacheDir):
+            if 'marked_invalid' in os.listdir(os.path.join(compilerCacheDir, subdir)):
+                badCt += 1
+
+        assert badCt == 1

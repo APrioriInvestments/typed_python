@@ -1,5 +1,5 @@
 from typed_python.compiler.module_definition import ModuleDefinition
-from typed_python import PointerTo, ListOf
+from typed_python import PointerTo, ListOf, Class
 from typed_python import _types
 
 
@@ -18,6 +18,41 @@ class LoadedModule:
         self.functionPointers = functionPointers
 
         self.globalVariableDefinitions = globalVariableDefinitions
+
+    @staticmethod
+    def validateGlobalVariables(globalVariableDefinitions):
+        """Check that each global variable definition is sensible.
+
+        Sometimes we may successfully deserialize a global variable from a cached
+        module, but then some dictionary member is not valid because it was removed
+        or has the wrong type. In this case, we need to evict this module from
+        the cache because it's no longer valid.
+
+        Args:
+            globalVariableDefinitions - a dict from string to GlobalVariableMetadata
+        """
+        for gvd in globalVariableDefinitions.values():
+            meta = gvd.metadata
+
+            if meta.matches.PointerToTypedPythonObjectAsMemberOfDict:
+                if not isinstance(meta.sourceDict, dict):
+                    return False
+
+                if meta.name not in meta.sourceDict:
+                    return False
+
+                if not isinstance(meta.sourceDict[meta.name], meta.type):
+                    return False
+
+            if meta.matches.PointerToTypedPythonObject:
+                if not isinstance(meta.value, meta.type):
+                    return False
+
+            if meta.matches.ClassVtable:
+                if not issubclass(meta.value, Class):
+                    return False
+
+        return True
 
     def linkGlobalVariables(self):
         """Walk over all global variables in the module and make sure they are populated.

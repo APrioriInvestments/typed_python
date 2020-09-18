@@ -249,12 +249,17 @@ class PythonToNativeConverter(object):
             self._link_name_for_identity[identity] = linkName
             self._identity_for_link_name[linkName] = identity
 
-        if linkName not in self._allDefinedNames:
-            self._allDefinedNames.add(linkName)
+        if linkName in self._allDefinedNames:
+            return False
 
-            if self.compilerCache:
-                if self.compilerCache.hasSymbol(linkName):
-                    newTypedCallTargets, newNativeFunctionTypes = self.compilerCache.loadForSymbol(linkName)
+        self._allDefinedNames.add(linkName)
+
+        if self.compilerCache:
+            if self.compilerCache.hasSymbol(linkName):
+                callTargetsAndTypes = self.compilerCache.loadForSymbol(linkName)
+
+                if callTargetsAndTypes is not None:
+                    newTypedCallTargets, newNativeFunctionTypes = callTargetsAndTypes
 
                     self._targets.update(newTypedCallTargets)
                     self.llvmCompiler.markExternal(newNativeFunctionTypes)
@@ -262,8 +267,7 @@ class PythonToNativeConverter(object):
                     self._allDefinedNames.update(newNativeFunctionTypes)
                     self._allCachedNames.update(newNativeFunctionTypes)
 
-            return True
-        return False
+        return True
 
     def defineNonPythonFunction(self, name, identityTuple, context):
         """Define a non-python generating function (if we haven't defined it before already)
