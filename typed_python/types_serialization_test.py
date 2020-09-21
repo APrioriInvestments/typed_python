@@ -30,6 +30,7 @@ import pytz
 import gc
 import pprint
 import tempfile
+import types
 import typed_python.dummy_test_module as dummy_test_module
 
 from typed_python.compiler.native_ast import Expression, NamedCallTarget
@@ -2072,3 +2073,13 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert b'types_serialization_test' not in sc.serialize(aFun.__code__)
         assert b'types_serialization_test' not in sc.serialize(aFun.__code__)
+
+    def test_serialize_builtin_type_objects(self):
+        s = SerializationContext()
+
+        def check(x):
+            assert s.deserialize(s.serialize(x)) is x
+
+        check(types.BuiltinFunctionType)
+        check(types.FunctionType)
+        check(types.ModuleType)

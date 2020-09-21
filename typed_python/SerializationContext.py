@@ -62,7 +62,11 @@ CellType = type(capture(10).__closure__[0])
 DEFAULT_NAME_TO_OVERRIDE = {
     ".builtin.lock": LockType,
     ".builtin.rlock": RLock,
-    ".builtin.cell": CellType
+    ".builtin.cell": CellType,
+    ".builtin.builtin_function_or_method": BuiltinFunctionType,
+    ".builtin.code_type": CodeType,
+    ".builtin.module_type": ModuleType,
+    ".builtin.function_type": FunctionType,
 }
 
 
