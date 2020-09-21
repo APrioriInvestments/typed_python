@@ -85,7 +85,7 @@ class CompilerCache:
         have been uncovered.
         """
         if moduleHash in self.loadedModules:
-            return
+            return True
 
         targetDir = os.path.join(self.cacheDir, moduleHash)
 
