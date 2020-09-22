@@ -490,6 +490,62 @@ int64_t StringType::find(layout *l, layout *sub, int64_t start, int64_t stop) {
     return -1;
 }
 
+int64_t StringType::rfind(layout *l, layout *sub, int64_t start, int64_t stop) {
+    if (!l || !l->pointcount) {
+        if (!sub || !sub->pointcount)
+            return start > 0 ? -1 : 0;
+        return -1;
+    }
+    if (start < 0) {
+        start += l->pointcount;
+        if (start < 0) start = 0;
+    }
+    if (stop < 0) {
+        stop += l->pointcount;
+        if (stop < 0) stop = 0;
+    }
+    if (stop < start || start > l->pointcount)
+        return -1;
+    if (stop > l->pointcount)
+        stop = l->pointcount;
+    if (!sub || !sub->pointcount)
+        return stop;
+
+    //if (stop > l->pointcount)
+    //    stop = l->pointcount;
+
+    stop -= (sub->pointcount - 1);
+
+    if (start < 0 || stop < 0 || start >= stop || sub->pointcount > l->pointcount || start > l->pointcount - sub->pointcount)
+        return -1;
+
+    if (l->bytes_per_codepoint == 1 and sub->bytes_per_codepoint == 1 && sub->pointcount == 1) {
+        const uint8_t* lPtr = (const uint8_t*)l->data;
+        const uint8_t subChar = sub->data[0];
+
+        for (int64_t i = stop - 1; i >= start; i--) {
+            if (lPtr[i] == subChar) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    for (int64_t i = stop - 1; i >= start; i--) {
+        bool match = true;
+        for (int64_t j = 0; j < sub->pointcount; j++) {
+            if (getpoint(l, i+j) != getpoint(sub, j)) {
+                match = false;
+                break;
+            }
+        }
+        if (match)
+            return i;
+    }
+
+    return -1;
+}
+
 void StringType::split_3(ListOfType::layout* outList, layout* l, int64_t max) {
     if (!outList)
         throw std::invalid_argument("missing return argument");

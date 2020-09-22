@@ -606,16 +606,22 @@ string_find = externalCallTarget(
     Void.pointer(), Void.pointer(), Int64, Int64
 )
 
-string_find_2 = externalCallTarget(
-    "nativepython_runtime_string_find_2",
+string_rfind = externalCallTarget(
+    "nativepython_runtime_string_rfind",
     Int64,
-    Void.pointer(), Void.pointer()
+    Void.pointer(), Void.pointer(), Int64, Int64
 )
 
-string_find_3 = externalCallTarget(
-    "nativepython_runtime_string_find_3",
+string_index = externalCallTarget(
+    "nativepython_runtime_string_index",
     Int64,
-    Void.pointer(), Void.pointer(), Int64
+    Void.pointer(), Void.pointer(), Int64, Int64
+)
+
+string_rindex = externalCallTarget(
+    "nativepython_runtime_string_rindex",
+    Int64,
+    Void.pointer(), Void.pointer(), Int64, Int64
 )
 
 string_join = externalCallTarget(

@@ -75,6 +75,7 @@ public:
 
     //return the lowest index in the string where substring sub is found within l[start, end]
     static int64_t find(layout* l, layout* sub, int64_t start, int64_t end);
+    static int64_t rfind(layout* l, layout* sub, int64_t start, int64_t end);
     static void split(ListOfType::layout *outList, layout* l, layout* sep, int64_t max);
     static void split_3(ListOfType::layout *outList, layout* l, int64_t max);
 

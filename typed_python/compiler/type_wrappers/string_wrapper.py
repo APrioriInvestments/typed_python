@@ -213,32 +213,6 @@ def strReplace(s, old, new, maxCount):
             return new.join(accumulator)
 
 
-def str_find(x, sub, start, end):
-    if start < 0:
-        start += len(x)
-    if start < 0:
-        start = 0
-    if end < 0:
-        end += len(x)
-    if end < 0:
-        end = 0
-    if end > len(x):
-        end = len(x)
-
-    len_sub = len(sub)
-    if len_sub == 0:
-        if start > len(x) or start > end:
-            return -1
-        return start
-
-    index = start
-    while index < end - len_sub + 1:
-        if x[index:index + len_sub] == sub:
-            return index
-        index += 1
-    return -1
-
-
 class StringWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -568,21 +542,31 @@ class StringWrapper(RefcountedWrapper):
         title=runtime_functions.string_title,
     )
 
+    _find_methods = dict(
+        find=runtime_functions.string_find,
+        rfind=runtime_functions.string_rfind,
+        index=runtime_functions.string_index,
+        rindex=runtime_functions.string_rindex,
+    )
+
     def convert_attribute(self, context, instance, attr):
         if (
-            attr in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace",
+            attr in ("split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace",
                      "__iter__", "encode")
             or attr in self._str_methods
             or attr in self._bool_methods
+            or attr in self._find_methods
         ):
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        if not (methodname in ("find", "split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace",
+        if not (methodname in ("split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace",
                                "__iter__", "encode")
-                or methodname in self._str_methods or methodname in self._bool_methods):
+                or methodname in self._str_methods
+                or methodname in self._bool_methods
+                or methodname in self._find_methods):
             return context.pushException(AttributeError, methodname)
 
         if methodname == "__iter__" and not args and not kwargs:
@@ -685,56 +669,20 @@ class StringWrapper(RefcountedWrapper):
                     return context.call_py_function(strReplace, (instance, args[0], args[1], context.constant(-1)), {})
                 else:
                     return context.call_py_function(strReplace, (instance, args[0], args[1], args[2]), {})
-
-        # elif methodname == "find" and 1 <= len(args) <= 3 and not kwargs:
-        #     if len(args) == 3:
-        #         start = args[1]
-        #         end = args[2]
-        #     elif len(args) == 2:
-        #         start = args[1]
-        #         end = self.convert_len(context, instance)
-        #     elif len(args) == 1:
-        #         start = context.constant(0)
-        #         end = self.convert_len(context, instance)
-        #
-        #     #py_f = self._find_methods[methodname]
-        #     py_f = str_find
-        #     return context.call_py_function(py_f, (instance, args[0], start, end), {})
-
-        elif methodname == "find" and not kwargs:
-            if len(args) == 1:
-                return context.push(
-                    int,
-                    lambda iRef: iRef.expr.store(
-                        runtime_functions.string_find_2.call(
-                            instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr.cast(VoidPtr)
-                        )
+        elif methodname in self._find_methods and 1 <= len(args) <= 3 and not kwargs:
+            arg1 = context.constant(0) if len(args) <= 1 else args[1].nonref_expr
+            arg2 = self.convert_len(context, instance) if len(args) <= 2 else args[2].nonref_expr
+            return context.push(
+                int,
+                lambda iRef: iRef.expr.store(
+                    self._find_methods[methodname].call(
+                        instance.nonref_expr.cast(VoidPtr),
+                        args[0].nonref_expr.cast(VoidPtr),
+                        arg1,
+                        arg2
                     )
                 )
-            elif len(args) == 2:
-                return context.push(
-                    int,
-                    lambda iRef: iRef.expr.store(
-                        runtime_functions.string_find_3.call(
-                            instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr.cast(VoidPtr),
-                            args[1].nonref_expr
-                        )
-                    )
-                )
-            elif len(args) == 3:
-                return context.push(
-                    int,
-                    lambda iRef: iRef.expr.store(
-                        runtime_functions.string_find.call(
-                            instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr.cast(VoidPtr),
-                            args[1].nonref_expr,
-                            args[2].nonref_expr
-                        )
-                    )
-                )
+            )
         elif methodname == "join" and not kwargs:
             if len(args) == 1:
                 # we need to pass the list of strings

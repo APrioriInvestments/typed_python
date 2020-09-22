@@ -492,12 +492,32 @@ extern "C" {
         return StringType::find(l, sub, start, end);
     }
 
-    int64_t nativepython_runtime_string_find_2(StringType::layout* l, StringType::layout* sub) {
-        return StringType::find(l, sub, 0, l ? l->pointcount : 0);
+    int64_t nativepython_runtime_string_rfind(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+        return StringType::rfind(l, sub, start, end);
     }
 
-    int64_t nativepython_runtime_string_find_3(StringType::layout* l, StringType::layout* sub, int64_t start) {
-        return StringType::find(l, sub, start, l ? l->pointcount : 0);
+    int64_t nativepython_runtime_string_index(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+        int64_t ret =  StringType::find(l, sub, start, end);
+        if (ret == -1) {
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(
+                PyExc_ValueError, "substring not found"
+            );
+            throw PythonExceptionSet();
+        }
+        return ret;
+    }
+
+    int64_t nativepython_runtime_string_rindex(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+        int64_t ret =  StringType::rfind(l, sub, start, end);
+        if (ret == -1) {
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(
+                PyExc_ValueError, "substring not found"
+            );
+            throw PythonExceptionSet();
+        }
+        return ret;
     }
 
     void nativepython_runtime_bytes_join(BytesType::layout** out, BytesType::layout* separator, ListOfType::layout* toJoin) {
@@ -886,7 +906,12 @@ extern "C" {
                 out->data[cur++] = 0x80 | ((rc >> 6) & 0x3F);
                 out->data[cur++] = 0x80 | (rc & 0x3F);
             } else if (err == ERH_STRICT) {
-                throw std::runtime_error("corrupt utf-8 codepoint");
+                PyEnsureGilAcquired getTheGil;
+                PyErr_Format(
+                    PyExc_UnicodeError,
+                    "illegal Unicode character"
+                    );
+                throw PythonExceptionSet();
             } // else err == ERH_IGNORE
         }
 
@@ -1440,7 +1465,13 @@ extern "C" {
 
     double nativepython_runtime_pow_float64_float64(double l, double r) {
         if (l == 0.0 && r < 0.0)
-            throw std::runtime_error("0**-x err");
+        {
+            PyEnsureGilAcquired acquireTheGil;
+
+            PyErr_Format(PyExc_ZeroDivisionError, "0.0 cannot be raised to a negative power");
+            throw PythonExceptionSet();
+        }
+
         double result = std::pow(l, r);
         if (l < 0.0 && r > 0.0 && nativepython_runtime_mod_float64_float64(r, 2.0) == 1.0 && result > 0.0)
             return -result;
@@ -1448,8 +1479,12 @@ extern "C" {
     }
 
     double nativepython_runtime_pow_int64_int64(int64_t l, int64_t r) {
-        if (l == 0 && r < 0)
-            throw std::runtime_error("0**-x err");
+        if (l == 0 && r < 0) {
+            PyEnsureGilAcquired acquireTheGil;
+
+            PyErr_Format(PyExc_ZeroDivisionError, "0.0 cannot be raised to a negative power");
+            throw PythonExceptionSet();
+        }
         double result = std::pow(l, r);
         if (l < 0 && r > 0 && r % 2 && result > 0)
             return -result;
@@ -1463,7 +1498,10 @@ extern "C" {
     // should match corresponding function in PyRegisterTypeInstance.hpp
     int64_t nativepython_runtime_lshift_int64_int64(int64_t l, int64_t r) {
         if (r < 0) {
-            throw std::runtime_error("negative shift count");
+            PyEnsureGilAcquired acquireTheGil;
+
+            PyErr_Format(PyExc_ValueError, "negative shift count");
+            throw PythonExceptionSet();
         }
 
         if (PY_MINOR_VERSION > 6 && l == 0) {
@@ -1471,7 +1509,10 @@ extern "C" {
         }
 
         if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
-            throw std::runtime_error("shift count too large");
+            PyEnsureGilAcquired acquireTheGil;
+
+            PyErr_Format(PyExc_OverflowError, "shift count too large");
+            throw PythonExceptionSet();
         }
 
         return (l >= 0) ? l << r : -((-l) << r);
@@ -1480,7 +1521,10 @@ extern "C" {
     // should match corresponding function in PyRegisterTypeInstance.hpp
     uint64_t nativepython_runtime_lshift_uint64_uint64(uint64_t l, uint64_t r) {
         if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
-            throw std::runtime_error("shift count too large");
+            PyEnsureGilAcquired acquireTheGil;
+
+            PyErr_Format(PyExc_OverflowError, "shift count too large");
+            throw PythonExceptionSet();
         }
         return l << r;
     }
@@ -1488,7 +1532,10 @@ extern "C" {
     // should match corresponding function in PyRegisterTypeInstance.hpp
     uint64_t nativepython_runtime_rshift_uint64_uint64(uint64_t l, uint64_t r) {
         if (r > SSIZE_MAX) {
-            throw std::runtime_error("shift count too large");
+            PyEnsureGilAcquired acquireTheGil;
+
+            PyErr_Format(PyExc_OverflowError, "shift count too large");
+            throw PythonExceptionSet();
         }
         if (r == 0)
             return l;
@@ -1500,10 +1547,16 @@ extern "C" {
     // should match corresponding function in PyRegisterTypeInstance.hpp
     int64_t nativepython_runtime_rshift_int64_int64(int64_t l, int64_t r) {
         if (r < 0) {
-            throw std::runtime_error("negative shift count");
+            PyEnsureGilAcquired acquireTheGil;
+
+            PyErr_Format(PyExc_ValueError, "negative shift count");
+            throw PythonExceptionSet();
         }
         if (r > SSIZE_MAX) {
-            throw std::runtime_error("shift count too large");
+            PyEnsureGilAcquired acquireTheGil;
+
+            PyErr_Format(PyExc_OverflowError, "shift count too large");
+            throw PythonExceptionSet();
         }
         if (r == 0)
             return l;
@@ -1520,7 +1573,10 @@ extern "C" {
     // should match corresponding function in PyRegisterTypeInstance.hpp
     int64_t nativepython_runtime_floordiv_int64_int64(int64_t l, int64_t r) {
         if (r == 0) {
-            throw std::runtime_error("floordiv by 0");
+            PyEnsureGilAcquired acquireTheGil;
+
+            PyErr_Format(PyExc_ZeroDivisionError, "integer floordiv by zero");
+            throw PythonExceptionSet();
         }
         if (l < 0 && l == -l && r == -1) {
             // overflow because int64_min / -1 > int64_max
@@ -1537,7 +1593,10 @@ extern "C" {
     // should match corresponding function in PyRegisterTypeInstance.hpp
     double nativepython_runtime_floordiv_float64_float64(double l, double r) {
         if (r == 0.0) {
-            throw std::runtime_error("floordiv by 0.0");
+            PyEnsureGilAcquired acquireTheGil;
+
+            PyErr_Format(PyExc_ZeroDivisionError, "floating point floordiv by zero");
+            throw PythonExceptionSet();
         }
         double result = (l - nativepython_runtime_mod_float64_float64(l, r))/r;
         double floorresult = std::floor(result);

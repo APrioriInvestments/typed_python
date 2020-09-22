@@ -449,47 +449,45 @@ class TestStringCompilation(unittest.TestCase):
         def f_rindex3(x, sub, start, end):
             return x.rindex(sub, start, end)
 
-        cases = [b'ababcab', b'ababcabcab', b'aabbabbbaaabbaaba']
-        subs = [97, 98, b'a', b'c', b'X', b'ab', b'ba', b'abc', b'']
+        cases = ['ababcab', 'ababcabcab', 'aabbabbbaaabbaaba', '\u00CA\u00CB', '\u1EEa\u1EEb', '\U0001D471\U0001D472']
+        subs = ['a', 'c', 'X', 'ab', 'ba', 'abc', '', '\u00C9', '\u00CA', '\u1EE9', '\u1EEb', '\U0001D470', 'ab\U0001D471']
+        # for a larger test:
+        # subs += [x + y for x in subs for y in subs] + cases + [c[1:] for c in cases] + [c[:-1] for c in cases]
+        # cases += [x + y for x in cases for y in cases]
         for v in cases:
             for sub in subs:
-                for f in [f_find]:  # [f_find, f_rfind]:
+                for (f, g) in [(f_find, f_index), (f_rfind, f_rindex)]:
                     r1 = f(v, sub)
                     r2 = Entrypoint(f)(v, sub)
                     self.assertEqual(r1, r2, (f, v, sub))
-                #     g = f_index if f == f_find else f_rindex
-                #     if r1 != -1:
-                #         r3 = Entrypoint(g)(v, sub)
-                #         self.assertEqual(r1, r3, (g, v, sub))
-                #     else:
-                #         with self.assertRaises(ValueError):
-                #             Entrypoint(g)(v, sub)
-                #
+                    if r1 != -1:
+                        r3 = Entrypoint(g)(v, sub)
+                        self.assertEqual(r1, r3, (g, v, sub))
+                    else:
+                        with self.assertRaises(ValueError):
+                            Entrypoint(g)(v, sub)
                 for start in range(-10, 11, 2):
-                    for f in [f_find2]:  # [f_find2, f_rfind2]:
+                    for (f, g) in [(f_find2, f_index2), (f_rfind2, f_rindex2)]:
                         r1 = f(v, sub, start)
                         r2 = Entrypoint(f)(v, sub, start)
                         self.assertEqual(r1, r2, (f, v, sub, start))
-                #         g = f_index2 if f == f_find2 else f_rindex2
-                #         if r1 != -1:
-                #             r3 = Entrypoint(g)(v, sub, start)
-                #             self.assertEqual(r1, r3, (g, v, sub, start))
-                #         else:
-                #             with self.assertRaises(ValueError):
-                #                 Entrypoint(g)(v, sub, start)
+                        if r1 != -1:
+                            r3 = Entrypoint(g)(v, sub, start)
+                            self.assertEqual(r1, r3, (g, v, sub, start))
+                        else:
+                            with self.assertRaises(ValueError):
+                                Entrypoint(g)(v, sub, start)
                     for end in range(-10, 11, 2):
-                        for f in [f_find3]:  # [f_find3, f_rfind3]:
+                        for (f, g) in [(f_find3, f_index3), (f_rfind3, f_rindex3)]:
                             r1 = f(v, sub, start, end)
                             r2 = Entrypoint(f)(v, sub, start, end)
                             self.assertEqual(r1, r2, (f, v, sub, start, end))
-                #
-                #             g = f_index3 if f == f_find3 else f_rindex3
-                #             if r1 != -1:
-                #                 r3 = Entrypoint(g)(v, sub, start, end)
-                #                 self.assertEqual(r1, r3, (g, v, sub, start, end))
-                #             else:
-                #                 with self.assertRaises(ValueError):
-                #                     Entrypoint(g)(v, sub, start, end)
+                            if r1 != -1:
+                                r3 = Entrypoint(g)(v, sub, start, end)
+                                self.assertEqual(r1, r3, (g, v, sub, start, end))
+                            else:
+                                with self.assertRaises(ValueError):
+                                    Entrypoint(g)(v, sub, start, end)
 
     def test_string_from_float(self):
         @Compiled
