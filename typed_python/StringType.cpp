@@ -546,6 +546,66 @@ int64_t StringType::rfind(layout *l, layout *sub, int64_t start, int64_t stop) {
     return -1;
 }
 
+int64_t StringType::count(layout *l, layout *sub, int64_t start, int64_t stop) {
+    int64_t count = 0;
+
+    if (!l || !l->pointcount) {
+        return 0;
+    }
+    if (start < 0) {
+        start += l->pointcount;
+        if (start < 0) start = 0;
+    }
+    if (stop < 0) {
+        stop += l->pointcount;
+        if (stop < 0) stop = 0;
+    }
+    if (stop < start || start > l->pointcount) {
+        return 0;
+    }
+    if (stop > l->pointcount) {
+        stop = l->pointcount;
+    }
+    if (!sub || !sub->pointcount) {
+        if (start > l->pointcount) return 0;
+        count = stop - start + 1;
+        return count >= 0 ? count : 0;
+    }
+
+    stop -= (sub->pointcount - 1);
+
+    if (start < 0 || stop < 0 || start >= stop || sub->pointcount > l->pointcount || start > l->pointcount - sub->pointcount)
+        return 0;
+
+    if (l->bytes_per_codepoint == 1 and sub->bytes_per_codepoint == 1 && sub->pointcount == 1) {
+        const uint8_t* lPtr = (const uint8_t*)l->data;
+        const uint8_t subChar = sub->data[0];
+
+        for (int64_t i = start; i < stop; i++) {
+            if (lPtr[i] == subChar) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    for (int64_t i = start; i < stop; i++) {
+        bool match = true;
+        for (int64_t j = 0; j < sub->pointcount; j++) {
+            if (getpoint(l, i+j) != getpoint(sub, j)) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            count++;
+            i += sub->pointcount - 1;
+        }
+    }
+
+    return count;
+}
+
 void StringType::split_3(ListOfType::layout* outList, layout* l, int64_t max) {
     if (!outList)
         throw std::invalid_argument("missing return argument");
@@ -682,6 +742,63 @@ void StringType::split(ListOfType::layout* outList, layout* l, layout* sep, int6
         destroyStatic((instance_ptr)&remainder);
     }
 }
+
+bool linebreak(int32_t c) {
+    // \r\n must be handled outside of this function
+    return c == '\n' || c == '\r'
+    || c == 0x0B || c == 0x0C
+    || c == 0x1C || c == 0x1D || c == 0x1E
+    || c == 0x85 || c == 0x2028 || c == 0x2029;
+}
+
+/* static */
+// assumes outList was initialized to an empty list before calling
+void StringType::splitlines(ListOfType::layout *outList, layout* in, bool keepends) {
+    static ListOfType* listOfString = ListOfType::Make(StringType::Make());
+
+    int64_t cur = 0;
+
+    listOfString->reserve((instance_ptr)&outList, 10);
+
+    int64_t inLen = in ? in->pointcount : 0;
+    int sepLen = 0;
+
+    while (cur < inLen) {
+        int64_t match = cur;
+
+        while (match < inLen && !linebreak(getpoint(in, match))) {
+            match++;
+        }
+        sepLen = 0;
+        if (match < inLen) {
+            if (getpoint(in, match) == '\r' && match + 1 < inLen && getpoint(in, match+1) == '\n') {
+                sepLen = 2;
+            }
+            else {
+                sepLen = 1;
+            }
+        }
+
+        if (match + sepLen > inLen) {
+            break;
+        }
+
+        layout* piece = getsubstr(in, cur, match + (keepends ? sepLen : 0));
+
+        if (outList->count == outList->reserved) {
+            listOfString->reserve((instance_ptr)&outList, outList->reserved * 1.5);
+        }
+
+        ((layout**)outList->data)[outList->count++] = piece;
+        cur = match + sepLen;
+    }
+    if (inLen != cur) {
+        layout* remainder = getsubstr(in, cur, inLen);
+        listOfString->append((instance_ptr)&outList, (instance_ptr)&remainder);
+        destroyStatic((instance_ptr)&remainder);
+    }
+}
+
 
 bool StringType::isalpha(layout *l) {
     if (!l || !l->pointcount)
@@ -938,7 +1055,7 @@ StringType::layout* StringType::getsubstr(layout* l, int64_t start, int64_t stop
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
     new_layout->pointcount = datalength;
 
-    memcpy(new_layout->data, l->data + start * l->bytes_per_codepoint, datalength);
+    memcpy(new_layout->data, l->data + start * l->bytes_per_codepoint, datasize);
 
     return new_layout;
 }
@@ -1249,6 +1366,60 @@ char StringType::cmpStatic(layout* left, layout* right) {
     return 0;
 }
 
+char StringType::cmpStatic(layout* left, uint8_t* right_data, int right_pointcount, int right_bytes_per_codepoint) {
+    if ( !left && !right ) {
+        return 0;
+    }
+    if ( !left && right ) {
+        return -1;
+    }
+    if ( left && !right ) {
+        return 1;
+    }
+
+    int bytesPerLeft = left->bytes_per_codepoint;
+    int bytesPerRight = right_bytes_per_codepoint;
+    int commonCount = std::min(left->pointcount, right_pointcount);
+
+    char res = 0;
+
+    if (bytesPerLeft == 1 && bytesPerRight == 1) {
+        res = byteCompare(left->data, right_data, bytesPerLeft * commonCount);
+    } else if (bytesPerLeft == 1 && bytesPerRight == 2) {
+        res = typedArrayCompare((uint8_t*)left->data, (uint16_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 1 && bytesPerRight == 4) {
+        res = typedArrayCompare((uint8_t*)left->data, (uint32_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 2 && bytesPerRight == 1) {
+        res = typedArrayCompare((uint16_t*)left->data, (uint8_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 2 && bytesPerRight == 2) {
+        res = typedArrayCompare((uint16_t*)left->data, (uint16_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 2 && bytesPerRight == 4) {
+        res = typedArrayCompare((uint16_t*)left->data, (uint32_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 4 && bytesPerRight == 1) {
+        res = typedArrayCompare((uint32_t*)left->data, (uint8_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 4 && bytesPerRight == 2) {
+        res = typedArrayCompare((uint32_t*)left->data, (uint16_t*)right_data, commonCount);
+    } else if (bytesPerLeft == 4 && bytesPerRight == 4) {
+        res = typedArrayCompare((uint32_t*)left->data, (uint32_t*)right_data, commonCount);
+    } else {
+        throw std::runtime_error("Nonsensical bytes-per-codepoint");
+    }
+
+    if (res) {
+        return res;
+    }
+
+    if (left->pointcount < right_pointcount) {
+        return -1;
+    }
+
+    if (left->pointcount > right_pointcount) {
+        return 1;
+    }
+
+    return 0;
+}
+
 void StringType::constructor(instance_ptr self, int64_t bytes_per_codepoint, int64_t count, const char* data) const {
     if (count == 0) {
         *(layout**)self = nullptr;
@@ -1278,32 +1449,49 @@ void StringType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
 
     stream << "\"";
 
-    //as if it were bytes, which is totally wrong...
-    long bytes = count(self);
-    uint8_t* base = eltPtr(self,0);
-
     static char hexDigits[] = "0123456789abcdef";
 
-    for (long k = 0; k < bytes;k++) {
-        if (base[k] == '"') {
+    layout *l = *(layout**)self;
+    for (int64_t i = 0; i < (l ? l->pointcount : 0); i++) {
+        uint64_t c = StringType::getpoint(l, i);
+        if (c == '"') {
             stream << "\\\"";
-        } else if (base[k] == '\\') {
+        } else if (c == '\\') {
             stream << "\\\\";
-        } else if (isprint(base[k])) {
-            stream << base[k];
-        } else {
-            if (base[k] == '\n') {
+        } else if (c <= 0x1F || c == 0x7F) {
+            if (c == '\n') {
                 stream << "\\n";
             } else
-            if (base[k] == '\r') {
+            if (c == '\r') {
                 stream << "\\r";
             } else
-            if (base[k] == '\t') {
+            if (c == '\t') {
                 stream << "\\t";
             } else {
-                stream << "\\x" << hexDigits[base[k] / 16] << hexDigits[base[k] % 16];
+                stream << "\\x" << hexDigits[c / 16] << hexDigits[c % 16];
             }
+        } else if (c < 0x80) {
+            stream << (char)c;
+        } else if (c < 0x800) {
+            stream << (char)(0xC0 | (c >> 6));
+            stream << (char)(0x80 | (c & 0x3F));
+        } else if (c < 0x10000) {
+            stream << (char)(0xE0 | (c >> 12));
+            stream << (char)(0x80 | ((c >> 6) & 0x3F));
+            stream << (char)(0x80 | (c & 0x3F));
+        } else if (c < 0x110000) {
+            stream << (char)(0xF0 | (c >> 18));
+            stream << (char)(0x80 | ((c >> 12) & 0x3F));
+            stream << (char)(0x80 | ((c >> 6) & 0x3F));
+            stream << (char)(0x80 | (c & 0x3F));
+        } else {
+            const uint32_t rc = 0xFFFD;
+            stream << (char)(0xF0 | (rc >> 18));
+            stream << (char)(0x80 | ((rc >> 12) & 0x3F));
+            stream << (char)(0x80 | ((rc >> 6) & 0x3F));
+            stream << (char)(0x80 | (rc & 0x3F));
         }
+
     }
 
     stream << "\"";

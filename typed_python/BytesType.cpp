@@ -295,7 +295,7 @@ void BytesType::splitlines(ListOfType::layout *outList, layout* in, bool keepend
         cur = match + sepLen;
     }
     if (inLen != cur) {
-        layout* remainder = createFromPtr((const char*)inData + cur, inLen - cur + (keepends ? sepLen : 0));
+        layout* remainder = createFromPtr((const char*)inData + cur, inLen - cur);
         listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
         destroyStatic((instance_ptr)&remainder);
     }

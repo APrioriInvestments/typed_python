@@ -624,6 +624,12 @@ string_rindex = externalCallTarget(
     Void.pointer(), Void.pointer(), Int64, Int64
 )
 
+string_count = externalCallTarget(
+    "nativepython_runtime_string_count",
+    Int64,
+    Void.pointer(), Void.pointer(), Int64, Int64
+)
+
 string_join = externalCallTarget(
     "nativepython_runtime_string_join",
     Void,
@@ -652,6 +658,13 @@ string_split_3max = externalCallTarget(
     "nativepython_runtime_string_split_3max",
     Void.pointer(),
     Void.pointer(), Int64
+)
+
+string_splitlines = externalCallTarget(
+    "nativepython_runtime_string_splitlines",
+    Void.pointer(),
+    Void.pointer(),
+    Bool
 )
 
 string_isalpha = externalCallTarget(

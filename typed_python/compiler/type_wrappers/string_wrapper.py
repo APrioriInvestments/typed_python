@@ -16,7 +16,7 @@ from typed_python import sha_hash
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python import Int32, Float32, TupleOf
+from typed_python import Int32, Float32, TupleOf, Tuple
 from typed_python.type_promotion import isInteger
 from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import TypedListMasqueradingAsList
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -211,6 +211,89 @@ def strReplace(s, old, new, maxCount):
         else:
             accumulator.append(s[pos:])
             return new.join(accumulator)
+
+
+def strPartition(x: str, sep):
+    if len(sep) == 0:
+        raise ValueError("empty separator")
+
+    pos = x.find(sep)
+    if pos == -1:
+        return Tuple(str, str, str)((x, '', ''))
+    return Tuple(str, str, str)((x[0:pos], sep, x[pos+len(sep):]))
+
+
+def strRpartition(x, sep):
+    if len(sep) == 0:
+        raise ValueError("empty separator")
+
+    pos = x.rfind(sep)
+    if pos == -1:
+        return Tuple(str, str, str)(('', '', x))
+    return Tuple(str, str, str)((x[0:pos], sep, x[pos+len(sep):]))
+
+
+def strCenter(x, width, fill):
+    if width <= len(x):
+        return x
+
+    left = (width - len(x)) // 2
+    right = (width - len(x)) - left
+    return fill * left + x + fill * right
+
+
+def strLjust(x, width, fill):
+    if width <= len(x):
+        return x
+
+    return x + fill * (width - len(x))
+
+
+def strRjust(x, width, fill):
+    if width <= len(x):
+        return x
+
+    return fill * (width - len(x)) + x
+
+
+def strExpandtabs(x, tabsize):
+    accumulator = ListOf(str)()
+
+    col = 0  # column mod tabsize, not necessarily actual column
+    last = 0
+    for i in range(len(x)):
+        c = x[i]
+        if c == '\t':
+            accumulator.append(x[last:i])
+            spaces = tabsize - (col % tabsize) if tabsize > 0 else 0
+            accumulator.append(' ' * spaces)
+            last = i + 1
+            col = 0
+        elif c == '\n' or c == '\r':
+            col = 0
+        else:
+            col += 1
+    accumulator.append(x[last:])
+    return ''.join(accumulator)
+
+
+def strZfill(x, width):
+    accumulator = ListOf(str)()
+
+    sign = False
+    if len(x):
+        c = x[0]
+        if c == '+' or c == '-':
+            accumulator.append(x[0:1])
+            sign = True
+
+    fill = width - len(x)
+    if fill > 0:
+        accumulator.append('0' * fill)
+
+    accumulator.append(x[1:] if sign else x)
+
+    return ''.join(accumulator)
 
 
 class StringWrapper(RefcountedWrapper):
@@ -547,26 +630,21 @@ class StringWrapper(RefcountedWrapper):
         rfind=runtime_functions.string_rfind,
         index=runtime_functions.string_index,
         rindex=runtime_functions.string_rindex,
+        count=runtime_functions.string_count,
     )
 
+    _methods = ['split', 'splitlines', 'join', 'partition', 'rpartition', 'strip', 'rstrip', 'lstrip', 'startswith', 'endswith', 'replace',
+                '__iter__', 'encode', 'center', 'ljust', 'rjust', 'expandtabs', 'splitlines', 'zfill'] \
+        + list(_bool_methods) + list(_str_methods) + list(_find_methods)
+
     def convert_attribute(self, context, instance, attr):
-        if (
-            attr in ("split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace",
-                     "__iter__", "encode")
-            or attr in self._str_methods
-            or attr in self._bool_methods
-            or attr in self._find_methods
-        ):
+        if attr in self._methods:
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        if not (methodname in ("split", "join", 'strip', 'rstrip', 'lstrip', "startswith", "endswith", "replace",
-                               "__iter__", "encode")
-                or methodname in self._str_methods
-                or methodname in self._bool_methods
-                or methodname in self._find_methods):
+        if methodname not in self._methods:
             return context.pushException(AttributeError, methodname)
 
         if methodname == "__iter__" and not args and not kwargs:
@@ -598,7 +676,7 @@ class StringWrapper(RefcountedWrapper):
                     )
                 )
 
-        elif methodname in self._str_methods and not kwargs:
+        if methodname in self._str_methods and not kwargs:
             if len(args) == 0:
                 return context.push(
                     str,
@@ -608,7 +686,8 @@ class StringWrapper(RefcountedWrapper):
                         ).cast(self.layoutType)
                     )
                 )
-        elif methodname in self._bool_methods and not kwargs:
+
+        if methodname in self._bool_methods and not kwargs:
             if len(args) == 0:
                 return context.push(
                     bool,
@@ -648,7 +727,14 @@ class StringWrapper(RefcountedWrapper):
                     TypeError,
                     f"{'starts' if sw else 'ends'}with first arg must be str or a tuple of str, not {t}"
                 )
-        elif methodname == "replace" and not kwargs:
+
+        if methodname == 'expandtabs' and len(args) == 1 and not kwargs:
+            arg0type = args[0].expr_type.typeRepresentation
+            if arg0type != int:
+                return context.pushException(TypeError, f"an integer is required, not '{arg0type}'")
+            return context.call_py_function(strExpandtabs, (instance, args[0]), {})
+
+        if methodname == "replace" and not kwargs:
             if len(args) in [2, 3]:
                 for i in [0, 1]:
                     if args[i].expr_type != self:
@@ -669,7 +755,8 @@ class StringWrapper(RefcountedWrapper):
                     return context.call_py_function(strReplace, (instance, args[0], args[1], context.constant(-1)), {})
                 else:
                     return context.call_py_function(strReplace, (instance, args[0], args[1], args[2]), {})
-        elif methodname in self._find_methods and 1 <= len(args) <= 3 and not kwargs:
+
+        if methodname in self._find_methods and 1 <= len(args) <= 3 and not kwargs:
             arg1 = context.constant(0) if len(args) <= 1 else args[1].nonref_expr
             arg2 = self.convert_len(context, instance) if len(args) <= 2 else args[2].nonref_expr
             return context.push(
@@ -683,7 +770,8 @@ class StringWrapper(RefcountedWrapper):
                     )
                 )
             )
-        elif methodname == "join" and not kwargs:
+
+        if methodname == "join" and not kwargs:
             if len(args) == 1:
                 # we need to pass the list of strings
                 separator = instance
@@ -700,7 +788,8 @@ class StringWrapper(RefcountedWrapper):
                     )
                 else:
                     return context.call_py_function(strJoinIterable, (separator, itemsToJoin), {})
-        elif methodname == "split" and not kwargs:
+
+        if methodname == "split" and not kwargs:
             if len(args) == 0:
                 return context.push(
                     TypedListMasqueradingAsList(ListOf(str)),
@@ -741,7 +830,25 @@ class StringWrapper(RefcountedWrapper):
                         ).cast(outStrings.expr_type.getNativeLayoutType())
                     )
                 )
-        elif methodname == 'encode':
+
+        if methodname == 'splitlines' and not kwargs:
+            if len(args) == 0:
+                arg0 = context.constant(False)
+            elif len(args) == 1:
+                arg0 = args[0].toBool()
+                if arg0 is None:
+                    return None
+
+            return context.push(
+                TypedListMasqueradingAsList(ListOf(str)),
+                lambda out: out.expr.store(
+                    runtime_functions.string_splitlines.call(
+                        instance.nonref_expr.cast(VoidPtr),
+                        arg0
+                    ).cast(out.expr_type.getNativeLayoutType())
+                )
+            )
+        if methodname == 'encode':
             if 0 <= len(args) <= 2:
                 if len(args) >= 1:
                     arg0 = args[0]
@@ -767,6 +874,47 @@ class StringWrapper(RefcountedWrapper):
                         ).cast(typeWrapper(bytes).layoutType)
                     )
                 )
+
+        if methodname in ['partition', 'rpartition'] and len(args) == 1 and not kwargs:
+            arg0type = args[0].expr_type.typeRepresentation
+            if arg0type != str:
+                context.pushException(TypeError, f"must be str, not '{arg0type}'")
+            py_f = strPartition if methodname == 'partition' else strRpartition
+            return context.call_py_function(py_f, (instance, args[0]), {})
+
+        if methodname in ['center', 'ljust', 'rjust']:
+            if len(args) in [1, 2]:
+                arg0 = args[0].toInt64()
+                if arg0 is None:
+                    return None
+
+                if len(args) == 2:
+                    arg1 = args[1]
+                    arg1type = arg1.expr_type.typeRepresentation
+                    if arg1type != str:
+                        context.pushException(TypeError, f"{methodname}() the fill character must be a unicode character, not {arg1type}")
+                    arg1len = arg1.convert_len()
+                    if arg1len is None:
+                        return None
+                    with context.ifelse(arg1len.nonref_expr.eq(1)) as (ifTrue, ifFalse):
+                        with ifFalse:
+                            context.pushException(
+                                TypeError,
+                                f"{methodname}() the fill character must be exactly one character long"
+                            )
+                else:
+                    arg1 = context.constant(' ')
+
+            py_f = strCenter if methodname == 'center' else \
+                strLjust if methodname == 'ljust' else \
+                strRjust if methodname == 'rjust' else None
+            return context.call_py_function(py_f, (instance, arg0, arg1), {})
+
+        if methodname == 'zfill' and len(args) == 1 and not kwargs:
+            arg0 = args[0].toInt64()
+            if arg0 is None:
+                return None
+            return context.call_py_function(strZfill, (instance, arg0), {})
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 

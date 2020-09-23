@@ -489,6 +489,37 @@ class TestStringCompilation(unittest.TestCase):
                                 with self.assertRaises(ValueError):
                                     Entrypoint(g)(v, sub, start, end)
 
+    def test_string_count(self):
+        def f_count(x, sub):
+            return x.count(sub)
+
+        def f_count2(x, sub, start):
+            return x.count(sub, start)
+
+        def f_count3(x, sub, start, end):
+            return x.count(sub, start, end)
+
+        cases = ['ababcab', 'ababcabcab', 'aabbabbbaaabbaaba', '\u00CA\u00CB', '\u1EEa\u1EEb', '\U0001D471\U0001D472']
+        subs = ['a', 'c', 'X', 'ab', 'ba', 'abc', '', '\u00C9', '\u00CA', '\u1EE9', '\u1EEb', '\U0001D470', 'ab\U0001D471']
+        for v in cases:
+            for sub in subs:
+                f = f_count
+                r1 = f(v, sub)
+                r2 = Entrypoint(f)(v, sub)
+                self.assertEqual(r1, r2, (v, sub))
+
+                for start in range(-10, 11, 2):
+                    f = f_count2
+                    r1 = f(v, sub, start)
+                    subs = ['a', 'ab', 'ba', 'abc', '']
+                    r2 = Entrypoint(f)(v, sub, start)
+                    self.assertEqual(r1, r2, (v, sub, start))
+                    for end in range(-10, 11, 2):
+                        f = f_count3
+                        r1 = f(v, sub, start, end)
+                        r2 = Entrypoint(f)(v, sub, start, end)
+                        self.assertEqual(r1, r2, (v, sub, start, end))
+
     def test_string_from_float(self):
         @Compiled
         def toString(f: float):
@@ -1190,3 +1221,93 @@ class TestStringCompilation(unittest.TestCase):
         c_endecode2(Cases)
         t3 = time.time()
         print("compiled2 ", t3 - t2)
+
+    def test_string_partition(self):
+        def f_partition(x, sep):
+            return x.partition(sep)
+
+        def f_rpartition(x, sep):
+            return x.rpartition(sep)
+
+        for f in [f_partition, f_rpartition]:
+            for v in [' beginning', 'end ', 'mid dle', 'wind', 'spin', '', 'ab¢de', '汉字', 'gamma𝛤epsilon']:
+                for sep in [' ', 'in', '¢', '¢d', '字', '𝛤', 'a𝛤']:
+                    r1 = f(v, sep)
+                    r2 = Entrypoint(f)(v, sep)
+                    self.assertEqual(r1, r2, (f, v, sep))
+
+                with self.assertRaises(ValueError):
+                    Entrypoint(f)(v, '')
+
+                with self.assertRaises(TypeError):
+                    Entrypoint(f)(v, b'abc')
+
+    def test_string_just(self):
+        def f_center(x, w, fill):
+            if fill == ' ':
+                return x.center(w)
+            else:
+                return x.center(w, fill)
+
+        def f_ljust(x, w, fill):
+            if fill == ' ':
+                return x.ljust(w)
+            else:
+                return x.ljust(w, fill)
+
+        def f_rjust(x, w, fill):
+            if fill == ' ':
+                return x.rjust(w)
+            else:
+                return x.rjust(w, fill)
+
+        for f in [f_center, f_ljust, f_rjust]:
+            for v in ['short', 'long'*100, '𝛤'*10, '']:
+                for w in [0, 8, 16, 100]:
+                    for fill in [' ', 'X', '¢', '字', '𝛤']:
+                        r1 = f(v, w, fill)
+                        r2 = Entrypoint(f)(v, w, fill)
+                        self.assertEqual(r1, r2, (f, v, w, fill))
+
+                    with self.assertRaises(TypeError):
+                        Entrypoint(f)(v, w, '22')
+                    with self.assertRaises(TypeError):
+                        Entrypoint(f)(v, w, '')
+                    with self.assertRaises(TypeError):
+                        Entrypoint(f)(v, w, b'X')
+
+    def test_string_tabs(self):
+        def f_expandtabs(x, t):
+            return x.expandtabs(t)
+
+        def f_splitlines(x, *a):
+            return x.splitlines(*a)
+
+        words = {'one\ttwo\tthree', 'eleven\ttwelve\t字字字字', '\tseveral words in a row¢¢¢\t', '', '\t', '\n', '\x00'}
+        words = words.union({x + y + z for x in words for y in words for z in words})
+        for v in words:
+            for t in [8, 3, 1, 0, -1]:
+                r1 = f_expandtabs(v, t)
+                r2 = Entrypoint(f_expandtabs)(v, t)
+                self.assertEqual(r1, r2, (v, t))
+
+        segments = {'one\ntwo\rthree', '\nseveral words on a line(𝛤)\r\n', '', '\t', '\n', '\r', '\r\n', '\n\r', '\x00'}
+        segments = segments.union({x + y + z for x in segments for y in segments for z in segments})
+        for v in segments:
+            r1 = f_splitlines(v)
+            r2 = Entrypoint(f_splitlines)(v)
+            self.assertEqual(r1, r2, (v,))
+            for k in [True, False]:
+                r1 = f_splitlines(v, k)
+                r2 = Entrypoint(f_splitlines)(v, k)
+                self.assertEqual(r1, r2, (v, k))
+
+    def test_string_zfill(self):
+        def f_zfill(x, w):
+            return x.zfill(w)
+
+        for v in ['123', '-9876', '+1', 'testing', '+', '-', 'ß', '']:
+            for w in [0, 1, 5, 10, 100, -1]:
+                r1 = f_zfill(v, w)
+                r2 = Entrypoint(f_zfill)(v, w)
+                self.assertEqual(r1, r2, (v, w))

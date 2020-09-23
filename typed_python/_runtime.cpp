@@ -496,6 +496,10 @@ extern "C" {
         return StringType::rfind(l, sub, start, end);
     }
 
+    int64_t nativepython_runtime_string_count(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+        return StringType::count(l, sub, start, end);
+    }
+
     int64_t nativepython_runtime_string_index(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
         int64_t ret =  StringType::find(l, sub, start, end);
         if (ret == -1) {
@@ -608,6 +612,18 @@ extern "C" {
         listOfStringT->constructor((instance_ptr)&outList);
 
         StringType::split_3(outList, l, max);
+
+        return outList;
+    }
+
+    ListOfType::layout* nativepython_runtime_string_splitlines(StringType::layout* l, bool keepends) {
+        static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfStringT->constructor((instance_ptr)&outList);
+
+        StringType::splitlines(outList, l, keepends);
 
         return outList;
     }

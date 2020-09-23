@@ -684,20 +684,21 @@ class BytesWrapper(RefcountedWrapper):
         title=runtime_functions.bytes_title,
     )
 
+    _methods = ['decode', 'translate', 'maketrans', 'split', 'rsplit', 'join', 'partition', 'rpartition',
+                'strip', 'rstrip', 'lstrip', 'startswith', 'endswith', 'replace',
+                '__iter__', 'center', 'ljust', 'rjust', 'expandtabs', 'splitlines', 'zfill'] \
+        + list(_bool_methods) + list(_bytes_methods) + list(_find_methods)
+
     def convert_attribute(self, context, instance, attr):
-        if (
-                attr in ('decode', 'translate', 'maketrans', 'split', 'rsplit', 'join', 'partition', 'rpartition',
-                         'strip', 'rstrip', 'lstrip', 'startswith', 'endswith', 'replace',
-                         '__iter__', 'center', 'ljust', 'rjust', 'expandtabs', 'splitlines', 'zfill')
-                or attr in self._bytes_methods
-                or attr in self._find_methods
-                or attr in self._bool_methods
-        ):
+        if attr in self._methods:
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs0):
+        if methodname not in self._methods:
+            return context.pushException(AttributeError, methodname)
+
         kwargs = kwargs0.copy()
         if methodname == '__iter__' and not args and not kwargs:
             res = context.push(
