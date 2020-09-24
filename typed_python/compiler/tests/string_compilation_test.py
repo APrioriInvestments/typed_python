@@ -189,7 +189,7 @@ class TestStringCompilation(unittest.TestCase):
         c_startswith_range = Compiled(startswith_range)
         c_endswith_range = Compiled(endswith_range)
 
-        strings = ["", "a", "ab", "b", "abc", "bc", "ac", "ab", "bc", "bca"]
+        strings = ["", "a", "aβ", "β", "aβc", "βc", "ac", "aβ", "βc", "βca"]
 
         for s1 in strings:
             for s2 in strings:
@@ -232,7 +232,7 @@ class TestStringCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             c_startswith('abc', (1, 3))
 
-        strings = ["", "a", "ab", "b", "abc", "bc", "ac", "ab", "bc", "bca"]
+        strings = ["", "a", "ab", "b", "ab汉", "b汉", "a汉", "ab", "b汉", "b汉a"]
         tuples = [(a, b) for a in strings for b in strings]
         for s in strings:
             for t in tuples:
@@ -263,10 +263,10 @@ class TestStringCompilation(unittest.TestCase):
         replaceCompiled = Compiled(replace)
         replace2Compiled = Compiled(replace2)
 
-        strings = [""]
+        strings = {""}
         for _ in range(2):
-            for s in ["ab", "c", "ba"*100]:
-                strings += [x + s for x in strings]
+            for s in ["ab", "汉", "ba"*100]:
+                strings |= {x + s for x in strings}
 
         for s1 in strings:
             for s2 in strings:
@@ -720,65 +720,63 @@ class TestStringCompilation(unittest.TestCase):
             self.assertLess(ratio, expectedRatio)
 
     def test_string_split(self):
-        @Compiled
-        def c_split(s: str, sep: str, max: int) -> ListOf(str):
-            return s.split(sep, max)
+        def f_split(s: str, *args) -> ListOf(str):
+            return s.split(*args)
 
-        @Compiled
-        def c_split_2(s: str) -> ListOf(str):
-            return s.split()
-
-        @Compiled
-        def c_split_3(s: str, sep: str) -> ListOf(str):
-            return s.split(sep)
-
-        @Compiled
-        def c_split_3max(s: str, max: int) -> ListOf(str):
-            return s.split(max)
+        def f_rsplit(s: str, *args) -> ListOf(str):
+            return s.rsplit(*args)
 
         # unexpected standard behavior:
-        #   "   abc   ".split(maxsplit=0) = "abc   "  *** not "abc" nor "   abc   " ***
+        #   "   abc   ".split(maxsplit=0) = "abc   " not "abc" nor "   abc   "
         split_strings = [
             "  abc  ",
-            "ahjdfashjkdfsj ksdjkhsfhjdkf",
+            "  abc",
+            "abc  ",
+            "ßahjdfßashjkdfsj ksdjkhsfhjdßa",
             "ahjdfashjkdfsj ksdjkhsfhjdkf" * 100,
             "",
-            "a",
+            "ß",
             " one two  three   \tfour    \n\nfive\r\rsix\n",
-            " one two  three   \tfour    \n\nfive\r\rsix\n" * 100
+            "\u2029one\u2003two  three   \tfour汉   \n\nfive\r\rsix\xA0" * 100
         ]
-        for s in split_strings:
-            result = callOrExceptNoType(c_split_2, s)
-            if result[0] == "Normal":
-                self.assertEqual(_types.refcount(result[1]), 1)
-            baseline = callOrExceptNoType(lambda: s.split())
-            self.assertEqual(result, baseline, f"{s} -> {result}")
-            self.assertEqual(result, baseline, "{} -> {}".format(s, result))
-            for m in range(-2, 10):
-                result = callOrExceptNoType(c_split_3max, s, m)
-                if result[0] == "Normal":
-                    self.assertEqual(_types.refcount(result[1]), 1)
-                baseline = callOrExceptNoType(lambda: s.split(maxsplit=m))
-                self.assertEqual(result, baseline, f"{s},{m}-> {result}")
 
-            for sep in ["", "j", "s", "d", "t", " ", "as", "jks"]:
-                result = callOrExceptNoType(c_split_3, s, sep)
-                if result[0] == "Normal":
-                    self.assertEqual(_types.refcount(result[1]), 1)
-                baseline = callOrExceptNoType(lambda: s.split(sep))
-                self.assertEqual(result, baseline, f"{s},{sep}-> {result}")
-                for m in range(-2, 10):
-                    result = callOrExceptNoType(c_split, s, sep, m)
-                    if result[0] == "Normal":
-                        self.assertEqual(_types.refcount(result[1]), 1)
-                    baseline = callOrExceptNoType(lambda: s.split(sep, m))
-                    self.assertEqual(result, baseline, f"{s},{sep},{m}-> {result}")
-
-        startusage = currentMemUsageMb()
-        for i in range(100000):
+        for f in [f_split, f_rsplit]:
+            c_f = Entrypoint(f)
             for s in split_strings:
-                result = c_split_2(s)
-                result = c_split(s, " ", 9)
+                result = callOrExceptNoType(c_f, s)
+                if result[0] == 'Normal':
+                    self.assertEqual(_types.refcount(result[1]), 1)
+                baseline = callOrExceptNoType(f, s)
+                self.assertEqual(result, baseline, f"{s} -> {result}")
+                for m in range(-2, 10):
+                    result = callOrExceptNoType(c_f, s, None, m)
+                    if result[0] == 'Normal':
+                        self.assertEqual(_types.refcount(result[1]), 1)
+                    baseline = callOrExceptNoType(f, s, None, m)
+                    self.assertEqual(result, baseline, f"{s},{m}-> {result}")
+
+                for sep in ['', 'j', 's', 'd', 'ßa', ' ', 'as', 'jks', '汉']:
+                    result = callOrExceptNoType(c_f, s, sep)
+                    if result[0] == 'Normal':
+                        self.assertEqual(_types.refcount(result[1]), 1)
+                    baseline = callOrExceptNoType(f, s, sep)
+                    self.assertEqual(result, baseline, f"{s},'{sep}'-> {result}")
+                    for m in range(-2, 10):
+                        result = callOrExceptNoType(c_f, s, sep, m)
+                        if result[0] == 'Normal':
+                            self.assertEqual(_types.refcount(result[1]), 1)
+                        baseline = callOrExceptNoType(f, s, sep, m)
+                        self.assertEqual(result, baseline, f"{s},'{sep}',{m}-> {result}")
+
+        total = 0
+        c_split = Entrypoint(f_split)
+        startusage = currentMemUsageMb()
+        for i in range(1000):
+            for s in split_strings:
+                result = c_split(s)
+                total += len(result)
+                result = c_split(s, ' ', 9)
+                total += len(result)
         endusage = currentMemUsageMb()
         self.assertLess(endusage, startusage + 1)
 

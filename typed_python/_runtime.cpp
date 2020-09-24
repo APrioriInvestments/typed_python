@@ -574,12 +574,23 @@ extern "C" {
         ListOfType::layout* outList;
 
         listOfStringT->constructor((instance_ptr)&outList);
-
         StringType::split(outList, l, sep, max);
 
         return outList;
     }
 
+    ListOfType::layout* nativepython_runtime_string_rsplit(StringType::layout* l, StringType::layout* sep, int64_t max) {
+        static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
+
+        ListOfType::layout* outList;
+
+        listOfStringT->constructor((instance_ptr)&outList);
+
+        StringType::rsplit(outList, l, sep, max);
+
+        return outList;
+    }
+/*
     ListOfType::layout* nativepython_runtime_string_split_2(StringType::layout* l) {
         static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
 
@@ -615,6 +626,7 @@ extern "C" {
 
         return outList;
     }
+    */
 
     ListOfType::layout* nativepython_runtime_string_splitlines(StringType::layout* l, bool keepends) {
         static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());

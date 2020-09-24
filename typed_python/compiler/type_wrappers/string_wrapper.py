@@ -633,7 +633,8 @@ class StringWrapper(RefcountedWrapper):
         count=runtime_functions.string_count,
     )
 
-    _methods = ['split', 'splitlines', 'join', 'partition', 'rpartition', 'strip', 'rstrip', 'lstrip', 'startswith', 'endswith', 'replace',
+    _methods = ['split', 'rsplit', 'splitlines', 'join', 'partition', 'rpartition',
+                'strip', 'rstrip', 'lstrip', 'startswith', 'endswith', 'replace',
                 '__iter__', 'encode', 'center', 'ljust', 'rjust', 'expandtabs', 'splitlines', 'zfill'] \
         + list(_bool_methods) + list(_str_methods) + list(_find_methods)
 
@@ -789,48 +790,43 @@ class StringWrapper(RefcountedWrapper):
                 else:
                     return context.call_py_function(strJoinIterable, (separator, itemsToJoin), {})
 
-        if methodname == "split" and not kwargs:
+        if methodname in ['split', 'rsplit'] and not kwargs:
             if len(args) == 0:
-                return context.push(
-                    TypedListMasqueradingAsList(ListOf(str)),
-                    lambda outStrings: outStrings.expr.store(
-                        runtime_functions.string_split_2.call(
-                            instance.nonref_expr.cast(VoidPtr)
-                        ).cast(outStrings.expr_type.getNativeLayoutType())
-                    )
-                )
-            elif len(args) == 1 and args[0].expr_type.typeRepresentation == str:
-                return context.push(
-                    TypedListMasqueradingAsList(ListOf(str)),
-                    lambda outStrings: outStrings.expr.store(
-                        runtime_functions.string_split_3.call(
-                            instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr.cast(VoidPtr)
-                        ).cast(outStrings.expr_type.getNativeLayoutType())
-                    )
-                )
-            elif len(args) == 1 and args[0].expr_type.typeRepresentation == int:
-                return context.push(
-                    TypedListMasqueradingAsList(ListOf(str)),
-                    lambda outStrings: outStrings.expr.store(
-                        runtime_functions.string_split_3max.call(
-                            instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr
-                        ).cast(outStrings.expr_type.getNativeLayoutType())
-                    )
-                )
-            elif len(args) == 2 and args[0].expr_type.typeRepresentation == str and args[1].expr_type.typeRepresentation == int:
-                return context.push(
-                    TypedListMasqueradingAsList(ListOf(str)),
-                    lambda outStrings: outStrings.expr.store(
-                        runtime_functions.string_split.call(
-                            instance.nonref_expr.cast(VoidPtr),
-                            args[0].nonref_expr.cast(VoidPtr),
-                            args[1].nonref_expr
-                        ).cast(outStrings.expr_type.getNativeLayoutType())
-                    )
-                )
+                sepPtr = VoidPtr.zero()
+                maxCount = native_ast.const_int_expr(-1)
+            elif len(args) in [1, 2] and args[0].expr_type.typeRepresentation in [str, type(None)]:
+                if args[0].expr_type == typeWrapper(None):
+                    sepPtr = VoidPtr.zero()
+                else:
+                    sepPtr = args[0].nonref_expr.cast(VoidPtr)
+                    sepLen = args[0].convert_len()
+                    if sepLen is None:
+                        return None
+                    with context.ifelse(sepLen.nonref_expr.eq(0)) as (ifTrue, ifFalse):
+                        with ifTrue:
+                            context.pushException(ValueError, "empty separator")
 
+                if len(args) == 2:
+                    maxCount = args[1].toInt64()
+                    if maxCount is None:
+                        return None
+                else:
+                    maxCount = native_ast.const_int_expr(-1)
+            else:
+                maxCount = None
+
+            if maxCount is not None:
+                fn = runtime_functions.string_split if methodname == 'split' else runtime_functions.string_rsplit
+                return context.push(
+                    TypedListMasqueradingAsList(ListOf(str)),
+                    lambda out: out.expr.store(
+                        fn.call(
+                            instance.nonref_expr.cast(VoidPtr),
+                            sepPtr,
+                            maxCount
+                        ).cast(out.expr_type.getNativeLayoutType())
+                    )
+                )
         if methodname == 'splitlines' and not kwargs:
             if len(args) == 0:
                 arg0 = context.constant(False)

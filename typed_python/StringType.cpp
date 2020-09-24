@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -511,9 +511,6 @@ int64_t StringType::rfind(layout *l, layout *sub, int64_t start, int64_t stop) {
     if (!sub || !sub->pointcount)
         return stop;
 
-    //if (stop > l->pointcount)
-    //    stop = l->pointcount;
-
     stop -= (sub->pointcount - 1);
 
     if (start < 0 || stop < 0 || start >= stop || sub->pointcount > l->pointcount || start > l->pointcount - sub->pointcount)
@@ -539,8 +536,9 @@ int64_t StringType::rfind(layout *l, layout *sub, int64_t start, int64_t stop) {
                 break;
             }
         }
-        if (match)
+        if (match) {
             return i;
+            }
     }
 
     return -1;
@@ -606,61 +604,6 @@ int64_t StringType::count(layout *l, layout *sub, int64_t start, int64_t stop) {
     return count;
 }
 
-void StringType::split_3(ListOfType::layout* outList, layout* l, int64_t max) {
-    if (!outList)
-        throw std::invalid_argument("missing return argument");
-
-    static ListOfType* listofstring = ListOfType::Make(StringType::Make());
-    listofstring->resize((instance_ptr)&outList, 0, 0);
-
-    if (!l || !l->pointcount)
-        ;
-    else if (max == 0) {
-        // unexpected standard behavior:
-        //   "   abc   ".split(maxsplit=0) = "abc   "  *** not "abc" nor "   abc   " ***
-        int64_t cur = 0;
-        while (cur < l->pointcount && uprops[getpoint(l, cur)] & Uprops_SPACE)
-            cur++;
-        layout* remainder = getsubstr(l, cur, l->pointcount);
-        listofstring->append((instance_ptr)&outList, (instance_ptr)&remainder);
-        destroyStatic((instance_ptr)&remainder);
-    }
-    else {
-        int64_t cur = 0;
-        int64_t count = 0;
-        while (cur < l->pointcount) {
-            int64_t match = cur;
-            while (!(uprops[getpoint(l, match)] & Uprops_SPACE)) {
-                match++;
-                if (match >= l->pointcount) {
-                    match = -1;
-                    break;
-                }
-            }
-            if (match < 0)
-                break;
-            if (cur != match) {
-                layout* piece = getsubstr(l, cur, match);
-                listofstring->append((instance_ptr)&outList, (instance_ptr)&piece);
-                destroyStatic((instance_ptr)&piece);
-                count++;
-            }
-            cur = match + 1;
-            if (max >= 0 && count >= max)
-                break;
-        }
-        while (cur < l->pointcount && uprops[getpoint(l, cur)] & Uprops_SPACE)
-            cur++;
-        if (cur < l->pointcount) {
-            layout* remainder = getsubstr(l, cur, l->pointcount);
-            listofstring->append((instance_ptr)&outList, (instance_ptr)&remainder);
-            destroyStatic((instance_ptr)&remainder);
-        }
-    }
-    // to force a refcount error, uncomment the line below
-    //listofstring->copy_constructor((instance_ptr)&outList, (instance_ptr)&outList);
-}
-
 void StringType::split(ListOfType::layout* outList, layout* l, layout* sep, int64_t max) {
     if (!outList)
         throw std::invalid_argument("missing return argument");
@@ -668,83 +611,132 @@ void StringType::split(ListOfType::layout* outList, layout* l, layout* sep, int6
     static ListOfType* listofstring = ListOfType::Make(StringType::Make());
     listofstring->resize((instance_ptr)&outList, 0, 0);
 
-    if (!sep || !sep->pointcount) {
-        throw std::invalid_argument("ValueError: empty separator");
-    }
-    else if (!l || !l->pointcount || max == 0) {
-        listofstring->append((instance_ptr)&outList, (instance_ptr)&l);
-    }
-    else if (l->bytes_per_codepoint == 1 and sep->bytes_per_codepoint == 1 and sep->pointcount == 1) {
-        int64_t cur = 0;
-        int64_t count = 0;
+    int64_t sep_bytes_per_codepoint = sep ? sep->bytes_per_codepoint : 1;
+    int64_t sep_pointcount = sep ? sep->pointcount : 1;
 
-        listofstring->reserve((instance_ptr)&outList, 10);
-
-        uint8_t* lData = (uint8_t*)l->data;
-        uint8_t sepChar = *(uint8_t*)sep->data;
-
-        while (cur < l->pointcount) {
-            int64_t match = cur;
-
-            while (match < l->pointcount && lData[match] != sepChar) {
-                match++;
-            }
-
-            if (match >= l->pointcount) {
-                break;
-            }
-
-            layout* piece = getsubstr(l, cur, match);
-
-            if (outList->count == outList->reserved) {
-                listofstring->reserve((instance_ptr)&outList, outList->reserved * 1.5);
-            }
-
-            ((layout**)outList->data)[outList->count++] = piece;
-
-            cur = match + 1;
-
-            count++;
-
-            if (max >= 0 && count >= max)
-                break;
+    if (!l || !l->pointcount) {
+        if (sep && sep->pointcount) {
+            listofstring->append((instance_ptr)&outList, (instance_ptr)&l);
         }
-        layout* remainder = getsubstr(l, cur, l->pointcount);
-        listofstring->append((instance_ptr)&outList, (instance_ptr)&remainder);
-        destroyStatic((instance_ptr)&remainder);
+        return;
     }
-    else {
-        int64_t cur = 0;
-        int64_t count = 0;
+    int64_t cur = 0;
+    int64_t count = 0;
 
-        listofstring->reserve((instance_ptr)&outList, 10);
+    listofstring->reserve((instance_ptr)&outList, 10);
 
-        while (cur < l->pointcount) {
-            int64_t match = find(l, sep, cur, l->pointcount);
-            if (match < 0)
-                break;
+    while ((count < max || max < 0) && cur < l->pointcount) {
+        int64_t match = cur;
 
+        if (sep && l->bytes_per_codepoint == 1 && sep_bytes_per_codepoint == 1 && sep_pointcount == 1) {
+            while (match < l->pointcount && l->data[match] != sep->data[0]) match++;
+        } else if (sep) {
+            match = find(l, sep, cur, l->pointcount);
+            if (match == -1) match = l->pointcount;
+        } else {
+            while (match < l->pointcount && !(uprops[getpoint(l, match)] & Uprops_SPACE)) match++;
+        }
+        if (match >= l->pointcount) break;
+
+        if (sep || match != cur) {
             layout* piece = getsubstr(l, cur, match);
-
             if (outList->count == outList->reserved) {
                 listofstring->reserve((instance_ptr)&outList, outList->reserved * 1.5);
             }
-
             ((layout**)outList->data)[outList->count++] = piece;
 
-            cur = match + sep->pointcount;
+            cur = match + sep_pointcount;
+
             count++;
             if (max >= 0 && count >= max)
                 break;
         }
+        else if (!sep) {
+            cur++;
+        }
+    }
+    if (!sep) {
+        while (cur < l->pointcount && (uprops[getpoint(l, cur)] & Uprops_SPACE)) {
+            cur++;
+        }
+    }
+    if (sep || cur < l->pointcount || max == 0) {
         layout* remainder = getsubstr(l, cur, l->pointcount);
-        listofstring->append((instance_ptr)&outList, (instance_ptr)&remainder);
-        destroyStatic((instance_ptr)&remainder);
+        if (outList->count == outList->reserved) {
+            listofstring->reserve((instance_ptr)&outList, outList->reserved + 1);
+        }
+        ((layout**)outList->data)[outList->count++] = remainder;
     }
 }
 
+void StringType::rsplit(ListOfType::layout* outList, layout* l, layout* sep, int64_t max) {
+    if (!outList)
+        throw std::invalid_argument("missing return argument");
+
+    static ListOfType* listofstring = ListOfType::Make(StringType::Make());
+    listofstring->resize((instance_ptr)&outList, 0, 0);
+
+    int64_t sep_bytes_per_codepoint = sep ? sep->bytes_per_codepoint : 1;
+    int64_t sep_pointcount = sep ? sep->pointcount : 1;
+
+    if (!l || !l->pointcount) {
+        if (sep && sep->pointcount) {
+            listofstring->append((instance_ptr)&outList, (instance_ptr)&l);
+        }
+        return;
+    }
+    int64_t cur = l->pointcount - 1;
+    int64_t count = 0;
+
+    listofstring->reserve((instance_ptr)&outList, 10);
+
+    while ((count < max || max < 0) && cur >= 0) {
+        int64_t match = cur;
+
+        if (sep && l->bytes_per_codepoint == 1 && sep_bytes_per_codepoint == 1 && sep_pointcount == 1) {
+            while (match >= 0 && l->data[match] != sep->data[0]) match--;
+        } else if (sep) {
+            match = rfind(l, sep, 0, cur + 1);
+            if (match != -1) match += sep_pointcount - 1;
+        } else {
+            while (match >= 0 && !(uprops[getpoint(l, match)] & Uprops_SPACE)) match--;
+        }
+        if (match < 0) break;
+
+        if (sep || match != cur) {
+            layout* piece = getsubstr(l, match + 1, cur + 1);
+            if (outList->count == outList->reserved) {
+                listofstring->reserve((instance_ptr)&outList, outList->reserved * 1.5);
+            }
+            ((layout**)outList->data)[outList->count++] = piece;
+
+            cur = match - sep_pointcount;
+
+            count++;
+            if (max >= 0 && count >= max)
+                break;
+        }
+        else if (!sep) {
+            cur--;
+        }
+    }
+    if (!sep) {
+        while (cur >= 0 && (uprops[getpoint(l, cur)] & Uprops_SPACE)) {
+            cur--;
+        }
+    }
+    if (sep || cur >= 0 || max == 0) {
+        layout* remainder = getsubstr(l, 0, cur + 1);
+        if (outList->count == outList->reserved) {
+            listofstring->reserve((instance_ptr)&outList, outList->reserved + 1);
+        }
+        ((layout**)outList->data)[outList->count++] = remainder;
+    }
+    listofstring->reverse((instance_ptr)&outList);
+}
+
 bool linebreak(int32_t c) {
-    // \r\n must be handled outside of this function
+    // the two-character line break '\r\n' must be handled outside of this function
     return c == '\n' || c == '\r'
     || c == 0x0B || c == 0x0C
     || c == 0x1C || c == 0x1D || c == 0x1E
@@ -794,8 +786,11 @@ void StringType::splitlines(ListOfType::layout *outList, layout* in, bool keepen
     }
     if (inLen != cur) {
         layout* remainder = getsubstr(in, cur, inLen);
+        if (outList->count == outList->reserved) {
+            listOfString->reserve((instance_ptr)&outList, outList->reserved + 1);
+        }
         listOfString->append((instance_ptr)&outList, (instance_ptr)&remainder);
-        destroyStatic((instance_ptr)&remainder);
+        ((layout**)outList->data)[outList->count++] = remainder;
     }
 }
 

@@ -78,7 +78,7 @@ public:
     static int64_t rfind(layout* l, layout* sub, int64_t start, int64_t end);
     static int64_t count(layout* l, layout* sub, int64_t start, int64_t end);
     static void split(ListOfType::layout *outList, layout* l, layout* sep, int64_t max);
-    static void split_3(ListOfType::layout *outList, layout* l, int64_t max);
+    static void rsplit(ListOfType::layout *outList, layout* l, layout* sep, int64_t max);
     static void splitlines(ListOfType::layout *outList, layout* l, bool keepends);
 
     /**

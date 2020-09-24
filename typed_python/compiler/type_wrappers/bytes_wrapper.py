@@ -859,14 +859,17 @@ class BytesWrapper(RefcountedWrapper):
             if len(args) == 0:
                 sepPtr = VoidPtr.zero()
                 maxCount = native_ast.const_int_expr(-1)
-            elif len(args) in [1, 2] and args[0].expr_type.typeRepresentation == bytes:
-                sepPtr = args[0].nonref_expr.cast(VoidPtr)
-                sepLen = args[0].convert_len()
-                if sepLen is None:
-                    return None
-                with context.ifelse(sepLen.nonref_expr.eq(0)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        context.pushException(ValueError, "empty separator")
+            elif len(args) in [1, 2] and args[0].expr_type.typeRepresentation in [bytes, type(None)]:
+                if args[0].expr_type == typeWrapper(None):
+                    sepPtr = VoidPtr.zero()
+                else:
+                    sepPtr = args[0].nonref_expr.cast(VoidPtr)
+                    sepLen = args[0].convert_len()
+                    if sepLen is None:
+                        return None
+                    with context.ifelse(sepLen.nonref_expr.eq(0)) as (ifTrue, ifFalse):
+                        with ifTrue:
+                            context.pushException(ValueError, "empty separator")
 
                 if len(args) == 2:
                     maxCount = args[1].toInt64()

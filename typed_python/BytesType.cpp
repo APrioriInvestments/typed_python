@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -98,7 +98,7 @@ char BytesType::cmpStatic(layout* left, layout* right) {
 
 /* static */
 // assumes outList was initialized to an empty list before calling
-// x.split() with no parameters is not the same thing as x.split(b' \t\r\n\x0B\f')
+// x.split() with no parameters is not the same thing as x.split(b' ')
 // x.split() combines successive matches (of whitespace) into a single match
 void BytesType::split(ListOfType::layout *outList, layout* in, layout* sep, int64_t max) {
     static ListOfType* listOfBytes = ListOfType::Make(BytesType::Make());
@@ -115,9 +115,14 @@ void BytesType::split(ListOfType::layout *outList, layout* in, layout* sep, int6
     int64_t sepLen = sep ? sep->bytecount : 1;
 
     if (max == 0) {
-        layout* remainder = createFromPtr((const char*)inData, inLen);
-        listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
-        destroyStatic((instance_ptr)&remainder);
+        if (!sep) {
+            while (cur < inLen && std::isspace(inData[cur])) cur++;
+        }
+        if (cur != inLen) {
+            layout* remainder = createFromPtr((const char*)inData + cur, inLen - cur);
+            listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
+            destroyStatic((instance_ptr)&remainder);
+        }
         return;
     }
 
@@ -135,15 +140,7 @@ void BytesType::split(ListOfType::layout *outList, layout* in, layout* sep, int6
                 }
             }
         } else {
-            while (match < inLen && (
-                    inData[match] != '\n'
-                &&  inData[match] != '\r'
-                &&  inData[match] != '\t'
-                &&  inData[match] != ' '
-                &&  inData[match] != '\x0B'  // note: \x0B is whitespace, but \b is not whitespace
-                &&  inData[match] != '\f'
-                )
-            ) {
+            while (match < inLen && !isspace(inData[match])) {
                 match++;
             }
         }
@@ -165,9 +162,13 @@ void BytesType::split(ListOfType::layout *outList, layout* in, layout* sep, int6
             if (max >= 0 && count >= max)
                 break;
         }
-        else if (!sep)
+        else if (!sep) {
             cur++;
+        }
     }
+//    if (!sep) {
+//        while (cur < inLen && std::isspace(inData[cur])) cur++;
+//    }
     if (sep || inLen != cur) {
         layout* remainder = createFromPtr((const char*)inData + cur, inLen - cur);
         listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
@@ -179,8 +180,6 @@ void BytesType::split(ListOfType::layout *outList, layout* in, layout* sep, int6
 // assumes outList was initialized to an empty list before calling
 void BytesType::rsplit(ListOfType::layout *outList, layout* in, layout* sep, int64_t max) {
     static ListOfType* listOfBytes = ListOfType::Make(BytesType::Make());
-    int64_t cur = in ? in->bytecount - 1 : -1;
-    int64_t count = 0;
 
     listOfBytes->reserve((instance_ptr)&outList, 10);
 
@@ -190,10 +189,18 @@ void BytesType::rsplit(ListOfType::layout *outList, layout* in, layout* sep, int
     uint8_t* sepDat = sep ? (uint8_t*)sep->data : 0;
     int64_t sepLen = sep ? sep->bytecount : 1;
 
+    int64_t cur = inLen - 1;
+    int64_t count = 0;
+
     if (max == 0) {
-        layout* remainder = createFromPtr((const char*)inData, inLen);
-        listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
-        destroyStatic((instance_ptr)&remainder);
+        if (!sep) {
+            while (cur >= 0 && std::isspace(inData[cur])) cur--;
+        }
+        if (cur >= 0) {
+            layout* remainder = createFromPtr((const char*)inData, cur + 1);
+            listOfBytes->append((instance_ptr)&outList, (instance_ptr)&remainder);
+            destroyStatic((instance_ptr)&remainder);
+        }
         return;
     }
 

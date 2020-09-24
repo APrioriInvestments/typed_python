@@ -219,11 +219,11 @@ class TestBytesCompilation(unittest.TestCase):
         self.assertLess(time.time() - t0, 1e-4)
 
     def test_bytes_split(self):
-        def split(someBytes, *args):
-            return someBytes.split(*args)
+        def split(someBytes, *args, **kwargs):
+            return someBytes.split(*args, **kwargs)
 
-        def rsplit(someBytes, *args):
-            return someBytes.rsplit(*args)
+        def rsplit(someBytes, *args, **kwargs):
+            return someBytes.rsplit(*args, **kwargs)
 
         compiledSplit = Entrypoint(split)
         compiledRsplit = Entrypoint(rsplit)
@@ -239,6 +239,11 @@ class TestBytesCompilation(unittest.TestCase):
             (b'asdf', b'K'),
             (b'asdf', b's', 0),
             (b'asdf', b's', -1),
+            (b' asdf ', None, 0),
+            (b' asdf ', None, -1),
+            (b'as df', None, 0),
+            (b'     ', None, 0),
+            (b'', None, 0),
             (b'a aaa bababa a',),
             (b'a  aaa  bababa  a',),
             (b'  a   ',),

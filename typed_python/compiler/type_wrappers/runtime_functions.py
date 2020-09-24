@@ -642,22 +642,10 @@ string_split = externalCallTarget(
     Void.pointer(), Void.pointer(), Int64
 )
 
-string_split_2 = externalCallTarget(
-    "nativepython_runtime_string_split_2",
+string_rsplit = externalCallTarget(
+    "nativepython_runtime_string_rsplit",
     Void.pointer(),
-    Void.pointer()
-)
-
-string_split_3 = externalCallTarget(
-    "nativepython_runtime_string_split_3",
-    Void.pointer(),
-    Void.pointer(), Void.pointer()
-)
-
-string_split_3max = externalCallTarget(
-    "nativepython_runtime_string_split_3max",
-    Void.pointer(),
-    Void.pointer(), Int64
+    Void.pointer(), Void.pointer(), Int64
 )
 
 string_splitlines = externalCallTarget(
