@@ -53,7 +53,7 @@ from typed_python.compiler.type_wrappers.math_wrappers import MathFunctionWrappe
 from typed_python.compiler.type_wrappers.builtin_wrappers import BuiltinWrapper
 from typed_python.compiler.type_wrappers.bytecount_wrapper import BytecountWrapper
 from typed_python.compiler.type_wrappers.arithmetic_wrapper import IntWrapper, FloatWrapper, BoolWrapper
-from typed_python.compiler.type_wrappers.string_wrapper import StringWrapper
+from typed_python.compiler.type_wrappers.string_wrapper import StringWrapper, StringMaketransWrapper
 from typed_python.compiler.type_wrappers.bytes_wrapper import BytesWrapper, BytesMaketransWrapper
 from typed_python.compiler.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
 from typed_python.compiler.type_wrappers.abs_wrapper import AbsWrapper
@@ -217,6 +217,9 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
 
     if f is bytes.maketrans:
         return TypedExpression(context, native_ast.nullExpr, BytesMaketransWrapper(), False)
+
+    if f is str.maketrans:
+        return TypedExpression(context, native_ast.nullExpr, StringMaketransWrapper(), False)
 
     if f is isinstance:
         return TypedExpression(context, native_ast.nullExpr, IsinstanceWrapper(), False)

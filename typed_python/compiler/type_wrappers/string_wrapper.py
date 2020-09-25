@@ -16,7 +16,7 @@ from typed_python import sha_hash
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python import Int32, Float32, TupleOf, Tuple
+from typed_python import Int32, Float32, TupleOf, Tuple, Dict, OneOf
 from typed_python.type_promotion import isInteger
 from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import TypedListMasqueradingAsList
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -294,6 +294,45 @@ def strZfill(x, width):
     accumulator.append(x[1:] if sign else x)
 
     return ''.join(accumulator)
+
+
+def strTranslate(x, table):
+    accumulator = ListOf(str)()
+    for c in x:
+        t = c
+        try:
+            t = table.__getitem__(ord(c))
+        except LookupError:
+            pass
+        if t is not None:
+            accumulator.append(t)
+    return ''.join(accumulator)
+
+
+def strMaketransFromDict(x: Dict(OneOf(int, str), OneOf(int, str, None))) -> Dict(int, OneOf(int, str, None)):
+    # The line below is somehow necessary.  Without it, 'isinstance' type inference fails for elements of the dict key.
+    x = Dict(OneOf(int, str), OneOf(int, str, None))(x)  # this shouldn't be necessary, but it is
+    ret = Dict(int, OneOf(int, str, None))()
+    for c in x:
+        if isinstance(c, str):
+            if len(c) != 1:
+                raise ValueError("string keys in translate table must be of length 1")
+            ret[ord(c)] = x[c]
+        else:
+            ret[c] = x[c]
+    return ret
+
+
+def strMaketransFromStr(x: str, y: str, z: OneOf(str, None)) -> Dict(int, OneOf(int, None)):
+    if len(x) != len(y):
+        raise ValueError("the first two maketrans arguments must have equal length")
+    ret = Dict(int, OneOf(int, None))()
+    for i in range(len(x)):
+        ret[ord(x[i])] = ord(y[i])
+    if z is not None:
+        for c in z:
+            ret[ord(c)] = None
+    return ret
 
 
 class StringWrapper(RefcountedWrapper):
@@ -635,6 +674,7 @@ class StringWrapper(RefcountedWrapper):
 
     _methods = ['split', 'rsplit', 'splitlines', 'join', 'partition', 'rpartition',
                 'strip', 'rstrip', 'lstrip', 'startswith', 'endswith', 'replace',
+                "translate", "maketrans",
                 '__iter__', 'encode', 'center', 'ljust', 'rjust', 'expandtabs', 'splitlines', 'zfill'] \
         + list(_bool_methods) + list(_str_methods) + list(_find_methods)
 
@@ -698,7 +738,36 @@ class StringWrapper(RefcountedWrapper):
                         )
                     )
                 )
-        elif methodname in ["startswith", "endswith"] and not kwargs:
+        if methodname in self._find_methods and 1 <= len(args) <= 3 and not kwargs:
+            arg1 = context.constant(0) if len(args) <= 1 else args[1].nonref_expr
+            arg2 = self.convert_len(context, instance) if len(args) <= 2 else args[2].nonref_expr
+            return context.push(
+                int,
+                lambda iRef: iRef.expr.store(
+                    self._find_methods[methodname].call(
+                        instance.nonref_expr.cast(VoidPtr),
+                        args[0].nonref_expr.cast(VoidPtr),
+                        arg1,
+                        arg2
+                    )
+                )
+            )
+
+        if methodname == "translate" and not kwargs:
+            if len(args) == 1:
+                return context.call_py_function(strTranslate, (instance, args[0]), {})
+
+        if methodname == 'maketrans' and not kwargs:
+            if len(args) == 1:
+                return context.call_py_function(strMaketransFromDict, (args[0], ), {})
+            if 2 <= len(args) <= 3:
+                if len(args) == 3:
+                    arg2 = args[2]
+                else:
+                    arg2 = context.constant(None)
+                return context.call_py_function(strMaketransFromStr, (args[0], args[1], arg2), {})
+
+        if methodname in ["startswith", "endswith"] and not kwargs:
             if len(args) >= 1 and len(args) <= 3:
                 sw = (methodname == "startswith")
                 t = args[0].expr_type
@@ -756,21 +825,6 @@ class StringWrapper(RefcountedWrapper):
                     return context.call_py_function(strReplace, (instance, args[0], args[1], context.constant(-1)), {})
                 else:
                     return context.call_py_function(strReplace, (instance, args[0], args[1], args[2]), {})
-
-        if methodname in self._find_methods and 1 <= len(args) <= 3 and not kwargs:
-            arg1 = context.constant(0) if len(args) <= 1 else args[1].nonref_expr
-            arg2 = self.convert_len(context, instance) if len(args) <= 2 else args[2].nonref_expr
-            return context.push(
-                int,
-                lambda iRef: iRef.expr.store(
-                    self._find_methods[methodname].call(
-                        instance.nonref_expr.cast(VoidPtr),
-                        args[0].nonref_expr.cast(VoidPtr),
-                        arg1,
-                        arg2
-                    )
-                )
-            )
 
         if methodname == "join" and not kwargs:
             if len(args) == 1:
@@ -1019,3 +1073,27 @@ class StringIteratorWrapper(Wrapper):
 
 
 _StringIteratorWrapper = StringIteratorWrapper()
+
+
+class StringMaketransWrapper(Wrapper):
+    is_pod = True
+    is_empty = False
+    is_pass_by_ref = False
+
+    def __init__(self):
+        super().__init__(str.maketrans)
+
+    def getNativeLayoutType(self):
+        return native_ast.Type.Void()
+
+    def convert_call(self, context, expr, args, kwargs):
+        if not kwargs:
+            static_str_instance = StringWrapper().constant(context, '')
+            if len(args) == 1:
+                return static_str_instance.convert_method_call("maketrans", (args[0],), {})
+            elif len(args) == 2:
+                return static_str_instance.convert_method_call("maketrans", (args[0], args[1]), {})
+            elif len(args) == 3:
+                return static_str_instance.convert_method_call("maketrans", (args[0], args[1], args[2]), {})
+
+        return super().convert_call(context, expr, args, kwargs)

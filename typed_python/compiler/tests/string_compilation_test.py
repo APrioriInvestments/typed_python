@@ -1309,3 +1309,60 @@ class TestStringCompilation(unittest.TestCase):
                 r1 = f_zfill(v, w)
                 r2 = Entrypoint(f_zfill)(v, w)
                 self.assertEqual(r1, r2, (v, w))
+
+    def test_string_translate(self):
+        def f_translate(s, t):
+            return s.translate(t)
+
+        c_translate = Entrypoint(f_translate)
+
+        cases = ['', 'abc', 'c', 'aad'*100, 'baβca'*100]
+        dicts = [
+            dict(),
+            dict(a='A', b='B'),
+            dict(a='b', b='β', β='B', c=None),
+        ]
+        tables = [str.maketrans(d) for d in dicts]
+        for s in cases:
+            for t in tables:
+                r1 = f_translate(s, t)
+                r2 = c_translate(s, t)
+                self.assertEqual(r1, r2, s)
+
+    def test_string_maketrans(self):
+        def f_maketrans(*args):
+            return str.maketrans(*args)
+
+        c_maketrans = Entrypoint(f_maketrans)
+
+        cases = [
+            ({'a': 'A', 'b': 'B'},),
+            ({'a': 'A', 'b': '', 'c': 'CC', 'd': None},),
+            ({'a': 1234, 'b': 'β', 'β': 'B', 'd': None},),
+            (dict(),),
+            ({'a': 1234, 'bb': 'β', 'β': 'B', 'd': None},),  # Error
+            ({'a': 1234, None: 'β', 'β': 'B', 'd': None},),  # Error
+            ([1, 2, 3, 4],),  # Error
+            (set(),),  # Error
+            ('ab', 'AB'),
+            ('', ''),
+            ('ab', 'Aβ'),
+            ('aβ', 'Ab'),
+            ('ab', 'ABC'),  # Error
+            ('ab', 'AB', 'c'),
+            ('ab', 'AB', 'cβ'),
+            ('', '', ''),
+            ('', '', 'a'),
+            ('', '', 'abcdβ'),
+            ('', '', 123),  # Error
+        ]
+
+        s = 'abacadβ'
+        for args in cases:
+            r1 = callOrExceptType(f_maketrans, *args)
+            r2 = callOrExceptType(c_maketrans, *args)
+            self.assertEqual(r1, r2, args)
+            if r1[0] == 'Normal':
+                r3 = s.translate(r1[1])
+                r4 = s.translate(r2[1])
+                self.assertEqual(r3, r4, args)
