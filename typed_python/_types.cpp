@@ -1342,6 +1342,62 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
     return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
 }
 
+typedef struct {
+    PyObject_HEAD
+    PyObject *prop_get;
+    PyObject *prop_set;
+    PyObject *prop_del;
+    PyObject *prop_doc;
+    int getter_doc;
+} JustLikeAPropertyObject;
+
+PyObject *setPropertyGetSetDel(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 4) {
+        PyErr_SetString(PyExc_TypeError, "setPropertyGetSetDel takes 2 positional arguments");
+        return NULL;
+    }
+
+    JustLikeAPropertyObject* prop = (JustLikeAPropertyObject*)PyTuple_GetItem(args, 0);
+    PyObject* fget = PyTuple_GetItem(args, 1);
+    PyObject* fset = PyTuple_GetItem(args, 2);
+    PyObject* fdel = PyTuple_GetItem(args, 3);
+
+    incref(fget);
+    incref(fset);
+    incref(fdel);
+    decref(prop->prop_get);
+    decref(prop->prop_set);
+    decref(prop->prop_del);
+
+    prop->prop_get = fget;
+    prop->prop_set = fset;
+    prop->prop_del = fdel;
+
+    return incref(Py_None);
+}
+
+typedef struct {
+    PyObject_HEAD
+    PyObject *cm_callable;
+    PyObject *cm_dict;
+} ClassOrStaticmethod;
+
+PyObject *setClassOrStaticmethod(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "setClassOrStaticmethod takes 2 positional arguments");
+        return NULL;
+    }
+
+    ClassOrStaticmethod* method = (ClassOrStaticmethod*)PyTuple_GetItem(args, 0);
+    PyObject* func = PyTuple_GetItem(args, 1);
+
+    incref(func);
+    decref(method->cm_callable);
+
+    method->cm_callable = func;
+
+    return incref(Py_None);
+}
 
 PyObject *setFunctionClosure(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
@@ -2325,6 +2381,8 @@ static PyMethodDef module_methods[] = {
     {"getDispatchIndexForType", (PyCFunction)getDispatchIndexForType, METH_VARARGS | METH_KEYWORDS, NULL},
     {"prepareArgumentToBePassedToCompiler", (PyCFunction)prepareArgumentToBePassedToCompiler, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setFunctionClosure", (PyCFunction)setFunctionClosure, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"setClassOrStaticmethod", (PyCFunction)setClassOrStaticmethod, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"setPropertyGetSetDel", (PyCFunction)setPropertyGetSetDel, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 

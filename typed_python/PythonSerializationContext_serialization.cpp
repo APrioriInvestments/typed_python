@@ -26,7 +26,7 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
     b.writeBeginCompound(fieldNumber);
 
     // if this is already part of a recursive type group, then write it and exit
-    if (PyCell_Check(o)) {
+    if (PyCell_Check(o) || PyFunction_Check(o)) {
         auto groupAndIndex = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(o, false);
 
         if (groupAndIndex.first) {

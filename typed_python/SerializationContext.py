@@ -416,13 +416,13 @@ class SerializationContext(object):
                 return (type, (inst.__name__, inst.__bases__, {}), classMembers)
 
         if isinstance(inst, property):
-            return (property, (inst.fget, inst.fset, inst.fdel), None)
+            return (property, (None, None, None), (inst.fget, inst.fset, inst.fdel))
 
         if isinstance(inst, staticmethod):
-            return (staticmethod, (inst.__func__,), None)
+            return (staticmethod, (None,), inst.__func__)
 
         if isinstance(inst, classmethod):
-            return (classmethod, (inst.__func__,), None)
+            return (classmethod, (None,), inst.__func__)
 
         if isinstance(inst, numpy.ndarray):
             return inst.__reduce__()
@@ -507,12 +507,15 @@ class SerializationContext(object):
             return True
 
         if isinstance(instance, property):
+            _types.setPropertyGetSetDel(instance, representation[0], representation[1], representation[2])
             return True
 
         if isinstance(instance, staticmethod):
+            _types.setClassOrStaticmethod(instance, representation)
             return True
 
         if isinstance(instance, classmethod):
+            _types.setClassOrStaticmethod(instance, representation)
             return True
 
         if isinstance(instance, CodeType):

@@ -2083,3 +2083,17 @@ class TypesSerializationTest(unittest.TestCase):
         check(types.BuiltinFunctionType)
         check(types.FunctionType)
         check(types.ModuleType)
+
+    def test_serialize_self_referential_class(self):
+        class SeesItself(object):
+            @staticmethod
+            def factory(kwargs):
+                return lambda a, b, c: SeesItself(a, b, c)
+
+            @property
+            def seeItself(self, a, b, c, d):
+                return SeesItself
+
+        c = SerializationContext().withoutInternalizingTypeGroups()
+
+        c.deserialize(c.serialize(SeesItself))

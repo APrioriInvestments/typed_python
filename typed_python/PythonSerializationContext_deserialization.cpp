@@ -854,7 +854,10 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                                     //recall that setitem steals a reference
                                     PyObject* inItem = PyTuple_GetItem((PyObject*)state, k);
                                     if (!inItem) {
-                                        throw PythonExceptionSet();
+                                        throw std::runtime_error(
+                                            "Somehow our deserialized tuple  for " +
+                                            format(indexInGroup) + " has a null value"
+                                        );
                                     }
 
                                     PyTuple_SET_ITEM(inst, k, incref(inItem));
