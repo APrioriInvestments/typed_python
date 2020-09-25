@@ -579,12 +579,17 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
     std::map<int32_t, PyObject*> indicesWithSerializedBodies;
     std::map<int32_t, PyTypeObject*> indicesWithSerializedBodiesTypes;
 
+    bool cameFromMemo = false;
 
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
         if (fieldNumber == FieldNumbers::MEMO) {
             memo = b.readUnsignedVarint();
 
             outGroup = (MutuallyRecursiveTypeGroup*)b.lookupCachedPointer(memo);
+
+            if (outGroup) {
+                cameFromMemo = true;
+            }
         } else
         if (fieldNumber == 1) {
             assertWireTypesEqual(wireType, WireType::BYTES);
@@ -933,6 +938,20 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
         throw std::runtime_error("Somehow we didn't create a MutuallyRecursiveTypeGroup");
     }
 
+    if (outGroup->getIndexToObject().size() == 0) {
+        if (cameFromMemo) {
+            throw std::runtime_error(
+                "Somehow we accessed an empty memoized MutuallyRecursiveTypeGroup: \n"
+                + outGroup->repr()
+            );
+        } else {
+            throw std::runtime_error(
+                "Somehow we deserialized an empty MutuallyRecursiveTypeGroup: \n"
+                + outGroup->repr()
+            );
+        }
+    }
+
     if (actuallyBuildGroup) {
         for (auto indexAndType: indicesOfNativeTypes) {
             if (indexAndType.second->getTypeCategory() == Type::TypeCategory::catForward) {
@@ -1205,7 +1224,12 @@ PyObject* PythonSerializationContext::deserializeRecursiveObject(Deserialization
 
     auto it = group->getIndexToObject().find(indexInGroup);
     if (it == group->getIndexToObject().end()) {
-        throw std::runtime_error("Corrupt native pyobj: index " + format(indexInGroup) + " doesn't exist in group");
+        throw std::runtime_error(
+            "Corrupt native pyobj: index "
+            + format(indexInGroup)
+            + " doesn't exist in group:\n\n"
+            + group->repr()
+        );
     }
 
     if (!it->second.pyobj())  {
