@@ -13,6 +13,9 @@
 #   limitations under the License.
 
 from typed_python import _types, ListOf, TupleOf, Dict, ConstDict, Compiled, Entrypoint, OneOf
+from typed_python.compiler.type_wrappers.string_wrapper import strJoinIterable, \
+    strStartswith, strEndswith, strReplace, \
+    strPartition, strRpartition, strCenter, strRjust, strLjust, strExpandtabs, strZfill
 from typed_python.test_util import currentMemUsageMb, compilerPerformanceComparison
 from typed_python.compiler.runtime import PrintNewFunctionVisitor
 import pytest
@@ -1366,3 +1369,34 @@ class TestStringCompilation(unittest.TestCase):
                 r3 = s.translate(r1[1])
                 r4 = s.translate(r2[1])
                 self.assertEqual(r3, r4, args)
+
+    def test_string_internal_fns(self):
+        """
+        These are functions that are normally not called directly.
+        They are called here in order to improve codecov coverage.
+        """
+        lst = ['a', 'b', 'c']
+        sep = ','
+        self.assertEqual(strJoinIterable(sep, lst), sep.join(lst))
+        with self.assertRaises(TypeError):
+            strJoinIterable(sep, ['a', b'b', 'c'])
+
+        v = 'a1A\ta1A\n1A'
+        self.assertEqual(strReplace(v, 'a', 'xyz', 1), v.replace('a', 'xyz', 1))
+        self.assertEqual(strReplace(v, 'a', 'xyz', 0), v.replace('a', 'xyz', 0))
+        self.assertEqual(strReplace(v, '', 'xyz', 2), v.replace('', 'xyz', 2))
+        self.assertEqual(strStartswith(v, 'a'), v.startswith('a'))
+        self.assertEqual(strStartswith(v, 'A'), v.startswith('A'))
+        self.assertEqual(strEndswith(v, 'a'), v.endswith('a'))
+        self.assertEqual(strEndswith(v, 'A'), v.endswith('A'))
+        self.assertEqual(strPartition(v, '1'), v.partition('1'))
+        self.assertEqual(strRpartition(v, '1'), v.rpartition('1'))
+        self.assertEqual(strCenter(v, 20, 'X'), v.center(20, 'X'))
+        self.assertEqual(strCenter(v, 2, 'X'), v.center(2, 'X'))
+        self.assertEqual(strRjust(v, 20, 'X'), v.rjust(20, 'X'))
+        self.assertEqual(strRjust(v, 2, 'X'), v.rjust(2, 'X'))
+        self.assertEqual(strLjust(v, 20, 'X'), v.ljust(20, 'X'))
+        self.assertEqual(strLjust(v, 2, 'X'), v.ljust(2, 'X'))
+        self.assertEqual(strExpandtabs(v, 8), v.expandtabs(8))
+        self.assertEqual(strZfill(v, 20), v.zfill(20))
+        self.assertEqual(strZfill('+123', 20), '+123'.zfill(20))
