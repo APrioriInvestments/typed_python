@@ -14,8 +14,9 @@
 
 from typed_python import _types, ListOf, TupleOf, Dict, ConstDict, Compiled, Entrypoint, OneOf
 from typed_python.compiler.type_wrappers.string_wrapper import strJoinIterable, \
-    strStartswith, strEndswith, strReplace, \
-    strPartition, strRpartition, strCenter, strRjust, strLjust, strExpandtabs, strZfill
+    strStartswith, strRangeStartswith, strStartswithTuple, strRangeStartswithTuple, \
+    strEndswith, strRangeEndswith, strEndswithTuple, strRangeEndswithTuple, \
+    strReplace, strPartition, strRpartition, strCenter, strRjust, strLjust, strExpandtabs, strZfill
 from typed_python.test_util import currentMemUsageMb, compilerPerformanceComparison
 from typed_python.compiler.runtime import PrintNewFunctionVisitor
 import pytest
@@ -1387,8 +1388,20 @@ class TestStringCompilation(unittest.TestCase):
         self.assertEqual(strReplace(v, '', 'xyz', 2), v.replace('', 'xyz', 2))
         self.assertEqual(strStartswith(v, 'a'), v.startswith('a'))
         self.assertEqual(strStartswith(v, 'A'), v.startswith('A'))
+        self.assertEqual(strRangeStartswith(v, 'a', 0, 10), v.startswith('a', 0, 10))
+        self.assertEqual(strRangeStartswith(v, '', 0, 10), v.startswith('', 0, 10))
+        self.assertEqual(strRangeStartswith(v, '', -5, -3), v.startswith('', -5, -3))
+        self.assertEqual(strStartswithTuple(v, ('A', 'a')), v.startswith(('A', 'a')))
+        self.assertEqual(strRangeStartswithTuple(v, ('A', 'a'), 0, 10), v.startswith(('A', 'a'), 0, 10))
+        self.assertEqual(strRangeStartswithTuple(v, ('A', 'a'), -5, -3), v.startswith(('A', 'a'), -5, -3))
         self.assertEqual(strEndswith(v, 'a'), v.endswith('a'))
         self.assertEqual(strEndswith(v, 'A'), v.endswith('A'))
+        self.assertEqual(strRangeEndswith(v, 'a', 0, 10), v.endswith('a', 0, 10))
+        self.assertEqual(strRangeEndswith(v, '', 0, 10), v.endswith('', 0, 10))
+        self.assertEqual(strRangeEndswith(v, '', -5, -3), v.endswith('', -5, -3))
+        self.assertEqual(strEndswithTuple(v, ('A', 'a')), v.endswith(('A', 'a')))
+        self.assertEqual(strRangeEndswithTuple(v, ('A', 'a'), 0, 10), v.endswith(('A', 'a'), 0, 10))
+        self.assertEqual(strRangeEndswithTuple(v, ('A', 'a'), -5, -3), v.endswith(('A', 'a'), -5, -3))
         self.assertEqual(strPartition(v, '1'), v.partition('1'))
         self.assertEqual(strRpartition(v, '1'), v.rpartition('1'))
         self.assertEqual(strCenter(v, 20, 'X'), v.center(20, 'X'))
