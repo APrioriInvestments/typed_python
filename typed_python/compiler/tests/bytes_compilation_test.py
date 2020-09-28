@@ -16,7 +16,8 @@ from typed_python import Compiled, Entrypoint, ListOf, TupleOf, Dict, ConstDict
 from typed_python.compiler.type_wrappers.bytes_wrapper import bytesJoinIterable, \
     bytes_isalnum, bytes_isalpha, \
     bytes_isdigit, bytes_islower, bytes_isspace, bytes_istitle, bytes_isupper, bytes_replace, \
-    bytes_startswith, bytes_endswith, bytes_count, bytes_count_single, bytes_find, bytes_find_single, \
+    bytes_startswith, bytes_startswith_range, bytes_endswith, bytes_endswith_range, \
+    bytes_count, bytes_count_single, bytes_find, bytes_find_single, \
     bytes_rfind, bytes_rfind_single, bytes_index, bytes_index_single, bytes_rindex, bytes_rindex_single, \
     bytes_partition, bytes_rpartition, bytes_center, bytes_ljust, bytes_rjust, bytes_expandtabs, \
     bytes_zfill
@@ -379,20 +380,26 @@ class TestBytesCompilation(unittest.TestCase):
                 self.assertEqual(r1, r2, (f, v))
 
     def test_bytes_startswith_endswith(self):
-        def f_startswith(x, y):
-            return x.startswith(y)
+        def f_startswith(x, *args):
+            return x.startswith(*args)
 
-        def f_endswith(x, y):
-            return x.endswith(y)
+        def f_endswith(x, *args):
+            return x.endswith(*args)
 
         xcases = [b'abaabaaabaaaaabaaaabaaabaabab', b'']
         ycases = [b'a', b'ab', b'ba', b'abaabaaabaaaaabaaaabaaabaabab', b'abaabaaabaaaaabaaaabaaabaababa', b'']
         for f in [f_startswith, f_endswith]:
+            c_f = Entrypoint(f)
             for x in xcases:
                 for y in ycases:
                     r1 = f(x, y)
-                    r2 = Entrypoint(f)(x, y)
+                    r2 = c_f(x, y)
                     self.assertEqual(r1, r2, (f, x, y))
+                    for start in range(-30, 30):
+                        for end in range(-30, 30):
+                            r1 = f(x, y, start, end)
+                            r2 = c_f(x, y, start, end)
+                            self.assertEqual(r1, r2, (f, x, y, start, end))
 
     def test_bytes_case(self):
         def f_lower(x):
@@ -902,8 +909,12 @@ class TestBytesCompilation(unittest.TestCase):
         self.assertEqual(bytes_replace(v, b'', b'xyz', 2), v.replace(b'', b'xyz', 2))
         self.assertEqual(bytes_startswith(v, b'a'), v.startswith(b'a'))
         self.assertEqual(bytes_startswith(v, b'A'), v.startswith(b'A'))
+        self.assertEqual(bytes_startswith_range(v, b'a', -4, 2), v.startswith(b'a', -4, 2))
+        self.assertEqual(bytes_startswith_range(v, b'A', 0, 0), v.startswith(b'A', 0, 0))
         self.assertEqual(bytes_endswith(v, b'a'), v.endswith(b'a'))
         self.assertEqual(bytes_endswith(v, b'A'), v.endswith(b'A'))
+        self.assertEqual(bytes_endswith_range(v, b'a', -4, 2), v.endswith(b'a', -4, 2))
+        self.assertEqual(bytes_endswith_range(v, b'A', 0, 0), v.endswith(b'A', 0, 0))
         for start, end in [(0, 10), (-2, -1), (-20, 10), (0, -20)]:
             self.assertEqual(bytes_count(v, b'a1', start, end), v.count(b'a1', start, end))
             self.assertEqual(bytes_count(v, b'A1', start, end), v.count(b'A1', start, end))

@@ -169,8 +169,54 @@ def bytes_startswith(x, prefix):
     return True
 
 
+def bytes_startswith_range(x, prefix, start, end):
+    if start < 0:
+        start += len(x)
+        if start < 0:
+            start = 0
+    if end < 0:
+        end += len(x)
+        if end < 0:
+            end = 0
+    elif end > len(x):
+        end = len(x)
+
+    if end - start < len(prefix):
+        return False
+    index = start
+    for i in prefix:
+        if x[index] != i:
+            return False
+        index += 1
+    return True
+
+
 def bytes_endswith(x, suffix):
     index = len(x) - len(suffix)
+    if index < 0:
+        return False
+    for i in suffix:
+        if x[index] != i:
+            return False
+        index += 1
+    return True
+
+
+def bytes_endswith_range(x, suffix, start, end):
+    if start < 0:
+        start += len(x)
+        if start < 0:
+            start = 0
+    if end < 0:
+        end += len(x)
+        if end < 0:
+            end = 0
+    elif end > len(x):
+        end = len(x)
+
+    if end - start < len(suffix):
+        return False
+    index = end - len(suffix)
     if index < 0:
         return False
     for i in suffix:
@@ -755,8 +801,20 @@ class BytesWrapper(RefcountedWrapper):
                     )
                 )
 
-        if methodname == 'startswith' and len(args) == 1 and not kwargs:
-            return context.call_py_function(bytes_startswith, (instance, args[0]), {})
+        if methodname in ['startswith', 'endswith'] and not kwargs:
+            if len(args) == 1:
+                py_f = bytes_startswith if methodname == 'startswith' else bytes_endswith
+                return context.call_py_function(py_f, (instance, args[0]), {})
+            elif 2 <= len(args) <= 3:
+                if len(args) == 3:
+                    arg1 = args[1]
+                    arg2 = args[2]
+                elif len(args) == 2:
+                    arg1 = args[1]
+                    arg2 = self.convert_len(context, instance)
+                py_f = bytes_startswith_range if methodname == 'startswith' else bytes_endswith_range
+                return context.call_py_function(py_f, (instance, args[0], arg1, arg2), {})
+
         if methodname == 'endswith' and len(args) == 1 and not kwargs:
             return context.call_py_function(bytes_endswith, (instance, args[0]), {})
         if methodname == 'expandtabs' and len(args) == 1 and not kwargs:
