@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 from typed_python import ListOf, Function, TupleOf, OneOf, Compiled, Entrypoint
+from typed_python import UInt8, UInt16
 import typed_python._types as _types
 import unittest
 import time
@@ -568,3 +569,23 @@ class TestListOfCompilation(unittest.TestCase):
         t1.append(1)
 
         assert len(t2) == 0
+
+    def test_list_add_coersion(self):
+        aLst = ListOf(UInt16)()
+        aLst.resize(20)
+
+        @Entrypoint
+        def addTwo(l):
+            l[10] += 2
+
+        addTwo(aLst)
+        assert aLst[10] == 2
+
+        aLst[10] = UInt8(2)
+        assert aLst[10] == 2
+
+        aLst[10] = UInt16(2)
+        assert aLst[10] == 2
+
+        aLst[10] += 2
+        assert aLst[10] == 4

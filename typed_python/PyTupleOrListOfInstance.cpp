@@ -833,6 +833,8 @@ int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value)
                 type()->eltPtr(dataPtr(), ix),
                 value_w->dataPtr()
                 );
+
+            return 0;
         } else {
             Instance toAssign(eltType, [&](instance_ptr data) {
                 PyInstance::copyConstructFromPythonInstance(eltType, data, value, true);

@@ -380,6 +380,20 @@ PyObject* PyInstance::pyOperator(PyObject* lhs, PyObject* rhs, const char* op, c
             });
         }
 
+        long opErrRepLen = strlen(opErrRep);
+
+        if (op[0] == '_' && op[1] == '_' && op[2] == 'i' && opErrRepLen && opErrRep[opErrRepLen-1] == '=') {
+            // we were called with __iadd__, but our implementation doesn't have an 'i' form.
+            // just delegate to the regular one.
+            std::string opnameStr(op);
+            opnameStr = "__" + opnameStr.substr(3);
+
+            std::string opErrRepStr(opErrRep);
+            opErrRepStr = opErrRepStr.substr(0, opErrRepStr.size() - 1);
+
+            return pyOperator(lhs, rhs, opnameStr.c_str(), opErrRepStr.c_str());
+        }
+
         PyErr_Format(PyExc_TypeError, "Invalid type arguments of type '%S' and '%S' to binary operator %s",
             lhs->ob_type,
             rhs->ob_type,
