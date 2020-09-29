@@ -645,3 +645,10 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             callShift(1, 2048)
+
+    def test_formatting_with_format_strings_works(self):
+        @Entrypoint
+        def format(x):
+            return f"{x:.6g}"
+
+        assert format(1.0) == f"{1.0:.6g}"

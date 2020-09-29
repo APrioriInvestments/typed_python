@@ -525,7 +525,11 @@ class Wrapper(object):
         if formatSpecOrNone is None:
             return instance.convert_str_cast()
         else:
-            raise context.pushException(TypeError, "We don't support conversion in the base wrapper.")
+            return instance.convert_to_type(object).convert_method_call(
+                "__format__",
+                (context.constant(formatSpecOrNone),),
+                {}
+            ).convert_str_cast()
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         context.pushException(

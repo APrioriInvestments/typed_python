@@ -1751,7 +1751,12 @@ class ExpressionConversionContext(object):
             if value is None:
                 return None
 
-            result = value.convert_format(ast.format_spec)
+            if ast.format_spec is not None:
+                format_spec = "".join(x.s for x in ast.format_spec.values)
+            else:
+                format_spec = None
+
+            result = value.convert_format(format_spec)
 
             if result is None:
                 return
