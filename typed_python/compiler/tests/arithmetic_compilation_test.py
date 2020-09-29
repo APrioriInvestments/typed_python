@@ -612,3 +612,36 @@ class TestArithmeticCompilation(unittest.TestCase):
             return row.x % 1.0
 
         self.assertEqual(rf(makeNamedTuple(x=1.0)), 0.0)
+
+    def test_pow_with_bad_inputs(self):
+        @Entrypoint
+        def callPow(x, y):
+            return x ** y
+
+        with self.assertRaises(ZeroDivisionError):
+            callPow(0.0, -1.0)
+
+        with self.assertRaises(ZeroDivisionError):
+            callPow(0, -1)
+
+    def test_floordiv_with_bad_inputs(self):
+        @Entrypoint
+        def callFloordiv(x, y):
+            return x // y
+
+        with self.assertRaises(ZeroDivisionError):
+            callFloordiv(1.0, 0.0)
+
+        with self.assertRaises(ZeroDivisionError):
+            callFloordiv(1, 0)
+
+    def test_shift_with_bad_inputs(self):
+        @Entrypoint
+        def callShift(x, y):
+            return x << y
+
+        with self.assertRaises(ValueError):
+            callShift(1, -2)
+
+        with self.assertRaises(ValueError):
+            callShift(1, 2048)
