@@ -119,6 +119,11 @@ class ClassOrAlternativeWrapperMixin:
             return self.convert_method_call(context, e, "__bytes__", (), {})
         return super().convert_bytes_cast(context, e)
 
+    def convert_index_cast(self, context, e):
+        if self.has_method(context, e, '__index__'):
+            return self.convert_method_call(context, e, "__index__", (), {})
+        return context.pushException(TypeError, f"__index__ not implemented for {self.typeRepresentation}")
+
     def convert_int_cast(self, context, e):
         if self.has_method(context, e, '__int__'):
             return self.convert_method_call(context, e, "__int__", (), {})

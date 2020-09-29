@@ -14,7 +14,7 @@
 
 from typed_python import (
     Function, OneOf, Alternative,
-    Value, ListOf, NotCompiled, TupleOf, Tuple
+    Value, ListOf, NotCompiled, TupleOf, Tuple, UInt8
 )
 from typed_python.compiler.runtime import Entrypoint
 import unittest
@@ -126,6 +126,13 @@ class TestTypeInference(unittest.TestCase):
             set(f.resultTypeFor(OneOf(int, str)).typeRepresentation.Types),
             set([Value(int), Value(str)])
         )
+
+    def test_infer_result_of_uint8(self):
+        @Entrypoint
+        def f(x):
+            return UInt8(x)
+
+        self.assertEqual(f.resultTypeFor(float).typeRepresentation, UInt8)
 
     def test_infer_list_item(self):
         @Function

@@ -269,6 +269,12 @@ class Wrapper(object):
             "Can't take 'int' of instance of type '%s'" % (str(self),)
         )
 
+    def convert_index_cast(self, context, expr):
+        return context.pushException(
+            TypeError,
+            "Can't take instance of type '%s' to an integer index" % (str(self),)
+        )
+
     def convert_float_cast(self, context, expr):
         return context.pushException(
             TypeError,

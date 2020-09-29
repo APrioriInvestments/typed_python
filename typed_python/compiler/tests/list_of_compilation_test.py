@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import ListOf, Function, TupleOf, OneOf, Compiled, Entrypoint
-from typed_python import UInt8, UInt16
+from typed_python import UInt8, UInt16, Class, Final, Member
 import typed_python._types as _types
 import unittest
 import time
@@ -589,3 +589,85 @@ class TestListOfCompilation(unittest.TestCase):
 
         aLst[10] += 2
         assert aLst[10] == 4
+
+    def test_list_index_with_uints(self):
+        aLst = ListOf(UInt16)()
+        aLst.resize(20)
+
+        @Entrypoint
+        def addTwo(l):
+            l[UInt8(10)] += 2
+
+        addTwo(aLst)
+        assert aLst[UInt8(10)] == 2
+
+        aLst[UInt8(10)] = UInt8(2)
+        assert aLst[UInt8(10)] == 2
+
+        aLst[UInt8(10)] = UInt16(2)
+        assert aLst[UInt8(10)] == 2
+
+        aLst[UInt8(10)] += 2
+        assert aLst[UInt8(10)] == 4
+
+    def test_list_index_with_floats_fails(self):
+        aLst = ListOf(UInt16)()
+        aLst.resize(20)
+
+        @Entrypoint
+        def addTwo(l):
+            l[10.5] += 2
+
+        @Entrypoint
+        def lookup(l):
+            return l[10.5]
+
+        @Entrypoint
+        def assign(l):
+            l[10.5] = 0
+
+        with self.assertRaisesRegex(TypeError, "Can't take.*integer index"):
+            addTwo(aLst)
+
+        with self.assertRaisesRegex(TypeError, "Can't take.*integer index"):
+            lookup(aLst)
+
+        with self.assertRaisesRegex(TypeError, "Can't take.*integer index"):
+            assign(aLst)
+
+        with self.assertRaises(TypeError):
+            aLst[1.2]
+
+        with self.assertRaises(TypeError):
+            aLst[1.2] = 1
+
+        with self.assertRaises(TypeError):
+            aLst[1.2] += 1
+
+    def test_list_index_with_class_with_index(self):
+        aLst = ListOf(UInt16)()
+        aLst.resize(20)
+
+        class AnIndex(Class, Final):
+            ix = Member(int)
+
+            def __index__(self):
+                return self.ix
+
+        anIndex = AnIndex(ix=10)
+
+        @Entrypoint
+        def addTwo(l):
+            l[anIndex] += 2
+
+        addTwo(aLst)
+        assert aLst[anIndex] == 2
+
+        aLst[anIndex] = UInt8(2)
+        assert aLst[anIndex] == 2
+
+        aLst[anIndex] = UInt16(2)
+        assert aLst[anIndex] == 2
+
+        aLst[anIndex] += 2
+        assert aLst[anIndex] == 4

@@ -273,6 +273,10 @@ class TypedExpression(object):
     def toBool(self):
         return self.expr_type.convert_bool_cast(self.context, self)
 
+    def toIndex(self):
+        """Equivalent to __index__"""
+        return self.expr_type.convert_index_cast(self.context, self)
+
     def refAs(self, i):
         return self.expr_type.refAs(self.context, self, i)
 

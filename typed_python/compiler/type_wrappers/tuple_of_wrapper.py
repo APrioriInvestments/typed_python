@@ -325,7 +325,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         if item is None or expr is None:
             return None
 
-        item = item.toInt64()
+        item = item.toIndex()
         if item is None:
             return None
 
@@ -346,7 +346,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             self.underlyingWrapperType,
             expr.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
                 self.underlyingWrapperType.getNativeLayoutType().pointer()
-            ).elemPtr(actualItem.toInt64().nonref_expr)
+            ).elemPtr(actualItem.nonref_expr)
         ).heldToRef()
 
     def convert_getitem_unsafe(self, context, expr, item):
@@ -354,7 +354,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             self.underlyingWrapperType,
             expr.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
                 self.underlyingWrapperType.getNativeLayoutType().pointer()
-            ).elemPtr(item.toInt64().nonref_expr)
+            ).elemPtr(item.toIndex().nonref_expr)
         )
 
     def convert_len_native(self, expr):
@@ -371,7 +371,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         if methodname == "_getItemUnsafe" and len(args) == 1:
-            index = args[0].convert_to_type(int)
+            index = args[0].toIndex()
             if index is None:
                 return None
 
@@ -392,7 +392,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
                 return context.pushVoid()
 
         if methodname == "_initializeItemUnsafe" and len(args) == 2:
-            index = args[0].convert_to_type(int)
+            index = args[0].toIndex()
             if index is None:
                 return None
 

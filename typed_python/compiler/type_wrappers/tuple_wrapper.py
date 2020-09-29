@@ -250,7 +250,7 @@ class TupleWrapper(Wrapper):
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_getitem(self, context, expr, index):
-        index = index.convert_to_type(int)
+        index = index.toIndex()
         if index is None:
             return None
 
@@ -270,7 +270,7 @@ class TupleWrapper(Wrapper):
 
                     return self.refAs(context, expr, indexVal)
 
-        index = index.convert_to_type(int)
+        index = index.toIndex()
         if index is None:
             return None
 

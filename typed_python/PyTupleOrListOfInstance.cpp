@@ -483,7 +483,7 @@ PyObject* PyTupleOrListOfInstance::mp_subscript_concrete(PyObject* item) {
         return sq_item((PyObject*)this, PyLong_AsLongLong(res));
     }
 
-    PyErr_SetObject(PyExc_KeyError, item);
+    PyErr_Format(PyExc_TypeError, "ListOf indices must be integers or slices, not %S", item);
     return NULL;
 }
 
@@ -813,8 +813,18 @@ int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value)
 
     Type* eltType = type()->getEltType();
 
-    if (PyLong_Check(item)) {
-        int64_t ix = PyLong_AsLongLong(item);
+    PyObjectHolder index(item);
+
+    if (!PyLong_Check(item)) {
+        index.set(PyNumber_Index(item));
+
+        if (!index) {
+            throw PythonExceptionSet();
+        }
+    }
+
+    if (PyLong_Check(index)) {
+        int64_t ix = PyLong_AsLongLong(index);
         int64_t count = type()->count(dataPtr());
 
         if (ix < 0) {
