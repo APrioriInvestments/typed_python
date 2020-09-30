@@ -33,6 +33,13 @@ def compiledHash(x):
     return hash(x)
 
 
+def callOrExceptType(f, *args):
+    try:
+        return ("Normal", f(*args))
+    except Exception as e:
+        return ("Exception", str(type(e)))
+
+
 class TestMathFunctionsCompilation(unittest.TestCase):
     def test_entrypoint_overrides(self):
         @Entrypoint
@@ -630,3 +637,53 @@ class TestMathFunctionsCompilation(unittest.TestCase):
 
                 del f
                 del g
+
+    def test_math_functions_on_object(self):
+        class ClassCeil:
+            def __ceil__(self):
+                return 123.45
+
+        class ClassFloor:
+            def __floor__(self):
+                return 123.45
+
+        class ClassTrunc:
+            def __trunc__(self):
+                return 123.45
+
+        class ClassFloat:
+            def __float__(self):
+                return 1.24
+
+        class ClassCeilFloat:
+            def __ceil__(self):
+                return 1.23
+
+            def __float__(self):
+                return 1.24
+
+        def f_ceil(t: object):
+            return math.ceil(t)
+
+        def f_floor(t: object):
+            return math.floor(t)
+
+        def f_trunc(t: object):
+            return math.trunc(t)
+
+        def f_sin(t: object):
+            return math.sin(t)
+
+        self.assertEqual(Entrypoint(f_ceil)(1.5), 2.0)
+        self.assertEqual(Entrypoint(f_sin)(0.0), 0.0)
+
+        fns = [f_trunc, f_ceil, f_floor, f_sin]
+        values = [
+            0, 0.5, 1.0, -0.5, 7, -7, ClassCeil(), ClassFloor(), ClassTrunc(), ClassFloat(), ClassCeilFloat()
+        ]
+        for f in fns:
+            c_f = Entrypoint(f)
+            for v in values:
+                r1 = callOrExceptType(f, v)
+                r2 = callOrExceptType(c_f, v)
+                self.assertEqual(r2, r1, (f, v))

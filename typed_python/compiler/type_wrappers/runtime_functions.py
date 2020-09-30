@@ -984,3 +984,21 @@ raiseAttributeError = externalCallTarget(
     Void,
     UInt8Ptr
 )
+
+pyobj_ceil = externalCallTarget(
+    "np_pyobj_ceil",
+    Float64,
+    Void.pointer()
+)
+
+pyobj_floor = externalCallTarget(
+    "np_pyobj_floor",
+    Float64,
+    Void.pointer()
+)
+
+pyobj_trunc = externalCallTarget(
+    "np_pyobj_trunc",
+    Float64,
+    Void.pointer()
+)

@@ -139,17 +139,13 @@ class MathFunctionWrapper(Wrapper):
     def convert_call(self, context, expr, args, kwargs):
         if len(args) == 2 and not kwargs and self.typeRepresentation is ldexp:
             arg1 = args[0]
-            if not arg1.expr_type.is_arithmetic:
-                return context.pushException(TypeError, f"must be a real number, not {arg1.expr_type}")
             arg2 = args[1]
-            if not arg2.expr_type.is_arithmetic:
-                return context.pushException(TypeError, f"Expected an int as second argument to ldexp.")
             argType1 = arg1.expr_type.typeRepresentation
             argType2 = arg2.expr_type.typeRepresentation
             if argType1 not in (Float32, float):
                 arg1 = arg1.convert_to_type(float)
                 if arg1 is None:
-                    return None
+                    return context.pushException(TypeError, f"must be a real number, not {arg1.expr_type}")
                 argType1 = float
             if argType2 not in (int,):
                 arg2 = arg2.convert_to_type(int)
@@ -186,10 +182,14 @@ class MathFunctionWrapper(Wrapper):
         if len(args) == 2 and (not kwargs or self.typeRepresentation is isclose):
             arg1 = args[0]
             if not arg1.expr_type.is_arithmetic:
-                return context.pushException(TypeError, f"must be a real number, not {arg1.expr_type}")
+                arg1 = arg1.convert_to_type(float)
+                if arg1 is None:
+                    return context.pushException(TypeError, f"must be a real number, not {arg1.expr_type}")
             arg2 = args[1]
             if not arg2.expr_type.is_arithmetic:
-                return context.pushException(TypeError, f"must be a real number, not {arg2.expr_type}")
+                arg2 = arg2.convert_to_type(float)
+                if arg2 is None:
+                    return context.pushException(TypeError, f"must be a real number, not {arg2.expr_type}")
             argType1 = arg1.expr_type.typeRepresentation
             argType2 = arg2.expr_type.typeRepresentation
             if argType1 not in (Float32, float):
@@ -241,6 +241,14 @@ class MathFunctionWrapper(Wrapper):
                 else:
                     abs_tol = native_ast.const_float32_expr(0.0) if argType1 is Float32 else native_ast.const_float_expr(0.0)
 
+                if not arg1.expr_type.is_arithmetic:
+                    arg1 = arg1.convert_to_type(float)
+                    if arg1 is None:
+                        return context.pushException(TypeError, f"must be a real number, not {arg1.expr_type}")
+                if not arg2.expr_type.is_arithmetic:
+                    arg2 = arg2.convert_to_type(float)
+                    if arg2 is None:
+                        return context.pushException(TypeError, f"must be a real number, not {arg2.expr_type}")
                 return context.pushPod(bool, func.call(arg1.nonref_expr, arg2.nonref_expr, rel_tol, abs_tol))
             elif self.typeRepresentation is pow:
                 f_func = runtime_functions.floor32 if argType1 is Float32 else runtime_functions.floor64
@@ -259,6 +267,14 @@ class MathFunctionWrapper(Wrapper):
             else:
                 assert False, "Unreachable"
 
+            if not arg1.expr_type.is_arithmetic:
+                arg1 = arg1.convert_to_type(float)
+                if arg1 is None:
+                    return context.pushException(TypeError, f"must be a real number, not {arg1.expr_type}")
+            if not arg2.expr_type.is_arithmetic:
+                arg2 = arg2.convert_to_type(float)
+                if arg2 is None:
+                    return context.pushException(TypeError, f"must be a real number, not {arg2.expr_type}")
             return context.pushPod(outT, func.call(arg1.nonref_expr, arg2.nonref_expr))
 
         # handle integer factorial here
@@ -286,7 +302,9 @@ class MathFunctionWrapper(Wrapper):
         if len(args) == 1 and not kwargs:
             arg = args[0]
             if not arg.expr_type.is_arithmetic:
-                return context.pushException(TypeError, f"must be a real number, not {arg.expr_type}")
+                arg = arg.convert_to_type(float)
+                if not arg:
+                    return context.pushException(TypeError, f"must be a real number, not {arg.expr_type}")
 
             argType = arg.expr_type.typeRepresentation
 

@@ -1823,6 +1823,129 @@ extern "C" {
         return res;
     }
 
+    double np_pyobj_ceil(PythonObjectOfType::layout_type* obj) {
+        PyEnsureGilAcquired acquireTheGil;
+        if (PyFloat_Check(obj->pyObj)) {
+            double val = PyFloat_AsDouble(obj->pyObj);
+            if (val == -1.0 && PyErr_Occurred()) {
+                throw PythonExceptionSet();
+            }
+            return ceil(val);
+        }
+
+        if (!PyObject_HasAttrString(obj->pyObj, "__ceil__")) {
+            PyObjectHolder floatObj(PyObject_CallMethod(obj->pyObj, "__float__", NULL));
+            if ((PyObject*)floatObj) {
+                double val = PyFloat_AsDouble(floatObj);
+                if (val == -1.0 && PyErr_Occurred()) {
+                    throw PythonExceptionSet();
+                }
+                return ceil(val);
+             }
+             PyErr_Format(PyExc_TypeError, "'%s' object has no attribute __ceil__", Py_TYPE(obj->pyObj)->tp_name);
+             throw PythonExceptionSet();
+        }
+
+        PyObjectHolder retObj(PyObject_CallMethod(obj->pyObj, "__ceil__", NULL));
+        double ret;
+
+        // This is an additional condition.  Python does not have this condition (__ceil__ does not have to return a number).
+        if (PyFloat_Check(retObj)) {
+            ret = PyFloat_AsDouble(retObj);
+        }
+        else if (PyLong_Check(retObj)) {
+             ret = (double)PyLong_AsLong(retObj);
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError, "__ceil__ returned non-number");
+            throw PythonExceptionSet();
+        }
+        if (ret == -1.0 && PyErr_Occurred()) {
+            throw PythonExceptionSet();
+        }
+        return ret;
+    }
+
+    double np_pyobj_floor(PythonObjectOfType::layout_type* obj) {
+        PyEnsureGilAcquired acquireTheGil;
+        if (PyFloat_Check(obj->pyObj)) {
+            double val = PyFloat_AsDouble(obj->pyObj);
+            if (val == -1.0 && PyErr_Occurred()) {
+                throw PythonExceptionSet();
+            }
+            return floor(val);
+        }
+
+        if (!PyObject_HasAttrString(obj->pyObj, "__floor__")) {
+            PyObjectHolder floatObj(PyObject_CallMethod(obj->pyObj, "__float__", NULL));
+            if ((PyObject*)floatObj) {
+                double val = PyFloat_AsDouble(floatObj);
+                if (val == -1.0 && PyErr_Occurred()) {
+                    throw PythonExceptionSet();
+                }
+                return floor(val);
+             }
+             PyErr_Format(PyExc_TypeError, "'%s' object has no attribute __floor__", Py_TYPE(obj->pyObj)->tp_name);
+             throw PythonExceptionSet();
+        }
+
+        PyObjectHolder retObj(PyObject_CallMethod(obj->pyObj, "__floor__", NULL));
+        double ret;
+
+        // This is an additional condition.  Python does not have this condition (__floor__ does not have to return a number).
+        if (PyFloat_Check(retObj)) {
+            ret = PyFloat_AsDouble(retObj);
+        }
+        else if (PyLong_Check(retObj)) {
+             ret = (double)PyLong_AsLong(retObj);
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError, "__floor__ returned non-number");
+            throw PythonExceptionSet();
+        }
+        if (ret == -1.0 && PyErr_Occurred()) {
+            throw PythonExceptionSet();
+        }
+        return ret;
+    }
+
+    double np_pyobj_trunc(PythonObjectOfType::layout_type* obj) {
+        PyEnsureGilAcquired acquireTheGil;
+        if (PyFloat_Check(obj->pyObj)) {
+            double val = PyFloat_AsDouble(obj->pyObj);
+            if (val == -1.0 && PyErr_Occurred()) {
+                throw PythonExceptionSet();
+            }
+            return trunc(val);
+        }
+
+        if (!PyObject_HasAttrString(obj->pyObj, "__trunc__")) {
+            // unlike the others, __trunc__ doesn't devolve to __float__
+            PyErr_Format(PyExc_TypeError, "type %s doesn't define __trunc__ method", Py_TYPE(obj->pyObj)->tp_name);
+            throw PythonExceptionSet();
+        }
+
+        PyObjectHolder retObj(PyObject_CallMethod(obj->pyObj, "__trunc__", NULL));
+        double ret;
+
+        // This is an additional condition.  Python does not have this condition (__trunc__ does not have to return a number).
+        if (PyFloat_Check(retObj)) {
+            ret = PyFloat_AsDouble(retObj);
+        }
+        else if (PyLong_Check(retObj)) {
+             ret = (double)PyLong_AsLong(retObj);
+        }
+        else {
+            PyErr_Format(PyExc_TypeError, "__trunc__ returned non-number");
+            throw PythonExceptionSet();
+        }
+        if (ret == -1.0 && PyErr_Occurred()) {
+            throw PythonExceptionSet();
+        }
+        return ret;
+    }
+
+
     // this struct is defined in threadmodule.c - so it's internal to python itself,
     // but because we want to bypass the GIL, we'll just read from the corresponding
     // PyObject* knowing its structure.
@@ -1980,7 +2103,7 @@ extern "C" {
         PyEnsureGilAcquired getTheGil;
 
         double res = PyFloat_AsDouble(obj->pyObj);
-        if (PyErr_Occurred()) {
+        if (res == -1.0 && PyErr_Occurred()) {
             throw PythonExceptionSet();
         }
         return res;
@@ -1990,7 +2113,7 @@ extern "C" {
         PyEnsureGilAcquired getTheGil;
 
         int64_t res = PyLong_AsLong(obj->pyObj);
-        if (PyErr_Occurred()) {
+        if (res == -1 && PyErr_Occurred()) {
             throw PythonExceptionSet();
         }
         return res;
