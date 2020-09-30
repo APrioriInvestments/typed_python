@@ -196,6 +196,9 @@ class TypedExpression:
     def convert_bool_cast(self):
         return self.convert_to_type(bool, ConversionLevel.New)
 
+    def convert_index_cast(self):
+        return self.expr_type.convert_index_cast(self.context, self)
+
     def convert_int_cast(self):
         return self.convert_to_type(int, ConversionLevel.New)
 
