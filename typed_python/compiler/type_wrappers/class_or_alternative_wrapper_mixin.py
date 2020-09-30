@@ -121,7 +121,23 @@ class ClassOrAlternativeWrapperMixin:
 
     def convert_index_cast(self, context, e):
         if self.has_method(context, e, '__index__'):
-            return self.convert_method_call(context, e, "__index__", (), {})
+            res = self.convert_method_call(context, e, "__index__", (), {})
+            if res is None:
+                return None
+
+            if res.expr_type == typeWrapper(int):
+                return res
+
+            intRes = context.allocateUninitializedSlot(int)
+
+            succeeded = res.convert_to_type_with_target(intRes, explicit=False)
+
+            with context.ifelse(succeeded.nonref_expr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushException(TypeError, "__index__ returned non-int")
+
+            return intRes
+
         return context.pushException(TypeError, f"__index__ not implemented for {self.typeRepresentation}")
 
     def convert_int_cast(self, context, e):

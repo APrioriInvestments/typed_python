@@ -275,7 +275,15 @@ class TypedExpression(object):
 
     def toIndex(self):
         """Equivalent to __index__"""
-        return self.expr_type.convert_index_cast(self.context, self)
+        res = self.expr_type.convert_index_cast(self.context, self)
+
+        if not res:
+            return None
+
+        if res.expr_type.typeRepresentation is not int:
+            raise Exception(f"{self.expr_type}.toIndex() returned {res.expr_type}, not int.")
+
+        return res
 
     def refAs(self, i):
         return self.expr_type.refAs(self.context, self, i)

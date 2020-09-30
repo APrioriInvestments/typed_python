@@ -1592,6 +1592,24 @@ extern "C" {
         return ret;
     }
 
+    int64_t np_pyobj_pynumber_index(PythonObjectOfType::layout_type* lhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Index(lhs->pyObj);
+
+        if (!res) {
+            throw PythonExceptionSet();
+        }
+
+        if (!PyLong_Check(res)) {
+            PyErr_Format(PyExc_TypeError, "__index__ returned non-int (type %s)", res->ob_type->tp_name);
+            throw PythonExceptionSet();
+        }
+
+        return PyLong_AsLong(res);
+    }
+
+
     PythonObjectOfType::layout_type* np_pyobj_Add(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 

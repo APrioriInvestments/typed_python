@@ -663,6 +663,13 @@ class TestListOfCompilation(unittest.TestCase):
         addTwo(aLst)
         assert aLst[anIndex] == 2
 
+        @Entrypoint
+        def addTwoObjectstyle(l, index: object):
+            l[index] += 2
+
+        addTwoObjectstyle(aLst, anIndex)
+        assert aLst[anIndex] == 4
+
         aLst[anIndex] = UInt8(2)
         assert aLst[anIndex] == 2
 
@@ -671,3 +678,47 @@ class TestListOfCompilation(unittest.TestCase):
 
         aLst[anIndex] += 2
         assert aLst[anIndex] == 4
+
+    def test_list_index_with_class_with_bad_index(self):
+        aLst = ListOf(UInt16)()
+        aLst.resize(20)
+
+        class AnIndex(Class, Final):
+            ix = Member(int)
+
+            def __index__(self):
+                return "invalid index"
+
+        anIndex = AnIndex(ix=10)
+
+        @Entrypoint
+        def getIndex(l, index):
+            return l[index]
+
+        with self.assertRaisesRegex(TypeError, "returned non-int"):
+            getIndex(aLst, anIndex)
+
+        with self.assertRaisesRegex(TypeError, "returned non-int"):
+            aLst[anIndex]
+
+        @Entrypoint
+        def getIndexAsObject(l, index: object):
+            return l[index]
+
+        with self.assertRaisesRegex(TypeError, "returned non-int"):
+            getIndexAsObject(aLst, anIndex)
+
+        class AUintIndex(Class, Final):
+            ix = Member(int)
+
+            def __index__(self):
+                return UInt8(10)
+
+        with self.assertRaisesRegex(TypeError, "returned non-int"):
+            assert getIndexAsObject(aLst, AUintIndex()) == aLst[10]
+
+        with self.assertRaisesRegex(TypeError, "returned non-int"):
+            assert getIndex(aLst, AUintIndex()) == aLst[10]
+
+        with self.assertRaisesRegex(TypeError, "returned non-int"):
+            assert aLst[AUintIndex()] == aLst[10]

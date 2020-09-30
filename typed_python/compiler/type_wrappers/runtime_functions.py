@@ -292,6 +292,12 @@ builtin_pyobj_by_name = externalCallTarget(
     UInt8.pointer()
 )
 
+pyobj_pynumber_index = externalCallTarget(
+    "np_pyobj_pynumber_index",
+    Int64,
+    Void.pointer()
+)
+
 mod_int64_int64 = externalCallTarget(
     "nativepython_runtime_mod_int64_int64",
     Int64,

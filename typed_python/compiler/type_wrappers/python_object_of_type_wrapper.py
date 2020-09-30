@@ -307,6 +307,14 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             )
         )
 
+    def convert_index_cast(self, context, e):
+        return context.pushPod(
+            int,
+            runtime_functions.pyobj_pynumber_index.call(
+                e.nonref_expr.cast(VoidPtr)
+            )
+        )
+
     def convert_int_cast(self, context, e):
         e = context.constant(int).convert_call((e,), {})
         return context.pushPod(
