@@ -33,6 +33,13 @@ def compiledHash(x):
     return hash(x)
 
 
+def callOrExceptType(f, *args):
+    try:
+        return ("Normal", f(*args))
+    except Exception as e:
+        return ("Exception", str(type(e)))
+
+
 class TestMathFunctionsCompilation(unittest.TestCase):
     def test_entrypoint_overrides(self):
         @Entrypoint
@@ -481,7 +488,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                     self.assertEqual(r1, r2, (mathFun, v1, v2))
 
                     r3 = Float32(r1)
-                    r4 = compiled(Float32(v1), Float32(v2))
+                    r4 = compiled(Float32(v1), v2)
                     self.assertEqual(r3, r4, (mathFun, v1, v2))
 
     def test_math_fsum(self):
@@ -630,3 +637,188 @@ class TestMathFunctionsCompilation(unittest.TestCase):
 
                 del f
                 del g
+
+    def test_math_functions_on_object(self):
+        class ClassCeil:
+            def __ceil__(self):
+                return 123.45
+
+        class ClassFloor:
+            def __floor__(self):
+                return 123.45
+
+        class ClassTrunc:
+            def __trunc__(self):
+                return 123
+
+        class ClassFloat:
+            def __float__(self):
+                return 1.24
+
+        class ClassInt:
+            def __int__(self):
+                return 13
+
+        class ClassCeilFloat:
+            def __ceil__(self):
+                return 1.23
+
+            def __float__(self):
+                return 1.24
+
+        def f_ceil(t: object):
+            return math.ceil(t)
+
+        def f_floor(t: object):
+            return math.floor(t)
+
+        def f_trunc(t: object):
+            return math.trunc(t)
+
+        def f_acos(t: object):
+            return math.acos(t)
+
+        def f_acosh(t: object):
+            return math.acosh(t)
+
+        def f_asin(t: object):
+            return math.asin(t)
+
+        def f_asinh(t: object):
+            return math.asinh(t)
+
+        def f_atan(t: object):
+            return math.atan(t)
+
+        def f_atan2(t: object):
+            return math.atan2(t, t / 2 + 0.1)
+
+        def f_atanh(t: object):
+            return math.atanh(t)
+
+        def f_copysign(t: object):
+            return math.copysign(t, t + 1)
+
+        def f_cos(t: object):
+            return math.cos(t)
+
+        def f_cosh(t: object):
+            return math.cosh(t)
+
+        def f_degrees(t: object):
+            return math.degrees(t)
+
+        def f_erf(t: object):
+            return math.erf(t)
+
+        def f_erfc(t: object):
+            return math.erfc(t)
+
+        def f_exp(t: object):
+            return math.exp(t)
+
+        def f_expm1(t: object):
+            return math.expm1(t)
+
+        def f_fabs(t: object):
+            return math.fabs(t)
+
+        def f_fmod(t: object):
+            return math.fmod(t + 3, t + 1)
+
+        def f_frexp(t: object):
+            x = math.frexp(t)
+            return x[0] + x[1]
+
+        def f_fsum(t: object):
+            return math.fsum([t, t+1, t+2])
+
+        def f_gamma(t: object):
+            return math.gamma(t)
+
+        def f_gcd(t: object):
+            return math.gcd(t, t + 3)
+
+        def f_hypot(t: object):
+            return math.hypot(t, t + 3)
+
+        def f_isclose(t: object):
+            return math.isclose(t, t * 2 - 1)
+
+        def f_isfinite(t: object):
+            return math.isfinite(t)
+
+        def f_isinf(t: object):
+            return math.isinf(t)
+
+        def f_isnan(t: object):
+            return math.isnan(t)
+
+        def f_ldexp1(t: object):
+            return math.ldexp(t, 5)
+
+        def f_ldexp2(t: object):
+            return math.ldexp(2.0, t)
+
+        def f_lgamma(t: object):
+            return math.lgamma(t)
+
+        def f_log(t: object):
+            return math.log(t)
+
+        def f_log10(t: object):
+            return math.log10(t)
+
+        def f_log1p(t: object):
+            return math.log1p(t)
+
+        def f_log2(t: object):
+            return math.log2(t)
+
+        def f_modf(t: object):
+            return math.modf(t)
+
+        def f_pow(t: object):
+            return math.pow(t, t)
+
+        def f_radians(t: object):
+            return math.radians(t)
+
+        def f_sin(t: object):
+            return math.sin(t)
+
+        def f_sinh(t: object):
+            return math.sinh(t)
+
+        def f_sqrt(t: object):
+            return math.sqrt(t)
+
+        def f_tan(t: object):
+            return math.tan(t)
+
+        def f_tanh(t: object):
+            return math.tanh(t)
+
+        self.assertEqual(Entrypoint(f_ceil)(1.5), 2.0)
+        self.assertEqual(Entrypoint(f_sin)(0.0), 0.0)
+
+        fns = [f_pow, f_trunc, f_ceil, f_floor, f_acos, f_acosh, f_asin, f_asinh, f_atan, f_atan2, f_atanh, f_copysign,
+               f_cos, f_cosh, f_degrees, f_erf, f_erfc, f_exp, f_expm1, f_fabs, f_fmod, f_frexp, f_fsum, f_gamma, f_gcd,
+               f_hypot, f_isclose, f_isfinite, f_isinf, f_isnan, f_ldexp1, f_ldexp2, f_lgamma, f_log, f_log10, f_log1p,
+               f_log2, f_modf, f_pow, f_radians, f_sin, f_sinh, f_sqrt, f_tan, f_tanh]
+        values = [
+            0, 0.5, -0.5, 1.0, -1.0, 7, -7, 1e100, -1e100,
+            ClassCeil(), ClassFloor(), ClassTrunc(), ClassFloat(), ClassInt(), ClassCeilFloat()
+        ]
+        for f in fns:
+            c_f = Entrypoint(f)
+            for v in values:
+                r1 = callOrExceptType(f, v)
+                r2 = callOrExceptType(c_f, v)
+                if r1[0] == 'Normal' and r2[0] == 'Normal' and isinstance(r1[1], (float, int)):
+                    if r1[1] == 0.0:
+                        self.assertLess(abs(r2[1] - r1[1]), 1e-10, (f, v))
+                    else:
+                        self.assertLess(abs((r2[1] - r1[1]) / r1[1]), 1e-10, (f, v))
+                else:
+                    self.assertEqual(r1, r2, (f, v))
