@@ -227,7 +227,7 @@ extern "C" {
 
     double np_cosh_float64(double d) {
         double ret = std::cosh(d);
-        if (isinf(ret)) {
+        if (std::isinf(ret)) {
             PyEnsureGilAcquired getTheGil;
             PyErr_Format(PyExc_OverflowError, "math range error");
             throw PythonExceptionSet();
@@ -237,7 +237,7 @@ extern "C" {
 
     float np_cosh_float32(float f) {
         float ret = std::cosh(f);
-        if (isinf(ret)) {
+        if (std::isinf(ret)) {
             PyEnsureGilAcquired getTheGil;
             PyErr_Format(PyExc_OverflowError, "math range error");
             throw PythonExceptionSet();
@@ -261,31 +261,9 @@ extern "C" {
         return std::erfc(f);
     }
 
-/*
-    double np_exp_float64(double d) {
-        double ret = std::exp(d);
-        if (isinf(ret)) {
-            PyEnsureGilAcquired getTheGil;
-            PyErr_Format(PyExc_OverflowError, "math range error");
-            throw PythonExceptionSet();
-        }
-        return ret;
-    }
-
-    float np_exp_float32(float f) {
-        float ret = std::exp(f);
-        if (isinf(ret)) {
-            PyEnsureGilAcquired getTheGil;
-            PyErr_Format(PyExc_OverflowError, "math range error");
-            throw PythonExceptionSet();
-        }
-        return ret;
-    }
-    */
-
     double np_expm1_float64(double d) {
         double ret = std::expm1(d);
-        if (isinf(ret)) {
+        if (std::isinf(ret)) {
             PyEnsureGilAcquired getTheGil;
             PyErr_Format(PyExc_OverflowError, "math range error");
             throw PythonExceptionSet();
@@ -295,7 +273,7 @@ extern "C" {
 
     float np_expm1_float32(float f) {
         float ret = std::expm1(f);
-        if (isinf(ret)) {
+        if (std::isinf(ret)) {
             PyEnsureGilAcquired getTheGil;
             PyErr_Format(PyExc_OverflowError, "math range error");
             throw PythonExceptionSet();
@@ -381,7 +359,7 @@ extern "C" {
 
     double np_gamma_float64(double d) {
         double ret = std::tgamma(d);
-        if (isinf(ret)) {
+        if (std::isinf(ret)) {
             PyEnsureGilAcquired getTheGil;
             PyErr_Format(PyExc_OverflowError, "math range error");
             throw PythonExceptionSet();
@@ -391,7 +369,7 @@ extern "C" {
 
     float np_gamma_float32(float f) {
         float ret = std::tgamma(f);
-        if (isinf(ret)) {
+        if (std::isinf(ret)) {
             PyEnsureGilAcquired getTheGil;
             PyErr_Format(PyExc_OverflowError, "math range error");
             throw PythonExceptionSet();
