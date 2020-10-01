@@ -360,7 +360,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
         target_type = targetVal.expr_type
 
-        if targetVal.expr_type == typeWrapper(object):
+        if targetVal.expr_type == typeWrapper(object) or targetVal.expr_type == self:
             targetVal.convert_copy_initialize(e)
             return context.constant(True)
 

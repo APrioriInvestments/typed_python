@@ -1349,7 +1349,7 @@ class ExpressionConversionContext(object):
     def recastVariableAsRestrictedType(self, expr, varType):
         if varType is not None and varType != expr.expr_type.typeRepresentation:
             if getattr(expr.expr_type.typeRepresentation, "__typed_python_category__", None) == "OneOf":
-                return expr.convert_to_type(varType)
+                return expr.convert_to_type(varType, explicit=False)
 
             if getattr(expr.expr_type.typeRepresentation, "__typed_python_category__", None) == "Alternative" and \
                     getattr(varType, "__typed_python_category__", None) == "ConcreteAlternative":

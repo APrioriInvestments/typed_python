@@ -1337,19 +1337,20 @@ class FunctionConversionContext(ConversionContextBase):
                         exc_type = exc_match
                 cond = cond_context.matchExceptionObject(exc_match)
 
-                handler_context = ExpressionConversionContext(self, variableStates)
+                variableStatesHandler = variableStates.clone()
+                handler_context = ExpressionConversionContext(self, variableStatesHandler)
                 if h.name is None:
                     handler_context.pushEffect(runtime_functions.catch_exception.call())
                 else:
                     h_name = h.name
-                    self.assignToLocalVariable(h_name, handler_context.fetchExceptionObject(exc_type), variableStates)
+                    self.assignToLocalVariable(h_name, handler_context.fetchExceptionObject(exc_type), variableStatesHandler)
 
                 handler, handler_returns = self.convert_statement_list_ast(
-                    h.body, variableStates, in_loop=in_loop, return_to=f"end_of_try{ast.line_number}", try_flow=control_flow
+                    h.body, variableStatesHandler, in_loop=in_loop, return_to=f"end_of_try{ast.line_number}", try_flow=control_flow
                 )
 
                 if h.name is not None:
-                    cleanup_context = ExpressionConversionContext(self, variableStates)
+                    cleanup_context = ExpressionConversionContext(self, variableStatesHandler)
                     self.localVariableExpression(cleanup_context, h_name).convert_destroy()
                     cleanup_context.markVariableNotInitialized(h_name)
                     handler = native_ast.Expression.Finally(
@@ -1360,14 +1361,11 @@ class FunctionConversionContext(ConversionContextBase):
                             )
                         ]
                     )
-                    variableStates.variableUninitialized(h_name)
-
-                variableStatesMatch = variableStates.clone()
-                variableStatesOtherwise = variableStates.clone()
+                    variableStatesHandler.variableUninitialized(h_name)
 
                 variableStates.becomeMerge(
-                    variableStatesMatch if handler_returns else None,
-                    variableStatesOtherwise if working_returns else None
+                    variableStates.clone(),
+                    variableStatesHandler
                 )
                 working = native_ast.Expression.Branch(
                     cond=cond_context.finalize(cond.nonref_expr),

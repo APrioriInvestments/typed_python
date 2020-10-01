@@ -14,7 +14,7 @@
 
 from typed_python import (
     OneOf, TupleOf, Forward, ConstDict, Class, Final, Member,
-    ListOf, Compiled, Entrypoint, NamedTuple
+    ListOf, Compiled, Entrypoint, NamedTuple, UInt16
 )
 from typed_python import Value as ValueType
 import typed_python._types as _types
@@ -446,3 +446,136 @@ class TestOneOfCompilation(unittest.TestCase):
 
         assert getSlice(aList, 0, 0) == ListOf(int)()
         assert getSlice(aList, 0, 1) == aList
+
+    def test_oneof_resize_works_with_fcall(self):
+        from typed_python import UInt16
+
+        def callResize(s: ListOf(UInt16), ct):
+            s.resize(ct)
+
+        @Entrypoint
+        def resizeOneof(sz):
+            x = ListOf(OneOf(None, ListOf(UInt16)))()
+            x.resize(10)
+
+            for ix in range(10):
+                i = x[ix]
+
+                if not i:
+                    i = ListOf(UInt16)()
+                    x[ix] = i
+
+                    callResize(i, sz)
+
+            return x[0]
+
+        assert len(resizeOneof(10)) == 10
+
+    def test_oneof_resize_works_with_inline_call(self):
+        @Entrypoint
+        def resizeOneof(sz):
+            x = ListOf(OneOf(None, ListOf(UInt16)))()
+            x.resize(10)
+
+            for ix in range(10):
+                i = x[ix]
+
+                if not i:
+                    i = ListOf(UInt16)()
+                    x[ix] = i
+
+                    i.resize(sz)
+
+            return x[0]
+
+        assert len(resizeOneof(10)) == 10
+
+    def test_assign_to_oneof_preserves_ref(self):
+        @Entrypoint
+        def preservesReference():
+            x = ListOf(OneOf(None, ListOf(UInt16)))()
+            x.resize(10)
+
+            y = ListOf(UInt16)()
+
+            x[5] = y
+
+            y.resize(10)
+
+            assert len(x[5]) == 10
+
+    def test_returning_oneof_preserves_reference(self):
+        @Entrypoint
+        def returnAsNotNone(x: OneOf(None, ListOf(UInt16))) -> ListOf(UInt16):
+            if x is None:
+                return ListOf(UInt16)()
+            return x
+
+        @Entrypoint
+        def preservesReference():
+            x = ListOf(OneOf(None, ListOf(UInt16)))()
+            x.resize(10)
+
+            y = ListOf(UInt16)()
+
+            x[5] = y
+
+            returnAsNotNone(x[5]).resize(10)
+
+            assert len(x[5]) == 10
+            assert len(y) == 10
+
+    def test_explicitly_converting_to_oneof_works(self):
+        @Entrypoint
+        def check():
+            intList = ListOf(int)()
+            floatList = ListOf(float)()
+
+            # OneOf never wants to duplicate its arguments if it can
+            # avoid it. In this case, the type is correct, so it
+            # simply returns the relevant list.
+            oneOfList = OneOf(None, ListOf(int))(intList)
+            oneOfList.append(10)
+            assert len(intList) == 1
+
+            # if the type is different, however, it has to do a coersion
+            # which requires a new list object
+            oneOfList2 = OneOf(None, ListOf(int))(floatList)
+            oneOfList2.append(10)
+            assert len(floatList) == 0
+
+        check()
+
+    def test_oneof_binary_ops_dont_duplicate(self):
+        class AddMakesTuple:
+            def __init__(self, x):
+                self.x = x
+
+            def __add__(self, other):
+                return (self, other)
+
+        @Entrypoint
+        def check(a1, a2):
+            aList = ListOf(OneOf(ListOf(int), AddMakesTuple))()
+            aList.append(a1)
+            aList.append(a2)
+
+            return aList[0] + aList[1]
+
+        amt = AddMakesTuple(1)
+        lst = ListOf(int)()
+
+        aL = check(amt, lst)
+
+        assert isinstance(aL, tuple)
+        assert aL[0] is amt
+
+        lst.append(10)
+        assert aL[1] == lst
+
+    def test_compile_str_on_oneof(self):
+        @Entrypoint
+        def callStr(x: OneOf(ZeroDivisionError, str)):
+            return str(x)
+
+        assert callStr(ZeroDivisionError()) == str(ZeroDivisionError())

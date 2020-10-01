@@ -112,7 +112,8 @@ class OneOfWrapper(Wrapper):
             for i, subcontext in indicesAndContexts:
                 with subcontext:
                     if exprs[i] is not None:
-                        converted_res = exprs[i].convert_to_type(output_type)
+                        converted_res = exprs[i].convert_to_type(output_type, explicit=False)
+
                         if converted_res is not None:
                             context.pushEffect(
                                 out_slot.convert_copy_initialize(converted_res)
@@ -311,7 +312,15 @@ class OneOfWrapper(Wrapper):
                 with subcontext:
                     concreteChild = self.refAs(context, expr, ix)
 
-                    converted = concreteChild.expr_type.convert_to_type_with_target(context, concreteChild, targetVal, explicit)
+                    if concreteChild.expr_type == targetVal.expr_type:
+                        # we never want to duplicate
+                        explicitThisTime = False
+                    else:
+                        explicitThisTime = explicit
+
+                    converted = concreteChild.expr_type.convert_to_type_with_target(
+                        context, concreteChild, targetVal, explicitThisTime
+                    )
 
                     if converted is not None:
                         if not (converted.expr.matches.Constant and converted.expr.val.truth_value()):
