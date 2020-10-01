@@ -2975,3 +2975,35 @@ class TestCompilationStructures(unittest.TestCase):
                 t.join(.1)
 
             assert len(overloads) == 2
+
+    def test_double_assignment(self):
+        def doubleAssign():
+            x = y = ListOf(int)() # noqa
+            return x
+
+        assert len(doubleAssign()) == 0
+        assert len(Entrypoint(doubleAssign)()) == 0
+
+    def test_double_nested_assignment(self):
+        def doubleAssign():
+            x = (y, z) = (1, 2)
+
+            assert x == (1, 2)
+            assert y == 1
+            assert z == 2
+
+        doubleAssign()
+        Entrypoint(doubleAssign)()
+
+    def test_double_nested_assignment_with_failure(self):
+        def doubleAssign():
+            try:
+                x = (y, z) = (1, 2, 3)
+            except ValueError:
+                pass
+
+            # the x assignment should have succeeded
+            assert x == (1, 2, 3)
+
+        doubleAssign()
+        Entrypoint(doubleAssign)()

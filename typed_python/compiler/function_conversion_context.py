@@ -990,11 +990,11 @@ class FunctionConversionContext(ConversionContextBase):
             return True
 
         if target.matches.Tuple and target.ctx.matches.Store and op is None:
-            return self.convert_multi_assign(target.elts, val_to_store)
+            return self.convert_tuple_assign(target.elts, val_to_store)
 
         assert False, target
 
-    def convert_multi_assign(self, targets, val_to_store):
+    def convert_tuple_assign(self, targets, val_to_store):
         subcontext = val_to_store.context
         variableStates = subcontext.variableStates
 
@@ -1135,8 +1135,13 @@ class FunctionConversionContext(ConversionContextBase):
                 succeeds = self.convert_assignment(ast.targets[0], None, val_to_store)
                 return subcontext.finalize(None, exceptionsTakeFrom=ast), succeeds
             else:
-                succeeds = self.convert_multi_assign(ast.targets, val_to_store)
-                return subcontext.finalize(None, exceptionsTakeFrom=ast), succeeds
+                for target in ast.targets:
+                    succeeds = self.convert_assignment(target, None, val_to_store)
+
+                    if not succeeds:
+                        return subcontext.finalize(None, exceptionsTakeFrom=ast), False
+
+                return subcontext.finalize(None, exceptionsTakeFrom=ast), True
 
         if ast.matches.Return:
             subcontext = ExpressionConversionContext(self, variableStates)
