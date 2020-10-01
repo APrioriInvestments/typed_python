@@ -649,7 +649,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
 
         class ClassTrunc:
             def __trunc__(self):
-                return 123.45
+                return 123
 
         class ClassFloat:
             def __float__(self):
@@ -736,7 +736,6 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def f_gamma(t: object):
             return math.gamma(t)
 
-        # behavior does not match
         def f_gcd(t: object):
             return math.gcd(t, t + 3)
 
@@ -758,7 +757,6 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def f_ldexp1(t: object):
             return math.ldexp(t, 5)
 
-        # behavior does not match
         def f_ldexp2(t: object):
             return math.ldexp(2.0, t)
 
@@ -805,15 +803,9 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         self.assertEqual(Entrypoint(f_sin)(0.0), 0.0)
 
         fns = [f_pow, f_trunc, f_ceil, f_floor, f_acos, f_acosh, f_asin, f_asinh, f_atan, f_atan2, f_atanh, f_copysign,
-               f_cos, f_cosh, f_degrees, f_erf, f_erfc, f_exp, f_expm1, f_fabs, f_fmod, f_frexp, f_fsum, f_gamma,
-               f_sin, f_hypot, f_isclose, f_isfinite, f_isinf, f_isnan, f_ldexp1, f_lgamma, f_log, f_log10, f_log1p,
+               f_cos, f_cosh, f_degrees, f_erf, f_erfc, f_exp, f_expm1, f_fabs, f_fmod, f_frexp, f_fsum, f_gamma, f_gcd,
+               f_hypot, f_isclose, f_isfinite, f_isinf, f_isnan, f_ldexp1, f_ldexp2, f_lgamma, f_log, f_log10, f_log1p,
                f_log2, f_modf, f_pow, f_radians, f_sin, f_sinh, f_sqrt, f_tan, f_tanh]
-        # failures = [f_gcd, f_ldexp2]
-        # These both fail because they accept int arguments, not float.
-        # When we pass in an object, we try to convert it to int.
-        # So an int passed in as an object works.
-        # But if we pass in a float as an object, it converts to int fine, but we should have raised TypeError instead.
-
         values = [
             0, 0.5, -0.5, 1.0, -1.0, 7, -7, 1e100, -1e100,
             ClassCeil(), ClassFloor(), ClassTrunc(), ClassFloat(), ClassInt(), ClassCeilFloat()

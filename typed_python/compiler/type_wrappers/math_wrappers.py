@@ -137,8 +137,8 @@ class MathFunctionWrapper(Wrapper):
         return native_ast.Type.Void()
 
     def convert_call(self, context, expr, args, kwargs):
-        # Set this flag to check for an infinite result, and if so, generate an Overflow exception.
-        # This is only needed for the operations that are implemented as llvm opcodes.
+        # Set check_inf to generate a check for an infinite result that generates an Overflow exception.
+        # This is only needed for the few operations that are compiled directly to llvm intrinsic functions.
         check_inf = False
 
         if self.typeRepresentation is ldexp and len(args) == 2 and not kwargs:
@@ -151,13 +151,18 @@ class MathFunctionWrapper(Wrapper):
                 if arg1 is None:
                     return context.pushException(TypeError, f'must be a real number, not {argType1}')
                 argType1 = float
-            if argType2 is object or (hasattr(argType2, 'IsInteger') and argType2.IsInteger):
+            if argType2 is object:
+                arg2 = arg2.convert_to_type(int, explicit=False)
+                if arg2 is None:
+                    return None
+            elif hasattr(argType2, 'IsInteger') and argType2.IsInteger:
                 arg2 = arg2.toInt64()
-                if arg2 is not None:
-                    argType2 = arg2.expr_type.typeRepresentation
+                if arg2 is None:
+                    return None
+            argType2 = arg2.expr_type.typeRepresentation
             if argType2 is not int:
                 return context.pushException(TypeError, f'Expected an int as second argument to ldexp, not {argType2}')
-            # argType2 == int
+            # now argType2 == int
             outT = argType1
             func = runtime_functions.ldexp32 if argType1 is Float32 else runtime_functions.ldexp64
             return context.pushPod(outT, func.call(arg1.nonref_expr, arg2.nonref_expr))
@@ -167,19 +172,31 @@ class MathFunctionWrapper(Wrapper):
             arg2 = args[1]
             argType1 = arg1.expr_type.typeRepresentation
             argType2 = arg2.expr_type.typeRepresentation
-            # if argType1 in (Float32, float) or not arg1.expr_type.is_arithmetic:
-            if argType1 is object or (hasattr(argType2, 'IsInteger') and argType1.IsInteger):
+
+            if argType1 is object:
+                arg1 = arg1.convert_to_type(int, explicit=False)
+                if arg1 is None:
+                    return None
+            elif hasattr(argType1, 'IsInteger') and argType1.IsInteger:
                 arg1 = arg1.toInt64()
-                if arg1 is not None:
-                    argType1 = arg1.expr_type.typeRepresentation
+                if arg1 is None:
+                    return None
+            argType1 = arg1.expr_type.typeRepresentation
             if argType1 is not int:
                 return context.pushException(ValueError, f"'{argType1}' object cannot be interpreted as an integer")
-            if argType2 is object or (hasattr(argType2, 'IsInteger') and argType2.IsInteger):
+
+            if argType2 is object:
+                arg2 = arg2.convert_to_type(int, explicit=False)
+                if arg2 is None:
+                    return None
+            elif hasattr(argType2, 'IsInteger') and argType2.IsInteger:
                 arg2 = arg2.toInt64()
-                if arg2 is not None:
-                    argType2 = arg2.expr_type.typeRepresentation
+                if arg2 is None:
+                    return None
+            argType2 = arg2.expr_type.typeRepresentation
             if argType2 is not int:
                 return context.pushException(ValueError, f"'{argType2}' object cannot be interpreted as an integer")
+
             arg1 = arg1.convert_abs()
             if arg1 is None:
                 return None
@@ -308,8 +325,13 @@ class MathFunctionWrapper(Wrapper):
 
             argType = arg.expr_type.typeRepresentation
             if argType not in (Float32, float):
-                if argType not in (int,):
+                if hasattr(argType, 'IsInteger') and argType.IsInteger:
                     arg = arg.toInt64()
+                    if arg is None:
+                        return None
+                    argType = arg.expr_type.typeRepresentation
+                elif argType not in (int,):
+                    arg = arg.convert_to_type(int, explicit=False)
                     if arg is None:
                         return None
                 with context.ifelse(arg.nonref_expr.lt(0)) as (ifTrue, ifFalse):
