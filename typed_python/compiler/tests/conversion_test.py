@@ -3007,3 +3007,34 @@ class TestCompilationStructures(unittest.TestCase):
 
         doubleAssign()
         Entrypoint(doubleAssign)()
+
+    def test_slice_objects(self):
+        @Entrypoint
+        def createSlice(start, stop, step):
+            return slice(start, stop, step)
+
+        assert isinstance(createSlice(1, 2, 3), slice)
+
+    def test_slice_objects_are_fast(self):
+        def count(start, stop, step):
+            res = 0.0
+            for i in range(start, stop, step):
+                res += slice(i).stop
+
+            return res
+
+        Entrypoint(count)(0, 1000000, 1)
+
+        t0 = time.time()
+        val1 = count(0, 1000000, 1)
+        t1 = time.time()
+        val2 = Entrypoint(count)(0, 1000000, 1)
+        t2 = time.time()
+
+        assert val1 == val2
+
+        speedup = (t1 - t0) / (t2 - t1)
+
+        assert speedup > 5
+
+        print("speedup is ", speedup)

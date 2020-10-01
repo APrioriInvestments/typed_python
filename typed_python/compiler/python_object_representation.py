@@ -41,6 +41,7 @@ from typed_python.compiler.type_wrappers.const_dict_wrapper import ConstDictWrap
 from typed_python.compiler.type_wrappers.dict_wrapper import DictWrapper
 from typed_python.compiler.type_wrappers.set_wrapper import SetWrapper
 from typed_python.compiler.type_wrappers.tuple_wrapper import TupleWrapper, NamedTupleWrapper
+from typed_python.compiler.type_wrappers.slice_type_object_wrapper import SliceWrapper
 from typed_python.compiler.type_wrappers.alternative_wrapper import makeAlternativeWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.len_wrapper import LenWrapper
@@ -199,6 +200,9 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
 
     if f is hash:
         return TypedExpression(context, native_ast.nullExpr, HashWrapper(), False)
+
+    if f is slice:
+        return TypedExpression(context, native_ast.nullExpr, SliceWrapper(), False)
 
     if f is abs:
         return TypedExpression(context, native_ast.nullExpr, AbsWrapper(), False)
