@@ -3038,3 +3038,51 @@ class TestCompilationStructures(unittest.TestCase):
         assert speedup > 5
 
         print("speedup is ", speedup)
+
+    def test_type_and_repr_of_slice_objects(self):
+        @Entrypoint
+        def typeOf():
+            return type(slice(1, 2, 3))
+
+        assert typeOf() is slice
+
+        @Entrypoint
+        def strOf():
+            return str(slice(1, 2, 3))
+
+        assert strOf() == str(slice(1, 2, 3))
+
+        @Entrypoint
+        def reprOf():
+            return repr(slice(1, 2, 3))
+
+        assert reprOf() == repr(slice(1, 2, 3))
+
+    def test_class_interaction_with_slice_is_fast(self):
+        class C(Class, Final):
+            def __getitem__(self, x):
+                return x.stop
+
+        @Entrypoint
+        def count(c, start, stop, step):
+            res = 0.0
+            for i in range(start, stop, step):
+                res += c[0:i]
+
+            return res
+
+        Entrypoint(count)(C(), 0, 1000000, 1)
+
+        t0 = time.time()
+        val1 = count(C(), 0, 1000000, 1)
+        t1 = time.time()
+        val2 = Entrypoint(count)(C(), 0, 1000000, 1)
+        t2 = time.time()
+
+        assert val1 == val2
+
+        speedup = (t1 - t0) / (t2 - t1)
+
+        assert speedup > 5
+
+        print("speedup is ", speedup)

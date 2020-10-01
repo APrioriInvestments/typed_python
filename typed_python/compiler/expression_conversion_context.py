@@ -1582,27 +1582,29 @@ class ExpressionConversionContext(object):
                 return val.convert_getitem(index)
             elif ast.slice.matches.Slice:
                 if ast.slice.lower is None:
-                    lower = None
+                    lower = self.constant(None)
                 else:
                     lower = self.convert_expression_ast(ast.slice.lower)
                     if lower is None:
                         return lower
 
                 if ast.slice.upper is None:
-                    upper = None
+                    upper = self.constant(None)
                 else:
                     upper = self.convert_expression_ast(ast.slice.upper)
                     if upper is None:
                         return upper
 
                 if ast.slice.step is None:
-                    step = None
+                    step = self.constant(None)
                 else:
                     step = self.convert_expression_ast(ast.slice.step)
                     if step is None:
                         return step
 
-                return val.convert_getslice(lower, upper, step)
+                return val.convert_getitem(
+                    self.constant(slice).convert_call([lower, upper, step], {})
+                )
             else:
                 assert False, type(ast.slice)
 
