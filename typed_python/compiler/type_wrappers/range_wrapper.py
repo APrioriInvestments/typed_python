@@ -29,7 +29,7 @@ class RangeWrapper(Wrapper):
 
     def convert_call(self, context, expr, args, kwargs):
         if len(args) == 1 and not kwargs:
-            arg = args[0].toInt64()
+            arg = args[0].toIndex()
             if not arg:
                 return None
             return context.push(
@@ -37,14 +37,15 @@ class RangeWrapper(Wrapper):
                 lambda newInstance:
                     newInstance.expr.ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(-1))
                     >> newInstance.expr.ElementPtrIntegers(0, 1).store(arg.nonref_expr)
+                    >> newInstance.expr.ElementPtrIntegers(0, 2).store(native_ast.const_int_expr(1))
             )
 
         if len(args) == 2 and not kwargs:
-            arg0 = args[0].toInt64()
+            arg0 = args[0].toIndex()
             if not arg0:
                 return None
 
-            arg1 = args[1].toInt64()
+            arg1 = args[1].toIndex()
             if not arg1:
                 return None
 
@@ -53,7 +54,34 @@ class RangeWrapper(Wrapper):
                 lambda newInstance:
                     newInstance.expr.ElementPtrIntegers(0, 0).store(arg0.nonref_expr.sub(1))
                     >> newInstance.expr.ElementPtrIntegers(0, 1).store(arg1.nonref_expr)
+                    >> newInstance.expr.ElementPtrIntegers(0, 2).store(native_ast.const_int_expr(1))
             )
+
+        if len(args) == 3 and not kwargs:
+            arg0 = args[0].toIndex()
+            if not arg0:
+                return None
+
+            arg1 = args[1].toIndex()
+            if not arg1:
+                return None
+
+            arg2 = args[2].toIndex()
+            if not arg2:
+                return None
+
+            with context.ifelse(arg2.nonref_expr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushException(ValueError, "range() arg 3 must not be zero")
+
+            return context.push(
+                _RangeInstanceWrapper,
+                lambda newInstance:
+                    newInstance.expr.ElementPtrIntegers(0, 0).store(arg0.nonref_expr.sub(arg2.nonref_expr))
+                    >> newInstance.expr.ElementPtrIntegers(0, 1).store(arg1.nonref_expr)
+                    >> newInstance.expr.ElementPtrIntegers(0, 2).store(arg2.nonref_expr)
+            )
+
         return super().convert_call(context, expr, args, kwargs)
 
     def convert_str_cast(self, context, instance):
@@ -71,7 +99,13 @@ class RangeInstanceWrapper(Wrapper):
         super().__init__((range, "instance"))
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Struct(element_types=(('start', native_ast.Int64), ('stop', native_ast.Int64)))
+        return native_ast.Type.Struct(
+            element_types=(
+                ('start', native_ast.Int64),
+                ('stop', native_ast.Int64),
+                ('step', native_ast.Int64)
+            )
+        )
 
     def convert_method_call(self, context, expr, methodname, args, kwargs):
         if methodname == "__iter__" and not args and not kwargs:
@@ -93,23 +127,44 @@ class RangeIteratorWrapper(Wrapper):
 
     def getNativeLayoutType(self):
         return native_ast.Type.Struct(
-            element_types=(("count", native_ast.Int64), ("len", native_ast.Int64)),
+            element_types=(("start", native_ast.Int64), ("stop", native_ast.Int64), ("step", native_ast.Int64)),
             name="range_storage"
         )
 
     def convert_next(self, context, expr):
         context.pushEffect(
             expr.expr.ElementPtrIntegers(0, 0).store(
-                expr.expr.ElementPtrIntegers(0, 0).load().add(1)
+                expr.expr.ElementPtrIntegers(0, 0).load().add(
+                    expr.expr.ElementPtrIntegers(0, 2).load()
+                )
             )
         )
-        canContinue = context.pushPod(
-            bool,
-            expr.expr.ElementPtrIntegers(0, 0).load().lt(
-                expr.expr.ElementPtrIntegers(0, 1).load()
-            )
+        canContinue = context.allocateUninitializedSlot(bool)
+
+        with context.ifelse(expr.expr.ElementPtrIntegers(0, 2).load().gt(native_ast.const_int_expr(0))) as (ifTrue, ifFalse):
+            with ifTrue:
+                context.pushEffect(
+                    canContinue.expr.store(
+                        expr.expr.ElementPtrIntegers(0, 0).load().lt(
+                            expr.expr.ElementPtrIntegers(0, 1).load()
+                        )
+                    )
+                )
+            with ifFalse:
+                context.pushEffect(
+                    canContinue.expr.store(
+                        expr.expr.ElementPtrIntegers(0, 0).load().gt(
+                            expr.expr.ElementPtrIntegers(0, 1).load()
+                        )
+                    )
+                )
+
+        context.markUninitializedSlotInitialized(canContinue)
+
+        nextExpr = context.pushReference(
+            int,
+            expr.expr.ElementPtrIntegers(0, 0)
         )
-        nextExpr = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
 
         return nextExpr, canContinue
 

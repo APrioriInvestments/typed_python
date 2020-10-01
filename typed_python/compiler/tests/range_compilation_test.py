@@ -75,3 +75,34 @@ class TestRangeCompilation(unittest.TestCase):
         r1 = f(x)
         r2 = Entrypoint(f)(x)
         self.assertEqual(r1, r2)
+
+    def test_range_with_step(self):
+        def f(start, stop, step):
+            res = ListOf(int)()
+            ct = 0
+            for i in range(start, stop, step):
+                ct += 1
+                res.append(i)
+            return res
+
+        fCompiled = Entrypoint(f)
+
+        for args in [
+            (0, 10, 1),
+            (-10, 10, 1),
+            (-10, 10, 2),
+            (-10, 10, 3),
+            (-10, 10, 7),
+            (-10, 10, 500),
+            (20, 10, 1),
+            (10, 10, 1),
+            (9, 10, 1),
+            (9, 10, 2),
+            (9, 10, -1),
+            (10, 9, -1),
+            (10, -10, -1),
+            (10, -10, -2),
+            (10, -10, -3),
+            (10, -10, -500),
+        ]:
+            assert fCompiled(*args) == f(*args)

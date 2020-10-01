@@ -715,7 +715,7 @@ class ExpressionConversionContext(object):
             pass
         else:
             assert isinstance(expr, TypedExpression), type(expr)
-            expr = expr.expr
+            expr = expr.nonref_expr
 
         for i in reversed(self.intermediates):
             if i.matches.Terminal or i.matches.Effect:
