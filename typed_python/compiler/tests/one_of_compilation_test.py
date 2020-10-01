@@ -424,3 +424,25 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(oneof_abs(-234.5), 234.5)
         self.assertEqual(oneof_not(0), True)
         self.assertEqual(oneof_not(1), False)
+
+    def test_oneof_setitem(self):
+        @Entrypoint
+        def setItem(x: OneOf(None, ListOf(int)), i, y):
+            x[i] = y
+
+        @Entrypoint
+        def getItem(x: OneOf(None, ListOf(int)), i):
+            return x[i]
+
+        @Entrypoint
+        def getSlice(x: OneOf(None, ListOf(int)), i, j):
+            return x[i:j]
+
+        aList = ListOf(int)([0])
+
+        setItem(aList, 0, 10)
+
+        assert getItem(aList, 0) == 10
+
+        assert getSlice(aList, 0, 0) == ListOf(int)()
+        assert getSlice(aList, 0, 1) == aList

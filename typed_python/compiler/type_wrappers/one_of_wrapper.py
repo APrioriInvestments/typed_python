@@ -167,6 +167,14 @@ class OneOfWrapper(Wrapper):
         # just unwrap us
         return self.unwrap(context, expr, lambda realInstance: realInstance.convert_getitem(index))
 
+    def convert_setitem(self, context, expr, index, value):
+        # just unwrap us
+        return self.unwrap(context, expr, lambda realInstance: realInstance.convert_setitem(index, value))
+
+    def convert_getslice(self, context, expr, lower, upper, step):
+        # just unwrap us
+        return self.unwrap(context, expr, lambda realInstance: realInstance.convert_getslice(lower, upper, step))
+
     def convert_abs(self, context, expr):
         return context.expressionAsFunctionCall(
             "oneof_abs",
