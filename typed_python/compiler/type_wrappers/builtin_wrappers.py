@@ -14,8 +14,6 @@
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
-import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python.compiler.native_ast import VoidPtr
 
 from math import trunc, floor, ceil
 
@@ -36,14 +34,6 @@ class BuiltinWrapper(Wrapper):
 
     def convert_call(self, context, expr, args, kwargs):
         builtin = self.typeRepresentation
-
-        if args[0].expr_type.typeRepresentation is object:
-            if builtin == ceil:
-                return context.pushPod(float, runtime_functions.pyobj_ceil.call(args[0].nonref_expr.cast(VoidPtr)))
-            elif builtin == floor:
-                return context.pushPod(float, runtime_functions.pyobj_floor.call(args[0].nonref_expr.cast(VoidPtr)))
-            elif builtin == trunc:
-                return context.pushPod(float, runtime_functions.pyobj_trunc.call(args[0].nonref_expr.cast(VoidPtr)))
 
         if len(args) == 1 and not kwargs:
             return args[0].convert_builtin(builtin)

@@ -226,11 +226,23 @@ extern "C" {
     }
 
     double np_cosh_float64(double d) {
-        return std::cosh(d);
+        double ret = std::cosh(d);
+        if (isinf(ret)) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_OverflowError, "math range error");
+            throw PythonExceptionSet();
+        }
+        return ret;
     }
 
     float np_cosh_float32(float f) {
-        return std::cosh(f);
+        float ret = std::cosh(f);
+        if (isinf(ret)) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_OverflowError, "math range error");
+            throw PythonExceptionSet();
+        }
+        return ret;
     }
 
     double np_erf_float64(double d) {
@@ -249,12 +261,46 @@ extern "C" {
         return std::erfc(f);
     }
 
+/*
+    double np_exp_float64(double d) {
+        double ret = std::exp(d);
+        if (isinf(ret)) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_OverflowError, "math range error");
+            throw PythonExceptionSet();
+        }
+        return ret;
+    }
+
+    float np_exp_float32(float f) {
+        float ret = std::exp(f);
+        if (isinf(ret)) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_OverflowError, "math range error");
+            throw PythonExceptionSet();
+        }
+        return ret;
+    }
+    */
+
     double np_expm1_float64(double d) {
-        return std::expm1(d);
+        double ret = std::expm1(d);
+        if (isinf(ret)) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_OverflowError, "math range error");
+            throw PythonExceptionSet();
+        }
+        return ret;
     }
 
     float np_expm1_float32(float f) {
-        return std::expm1(f);
+        float ret = std::expm1(f);
+        if (isinf(ret)) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_OverflowError, "math range error");
+            throw PythonExceptionSet();
+        }
+        return ret;
     }
 
     // d = 171.0 will overflow 64-bit float, so could replace this calculation with a table lookup
@@ -334,11 +380,23 @@ extern "C" {
     }
 
     double np_gamma_float64(double d) {
-        return std::tgamma(d);
+        double ret = std::tgamma(d);
+        if (isinf(ret)) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_OverflowError, "math range error");
+            throw PythonExceptionSet();
+        }
+        return ret;
     }
 
     float np_gamma_float32(float f) {
-        return std::tgamma(f);
+        float ret = std::tgamma(f);
+        if (isinf(ret)) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_OverflowError, "math range error");
+            throw PythonExceptionSet();
+        }
+        return ret;
     }
 
     uint64_t np_gcd(uint64_t i1, uint64_t i2) {
@@ -1143,8 +1201,11 @@ extern "C" {
     }
 
     double nativepython_runtime_pow_float64_float64(double l, double r) {
-        if (l == 0.0 && r < 0.0)
-            throw std::runtime_error("0**-x err");
+        if (l == 0.0 && r < 0.0) {
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(PyExc_ZeroDivisionError, "0.0 cannot be raised to a negative power");
+            throw PythonExceptionSet();
+        }
         double result = std::pow(l, r);
         if (l < 0.0 && r > 0.0 && nativepython_runtime_mod_float64_float64(r, 2.0) == 1.0 && result > 0.0)
             return -result;
@@ -1152,8 +1213,11 @@ extern "C" {
     }
 
     double nativepython_runtime_pow_int64_int64(int64_t l, int64_t r) {
-        if (l == 0 && r < 0)
-            throw std::runtime_error("0**-x err");
+        if (l == 0 && r < 0) {
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(PyExc_ZeroDivisionError, "0.0 cannot be raised to a negative power");
+            throw PythonExceptionSet();
+        }
         double result = std::pow(l, r);
         if (l < 0 && r > 0 && r % 2 && result > 0)
             return -result;
@@ -1167,7 +1231,9 @@ extern "C" {
     // should match corresponding function in PyRegisterTypeInstance.hpp
     int64_t nativepython_runtime_lshift_int64_int64(int64_t l, int64_t r) {
         if (r < 0) {
-            throw std::runtime_error("negative shift count");
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(PyExc_ValueError, "negative shift count");
+            throw PythonExceptionSet();
         }
 
         if (PY_MINOR_VERSION > 6 && l == 0) {
@@ -1175,7 +1241,9 @@ extern "C" {
         }
 
         if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
-            throw std::runtime_error("shift count too large");
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(PyExc_ValueError, "shift count too large");
+            throw PythonExceptionSet();
         }
 
         return (l >= 0) ? l << r : -((-l) << r);
@@ -1184,7 +1252,9 @@ extern "C" {
     // should match corresponding function in PyRegisterTypeInstance.hpp
     uint64_t nativepython_runtime_lshift_uint64_uint64(uint64_t l, uint64_t r) {
         if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
-            throw std::runtime_error("shift count too large");
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(PyExc_ValueError, "shift count too large");
+            throw PythonExceptionSet();
         }
         return l << r;
     }
@@ -1192,7 +1262,9 @@ extern "C" {
     // should match corresponding function in PyRegisterTypeInstance.hpp
     uint64_t nativepython_runtime_rshift_uint64_uint64(uint64_t l, uint64_t r) {
         if (r > SSIZE_MAX) {
-            throw std::runtime_error("shift count too large");
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(PyExc_ValueError, "shift count too large");
+            throw PythonExceptionSet();
         }
         if (r == 0)
             return l;
@@ -1204,10 +1276,14 @@ extern "C" {
     // should match corresponding function in PyRegisterTypeInstance.hpp
     int64_t nativepython_runtime_rshift_int64_int64(int64_t l, int64_t r) {
         if (r < 0) {
-            throw std::runtime_error("negative shift count");
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(PyExc_ValueError, "negative shift count");
+            throw PythonExceptionSet();
         }
         if (r > SSIZE_MAX) {
-            throw std::runtime_error("shift count too large");
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(PyExc_ValueError, "shift count too large");
+            throw PythonExceptionSet();
         }
         if (r == 0)
             return l;
@@ -1224,7 +1300,9 @@ extern "C" {
     // should match corresponding function in PyRegisterTypeInstance.hpp
     int64_t nativepython_runtime_floordiv_int64_int64(int64_t l, int64_t r) {
         if (r == 0) {
-            throw std::runtime_error("floordiv by 0");
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(PyExc_ZeroDivisionError, "integer division or modulo by zero");
+            throw PythonExceptionSet();
         }
         if (l < 0 && l == -l && r == -1) {
             // overflow because int64_min / -1 > int64_max
@@ -1241,7 +1319,9 @@ extern "C" {
     // should match corresponding function in PyRegisterTypeInstance.hpp
     double nativepython_runtime_floordiv_float64_float64(double l, double r) {
         if (r == 0.0) {
-            throw std::runtime_error("floordiv by 0.0");
+            PyEnsureGilAcquired acquireTheGil;
+            PyErr_Format(PyExc_ZeroDivisionError, "integer division or modulo by zero");
+            throw PythonExceptionSet();
         }
         double result = (l - nativepython_runtime_mod_float64_float64(l, r))/r;
         double floorresult = std::floor(result);
