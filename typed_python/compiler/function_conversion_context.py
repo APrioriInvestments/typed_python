@@ -1601,11 +1601,11 @@ class FunctionConversionContext(ConversionContextBase):
                 toThrow = expr_context.convert_expression_ast(ast.exc)
 
                 if toThrow is None:
-                    return None
+                    return expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast), False
 
                 toThrow = toThrow.convert_to_type(object)
                 if toThrow is None:
-                    return None
+                    return expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast), False
 
             if ast.cause is None:
                 expr_context.pushExceptionObject(toThrow)
@@ -1886,9 +1886,16 @@ class FunctionConversionContext(ConversionContextBase):
         """
         exprAndReturns = []
         for s in statements:
-            expr, controlFlowReturns = self.convert_statement_ast(
+            res = self.convert_statement_ast(
                 s, variableStates, return_to=return_to, in_loop=in_loop, try_flow=try_flow
             )
+
+            if not isinstance(res, tuple) or len(res) != 2:
+                raise Exception(
+                    f"convert_statement_ast is supposed to return a pair. It returned {res}. "
+                    f"Statement type is {type(s)}"
+                )
+            expr, controlFlowReturns = res
 
             exprAndReturns.append((expr, controlFlowReturns))
 
