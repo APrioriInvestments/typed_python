@@ -52,7 +52,8 @@ bool isCanonicalName(std::string name) {
         // and some standard ones we might commonly install
         "numpy", "pandas", "scipy", "pytest", "_pytest", "typed_python", "llvmlite",
         "requests", "redis", "websockets", "boto3", "py", "xdist", "pytest_jsonreport",
-        "pytest_metadata", "flask", "flaky", "coverage", "pyasn1"
+        "pytest_metadata", "flask", "flaky", "coverage", "pyasn1", "cryptography", "paramiko",
+        "six"
     });
 
     std::string moduleNameRoot;
