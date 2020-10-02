@@ -579,3 +579,13 @@ class TestOneOfCompilation(unittest.TestCase):
             return str(x)
 
         assert callStr(ZeroDivisionError()) == str(ZeroDivisionError())
+
+    def test_convert_oneof_or_none_to_index(self):
+        @Entrypoint
+        def index(l: ListOf(int), y: OneOf(None, int)):
+            return l[y]
+
+        assert index([1, 2, 3], 2) == 3
+
+        with self.assertRaisesRegex(TypeError, "Can't take instance of type 'NoneType'"):
+            assert index([1, 2, 3], None) == 3

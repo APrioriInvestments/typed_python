@@ -499,6 +499,18 @@ class OneOfWrapper(Wrapper):
             ("oneof", self, "bytes_cast")
         )
 
+    def convert_index_cast(self, context, expr):
+        return context.expressionAsFunctionCall(
+            "oneof_convert_index",
+            (expr,),
+            lambda expr: self.unwrap(
+                expr.context,
+                expr,
+                lambda exprUnwrapped: exprUnwrapped.toIndex()
+            ),
+            ("oneof", self, "index_cast")
+        )
+
     def convert_str_cast(self, context, expr):
         return context.expressionAsFunctionCall(
             "oneof_convert_str",
