@@ -380,7 +380,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
-        if not explicit:
+        if not explicit and self.typeRepresentation is not object:
             return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
 
         t = sourceVal.expr_type.typeRepresentation

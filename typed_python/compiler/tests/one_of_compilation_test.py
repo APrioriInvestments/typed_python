@@ -589,3 +589,22 @@ class TestOneOfCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "Can't take instance of type 'NoneType'"):
             assert index([1, 2, 3], None) == 3
+
+    def test_check_if_oneof_is_none(self):
+        @Entrypoint
+        def strTranslate(x: str, table):
+            accumulator = ListOf(str)()
+            for c in x:
+                t = c
+
+                try:
+                    t = table.__getitem__(ord(c))
+                except LookupError:
+                    pass
+
+                if t is not None:
+                    accumulator.append(t)
+
+            return ''.join(accumulator)
+
+        strTranslate("hi", {})
