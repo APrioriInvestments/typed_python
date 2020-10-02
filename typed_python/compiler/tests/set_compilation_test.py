@@ -23,6 +23,7 @@ import typed_python._types as _types
 import time
 import numpy
 import unittest
+import pytest
 
 
 def result_or_exception(f, *p):
@@ -703,6 +704,7 @@ class TestSetCompilation(unittest.TestCase):
                     Entrypoint(f)(s2, v)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_set_binop_perf(self):
         for T in [int, str]:
             S = Set(T)
