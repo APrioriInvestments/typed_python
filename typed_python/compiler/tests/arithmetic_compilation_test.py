@@ -643,7 +643,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         with self.assertRaises(ValueError):
             callShift(1, -2)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(OverflowError):
             callShift(1, 2048)
 
     def test_formatting_with_format_strings_works(self):

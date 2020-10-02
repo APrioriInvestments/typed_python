@@ -309,9 +309,10 @@ def strTranslate(x, table):
     return ''.join(accumulator)
 
 
-def strMaketransFromDict(x: Dict(OneOf(int, str), OneOf(int, str, None))) -> Dict(int, OneOf(int, str, None)):
+def strMaketransFromDict(xArg: Dict(OneOf(int, str), OneOf(int, str, None))) -> Dict(int, OneOf(int, str, None)):
     # The line below is somehow necessary.  Without it, 'isinstance' type inference fails for elements of the dict key.
-    x = Dict(OneOf(int, str), OneOf(int, str, None))(x)  # this shouldn't be necessary, but it is
+    x = Dict(OneOf(int, str), OneOf(int, str, None))(xArg)  # this shouldn't be necessary, but it is
+
     ret = Dict(int, OneOf(int, str, None))()
     for c in x:
         if isinstance(c, str):
