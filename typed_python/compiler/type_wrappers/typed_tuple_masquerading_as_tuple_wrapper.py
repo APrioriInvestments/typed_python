@@ -22,12 +22,39 @@ typeWrapper = lambda t: typed_python.compiler.python_object_representation.typed
 class TypedTupleMasqueradingAsTuple(MasqueradeWrapper):
     """Models a 'NamedTuple' that's masquerading as a 'dict' for use in **kwargs."""
 
-    def __init__(self, typeRepresentation):
+    def __init__(self, typeRepresentation, interiorTypeWrappers=None):
         super().__init__(typeRepresentation)
+        self.interiorTypeWrappers = interiorTypeWrappers
+
+    def __eq__(self, other):
+        if type(self) != type(other):
+            return False
+
+        return (
+            self.typeRepresentation == other.typeRepresentation
+            and self.interiorTypeWrappers == other.interiorTypeWrappers
+        )
 
     @property
     def interpreterTypeRepresentation(self):
         return tuple
+
+    def convert_getitem(self, context, instance, index):
+        actualRes = super().convert_getitem(context, instance, index)
+
+        if actualRes is None:
+            return None
+
+        if (
+            index.isConstant
+            and isinstance(index.constantValue, int)
+            and self.interiorTypeWrappers is not None
+        ):
+            return actualRes.changeType(
+                self.interiorTypeWrappers[index.constantValue]
+            )
+
+        return actualRes
 
     def convert_masquerade_to_untyped(self, context, instance):
         return context.constant(tuple).convert_call([instance], {}).changeType(tuple)
@@ -40,6 +67,3 @@ class TypedTupleMasqueradingAsTuple(MasqueradeWrapper):
 
     def convert_float_cast(self, context, expr):
         return expr.convert_masquerade_to_typed().convert_float_cast()
-
-    def convert_getitem(self, context, instance, item):
-        return instance.convert_masquerade_to_typed().convert_getitem(item)

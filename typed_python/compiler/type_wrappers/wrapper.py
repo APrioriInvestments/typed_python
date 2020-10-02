@@ -19,7 +19,6 @@ from typed_python.hash import Hash
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.native_ast import VoidPtr
 
-
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
@@ -178,10 +177,23 @@ class Wrapper(object):
             "%s is not subscriptable" % str(self)
         )
 
-    def convert_getslice(self, context, instance, lower, upper, step):
-        return context.pushException(
-            AttributeError,
-            "%s is not sliceable" % str(self)
+    def convert_getslice(self, context, instance, start, stop, step):
+        # have to import this here to break the import cycle
+        from typed_python.compiler.type_wrappers.slice_type_object_wrapper import SliceWrapper
+
+        if start is None:
+            start = context.constant(None)
+
+        if stop is None:
+            stop = context.constant(None)
+
+        if step is None:
+            step = context.constant(None)
+
+        return self.convert_getitem(
+            context,
+            instance,
+            SliceWrapper().convert_call(context, None, [start, stop, step], {})
         )
 
     def convert_setitem(self, context, instance, index, value):

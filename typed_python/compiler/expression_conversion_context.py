@@ -18,6 +18,7 @@ import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 import types
 
+from typed_python.compiler.type_wrappers.slice_type_object_wrapper import SliceWrapper
 from typed_python.SerializationContext import SerializationContext
 from typed_python.internals import makeFunctionType, FunctionOverload
 from typed_python.compiler.function_stack_state import FunctionStackState
@@ -1582,29 +1583,77 @@ class ExpressionConversionContext(object):
                 return val.convert_getitem(index)
             elif ast.slice.matches.Slice:
                 if ast.slice.lower is None:
-                    lower = self.constant(None)
+                    lower = None
                 else:
                     lower = self.convert_expression_ast(ast.slice.lower)
                     if lower is None:
-                        return lower
+                        return None
 
                 if ast.slice.upper is None:
-                    upper = self.constant(None)
+                    upper = None
                 else:
                     upper = self.convert_expression_ast(ast.slice.upper)
                     if upper is None:
-                        return upper
+                        return None
 
                 if ast.slice.step is None:
-                    step = self.constant(None)
+                    step = None
                 else:
                     step = self.convert_expression_ast(ast.slice.step)
                     if step is None:
-                        return step
+                        return None
 
-                return val.convert_getitem(
-                    self.constant(slice).convert_call([lower, upper, step], {})
+                return val.convert_getslice(lower, upper, step)
+            elif ast.slice.matches.ExtSlice:
+                args = []
+                for dim in ast.slice.dims:
+                    if dim.matches.Index:
+                        index = self.convert_expression_ast(ast.slice.value)
+                        if index is None:
+                            return None
+
+                        args.append(index)
+                    elif dim.matches.Slice:
+                        if dim.lower is None:
+                            lower = self.constant(None)
+                        else:
+                            lower = self.convert_expression_ast(dim.lower)
+                            if lower is None:
+                                return None
+
+                        if dim.upper is None:
+                            upper = self.constant(None)
+                        else:
+                            upper = self.convert_expression_ast(dim.upper)
+                            if upper is None:
+                                return None
+
+                        if dim.step is None:
+                            step = self.constant(None)
+                        else:
+                            step = self.convert_expression_ast(dim.step)
+                            if step is None:
+                                return None
+
+                        args.append(
+                            SliceWrapper().convert_call(self, None, [lower, upper, step], {})
+                        )
+
+                tupType = Tuple(*[x.expr_type.typeRepresentation for x in args])
+
+                instance = typeWrapper(tupType).createFromArgs(self, args)
+
+                if instance is None:
+                    return None
+
+                index = instance.changeType(
+                    TypedTupleMasqueradingAsTuple(
+                        tupType,
+                        interiorTypeWrappers=[x.expr_type for x in args]
+                    )
                 )
+
+                return val.convert_getitem(index)
             else:
                 assert False, type(ast.slice)
 

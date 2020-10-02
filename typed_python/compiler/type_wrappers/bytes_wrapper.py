@@ -138,11 +138,11 @@ class BytesWrapper(RefcountedWrapper):
         if lower is None and upper is not None:
             lower = context.constant(0)
 
-        lower = lower.toInt64()
+        lower = lower.toIndex()
         if lower is None:
             return
 
-        upper = upper.toInt64()
+        upper = upper.toIndex()
         if upper is None:
             return
 
@@ -161,7 +161,7 @@ class BytesWrapper(RefcountedWrapper):
         )
 
     def convert_getitem(self, context, expr, item):
-        item = item.toInt64()
+        item = item.toIndex()
 
         if item is None:
             return None

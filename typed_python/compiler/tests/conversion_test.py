@@ -3060,14 +3060,41 @@ class TestCompilationStructures(unittest.TestCase):
 
     def test_class_interaction_with_slice_is_fast(self):
         class C(Class, Final):
-            def __getitem__(self, x):
+            def __getitem__(self, x) -> int:
                 return x.stop
 
-        @Entrypoint
         def count(c, start, stop, step):
             res = 0.0
             for i in range(start, stop, step):
                 res += c[0:i]
+
+            return res
+
+        Entrypoint(count)(C(), 0, 1000000, 1)
+
+        t0 = time.time()
+        val1 = count(C(), 0, 1000000, 1)
+        t1 = time.time()
+        val2 = Entrypoint(count)(C(), 0, 1000000, 1)
+        t2 = time.time()
+
+        assert val1 == val2
+
+        speedup = (t1 - t0) / (t2 - t1)
+
+        assert speedup > 5
+
+        print("speedup is ", speedup)
+
+    def test_class_interaction_with_slice_pairs(self):
+        class C(Class, Final):
+            def __getitem__(self, x) -> int:
+                return x[0].stop + x[1].stop
+
+        def count(c, start, stop, step):
+            res = 0.0
+            for i in range(start, stop, step):
+                res += c[:i, :i]
 
             return res
 
