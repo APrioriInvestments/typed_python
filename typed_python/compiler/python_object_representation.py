@@ -108,6 +108,22 @@ _concreteWrappers = {
 }
 
 
+def functionIsCompilable(f):
+    """Is a python function 'f' compilable?
+
+    Specifically, we try to cordon off the functions we know are not going to compile
+    so that we can just represent them as python objects.
+    """
+    # we know we can't compile standard numpy and scipy functions
+    if f.__module__ == "numpy" or f.__module__.startswith("numpy."):
+        return False
+
+    if f.__module__ == "scipy" or f.__module__.startswith("scipy."):
+        return False
+
+    return True
+
+
 def _typedPythonTypeToTypeWrapper(t):
     if isinstance(t, Wrapper):
         return t
@@ -308,12 +324,15 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
         return BytesWrapper().constant(context, f)
 
     if isinstance(f, type(pythonObjectRepresentation)):
-        return TypedExpression(
-            context,
-            native_ast.nullExpr,
-            PythonFreeFunctionWrapper(f),
-            False
-        )
+        if functionIsCompilable(f):
+            return TypedExpression(
+                context,
+                native_ast.nullExpr,
+                PythonFreeFunctionWrapper(f),
+                False
+            )
+        else:
+            return context.constantPyObject(f, owningGlobalScopeAndName)
 
     if isinstance(f, method_descriptor):
         return TypedExpression(
