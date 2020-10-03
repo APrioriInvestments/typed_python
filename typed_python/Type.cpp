@@ -41,6 +41,49 @@ typed_python_hash_type Type::hash(instance_ptr left) {
     });
 }
 
+bool Type::isValidUpcastType(Type* t1, Type* t2) {
+    if (typesEquivalent(t1, t2)) {
+        return true;
+    }
+
+    if (t1->isRegister() && t2->isRegister()) {
+        return RegisterTypeProperties::isValidUpcast(t1, t2);
+    }
+
+    if (t1->isValue()) {
+        return isValidUpcastType(((Value*)t1)->value().type(), t2);
+    }
+
+    if (t2->isValue()) {
+        return false;
+    }
+
+    if (t1->isOneOf()) {
+        for (auto t: ((OneOfType*)t1)->getTypes()) {
+            if (!RegisterTypeProperties::isValidUpcast(t, t2)) {
+                return false;
+            }
+        }
+    }
+
+    if (t2->isOneOf()) {
+        for (auto t: ((OneOfType*)t2)->getTypes()) {
+            if (RegisterTypeProperties::isValidUpcast(t1, t)) {
+                return true;
+            }
+        }
+    }
+
+    if (t1->isTupleOf() && t2->isTupleOf()) {
+        return RegisterTypeProperties::isValidUpcast(
+            ((TupleOfType*)t1)->getEltType(),
+            ((TupleOfType*)t2)->getEltType()
+        );
+    }
+
+    return false;
+}
+
 void Type::move(instance_ptr dest, instance_ptr src) {
     //right now, this is legal because we have no self references.
     swap(dest, src);

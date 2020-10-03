@@ -3,7 +3,7 @@ import numpy
 import ctypes
 
 from typed_python import Int32, Float32, Entrypoint, PointerTo, ListOf, TupleOf, UInt8
-
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python.compiler.type_wrappers.runtime_functions import externalCallTarget
 import typed_python.compiler.native_ast as native_ast
@@ -72,7 +72,7 @@ def makePointer(e, viableOutputTypes):
 
 
 def ensureOnStack(e, desiredType):
-    e = e.convert_to_type(desiredType)
+    e = e.convert_to_type(desiredType, ConversionLevel.Implicit)
     if e is None:
         return None
 

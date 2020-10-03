@@ -155,5 +155,20 @@ class TestPointerToCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Couldn't initialize type C from int"):
             Entrypoint(f)(C, 2)
 
-        with self.assertRaisesRegex(Exception, "Couldn't initialize type C from int"):
+        with self.assertRaisesRegex(Exception, "Cannot implicitly convert an object of type int to an instance of C"):
             f(C, 2)
+
+    def test_pointer_destroy_in_interpreter(self):
+        aList = ListOf(str)(["a", "b"])
+
+        p = aList.pointerUnsafe(0)
+
+        p.destroy()
+        p.initialize("B")
+
+        assert aList[0] == "B"
+
+        p.destroy()
+        p.initialize()
+
+        assert aList[0] == ""

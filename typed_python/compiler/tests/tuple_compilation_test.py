@@ -181,11 +181,11 @@ class TestTupleCompilation(unittest.TestCase):
             return NT(x=x, y=y)
 
         self.assertEqual(makeNt(), NT())
-        self.assertEqual(makeNtX(ListOf(int)([1, 2, 3])), NT(x=[1, 2, 3]))
-        self.assertEqual(makeNtXY(ListOf(int)([1, 2, 3]), 2.0), NT(x=[1, 2, 3], y=2.0))
+        self.assertEqual(makeNtX(ListOf(int)([1, 2, 3])), NT(x=ListOf(int)([1, 2, 3])))
+        self.assertEqual(makeNtXY(ListOf(int)([1, 2, 3]), 2.0), NT(x=ListOf(int)([1, 2, 3]), y=2.0))
         self.assertEqual(makeNtY(2.0), NT(y=2.0))
 
-        with self.assertRaisesRegex(TypeError, "convert from type float to type List"):
+        with self.assertRaisesRegex(TypeError, "Couldn't initialize type ListOf.int. from float"):
             makeNtX(1.2)
 
     def test_compile_make_named_tuple(self):

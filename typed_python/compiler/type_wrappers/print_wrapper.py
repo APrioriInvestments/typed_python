@@ -34,11 +34,11 @@ class PrintWrapper(Wrapper):
 
         for kwargName, value in kwargs.items():
             if kwargName == 'sep':
-                sep = value.convert_to_type(str)
+                sep = value.convert_str_cast()
                 if sep is None:
                     return
             elif kwargName == 'end':
-                end = value.convert_to_type(str)
+                end = value.convert_str_cast()
                 if end is None:
                     return
             else:

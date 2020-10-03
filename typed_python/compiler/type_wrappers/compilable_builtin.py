@@ -47,6 +47,9 @@ class CompilableBuiltin(Wrapper):
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
+    def getCompileTimeConstant(self):
+        return self
+
     def __eq__(self, other):
         raise NotImplementedError(self)
 
@@ -65,9 +68,18 @@ class CompilableBuiltin(Wrapper):
 
     @classmethod
     def convert_type_call(cls, context, typeInst, args, kwargs):
-        if all(a.expr_type.is_compile_time_constant for a in args):
-            tw = cls(*[a.expr_type.getCompileTimeConstant() for a in args])
+        if (
+            all(a.isConstant for a in args)
+            and all(v.isConstant for v in kwargs.values())
+        ):
+            tw = cls(
+                *[a.constantValue for a in args],
+                **{k: v.constantValue for k, v in kwargs.items()}
+            )
 
             return typed_python.compiler.python_object_representation.pythonObjectRepresentation(context, tw)
 
-        raise Exception("Can't convert this")
+        raise Exception(
+            f"Can't initialize {cls} with args {args} and {kwargs}"
+            f" because they're not all compile time constants"
+        )

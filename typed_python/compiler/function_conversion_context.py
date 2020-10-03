@@ -24,7 +24,7 @@ from typed_python.compiler.python_ast_analysis import (
     extractFunctionDefs
 )
 from typed_python.internals import makeFunctionType
-
+from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 from typed_python import _types, Type
@@ -614,7 +614,7 @@ class ConversionContextBase:
                     else:
                         # need to make a stackslot for this variable
                         var_expr = context.inputArg(self._argtypes[name], name)
-                        converted = var_expr.convert_to_type(slot_type)
+                        converted = var_expr.convert_to_type(slot_type, ConversionLevel.Signature)
                         assert converted is not None, (
                             "It makes no sense we can't convert an argument to its"
                             " type representation in the function stack."
@@ -703,7 +703,7 @@ class ConversionContextBase:
             return
 
         # convert the value to the target type now that we've upsized it
-        val_to_store = val_to_store.convert_to_type(slot_ref.expr_type)
+        val_to_store = val_to_store.convert_to_type(slot_ref.expr_type, ConversionLevel.Signature)
 
         assert val_to_store is not None, "We should always be able to upsize"
 
@@ -1163,7 +1163,7 @@ class FunctionConversionContext(ConversionContextBase):
                     self.upsizeVariableType(FunctionOutput, e.expr_type)
 
             if e.expr_type != self._varname_to_type[FunctionOutput]:
-                e = e.convert_to_type(self._varname_to_type[FunctionOutput])
+                e = e.convert_to_type(self._varname_to_type[FunctionOutput], ConversionLevel.ImplicitContainers)
 
             if e is None:
                 return subcontext.finalize(None, exceptionsTakeFrom=ast), False
@@ -1449,6 +1449,7 @@ class FunctionConversionContext(ConversionContextBase):
                     )
                     >> return_context.finalize(rtn)
                 )
+
             if in_loop:
                 break_context = ExpressionConversionContext(self, variableStates)
                 brk, _ = self.convert_statement_ast(
@@ -1604,7 +1605,7 @@ class FunctionConversionContext(ConversionContextBase):
                 if toThrow is None:
                     return expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast), False
 
-                toThrow = toThrow.convert_to_type(object)
+                toThrow = toThrow.convert_to_type(object, ConversionLevel.Signature)
                 if toThrow is None:
                     return expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast), False
 

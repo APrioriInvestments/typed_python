@@ -22,7 +22,17 @@ class PyStringInstance : public PyInstance {
 public:
     typedef StringType modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(StringType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    static void copyConstructFromPythonInstanceConcrete(StringType* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
+        if (level >= ConversionLevel::New) {
+            PyObjectStealer newStr(PyObject_Str(pyRepresentation));
+            if (!newStr) {
+                // defer to python execption
+                throw PythonExceptionSet();
+            }
+
+            copyConstructFromPythonInstanceConcrete(eltType, tgt, newStr, ConversionLevel::Signature);
+            return;
+        }
 
         if (PyUnicode_Check(pyRepresentation)) {
             if (PyUnicode_READY(pyRepresentation) == -1) throw PythonExceptionSet();
@@ -45,11 +55,15 @@ public:
                 );
             return;
         }
-        throw std::logic_error("Can't initialize a string from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
+
+        PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, level);
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
+        if (level >= ConversionLevel::New) {
+            return true;
+        }
+
         return PyUnicode_Check(pyRepresentation);
     }
 

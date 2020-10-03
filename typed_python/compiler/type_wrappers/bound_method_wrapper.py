@@ -61,5 +61,9 @@ class BoundMethodWrapper(Wrapper):
             kwargs
         )
 
-    def convert_bool_cast(self, context, e):
-        return context.constant(True)
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if targetVal.expr_type.typeRepresentation is bool:
+            targetVal.convert_copy_initialize(context.constant(True))
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)

@@ -16,7 +16,6 @@ from typed_python import sha_hash
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python import Int32, Float32, TupleOf, Tuple, Dict, OneOf
 from typed_python.type_promotion import isInteger
 from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import TypedListMasqueradingAsList
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -25,7 +24,9 @@ from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethod
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
-from typed_python import ListOf
+from typed_python import (
+    ListOf, Float32, Int8, Int16, Int32, UInt8, UInt16, UInt32, UInt64, TupleOf, Tuple, Dict, OneOf
+)
 
 from typed_python.compiler.native_ast import VoidPtr
 
@@ -309,9 +310,12 @@ def strTranslate(x, table):
     return ''.join(accumulator)
 
 
-def strMaketransFromDict(xArg: Dict(OneOf(int, str), OneOf(int, str, None))) -> Dict(int, OneOf(int, str, None)):
+def strMaketransFromDict(xArg) -> Dict(int, OneOf(int, str, None)):
     # The line below is somehow necessary.  Without it, 'isinstance' type inference fails for elements of the dict key.
-    x = Dict(OneOf(int, str), OneOf(int, str, None))(xArg)  # this shouldn't be necessary, but it is
+    if not isinstance(xArg, dict):
+        raise TypeError("if you give only one argument to maketrans it must be a dict")
+
+    x = Dict(OneOf(int, str), OneOf(int, str, None))(xArg)
 
     ret = Dict(int, OneOf(int, str, None))()
     for c in x:
@@ -403,9 +407,6 @@ class StringWrapper(RefcountedWrapper):
     def on_refcount_zero(self, context, instance):
         assert instance.isReference
         return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
-
-    def _can_convert_to_type(self, otherType, explicit):
-        return otherType.typeRepresentation is bool or otherType == self
 
     def _can_convert_from_type(self, otherType, explicit):
         return False
@@ -969,38 +970,64 @@ class StringWrapper(RefcountedWrapper):
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
-    def can_cast_to_primitive(self, context, e, primitiveType):
-        return primitiveType in (bool, int, float, str)
+    def _can_convert_to_type(self, targetType, conversionLevel):
+        if not conversionLevel.isNewOrHigher():
+            return False
 
-    def convert_bool_cast(self, context, expr):
-        if expr.isConstant:
-            try:
-                return context.constant(bool(expr.constantValue))
-            except Exception as e:
-                return context.pushException(type(e), *e.args)
+        return targetType.typeRepresentation in (
+            Float32, Int8, Int16, Int32, UInt8, UInt16, UInt32, UInt64, float, int, bool, str
+        )
 
-        return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if not conversionLevel.isNewOrHigher():
+            return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
-    def convert_int_cast(self, context, expr):
-        if expr.isConstant:
-            try:
-                return context.constant(int(expr.constantValue))
-            except Exception as e:
-                return context.pushException(type(e), *e.args)
+        if targetVal.expr_type.typeRepresentation is bool:
+            res = context.pushPod(bool, self.convert_len_native(instance.nonref_expr).neq(0))
+            context.pushEffect(
+                targetVal.expr.store(res.nonref_expr)
+            )
+            return context.constant(True)
 
-        return context.pushPod(int, runtime_functions.str_to_int64.call(expr.nonref_expr.cast(VoidPtr)))
+        if targetVal.expr_type.typeRepresentation is int:
+            res = context.pushPod(
+                int,
+                runtime_functions.str_to_int64.call(instance.nonref_expr.cast(VoidPtr))
+            )
+            context.pushEffect(
+                targetVal.expr.store(res.nonref_expr)
+            )
+            return context.constant(True)
 
-    def convert_str_cast(self, context, expr):
-        return expr
+        if targetVal.expr_type.typeRepresentation is float:
+            res = context.pushPod(
+                float,
+                runtime_functions.str_to_float64.call(instance.nonref_expr.cast(VoidPtr))
+            )
+            context.pushEffect(
+                targetVal.expr.store(res.nonref_expr)
+            )
+            return context.constant(True)
 
-    def convert_float_cast(self, context, expr):
-        if expr.isConstant:
-            try:
-                return context.constant(float(expr.constantValue))
-            except Exception as e:
-                return context.pushException(type(e), *e.args)
+        # for the nonstandard int types, convert to 'int' first.
+        if targetVal.expr_type.typeRepresentation in (Int8, UInt8, Int16, UInt16, Int32, UInt32, UInt64):
+            outInt = context.allocateUninitializedSlot(int)
+            isInitialized = instance.convert_to_type_with_target(outInt, conversionLevel)
+            with context.ifelse(isInitialized.nonref_expr) as (ifTrue, ifFalse):
+                with ifTrue:
+                    outInt.convert_to_type_with_target(targetVal, conversionLevel)
+            return isInitialized
 
-        return context.pushPod(float, runtime_functions.str_to_float64.call(expr.nonref_expr.cast(VoidPtr)))
+        # for float32, convert to float first, then downcast
+        if targetVal.expr_type.typeRepresentation is Float32:
+            outFloat = context.allocateUninitializedSlot(float)
+            isInitialized = instance.convert_to_type_with_target(outFloat, conversionLevel)
+            with context.ifelse(isInitialized.nonref_expr) as (ifTrue, ifFalse):
+                with ifTrue:
+                    outFloat.convert_to_type_with_target(targetVal, conversionLevel)
+            return isInitialized
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
     def get_iteration_expressions(self, context, expr):
         if expr.isConstant:

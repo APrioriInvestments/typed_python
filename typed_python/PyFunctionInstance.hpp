@@ -26,9 +26,9 @@ public:
 
     Function* type();
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit);
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level);
 
-    static void copyConstructFromPythonInstanceConcrete(modeled_type* type, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
+    static void copyConstructFromPythonInstanceConcrete(modeled_type* type, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level);
 
     static std::pair<bool, PyObject*> tryToCall(const Function* f, instance_ptr functionClosure, PyObject* arg0=nullptr, PyObject* arg1=nullptr, PyObject* arg2=nullptr);
 
@@ -47,7 +47,7 @@ public:
         PyObject* self,
         PyObject* args,
         PyObject* kwargs,
-        bool convertExplicitly
+        ConversionLevel conversionLevel
     );
 
     //perform a linear scan of all specializations contained in overload and attempt to dispatch to each one.

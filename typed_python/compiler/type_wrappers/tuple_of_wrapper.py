@@ -14,15 +14,19 @@
 
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python.compiler.type_wrappers.const_dict_wrapper import ConstDictWrapper
-from typed_python.compiler.type_wrappers.dict_wrapper import DictWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler.type_wrappers.tuple_wrapper import TupleWrapper
+from typed_python.compiler.conversion_level import ConversionLevel
+from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
+from typed_python.compiler.converter_utils import (
+    InitializeRefAsImplicit,
+    InitializeRefAsDeepNew,
+    InitializeRefAsUpcastContainers
+)
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.typed_expression import TypedExpression
-from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 
-from typed_python import Int32, TupleOf, ListOf
+from typed_python import Int32, TupleOf, ListOf, Tuple, NamedTuple
+
 from typed_python.compiler.type_wrappers.util import min
 
 import typed_python.compiler.native_ast as native_ast
@@ -149,40 +153,14 @@ class PreReservedTupleOrList(CompilableBuiltin):
         return super().convert_call(context, instance, args, kwargs)
 
 
-class InitializeRef(CompilableBuiltin):
-    def __eq__(self, other):
-        return isinstance(other, InitializeRef)
-
-    def __hash__(self):
-        return hash("InitializeRef")
-
-    def convert_call(self, context, instance, args, kwargs):
-        """InitializeRef()(target, sourceVal) -> bool.
-
-        Initializes 'target' with the contents of 'sourceVal', returning True on success
-        and False on failure.
-
-        'target' must be a reference expression to an uninitialized value.
-        """
-        if len(args) == 2:
-            return args[0].expr_type.convert_to_type_with_target(
-                context,
-                args[0],
-                args[1],
-                True
-            )
-
-        return super().convert_call(context, instance, args, kwargs)
-
-
-def initialize_tuple_or_list_from_other(targetPtr, src):
+def initialize_tuple_or_list_from_other(targetPtr, src, converter_class):
     ct = len(src)
 
     target = PreReservedTupleOrList(type(targetPtr).ElementType)(ct)
 
     ix = 0
     for item in src:
-        if not InitializeRef()(item, target._getItemUnsafe(ix)):
+        if not converter_class()(item, target._getItemUnsafe(ix)):
             return False
         ix += 1
         target.setSizeUnsafe(ix)
@@ -283,9 +261,11 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
     def convert_bin_op_reverse(self, context, right, op, left, inplace):
         if op.matches.In or op.matches.NotIn:
-            left = left.convert_to_type(self.typeRepresentation.ElementType, False)
+            left = left.convert_to_type(self.typeRepresentation.ElementType, ConversionLevel.Implicit)
+
             if left is None:
                 return None
+
             return context.call_py_function(
                 tuple_or_list_contains if op.matches.In else tuple_or_list_contains_not,
                 (right, left),
@@ -294,8 +274,33 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
         return super().convert_bin_op_reverse(context, right, op, left, inplace)
 
+    def convert_type_attribute(self, context, typeInst, attr):
+        if attr in ('fromBytes',):
+            return typeInst.changeType(BoundMethodWrapper.Make(typeInst.expr_type, attr))
+
+        return super().convert_type_attribute(context, typeInst, attr)
+
+    def convert_type_method_call(self, context, typeInst, methodname, args, kwargs):
+        if methodname == "fromBytes" and len(args) == 1:
+            arg = args[0].convert_to_type(bytes, ConversionLevel.Signature)
+            if arg is None:
+                return None
+
+            return context.push(
+                self,
+                lambda newListPtr:
+                newListPtr.expr.store(
+                    runtime_functions.list_or_tuple_of_from_bytes.call(
+                        arg.nonref_expr.cast(native_ast.VoidPtr),
+                        context.getTypePointer(self.typeRepresentation).cast(native_ast.VoidPtr)
+                    ).cast(newListPtr.expr_type.layoutType)
+                )
+            )
+
+        return super().convert_type_method_call(context, typeInst, methodname, args, kwargs)
+
     def convert_attribute(self, context, expr, attr):
-        if attr in ("_getItemUnsafe", "_initializeItemUnsafe", "setSizeUnsafe"):
+        if attr in ("_getItemUnsafe", "_initializeItemUnsafe", "setSizeUnsafe", 'toBytes'):
             return expr.changeType(BoundMethodWrapper.Make(self, attr))
 
         if attr == '_hash_cache':
@@ -308,7 +313,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
     def convert_set_attribute(self, context, expr, attr, val):
         if attr == '_hash_cache':
-            val = val.convert_to_type(Int32)
+            val = val.convert_to_type(Int32, ConversionLevel.Implicit)
             if val is None:
                 return None
 
@@ -377,6 +382,19 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
             return self.convert_getitem_unsafe(context, instance, index)
 
+        if methodname == "toBytes":
+            if len(args) == 0:
+                return context.push(
+                    bytes,
+                    lambda bytesRef:
+                        bytesRef.expr.store(
+                            runtime_functions.list_or_tuple_of_to_bytes.call(
+                                instance.nonref_expr.cast(native_ast.VoidPtr),
+                                context.getTypePointer(self.typeRepresentation).cast(native_ast.VoidPtr)
+                            ).cast(bytesRef.expr_type.layoutType)
+                        )
+                )
+
         if methodname == "setSizeUnsafe":
             if len(args) == 1:
                 count = args[0].toInt64()
@@ -396,7 +414,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             if index is None:
                 return None
 
-            value = args[1].convert_to_type(self.typeRepresentation.ElementType)
+            value = args[1].convert_to_type(self.typeRepresentation.ElementType, ConversionLevel.Implicit)
             if value is None:
                 return None
 
@@ -420,48 +438,75 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
-    def _can_convert_from_type(self, otherType, explicit):
-        convertible = (
-            TupleOrListOfWrapper,
-            typed_python.compiler.type_wrappers.set_wrapper.SetWrapper,
-            DictWrapper,
-            ConstDictWrapper,
-            # TupleWrapper  # doesn't have .ElementType
+    def _can_convert_from_type(self, otherType, conversionLevel):
+        if not conversionLevel.isImplicitContainersOrHigher() and issubclass(self.typeRepresentation, ListOf):
+            # ListOf only allows 'implicit container' conversions.
+            return False
+
+        if conversionLevel < ConversionLevel.UpcastContainers:
+            return False
+
+        # note that if the other object is an untyped container, then the
+        # pathway in python_object_of_type will take care of it.
+        childLevel = (
+            ConversionLevel.DeepNew if conversionLevel == ConversionLevel.DeepNew
+            else
+            ConversionLevel.Implicit if conversionLevel.isImplicitContainersOrHigher()
+            else
+            conversionLevel
         )
-        if explicit and isinstance(otherType, convertible):
-            sourceEltType = typeWrapper(otherType.typeRepresentation.ElementType)
-            destEltType = typeWrapper(self.typeRepresentation.ElementType)
 
-            return sourceEltType.can_convert_to_type(destEltType, True)
+        if issubclass(otherType.typeRepresentation, (ListOf, TupleOf)):
+            # check if we can _definitely_ convert
+            if typeWrapper(otherType.typeRepresentation.ElementType).can_convert_to_type(
+                self.typeRepresentation.ElementType,
+                childLevel
+            ) is True:
+                return True
 
-        return super()._can_convert_from_type(otherType, explicit)
+            return "Maybe"
 
-    def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
-        convertible = (
-            TupleOrListOfWrapper,
-            typed_python.compiler.type_wrappers.set_wrapper.SetWrapper,
-            DictWrapper,
-            ConstDictWrapper,
-            TupleWrapper
+        if issubclass(otherType.typeRepresentation, (Tuple, NamedTuple)):
+            allConvertible = True
+
+            for t in otherType.typeRepresentation.ElementTypes:
+                canDoIt = typeWrapper(t).can_convert_to_type(self.typeRepresentation.ElementType, childLevel)
+                if canDoIt is False:
+                    return False
+
+                if canDoIt is not True:
+                    allConvertible = False
+
+            if allConvertible:
+                return True
+
+            return "Maybe"
+
+        return super()._can_convert_from_type(otherType, conversionLevel)
+
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure=False):
+        canConvert = self._can_convert_from_type(sourceVal.expr_type, conversionLevel)
+
+        if canConvert is False:
+            return super().convert_to_self_with_target(context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure)
+
+        if conversionLevel == ConversionLevel.DeepNew:
+            converter_class = InitializeRefAsDeepNew
+        elif conversionLevel == ConversionLevel.UpcastContainers:
+            converter_class = InitializeRefAsUpcastContainers
+        else:
+            converter_class = InitializeRefAsImplicit
+
+        res = context.call_py_function(
+            initialize_tuple_or_list_from_other,
+            (targetVal.asPointer(), sourceVal, context.constant(converter_class)),
+            {}
         )
-        if explicit and isinstance(sourceVal.expr_type, convertible):
-            canConvert = self._can_convert_from_type(sourceVal.expr_type, True)
 
-            if canConvert is False:
-                return context.constant(False)
+        if canConvert is True:
+            return context.constant(True)
 
-            res = context.call_py_function(
-                initialize_tuple_or_list_from_other,
-                (targetVal.asPointer(), sourceVal),
-                {}
-            )
-
-            if canConvert is True:
-                return context.constant(True)
-
-            return res
-
-        return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
+        return res
 
     def convert_type_call_on_container_expression(self, context, typeInst, argExpr):
         if not (argExpr.matches.Tuple or argExpr.matches.List or argExpr.matches.Set):
@@ -486,6 +531,10 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             if val is None:
                 return None
 
+            val = val.convert_to_type(self.typeRepresentation.ElementType, ConversionLevel.Implicit)
+            if val is None:
+                return None
+
             aTup.convert_method_call(
                 "_initializeItemUnsafe",
                 (context.constant(i), val),
@@ -506,8 +555,27 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
-    def convert_bool_cast(self, context, expr):
-        return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
+    def _can_convert_to_type(self, targetType, conversionLevel):
+        if not conversionLevel.isNewOrHigher():
+            return False
+
+        if targetType.typeRepresentation is bool:
+            return True
+
+        if targetType.typeRepresentation is str:
+            return "Maybe"
+
+        return False
+
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if targetVal.expr_type.typeRepresentation is bool:
+            res = context.pushPod(bool, self.convert_len_native(instance.nonref_expr).neq(0))
+            context.pushEffect(
+                targetVal.expr.store(res.nonref_expr)
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
 
 class TupleOrListOfIteratorWrapper(Wrapper):
@@ -586,6 +654,6 @@ class TupleOfWrapper(TupleOrListOfWrapper):
             return args[0]
 
         if len(args) == 1 and not kwargs:
-            return args[0].convert_to_type(self, True)
+            return args[0].convert_to_type(self, ConversionLevel.New)
 
         return super().convert_type_call(context, typeInst, args, kwargs)

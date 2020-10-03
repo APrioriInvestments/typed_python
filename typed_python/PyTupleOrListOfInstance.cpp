@@ -28,20 +28,41 @@ ListOfType* PyListOfInstance::type() {
     return (ListOfType*)extractTypeFrom(((PyObject*)this)->ob_type);
 }
 
-bool PyTupleOrListOfInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
-    if (!isExplicit) {
-        return PyList_Check(pyRepresentation) || PyTuple_Check(pyRepresentation);
+bool PyTupleOrListOfInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
+    if (type->isListOf()) {
+        return level >= ConversionLevel::ImplicitContainers;
     }
 
-    return
-        PyTuple_Check(pyRepresentation) ||
-        PyList_Check(pyRepresentation) ||
-        PyDict_Check(pyRepresentation) ||
-        PySet_Check(pyRepresentation) ||
-        PySequence_Check(pyRepresentation) ||
-        PyIter_Check(pyRepresentation) ||
-        PyArray_Check(pyRepresentation)
-        ;
+    std::pair<Type*, instance_ptr> typeAndPtrOfArg = extractTypeAndPtrFrom(pyRepresentation);
+
+    if (level == ConversionLevel::Signature) {
+        return Type::typesEquivalent(typeAndPtrOfArg.first, type);
+    }
+
+    if (level == ConversionLevel::Upcast) {
+        return false;
+    }
+
+    if (level >= ConversionLevel::ImplicitContainers) {
+        return true;
+    }
+
+    // only allow implicit conversion from tuple/list of. We don't want dicts and sets to implicitly
+    // convert to tuples
+    if (PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation)) {
+        return true;
+    }
+
+    if (typeAndPtrOfArg.first && (
+            typeAndPtrOfArg.first->isListOf()
+            || typeAndPtrOfArg.first->isTupleOf()
+            || typeAndPtrOfArg.first->isComposite()
+            )
+    ) {
+        return true;
+    }
+
+    return false;
 }
 
 PyObject* PyTupleOrListOfInstance::pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErrRep) {
@@ -122,7 +143,7 @@ PyObject* PyTupleOrListOfInstance::pyOperatorAdd(PyObject* rhs, const char* op, 
                             throw PythonExceptionSet();
                         }
 
-                        PyInstance::copyConstructFromPythonInstance(eltType, eltPtr, o, true);
+                        PyInstance::copyConstructFromPythonInstance(eltType, eltPtr, o, ConversionLevel::Implicit);
                     }
                 });
         });
@@ -193,14 +214,8 @@ bool constructTupleOrListInstFromNumpy(TupleOrListOfType* tupT, instance_ptr tgt
 
     return true;
 }
-void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrListOfType* tupT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-    if (!isExplicit) {
-        throw std::logic_error("Can't convert from " +
-            std::string(pyRepresentation->ob_type->tp_name) + " to " + tupT->name()
-        );
-    }
-
-    if (PyArray_Check(pyRepresentation)) {
+void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrListOfType* tupT, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
+    if (PyArray_Check(pyRepresentation) && level >= ConversionLevel::ImplicitContainers) {
         if (!PyArray_ISBEHAVED_RO(pyRepresentation)) {
             throw std::logic_error("Can't convert a numpy array that's not contiguous and in machine-native byte order.");
         }
@@ -269,45 +284,52 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
         }
     }
 
-    if (PyTuple_Check(pyRepresentation)) {
-        tupT->constructor(tgt, PyTuple_Size(pyRepresentation),
-            [&](uint8_t* eltPtr, int64_t k) {
-                PyObjectHolder arg(PyTuple_GetItem(pyRepresentation,k));
-                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, arg, isExplicit);
-                }
-            );
-        return;
-    }
-    if (PyList_Check(pyRepresentation)) {
-        tupT->constructor(tgt, PyList_Size(pyRepresentation),
-            [&](uint8_t* eltPtr, int64_t k) {
-                PyObjectHolder listItem(PyList_GetItem(pyRepresentation,k));
-                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, listItem, isExplicit);
-                }
-            );
-        return;
-    }
+    ConversionLevel childLevel = (
+        level == ConversionLevel::DeepNew ? ConversionLevel::DeepNew : ConversionLevel::Implicit
+    );
 
-    if (PySet_Check(pyRepresentation)) {
-        if (PySet_Size(pyRepresentation) == 0) {
-            tupT->constructor(tgt);
-            return;
+    // determine the level of conversion we'll use when converting the children if we're not a New call
+    if (level < ConversionLevel::ImplicitContainers) {
+        // ListOf only operates if we're above ImplicitContainers
+        if (tupT->isListOf()) {
+            throw std::logic_error("Can't implicitly convert from " +
+                std::string(pyRepresentation->ob_type->tp_name) + " to " + tupT->name()
+            );
         }
 
-        PyObjectStealer iterator(PyObject_GetIter(pyRepresentation));
+        if (level == ConversionLevel::Upcast) {
+            throw std::logic_error("Can't upcast from " +
+                std::string(pyRepresentation->ob_type->tp_name) + " to " + tupT->name()
+            );
+        } else if (level == ConversionLevel::UpcastContainers) {
+            childLevel = level;
+        } else if (level == ConversionLevel::Signature) {
+            PyInstance::copyConstructFromPythonInstanceConcrete(tupT, tgt, pyRepresentation, level);
+            return;
+        }
+    }
 
-        tupT->constructor(tgt, PySet_Size(pyRepresentation),
-            [&](uint8_t* eltPtr, int64_t k) {
-                PyObjectStealer item(PyIter_Next(iterator));
+    if (level < ConversionLevel::ImplicitContainers) {
+        // only allow implicit conversion from tuple/list of. We don't want dicts and sets to implicitly
+        // convert to tuples
+        bool isValid = false;
+        if (PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation)) {
+            isValid = true;
+        }
 
-                if (!item) {
-                    throw std::logic_error("Set ran out of elements.");
-                }
+        std::pair<Type*, instance_ptr> typeAndPtrOfArg = extractTypeAndPtrFrom(pyRepresentation);
+        if (typeAndPtrOfArg.first && (
+                typeAndPtrOfArg.first->isListOf()
+                || typeAndPtrOfArg.first->isTupleOf()
+                || typeAndPtrOfArg.first->isComposite())
+        ) {
+            isValid = true;
+        }
 
-                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, item, isExplicit);
-            });
-
-        return;
+        if (!isValid) {
+            PyInstance::copyConstructFromPythonInstanceConcrete(tupT, tgt, pyRepresentation, level);
+            return;
+        }
     }
 
     PyObjectStealer iterator(PyObject_GetIter(pyRepresentation));
@@ -325,7 +347,7 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
                     return false;
                 }
 
-                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, item, isExplicit);
+                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, item, childLevel);
 
                 return true;
             });
@@ -334,6 +356,81 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
     } else {
         throw PythonExceptionSet();
     }
+}
+
+PyObject* PyTupleOrListOfInstance::toBytes(PyObject* o, PyObject* args) {
+    PyListOfInstance* self_w = (PyListOfInstance*)o;
+
+    if (!self_w->type()->getEltType()->isPOD()) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "Can't convert %s to bytes because internals are not POD",
+            self_w->type()->name().c_str()
+        );
+
+        return NULL;
+    }
+
+    return PyBytes_FromStringAndSize(
+        (const char*)self_w->type()->eltPtr(self_w->dataPtr(), 0),
+        self_w->type()->count(self_w->dataPtr()) *
+        self_w->type()->getEltType()->bytecount()
+    );
+}
+
+PyObject* PyTupleOrListOfInstance::fromBytes(PyObject* o, PyObject* args, PyObject* kwds) {
+    static const char *kwlist[] = {"bytesObj", NULL};
+
+    PyObject* bytesObj;
+
+    if (!PyArg_ParseTupleAndKeywords(args, NULL, "O", (char**)kwlist, &bytesObj)) {
+        return nullptr;
+    }
+
+    if (!PyBytes_Check(bytesObj)) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "Expected 'bytesObj' to be a bytes object. Got %s",
+            bytesObj->ob_type->tp_name
+        );
+    }
+
+    Type* selfType = PyInstance::unwrapTypeArgToTypePtr(o);
+
+    if (!selfType || !selfType->isTupleOrListOf()) {
+        PyErr_Format(PyExc_TypeError, "Expected cls to be a Type");
+        return nullptr;
+    }
+
+    TupleOrListOfType* tupT = (TupleOrListOfType*)selfType;
+
+    if (!tupT->getEltType()->isPOD()) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "Can't convert %s from bytes because internals are not POD",
+            tupT->name().c_str()
+        );
+        return nullptr;
+    }
+
+    int64_t bytecount = tupT->getEltType()->bytecount();
+    size_t sz = PyBytes_GET_SIZE(bytesObj);
+
+    if ((bytecount == 0 && sz) || sz % bytecount != 0) {
+        PyErr_Format(PyExc_ValueError, "Byte array must be an integer multiple of underlying type.");
+        return nullptr;
+    }
+
+    size_t eltCount = bytecount > 0 ? sz / bytecount : 0;
+
+    Instance outConverted(selfType, [&](instance_ptr data) {
+        tupT->constructor(data);
+        tupT->reserve(data, eltCount);
+        memcpy(tupT->eltPtr(data, 0), PyBytes_AsString(bytesObj), sz);
+        tupT->setSizeUnsafe(data, eltCount);
+    });
+
+    return PyInstance::fromInstance(outConverted);
 }
 
 PyObject* PyTupleOrListOfInstance::toArray(PyObject* o, PyObject* args) {
@@ -487,9 +584,38 @@ PyObject* PyTupleOrListOfInstance::mp_subscript_concrete(PyObject* item) {
     return NULL;
 }
 
+const char* TUPLE_CONVERT_DOCSTRING =
+    "Convert an arbitrary value to a `TupleOf(T)`\n\n"
+    "Unlike calling `TupleOf(T)`, `TupleOf(T).convert` will recursively attempt\n"
+    "to convert all of the interior values in the argument as well.\n"
+    "Normally, `TupleOf(T)([x])` will only succeed if `x` is implicitly convertible to `T`\n"
+    "TupleOf(T).convert([x]) will call 'convert' on each of the members of the iterable.\n"
+    "Note that this means that you may get deepcopies of objects: `TupleOf(TupleOf(int))([[x]])`\n"
+    "will duplicate the inner list as a `TupleOf(int)`."
+;
+
+
+const char* TUPLE_TO_BYTES_DOCSTRING =
+    "Convert a TupleOf(T) to the raw bytes underneath it.\n\n"
+    "This is only valid if T is \"POD\" (Plain Old Data), meaning it must be\n"
+    "an integer, float, or bool type, or some combination of those in a Tuple or \n"
+    "NamedTuple."
+;
+
+const char* TUPLE_FROM_BYTES_DOCSTRING =
+    "Construct a TupleOf(T) from the raw bytes that would underly it.\n\n"
+    "This is only valid if T is \"POD\" (Plain Old Data), meaning it must be\n"
+    "an integer, float, or bool type, or some combination of those in a Tuple or \n"
+    "NamedTuple."
+;
+
 PyMethodDef* PyTupleOfInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [3] {
+    return new PyMethodDef [6] {
         {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
+        {"toBytes", (PyCFunction)PyTupleOrListOfInstance::toBytes, METH_VARARGS, TUPLE_TO_BYTES_DOCSTRING},
+        {"fromBytes", (PyCFunction)PyTupleOrListOfInstance::fromBytes, METH_VARARGS | METH_KEYWORDS | METH_CLASS, TUPLE_FROM_BYTES_DOCSTRING},
+        {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
+        {"convert", (PyCFunction)PyInstance::pyDeepNewConvert, METH_VARARGS | METH_KEYWORDS | METH_CLASS, TUPLE_CONVERT_DOCSTRING},
         {NULL, NULL}
     };
 }
@@ -512,14 +638,16 @@ PyObject* PyListOfInstance::listPointerUnsafe(PyObject* o, PyObject* args) {
 
 // static
 PyObject* PyListOfInstance::listAppend(PyObject* o, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.append takes one argument");
+        return NULL;
+    }
+
+    return listAppendDirect(o, PyTuple_GetItem(args, 0));
+}
+
+PyObject* PyListOfInstance::listAppendDirect(PyObject* o, PyObject* value) {
     try {
-        if (PyTuple_Size(args) != 1) {
-            PyErr_SetString(PyExc_TypeError, "ListOf.append takes one argument");
-            return NULL;
-        }
-
-        PyObjectHolder value(PyTuple_GetItem(args, 0));
-
         PyListOfInstance* self_w = (PyListOfInstance*)o;
 
         Type* value_type = extractTypeFrom(value->ob_type);
@@ -532,7 +660,7 @@ PyObject* PyListOfInstance::listAppend(PyObject* o, PyObject* args) {
             self_w->type()->append(self_w->dataPtr(), value_w->dataPtr());
         } else {
             Instance temp(eltType, [&](instance_ptr data) {
-                PyInstance::copyConstructFromPythonInstance(eltType, data, value, true);
+                PyInstance::copyConstructFromPythonInstance(eltType, data, value, ConversionLevel::Implicit);
             });
 
             self_w->type()->append(self_w->dataPtr(), temp.data());
@@ -546,6 +674,7 @@ PyObject* PyListOfInstance::listAppend(PyObject* o, PyObject* args) {
         return NULL;
     }
 }
+
 
 // static
 PyObject* PyListOfInstance::listExtend(PyObject* o, PyObject* args) {
@@ -582,12 +711,12 @@ PyObject* PyListOfInstance::listExtend(PyObject* o, PyObject* args) {
             return incref(Py_None);
         }
 
-        // try to convert this to a list
-        Instance temp(self_type, [&](instance_ptr data) {
-            PyInstance::copyConstructFromPythonInstance(self_type, data, value, true);
+        // iterate
+        iterate(value, [&](PyObject* arg) {
+            if (!listAppendDirect(o, arg)) {
+                throw PythonExceptionSet();
+            }
         });
-
-        extendFromBinaryCompatiblePtr(temp.data());
 
         return incref(Py_None);
     });
@@ -664,7 +793,12 @@ PyObject* PyListOfInstance::listResize(PyObject* o, PyObject* args) {
         } else {
             if (PyTuple_Size(args) == 2) {
                 Instance temp(eltType, [&](instance_ptr data) {
-                    PyInstance::copyConstructFromPythonInstance(eltType, data, PyTuple_GetItem(args, 1), true);
+                    PyInstance::copyConstructFromPythonInstance(
+                        eltType,
+                        data,
+                        PyTuple_GetItem(args, 1),
+                        ConversionLevel::Implicit
+                    );
                 });
 
                 self_w->type()->resize(self_w->dataPtr(), size, temp.data());
@@ -847,7 +981,12 @@ int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value)
             return 0;
         } else {
             Instance toAssign(eltType, [&](instance_ptr data) {
-                PyInstance::copyConstructFromPythonInstance(eltType, data, value, true);
+                PyInstance::copyConstructFromPythonInstance(
+                    eltType,
+                    data,
+                    value,
+                    ConversionLevel::Implicit
+                );
             });
 
             eltType->assign(
@@ -862,9 +1001,36 @@ int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value)
     return PyInstance::mp_ass_subscript_concrete(item, value);
 }
 
+
+const char* LIST_CONVERT_DOCSTRING =
+    "Convert an arbitrary value to a `ListOf(T)`\n\n"
+    "Unlike calling `ListOf(T)`, `ListOf(T).convert` will recursively attempt\n"
+    "to convert all of the interior values in the argument as well.\n"
+    "Normally, `ListOf(T)([x])` will only succeed if `x` is implicitly convertible to `T`\n"
+    "ListOf(T).convert([x]) will call 'convert' on each of the members of the iterable.\n"
+    "Note that this means that you may get deepcopies of objects: `ListOf(ListOf(int))([[x]])`\n"
+    "will duplicate the inner list as a `ListOf(int)`."
+;
+
+const char* LIST_TO_BYTES_DOCSTRING =
+    "Convert a ListOf(T) to the raw bytes underneath it.\n\n"
+    "This is only valid if T is \"POD\" (Plain Old Data), meaning it must be\n"
+    "an integer, float, or bool type, or some combination of those in a Tuple or \n"
+    "NamedTuple."
+;
+
+const char* LIST_FROM_BYTES_DOCSTRING =
+    "Construct a ListOf(T) from the raw bytes that would underly it.\n\n"
+    "This is only valid if T is \"POD\" (Plain Old Data), meaning it must be\n"
+    "an integer, float, or bool type, or some combination of those in a Tuple or \n"
+    "NamedTuple."
+;
+
 PyMethodDef* PyListOfInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [12] {
+    return new PyMethodDef [15] {
         {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
+        {"toBytes", (PyCFunction)PyTupleOrListOfInstance::toBytes, METH_VARARGS, LIST_TO_BYTES_DOCSTRING},
+        {"fromBytes", (PyCFunction)PyTupleOrListOfInstance::fromBytes, METH_VARARGS | METH_KEYWORDS | METH_CLASS, LIST_FROM_BYTES_DOCSTRING},
         {"append", (PyCFunction)PyListOfInstance::listAppend, METH_VARARGS, NULL},
         {"extend", (PyCFunction)PyListOfInstance::listExtend, METH_VARARGS, NULL},
         {"clear", (PyCFunction)PyListOfInstance::listClear, METH_VARARGS, NULL},
@@ -875,6 +1041,7 @@ PyMethodDef* PyListOfInstance::typeMethodsConcrete(Type* t) {
         {"setSizeUnsafe", (PyCFunction)PyListOfInstance::listSetSizeUnsafe, METH_VARARGS, NULL},
         {"pointerUnsafe", (PyCFunction)PyListOfInstance::listPointerUnsafe, METH_VARARGS, NULL},
         {"transpose", (PyCFunction)PyListOfInstance::listTranspose, METH_VARARGS, NULL},
+        {"convert", (PyCFunction)PyInstance::pyDeepNewConvert, METH_VARARGS | METH_KEYWORDS | METH_CLASS, LIST_CONVERT_DOCSTRING},
         {NULL, NULL}
     };
 }

@@ -1222,10 +1222,10 @@ class TestCompilationStructures(unittest.TestCase):
 
     def test_check_type_of_method_conversion(self):
         @Entrypoint
-        def g(x: OneOf(None, ListOf(int))):
+        def g(x: OneOf(None, TupleOf(int))):
             return type(x)
 
-        self.assertEqual(g([1, 2, 3]), ListOf(int))
+        self.assertEqual(g((1, 2, 3)), TupleOf(int))
         self.assertEqual(g(None), type(None))
 
     def test_check_is_on_unlike_things(self):
@@ -1251,7 +1251,7 @@ class TestCompilationStructures(unittest.TestCase):
             else:
                 return False
 
-        with self.assertRaisesRegex(Exception, "Can't convert"):
+        with self.assertRaisesRegex(Exception, "Couldn't initialize type int"):
             shouldThrow()
 
     def test_if_with_return_types(self):
@@ -1315,7 +1315,7 @@ class TestCompilationStructures(unittest.TestCase):
             return C().f(l, i, y)
 
         with NoPythonObjectTypes():
-            f([1, 2, 3], 0, 2)
+            f(ListOf(int)([1, 2, 3]), 0, 2)
 
     def test_try_simple(self):
 
@@ -3125,3 +3125,22 @@ class TestCompilationStructures(unittest.TestCase):
                         r2 = Entrypoint(f7)(w, x, y, z)
 
                         self.assertEqual(r1, r2)
+
+    def test_variable_restriction_is_correct(self):
+        @Entrypoint
+        def toTypedDict(x: dict):
+            x = Dict(int, int)(x)
+            return x
+
+        assert toTypedDict({1: 2}) == {1: 2}
+
+    def test_function_return_conversion_level_is_ImplicitContainers(self):
+        @Function
+        def toList(x) -> ListOf(int):
+            return x
+
+        @Entrypoint
+        def toListC(x) -> ListOf(int):
+            return x
+
+        assert toList([1, 2]) == toListC([1, 2]) == ListOf(int)([1, 2])

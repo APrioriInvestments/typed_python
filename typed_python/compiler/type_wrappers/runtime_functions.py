@@ -412,6 +412,15 @@ np_repr = externalCallTarget(
     canThrow=True
 )
 
+np_try_pyobj_to_str = externalCallTarget(
+    "np_try_pyobj_to_str",
+    Bool,
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+    canThrow=False
+)
+
 np_str = externalCallTarget(
     "nativepython_runtime_str",
     Void.pointer(),
@@ -475,7 +484,8 @@ pyobj_to_typed = externalCallTarget(
     Void.pointer(),
     Void.pointer(),
     Void.pointer(),
-    Bool,
+    Int64,
+    Int64,
     canThrow=True
 )
 
@@ -903,15 +913,21 @@ float32_to_string = externalCallTarget(
 
 float64_to_int = externalCallTarget(
     "nativepython_float64_to_int",
-    Int64,
+    Bool,
+    Void.pointer(),
     Float64,
+    Bool,
+    Void.pointer(),
     canThrow=True
 )
 
 float32_to_int = externalCallTarget(
     "nativepython_float32_to_int",
-    Int64,
+    Bool,
+    Void.pointer(),
     Float32,
+    Bool,
+    Void.pointer(),
     canThrow=True
 )
 
@@ -1093,16 +1109,18 @@ pyobj_to_float64 = externalCallTarget(
     Void.pointer()
 )
 
-pyobj_to_str = externalCallTarget(
-    "np_pyobj_to_str",
-    Void.pointer(),
-    Void.pointer()
+list_or_tuple_of_to_bytes = externalCallTarget(
+    "tp_list_or_tuple_of_to_bytes",
+    Void.pointer(),  # returns a BytesType::layout*
+    Void.pointer(),  # accepts a TupleOrListOfType::layout_type*
+    Void.pointer()   # and a Type*
 )
 
-pyobj_to_bytes = externalCallTarget(
-    "np_pyobj_to_bytes",
-    Void.pointer(),
-    Void.pointer()
+list_or_tuple_of_from_bytes = externalCallTarget(
+    "tp_list_or_tuple_of_from_bytes",
+    Void.pointer(),  # returns a TupleOrListOfType::layout_type*
+    Void.pointer(),  # accepts a BytesType::layout*
+    Void.pointer()   # and a Type*
 )
 
 str_to_int64 = externalCallTarget(

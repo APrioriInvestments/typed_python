@@ -44,7 +44,7 @@ PyObject* PyPointerToInstance::pointerInitialize(PyObject* o, PyObject* args) {
         try {
             PyObjectHolder arg0(PyTuple_GetItem(args,0));
 
-            copyConstructFromPythonInstance(pointerT->getEltType(), target, arg0, true);
+            copyConstructFromPythonInstance(pointerT->getEltType(), target, arg0, ConversionLevel::Implicit);
             return incref(Py_None);
         } catch(std::exception& e) {
             PyErr_SetString(PyExc_TypeError, e.what());
@@ -72,7 +72,7 @@ PyObject* PyPointerToInstance::pointerSet(PyObject* o, PyObject* args) {
     try {
         PyObjectHolder arg0(PyTuple_GetItem(args,0));
 
-        copyConstructFromPythonInstance(pointerT->getEltType(), tempObj, arg0);
+        copyConstructFromPythonInstance(pointerT->getEltType(), tempObj, arg0, ConversionLevel::Implicit);
     } catch(std::exception& e) {
         free(tempObj);
         PyErr_SetString(PyExc_TypeError, e.what());
@@ -88,11 +88,28 @@ PyObject* PyPointerToInstance::pointerSet(PyObject* o, PyObject* args) {
     return incref(Py_None);
 }
 
+//static
+PyObject* PyPointerToInstance::pointerDestroy(PyObject* o, PyObject* args) {
+    PyInstance* self_w = (PyInstance*)o;
+    PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
+
+    if (PyTuple_Size(args) != 0) {
+        PyErr_SetString(PyExc_TypeError, "PointerTo.destroy takes no arguments");
+        return NULL;
+    }
+
+    instance_ptr target = (instance_ptr)*(void**)self_w->dataPtr();
+
+    pointerT->getEltType()->destroy(target);
+
+    return incref(Py_None);
+}
+
 PyObject* PyPointerToInstance::mp_subscript_concrete(PyObject* key) {
     return translateExceptionToPyObject([&]() {
         int64_t offset;
 
-        copyConstructFromPythonInstance(Int64::Make(), (instance_ptr)&offset, key);
+        copyConstructFromPythonInstance(Int64::Make(), (instance_ptr)&offset, key, ConversionLevel::Implicit);
 
         instance_ptr output;
 
@@ -106,12 +123,12 @@ int PyPointerToInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* val
     return translateExceptionToPyObjectReturningInt([&]() {
         int64_t offset;
 
-        copyConstructFromPythonInstance(Int64::Make(), (instance_ptr)&offset, item);
+        copyConstructFromPythonInstance(Int64::Make(), (instance_ptr)&offset, item, ConversionLevel::Implicit);
 
         Instance val = Instance::createAndInitialize(
             type()->getEltType(),
             [&](instance_ptr i) {
-                copyConstructFromPythonInstance(type()->getEltType(), i, value);
+                copyConstructFromPythonInstance(type()->getEltType(), i, value, ConversionLevel::Implicit);
             }
         );
 
@@ -167,8 +184,15 @@ PyObject* PyPointerToInstance::pointerCast(PyObject* o, PyObject* args) {
 
 PyObject* PyPointerToInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
     if (strcmp(op, "__add__") == 0 || strcmp(op, "__iadd__") == 0) {
-        if (!PyLong_Check(rhs))
+        if (!PyIndex_Check(rhs)) {
             return PyInstance::pyOperatorConcrete(rhs, op, opErr);
+        }
+
+        PyObjectStealer index(PyNumber_Index(rhs));
+        if (!index) {
+            throw PythonExceptionSet();
+        }
+
         int64_t ix = PyLong_AsLongLong(rhs);
         void* output;
 
@@ -197,11 +221,12 @@ PyObject* PyPointerToInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
 }
 
 PyMethodDef* PyPointerToInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [5] {
+    return new PyMethodDef [6] {
         {"initialize", (PyCFunction)PyPointerToInstance::pointerInitialize, METH_VARARGS, NULL},
         {"set", (PyCFunction)PyPointerToInstance::pointerSet, METH_VARARGS, NULL},
         {"get", (PyCFunction)PyPointerToInstance::pointerGet, METH_VARARGS, NULL},
         {"cast", (PyCFunction)PyPointerToInstance::pointerCast, METH_VARARGS, NULL},
+        {"destroy", (PyCFunction)PyPointerToInstance::pointerDestroy, METH_VARARGS, NULL},
         {NULL, NULL}
     };
 }

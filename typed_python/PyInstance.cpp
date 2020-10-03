@@ -108,7 +108,7 @@ void PyInstance::tp_dealloc(PyObject* self) {
 }
 
 // static
-bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, bool isExplicit) {
+bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, ConversionLevel level) {
     t->assertForwardsResolvedSufficientlyToInstantiate();
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
@@ -123,13 +123,13 @@ bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, bool is
         return py_instance_type::pyValCouldBeOfTypeConcrete(
             (typename py_instance_type::modeled_type*)t,
             pyRepresentation,
-            isExplicit
-            );
+            level
+        );
     });
 }
 
 // static
-void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
     eltType->assertForwardsResolvedSufficientlyToInstantiate();
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
@@ -167,13 +167,37 @@ void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt
             (typename py_instance_type::modeled_type*)eltType,
             tgt,
             pyRepresentation,
-            isExplicit
+            level
         );
     });
 }
 
-void PyInstance::copyConstructFromPythonInstanceConcrete(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-    throw std::logic_error("Couldn't initialize type " + eltType->name() + " from " + pyRepresentation->ob_type->tp_name);
+void PyInstance::copyConstructFromPythonInstanceConcrete(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
+    std::string typeName = "an instance of " + eltType->name();
+    std::string aNewName = "a new " + eltType->name();
+
+    if (eltType->isValue()) {
+        typeName = "the value " + eltType->name();
+        aNewName = typeName;
+    } else if (eltType->isNone()) {
+        typeName = "the value None";
+        aNewName = typeName;
+    }
+
+    std::string verb;
+    if (level == ConversionLevel::Signature) {
+        throw std::logic_error("Object of type " + std::string(pyRepresentation->ob_type->tp_name) + " is not " + typeName);
+    }
+
+    if (level < ConversionLevel::Implicit) {
+        throw std::logic_error("Cannot upcast an object of type " + std::string(pyRepresentation->ob_type->tp_name) + " to " + typeName);
+    }
+
+    if (level == ConversionLevel::Implicit) {
+        throw std::logic_error("Cannot implicitly convert an object of type " + std::string(pyRepresentation->ob_type->tp_name) + " to " + typeName);
+    }
+
+    throw std::logic_error("Cannot construct " + aNewName + " from an instance of " + std::string(pyRepresentation->ob_type->tp_name));
 }
 
 
@@ -205,7 +229,7 @@ void PyInstance::constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, Py
     if ((kwargs == NULL || PyDict_Size(kwargs) == 0) && (args && PyTuple_Size(args) == 1)) {
         PyObjectHolder argTuple(PyTuple_GetItem(args, 0));
 
-        copyConstructFromPythonInstance(t, data, argTuple, true /* mark isExplicit */);
+        copyConstructFromPythonInstance(t, data, argTuple, ConversionLevel::New);
 
         return;
     }
@@ -701,45 +725,46 @@ PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
 // static
 PyNumberMethods* PyInstance::numberMethods(Type* t) {
     return new PyNumberMethods {
-            //only enable this for the types that it operates on. Otherwise it disables the concatenation functions
-            //we should probably just unify them
-            nb_add, //binaryfunc nb_add
-            nb_subtract, //binaryfunc nb_subtract
-            nb_multiply, //binaryfunc nb_multiply
-            nb_remainder, //binaryfunc nb_remainder
-            nb_divmod, //binaryfunc nb_divmod
-            nb_power, //ternaryfunc nb_power
-            nb_negative, //unaryfunc nb_negative
-            nb_positive, //unaryfunc nb_positive
-            nb_absolute, //unaryfunc nb_absolute
-            nb_bool, //inquiry nb_bool
-            nb_invert, //unaryfunc nb_invert
-            nb_lshift, //binaryfunc nb_lshift
-            nb_rshift, //binaryfunc nb_rshift
-            nb_and, //binaryfunc nb_and
-            nb_xor, //binaryfunc nb_xor
-            nb_or, //binaryfunc nb_or
-            nb_int, //unaryfunc nb_int
-            0, //void *nb_reserved
-            nb_float, //unaryfunc nb_float
-            nb_inplace_add, //binaryfunc nb_inplace_add
-            nb_inplace_subtract, //binaryfunc nb_inplace_subtract
-            nb_inplace_multiply, //binaryfunc nb_inplace_multiply
-            nb_inplace_remainder, //binaryfunc nb_inplace_remainder
-            nb_inplace_power, //ternaryfunc nb_inplace_power
-            nb_inplace_lshift, //binaryfunc nb_inplace_lshift
-            nb_inplace_rshift, //binaryfunc nb_inplace_rshift
-            nb_inplace_and, //binaryfunc nb_inplace_and
-            nb_inplace_xor, //binaryfunc nb_inplace_xor
-            nb_inplace_or, //binaryfunc nb_inplace_or
-            nb_floor_divide, //binaryfunc nb_floor_divide
-            nb_true_divide, //binaryfunc nb_true_divide
-            nb_inplace_floor_divide, //binaryfunc nb_inplace_floor_divide
-            nb_inplace_true_divide, //binaryfunc nb_inplace_true_divide
-            nb_index, //unaryfunc nb_index
-            nb_matmul, //binaryfunc nb_matrix_multiply
-            nb_inplace_matrix_multiply  //binaryfunc nb_inplace_matrix_multiply
-            };
+        // We should eventually only enable this for the types that have definitions.
+        // otherwise, things like PyIndex_Check(x) will return True on all of our types,
+        // but then fail when we go to implement them.
+        nb_add, //binaryfunc nb_add
+        nb_subtract, //binaryfunc nb_subtract
+        nb_multiply, //binaryfunc nb_multiply
+        nb_remainder, //binaryfunc nb_remainder
+        nb_divmod, //binaryfunc nb_divmod
+        nb_power, //ternaryfunc nb_power
+        nb_negative, //unaryfunc nb_negative
+        nb_positive, //unaryfunc nb_positive
+        nb_absolute, //unaryfunc nb_absolute
+        nb_bool, //inquiry nb_bool
+        nb_invert, //unaryfunc nb_invert
+        nb_lshift, //binaryfunc nb_lshift
+        nb_rshift, //binaryfunc nb_rshift
+        nb_and, //binaryfunc nb_and
+        nb_xor, //binaryfunc nb_xor
+        nb_or, //binaryfunc nb_or
+        nb_int, //unaryfunc nb_int
+        0, //void *nb_reserved
+        nb_float, //unaryfunc nb_float
+        nb_inplace_add, //binaryfunc nb_inplace_add
+        nb_inplace_subtract, //binaryfunc nb_inplace_subtract
+        nb_inplace_multiply, //binaryfunc nb_inplace_multiply
+        nb_inplace_remainder, //binaryfunc nb_inplace_remainder
+        nb_inplace_power, //ternaryfunc nb_inplace_power
+        nb_inplace_lshift, //binaryfunc nb_inplace_lshift
+        nb_inplace_rshift, //binaryfunc nb_inplace_rshift
+        nb_inplace_and, //binaryfunc nb_inplace_and
+        nb_inplace_xor, //binaryfunc nb_inplace_xor
+        nb_inplace_or, //binaryfunc nb_inplace_or
+        nb_floor_divide, //binaryfunc nb_floor_divide
+        nb_true_divide, //binaryfunc nb_true_divide
+        nb_inplace_floor_divide, //binaryfunc nb_inplace_floor_divide
+        nb_inplace_true_divide, //binaryfunc nb_inplace_true_divide
+        nb_index, //unaryfunc nb_index
+        nb_matmul, //binaryfunc nb_matrix_multiply
+        nb_inplace_matrix_multiply  //binaryfunc nb_inplace_matrix_multiply
+    };
 }
 
 // static
@@ -1660,6 +1685,29 @@ Type* PyInstance::tryUnwrapPyInstanceToType(PyObject* arg) {
     }
 
     return  PyInstance::tryUnwrapPyInstanceToValueType(arg, false);
+}
+
+PyObject* PyInstance::pyDeepNewConvert(PyObject* cls, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {"newType", NULL};
+
+    PyObject* arg;
+
+    if (!PyArg_ParseTupleAndKeywords(args, NULL, "O", (char**)kwlist, &arg)) {
+        return nullptr;
+    }
+
+    Type* selfType = PyInstance::unwrapTypeArgToTypePtr(cls);
+
+    if (!selfType) {
+        PyErr_Format(PyExc_TypeError, "Expected cls to be a Type");
+        return nullptr;
+    }
+
+    Instance outConverted(selfType, [&](instance_ptr data) {
+        PyInstance::copyConstructFromPythonInstance(selfType, data, arg, ConversionLevel::DeepNew);
+    });
+
+    return PyInstance::fromInstance(outConverted);
 }
 
 // static

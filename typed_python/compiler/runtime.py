@@ -18,6 +18,7 @@ import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
 import typed_python.compiler.llvm_compiler as llvm_compiler
 import typed_python
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.compiler_cache import CompilerCache
 from typed_python.type_function import ConcreteTypeFunction
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
@@ -173,7 +174,7 @@ class Runtime:
 
         resType = PythonTypedFunctionWrapper.pickSpecializationTypeFor(overloadArg, argType)
 
-        if argType.can_convert_to_type(resType, True) is False:
+        if argType.can_convert_to_type(resType, ConversionLevel.Implicit) is False:
             return None
 
         if (overloadArg.isStarArg or overloadArg.isKwarg) and resType != argType:

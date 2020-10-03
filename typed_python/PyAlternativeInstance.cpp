@@ -107,7 +107,7 @@ void PyConcreteAlternativeInstance::constructFromPythonArgumentsConcrete(Concret
                 throw std::logic_error("Can't initialize " + alt->name() + " with positional arguments because it doesn't have only one field.");
             }
 
-            PyInstance::copyConstructFromPythonInstance(alternativeEltType->getTypes()[0], p, arg, true);
+            PyInstance::copyConstructFromPythonInstance(alternativeEltType->getTypes()[0], p, arg, ConversionLevel::ImplicitContainers);
         } else if (PyTuple_Size(args) == 0) {
             //construct an alternative from Kwargs
             constructFromPythonArguments(p, alt->elementType(), args, kwargs);
@@ -117,7 +117,7 @@ void PyConcreteAlternativeInstance::constructFromPythonArgumentsConcrete(Concret
     });
 }
 
-void PyAlternativeInstance::copyConstructFromPythonInstanceConcrete(Alternative* altType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+void PyAlternativeInstance::copyConstructFromPythonInstanceConcrete(Alternative* altType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
     std::pair<Type*, instance_ptr> typeAndPtr = extractTypeAndPtrFrom(pyRepresentation);
 
     if (typeAndPtr.first && typeAndPtr.first->getTypeCategory() == Type::TypeCategory::catConcreteAlternative &&
@@ -126,7 +126,7 @@ void PyAlternativeInstance::copyConstructFromPythonInstanceConcrete(Alternative*
         return;
     }
 
-    PyInstance::copyConstructFromPythonInstanceConcrete(altType, tgt, pyRepresentation, isExplicit);
+    PyInstance::copyConstructFromPythonInstanceConcrete(altType, tgt, pyRepresentation, level);
 }
 
 

@@ -15,7 +15,7 @@
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
 from typed_python import _types, Int32, Tuple, NamedTuple, Function
-
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
@@ -49,7 +49,7 @@ class _TupleLt(CompilableBuiltin):
             if res is None:
                 return None
 
-            res = res.convert_bool_cast()
+            res = res.toBool()
             if res is None:
                 return None
 
@@ -61,7 +61,7 @@ class _TupleLt(CompilableBuiltin):
             if resReverse is None:
                 return None
 
-            resReverse = resReverse.convert_bool_cast()
+            resReverse = resReverse.toBool()
             if resReverse is None:
                 return None
 
@@ -110,7 +110,7 @@ class _TupleEq(CompilableBuiltin):
             if res is None:
                 return None
 
-            res = res.convert_bool_cast()
+            res = res.toBool()
             if res is None:
                 return None
 
@@ -235,9 +235,6 @@ class TupleWrapper(Wrapper):
     def convert_len(self, context, instance):
         return context.constant(len(self.subTypeWrappers))
 
-    def convert_bool_cast(self, context, e):
-        return context.constant(len(self.subTypeWrappers) != 0)
-
     def convert_bin_op(self, context, left, op, right, inplace):
         rhsT = right.expr_type.typeRepresentation
         if isinstance(rhsT, type) and issubclass(rhsT, (NamedTuple, Tuple)) and op in pyCompOpToTupleFun:
@@ -283,7 +280,9 @@ class TupleWrapper(Wrapper):
             for i, subcontext in indicesAndContexts:
                 with subcontext:
                     if i is not None:
-                        converted = self.refAs(context, expr, i).convert_to_type(self.unionType)
+                        converted = self.refAs(context, expr, i).convert_to_type(
+                            self.unionType, ConversionLevel.Signature
+                        )
                         if converted is not None:
                             result.convert_copy_initialize(converted)
                             context.markUninitializedSlotInitialized(result)
@@ -312,7 +311,7 @@ class TupleWrapper(Wrapper):
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 1 and not kwargs:
-            return args[0].convert_to_type(self)
+            return args[0].convert_to_type(self, ConversionLevel.New)
 
         return context.pushException(TypeError, f"Can't initialize {self.typeRepresentation} with this signature")
 
@@ -339,10 +338,16 @@ class TupleWrapper(Wrapper):
         This will attempt to convert the tuple.
         """
         typeConvertedArgs = []
+
         for i in range(len(args)):
-            typeConvertedArg = args[i].convert_to_type(self.typeRepresentation.ElementTypes[i])
+            typeConvertedArg = args[i].convert_to_type(
+                self.typeRepresentation.ElementTypes[i],
+                ConversionLevel.Implicit
+            )
+
             if typeConvertedArg is None:
                 return None
+
             typeConvertedArgs.append(typeConvertedArg)
 
         uninitializedTuple = context.allocateUninitializedSlot(self)
@@ -356,8 +361,24 @@ class TupleWrapper(Wrapper):
         # the tuple is now initialized
         return uninitializedTuple
 
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+    def _can_convert_to_type(self, targetType, conversionLevel):
+        if not conversionLevel.isNewOrHigher():
+            return False
+
+        if targetType.typeRepresentation is bool:
+            return True
+
+        if targetType.typeRepresentation is str:
+            return "Maybe"
+
+        return False
+
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if targetVal.expr_type.typeRepresentation is bool:
+            targetVal.convert_copy_initialize(context.constant(len(self.typeRepresentation.ElementTypes) > 0))
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
 
 class NamedTupleWrapper(TupleWrapper):
@@ -398,7 +419,7 @@ class NamedTupleWrapper(TupleWrapper):
             uninitializedNamedTuple = context.allocateUninitializedSlot(self)
 
             for name, expr in kwargs.items():
-                actualExpr = expr.convert_to_type(self.namesToTypes[name])
+                actualExpr = expr.convert_to_type(self.namesToTypes[name], ConversionLevel.Implicit)
                 if actualExpr is None:
                     return None
 
@@ -414,7 +435,7 @@ class NamedTupleWrapper(TupleWrapper):
             return uninitializedNamedTuple
 
         if len(args) == 1 and not kwargs:
-            return args[0].convert_to_type(self, True)
+            return args[0].convert_to_type(self, ConversionLevel.New)
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
@@ -442,7 +463,7 @@ class NamedTupleWrapper(TupleWrapper):
             if field_name not in kwargs:
                 self.refAs(context, toInitialize, i).convert_copy_initialize(self.refAs(context, existingInstance, i))
             else:
-                converted = kwargs[field_name].convert_to_type(field_type)
+                converted = kwargs[field_name].convert_to_type(field_type, ConversionLevel.Implicit)
                 if converted is None:
                     return None
                 self.refAs(context, toInitialize, i).convert_copy_initialize(converted)
@@ -460,7 +481,7 @@ class MasqueradingTupleWrapper(TupleWrapper):
     def convert_masquerade_to_untyped(self, context, instance):
         return context.constant(tuple).convert_call([instance], {}).changeType(typeWrapper(tuple))
 
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         # Allow the typed form of the object to perform the conversion
-        e = e.changeType(typeWrapper(self.typeRepresentation))
-        return e.convert_to_type_with_target(targetVal, explicit)
+        instance = instance.changeType(typeWrapper(self.typeRepresentation))
+        return instance.convert_to_type_with_target(targetVal, conversionLevel)

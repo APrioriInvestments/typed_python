@@ -447,6 +447,8 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             r3 = specialized_cast(x)
             r4 = compiled_conv(x)
             r5 = specialized_conv(x)
+            if r1 != r2:
+                print(f"bool of {x} of type {type(x)} is {r1} but compiler has {r2}")
             self.assertEqual(r1, r2)
             self.assertEqual(r1, r3)
             self.assertEqual(r1, r4)
@@ -744,6 +746,41 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "bad float call"):
             callFloat(C())
+
+        @Entrypoint
+        def callBoolTyped(x):
+            return bool(x)
+
+        @Entrypoint
+        def callIntTyped(x):
+            return int(x)
+
+        @Entrypoint
+        def callStrTyped(x):
+            return str(x)
+
+        @Entrypoint
+        def callFloatTyped(x):
+            return float(x)
+
+        @Entrypoint
+        def callBytesTyped(x):
+            return bytes(x)
+
+        with self.assertRaisesRegex(Exception, "bad bool call"):
+            callBoolTyped(C())
+
+        with self.assertRaisesRegex(Exception, "bad int call"):
+            callIntTyped(C())
+
+        with self.assertRaisesRegex(Exception, "bad str call"):
+            callStrTyped(C())
+
+        with self.assertRaisesRegex(Exception, "bad bytes call"):
+            callBytesTyped(C())
+
+        with self.assertRaisesRegex(Exception, "bad float call"):
+            callFloatTyped(C())
 
     def test_invalid_return_value_in_arbitrary_pyobj_conversion(self):
         class C:

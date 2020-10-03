@@ -15,6 +15,7 @@
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.type_wrappers.tuple_of_wrapper import TupleOrListOfWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
+from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
 from typed_python import PointerTo, ListOf
@@ -208,7 +209,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 if count is None:
                     return
 
-                val = args[1].convert_to_type(self.underlyingWrapperType)
+                val = args[1].convert_to_type(self.underlyingWrapperType, ConversionLevel.Implicit)
                 if val is None:
                     return
 
@@ -229,7 +230,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
         if methodname == "append":
             if len(args) == 1:
-                val = args[0].convert_to_type(self.underlyingWrapperType)
+                val = args[0].convert_to_type(self.underlyingWrapperType, ConversionLevel.Implicit)
                 if val is None:
                     return
 
@@ -397,7 +398,10 @@ class ListOfWrapper(TupleOrListOfWrapper):
         self.convert_method_call(context, out, "reserve", (listInst.convert_len(),), {})
 
         with context.loop(listInst.convert_len()) as i:
-            result = listInst.convert_getitem_unsafe(i).convert_to_type(typeWrapper(self.typeRepresentation.ElementType))
+            result = listInst.convert_getitem_unsafe(i).convert_to_type(
+                typeWrapper(self.typeRepresentation.ElementType),
+                ConversionLevel.Signature
+            )
             if result is None:
                 return None
             out.convert_getitem_unsafe(i).convert_copy_initialize(result)
@@ -470,7 +474,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
         item = item.refToHeld()
 
-        item = item.convert_to_type(self.underlyingWrapperType)
+        item = item.convert_to_type(self.underlyingWrapperType, ConversionLevel.Implicit)
 
         if item is None:
             return None
@@ -502,6 +506,6 @@ class ListOfWrapper(TupleOrListOfWrapper):
             )
 
         if len(args) == 1 and not kwargs:
-            return args[0].convert_to_type(self, True)
+            return args[0].convert_to_type(self, ConversionLevel.New)
 
         return super().convert_type_call(context, typeInst, args, kwargs)

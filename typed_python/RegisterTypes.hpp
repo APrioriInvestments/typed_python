@@ -18,6 +18,171 @@
 #include <iomanip>
 
 #include "Type.hpp"
+#include "ConversionLevel.hpp"
+
+// class to contain methods that describe properties of register types.
+class RegisterTypeProperties {
+public:
+    // assign a value 'v' to the memory at 'tgt' assuming it points to an element of type 'category'
+    template<class other_type>
+    static void assign(instance_ptr tgt, Type::TypeCategory category, const other_type& v) {
+        if (category == Type::TypeCategory::catUInt64) {
+            ((uint64_t*)tgt)[0] = v;
+        } else
+        if (category == Type::TypeCategory::catUInt32) {
+            ((uint32_t*)tgt)[0] = v;
+        } else
+        if (category == Type::TypeCategory::catUInt16) {
+            ((uint16_t*)tgt)[0] = v;
+        } else
+        if (category == Type::TypeCategory::catUInt8) {
+            ((uint8_t*)tgt)[0] = v;
+        } else
+        if (category == Type::TypeCategory::catInt64) {
+            ((int64_t*)tgt)[0] = v;
+        } else
+        if (category == Type::TypeCategory::catInt32) {
+            ((int32_t*)tgt)[0] = v;
+        } else
+        if (category == Type::TypeCategory::catInt16) {
+            ((int16_t*)tgt)[0] = v;
+        } else
+        if (category == Type::TypeCategory::catInt8) {
+            ((int8_t*)tgt)[0] = v;
+        } else
+        if (category == Type::TypeCategory::catBool) {
+            ((bool*)tgt)[0] = v;
+        } else
+        if (category == Type::TypeCategory::catFloat64) {
+            ((double*)tgt)[0] = v;
+        } else
+        if (category == Type::TypeCategory::catFloat32) {
+            ((float*)tgt)[0] = v;
+        } else {
+            throw std::runtime_error("invalid register category");
+        }
+    }
+
+    static bool isValidConversion(Type* fromT, Type* toT, ConversionLevel level) {
+        return isValidConversion(fromT->getTypeCategory(), toT->getTypeCategory(), level);
+    }
+
+    static bool isValidConversion(Type::TypeCategory fromCat, Type::TypeCategory toCat, ConversionLevel level) {
+        if (level >= ConversionLevel::Implicit) {
+            return true;
+        }
+
+        if (fromCat == toCat) {
+            return true;
+        }
+
+        if (level >= ConversionLevel::Upcast && isValidUpcast(fromCat, toCat)) {
+            return true;
+        }
+
+        return false;
+    }
+
+
+    // is this a 'lossless' cast, meaning that the number of bits isn't
+    // decreasing, nor are we losing signage, nor are we going from float->int?
+    static bool isValidUpcast(Type* fromType, Type* toType) {
+        return isValidUpcast(fromType->getTypeCategory(), toType->getTypeCategory());
+    }
+
+    static bool isValidUpcast(Type::TypeCategory c1, Type::TypeCategory c2) {
+        return isValidUpcast_(c1, c2);
+    }
+
+    static bool isValidUpcast_(Type::TypeCategory fromType, Type::TypeCategory toType) {
+        if (fromType == Type::TypeCategory::catBool) {
+            return true;
+        }
+
+        if (isFloat(fromType) && !isFloat(toType)) {
+            return false;
+        }
+
+        if (bits(fromType) > bits(toType)) {
+            return false;
+        }
+
+        if (isFloat(toType)) {
+            return true;
+        }
+
+        // casting to strictly more bits and also signedness will always succeed
+        if (!isUnsigned(toType) && bits(toType) > bits(fromType)) {
+            return true;
+        }
+
+        if (isUnsigned(toType) != isUnsigned(fromType)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    static bool isUnsigned(Type* t) {
+        return isUnsigned(t->getTypeCategory());
+    }
+
+    static bool isUnsigned(Type::TypeCategory cat) {
+        return (cat == Type::TypeCategory::catUInt64 ||
+                cat == Type::TypeCategory::catUInt32 ||
+                cat == Type::TypeCategory::catUInt16 ||
+                cat == Type::TypeCategory::catUInt8 ||
+                cat == Type::TypeCategory::catBool
+                );
+    }
+
+    static int bits(Type* t) {
+        return bits(t->getTypeCategory());
+    }
+
+    static int bits(Type::TypeCategory cat) {
+        return
+            cat == Type::TypeCategory::catBool ? 1 :
+            cat == Type::TypeCategory::catInt8 ? 8 :
+            cat == Type::TypeCategory::catInt16 ? 16 :
+            cat == Type::TypeCategory::catInt32 ? 32 :
+            cat == Type::TypeCategory::catInt64 ? 64 :
+            cat == Type::TypeCategory::catUInt8 ? 8 :
+            cat == Type::TypeCategory::catUInt16 ? 16 :
+            cat == Type::TypeCategory::catUInt32 ? 32 :
+            cat == Type::TypeCategory::catUInt64 ? 64 :
+            cat == Type::TypeCategory::catFloat32 ? 32 :
+            cat == Type::TypeCategory::catFloat64 ? 64 : -1
+            ;
+    }
+
+    static bool isInteger(Type* t) {
+        return isInteger(t->getTypeCategory());
+    }
+
+    static bool isInteger(Type::TypeCategory cat) {
+        return (cat == Type::TypeCategory::catInt64 ||
+                cat == Type::TypeCategory::catInt32 ||
+                cat == Type::TypeCategory::catInt16 ||
+                cat == Type::TypeCategory::catInt8 ||
+                cat == Type::TypeCategory::catUInt64 ||
+                cat == Type::TypeCategory::catUInt32 ||
+                cat == Type::TypeCategory::catUInt16 ||
+                cat == Type::TypeCategory::catUInt8
+                );
+    }
+
+    static bool isFloat(Type* t) {
+        return isFloat(t->getTypeCategory());
+    }
+
+    static bool isFloat(Type::TypeCategory cat) {
+        return (cat == Type::TypeCategory::catFloat64 ||
+                cat == Type::TypeCategory::catFloat32
+                );
+    }
+};
+
 
 template<class T>
 class RegisterType : public Type {
@@ -37,7 +202,6 @@ public:
 
         return true;
     }
-
 
     bool isPODConcrete() {
         return true;

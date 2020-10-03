@@ -23,7 +23,7 @@ class PyPyCellInstance : public PyInstance {
 public:
     typedef PyCellType modeled_type;
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
         return false;
     }
 

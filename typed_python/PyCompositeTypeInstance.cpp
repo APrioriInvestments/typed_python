@@ -35,35 +35,94 @@ CompositeType* PyCompositeTypeInstance::type() {
     return (CompositeType*)t;
 }
 
-void PyCompositeTypeInstance::copyConstructFromPythonInstanceConcrete(CompositeType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-    if (PyTuple_Check(pyRepresentation)) {
-        if (eltType->getTypes().size() != PyTuple_Size(pyRepresentation)) {
-            throw std::runtime_error("Wrong number of arguments to construct " + eltType->name());
-        }
-
-        eltType->constructor(tgt,
-            [&](uint8_t* eltPtr, int64_t k) {
-                PyObjectHolder arg(PyTuple_GetItem(pyRepresentation, k));
-                copyConstructFromPythonInstance(eltType->getTypes()[k], eltPtr, arg, isExplicit);
-                }
-            );
-        return;
-    }
-    if (PyList_Check(pyRepresentation)) {
-        if (eltType->getTypes().size() != PyList_Size(pyRepresentation)) {
-            throw std::runtime_error("Wrong number of arguments to construct " + eltType->name());
-        }
-
-        eltType->constructor(tgt,
-            [&](uint8_t* eltPtr, int64_t k) {
-                PyObjectHolder listItem(PyList_GetItem(pyRepresentation,k));
-                copyConstructFromPythonInstance(eltType->getTypes()[k], eltPtr, listItem, isExplicit);
-                }
-            );
+void PyCompositeTypeInstance::copyConstructFromPythonInstanceConcrete(CompositeType* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
+    if (level < ConversionLevel::Upcast) {
+        PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, level);
         return;
     }
 
-    PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, isExplicit);
+    ConversionLevel childConversionLevel = ConversionLevel::Implicit;
+
+    if (level == ConversionLevel::New) {
+        childConversionLevel = ConversionLevel::ImplicitContainers;
+    }
+    if (level == ConversionLevel::UpcastContainers) {
+        childConversionLevel = ConversionLevel::UpcastContainers;
+    }
+    if (level == ConversionLevel::Upcast) {
+        childConversionLevel = ConversionLevel::Upcast;
+    }
+
+
+    if (level < ConversionLevel::New) {
+        // only allow implicit conversion from tuple/list of. We don't want dicts and sets to implicitly
+        // convert to tuples
+        bool isValid = false;
+        if (PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation)) {
+            isValid = true;
+        }
+
+        std::pair<Type*, instance_ptr> typeAndPtrOfArg = extractTypeAndPtrFrom(pyRepresentation);
+        if (typeAndPtrOfArg.first && (
+                typeAndPtrOfArg.first->isListOf()
+                || typeAndPtrOfArg.first->isTupleOf()
+                || typeAndPtrOfArg.first->isComposite())
+        ) {
+            isValid = true;
+        }
+
+        if (!isValid) {
+            PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, level);
+            return;
+        }
+    }
+
+    int containerSize = PyObject_Length(pyRepresentation);
+    if (containerSize == -1) {
+        PyErr_Clear();
+        PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, level);
+        return;
+    }
+
+    if (containerSize != eltType->getTypes().size()) {
+        throw std::runtime_error(
+            "Can't convert a "
+            + std::string(pyRepresentation->ob_type->tp_name)
+            + " with "
+            + format(containerSize)
+            + " arguments to a "
+            + eltType->name()
+        );
+    }
+
+    PyObjectStealer iterator(PyObject_GetIter(pyRepresentation));
+
+    if (iterator) {
+        eltType->constructor(tgt,
+            [&](uint8_t* eltPtr, int64_t k) {
+                PyObjectStealer item(PyIter_Next(iterator));
+
+                if (!item) {
+                    if (PyErr_Occurred()) {
+                        throw PythonExceptionSet();
+                    }
+
+                    return false;
+                }
+
+                PyInstance::copyConstructFromPythonInstance(eltType->getTypes()[k], eltPtr, item, childConversionLevel);
+
+                return true;
+            });
+
+        return;
+    } else {
+        PyErr_Clear();
+        PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, level);
+        return;
+    }
+
+    PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, level);
 }
 
 bool PyCompositeTypeInstance::compare_to_python_concrete(CompositeType* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
@@ -177,19 +236,26 @@ int PyCompositeTypeInstance::pyInquiryConcrete(const char* op, const char* opErr
     return type()->getTypes().size() != 0;
 }
 
-void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-    if (PyDict_Check(pyRepresentation)) {
+void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(
+    NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level)
+ {
+    // allow implicit conversion of dict to named tuple.
+    if (level >= ConversionLevel::Implicit && PyDict_Check(pyRepresentation)) {
         static PyObject* emptyTuple = PyTuple_New(0);
 
-        constructFromPythonArgumentsConcrete(namedTupleT, tgt, emptyTuple, pyRepresentation, isExplicit);
+        constructFromPythonArgumentsConcrete(
+            namedTupleT, tgt, emptyTuple, pyRepresentation
+        );
 
         return;
     }
 
-    PyCompositeTypeInstance::copyConstructFromPythonInstanceConcrete(namedTupleT, tgt, pyRepresentation, isExplicit);
+    PyCompositeTypeInstance::copyConstructFromPythonInstanceConcrete(namedTupleT, tgt, pyRepresentation, level);
 }
 
-void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(NamedTuple* namedTupleT, uint8_t* data, PyObject* args, PyObject* kwargs, bool isExplicit) {
+void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(
+    NamedTuple* namedTupleT, uint8_t* data, PyObject* args, PyObject* kwargs
+) {
     if (kwargs) {
         iterate(kwargs, [&](PyObject* name) {
             if (!PyUnicode_Check(name)) {
@@ -216,7 +282,12 @@ void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(NamedTuple* name
                 PyObject* o = PyDict_GetItemString(kwargs, name.c_str());
                 if (o) {
                     try {
-                        copyConstructFromPythonInstance(t, eltPtr, o, isExplicit);
+                        copyConstructFromPythonInstance(
+                            t,
+                            eltPtr,
+                            o,
+                            ConversionLevel::ImplicitContainers
+                        );
                     } catch(PythonExceptionSet&) {
                         PyErr_Clear();
                         throw std::runtime_error(
@@ -233,7 +304,10 @@ void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(NamedTuple* name
                 else if (t->is_default_constructible()) {
                     t->constructor(eltPtr);
                 } else {
-                    throw std::logic_error("Can't default initialize member '" + name + "' of " + namedTupleT->name());
+                    throw std::logic_error(
+                        "Can't default initialize member '" + name + "' of " + namedTupleT->name()
+                        + " because it's not default-constructible"
+                    );
                 }
             });
 
@@ -351,7 +425,7 @@ PyObject* PyNamedTupleInstance::replacing(PyObject* o, PyObject* args, PyObject*
         }
     }
 
-    // return a copy with updated valuess. We instantiate the subclass type. if it's a subclass,
+    // return a copy with updated values. We instantiate the subclass type. if it's a subclass,
     // then it will have the correct memory layout.
     return PyInstance::initialize(tupOrSubclassType, [&](instance_ptr newInstanceData) {
         //newInstanceData will point to the uninitialized memory we've allocated for the new tuple
@@ -368,7 +442,8 @@ PyObject* PyNamedTupleInstance::replacing(PyObject* o, PyObject* args, PyObject*
                 PyInstance::copyConstructFromPythonInstance(
                         itemType,
                         item_data,
-                        value
+                        value,
+                        ConversionLevel::ImplicitContainers
                 );
             } else {
                 //on failure, PyDict_GetItemString doesn't actually throw an exception,

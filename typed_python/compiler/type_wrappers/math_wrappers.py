@@ -16,6 +16,7 @@ import typed_python.compiler
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
 from typed_python import UInt64, Float32, Tuple, ListOf
+from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.tuple_wrapper import MasqueradingTupleWrapper
 
@@ -143,18 +144,18 @@ class MathFunctionWrapper(Wrapper):
                 return context.pushException(TypeError, f"must be a real number, not {arg1.expr_type}")
             arg2 = args[1]
             if not arg2.expr_type.is_arithmetic:
-                return context.pushException(TypeError, f"Expected an int as second argument to ldexp.")
+                return context.pushException(TypeError, "Expected an int as second argument to ldexp.")
             argType1 = arg1.expr_type.typeRepresentation
             argType2 = arg2.expr_type.typeRepresentation
             if argType1 not in (Float32, float):
-                arg1 = arg1.convert_to_type(float)
+                arg1 = arg1.toFloat64()
                 if arg1 is None:
                     return None
                 argType1 = float
             if argType2 not in (int,):
-                arg2 = arg2.convert_to_type(int)
+                arg2 = arg2.toInt64()
                 if arg2 is None:
-                    return context.pushException(TypeError, f"Expected an int as second argument to ldexp.")
+                    return context.pushException(TypeError, "Expected an int as second argument to ldexp.")
             # argType2 == int
             outT = argType1
             func = runtime_functions.ldexp32 if argType1 is Float32 else runtime_functions.ldexp64
@@ -172,13 +173,13 @@ class MathFunctionWrapper(Wrapper):
             arg1 = arg1.convert_abs()
             if arg1 is None:
                 return None
-            arg1 = arg1.convert_to_type(UInt64)
+            arg1 = arg1.convert_to_type(UInt64, ConversionLevel.Implicit)
             if arg1 is None:
                 return None
             arg2 = arg2.convert_abs()
             if arg2 is None:
                 return None
-            arg2 = arg2.convert_to_type(UInt64)
+            arg2 = arg2.convert_to_type(UInt64, ConversionLevel.Implicit)
             if arg2 is None:
                 return None
             return context.pushPod(UInt64, runtime_functions.gcd.call(arg1.nonref_expr, arg2.nonref_expr))
@@ -193,20 +194,20 @@ class MathFunctionWrapper(Wrapper):
             argType1 = arg1.expr_type.typeRepresentation
             argType2 = arg2.expr_type.typeRepresentation
             if argType1 not in (Float32, float):
-                arg1 = arg1.convert_to_type(float)
+                arg1 = arg1.toFloat64()
                 if arg1 is None:
                     return None
                 argType1 = float
             if argType2 not in (Float32, float):
-                arg2 = arg2.convert_to_type(float)
+                arg2 = arg2.toFloat64()
                 if arg2 is None:
                     return None
                 argType2 = float
             if argType1 == Float32 and argType2 == float:
-                arg1 = arg1.convert_to_type(float)
+                arg1 = arg1.toFloat64()
                 argType1 = float
             if argType1 == float and argType2 == Float32:
-                arg2 = arg2.convert_to_type(float)
+                arg2 = arg2.toFloat64()
                 argType2 = float
             assert argType1 == argType2
 
@@ -228,14 +229,14 @@ class MathFunctionWrapper(Wrapper):
                 func = runtime_functions.isclose32 if argType1 is Float32 else runtime_functions.isclose64
 
                 if "rel_tol" in kwargs:
-                    rel_tol = kwargs["rel_tol"].convert_to_type(argType1)
+                    rel_tol = kwargs["rel_tol"].convert_to_type(argType1, ConversionLevel.Implicit)
                     if rel_tol is None:
                         return None
                 else:
                     rel_tol = native_ast.const_float32_expr(1e-5) if argType1 is Float32 else native_ast.const_float_expr(1e-9)
 
                 if "abs_tol" in kwargs:
-                    abs_tol = kwargs["abs_tol"].convert_to_type(argType1)
+                    abs_tol = kwargs["abs_tol"].convert_to_type(argType1, ConversionLevel.Implicit)
                     if abs_tol is None:
                         return None
                 else:
@@ -270,7 +271,7 @@ class MathFunctionWrapper(Wrapper):
             argType = arg.expr_type.typeRepresentation
             if argType not in (Float32, float):
                 if argType not in (int,):
-                    arg = arg.convert_to_type(int, explicit=True)
+                    arg = arg.convert_to_type(int, ConversionLevel.New)
                     if arg is None:
                         return None
                 with context.ifelse(arg.nonref_expr.lt(0)) as (ifTrue, ifFalse):
@@ -296,7 +297,7 @@ class MathFunctionWrapper(Wrapper):
                 elif self.typeRepresentation in (isfinite,):
                     return context.constant(True)
                 else:
-                    arg = arg.convert_to_type(float)
+                    arg = arg.toFloat64()
                     if arg is None:
                         return None
                     argType = float

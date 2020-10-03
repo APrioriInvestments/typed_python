@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import TypeFunction, Int16, UInt64, Float32, Alternative, Forward, \
-    Dict, ConstDict, ListOf, PointerTo, Compiled
+    Dict, ConstDict, ListOf, Compiled
 import typed_python._types as _types
 from typed_python import Entrypoint
 import unittest
@@ -367,7 +367,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                         )
 
         values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
-                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"}), PointerTo(int)()]
+                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"})]
         for v in values:
             T = type(v)
 
@@ -1027,7 +1027,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                         )
 
         values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
-                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"}), PointerTo(int)()]
+                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"})]
         for v in values:
             T = type(v)
 
@@ -1138,6 +1138,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             return bytes(x)
 
         v = A.a()
+
         r1 = f_bytes(v)
         c_f = Compiled(f_bytes)
         r2 = c_f(v)

@@ -15,6 +15,7 @@
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.util import min
 from typed_python.compiler.typed_expression import TypedExpression
@@ -316,7 +317,7 @@ class ConstDictWrapper(ConstDictWrapperBase):
 
     def convert_bin_op_reverse(self, context, left, op, right, inplace):
         if op.matches.In:
-            right = right.convert_to_type(self.keyType)
+            right = right.convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
             if right is None:
                 return None
 
@@ -325,7 +326,7 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return super().convert_bin_op_reverse(context, left, op, right, inplace)
 
     def convert_getitem(self, context, instance, item):
-        item = item.convert_to_type(self.keyType, explicit=False)
+        item = item.convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
         if item is None:
             return None
 
@@ -335,7 +336,7 @@ class ConstDictWrapper(ConstDictWrapperBase):
         if item is None or expr is None or default is None:
             return None
 
-        item = item.convert_to_type(self.keyType, explicit=False)
+        item = item.convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
         if item is None:
             return None
 
@@ -353,8 +354,27 @@ class ConstDictWrapper(ConstDictWrapperBase):
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
-    def convert_bool_cast(self, context, expr):
-        return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
+    def _can_convert_to_type(self, targetType, conversionLevel):
+        if not conversionLevel.isNewOrHigher():
+            return False
+
+        if targetType.typeRepresentation is bool:
+            return True
+
+        if targetType.typeRepresentation is str:
+            return "Maybe"
+
+        return False
+
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if targetVal.expr_type.typeRepresentation is bool:
+            res = context.pushPod(bool, self.convert_len_native(instance.nonref_expr).neq(0))
+            context.pushEffect(
+                targetVal.expr.store(res.nonref_expr)
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
 
 class ConstDictMakeIteratorWrapper(ConstDictWrapperBase):

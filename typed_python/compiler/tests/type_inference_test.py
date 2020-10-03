@@ -136,6 +136,13 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(f.resultTypeFor(float).typeRepresentation, UInt8)
 
+    def test_infer_result_of_uint8_constant(self):
+        @Entrypoint
+        def f():
+            return UInt8(10)
+
+        self.assertEqual(f.resultTypeFor().typeRepresentation, UInt8)
+
     def test_infer_list_item(self):
         @Function
         def f(a: ListOf(str), x: int):

@@ -16,6 +16,7 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python import _types
 import typed_python.compiler
 from typed_python.compiler.native_ast import VoidPtr
@@ -75,7 +76,7 @@ class AlternativeWrapperMixin(ClassOrAlternativeWrapperMixin):
 
         return super().convert_comparison(context, lhs, op, rhs)
 
-    def has_method(self, context, instance, methodName):
+    def has_method(self, methodName):
         assert isinstance(methodName, str)
         return methodName in self.typeRepresentation.__typed_python_methods__
 
@@ -126,6 +127,19 @@ class SimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
 
         return context.pushPod(bool, instance.nonref_expr.cast(native_ast.Int64).eq(index))
 
+    def convert_attribute(self, context, instance, attribute, nocheck=False):
+        if attribute == 'matches':
+            return instance.changeType(self.matcherType)
+
+        if attribute in self.typeRepresentation.__typed_python_methods__:
+            methodType = BoundMethodWrapper(
+                _types.BoundMethod(self.typeRepresentation, attribute)
+            )
+
+            return instance.changeType(methodType)
+
+        return super().convert_attribute(context, instance, attribute)
+
 
 class ConcreteSimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
     """Wrapper around alternatives with all empty arguments, after choosing a specific alternative."""
@@ -152,18 +166,16 @@ class ConcreteSimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
             )
         )
 
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        # there is deliberately no code path for "not explicit" here
-        # Alternative conversions must be explicit
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         assert targetVal.isReference
 
         target_type = targetVal.expr_type
 
         if target_type == typeWrapper(self.alternativeType):
-            targetVal.convert_copy_initialize(e.changeType(target_type))
+            targetVal.convert_copy_initialize(instance.changeType(target_type))
             return context.constant(True)
 
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:
@@ -173,6 +185,19 @@ class ConcreteSimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
 
     def convert_check_matches(self, context, instance, typename):
         return context.constant(typename == self.typeRepresentation.Name)
+
+    def convert_attribute(self, context, instance, attribute, nocheck=False):
+        if attribute == 'matches':
+            return instance.changeType(self.matcherType)
+
+        if attribute in self.typeRepresentation.__typed_python_methods__:
+            methodType = BoundMethodWrapper(
+                _types.BoundMethod(self.typeRepresentation, attribute)
+            )
+
+            return instance.changeType(methodType)
+
+        return super().convert_attribute(context, instance, attribute)
 
 
 class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
@@ -250,7 +275,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
                 validIndices.append(i)
 
         if not validIndices:
-            if self.has_method(context, instance, "__getattr__"):
+            if self.has_method("__getattr__"):
                 return self.convert_method_call(context, instance, "__getattr__", (context.constant(attribute),), {})
 
             return super().convert_attribute(context, instance, attribute)
@@ -268,7 +293,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
                 for ix, subcontext in indicesAndContexts:
                     with subcontext:
                         attr = self.refAs(context, instance, ix).convert_attribute(attribute)
-                        attr = attr.convert_to_type(outputType)
+                        attr = attr.convert_to_type(outputType, ConversionLevel.Signature)
                         output.convert_copy_initialize(attr)
                         context.markUninitializedSlotInitialized(output)
 
@@ -323,18 +348,16 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
             instance.nonref_expr.ElementPtrIntegers(0, 2).cast(self.underlyingLayout.getNativeLayoutType().pointer())
         )
 
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
-        # there is deliberately no code path for "not explicit" here
-        # Alternative conversions must be explicit
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         assert targetVal.isReference
 
         target_type = targetVal.expr_type
 
         if target_type == typeWrapper(self.alternativeType):
-            targetVal.convert_copy_initialize(e.changeType(target_type))
+            targetVal.convert_copy_initialize(instance.changeType(target_type))
             return context.constant(True)
 
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         tupletype = self.typeRepresentation.ElementType
@@ -369,7 +392,8 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
             if eltName not in kwargs:
                 kwargs[eltName] = context.push(eltType, lambda out: out.convert_default_initialize())
             else:
-                kwargs[eltName] = kwargs[eltName].convert_to_type(typeWrapper(eltType))
+                kwargs[eltName] = kwargs[eltName].convert_to_type(typeWrapper(eltType), ConversionLevel.New)
+
                 if kwargs[eltName] is None:
                     return
 

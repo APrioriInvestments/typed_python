@@ -159,11 +159,13 @@ class TestBuiltinCompilation(unittest.TestCase):
                     continue
                 r1 = result_or_exception(f, T(v))
                 c_f = Compiled(f)
-                r2 = result_or_exception(c_f, v)
+                r2 = result_or_exception(c_f, T(v))
                 if type(r1) is float and isnan(r1):
                     self.assertEqual(isnan(r1), isnan(r2))
                 else:
-                    self.assertEqual(r1, r2)
+                    if r1 != r2:
+                        c_f(T(v))
+                    self.assertEqual(r1, r2, (T, v, f))
 
     def test_min_max(self):
         def f_min(*v):

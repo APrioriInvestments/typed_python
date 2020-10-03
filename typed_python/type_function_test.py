@@ -166,7 +166,8 @@ class TypeFunctionTest(unittest.TestCase):
 
         @Entrypoint
         def callAFunc():
-            return A(float).aFunc(ListOf(float)([1, 2]))
+            anLst = ListOf(float)([1, 2])
+            return A(float).aFunc(anLst)
 
         # we should be able to dispatch to this from the compiler
         self.assertEqual(callAFunc(), [1, 2])

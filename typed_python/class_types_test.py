@@ -20,7 +20,7 @@ from typed_python.test_util import currentMemUsageMb
 from typed_python._types import is_default_constructible
 from typed_python import (
     Int16, UInt64, Float32, ListOf, TupleOf, OneOf, NamedTuple, Class, Alternative,
-    ConstDict, PointerTo, Member, _types, Forward, Final, Function, Entrypoint, Tuple,
+    ConstDict, Member, _types, Forward, Final, Function, Entrypoint, Tuple,
     Held, RefTo, refTo, pointerTo, copy
 )
 
@@ -1403,7 +1403,7 @@ class NativeClassTypesTests(unittest.TestCase):
             __ror__ = lambda lhs, rhs: "ror" + str(rhs)
 
         values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
-                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"}), PointerTo(int)()]
+                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"})]
         for v in values:
             self.assertEqual(v + C(), "radd" + str(v))
             self.assertEqual(v - C(), "rsub" + str(v))
@@ -1445,25 +1445,6 @@ class NativeClassTypesTests(unittest.TestCase):
                 C() ^ v
             with self.assertRaises(TypeError):
                 C() | v
-
-    def test_class_assign_coerces(self):
-        class C(Class, Final):
-            m = Member(int)
-
-            def assign(self, x: float):
-                self.m = x
-
-        aC = C()
-        aC.assign(1.5)
-        self.assertEqual(aC.m, 1)
-
-        @Entrypoint
-        def callAssign(c: C, f: float):
-            c.assign(f)
-
-        callAssign(aC, 2.5)
-
-        self.assertEqual(aC.m, 2)
 
     def test_class_default_constructible(self):
         # classes without 'init' are always default constructible,
@@ -1634,14 +1615,14 @@ class NativeClassTypesTests(unittest.TestCase):
 
         c = C()
 
-        with self.assertRaisesRegex(Exception, "an integer is required"):
+        with self.assertRaisesRegex(Exception, "Cannot construct a new int from an instance of NoneType"):
             len(c)
 
-        with self.assertRaisesRegex(Exception, "Can't initialize None from an instance of bool"):
+        with self.assertRaisesRegex(Exception, "Cannot construct the value None from an instance of bool"):
             del c.x
 
-        with self.assertRaisesRegex(Exception, "Can't initialize None from an instance of bool"):
+        with self.assertRaisesRegex(Exception, "Cannot construct the value None from an instance of bool"):
             c.x = 10
 
-        with self.assertRaisesRegex(Exception, "Can't initialize None from an instance of bool"):
+        with self.assertRaisesRegex(Exception, "Cannot construct the value None from an instance of bool"):
             c[10] = 20

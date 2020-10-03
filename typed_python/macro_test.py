@@ -1,5 +1,5 @@
 from typed_python.macro import Macro
-from typed_python import TypeFunction, ListOf, Entrypoint
+from typed_python import TypeFunction, TupleOf, Entrypoint
 from typed_python import Class, NamedTuple, Member, makeNamedTuple  # noqa: F401
 
 from typed_python.compiler.runtime import PrintNewFunctionVisitor
@@ -114,10 +114,10 @@ class TestMacro(unittest.TestCase):
                 "locals": {"T": T},
             }
 
-        Table = NamedTuple(a=ListOf(int), b=ListOf(str))
+        Table = NamedTuple(a=TupleOf(int), b=TupleOf(str))
         Lazy = lazyWindow(Table)
 
-        table = Table(a=[1, 2, 3, 4, 5], b=['a', 'b', 'c', 'd', 'e'])
+        table = Table(a=(1, 2, 3, 4, 5), b=('a', 'b', 'c', 'd', 'e'))
         lazy = Lazy(table)
 
         @Entrypoint

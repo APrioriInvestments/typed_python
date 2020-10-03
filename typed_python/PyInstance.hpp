@@ -18,6 +18,7 @@
 
 #include "util.hpp"
 #include "AllTypes.hpp"
+#include "ConversionLevel.hpp"
 
 //extension of PyTypeObject that adds a Type* at the end.
 struct NativeTypeWrapper {
@@ -349,16 +350,16 @@ public:
 
     static void tp_dealloc(PyObject* self);
 
-    static bool pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, bool isExplicit);
+    static bool pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, ConversionLevel level);
 
     /**
      construct an 'eltType' from a python object at 'tgt'. If 'isExplicit' then we're invoked from an explicit
      copy constructor, so more liberal conversion is allowed than if 'isExplicit' is false, which happens
      when we're attempting to convert for purposes of method dispatch.
      */
-    static void copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit=false);
+    static void copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level);
 
-    static void copyConstructFromPythonInstanceConcrete(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
+    static void copyConstructFromPythonInstanceConcrete(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level);
 
     static void constructFromPythonArguments(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs);
 
@@ -383,6 +384,8 @@ public:
     static PyObject* tp_new_type(PyTypeObject *subtype, PyObject *args, PyObject *kwds);
 
     static PyObject* nb_rshift(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* pyDeepNewConvert(PyObject* o, PyObject* args, PyObject* kwargs);
 
     static PyObject* pyUnaryOperator(PyObject* lhs, const char* op, const char* opErrRep);
 

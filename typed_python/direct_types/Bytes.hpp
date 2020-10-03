@@ -27,7 +27,7 @@ public:
 
     static Bytes fromPython(PyObject* p) {
         BytesType::layout* l = nullptr;
-        PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
+        PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, ConversionLevel::Implicit);
         return Bytes(l);
     }
 
@@ -139,4 +139,3 @@ public:
 
     static const uint64_t bytecount = sizeof(void*);
 };
-

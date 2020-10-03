@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 from typed_python.compiler.typed_expression import TypedExpression
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -123,7 +124,7 @@ class TypedCellWrapper(RefcountedWrapper):
             return context.call_py_function(cell_clear, (instance,), {})
 
         if methodName == "isSet" and not args and not kwargs:
-            return self.isInitialized(instance).convert_bool_cast()
+            return self.isInitialized(instance).toBool()
 
         if methodName == "getUnsafe" and not args and not kwargs:
             return self.refHeld(instance)
@@ -133,7 +134,7 @@ class TypedCellWrapper(RefcountedWrapper):
             return context.constant(None)
 
         if methodName == "initializeUnsafe" and len(args) == 1 and not kwargs:
-            arg = args[0].convert_to_type(self.typeRepresentation.HeldType, explicit=True)
+            arg = args[0].convert_to_type(self.typeRepresentation.HeldType, ConversionLevel.Implicit)
             if arg is None:
                 return None
 

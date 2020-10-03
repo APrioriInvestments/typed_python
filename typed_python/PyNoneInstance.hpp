@@ -22,15 +22,15 @@ class PyNoneInstance : public PyInstance {
 public:
     typedef NoneType modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(NoneType* none, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    static void copyConstructFromPythonInstanceConcrete(NoneType* none, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
         if (pyRepresentation == Py_None) {
             return;
         }
-        throw std::logic_error("Can't initialize None from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
+
+        PyInstance::copyConstructFromPythonInstanceConcrete(none, tgt, pyRepresentation, level);
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
         return pyRepresentation == Py_None;
     }
 

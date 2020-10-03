@@ -824,9 +824,10 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
         try:
             return converter(**args)
         except Exception:
-            del args['line_number']
-            del args['col_offset']
-            del args['filename']
+            if 'line_number' in args:
+                del args['line_number']
+                del args['col_offset']
+                del args['filename']
 
             try:
                 return converter(**args)

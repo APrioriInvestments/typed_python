@@ -28,11 +28,11 @@ public:
 
     static int classInstanceSetAttributeFromPyObject(Class* cls, uint8_t* data, PyObject* attrName, PyObject* attrVal);
 
-    static bool pyValCouldBeOfTypeConcrete(Class* type, PyObject* pyRepresentation, bool isExplicit);
+    static bool pyValCouldBeOfTypeConcrete(Class* type, PyObject* pyRepresentation, ConversionLevel level);
 
     static PyObject* extractPythonObjectConcrete(Type* eltType, instance_ptr data);
 
-    static void copyConstructFromPythonInstanceConcrete(Class* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
+    static void copyConstructFromPythonInstanceConcrete(Class* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level);
 
     static void constructFromPythonArgumentsConcrete(Class* t, uint8_t* data, PyObject* args, PyObject* kwargs);
 

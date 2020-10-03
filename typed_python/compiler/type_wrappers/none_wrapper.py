@@ -60,5 +60,19 @@ class NoneWrapper(Wrapper):
 
         return super().convert_bin_op(context, left, op, right, inplace)
 
-    def convert_bool_cast(self, context, expr):
-        return context.constant(False)
+    def _can_convert_to_type(self, targetType, conversionLevel):
+        if not conversionLevel.isNewOrHigher():
+            return False
+
+        return targetType.typeRepresentation in (bool, str)
+
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if targetVal.expr_type.typeRepresentation is bool:
+            context.pushEffect(targetVal.expr.store(context.constant(False).nonref_expr))
+            return context.constant(True)
+
+        if targetVal.expr_type.typeRepresentation is str:
+            targetVal.convert_copy_initialize(context.constant("None"))
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)

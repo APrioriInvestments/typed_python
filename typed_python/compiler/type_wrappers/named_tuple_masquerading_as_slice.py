@@ -15,14 +15,22 @@
 import typed_python
 
 from typed_python import NamedTuple
-
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.masquerade_wrapper import MasqueradeWrapper
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
-def slice_repr(sliceObj):
-    return f"slice({repr(sliceObj.start)}, {repr(sliceObj.stop)}, {repr(sliceObj.step)})"
+def slice_repr(tgt, sliceObj, mayThrow):
+    try:
+        tgt.initialize(
+            f"slice({repr(sliceObj.start)}, {repr(sliceObj.stop)}, {repr(sliceObj.step)})"
+        )
+        return True
+    except: # noqa
+        if mayThrow:
+            raise
+        return False
 
 
 class NamedTupleMasqueradingAsSlice(MasqueradeWrapper):
@@ -41,25 +49,37 @@ class NamedTupleMasqueradingAsSlice(MasqueradeWrapper):
         return slice
 
     def convert_masquerade_to_untyped(self, context, instance):
-        return context.constant(slice).convert_to_type(object).convert_call(
+        return context.constant(slice).convert_to_type(object, ConversionLevel.Signature).convert_call(
             [instance.convert_attribute("start"), instance.convert_attribute("stop"), instance.convert_attribute("step")],
             {}
         )
 
-    def can_cast_to_primitive(self, context, instance, primitiveType):
-        return instance.convert_masquerade_to_typed().can_cast_to_primitive(primitiveType)
+    def _can_convert_to_type(self, targetType, conversionLevel):
+        if not conversionLevel.isNewOrHigher():
+            return False
 
-    def convert_bool_cast(self, context, instance):
-        return context.constant(True)
+        if targetType.typeRepresentation is bool:
+            return True
 
-    def convert_int_cast(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_int_cast()
+        if targetType.typeRepresentation is str:
+            return "Maybe"
 
-    def convert_float_cast(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_float_cast()
+        return False
 
-    def convert_str_cast(self, context, instance):
-        return context.call_py_function(slice_repr, (instance,), {})
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if conversionLevel.isNewOrHigher():
+            if targetVal.expr_type.typeRepresentation is bool:
+                targetVal.convert_copy_initialize(context.constant(True))
+                return context.constant(True)
+
+            if targetVal.expr_type.typeRepresentation is str:
+                return context.call_py_function(
+                    slice_repr,
+                    (targetVal.asPointer(), instance, context.constant(mayThrowOnFailure)),
+                    {}
+                )
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
     def convert_repr(self, context, instance):
-        return context.call_py_function(slice_repr, (instance,), {})
+        return instance.convert_to_type(str, ConversionLevel.New)

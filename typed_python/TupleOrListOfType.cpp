@@ -252,6 +252,12 @@ void TupleOrListOfType::assign(instance_ptr self, instance_ptr other) {
     destroy((instance_ptr)&old);
 }
 
+void TupleOrListOfType::setSizeUnsafe(instance_ptr self, size_t target) {
+    layout_ptr& self_layout = *(layout_ptr*)self;
+
+    self_layout->count = target;
+}
+
 void TupleOrListOfType::reserve(instance_ptr self, size_t target) {
     layout_ptr& self_layout = *(layout_ptr*)self;
 

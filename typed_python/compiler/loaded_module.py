@@ -104,15 +104,14 @@ class LoadedModule:
                 pointers[i].cast(meta.type).initialize(meta.sourceDict[meta.name])
 
             elif meta.matches.ClassMethodDispatchSlot:
-                pointers[i].cast(int).initialize(
-                    _types.allocateClassMethodDispatch(
-                        meta.clsType,
-                        meta.methodName,
-                        meta.retType,
-                        meta.argTupleType,
-                        meta.kwargTupleType
-                    )
+                slotIx = _types.allocateClassMethodDispatch(
+                    meta.clsType,
+                    meta.methodName,
+                    meta.retType,
+                    meta.argTupleType,
+                    meta.kwargTupleType
                 )
+                pointers[i].cast(int).initialize(slotIx)
 
             elif meta.matches.IdOfPyObject:
                 pointers[i].cast(int).initialize(id(meta.value))

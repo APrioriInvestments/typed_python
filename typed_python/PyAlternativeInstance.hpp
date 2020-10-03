@@ -30,7 +30,7 @@ public:
 
     int tp_setattr_concrete(PyObject* attrName, PyObject* attrVal);
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
         Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
         if (argType && argType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative &&
@@ -38,10 +38,10 @@ public:
             return true;
         }
 
-return false;
+        return false;
     }
 
-    static void copyConstructFromPythonInstanceConcrete(Alternative* altType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
+    static void copyConstructFromPythonInstanceConcrete(Alternative* altType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level);
 };
 
 class PyConcreteAlternativeInstance : public PyInstance {
@@ -83,7 +83,7 @@ public:
 
     static bool compare_to_python_concrete(ConcreteAlternative* altT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
         return extractTypeFrom(pyRepresentation->ob_type) == type;
     }
 

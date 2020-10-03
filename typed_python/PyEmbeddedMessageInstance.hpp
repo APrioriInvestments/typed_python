@@ -22,20 +22,22 @@ class PyEmbeddedMessageInstance : public PyInstance {
 public:
     typedef EmbeddedMessageType modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(EmbeddedMessageType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-        if (PyBytes_Check(pyRepresentation)) {
+    static void copyConstructFromPythonInstanceConcrete(
+        EmbeddedMessageType* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level
+    ) {
+        if (PyBytes_Check(pyRepresentation) && level >= ConversionLevel::Implicit) {
             EmbeddedMessageType::Make()->constructor(
                 tgt,
                 PyBytes_GET_SIZE(pyRepresentation),
                 PyBytes_AsString(pyRepresentation)
-                );
+            );
             return;
         }
-        throw std::logic_error("Can't initialize an EmbeddedMessageType object from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
+
+        PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, level);
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
         return PyBytes_Check(pyRepresentation);
     }
 
@@ -69,4 +71,3 @@ public:
             );
     }
 };
-

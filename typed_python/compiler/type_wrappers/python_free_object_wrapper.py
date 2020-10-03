@@ -97,14 +97,11 @@ class PythonFreeObjectWrapper(Wrapper):
             attrVal
         )
 
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         target_type = targetVal.expr_type
 
-        if not explicit:
-            return super().convert_to_type_with_target(context, e, targetVal, explicit)
-
-        if target_type.typeRepresentation == str:
+        if target_type.typeRepresentation == str and conversionLevel.isNewOrHigher():
             targetVal.convert_copy_initialize(context.constant(str(self.typeRepresentation.Value)))
             return context.constant(True)
 
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)

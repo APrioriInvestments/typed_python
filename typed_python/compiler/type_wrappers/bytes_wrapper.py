@@ -14,13 +14,14 @@
 
 from typed_python import sha_hash
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import TypedListMasqueradingAsList
 
-from typed_python import UInt8, Int32, ListOf, Tuple
+from typed_python import UInt8, Int32, ListOf, Tuple, TupleOf, Dict, Set, ConstDict
 from typed_python.type_promotion import isInteger
 
 import typed_python.compiler.native_ast as native_ast
@@ -30,6 +31,25 @@ from typed_python.compiler.native_ast import VoidPtr
 
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+def convertIterableToBytes(outPtr, iterable, canThrow):
+    lst = ListOf(UInt8)()
+    lst.reserve(len(iterable))
+
+    try:
+        for i in iterable:
+            lst.append(i)
+
+        # bytes from ListOf(UInt8) is guaranteed to work.
+        outPtr.initialize(bytes(lst))
+
+        return True
+    except:  # noqa
+        if canThrow:
+            raise
+
+        return False
 
 
 def bytesJoinIterable(sep, iterable):
@@ -1652,71 +1672,93 @@ class BytesWrapper(RefcountedWrapper):
             constantValue=s
         )
 
-    def can_cast_to_primitive(self, context, expr, primitiveType):
-        return primitiveType in (bytes, float, int, bool)
+    def convert_to_type_constant(self, context, expr, target_type, level: ConversionLevel):
+        """Given that 'expr' is a constant expression, attempt to convert it directly.
 
-    def convert_bool_cast(self, context, expr):
-        """Generates code for casting bytes to bool.
-
-        Args:
-            context: ExpressionConversionContext
-            expr: TypedExpression to be cast
-
-        Returns:
-            TypedExpression representing this cast.
+        This function should return None if it can't convert it to a constant, otherwise
+        a typed expression with the constant.
         """
-        if expr.isConstant:
-            return context.constant(bool(expr.constantValue))
+        if target_type.typeRepresentation in (str, int, float, bool):
+            if level.isNewOrHigher():
+                try:
+                    return context.constant(target_type.typeRepresentation(expr.constantValue))
+                except Exception as e:
+                    context.pushException(type(e), *e.args)
+                    return "FAILURE"
 
-        return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
+    def _can_convert_from_type(self, targetType, conversionLevel):
+        if conversionLevel.isNewOrHigher():
+            return "Maybe"
 
-    def convert_int_cast(self, context, expr):
-        """Generates code for casting bytes to int.
+        return False
 
-        Args:
-            context: ExpressionConversionContext
-            expr: TypedExpression to be cast
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure=False):
+        if conversionLevel.isNewOrHigher():
+            if sourceVal.expr_type.typeRepresentation in (ListOf(UInt8), TupleOf(UInt8)):
+                # we have a fastpath for this
+                context.pushEffect(
+                    targetVal.expr.store(
+                        runtime_functions.list_or_tuple_of_to_bytes.call(
+                            sourceVal.nonref_expr.cast(native_ast.VoidPtr),
+                            context.getTypePointer(sourceVal.expr_type.typeRepresentation)
+                        ).cast(targetVal.expr_type.layoutType)
+                    )
+                )
 
-        Returns:
-            TypedExpression representing this cast.
-        """
-        if expr.isConstant:
-            try:
-                return context.constant(int(expr.constantValue))
-            except Exception as e:
-                return context.pushException(type(e), *e.args)
+                return context.constant(True)
 
-        return context.pushPod(int, runtime_functions.bytes_to_int64.call(expr.nonref_expr.cast(VoidPtr)))
+            # note - need a better way of determining whether we just want to let the interpreter
+            # handle this.
+            if issubclass(sourceVal.expr_type.typeRepresentation, (ListOf, TupleOf, Dict, ConstDict, Set)):
+                return context.call_py_function(
+                    convertIterableToBytes,
+                    (targetVal.asPointer(), sourceVal, context.constant(mayThrowOnFailure)),
+                    {}
+                )
 
-    def convert_float_cast(self, context, expr):
-        """Generates code for casting bytes to float.
+        return super().convert_to_self_with_target(context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure)
 
-        Args:
-            context: ExpressionConversionContext
-            expr: TypedExpression to be cast
+    def _can_convert_to_type(self, targetType, conversionLevel):
+        if not conversionLevel.isNewOrHigher():
+            return False
 
-        Returns:
-            TypedExpression representing this cast.
-        """
-        if expr.isConstant:
-            try:
-                return context.constant(float(expr.constantValue))
-            except Exception as e:
-                return context.pushException(type(e), *e.args)
+        if targetType.typeRepresentation in (bytes, float, int, bool):
+            return True
 
-        return context.pushPod(float, runtime_functions.bytes_to_float64.call(expr.nonref_expr.cast(VoidPtr)))
+        if targetType.typeRepresentation is str:
+            return "Maybe"
 
-    def convert_bytes_cast(self, context, expr):
-        """Generates code for casting bytes to bytes, i.e. doing nothing
+        return False
 
-        Args:
-            context: ExpressionConversionContext
-            expr: TypedExpression to be cast
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if targetVal.expr_type.typeRepresentation is bool:
+            res = context.pushPod(bool, self.convert_len_native(instance.nonref_expr).neq(0))
+            context.pushEffect(
+                targetVal.expr.store(res.nonref_expr)
+            )
+            return context.constant(True)
 
-        Returns:
-            TypedExpression representing this cast.
-        """
-        return expr
+        if targetVal.expr_type.typeRepresentation is int:
+            res = context.pushPod(
+                int,
+                runtime_functions.bytes_to_int64.call(instance.nonref_expr.cast(VoidPtr))
+            )
+            context.pushEffect(
+                targetVal.expr.store(res.nonref_expr)
+            )
+            return context.constant(True)
+
+        if targetVal.expr_type.typeRepresentation is float:
+            res = context.pushPod(
+                float,
+                runtime_functions.bytes_to_float64.call(instance.nonref_expr.cast(VoidPtr))
+            )
+            context.pushEffect(
+                targetVal.expr.store(res.nonref_expr)
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
     def get_iteration_expressions(self, context, expr):
         """Generates fixed list of iteration values of the bytes expression.

@@ -45,7 +45,7 @@ public:
         }
     }
 
-    void coerceToType(py_obj_ptr& ptr, Type* target, bool convertExplicitly) {
+    void coerceToType(py_obj_ptr& ptr, Type* target, ConversionLevel level) {
         try {
             PyObject* coerced = PyInstance::initializePythonRepresentation(
                 target,
@@ -54,7 +54,7 @@ public:
                         target,
                         data,
                         ptr,
-                        convertExplicitly
+                        level
                     );
                 }
             );
@@ -72,18 +72,18 @@ public:
         }
     }
 
-    void applyTypeCoercion(bool convertExplicitly) {
+    void applyTypeCoercion(ConversionLevel level) {
         for (long k = 0; k < mArgs.size(); k++) {
             if (mArgs[k].getTypeFilter()) {
                 if (mArgs[k].getIsNormalArg()) {
-                    coerceToType(mSingleValueArgs[k], mArgs[k].getTypeFilter(), convertExplicitly);
+                    coerceToType(mSingleValueArgs[k], mArgs[k].getTypeFilter(), level);
                 } else if (mArgs[k].getIsStarArg()) {
                     for (long j = 0; j < mStarArgValues.size(); j++) {
-                        coerceToType(mStarArgValues[j], mArgs[k].getTypeFilter(), convertExplicitly);
+                        coerceToType(mStarArgValues[j], mArgs[k].getTypeFilter(), level);
                     }
                 } else if (mArgs[k].getIsKwarg()) {
                     for (long j = 0; j < mKwargValues.size(); j++) {
-                        coerceToType(mKwargValues[j].second, mArgs[k].getTypeFilter(), convertExplicitly);
+                        coerceToType(mKwargValues[j].second, mArgs[k].getTypeFilter(), level);
                     }
                 }
             }
@@ -253,7 +253,9 @@ public:
             try {
                 return std::make_pair(
                     Instance::createAndInitialize(argType, [&](instance_ptr p) {
-                        PyInstance::copyConstructFromPythonInstance(argType, p, mSingleValueArgs[argIx], false);
+                        PyInstance::copyConstructFromPythonInstance(
+                            argType, p, mSingleValueArgs[argIx], ConversionLevel::Signature
+                        );
                     }),
                     true
                 );
@@ -281,7 +283,10 @@ public:
                 return std::make_pair(
                     Instance::createAndInitialize(tup, [&](instance_ptr p) {
                         tup->constructor(p, [&](instance_ptr subElt, int tupArg) {
-                            PyInstance::copyConstructFromPythonInstance(tup->getTypes()[tupArg], subElt, mStarArgValues[tupArg], false);
+                            PyInstance::copyConstructFromPythonInstance(
+                                tup->getTypes()[tupArg], subElt, mStarArgValues[tupArg],
+                                ConversionLevel::Signature
+                            );
                         });
                     }),
                     true
@@ -316,7 +321,12 @@ public:
                 return std::make_pair(
                     Instance::createAndInitialize(tup, [&](instance_ptr p) {
                         tup->constructor(p, [&](instance_ptr subElt, int tupArg) {
-                            PyInstance::copyConstructFromPythonInstance(tup->getTypes()[tupArg], subElt, mKwargValues[tupArg].second, false);
+                            PyInstance::copyConstructFromPythonInstance(
+                                tup->getTypes()[tupArg],
+                                subElt,
+                                mKwargValues[tupArg].second,
+                                ConversionLevel::Signature
+                            );
                         });
                     }),
                     true

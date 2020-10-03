@@ -71,7 +71,7 @@ PyObject* PySetInstance::try_remove(PyObject* o, PyObject* item, bool assertKeyE
         } else {
             try {
                 Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(self_w->type()->keyType(), data, item);
+                    copyConstructFromPythonInstance(self_w->type()->keyType(), data, item, ConversionLevel::UpcastContainers);
                 });
                 bool found_and_discarded = self_w->type()->discard(self_w->dataPtr(), key.data());
                 if (assertKeyError && !found_and_discarded) {
@@ -110,7 +110,7 @@ PyObject* PySetInstance::try_add_if_not_found(PyObject* o, PySetInstance* to_be_
         } else {
             try {
                 Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(self_w->type()->keyType(), data, item);
+                    copyConstructFromPythonInstance(self_w->type()->keyType(), data, item, ConversionLevel::UpcastContainers);
                 });
                 if (!self_w->type()->lookupKey(self_w->dataPtr(), key.data())) {
                     to_be_added->type()->insertKey(to_be_added->dataPtr(), key.data());
@@ -183,7 +183,7 @@ void PySetInstance::copy_elements(PyObject* dst, PyObject* src) {
         iterate(src, [&](PyObject* item) {
             Instance key(dst_w->type()->keyType(), [&](instance_ptr data) {
                 PyInstance::copyConstructFromPythonInstance(dst_w->type()->keyType(), data, item,
-                                                            true);
+                                                            ConversionLevel::UpcastContainers);
             });
             insertKey(dst_w, item, key.data());
         });
@@ -251,7 +251,7 @@ PyObject* PySetInstance::set_intersection(PyObject* o, PyObject* other) {
             iterate(other, [&](PyObject* item) {
                 Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
                     PyInstance::copyConstructFromPythonInstance(self_w->type()->keyType(), data,
-                                                                item, true);
+                                                                item, ConversionLevel::UpcastContainers);
                 });
                 instance_ptr existingLoc = self_w->type()->lookupKey(self_w->dataPtr(), key.data());
                 if (existingLoc) {
@@ -303,7 +303,7 @@ int PySetInstance::set_intersection_update(PyObject* o, PyObject* other) {
 
             iterate(other, [&](PyObject* item) {
                     Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
-                        copyConstructFromPythonInstance(self_w->type()->keyType(), data, item);
+                        copyConstructFromPythonInstance(self_w->type()->keyType(), data, item, ConversionLevel::UpcastContainers);
                     });
                     if (copy_w->type()->lookupKey(copy_w->dataPtr(), key.data()))
                         insertKey(self_w, item, key.data());
@@ -410,7 +410,7 @@ int PySetInstance::set_is_subset(PyObject *o, PyObject* other) {
     try {
         iterateWithEarlyExit(other, [&](PyObject* item) {
             Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
-                copyConstructFromPythonInstance(self_w->type()->keyType(), data, item);
+                copyConstructFromPythonInstance(self_w->type()->keyType(), data, item, ConversionLevel::UpcastContainers);
             });
             if (self_w->type()->lookupKey(self_w->dataPtr(), key.data())) {
                 insertKey(shadow, item, key.data());
@@ -548,7 +548,7 @@ int PySetInstance::set_symmetric_difference_update(PyObject* o, PyObject* other)
     try {
         iterate(other, [&](PyObject* item) {
             Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
-                copyConstructFromPythonInstance(self_w->type()->keyType(), data, item);
+                copyConstructFromPythonInstance(self_w->type()->keyType(), data, item, ConversionLevel::UpcastContainers);
             });
             instance_ptr i = self_w->type()->lookupKey(self_w->dataPtr(), key.data());
             if (i)
@@ -942,7 +942,7 @@ int PySetInstance::sq_contains_concrete(PyObject* item) {
         return i ? 1 : 0;
     } else {
         Instance key(type()->keyType(), [&](instance_ptr data) {
-            copyConstructFromPythonInstance(type()->keyType(), data, item);
+            copyConstructFromPythonInstance(type()->keyType(), data, item, ConversionLevel::UpcastContainers);
         });
         instance_ptr i = type()->lookupKey(dataPtr(), key.data());
         return i ? 1 : 0;
@@ -1003,7 +1003,7 @@ PyObject* PySetInstance::setAdd(PyObject* o, PyObject* args) {
     } else {
         try {
             Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
-                copyConstructFromPythonInstance(self_w->type()->keyType(), data, item);
+                copyConstructFromPythonInstance(self_w->type()->keyType(), data, item, ConversionLevel::UpcastContainers);
             });
             insertKey(self_w, item, key.data());
 
@@ -1067,9 +1067,18 @@ SetType* PySetInstance::type() {
     return (SetType*)extractTypeFrom(((PyObject*)this)->ob_type);
 }
 
-void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, instance_ptr tgt,
-                                                            PyObject* pyRepresentation,
-                                                            bool isExplicit) {
+void PySetInstance::copyConstructFromPythonInstanceConcrete(
+    SetType* setType, instance_ptr tgt,
+    PyObject* pyRepresentation,
+    ConversionLevel level
+) {
+    if (level < ConversionLevel::New) {
+        return PyInstance::copyConstructFromPythonInstanceConcrete(setType, tgt, pyRepresentation, level);
+    }
+
+    ConversionLevel childLevel = level == ConversionLevel::DeepNew ? ConversionLevel::DeepNew : ConversionLevel::Implicit;
+
+
     bool setIsInitialized = false;
 
     std::pair<Type*, instance_ptr> typeAndPtr = extractTypeAndPtrFrom(pyRepresentation);
@@ -1120,7 +1129,7 @@ void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, in
 
         iterate(pyRepresentation, [&](PyObject* item) {
             Instance key(setType->keyType(), [&](instance_ptr data) {
-                copyConstructFromPythonInstance(setType->keyType(), data, item, isExplicit);
+                copyConstructFromPythonInstance(setType->keyType(), data, item, childLevel);
                 return true;
             });
 
@@ -1321,18 +1330,19 @@ bool PySetInstance::compare_to_python_concrete(SetType* setT, instance_ptr left,
     return false;
 }
 
-bool PySetInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
-    if (!isExplicit) {
-        return PySet_Check(pyRepresentation);
+bool PySetInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
+    if (level >= ConversionLevel::New) {
+        return (
+            PySet_Check(pyRepresentation) ||
+            PyTuple_Check(pyRepresentation) ||
+            PyList_Check(pyRepresentation) ||
+            PyDict_Check(pyRepresentation) ||
+            PySet_Check(pyRepresentation) ||
+            PyIter_Check(pyRepresentation) ||
+            PySequence_Check(pyRepresentation) ||
+            PyArray_Check(pyRepresentation)
+        );
     }
 
-    return
-        PyTuple_Check(pyRepresentation) ||
-        PyList_Check(pyRepresentation) ||
-        PyDict_Check(pyRepresentation) ||
-        PySet_Check(pyRepresentation) ||
-        PyIter_Check(pyRepresentation) ||
-        PySequence_Check(pyRepresentation) ||
-        PyArray_Check(pyRepresentation)
-        ;
+    return false;
 }

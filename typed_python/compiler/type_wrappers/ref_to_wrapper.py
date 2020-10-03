@@ -59,23 +59,11 @@ class RefToWrapper(Wrapper):
     def convert_destroy(self, context, instance):
         pass
 
-    def can_cast_to_primitive(self, context, instance, primitiveType):
-        return self.deref(instance).can_cast_to_primitive(primitiveType)
+    def _can_convert_to_type(self, targetType, conversionLevel):
+        return self.underlyingTypeWrapper._can_convert_to_type(targetType, conversionLevel)
 
-    def convert_int_cast(self, context, e):
-        return self.deref(e).convert_int_cast()
-
-    def convert_float_cast(self, context, e):
-        return self.deref(e).convert_float_cast()
-
-    def convert_str_cast(self, context, e):
-        return self.deref(e).convert_str_cast()
-
-    def convert_bytes_cast(self, context, e):
-        return self.deref(e).convert_bytes_cast()
-
-    def convert_bool_cast(self, context, e):
-        return self.deref(e).convert_bool_cast()
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        return self.deref(instance).convert_to_type_with_target(targetVal, conversionLevel)
 
     def convert_bin_op(self, context, left, op, right, inplace):
         return self.deref(left).convert_bin_op(op, right, inplace)

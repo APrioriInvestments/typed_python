@@ -16,33 +16,86 @@ from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWra
 from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
-from typed_python.compiler.type_wrappers.tuple_wrapper import TupleWrapper
-from typed_python.compiler.type_wrappers.tuple_of_wrapper import TupleOrListOfWrapper
-from typed_python.compiler.type_wrappers.const_dict_wrapper import ConstDictWrapper
-from typed_python.compiler.type_wrappers.dict_wrapper import DictWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.native_hash import table_next_slot, table_clear, \
     table_contains, set_add, set_add_or_remove, set_remove, set_discard, set_pop
-from typed_python import PointerTo, Int32, UInt8
+from typed_python import PointerTo, Int32, UInt8, ListOf, TupleOf, Set, Tuple, NamedTuple, Dict, ConstDict
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
-
+from typed_python.compiler.converter_utils import (
+    ConvertDeep,
+    ConvertImplicit
+)
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
-def initialize_set_from_other(targetPtr, src):
-    # TODO: Maybe could do this directly with unsafe calls, like we do for ListOf and TupleOf.
-    target = type(targetPtr).ElementType()
+def initialize_set_from_other_implicit(ptrToOutSet, iterable, mayThrowOnFailure):
+    """Initialize a set from an arbitrary iterable object
 
-    for item in src:
-        converted_item = type(targetPtr).ElementType.ElementType(item)
-        target.add(converted_item)
+    This is called internally by the compiler to support initializing
+    a Set(T) from any other iterable object.
 
-    targetPtr.initialize(target)
+    Args:
+        ptrToOutSet - a pointer to an uninitialized Set instance.
+        mappable - something we can iterate over
+        mayThrowOnFailure - if True, we throw if we propagate exceptions
+            if we can't convert an interior element
+    Returns:
+        True if we succeeded, and ptrToOutSet is valid. False if
+        we failed, and ptrToOutSet will not point to an initialized
+        set.
+    """
+    ptrToOutSet.initialize()
+    T = ptrToOutSet.ElementType.ElementType
 
-    return True
+    try:
+        for m in iterable:
+            ptrToOutSet.get().add(ConvertImplicit(T)(m))
+
+        return True
+    except: # noqa
+        ptrToOutSet.destroy()
+
+        if mayThrowOnFailure:
+            raise
+
+        return False
+
+
+def initialize_set_from_other_deep(ptrToOutSet, iterable, mayThrowOnFailure):
+    """Initialize a set from an arbitrary iterable object
+
+    This is called internally by the compiler to support initializing
+    a Set(T) from any other iterable object.
+
+    Args:
+        ptrToOutSet - a pointer to an uninitialized Set instance.
+        mappable - something we can iterate over
+        mayThrowOnFailure - if True, we throw if we propagate exceptions
+            if we can't convert an interior element
+    Returns:
+        True if we succeeded, and ptrToOutSet is valid. False if
+        we failed, and ptrToOutSet will not point to an initialized
+        set.
+    """
+    ptrToOutSet.initialize()
+    T = ptrToOutSet.ElementType.ElementType
+
+    try:
+        for m in iterable:
+            ptrToOutSet.get().add(ConvertDeep(T)(m))
+
+        return True
+    except: # noqa
+        ptrToOutSet.destroy()
+
+        if mayThrowOnFailure:
+            raise
+
+        return False
 
 
 def set_union(left, right):
@@ -349,7 +402,7 @@ class SetWrapper(SetWrapperBase):
 
     def convert_set_attribute(self, context, instance, attr, expr):
         if attr == '_items_reserved':
-            val = expr.convert_to_type(int)
+            val = expr.toInt64()
             if val is None:
                 return None
             context.pushEffect(
@@ -359,7 +412,7 @@ class SetWrapper(SetWrapperBase):
             return context.pushVoid()
 
         if attr == '_top_item_slot':
-            val = expr.convert_to_type(int)
+            val = expr.toInt64()
             if val is None:
                 return None
             context.pushEffect(
@@ -369,7 +422,7 @@ class SetWrapper(SetWrapperBase):
             return context.pushVoid()
 
         if attr == '_hash_table_size':
-            val = expr.convert_to_type(int)
+            val = expr.toInt64()
             if val is None:
                 return None
             context.pushEffect(
@@ -379,7 +432,7 @@ class SetWrapper(SetWrapperBase):
             return context.pushVoid()
 
         if attr == '_hash_table_count':
-            val = expr.convert_to_type(int)
+            val = expr.toInt64()
             if val is None:
                 return None
             context.pushEffect(
@@ -389,7 +442,7 @@ class SetWrapper(SetWrapperBase):
             return context.pushVoid()
 
         if attr == '_hash_table_empty_slots':
-            val = expr.convert_to_type(int)
+            val = expr.toInt64()
             if val is None:
                 return None
             context.pushEffect(
@@ -504,28 +557,28 @@ class SetWrapper(SetWrapperBase):
                 return context.call_py_function(set_superset, (instance, args[0]), {})
 
             if methodname == "add":
-                key = args[0].convert_to_type(self.keyType, explicit=False)
+                key = args[0].convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
                 if key is None:
                     return None
 
                 return context.call_py_function(set_add, (instance, key), {})
 
             if methodname == "remove":
-                key = args[0].convert_to_type(self.keyType, explicit=False)
+                key = args[0].convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
                 if key is None:
                     return None
 
                 return context.call_py_function(set_remove, (instance, key), {})
 
             if methodname == "discard":
-                key = args[0].convert_to_type(self.keyType, explicit=False)
+                key = args[0].convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
                 if key is None:
                     return None
 
                 return context.call_py_function(set_discard, (instance, key), {})
 
             if methodname in ("getKeyByIndexUnsafe", "deleteItemByIndexUnsafe"):
-                index = args[0].convert_to_type(int)
+                index = args[0].toInt64()
                 if index is None:
                     return None
 
@@ -544,11 +597,11 @@ class SetWrapper(SetWrapperBase):
 
         if len(args) == 2:
             if methodname == "initializeKeyByIndexUnsafe":
-                index = args[0].convert_to_type(int)
+                index = args[0].toInt64()
                 if index is None:
                     return None
 
-                key = args[1].convert_to_type(self.keyType)
+                key = args[1].convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
                 if key is None:
                     return None
 
@@ -613,7 +666,7 @@ class SetWrapper(SetWrapperBase):
 
     def convert_bin_op_reverse(self, context, right, op, left, inplace):
         if op.matches.In:
-            left = left.convert_to_type(self.keyType, False)
+            left = left.convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
             if left is None:
                 return None
 
@@ -667,83 +720,95 @@ class SetWrapper(SetWrapperBase):
         if len(args) == 1 and not kwargs:
             if args[0].expr_type == self:
                 return context.call_py_function(set_duplicate, (args[0],), {})
-            return args[0].convert_to_type(self, True)
+            return args[0].convert_to_type(self, ConversionLevel.New)
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
-    def _can_convert_to_type(self, otherType, explicit):
-        convertible = (
-            TupleOrListOfWrapper,
-            typed_python.compiler.type_wrappers.set_wrapper.SetWrapper,
-            DictWrapper,
-            ConstDictWrapper,
-            TupleWrapper  # doesn't have .ElementType, length must match
+    def _can_convert_from_type(self, otherType, conversionLevel):
+        if not conversionLevel.isNewOrHigher():
+            # Set only allows 'new' conversions.
+            return False
+
+        # note that if the other object is an untyped container, then the
+        # pathway in python_object_of_type will take care of it.
+        childLevel = (
+            ConversionLevel.DeepNew if conversionLevel == ConversionLevel.DeepNew
+            else
+            ConversionLevel.Implicit
         )
-        if explicit and isinstance(otherType, convertible):
-            if isinstance(otherType, TupleWrapper):
-                destEltType = typeWrapper(otherType.unionType)
-            else:
-                destEltType = typeWrapper(otherType.typeRepresentation.ElementType)
-            sourceEltType = typeWrapper(self.typeRepresentation.ElementType)
 
-            ret = sourceEltType.can_convert_to_type(destEltType, True)
-            if isinstance(otherType, TupleWrapper) and ret:
-                return "Maybe"  # since length might not match
-            return ret
+        if issubclass(otherType.typeRepresentation, (ListOf, TupleOf, Set, Dict, ConstDict)):
+            # check if we can _definitely_ convert
+            if typeWrapper(otherType.typeRepresentation.ElementType).can_convert_to_type(
+                self.typeRepresentation.ElementType,
+                childLevel
+            ) is True:
+                return True
 
-        return super()._can_convert_to_type(otherType, explicit)
+            return "Maybe"
 
-    def _can_convert_from_type(self, otherType, explicit):
-        convertible = (
-            TupleOrListOfWrapper,
-            typed_python.compiler.type_wrappers.set_wrapper.SetWrapper,
-            DictWrapper,
-            ConstDictWrapper,
-            TupleWrapper  # doesn't have .ElementType
+        if issubclass(otherType.typeRepresentation, (Tuple, NamedTuple)):
+            allConvertible = True
+
+            for t in otherType.typeRepresentation.ElementTypes:
+                canDoIt = typeWrapper(t).can_convert_to_type(self.typeRepresentation.ElementType, childLevel)
+                if canDoIt is False:
+                    return False
+
+                if canDoIt is not True:
+                    allConvertible = False
+
+            if allConvertible:
+                return True
+
+            return "Maybe"
+
+        return super()._can_convert_from_type(otherType, conversionLevel)
+
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure=False):
+        canConvert = self._can_convert_from_type(sourceVal.expr_type, conversionLevel)
+
+        if canConvert is False:
+            return super().convert_to_self_with_target(context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure)
+
+        converter = (
+            initialize_set_from_other_deep if conversionLevel == ConversionLevel.DeepNew
+            else
+            initialize_set_from_other_implicit
         )
-        if explicit and isinstance(otherType, convertible):
-            if isinstance(otherType, TupleWrapper):
-                minimum = True
-                destEltType = typeWrapper(self.typeRepresentation.ElementType)
-                for one_src in otherType.typeRepresentation.ElementTypes:
-                    sourceEltType = typeWrapper(one_src)
-                    cvt_one = sourceEltType.can_convert_to_type(destEltType, True)
-                    if cvt_one is False:
-                        return False
-                    if cvt_one == "Maybe":
-                        minimum = "Maybe"
-                return minimum
-            else:
-                sourceEltType = typeWrapper(otherType.typeRepresentation.ElementType)
-            destEltType = typeWrapper(self.typeRepresentation.ElementType)
 
-            return sourceEltType.can_convert_to_type(destEltType, True)
+        res = context.call_py_function(
+            converter,
+            (targetVal.asPointer(), sourceVal, context.constant(mayThrowOnFailure)),
+            {}
+        )
 
-        return super()._can_convert_from_type(otherType, explicit)
+        if canConvert is True:
+            return context.constant(True)
 
-    def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
-        convertible = (SetWrapper, TupleWrapper, TupleOrListOfWrapper, DictWrapper, ConstDictWrapper)
-        if explicit and isinstance(sourceVal.expr_type, convertible):
-            canConvert = self._can_convert_from_type(sourceVal.expr_type, True)
+        return res
 
-            if canConvert is False:
-                return context.constant(False)
+    def _can_convert_to_type(self, targetType, conversionLevel):
+        if not conversionLevel.isNewOrHigher():
+            return False
 
-            res = context.call_py_function(
-                initialize_set_from_other,
-                (targetVal.asPointer(), sourceVal),
-                {}
+        if targetType.typeRepresentation is bool:
+            return True
+
+        if targetType.typeRepresentation is str:
+            return "Maybe"
+
+        return False
+
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if targetVal.expr_type.typeRepresentation is bool:
+            res = context.pushPod(bool, self.convert_len_native(instance.nonref_expr).neq(0))
+            context.pushEffect(
+                targetVal.expr.store(res.nonref_expr)
             )
+            return context.constant(True)
 
-            if canConvert is True:
-                return context.constant(True)
-
-            return res
-
-        return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
-
-    def convert_bool_cast(self, context, expr):
-        return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
 
 class SetMakeIteratorWrapper(SetWrapperBase):

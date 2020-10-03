@@ -84,11 +84,11 @@ class ValueWrapper(Wrapper):
     def convert_abs(self, context, expr):
         return context.constant(self.typeRepresentation.Value).convert_abs()
 
-    def can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
+    def _can_convert_to_type(self, otherType, conversionLevel) -> OneOf(False, True, "Maybe"):  # noqa
         return "Maybe"
 
-    def convert_to_type_with_target(self, context, expr, targetVal, explicit):
-        return context.constant(self.typeRepresentation.Value).convert_to_type_with_target(targetVal, explicit)
+    def convert_to_type_with_target(self, context, expr, targetVal, conversionLevel, mayThrowOnFailure=False):
+        return context.constant(self.typeRepresentation.Value).convert_to_type_with_target(targetVal, conversionLevel, mayThrowOnFailure)
 
-    def convert_to_self_with_target(self, context, targetVal, otherExpr, explicit):
+    def convert_to_self_with_target(self, context, targetVal, otherExpr, conversionLevel, mayThrowOnFailure=False):
         return context.constant(self.typeRepresentation.Value) == otherExpr

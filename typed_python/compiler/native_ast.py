@@ -608,15 +608,39 @@ def const_uint64_expr(i):
     )
 
 
-def const_int32_expr(i):
+def const_uint32_expr(i):
     return Expression.Constant(
-        val=Constant.Int(bits=32, val=i, signed=True)
+        val=Constant.Int(bits=32, val=i, signed=False)
+    )
+
+
+def const_uint16_expr(i):
+    return Expression.Constant(
+        val=Constant.Int(bits=16, val=i, signed=False)
     )
 
 
 def const_uint8_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=8, val=i, signed=False)
+    )
+
+
+def const_int32_expr(i):
+    return Expression.Constant(
+        val=Constant.Int(bits=32, val=i, signed=True)
+    )
+
+
+def const_int16_expr(i):
+    return Expression.Constant(
+        val=Constant.Int(bits=16, val=i, signed=True)
+    )
+
+
+def const_int8_expr(i):
+    return Expression.Constant(
+        val=Constant.Int(bits=8, val=i, signed=True)
     )
 
 

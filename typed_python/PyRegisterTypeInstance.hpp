@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <numpy/arrayscalars.h>
 #include "PyInstance.hpp"
 #include "PromotesTo.hpp"
 #include <cmath>
@@ -409,8 +410,60 @@ public:
 
     inline T get() { return *(T*)dataPtr(); }
 
-    static void copyConstructFromPythonInstanceConcrete(RegisterType<T>* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-        Type::TypeCategory cat = eltType->getTypeCategory();
+    static bool isNumpyFloatType(PyTypeObject* t) {
+        return (
+            t == &PyHalfArrType_Type
+            || t == &PyFloatArrType_Type
+            || t == &PyDoubleArrType_Type
+            || t == &PyLongDoubleArrType_Type
+        );
+    }
+
+    static bool isNumpyIntType(PyTypeObject* t) {
+        return (
+            t == &PyByteArrType_Type
+            || t == &PyShortArrType_Type
+            || t == &PyIntArrType_Type
+            || t == &PyLongArrType_Type
+            || t == &PyLongLongArrType_Type
+            || t == &PyUByteArrType_Type
+            || t == &PyUShortArrType_Type
+            || t == &PyUIntArrType_Type
+            || t == &PyULongArrType_Type
+            || t == &PyULongLongArrType_Type
+        );
+    }
+
+    static bool isNumpyScalarType(PyTypeObject* t) {
+        return t == &PyBoolArrType_Type || isNumpyFloatType(t) || isNumpyIntType(t);
+    }
+
+    static Type::TypeCategory numpyScalarTypeToBestCategory(PyTypeObject* t) {
+        if (t == &PyBoolArrType_Type) { return Type::TypeCategory::catBool; }
+        if (t == &PyHalfArrType_Type) { return Type::TypeCategory::catFloat32; }
+        if (t == &PyFloatArrType_Type) { return Type::TypeCategory::catFloat32; }
+        if (t == &PyDoubleArrType_Type) { return Type::TypeCategory::catFloat64; }
+        if (t == &PyLongDoubleArrType_Type) { return Type::TypeCategory::catFloat64; }
+        if (t == &PyByteArrType_Type) { return Type::TypeCategory::catInt8; }
+        if (t == &PyShortArrType_Type) { return Type::TypeCategory::catInt16; }
+        if (t == &PyIntArrType_Type) { return Type::TypeCategory::catInt32; }
+        if (t == &PyLongArrType_Type) {
+            return sizeof(long) == 8 ? Type::TypeCategory::catInt64 : Type::TypeCategory::catInt32;
+        }
+        if (t == &PyLongLongArrType_Type) { return Type::TypeCategory::catInt64; }
+        if (t == &PyUByteArrType_Type) { return Type::TypeCategory::catUInt8; }
+        if (t == &PyUShortArrType_Type) { return Type::TypeCategory::catUInt16; }
+        if (t == &PyUIntArrType_Type) { return Type::TypeCategory::catUInt32; }
+        if (t == &PyULongArrType_Type) {
+            return sizeof(long) == 8 ? Type::TypeCategory::catUInt64 : Type::TypeCategory::catUInt32;
+        }
+        if (t == &PyULongLongArrType_Type) { return Type::TypeCategory::catUInt64; }
+
+        throw std::runtime_error("Type is not a numpy type.");
+    }
+
+    static void copyConstructFromPythonInstanceConcrete(RegisterType<T>* targetType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
+        Type::TypeCategory targetCat = targetType->getTypeCategory();
 
         std::pair<Type*, instance_ptr> typeAndPtr = extractTypeAndPtrFrom(pyRepresentation);
         Type* other = typeAndPtr.first;
@@ -419,7 +472,7 @@ public:
         if (other) {
             Type::TypeCategory otherCat = other->getTypeCategory();
 
-            if (otherCat == cat || isExplicit) {
+            if (RegisterTypeProperties::isValidConversion(otherCat, targetCat, level)) {
                 if (otherCat == Type::TypeCategory::catUInt64) {
                     ((T*)tgt)[0] = *(uint64_t*)otherDataPtr;
                     return;
@@ -467,128 +520,157 @@ public:
             }
         }
 
-        if (isExplicit) {
+        if (PyBool_Check(pyRepresentation) || pyRepresentation->ob_type == &PyBoolArrType_Type) {
+            if (RegisterTypeProperties::isValidConversion(Type::TypeCategory::catBool, targetCat, level)) {
+                ((T*)tgt)[0] = PyObject_IsTrue(pyRepresentation);
+                return;
+            }
+        }
+
+        if (PyFloat_Check(pyRepresentation) || isNumpyFloatType(pyRepresentation->ob_type)) {
+            Type::TypeCategory cat = Type::TypeCategory::catFloat64;
+
+            if (isNumpyFloatType(pyRepresentation->ob_type)) {
+                cat = numpyScalarTypeToBestCategory(pyRepresentation->ob_type);
+            }
+
+            if (RegisterTypeProperties::isValidConversion(cat, targetCat, level)) {
+                ((T*)tgt)[0] = PyFloat_AsDouble(pyRepresentation);
+                return;
+            }
+        }
+
+        if ((PyLong_Check(pyRepresentation) && !PyBool_Check(pyRepresentation))
+                || isNumpyIntType(pyRepresentation->ob_type)) {
+            Type::TypeCategory cat = Type::TypeCategory::catInt64;
+
+            if (isNumpyIntType(pyRepresentation->ob_type)) {
+                cat = numpyScalarTypeToBestCategory(pyRepresentation->ob_type);
+            }
+
+            if (RegisterTypeProperties::isValidConversion(cat, targetCat, level)) {
+                if (targetCat == Type::TypeCategory::catFloat64 || targetCat == Type::TypeCategory::catFloat32) {
+                    ((T*)tgt)[0] = PyFloat_AsDouble(pyRepresentation);
+                    return;
+                } else {
+                    int64_t l = PyLong_AsLongLong(pyRepresentation);
+                    if (l == -1 && PyErr_Occurred()) {
+                        PyErr_Clear();
+                        // we always want to be able to cast, even if we throw information away.
+                        uint64_t u = PyLong_AsUnsignedLongLongMask(pyRepresentation);
+
+                        if (!(u == (uint64_t)(-1) && PyErr_Occurred())) {
+                            ((T*)tgt)[0] = u;
+                            return;
+                        } else {
+                            PyErr_Clear();
+                        }
+                    } else {
+                        ((T*)tgt)[0] = l;
+                        return;
+                    }
+                }
+            }
+        }
+
+        if (level >= ConversionLevel::New) {
             //if this is an explicit cast, use python's internal type conversion
             //mechanisms, which will call methods like __bool__, __int__, or __float__ on
             //objects that have conversions defined.
-            if (cat == Type::TypeCategory::catBool) {
+            if (targetCat == Type::TypeCategory::catBool) {
                 int result = PyObject_IsTrue(pyRepresentation);
                 if (result == -1) {
+                    // use the error message created by python
                     throw PythonExceptionSet();
-                }
-
-                ((T*)tgt)[0] = (result == 1);
-                return;
-            }
-
-            bool otherIsAlternativeOrClass = other && (
-                other->getTypeCategory() == Type::TypeCategory::catConcreteAlternative
-                || other->getTypeCategory() == Type::TypeCategory::catClass
-            );
-
-            if (isInteger(cat) && !otherIsAlternativeOrClass) {
-                int64_t l = PyLong_AsLongLong(pyRepresentation);
-                if (l == -1 && PyErr_Occurred()) {
-                    PyErr_Clear();
-                    // we always want to be able to cast, even if we throw information away.
-                    uint64_t u = PyLong_AsUnsignedLongLongMask(pyRepresentation);
-                    if (u == (uint64_t)(-1) && PyErr_Occurred()) {
-                        throw PythonExceptionSet();
-                    }
-                    ((T*)tgt)[0] = u;
-                    return;
-                }
-
-                ((T*)tgt)[0] = l;
-                return;
-            }
-
-            if (isFloat(cat) && !otherIsAlternativeOrClass) {
-                double d = PyFloat_AsDouble(pyRepresentation);
-
-                if (d == -1.0 && PyErr_Occurred()) {
-                    throw PythonExceptionSet();
-                }
-
-                ((T*)tgt)[0] = d;
-                return;
-            }
-        } else {
-            //if not explicit, we need to only convert types that have a direct
-            //correspondence
-            if (cat == Type::TypeCategory::catBool) {
-                if (PyBool_Check(pyRepresentation)) {
-                    int result = PyObject_IsTrue(pyRepresentation);
-                    if (result == -1) {
-                        throw PythonExceptionSet();
-                    }
-
+                } else {
                     ((T*)tgt)[0] = (result == 1);
                     return;
                 }
             }
 
-            if (cat == Type::TypeCategory::catUInt64) {
-                if (PyLong_CheckExact(pyRepresentation)) {
-                    ((T*)tgt)[0] = PyLong_AsUnsignedLongLongMask(pyRepresentation);
+            if (RegisterTypeProperties::isInteger(targetCat)) {
+                PyObjectStealer asLong(PyNumber_Long(pyRepresentation));
+                if (!asLong) {
+                    // use the error message created by python
+                    throw PythonExceptionSet();
+                }
+
+                int64_t l = PyLong_AsLongLong(asLong);
+                if (l == -1 && PyErr_Occurred()) {
+                    PyErr_Clear();
+                    // we always want to be able to cast, even if we throw information away.
+                    uint64_t u = PyLong_AsUnsignedLongLongMask(asLong);
+                    if (!(u == (uint64_t)(-1) && PyErr_Occurred())) {
+                        ((T*)tgt)[0] = u;
+                        return;
+                    } else {
+                        // use the error message creaed by python
+                        throw PythonExceptionSet();
+                    }
+                } else {
+                    ((T*)tgt)[0] = l;
                     return;
                 }
             }
 
-            if (isInteger(cat)) {
-                if (PyLong_CheckExact(pyRepresentation)) {
-                    ((T*)tgt)[0] = PyLong_AsLongLong(pyRepresentation);
-                    return;
+            if (RegisterTypeProperties::isFloat(targetCat)) {
+                PyObjectStealer asFloat(PyNumber_Float(pyRepresentation));
+                if (!asFloat) {
+                    // use the error message created by python
+                    throw PythonExceptionSet();
                 }
-            }
 
-            if (isFloat(cat)) {
-                if (PyFloat_Check(pyRepresentation)) {
-                    ((T*)tgt)[0] = PyFloat_AsDouble(pyRepresentation);
+                double d = PyFloat_AsDouble(asFloat);
+
+                if (d == -1.0 && PyErr_Occurred()) {
+                    // use the error message created by python
+                    throw PythonExceptionSet();
+                } else {
+                    ((T*)tgt)[0] = d;
                     return;
                 }
             }
         }
 
-        PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, isExplicit);
+        PyInstance::copyConstructFromPythonInstanceConcrete(targetType, tgt, pyRepresentation, level);
     }
 
-    static bool isUnsigned(Type::TypeCategory cat) {
-        return (cat == Type::TypeCategory::catUInt64 ||
-                cat == Type::TypeCategory::catUInt32 ||
-                cat == Type::TypeCategory::catUInt16 ||
-                cat == Type::TypeCategory::catUInt8 ||
-                cat == Type::TypeCategory::catBool
-                );
-    }
-    static bool isInteger(Type::TypeCategory cat) {
-        return (cat == Type::TypeCategory::catInt64 ||
-                cat == Type::TypeCategory::catInt32 ||
-                cat == Type::TypeCategory::catInt16 ||
-                cat == Type::TypeCategory::catInt8 ||
-                cat == Type::TypeCategory::catUInt64 ||
-                cat == Type::TypeCategory::catUInt32 ||
-                cat == Type::TypeCategory::catUInt16 ||
-                cat == Type::TypeCategory::catUInt8
-                );
-    }
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* t, PyObject* pyRepresentation, ConversionLevel level) {
+        if (PyFloat_Check(pyRepresentation)) {
+            return RegisterTypeProperties::isValidConversion(Type::TypeCategory::catFloat64, t->getTypeCategory(), level);
+        }
 
-    static bool isFloat(Type::TypeCategory cat) {
-        return (cat == Type::TypeCategory::catFloat64 ||
-                cat == Type::TypeCategory::catFloat32
-                );
-    }
+        if ((PyLong_Check(pyRepresentation) && !PyBool_Check(pyRepresentation))) {
+            return RegisterTypeProperties::isValidConversion(Type::TypeCategory::catInt64, t->getTypeCategory(), level);
+        }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* t, PyObject* pyRepresentation, bool isExplicit) {
-        if (isFloat(t->getTypeCategory()))  {
-            if (PyFloat_Check(pyRepresentation)) {
-                return isExplicit || t->getTypeCategory() == Type::TypeCategory::catFloat64;
+        if (PyBool_Check(pyRepresentation)) {
+            return RegisterTypeProperties::isValidConversion(Type::TypeCategory::catBool, t->getTypeCategory(), level);
+        }
+
+        if (isNumpyScalarType(pyRepresentation->ob_type)) {
+            return RegisterTypeProperties::isValidConversion(
+                numpyScalarTypeToBestCategory(pyRepresentation->ob_type),
+                t->getTypeCategory(),
+                level
+            );
+        }
+
+        if (Type* otherT = extractTypeFrom(pyRepresentation->ob_type)) {
+            if (RegisterTypeProperties::isValidConversion(otherT->getTypeCategory(), t->getTypeCategory(), level)) {
+                return true;
             }
+        }
 
-            if (!isExplicit) {
-                return false;
-            }
+        if (level < ConversionLevel::New) {
+            return false;
+        }
 
+        if (PyUnicode_Check(pyRepresentation) || PyBytes_Check(pyRepresentation)) {
+            return true;
+        }
+
+        if (RegisterTypeProperties::isFloat(t->getTypeCategory()))  {
             if (!pyRepresentation->ob_type->tp_as_number) {
                 return false;
             }
@@ -596,15 +678,7 @@ public:
             return pyRepresentation->ob_type->tp_as_number->nb_float != nullptr;
         }
 
-        if (isInteger(t->getTypeCategory()))  {
-            if (PyLong_Check(pyRepresentation)) {
-                return isExplicit || t->getTypeCategory() == Type::TypeCategory::catInt64;
-            }
-
-            if (!isExplicit) {
-                return false;
-            }
-
+        if (RegisterTypeProperties::isInteger(t->getTypeCategory()))  {
             if (!pyRepresentation->ob_type->tp_as_number) {
                 return false;
             }
@@ -613,19 +687,7 @@ public:
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catBool) {
-            if (isExplicit) {
-                return true;
-            }
-
-            return PyBool_Check(pyRepresentation);
-        }
-
-        if (Type* otherT = extractTypeFrom(pyRepresentation->ob_type)) {
-            Type::TypeCategory otherCat = otherT->getTypeCategory();
-
-            if (isInteger(otherCat) || isFloat(otherCat) || otherCat == Type::TypeCategory::catBool) {
-                return true;
-            }
+            return true;
         }
 
         return false;
@@ -669,12 +731,12 @@ public:
             T val = get();
             return extractPythonObject((instance_ptr)&val, type());
         }
-        if (strcmp(op, "__invert__") == 0 && isInteger(type()->getTypeCategory())) {
+        if (strcmp(op, "__invert__") == 0 && RegisterTypeProperties::isInteger(type()->getTypeCategory())) {
             T val = get();
             val = bitInvert(val);
             return extractPythonObject((instance_ptr)&val, type());
         }
-        if (strcmp(op, "__index__") == 0 && isInteger(type()->getTypeCategory())) {
+        if (strcmp(op, "__index__") == 0 && RegisterTypeProperties::isInteger(type()->getTypeCategory())) {
             int64_t val = get();
             return PyLong_FromLong(val);
         }
@@ -864,31 +926,20 @@ public:
     static void mirrorTypeInformationIntoPyTypeConcrete(RegisterType<T>* type, PyTypeObject* pyType) {
         //expose 'ElementType' as a member of the type object
         PyDict_SetItemString(pyType->tp_dict, "IsFloat",
-            isFloat(type->getTypeCategory()) ? Py_True : Py_False
+            RegisterTypeProperties::isFloat(type->getTypeCategory()) ? Py_True : Py_False
             );
         PyDict_SetItemString(pyType->tp_dict, "IsInteger",
-            isInteger(type->getTypeCategory()) ? Py_True : Py_False
+            RegisterTypeProperties::isInteger(type->getTypeCategory()) ? Py_True : Py_False
             );
         PyDict_SetItemString(pyType->tp_dict, "IsSignedInt",
-            isInteger(type->getTypeCategory()) && !isUnsigned(type->getTypeCategory()) ? Py_True : Py_False
+            RegisterTypeProperties::isInteger(type->getTypeCategory())
+            && !RegisterTypeProperties::isUnsigned(type->getTypeCategory()) ? Py_True : Py_False
             );
         PyDict_SetItemString(pyType->tp_dict, "IsUnsignedInt",
-            isUnsigned(type->getTypeCategory()) ? Py_True : Py_False
+            RegisterTypeProperties::isUnsigned(type->getTypeCategory()) ? Py_True : Py_False
             );
         PyDict_SetItemString(pyType->tp_dict, "Bits",
-            PyLong_FromLong(
-                type->getTypeCategory() == Type::TypeCategory::catBool ? 1 :
-                type->getTypeCategory() == Type::TypeCategory::catInt8 ? 8 :
-                type->getTypeCategory() == Type::TypeCategory::catInt16 ? 16 :
-                type->getTypeCategory() == Type::TypeCategory::catInt32 ? 32 :
-                type->getTypeCategory() == Type::TypeCategory::catInt64 ? 64 :
-                type->getTypeCategory() == Type::TypeCategory::catUInt8 ? 8 :
-                type->getTypeCategory() == Type::TypeCategory::catUInt16 ? 16 :
-                type->getTypeCategory() == Type::TypeCategory::catUInt32 ? 32 :
-                type->getTypeCategory() == Type::TypeCategory::catUInt64 ? 64 :
-                type->getTypeCategory() == Type::TypeCategory::catFloat32 ? 32 :
-                type->getTypeCategory() == Type::TypeCategory::catFloat64 ? 64 : -1
-                )
+            PyLong_FromLong(RegisterTypeProperties::bits(type))
             );
     }
 

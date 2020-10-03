@@ -20,7 +20,7 @@ Class* PyClassInstance::type() {
     return (Class*)extractTypeFrom(((PyObject*)this)->ob_type);
 }
 
-bool PyClassInstance::pyValCouldBeOfTypeConcrete(Class* type, PyObject* pyRepresentation, bool isExplicit) {
+bool PyClassInstance::pyValCouldBeOfTypeConcrete(Class* type, PyObject* pyRepresentation, ConversionLevel level) {
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
     return argType && (
@@ -41,7 +41,7 @@ PyObject* PyClassInstance::extractPythonObjectConcrete(Type* eltType, instance_p
     });
 }
 
-void PyClassInstance::copyConstructFromPythonInstanceConcrete(Class* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+void PyClassInstance::copyConstructFromPythonInstanceConcrete(Class* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
     std::pair<Type*, instance_ptr> typeAndPtr = extractTypeAndPtrFrom(pyRepresentation);
     Type* argType = typeAndPtr.first;
     instance_ptr argDataPtr = typeAndPtr.second;
@@ -65,7 +65,7 @@ void PyClassInstance::copyConstructFromPythonInstanceConcrete(Class* eltType, in
         return;
     }
 
-    PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, isExplicit);
+    PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, level);
 }
 
 void PyClassInstance::initializeClassWithDefaultArguments(Class* cls, uint8_t* data, PyObject* args, PyObject* kwargs) {
@@ -139,7 +139,7 @@ int PyClassInstance::classInstanceSetAttributeFromPyObject(Class* cls, instance_
     } else {
         instance_ptr tempObj = (instance_ptr)malloc(eltType->bytecount());
         try {
-            copyConstructFromPythonInstance(eltType, tempObj, attrVal, true /* set isExplicit to True */ );
+            copyConstructFromPythonInstance(eltType, tempObj, attrVal, ConversionLevel::ImplicitContainers);
         } catch(PythonExceptionSet& e) {
             free(tempObj);
             return -1;

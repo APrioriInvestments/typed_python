@@ -14,10 +14,10 @@
 
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 from typed_python.compiler.typed_expression import TypedExpression
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
-from typed_python.compiler.type_wrappers.arithmetic_wrapper import FloatWrapper, IntWrapper
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
@@ -107,25 +107,19 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             )
         ).load()
 
-    def _can_convert_to_type(self, otherType, explicit):
-        if otherType.typeRepresentation is bool:
-            return True
+    def _can_convert_to_type(self, otherType, conversionLevel):
         if isinstance(otherType, ClassWrapper):
             if otherType.typeRepresentation in self.typeRepresentation.MRO:
                 return True
             elif self.typeRepresentation in otherType.typeRepresentation.MRO:
                 return "Maybe"
-        if isinstance(otherType, IntWrapper):
-            return "Maybe"
-        if isinstance(otherType, FloatWrapper):
-            return "Maybe"
 
+        return super()._can_convert_to_type(otherType, conversionLevel)
+
+    def _can_convert_from_type(self, otherType, conversionLevel):
         return False
 
-    def _can_convert_from_type(self, otherType, explicit):
-        return False
-
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         otherType = targetVal.expr_type
 
         if isinstance(otherType, ClassWrapper):
@@ -135,7 +129,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
                 context.pushEffect(
                     targetVal.expr.store(
-                        self.withDispatchIndex(e, index)
+                        self.withDispatchIndex(instance, index)
                     )
                 )
                 targetVal.convert_incref()
@@ -145,7 +139,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             elif self.typeRepresentation in otherType.typeRepresentation.MRO:
                 raise Exception("Downcast in compiled code not implemented yet")
 
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
     def get_layout_pointer(self, nonref_expr):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.
@@ -339,7 +333,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             ix = attribute
 
         if ix is None:
-            if self.has_method(context, instance, "__getattr__"):
+            if self.has_method("__getattr__"):
                 return self.convert_method_call(context, instance, "__getattr__", (context.constant(attribute),), {})
             return super().convert_attribute(context, instance, attribute)
 
@@ -356,21 +350,19 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
     def resultTypesForCall(self, func, argTypes, kwargTypes):
         resultTypes = set()
 
-        for isExplicit in [False, True]:
+        for conversionLevel in ConversionLevel.functionConversionSequence():
             for o in func.overloads:
                 # check each overload that we might match.
-                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(o, argTypes, kwargTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(o, argTypes, kwargTypes, conversionLevel)
 
-                if mightMatch is False:
-                    return resultTypes
+                if mightMatch is not False:
+                    if o.returnType is None:
+                        resultTypes.add(object)
+                    else:
+                        resultTypes.add(o.returnType)
 
-                if o.returnType is None:
-                    resultTypes.add(object)
-                else:
-                    resultTypes.add(o.returnType)
-
-                if mightMatch is True:
-                    return resultTypes
+                    if mightMatch is True:
+                        return resultTypes
 
         return resultTypes
 
@@ -380,7 +372,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             or self.typeRepresentation.PropertyFunctions.get(name)
         )
 
-    def has_method(self, context, instance, methodName):
+    def has_method(self, methodName):
         assert isinstance(methodName, str)
         return self.getMethodOrPropertyBody(methodName) is not None
 
@@ -420,13 +412,13 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         # of a base class implementation.
 
         # first, see if there is exacly one possible overload
-        overloadAndIsExplicit = PythonTypedFunctionWrapper.pickSingleOverloadForCall(func, argTypes, kwargTypes)
+        overloadAndConversionLevel = PythonTypedFunctionWrapper.pickSingleOverloadForCall(func, argTypes, kwargTypes)
 
-        if overloadAndIsExplicit is not None:
+        if overloadAndConversionLevel is not None:
             return self.dispatchToSingleOverload(
                 context,
-                overloadAndIsExplicit[0],
-                overloadAndIsExplicit[1],
+                overloadAndConversionLevel[0],
+                overloadAndConversionLevel[1],
                 methodName,
                 instance,
                 args,
@@ -465,13 +457,13 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             )
         )
 
-        return context.call_typed_call_target(dispatchToOverloads, [instance] + args)
+        return context.call_typed_call_target(dispatchToOverloads, [instance] + args + list(kwargs.values()))
 
     def generateMethodDispatch(self, context, methodName, methodReturnType, args, argNames):
         """Generate native code that tries to dispatch to each of func's overloads
 
-        We try each overload, first with 'isExplicit' as False, then with True. The first one that
-        succeeds gets to produce the output.
+        We try each overload, with conversionLevel going up through the alternatives.
+        The first one that succeeds gets to produce the output.
 
         Args:
             context - an ExpressionConversionContext
@@ -489,25 +481,26 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         argTypes = [a.expr_type for i, a in enumerate(args) if argNames[i] is None]
         kwargTypes = {argNames[i]: a.expr_type for i, a in enumerate(args) if argNames[i] is not None}
 
-        def makeOverloadDispatcher(overload, isExplicit):
+        def makeOverloadDispatcher(overload, conversionLevel):
             return lambda context, _, outputVar, *args: self.generateOverloadDispatch(
-                context, methodName, overload, isExplicit, outputVar, args, argNames
+                context, methodName, overload, conversionLevel, outputVar, args, argNames
             )
 
-        for isExplicit in [False, True]:
+        for conversionLevel in ConversionLevel.functionConversionSequence():
             for overloadIndex, overload in enumerate(func.overloads):
-                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, argTypes, kwargTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, argTypes, kwargTypes, conversionLevel)
 
                 if mightMatch is not False:
                     overloadRetType = overload.returnType or object
 
                     testSingleOverloadForm = context.converter.defineNativeFunction(
-                        f'call_overload.{self}.{methodName}.{overloadIndex}.{isExplicit}.{argTypes[1:]}.{kwargTypes}->{overloadRetType}',
-                        ('call_overload', self, methodName, overloadIndex, isExplicit,
+                        f'call_overload.{self}.{methodName}.{overloadIndex}.'
+                        f'{conversionLevel.LEVEL}.{argTypes[1:]}.{kwargTypes}->{overloadRetType}',
+                        ('call_overload', self, methodName, overloadIndex, conversionLevel.LEVEL,
                          overloadRetType, tuple(argTypes[1:]), tuple(kwargTypes.items())),
                         [PointerTo(overloadRetType)] + list(argTypes) + list(kwargTypes.values()),
                         typeWrapper(bool),
-                        makeOverloadDispatcher(overload, isExplicit)
+                        makeOverloadDispatcher(overload, conversionLevel)
                     )
 
                     outputSlot = context.allocateUninitializedSlot(overloadRetType)
@@ -522,7 +515,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                             context.markUninitializedSlotInitialized(outputSlot)
 
                             # upcast the result
-                            actualResult = outputSlot.convert_to_type(methodReturnType)
+                            actualResult = outputSlot.convert_to_type(methodReturnType, ConversionLevel.Signature)
 
                             if actualResult is not None:
                                 context.pushReturnValue(actualResult)
@@ -536,7 +529,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         # this should actually be hitting the interpreter instead.
         context.pushException(TypeError, f"Failed to find a dispatchable overload for {self}.{methodName} matching {args}")
 
-    def generateOverloadDispatch(self, context, methodName, overload, isExplicit, outputVar, args, argNames):
+    def generateOverloadDispatch(self, context, methodName, overload, conversionLevel, outputVar, args, argNames):
         """Produce the code that calls this specific overload.
 
         We return True if successful, False otherwise, and the output is a pointer to the result
@@ -549,7 +542,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             context - an ExpressionConversionContext
             methodName - the name of the method we're compiling
             overload - the FunctionOverload we're trying to convert.
-            isExplicit - are we using explicit conversion?
+            conversionLevel - the degree of conversion we apply to each argument.
             outputVar - a TypedExpression(PointerTo(returnType)) we're supposed to initialize.
             args - the arguments to pass to the method (including the instance)
             argNames - a list containing, for each argument, None if the argument is a positional argument,
@@ -578,13 +571,23 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         funcPtr = classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
 
+        with context.ifelse(funcPtr.cast(native_ast.Int64)) as (ifTrue, ifFalse):
+            with ifFalse:
+                # we have an empty slot. We need to compile it
+                context.pushEffect(
+                    runtime_functions.compileClassDispatch.call(
+                        classDispatchTable.cast(native_ast.VoidPtr),
+                        dispatchSlot
+                    )
+                )
+
         convertedArgs = []
 
         for argIx, argExpr in enumerate(args):
             if argIx == 0:
                 argType = args[0].expr_type
             elif argNames[argIx] is None:
-                argType = argAndKwargTypes[0][argIx - 1]
+                argType = argAndKwargTypes[0][argIx]
             else:
                 argType = argAndKwargTypes[1][argNames[argIx]]
 
@@ -592,7 +595,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
             convertedArg = context.allocateUninitializedSlot(argType)
 
-            successful = argExpr.convert_to_type_with_target(convertedArg, isExplicit)
+            successful = argExpr.convert_to_type_with_target(convertedArg, conversionLevel)
 
             with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
                 with ifFalse:
@@ -614,7 +617,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         context.pushReturnValue(context.constant(True))
 
-    def dispatchToSingleOverload(self, context, overload, explicitConversions, methodName, instance, args, kwargs):
+    def dispatchToSingleOverload(self, context, overload, conversionLevel, methodName, instance, args, kwargs):
         # pack the args/kwargs
         argTypes = [instance.expr_type] + [a.expr_type for a in args]
         kwargTypes = {k: v.expr_type for k, v in kwargs.items()}
@@ -658,7 +661,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             convertedArgs.append(
                 args[argIx].convert_to_type(
                     argAndKwargTypes[0][argIx + 1],
-                    explicit=explicitConversions
+                    conversionLevel
                 )
             )
 
@@ -669,7 +672,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             convertedArgs.append(
                 kwargs[argName].convert_to_type(
                     argAndKwargTypes[1][argName],
-                    explicit=explicitConversions
+                    conversionLevel
                 )
             )
 
@@ -729,19 +732,19 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         if ix is None:
             if value is None:
-                if self.has_method(context, instance, "__delattr__"):
+                if self.has_method("__delattr__"):
                     return self.convert_method_call(context, instance, "__delattr__", (context.constant(attribute),), {})
 
                 return RefcountedWrapper.convert_set_attribute(self, context, instance, attribute, value)
 
-            if self.has_method(context, instance, "__setattr__"):
+            if self.has_method("__setattr__"):
                 return self.convert_method_call(context, instance, "__setattr__", (context.constant(attribute), value), {})
 
             return RefcountedWrapper.convert_set_attribute(self, context, instance, attribute, value)
 
         attr_type = typeWrapper(self.typeRepresentation.MemberTypes[ix])
 
-        value = value.convert_to_type(attr_type)
+        value = value.convert_to_type(attr_type, ConversionLevel.ImplicitContainers)
         if value is None:
             return None
 
@@ -840,7 +843,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                                                 f" and {right.expr_type.typeRepresentation} with {op}")
 
     def convert_hash(self, context, expr):
-        if self.has_method(context, expr, "__hash__"):
+        if self.has_method("__hash__"):
             return self.convert_method_call(context, expr, "__hash__", (), {})
 
         layoutPtr = self.get_layout_pointer(expr.nonref_expr).cast(native_ast.UInt64)

@@ -84,10 +84,14 @@ class RangeWrapper(Wrapper):
 
         return super().convert_call(context, expr, args, kwargs)
 
-    def convert_str_cast(self, context, instance):
-        # need this to be able to print(type(r)) if r is a range, in compiled code
-        # otherwise the tuple confuses 'print'
-        return context.constant(str(self.typeRepresentation[0]))
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if conversionLevel.isNewOrHigher() and targetVal.expr_type.typeRepresentation is str:
+            targetVal.convert_copy_initialize(
+                context.constant(str(self.typeRepresentation[0]))
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
 
 class RangeInstanceWrapper(Wrapper):

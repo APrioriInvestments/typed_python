@@ -182,6 +182,8 @@ public:
 
     void reserve(instance_ptr self, size_t count);
 
+    void setSizeUnsafe(instance_ptr self, size_t count);
+
     void reverse(instance_ptr self);
 
 protected:

@@ -16,7 +16,7 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
 from typed_python import _types, OneOf, PointerTo
 from typed_python.compiler.typed_expression import TypedExpression
-
+from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
@@ -112,7 +112,7 @@ class OneOfWrapper(Wrapper):
             for i, subcontext in indicesAndContexts:
                 with subcontext:
                     if exprs[i] is not None:
-                        converted_res = exprs[i].convert_to_type(output_type, explicit=False)
+                        converted_res = exprs[i].convert_to_type(output_type, conversionLevel=ConversionLevel.Signature)
 
                         if converted_res is not None:
                             context.pushEffect(
@@ -287,20 +287,22 @@ class OneOfWrapper(Wrapper):
                     with subcontext:
                         self.refAs(context, expr, ix).convert_destroy()
 
-    def _can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
+    def _can_convert_to_type(self, otherType, conversionLevel) -> OneOf(False, True, "Maybe"):  # noqa
         if otherType == self:
             return True
 
         return "Maybe"
 
-    def _can_convert_from_type(self, targetType, explicit):
+    def _can_convert_from_type(self, targetType, conversionLevel):
         if targetType == self:
             return True
+
         if targetType.typeRepresentation in self.typeRepresentation.Types:
             return True
+
         return "Maybe"
 
-    def convert_to_type_with_target(self, context, expr, targetVal, explicit):
+    def convert_to_type_with_target(self, context, expr, targetVal, conversionLevel, mayThrowOnFailure=False):
         isInitialized = context.push(bool, lambda tgt: tgt.expr.store(native_ast.const_bool_expr(False)))
 
         allSucceed = True
@@ -312,14 +314,8 @@ class OneOfWrapper(Wrapper):
                 with subcontext:
                     concreteChild = self.refAs(context, expr, ix)
 
-                    if concreteChild.expr_type == targetVal.expr_type:
-                        # we never want to duplicate
-                        explicitThisTime = False
-                    else:
-                        explicitThisTime = explicit
-
                     converted = concreteChild.expr_type.convert_to_type_with_target(
-                        context, concreteChild, targetVal, explicitThisTime
+                        context, concreteChild, targetVal, conversionLevel
                     )
 
                     if converted is not None:
@@ -335,15 +331,15 @@ class OneOfWrapper(Wrapper):
 
         return isInitialized
 
-    def convert_to_self_with_target(self, context, targetVal, otherExpr, explicit):
+    def convert_to_self_with_target(self, context, targetVal, otherExpr, conversionLevel, mayThrowOnFailure=False):
         assert targetVal.isReference
 
         native = context.converter.defineNativeFunction(
-            f'type_convert({otherExpr.expr_type} -> {targetVal.expr_type}, explicit={explicit})',
-            ('type_convert', otherExpr.expr_type, targetVal.expr_type, explicit),
+            f'type_convert({otherExpr.expr_type} -> {targetVal.expr_type}, conversionLevel={conversionLevel.LEVEL})',
+            ('type_convert', otherExpr.expr_type, targetVal.expr_type, conversionLevel.LEVEL),
             [PointerTo(self.typeRepresentation), otherExpr.expr_type],
             bool,
-            lambda *args: self.generateConvertToSelf(*args, explicit=explicit)
+            lambda *args: self.generateConvertToSelf(*args, conversionLevel=conversionLevel)
         )
 
         didConvert = context.pushPod(
@@ -354,12 +350,12 @@ class OneOfWrapper(Wrapper):
             )
         )
 
-        if self._can_convert_from_type(otherExpr.expr_type, explicit) is True:
+        if self._can_convert_from_type(otherExpr.expr_type, conversionLevel) is True:
             return context.constant(True)
 
         return didConvert
 
-    def generateConvertToSelf(self, context, _, convertIntoPtr, convertFrom, explicit):
+    def generateConvertToSelf(self, context, _, convertIntoPtr, convertFrom, conversionLevel):
         """Store a conversion of 'convertFrom' into the pointed-to-value at convertIntoPointer."""
         assert not isinstance(convertFrom.expr_type, OneOfWrapper), "This should already have been expanded away"
 
@@ -367,11 +363,15 @@ class OneOfWrapper(Wrapper):
         # the same layout as the 'expr' for a reference to 'self'.
         targetVal = TypedExpression(context, convertIntoPtr.nonref_expr, self, True)
 
-        explicitnessPasses = [False, True] if explicit else [False]
+        conversionLevels = [x for x in ConversionLevel.functionConversionSequence() if x <= conversionLevel]
 
-        for explicitThisTime in explicitnessPasses:
-            # first, try converting without explicit turned on. If that works, that's our preferred
-            # conversion.
+        # don't pass a 'New' level of conversion into the interior types
+        # or else something like OneOf(None, str)(1.0) will attempt to convert
+        # the 1.0 to a 'str', which is not the point of a OneOf.
+        if conversionLevel >= ConversionLevel.DeepNew:
+            conversionLevels.append(conversionLevel)
+
+        for eltConversionLevel in conversionLevels:
             for ix, type in enumerate(self.typeRepresentation.Types):
                 # get a pointer to the uninitialized target as if it were the 'ix'th type
                 typedTarget = self.refAs(context, targetVal, ix)
@@ -387,36 +387,41 @@ class OneOfWrapper(Wrapper):
                     )
                     return
 
-                converted = convertFrom.expr_type.convert_to_type_with_target(
-                    context,
-                    convertFrom,
-                    typedTarget,
-                    explicitThisTime
-                )
+                canConvert = convertFrom.expr_type.can_convert_to_type(typedTarget.expr_type, eltConversionLevel)
 
-                if converted.expr.matches.Constant and converted.expr.val.matches.Int and converted.expr.val.val:
-                    # we _definitely_ match
-                    context.pushEffect(
-                        targetVal.expr.ElementPtrIntegers(0, 0).store(native_ast.const_uint8_expr(ix))
+                if canConvert is not False:
+                    converted = convertFrom.expr_type.convert_to_type_with_target(
+                        context,
+                        convertFrom,
+                        typedTarget,
+                        eltConversionLevel
                     )
-                    context.pushEffect(
-                        native_ast.Expression.Return(arg=native_ast.const_bool_expr(True))
-                    )
-                    return
 
-                if converted.expr.matches.Constant and converted.expr.val.matches.Int and not converted.expr.val.val:
-                    # we definitely didn't match
-                    pass
-                else:
-                    # maybe we matched.
-                    with context.ifelse(converted.nonref_expr) as (ifTrue, ifFalse):
-                        with ifTrue:
+                    if converted is not None:
+                        # we can get none if the conversion throws an exception
+                        if converted.expr.matches.Constant and converted.expr.val.matches.Int and converted.expr.val.val:
+                            # we _definitely_ match
                             context.pushEffect(
                                 targetVal.expr.ElementPtrIntegers(0, 0).store(native_ast.const_uint8_expr(ix))
                             )
                             context.pushEffect(
                                 native_ast.Expression.Return(arg=native_ast.const_bool_expr(True))
                             )
+                            return
+
+                        if converted.expr.matches.Constant and converted.expr.val.matches.Int and not converted.expr.val.val:
+                            # we definitely didn't match
+                            pass
+                        else:
+                            # maybe we matched.
+                            with context.ifelse(converted.nonref_expr) as (ifTrue, ifFalse):
+                                with ifTrue:
+                                    context.pushEffect(
+                                        targetVal.expr.ElementPtrIntegers(0, 0).store(native_ast.const_uint8_expr(ix))
+                                    )
+                                    context.pushEffect(
+                                        native_ast.Expression.Return(arg=native_ast.const_bool_expr(True))
+                                    )
 
         # at the end, we didn't convert
         context.pushEffect(
@@ -428,50 +433,9 @@ class OneOfWrapper(Wrapper):
             return context.push(self, lambda x: x.convert_default_initialize())
 
         if len(args) == 1 and not kwargs:
-            return args[0].convert_to_type(self, True)
+            return args[0].convert_to_type(self, ConversionLevel.New)
 
         return super().convert_type_call(context, typeInst, args, kwargs)
-
-    def can_cast_to_primitive(self, context, expr, primitiveType):
-        assert False, "Clients should already have unwrapped this oneof"
-
-    def convert_bool_cast(self, context, expr):
-        return context.expressionAsFunctionCall(
-            "oneof_convert_bool",
-            (expr,),
-            lambda expr: self.unwrap(
-                expr.context,
-                expr,
-                lambda exprUnwrapped: exprUnwrapped.convert_bool_cast()
-            ),
-            ("oneof", self, "bool_cast")
-        )
-
-    def convert_int_cast(self, context, expr):
-        return context.expressionAsFunctionCall(
-            "oneof_convert_int",
-            (expr,),
-            lambda expr: self.unwrap(
-                expr.context,
-                expr,
-                lambda exprUnwrapped: exprUnwrapped.convert_int_cast()
-            ),
-            ("oneof", self, "int_cast")
-        )
-
-        return expr.unwrap(lambda e: e.convert_int_cast())
-
-    def convert_float_cast(self, context, expr):
-        return context.expressionAsFunctionCall(
-            "oneof_convert_float",
-            (expr,),
-            lambda expr: self.unwrap(
-                expr.context,
-                expr,
-                lambda exprUnwrapped: exprUnwrapped.convert_float_cast()
-            ),
-            ("oneof", self, "float_cast")
-        )
 
     def convert_builtin(self, f, context, expr, a1=None):
         return context.expressionAsFunctionCall(
@@ -487,18 +451,6 @@ class OneOfWrapper(Wrapper):
 
         return expr.unwrap(lambda e: e.convert_builtin(f, a1))
 
-    def convert_bytes_cast(self, context, expr):
-        return context.expressionAsFunctionCall(
-            "oneof_convert_bytes",
-            (expr,),
-            lambda expr: self.unwrap(
-                expr.context,
-                expr,
-                lambda exprUnwrapped: exprUnwrapped.convert_bytes_cast()
-            ),
-            ("oneof", self, "bytes_cast")
-        )
-
     def convert_index_cast(self, context, expr):
         return context.expressionAsFunctionCall(
             "oneof_convert_index",
@@ -509,16 +461,4 @@ class OneOfWrapper(Wrapper):
                 lambda exprUnwrapped: exprUnwrapped.toIndex()
             ),
             ("oneof", self, "index_cast")
-        )
-
-    def convert_str_cast(self, context, expr):
-        return context.expressionAsFunctionCall(
-            "oneof_convert_str",
-            (expr,),
-            lambda expr: self.unwrap(
-                expr.context,
-                expr,
-                lambda exprUnwrapped: exprUnwrapped.convert_str_cast()
-            ),
-            ("oneof", self, "str_cast")
         )

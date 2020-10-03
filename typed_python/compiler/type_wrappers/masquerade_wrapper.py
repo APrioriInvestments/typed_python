@@ -42,9 +42,9 @@ class MasqueradeWrapper(Wrapper):
     def convert_masquerade_to_typed(self, context, instance):
         return instance.changeType(self.typeRepresentation)
 
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         # Allow the typed form of the object to perform the conversion
-        return e.convert_masquerade_to_typed().convert_to_type_with_target(targetVal, explicit)
+        return instance.convert_masquerade_to_typed().convert_to_type_with_target(targetVal, conversionLevel)
 
     def get_iteration_expressions(self, context, instance):
         return instance.convert_masquerade_to_typed().get_iteration_expressions()
@@ -111,24 +111,6 @@ class MasqueradeWrapper(Wrapper):
     def convert_abs(self, context, instance):
         return instance.convert_masquerade_to_typed().convert_abs()
 
-    def can_cast_to_primitive(self, context, instance, primitiveType):
-        return typeWrapper(self.interpreterTypeRepresentation).can_cast_to_primitive(context, instance, primitiveType)
-
-    def convert_bool_cast(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_bool_cast()
-
-    def convert_int_cast(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_int_cast()
-
-    def convert_float_cast(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_float_cast()
-
-    def convert_str_cast(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_str_cast()
-
-    def convert_bytes_cast(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_bytes_cast()
-
     def convert_builtin(self, f, context, instance, a1=None):
         return instance.convert_masquerade_to_typed().convert_builtin(f, a1)
 
@@ -138,13 +120,13 @@ class MasqueradeWrapper(Wrapper):
     def convert_unary_op(self, context, instance, op):
         return instance.convert_masquerade_to_typed().convert_unary_op(op)
 
-    def _can_convert_to_type(self, otherType, explicit):
-        return typeWrapper(self.interpreterTypeRepresentation)._can_convert_to_type(otherType, explicit)
+    def _can_convert_to_type(self, otherType, conversionLevel):
+        return typeWrapper(self.typeRepresentation)._can_convert_to_type(otherType, conversionLevel)
 
-    def _can_convert_from_type(self, otherType, explicit):
-        return typeWrapper(self.interpreterTypeRepresentation)._can_convert_from_type(otherType, explicit)
+    def _can_convert_from_type(self, otherType, conversionLevel):
+        return typeWrapper(self.typeRepresentation)._can_convert_from_type(otherType, conversionLevel)
 
-    def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure=False):
         assert False, "this should never be called"
 
     def convert_bin_op(self, context, l, op, r, inplace):

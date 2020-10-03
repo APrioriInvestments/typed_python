@@ -22,20 +22,64 @@ class PyBytesInstance : public PyInstance {
 public:
     typedef BytesType modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(BytesType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    static void copyConstructFromPythonInstanceConcrete(BytesType* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
+        if (level >= ConversionLevel::New) {
+            if (!PyBytes_Check(pyRepresentation)) {
+                std::pair<Type*, instance_ptr> typeAndPtrOfArg = extractTypeAndPtrFrom(pyRepresentation);
+
+                // fastpath for ListOf(UInt8) and TupleOf(UInt8)
+                if (typeAndPtrOfArg.first && typeAndPtrOfArg.first->isTupleOrListOf() &&
+                        ((TupleOrListOfType*)typeAndPtrOfArg.first)->getEltType()->getTypeCategory() == Type::TypeCategory::catUInt8) {
+                    TupleOrListOfType* lstType = (TupleOrListOfType*)typeAndPtrOfArg.first;
+
+                    BytesType::Make()->constructor(
+                        tgt,
+                        lstType->count(typeAndPtrOfArg.second),
+                        (const char*)lstType->eltPtr(typeAndPtrOfArg.second, 0)
+                    );
+                    return;
+                }
+
+                PyObjectStealer argTup(PyTuple_New(1));
+                PyObjectStealer emptyDict(PyDict_New());
+                PyTuple_SetItem(argTup, 0, incref(pyRepresentation));
+
+                PyObjectStealer newBytesObj(
+                    PyBytes_Type.tp_new(&PyBytes_Type, argTup, emptyDict)
+                );
+
+                if (!newBytesObj) {
+                    // take the interpreter's error
+                    throw PythonExceptionSet();
+                }
+
+                BytesType::Make()->constructor(
+                    tgt,
+                    PyBytes_GET_SIZE((PyObject*)newBytesObj),
+                    PyBytes_AsString((PyObject*)newBytesObj)
+                );
+                return;
+            }
+        }
+
         if (PyBytes_Check(pyRepresentation)) {
             BytesType::Make()->constructor(
                 tgt,
                 PyBytes_GET_SIZE(pyRepresentation),
                 PyBytes_AsString(pyRepresentation)
-                );
+            );
             return;
         }
-        throw std::logic_error("Can't initialize a Bytes object from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
+
+        PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, level);
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
+        // anything iterable can be a 'bytes'
+        if (level >= ConversionLevel::New) {
+            return true;
+        }
+
         return PyBytes_Check(pyRepresentation);
     }
 
@@ -69,4 +113,3 @@ public:
             );
     }
 };
-

@@ -50,11 +50,11 @@ public:
 
     static void mirrorTypeInformationIntoPyTypeConcrete(ConstDictType* constDictT, PyTypeObject* pyType);
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit);
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level);
 
     static bool compare_to_python_concrete(ConstDictType* dictType, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
-    static void copyConstructFromPythonInstanceConcrete(ConstDictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
+    static void copyConstructFromPythonInstanceConcrete(ConstDictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level);
 
     bool compare_as_iterator_to_python_concrete(PyObject* other, int pyComparisonOp);
 

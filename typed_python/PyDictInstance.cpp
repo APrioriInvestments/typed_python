@@ -158,7 +158,7 @@ PyObject* PyDictInstance::dictGet(PyObject* o, PyObject* args) {
         } else {
             try {
                 Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(self_w->type()->keyType(), data, item);
+                    copyConstructFromPythonInstance(self_w->type()->keyType(), data, item, ConversionLevel::UpcastContainers);
                 });
 
                 instance_ptr i = self_w->type()->lookupValueByKey(self_w->dataPtr(), key.data());
@@ -280,7 +280,7 @@ int PyDictInstance::sq_contains_concrete(PyObject* item) {
     if (mIteratorFlag == 1) {
         // we're a values iterator
         Instance value(type()->valueType(), [&](instance_ptr data) {
-            copyConstructFromPythonInstance(type()->valueType(), data, item);
+            copyConstructFromPythonInstance(type()->valueType(), data, item, ConversionLevel::UpcastContainers);
         });
 
         bool found = false;
@@ -303,7 +303,7 @@ int PyDictInstance::sq_contains_concrete(PyObject* item) {
         Type* tupType = Tuple::Make({type()->keyType(), type()->valueType()});
 
         Instance value(tupType, [&](instance_ptr data) {
-            copyConstructFromPythonInstance(tupType, data, item);
+            copyConstructFromPythonInstance(tupType, data, item, ConversionLevel::Implicit);
         });
 
         type()->visitKeyValuePairs(dataPtr(), [&](instance_ptr keyValuePairInst) {
@@ -330,7 +330,7 @@ int PyDictInstance::sq_contains_concrete(PyObject* item) {
         return 1;
     } else {
         Instance key(type()->keyType(), [&](instance_ptr data) {
-            copyConstructFromPythonInstance(type()->keyType(), data, item);
+            copyConstructFromPythonInstance(type()->keyType(), data, item, ConversionLevel::UpcastContainers);
         });
 
         instance_ptr i = type()->lookupValueByKey(dataPtr(), key.data());
@@ -368,7 +368,7 @@ PyObject* PyDictInstance::mp_subscript_concrete(PyObject* item) {
         return extractPythonObject(i, type()->valueType());
     } else {
         Instance key(type()->keyType(), [&](instance_ptr data) {
-            copyConstructFromPythonInstance(type()->keyType(), data, item);
+            copyConstructFromPythonInstance(type()->keyType(), data, item, ConversionLevel::UpcastContainers);
         });
 
         instance_ptr i = type()->lookupValueByKey(dataPtr(), key.data());
@@ -420,7 +420,7 @@ int PyDictInstance::mp_ass_subscript_concrete_keytyped(PyObject* pyKey, instance
         return mp_ass_subscript_concrete_typed(key, value_w->dataPtr());
     } else {
         Instance val(type()->valueType(), [&](instance_ptr data) {
-            copyConstructFromPythonInstance(type()->valueType(), data, value, true);
+            copyConstructFromPythonInstance(type()->valueType(), data, value, ConversionLevel::Implicit);
         });
 
         return mp_ass_subscript_concrete_typed(key, val.data());
@@ -435,7 +435,7 @@ int PyDictInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
         return mp_ass_subscript_concrete_keytyped(item, item_w->dataPtr(), value);
     } else {
         Instance key(type()->keyType(), [&](instance_ptr data) {
-            copyConstructFromPythonInstance(type()->keyType(), data, item);
+            copyConstructFromPythonInstance(type()->keyType(), data, item, ConversionLevel::UpcastContainers);
         });
 
         return mp_ass_subscript_concrete_keytyped(item, key.data(), value);
@@ -495,7 +495,13 @@ void PyDictInstance::constructFromPythonArgumentsConcrete(DictType* t, uint8_t* 
     PyInstance::constructFromPythonArgumentsConcrete(t, data, args, kwargs);
 }
 
-void PyDictInstance::copyConstructFromPythonInstanceConcrete(DictType* dictType, instance_ptr dictTgt, PyObject* pyRepresentation, bool isExplicit) {
+void PyDictInstance::copyConstructFromPythonInstanceConcrete(DictType* dictType, instance_ptr dictTgt, PyObject* pyRepresentation, ConversionLevel level) {
+    if (level < ConversionLevel::ImplicitContainers) {
+        return PyInstance::copyConstructFromPythonInstanceConcrete(dictType, dictTgt, pyRepresentation, level);
+    }
+
+    ConversionLevel childLevel = level == ConversionLevel::DeepNew ? ConversionLevel::DeepNew : ConversionLevel::Implicit;
+
     if (PyDict_Check(pyRepresentation)) {
         dictType->constructor(dictTgt);
 
@@ -505,11 +511,11 @@ void PyDictInstance::copyConstructFromPythonInstanceConcrete(DictType* dictType,
 
             while (PyDict_Next(pyRepresentation, &pos, &key, &value)) {
                 Instance keyInst(dictType->keyType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(dictType->keyType(), data, key);
+                    copyConstructFromPythonInstance(dictType->keyType(), data, key, childLevel);
                 });
 
                 Instance valueInst(dictType->valueType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(dictType->valueType(), data, value);
+                    copyConstructFromPythonInstance(dictType->valueType(), data, value, childLevel);
                 });
 
                 instance_ptr valueTgt = dictType->lookupValueByKey(dictTgt, keyInst.data());
@@ -529,7 +535,43 @@ void PyDictInstance::copyConstructFromPythonInstanceConcrete(DictType* dictType,
         }
     }
 
-    PyInstance::copyConstructFromPythonInstanceConcrete(dictType, dictTgt, pyRepresentation, isExplicit);
+    // if the argument supports the mapping protocol we can just iterate in the interpreter.
+    if (PyMapping_Check(pyRepresentation)) {
+        dictType->constructor(dictTgt);
+
+        try {
+            iterate(pyRepresentation, [&](PyObject* key) {
+                PyObjectHolder value(PyObject_GetItem(pyRepresentation, key));
+                if (!value) {
+                    throw PythonExceptionSet();
+                }
+
+                Instance keyInst(dictType->keyType(), [&](instance_ptr data) {
+                    copyConstructFromPythonInstance(dictType->keyType(), data, key, childLevel);
+                });
+
+                Instance valueInst(dictType->valueType(), [&](instance_ptr data) {
+                    copyConstructFromPythonInstance(dictType->valueType(), data, value, childLevel);
+                });
+
+                instance_ptr valueTgt = dictType->lookupValueByKey(dictTgt, keyInst.data());
+
+                if (valueTgt) {
+                    dictType->valueType()->assign(dictTgt, valueInst.data());
+                } else {
+                    valueTgt = dictType->insertKey(dictTgt, keyInst.data());
+                    dictType->valueType()->copy_constructor(valueTgt, valueInst.data());
+                }
+            });
+
+            return;
+        } catch(...) {
+            dictType->destroy(dictTgt);
+            throw;
+        }
+    }
+
+    PyInstance::copyConstructFromPythonInstanceConcrete(dictType, dictTgt, pyRepresentation, level);
 }
 
 bool PyDictInstance::compare_to_python_concrete(DictType* dictType, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
@@ -568,7 +610,10 @@ bool PyDictInstance::compare_to_python_concrete(DictType* dictType, instance_ptr
 
         try {
             keyInst = Instance(dictType->keyType(), [&](instance_ptr data) {
-                copyConstructFromPythonInstance(dictType->keyType(), data, key, !exact /* explicit */);
+                copyConstructFromPythonInstance(
+                    dictType->keyType(), data, key,
+                    exact ? ConversionLevel::Signature : ConversionLevel::Implicit
+                );
             });
         } catch(PythonExceptionSet&) {
             PyErr_Clear();
@@ -635,7 +680,7 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
             i = self->type()->lookupValueByKey(self->dataPtr(), item_w->dataPtr());
         } else {
             key = Instance(keyType, [&](instance_ptr data) {
-                copyConstructFromPythonInstance(keyType, data, item);
+                copyConstructFromPythonInstance(keyType, data, item, ConversionLevel::UpcastContainers);
             });
             lookupKey = key.data();
             i = self->type()->lookupValueByKey(self->dataPtr(), key.data());
@@ -667,7 +712,7 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
                 return extractPythonObject(valueTgt, self->type()->valueType());
             } else {
                 Instance i(valueType, [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(valueType, data, ifNotFound);
+                    copyConstructFromPythonInstance(valueType, data, ifNotFound, ConversionLevel::Implicit);
                 });
                 instance_ptr ifNotFoundValue = i.data();
                 instance_ptr valueTgt = self->type()->insertKey(self->dataPtr(), lookupKey);
@@ -722,7 +767,7 @@ PyObject* PyDictInstance::pop(PyObject* o, PyObject* args) {
             keyPtr = item_w->dataPtr();
         } else {
             key = Instance(keyType, [&](instance_ptr data) {
-                copyConstructFromPythonInstance(keyType, data, item);
+                copyConstructFromPythonInstance(keyType, data, item, ConversionLevel::UpcastContainers);
             });
             keyPtr = key.data();
         }

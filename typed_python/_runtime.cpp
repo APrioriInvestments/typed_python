@@ -894,7 +894,7 @@ extern "C" {
         }
 
         StringType::layout* ret = 0;
-        PyInstance::copyConstructFromPythonInstance(StringType::Make(), (instance_ptr)&ret, s, true);
+        PyInstance::copyConstructFromPythonInstance(StringType::Make(), (instance_ptr)&ret, s, ConversionLevel::New);
         decref(s);
 
         return ret;
@@ -994,7 +994,7 @@ extern "C" {
         }
 
         BytesType::layout* ret = 0;
-        PyInstance::copyConstructFromPythonInstance(BytesType::Make(), (instance_ptr)&ret, b, true);
+        PyInstance::copyConstructFromPythonInstance(BytesType::Make(), (instance_ptr)&ret, b, ConversionLevel::New);
         decref(b);
 
         return ret;
@@ -1156,7 +1156,7 @@ extern "C" {
         PyTuple_SetItem(p, 1, value ? value : incref(Py_None));
         PyTuple_SetItem(p, 2, traceback ? traceback : incref(Py_None));
 
-        PyInstance::copyConstructFromPythonInstance(return_type, inst, p, true);
+        PyInstance::copyConstructFromPythonInstance(return_type, inst, p, ConversionLevel::New);
 
         // Since we've caught it, need to save it as the most recently caught exception.
         PyErr_SetExcInfo(type, value, traceback);
@@ -1268,22 +1268,30 @@ extern "C" {
         return ret;
     }
 
-    StringType::layout* nativepython_runtime_str(instance_ptr inst, Type* tp) {
+
+    // attempt to convert object in 'inst' of type 'tp' to a string using the interpreter
+    // on success, return True, and outStr points to a string. On failure, return false,
+    // and outStr remains uninitialized.
+    bool np_try_pyobj_to_str(instance_ptr inst, StringType::layout** outStr, Type* tp) {
         PyEnsureGilAcquired getTheGil;
 
         PyObjectStealer o(PyInstance::extractPythonObject(inst, tp));
         if (!o) {
-            throw PythonExceptionSet();
+            PyErr_Clear();
+            return false;
         }
         PyObject *r = PyObject_Str(o);
         if (!r) {
-            throw PythonExceptionSet();
+            PyErr_Clear();
+            return false;
         }
+
         Py_ssize_t s;
         const char* c = PyUnicode_AsUTF8AndSize(r, &s);
-        StringType::layout* ret =StringType::createFromUtf8(c, s);
+        *outStr = StringType::createFromUtf8(c, s);
         decref(r);
-        return ret;
+
+        return true;
     }
 
     uint64_t nativepython_pyobj_len(PythonObjectOfType::layout_type* layout) {
@@ -1638,22 +1646,44 @@ extern "C" {
     }
 
     // attempt to initialize 'tgt' of type 'tp' with data from 'obj'. Returns true if we
-    // are able to do so.
-    bool np_runtime_pyobj_to_typed(PythonObjectOfType::layout_type *layout, instance_ptr tgt, Type* tp, bool isExplicit) {
+    // are able to do so, false otherwise. If 'canThrow', then allow an exception to propagate
+    // if we can't convert.
+    bool np_runtime_pyobj_to_typed(
+        PythonObjectOfType::layout_type *layout,
+        instance_ptr tgt,
+        Type* tp,
+        int64_t conversionLevel,
+        int64_t canThrow
+    ) {
         PyEnsureGilAcquired acquireTheGil;
 
         try {
-            if (!PyInstance::pyValCouldBeOfType(tp, layout->pyObj,  isExplicit)) {
+            ConversionLevel level = intToConversionLevel(conversionLevel);
+
+            if (!PyInstance::pyValCouldBeOfType(tp, layout->pyObj, level) && !canThrow) {
                 return false;
             }
 
-            PyInstance::copyConstructFromPythonInstance(tp, tgt, layout->pyObj, isExplicit);
+            PyInstance::copyConstructFromPythonInstance(
+                tp,
+                tgt,
+                layout->pyObj,
+                level
+            );
 
             return true;
-        } catch(PythonExceptionSet&) {
+        } catch (PythonExceptionSet&) {
+            if (canThrow) {
+                throw;
+            }
+
             PyErr_Clear();
             return false;
-        } catch(...) {
+        } catch(std::exception& e) {
+            if (canThrow) {
+                PyErr_SetString(PyExc_TypeError, e.what());
+                throw PythonExceptionSet();
+            }
             return false;
         }
     }
@@ -1678,8 +1708,19 @@ extern "C" {
         std::cout << StringType::Make()->toUtf8String((instance_ptr)&layout) << std::flush;
     }
 
-    int64_t nativepython_float32_to_int(float f) {
+    /* convert a float to an int, returning true if conversion is successful.
+
+    This function writes the value into 'out' if successful. if 'canThrow', then
+    raise an exception on failure.
+
+    Type* determines what kind of instance we're writing into.
+    */
+    bool nativepython_float32_to_int(void* out, float f, bool canThrow, Type* targetType) {
         if (!std::isfinite(f)) {
+            if (!canThrow) {
+                return false;
+            }
+
             if (std::isnan(f)) {
                 PyEnsureGilAcquired acquireTheGil;
 
@@ -1694,11 +1735,26 @@ extern "C" {
             }
         }
 
-        return int64_t(f);
+        Type::TypeCategory cat = targetType->getTypeCategory();
+
+        RegisterTypeProperties::assign((instance_ptr)out, cat, f);
+
+        return true;
     }
 
-    int64_t nativepython_float64_to_int(double f) {
+    /* convert a double to an int, returning true if conversion is successful.
+
+    This function writes the value into 'out' if successful. if 'canThrow', then
+    raise an exception on failure.
+
+    Type* determines what kind of instance we're writing into.
+    */
+    bool nativepython_float64_to_int(void* out, double f, bool canThrow, Type* targetType) {
         if (!std::isfinite(f)) {
+            if (!canThrow) {
+                return false;
+            }
+
             if (std::isnan(f)) {
                 PyEnsureGilAcquired acquireTheGil;
 
@@ -1713,7 +1769,11 @@ extern "C" {
             }
         }
 
-        return int64_t(f);
+        Type::TypeCategory cat = targetType->getTypeCategory();
+
+        RegisterTypeProperties::assign((instance_ptr)out, cat, f);
+
+        return true;
     }
 
     StringType::layout* nativepython_int64_to_string(int64_t i) {
@@ -1942,7 +2002,7 @@ extern "C" {
         ListOfType *retType = ListOfType::Make(StringType::Make());
         ListOfType::layout* ret = 0;
 
-        PyInstance::copyConstructFromPythonInstance(retType, (instance_ptr)&ret, dir, true);
+        PyInstance::copyConstructFromPythonInstance(retType, (instance_ptr)&ret, dir, ConversionLevel::New);
 
         return ret;
     }
@@ -2403,36 +2463,48 @@ extern "C" {
         return res;
     }
 
-    BytesType::layout* np_pyobj_to_bytes(PythonObjectOfType::layout_type* obj) {
-        PyEnsureGilAcquired getTheGil;
-
-        PyObjectStealer bytesRep(PyObject_Bytes(obj->pyObj));
-
-        if (!bytesRep) {
+    BytesType::layout* tp_list_or_tuple_of_to_bytes(TupleOrListOfType::layout* obj, Type* typeObj) {
+        if (!typeObj->isTupleOrListOf() || !((TupleOrListOfType*)typeObj)->getEltType()->isPOD()) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_TypeError, "Expected a POD Tuple or List. Got %s", typeObj->name().c_str());
             throw PythonExceptionSet();
         }
 
-        char* buf;
-        Py_ssize_t size;
+        TupleOrListOfType* lstType = (TupleOrListOfType*)typeObj;
 
-        PyBytes_AsStringAndSize((PyObject*)bytesRep, &buf, &size);
-
-        return BytesType::createFromPtr(buf, size);
+        return BytesType::createFromPtr(
+            (const char*)obj->data,
+            obj->count * lstType->getEltType()->bytecount()
+        );
     }
 
-    StringType::layout* np_pyobj_to_str(PythonObjectOfType::layout_type* obj) {
-        PyEnsureGilAcquired getTheGil;
-
-        PyObjectStealer repr(PyObject_Str(obj->pyObj));
-        if (!repr) {
+    TupleOrListOfType::layout* tp_list_or_tuple_of_from_bytes(BytesType::layout* bytes, Type* typeObj) {
+        if (!typeObj->isTupleOrListOf() || !((TupleOrListOfType*)typeObj)->getEltType()->isPOD()) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_TypeError, "Expected a POD Tuple or List. Got %s", typeObj->name().c_str());
             throw PythonExceptionSet();
         }
 
-        Py_ssize_t s;
+        TupleOrListOfType* tupT = (TupleOrListOfType*)typeObj;
 
-        const char* c = PyUnicode_AsUTF8AndSize(repr, &s);
+        size_t bytecount = tupT->getEltType()->bytecount();
 
-        return StringType::createFromUtf8(c, s);
+        if ((bytecount == 0 && bytes->bytecount) || bytes->bytecount % bytecount) {
+            PyErr_Format(PyExc_ValueError, "Byte array must be an integer multiple of underlying type.");
+            throw PythonExceptionSet();
+        }
+
+        size_t eltCount = (bytecount == 0 ? 0 : bytes->bytecount / bytecount);
+
+        TupleOrListOfType::layout* res;
+
+        tupT->constructor((instance_ptr)&res);
+        tupT->reserve((instance_ptr)&res, eltCount);
+
+        memcpy(res->data, bytes->data, bytes->bytecount);
+
+        tupT->setSizeUnsafe((instance_ptr)&res, eltCount);
+        return res;
     }
 
     bool np_pyobj_to_bool(PythonObjectOfType::layout_type* obj) {

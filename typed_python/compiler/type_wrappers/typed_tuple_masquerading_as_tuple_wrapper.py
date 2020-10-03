@@ -58,12 +58,3 @@ class TypedTupleMasqueradingAsTuple(MasqueradeWrapper):
 
     def convert_masquerade_to_untyped(self, context, instance):
         return context.constant(tuple).convert_call([instance], {}).changeType(tuple)
-
-    def convert_bool_cast(self, context, expr):
-        return expr.convert_masquerade_to_typed().convert_bool_cast()
-
-    def convert_int_cast(self, context, expr):
-        return expr.convert_masquerade_to_typed().convert_int_cast()
-
-    def convert_float_cast(self, context, expr):
-        return expr.convert_masquerade_to_typed().convert_float_cast()

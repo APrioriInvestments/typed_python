@@ -325,22 +325,6 @@ class NativeTypesTests(unittest.TestCase):
         X2(int)
         X2(float)
 
-    def test_alternative_and_set(self):
-        A = Alternative("A", X=dict(T=TupleOf(int)))
-
-        # we should be able to implicitly convert 'set' to a TupleOf when
-        # we are constructing an Alternative like this.
-        self.assertEqual(A.X(T=set([1, 2, 3])).T, (1, 2, 3))
-
-    def test_const_dict_and_set(self):
-        T = ConstDict(int, TupleOf(int))
-
-        # we should be able to implicitly convert 'set' to a TupleOf
-        self.assertEqual(
-            T({1: set([2, 3])}),
-            T({1: [2, 3]})
-        )
-
     def test_const_dict_add_mappable(self):
         T = ConstDict(int, int)
 
@@ -2177,7 +2161,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertNotEqual(x, y)
 
     def test_list_of_indexing_with_numpy_ints(self):
-        x = ListOf(ListOf(int))([[1, 2, 3], [4, 5, 6]])
+        x = ListOf(ListOf(int)).convert(((1, 2, 3), (4, 5, 6)))
         self.assertEqual(x[numpy.int64(0)][numpy.int64(0)], 1)
 
     def test_error_message_on_bad_dispatch(self):
@@ -2339,7 +2323,10 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(v2, "b")
         self.assertEqual(d[2], "b")
 
-        with self.assertRaisesRegex(TypeError, "Can't initialize a string from an instance of NoneType"):
+        with self.assertRaisesRegex(
+            TypeError,
+            "Cannot implicitly convert an object of type NoneType to an instance of str"
+        ):
             d.setdefault(3, None)
 
         self.assertEqual(d.setdefault(3), "")
@@ -2354,7 +2341,10 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(KeyError, "10"):
             d.pop(10)
 
-        with self.assertRaisesRegex(TypeError, "Couldn't initialize type int from str"):
+        with self.assertRaisesRegex(
+            TypeError,
+            "Cannot upcast an object of type str to an instance of int"
+        ):
             d.pop("hihi")
 
     def test_mutable_dict_pop_with_conversion(self):
@@ -3031,7 +3021,7 @@ class NativeTypesTests(unittest.TestCase):
                         )
 
         values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
-                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"}), PointerTo(int)()]
+                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"})]
         for v in values:
             self.assertEqual(v + A.a(), "radd")
             self.assertEqual(v - A.a(), "rsub")

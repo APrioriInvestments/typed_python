@@ -19,7 +19,7 @@ import unittest
 from flaky import flaky
 from typed_python import (
     Class, Member, Alternative, TupleOf, ListOf, ConstDict, SerializationContext,
-    Entrypoint, Compiled
+    Entrypoint, Compiled, localVariableTypesKnownToCompiler
 )
 
 import typed_python._types as _types
@@ -191,6 +191,7 @@ class TestMultithreading(unittest.TestCase):
 
         @Compiled
         def lockFun(l: threading.Lock, aList: ListOf(int), count: int):
+            print("I KNOW THESE AS ", localVariableTypesKnownToCompiler())
             for _ in range(count):
                 with l:
                     aList[0] += 1

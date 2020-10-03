@@ -28,6 +28,8 @@ public:
 
     static PyObject* pointerInitialize(PyObject* o, PyObject* args);
 
+    static PyObject* pointerDestroy(PyObject* o, PyObject* args);
+
     static PyObject* pointerSet(PyObject* o, PyObject* args);
 
     static PyObject* pointerGet(PyObject* o, PyObject* args);
@@ -38,7 +40,7 @@ public:
 
     static void mirrorTypeInformationIntoPyTypeConcrete(PointerTo* pointerT, PyTypeObject* pyType);
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
         return true;
     }
 

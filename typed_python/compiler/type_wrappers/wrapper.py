@@ -18,6 +18,7 @@ from typed_python import _types, OneOf, ListOf
 from typed_python.hash import Hash
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.native_ast import VoidPtr
+from typed_python.compiler.conversion_level import ConversionLevel
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
@@ -233,18 +234,6 @@ class Wrapper:
         """If we are masquerading as an untyped type, convert us to that type."""
         return instance
 
-    def can_cast_to_primitive(self, context, e, primitiveType):
-        """Returns true if we can call one of the 'convert_X_cast' functions.
-
-        Args:
-            primitiveType - one of bool, int, float, str, bytes
-        """
-        if primitiveType is str:
-            return True
-        if primitiveType in (int, float, bool, bytes):
-            return False
-        assert False, "Invalid primitive type argument " + str(primitiveType)
-
     def convert_call(self, context, left, args, kwargs):
         return context.pushException(TypeError, "Can't call %s with args of type (%s)" % (
             str(self) + " (of type " + str(self.typeRepresentation) + ")",
@@ -269,51 +258,10 @@ class Wrapper:
             "Can't take 'abs' of instance of type '%s'" % (str(self),)
         )
 
-    def convert_bool_cast(self, context, expr):
-        return context.pushException(
-            TypeError,
-            "Can't take 'bool' of instance of type '%s'" % (str(self),)
-        )
-
-    def convert_int_cast(self, context, expr):
-        return context.pushException(
-            TypeError,
-            "Can't take 'int' of instance of type '%s'" % (str(self),)
-        )
-
     def convert_index_cast(self, context, expr):
         return context.pushException(
             TypeError,
             "Can't take instance of type '%s' to an integer index" % (str(self),)
-        )
-
-    def convert_float_cast(self, context, expr):
-        return context.pushException(
-            TypeError,
-            "Can't take 'float' of instance of type '%s'" % (str(self),)
-        )
-
-    def convert_str_cast(self, context, instance):
-        t = instance.expr_type.typeRepresentation
-
-        if not instance.isReference:
-            instance = context.pushMove(instance)
-
-        return context.push(
-            str,
-            lambda newStr:
-                newStr.expr.store(
-                    runtime_functions.np_str.call(
-                        instance.expr.cast(VoidPtr),
-                        context.getTypePointer(t)
-                    ).cast(typeWrapper(str).getNativeLayoutType())
-                )
-        )
-
-    def convert_bytes_cast(self, context, expr):
-        return context.pushException(
-            TypeError,
-            "Can't take 'bytes' of instance of type '%s'" % (str(self),)
         )
 
     def convert_builtin(self, f, context, expr, a1=None):
@@ -358,9 +306,11 @@ class Wrapper:
 
     def convert_unary_op(self, context, expr, op):
         if op.matches.Not:
-            res = self.convert_bool_cast(context, expr)
+            res = expr.toBool()
+
             if res is None:
                 return res
+
             return res.convert_unary_op(op)
 
         return context.pushException(
@@ -368,7 +318,7 @@ class Wrapper:
             "Can't apply unary op %s to type '%s'" % (op, expr.expr_type)
         )
 
-    def can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
+    def can_convert_to_type(self, otherType, level: ConversionLevel) -> OneOf(False, True, "Maybe"):  # noqa
         """Can we convert to another type? This should match what typed_python does.
 
         Subclasses may not override this! If either of (self, otherType) knows what to do here,
@@ -376,20 +326,22 @@ class Wrapper:
 
         Args:
             otherType - another Wrapper instance.
-            explicit - are we allowing explicit conversion?
+            level (ConversionLevel) - how agressively we are willing to convert
 
         Returns:
             True if we can always convert to this other type
             False if we can never convert
             "Maybe" if it depends on the types involved.
         """
+        assert isinstance(level, ConversionLevel)
+
         otherType = typeWrapper(otherType)
 
         if otherType == self:
             return True
 
-        toType = self._can_convert_to_type(otherType, explicit)
-        fromType = otherType._can_convert_from_type(self, explicit)
+        toType = self._can_convert_to_type(otherType, level)
+        fromType = otherType._can_convert_from_type(self, level)
 
         if toType is True or fromType is True:
             return True
@@ -399,32 +351,40 @@ class Wrapper:
 
         return "Maybe"
 
-    def _can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
+    def _can_convert_to_type(self, otherType, level: ConversionLevel) -> OneOf(False, True, "Maybe"):  # noqa
         """Does this wrapper know how to convert to 'otherType'?
 
         Return True if we can convert to this type in all cases. Return False if we
         definitely don't know how. Return "Maybe" if we sometimes can.
         """
+        assert isinstance(level, ConversionLevel)
+
         if otherType == self:
             return True
 
         return "Maybe"
 
-    def _can_convert_from_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
+    def _can_convert_from_type(self, otherType, level: ConversionLevel) -> OneOf(False, True, "Maybe"):  # noqa
         """Analagous to _can_convert_to_type.
         """
+        assert isinstance(level, ConversionLevel)
+
         if otherType == self:
             return True
 
         return "Maybe"
 
-    def convert_to_type(self, context, expr, target_type, explicit=True):
+    def convert_to_type_constant(self, context, expr, target_type, level: ConversionLevel):
+        """Given that 'expr' is a constant expression, attempt to convert it directly.
+
+        This function should return None if it can't convert it to a constant, otherwise
+        a typed expression with the constant. If the conversion definitely fails, the
+        function should return "FAILURE" and push an exception onto the context.
+        """
+        return None
+
+    def convert_to_type(self, context, expr, target_type, level: ConversionLevel):
         """Convert to 'target_type' and return a handle on the resulting expression.
-
-        If 'explicit', then we're requesting an agressive conversion that may lose information.
-
-        If non-explicit, then we only allow conversion that's an obvious upcast (say, from float
-        to OneOf(None, float))
 
         We return a TypedExpression, or None if the operation always throws an exception.
 
@@ -432,10 +392,8 @@ class Wrapper:
         should override _can_convert_to_type, _can_convert_from_type, convert_to_type_with_target,
         and convert_to_self_with_target.
 
-        Note that this is not the pathway used by 'float(x)', 'bool(x)', 'int(x)', 'str(x)' etc,
-        which are converted by the convert_(float|int|bool|str|bytes)_cast functions etc. This is
-        to ensure that objects (particularly, class instances) that define __float__ don't end
-        up being _implicitly_ convertible to float.
+        Note that this is also now the pathway used by 'float(x)', 'bool(x)', 'int(x)', 'str(x)' etc,
+        with a ConversionLevel.New.
 
         Args:
             context - an ExpressionConversionContext
@@ -444,10 +402,24 @@ class Wrapper:
             explicit (bool) - should we allow conversion or not?
         """
         # check if there's nothing to do
-        if target_type == self.typeRepresentation or target_type == self:
+        assert isinstance(level, ConversionLevel)
+
+        target_type = typeWrapper(target_type)
+
+        if target_type == self:
             return expr
 
-        canConvert = self.can_convert_to_type(target_type, explicit)
+        if expr.isConstant:
+            res = self.convert_to_type_constant(context, expr, target_type, level)
+
+            if isinstance(res, str):
+                assert res == "FAILURE"
+                return None
+
+            if res is not None:
+                return res
+
+        canConvert = self.can_convert_to_type(target_type, level)
 
         if canConvert is False:
             context.pushException(TypeError, "Couldn't initialize type %s from %s" % (target_type, self))
@@ -456,7 +428,7 @@ class Wrapper:
         # put conversion into its own function
         targetVal = context.allocateUninitializedSlot(target_type)
 
-        succeeded = expr.expr_type.convert_to_type_with_target(context, expr, targetVal, explicit)
+        succeeded = expr.expr_type.convert_to_type_with_target(context, expr, targetVal, level, mayThrowOnFailure=True)
 
         if succeeded is None:
             return
@@ -466,14 +438,16 @@ class Wrapper:
         if canConvert is True:
             if not (succeeded.expr.matches.Constant and succeeded.expr.val.truth_value()):
                 raise Exception(
-                    f"Trying to convert {self} to {target_type}, we "
-                    f"were promised conversion would succeed, but it didn't. Expr was {succeeded.expr}"
+                    f"Trying to convert {self} ({type(self)}) to {target_type}, we "
+                    f"were promised conversion would succeed, but it didn't. Expr was {succeeded.expr}. "
+                    f"self._can_convert_to_type = {self._can_convert_to_type(target_type, level)}. "
+                    f"target._can_convert_from_type = {target_type._can_convert_from_type(self, level)}. "
                 )
 
             context.markUninitializedSlotInitialized(targetVal)
             return targetVal
 
-        succeeded = succeeded.convert_to_type(bool)
+        succeeded = succeeded.convert_to_type(bool, ConversionLevel.Implicit)
         if succeeded is None:
             return
 
@@ -482,20 +456,53 @@ class Wrapper:
                 context.markUninitializedSlotInitialized(targetVal)
 
             with ifFalse:
-                context.pushException(TypeError, f"Can't convert from type {self} to type {target_type}")
+                context.pushException(TypeError, f"Can't convert from type {self} to type {target_type} at level {level}")
 
         return targetVal
 
-    def convert_to_type_with_target(self, context, expr, targetVal, explicit):
+    def convert_to_type_with_target(self, context, expr, targetVal, level: ConversionLevel, mayThrowOnFailure=False):
         """Convert 'expr' into the slot contained by 'targetVal', returning True if initialized.
 
         This is the method child classes are expected to override in order to control how they convert.
         If no conversion to the target type is available, we're expected to call the super implementation
         which defers to 'convert_to_self_with_target'
-        """
-        return targetVal.expr_type.convert_to_self_with_target(context, targetVal, expr, explicit)
 
-    def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
+        Args:
+            context - the ExpressionConversionContext we're using
+            expr - a TypedExpression we're converting (the source)
+            targetVal - a TypedExpression reference to an uninitialized value
+            level - the level at which to convert
+            mayThrowOnFailure - if we fail to convert, we may throw a custom exception
+                to help the user make sense of the conversion failure.
+
+        Returns:
+            a TypedExpression of type 'bool' indicating whether the conversion succeeded, or None
+            indicating that control flow will not return. If the TypedExpression evaluates to True,
+            then 'targeVal' must be initialized. Otherwise it must not be initialized.  Conversions
+            that the compiler knows will succeed must return a constant expression that evaluates
+            to True.
+        """
+        assert isinstance(level, ConversionLevel)
+        assert targetVal.isReference
+
+        if level.isNewOrHigher() and targetVal.expr_type.typeRepresentation is str:
+            if not expr.isReference:
+                expr = context.pushMove(expr)
+
+            expr = expr.convert_to_type(object, ConversionLevel.Signature)
+
+            return context.pushPod(
+                bool,
+                runtime_functions.np_try_pyobj_to_str.call(
+                    expr.expr.cast(VoidPtr),
+                    targetVal.expr.cast(VoidPtr),
+                    context.getTypePointer(expr.expr_type.typeRepresentation)
+                )
+            )
+
+        return targetVal.expr_type.convert_to_self_with_target(context, targetVal, expr, level, mayThrowOnFailure)
+
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, level: ConversionLevel, mayThrowOnFailure=False):
         if sourceVal.expr_type == self:
             targetVal.convert_copy_initialize(sourceVal)
             return context.constant(True)
@@ -522,7 +529,7 @@ class Wrapper:
             res = l.convert_bin_op(ComparisonOp.In(), r, False)
             if not res:
                 return
-            res = res.convert_bool_cast()
+            res = res.toBool()
             if not res:
                 return
             return res.convert_unary_op(UnaryOp.Not())
@@ -535,13 +542,27 @@ class Wrapper:
 
     def convert_format(self, context, instance, formatSpecOrNone=None):
         if formatSpecOrNone is None:
-            return instance.convert_str_cast()
+            return instance.convert_to_type(str, ConversionLevel.New)
         else:
-            return instance.convert_to_type(object).convert_method_call(
+            return instance.convert_to_type(object, ConversionLevel.Signature).convert_method_call(
                 "__format__",
                 (context.constant(formatSpecOrNone),),
                 {}
-            ).convert_str_cast()
+            ).convert_to_type(str, ConversionLevel.New)
+
+    def convert_type_attribute(self, context, typeInst, attribute):
+        """Hook to allow us to convert an attribute access on a type object.
+
+        Used so that things like ListOf(T).toBytes can provide compiler-friendly
+        implementations.
+        """
+        return typeInst.expr_type.convert_attribute(
+            context,
+            typeInst,
+            attribute,
+            # don't let it call this function back
+            False
+        )
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         context.pushException(
@@ -593,9 +614,26 @@ class Wrapper:
 
         return typeInst.convert_call((argVal,), {})
 
-    def has_method(self, context, instance, methodName):
+    def has_method(self, methodName):
         assert isinstance(methodName, str)
         return False
+
+    def convert_type_method_call(self, context, typeInst, methodname, args, kwargs):
+        """Hook to allow us to convert an method call on a type object.
+
+        Used so that things like ListOf(T).toBytes can provide compiler-friendly
+        implementations.
+        """
+        print(typeInst.expr_type, type(typeInst.expr_type))
+        return typeInst.expr_type.convert_method_call(
+            context,
+            typeInst,
+            methodname,
+            args,
+            kwargs,
+            # don't let it call this function back
+            False
+        )
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         return context.pushException(

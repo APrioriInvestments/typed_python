@@ -69,7 +69,13 @@ PyObject* PyBoundMethodInstance::tp_call_concrete(PyObject* args, PyObject* kwar
         })
     );
 
-    for (long convertExplicitly = 0; convertExplicitly <= 1; convertExplicitly++) {
+    for (ConversionLevel conversionLevel: {
+        ConversionLevel::Signature,
+        ConversionLevel::Upcast,
+        ConversionLevel::UpcastContainers,
+        ConversionLevel::Implicit,
+        ConversionLevel::ImplicitContainers
+    }) {
         for (long overloadIx = 0; overloadIx < f->getOverloads().size(); overloadIx++) {
             std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(
                 f,
@@ -78,7 +84,7 @@ PyObject* PyBoundMethodInstance::tp_call_concrete(PyObject* args, PyObject* kwar
                 objectInstance,
                 mappedArgs,
                 mappedKwargs,
-                convertExplicitly
+                conversionLevel
             );
 
             if (res.first) {

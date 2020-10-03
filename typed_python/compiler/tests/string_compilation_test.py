@@ -751,7 +751,12 @@ class TestStringCompilation(unittest.TestCase):
                 if result[0] == 'Normal':
                     self.assertEqual(_types.refcount(result[1]), 1)
                 baseline = callOrExceptNoType(f, s)
-                self.assertEqual(result, baseline, f"{s} -> {result}")
+
+                if result != baseline:
+                    raise Exception(
+                        f"Splitting '{s}' -> produced {result} in the compiler instead of {baseline}"
+                    )
+
                 for m in range(-2, 10):
                     result = callOrExceptNoType(c_f, s, None, m)
                     if result[0] == 'Normal':
@@ -1365,6 +1370,7 @@ class TestStringCompilation(unittest.TestCase):
         for args in cases:
             r1 = callOrExceptType(f_maketrans, *args)
             r2 = callOrExceptType(c_maketrans, *args)
+
             self.assertEqual(r1, r2, args)
             if r1[0] == 'Normal':
                 r3 = s.translate(r1[1])

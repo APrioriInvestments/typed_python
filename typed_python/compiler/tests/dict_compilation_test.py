@@ -24,11 +24,11 @@ import numpy
 class TestDictCompilation(unittest.TestCase):
     def test_can_copy_dict(self):
         @Entrypoint
-        def f(x: Dict(int, int)):
+        def f(x):
             y = x
             return y
 
-        self.assertEqual(f({1: 2}), {1: 2})
+        self.assertEqual(f(Dict(int, int)({1: 2})), {1: 2})
 
         @Entrypoint
         def reversed(x: ListOf(Dict(int, int))):
@@ -44,11 +44,11 @@ class TestDictCompilation(unittest.TestCase):
         for length in range(100):
             dicts = [{x: x * 2 + 1} for x in range(length)]
 
-            aList = ListOf(Dict(int, int))(dicts)
+            aList = ListOf(Dict(int, int)).convert(dicts)
 
             refcounts = [_types.refcount(x) for x in aList]
             aListRev = reversed(aList)
-            self.assertEqual(aListRev, list(reversed(dicts)))
+            self.assertEqual(aListRev, reversed(ListOf(Dict(int, int)).convert(dicts)))
             aListRev = None
 
             refcounts2 = [_types.refcount(x) for x in aList]
@@ -600,7 +600,7 @@ class TestDictCompilation(unittest.TestCase):
     def test_dict_fuzz(self):
         # try adding and removing items repeatedly, in an effort to fill the table up
         @Entrypoint
-        def f(actions: ListOf(Tuple(bool, int))):
+        def f(actions: TupleOf(Tuple(bool, int))):
             x = Dict(int, int)()
 
             for thing in actions:

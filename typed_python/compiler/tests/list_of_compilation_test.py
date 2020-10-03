@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import ListOf, Function, TupleOf, OneOf, Compiled, Entrypoint
-from typed_python import UInt8, UInt16, Class, Final, Member
+from typed_python import UInt8, UInt16, UInt32, Class, Final, Member
 import typed_python._types as _types
 import unittest
 import time
@@ -471,7 +471,7 @@ class TestListOfCompilation(unittest.TestCase):
 
         # in a loop, so we can see we're not violating any refcounts
         for _ in range(100):
-            with self.assertRaisesRegex(TypeError, "not str"):
+            with self.assertRaisesRegex(TypeError, "Cannot implicitly convert an object of type str to an instance of float"):
                 convertTo(TupleOf(float)([1.5, 2.5, "3.5"]), ListOf(OneOf(int, str)))
 
     def test_pop_behind_if(self):
@@ -680,7 +680,7 @@ class TestListOfCompilation(unittest.TestCase):
         assert aLst[anIndex] == 4
 
     def test_list_index_with_class_with_bad_index(self):
-        aLst = ListOf(UInt16)()
+        aLst = ListOf(UInt32)()
         aLst.resize(20)
 
         class AnIndex(Class, Final):
@@ -722,3 +722,28 @@ class TestListOfCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "returned non-int"):
             assert aLst[AUintIndex()] == aLst[10]
+
+    def test_list_to_and_from_bytes(self):
+        aList = ListOf(int)([1, 2, 3])
+
+        assert len(aList.toBytes()) == 24
+        assert ListOf(int).fromBytes(aList.toBytes()) == aList
+
+        with self.assertRaisesRegex(TypeError, "POD"):
+            ListOf(str)(["hi"]).toBytes()
+
+        with self.assertRaisesRegex(TypeError, "POD"):
+            ListOf(str).fromBytes(b"")
+
+        @Entrypoint
+        def toBytes(l):
+            return l.toBytes()
+
+        @Entrypoint
+        def fromBytes(T, b):
+            return T.fromBytes(b)
+
+        assert aList.toBytes() == toBytes(aList)
+        assert fromBytes(ListOf(int), aList.toBytes()) == aList
+
+        assert fromBytes(ListOf(UInt8), aList.toBytes()) == ListOf(UInt8).fromBytes(aList.toBytes())

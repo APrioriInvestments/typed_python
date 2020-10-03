@@ -167,7 +167,7 @@ int PyRefToInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) 
     } else {
         instance_ptr tempObj = (instance_ptr)malloc(eltType->bytecount());
         try {
-            copyConstructFromPythonInstance(eltType, tempObj, attrVal, true /* set isExplicit to True */ );
+            copyConstructFromPythonInstance(eltType, tempObj, attrVal, ConversionLevel::Implicit);
         } catch(PythonExceptionSet& e) {
             free(tempObj);
             return -1;

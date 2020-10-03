@@ -38,8 +38,8 @@ def Array(T):
         dimensions = 1
         ElementType = T
 
-        def __init__(self, vals: ListOf(T)):
-            self._vals = vals
+        def __init__(self, vals):
+            self._vals = ListOf(T)(vals)
             self._offset = 0
             self._stride = 1
             self._shape = len(vals)
@@ -330,8 +330,8 @@ def Matrix(T):
 
         dimensions = 2
 
-        def __init__(self, vals: ListOf(T), offset, stride, shape):
-            self._vals = vals
+        def __init__(self, vals, offset, stride, shape):
+            self._vals = ListOf(T)(vals)
             self._offset = offset
             self._stride = stride
             self._shape = shape

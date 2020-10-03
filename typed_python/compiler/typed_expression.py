@@ -16,6 +16,8 @@ from typed_python import UInt64, PointerTo, RefTo
 from typed_python.python_ast import BinaryOp, ComparisonOp, BooleanOp
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
+from typed_python.compiler.conversion_level import ConversionLevel
+
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
@@ -48,6 +50,9 @@ class TypedExpression:
         self.expr_type = t
         self.isReference = isReference
         self.constantValue = constantValue
+
+        if self.constantValue is None and self.expr_type.is_compile_time_constant:
+            self.constantValue = self.expr_type.getCompileTimeConstant()
 
     @property
     def isConstant(self):
@@ -185,26 +190,23 @@ class TypedExpression:
     def convert_abs(self):
         return self.expr_type.convert_abs(self.context, self)
 
-    def convert_bool_cast(self):
-        return self.expr_type.convert_bool_cast(self.context, self)
-
-    def can_cast_to_primitive(self, primitiveType):
-        return self.expr_type.can_cast_to_primitive(self.context, self, primitiveType)
-
     def has_method(self, methodName):
-        return self.expr_type.has_method(self.context, self, methodName)
+        return self.expr_type.has_method(methodName)
+
+    def convert_bool_cast(self):
+        return self.convert_to_type(bool, ConversionLevel.New)
 
     def convert_int_cast(self):
-        return self.expr_type.convert_int_cast(self.context, self)
+        return self.convert_to_type(int, ConversionLevel.New)
 
     def convert_float_cast(self):
-        return self.expr_type.convert_float_cast(self.context, self)
+        return self.convert_to_type(float, ConversionLevel.New)
 
     def convert_str_cast(self):
-        return self.expr_type.convert_str_cast(self.context, self)
+        return self.convert_to_type(str, ConversionLevel.New)
 
     def convert_bytes_cast(self):
-        return self.expr_type.convert_bytes_cast(self.context, self)
+        return self.convert_to_type(bytes, ConversionLevel.New)
 
     def convert_builtin(self, f, a1=None):
         return self.expr_type.convert_builtin(f, self.context, self, a1)
@@ -230,7 +232,7 @@ class TypedExpression:
     def convert_method_call(self, methodname, args, kwargs):
         return self.expr_type.convert_method_call(self.context, self, methodname, args, kwargs)
 
-    def convert_to_type(self, target_type, explicit=True):
+    def convert_to_type(self, target_type, conversionLevel: ConversionLevel):
         """Convert to a target type as a function argument.
 
         If 'explicit', then allow conversions that may change type (e.g. int->float). Otherwise
@@ -238,7 +240,7 @@ class TypedExpression:
         """
         target_type = typeWrapper(target_type)
 
-        return self.expr_type.convert_to_type(self.context, self, target_type, explicit=explicit)
+        return self.expr_type.convert_to_type(self.context, self, target_type, conversionLevel)
 
     def convert_context_manager_enter(self):
         return self.expr_type.convert_context_manager_enter(self.context, self)
@@ -246,8 +248,30 @@ class TypedExpression:
     def convert_context_manager_exit(self, args):
         return self.expr_type.convert_context_manager_exit(self.context, self, args)
 
-    def convert_to_type_with_target(self, targetVal, explicit=True):
-        return self.expr_type.convert_to_type_with_target(self.context, self, targetVal, explicit=explicit)
+    def convert_to_type_with_target(self, targetVal, conversionLevel, mayThrowOnFailure=False):
+        """Convert this value to another type whose storage is already allocated.
+
+        Args:
+            targetVal - a TypedExpression containing the value to initialize. This must be
+                a reference to uninitialized storage for the value.
+            conversionLevel - a ConversionLevel indicating how strictly to convert values
+                that don't match in type.
+            mayThrowOnFailure - if True, the function may choose to push an exception onto the
+                stack and return None.
+
+        Returns:
+            None, or a TypedExpression(bool) indicating whether conversion succeeded or failed. If True,
+            then targetVal must be initialized.  If returning None, then the value must not be
+            initialized and control flow may not return. This can only happen if 'mayThrowOnFailure'
+            is True
+        """
+        return self.expr_type.convert_to_type_with_target(
+            self.context,
+            self,
+            targetVal,
+            conversionLevel,
+            mayThrowOnFailure
+        )
 
     def get_iteration_expressions(self):
         return self.expr_type.get_iteration_expressions(self.context, self)
@@ -262,16 +286,16 @@ class TypedExpression:
         return self.expr_type.convert_next(self.context, self)
 
     def toFloat64(self):
-        return self.expr_type.convert_float_cast(self.context, self)
+        return self.convert_to_type(float, ConversionLevel.New)
 
     def toInt64(self):
-        return self.expr_type.convert_int_cast(self.context, self)
+        return self.convert_to_type(int, ConversionLevel.New)
 
     def toUInt64(self):
-        return self.expr_type.convert_to_type(self.context, self, typeWrapper(UInt64))
+        return self.convert_to_type(UInt64, ConversionLevel.New)
 
     def toBool(self):
-        return self.expr_type.convert_bool_cast(self.context, self)
+        return self.convert_to_type(bool, ConversionLevel.New)
 
     def toIndex(self):
         """Equivalent to __index__"""
@@ -296,10 +320,14 @@ class TypedExpression:
             return None
 
     def __str__(self):
-        return "TypedExpression(%s%s)" % (self.expr_type, ",[ref]" if self.isReference else "")
+        return "TypedExpression(%s%s%s)" % (
+            self.expr_type,
+            ",[ref]" if self.isReference else "",
+            f",constant={self.constantValue}" if self.isConstant else ""
+        )
 
     def __repr__(self):
-        return "TypedExpression(%s%s)" % (self.expr_type, ",[ref]" if self.isReference else "")
+        return str(self)
 
     def __rshift__(self, other):
         return TypedExpression(self.context, self.expr >> other.expr, other.expr_type, other.isReference)

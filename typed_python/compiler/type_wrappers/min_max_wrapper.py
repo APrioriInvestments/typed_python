@@ -14,6 +14,7 @@
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
+from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.native_ast as native_ast
 import typed_python.python_ast as python_ast
 import typed_python.compiler
@@ -172,7 +173,7 @@ class MinMaxWrapper(Wrapper):
         if len(args) >= 2 and 'key' in kwargs:
             outT = OneOfWrapper.mergeTypes([a.expr_type.typeRepresentation for a in args]).typeRepresentation
             selected = context.allocateUninitializedSlot(outT)
-            selected.convert_copy_initialize(args[0].convert_to_type(outT))
+            selected.convert_copy_initialize(args[0].convert_to_type(outT, ConversionLevel.Signature))
             context.markUninitializedSlotInitialized(selected)
 
             key_f = kwargs['key']
@@ -198,7 +199,7 @@ class MinMaxWrapper(Wrapper):
                 context.markUninitializedSlotInitialized(keys[i])
 
             selected_key = context.allocateUninitializedSlot(keyT)
-            selected_key.convert_copy_initialize(keys[0].convert_to_type(keyT))
+            selected_key.convert_copy_initialize(keys[0].convert_to_type(keyT, ConversionLevel.Signature))
             context.markUninitializedSlotInitialized(selected_key)
             for i in range(1, len(args)):
                 cond = typeWrapper(keyT).convert_bin_op(context, selected_key, self.comparison_op1, keys[i], False)
@@ -209,8 +210,8 @@ class MinMaxWrapper(Wrapper):
                     return None
                 with context.ifelse(cond.nonref_expr) as (ifTrue, ifFalse):
                     with ifTrue:
-                        selected.convert_copy_initialize(args[i].convert_to_type(outT))
-                        selected_key.convert_copy_initialize(keys[i].convert_to_type(keyT))
+                        selected.convert_copy_initialize(args[i].convert_to_type(outT, ConversionLevel.Signature))
+                        selected_key.convert_copy_initialize(keys[i].convert_to_type(keyT, ConversionLevel.Signature))
 
             return selected
 
@@ -219,7 +220,7 @@ class MinMaxWrapper(Wrapper):
             selected = context.allocateUninitializedSlot(outT)
 
             for i in range(len(args)):
-                convertedArg = args[i].convert_to_type(outT)
+                convertedArg = args[i].convert_to_type(outT, ConversionLevel.Signature)
                 if convertedArg is None:
                     return None
 

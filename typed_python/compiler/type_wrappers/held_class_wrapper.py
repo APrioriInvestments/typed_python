@@ -14,6 +14,7 @@
 
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
     ClassOrAlternativeWrapperMixin
@@ -213,7 +214,7 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
             ix = attribute
 
         if ix is None:
-            if self.has_method(context, instance, "__getattr__"):
+            if self.has_method("__getattr__"):
                 return self.convert_method_call(context, instance, "__getattr__", (context.constant(attribute),), {})
             return super().convert_attribute(context, instance, attribute)
 
@@ -233,7 +234,7 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
             or self.classType.PropertyFunctions.get(name)
         )
 
-    def has_method(self, context, instance, methodName):
+    def has_method(self, methodName):
         assert isinstance(methodName, str)
         return self.getMethodOrPropertyBody(methodName) is not None
 
@@ -251,19 +252,19 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
 
         if ix is None:
             if value is None:
-                if self.has_method(context, instance, "__delattr__"):
+                if self.has_method("__delattr__"):
                     return self.convert_method_call(context, instance, "__delattr__", (context.constant(attribute),), {})
 
                 return Wrapper.convert_set_attribute(self, context, instance, attribute, value)
 
-            if self.has_method(context, instance, "__setattr__"):
+            if self.has_method("__setattr__"):
                 return self.convert_method_call(context, instance, "__setattr__", (context.constant(attribute), value), {})
 
             return Wrapper.convert_set_attribute(self, context, instance, attribute, value)
 
         attr_type = typeWrapper(self.classType.MemberTypes[ix])
 
-        value = value.convert_to_type(attr_type)
+        value = value.convert_to_type(attr_type, ConversionLevel.Implicit)
         if value is None:
             return None
 
@@ -301,7 +302,7 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
                                                 f" and {right.expr_type.typeRepresentation} with {op}")
 
     def convert_hash(self, context, expr):
-        if self.has_method(context, expr, "__hash__"):
+        if self.has_method("__hash__"):
             return self.convert_method_call(context, expr, "__hash__", (), {})
 
         return context.pushException(TypeError, f"Can't hash instances of {expr.expr_type}")

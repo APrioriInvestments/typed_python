@@ -15,6 +15,7 @@
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
+from typed_python.compiler.conversion_level import ConversionLevel
 
 from typed_python import PointerTo
 
@@ -59,38 +60,20 @@ class PointerToWrapper(Wrapper):
     def convert_destroy(self, context, instance):
         pass
 
-    def can_cast_to_primitive(self, context, instance, primitiveType):
-        return primitiveType in (int, str)
-
-    def convert_int_cast(self, context, e, raiseException=True):
-        return context.pushPod(int, e.nonref_expr.cast(native_ast.Int64))
-
-    def convert_str_cast(self, context, e):
-        asInt = e.convert_int_cast()
-        if asInt is None:
-            return None
-
-        asStr = asInt.convert_str_cast()
-        if asStr is None:
-            return None
-
-        return context.constant("0x") + asStr
-
     def convert_bin_op(self, context, left, op, right, inplace):
         if op.matches.Add:
-            if right.expr_type.can_cast_to_primitive(context, right, int):
-                right_int = right.expr_type.convert_int_cast(context, right, False)
-                if right_int is None:
-                    return None
-
-                return context.pushPod(self, left.nonref_expr.elemPtr(right_int.nonref_expr))
-
-        if op.matches.Sub and right.expr_type == left.expr_type:
-            right_int = right.expr_type.convert_int_cast(context, right, False)
+            right_int = right.toIndex()
             if right_int is None:
                 return None
 
-            left_int = left.expr_type.convert_int_cast(context, left, False)
+            return context.pushPod(self, left.nonref_expr.elemPtr(right_int.nonref_expr))
+
+        if op.matches.Sub and right.expr_type == left.expr_type:
+            right_int = right.toInt64()
+            if right_int is None:
+                return None
+
+            left_int = left.toInt64()
             if left_int is None:
                 return None
 
@@ -132,10 +115,20 @@ class PointerToWrapper(Wrapper):
         return super().convert_attribute(context, instance, attr)
 
     def convert_getitem(self, context, instance, key):
-        return (instance+key).convert_method_call("get", (), {})
+        addedValue = instance + key
+
+        if addedValue is None:
+            return None
+
+        return addedValue.convert_method_call("get", (), {})
 
     def convert_setitem(self, context, instance, key, val):
-        return (instance+key).convert_method_call("set", (val,), {})
+        addedValue = instance + key
+
+        if addedValue is None:
+            return None
+
+        return addedValue.convert_method_call("set", (val,), {})
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         if kwargs:
@@ -143,7 +136,7 @@ class PointerToWrapper(Wrapper):
 
         if methodname == "set":
             if len(args) == 1:
-                val = args[0].convert_to_type(self.typeRepresentation.ElementType)
+                val = args[0].convert_to_type(self.typeRepresentation.ElementType, ConversionLevel.Implicit)
                 if val is None:
                     return None
 
@@ -161,7 +154,7 @@ class PointerToWrapper(Wrapper):
                 return context.pushVoid()
 
             if len(args) == 1:
-                val = args[0].convert_to_type(self.typeRepresentation.ElementType)
+                val = args[0].convert_to_type(self.typeRepresentation.ElementType, ConversionLevel.Implicit)
                 if val is None:
                     return None
 
@@ -184,9 +177,29 @@ class PointerToWrapper(Wrapper):
             return context.push(self, lambda x: x.convert_default_initialize())
 
         if len(args) == 1 and not kwargs:
-            return args[0].convert_to_type(self, True)
+            return args[0].convert_to_type(self, ConversionLevel.New)
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
-    def convert_bool_cast(self, context, e):
-        return context.pushPod(bool, e.nonref_expr.cast(native_ast.Int64).neq(0))
+    def _can_convert_to_type(self, targetType, conversionLevel):
+        if not conversionLevel.isNewOrHigher():
+            return False
+
+        return targetType.typeRepresentation in (bool, int, str)
+
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if targetVal.expr_type.typeRepresentation is bool:
+            context.pushEffect(targetVal.expr.store(instance.nonref_expr.cast(native_ast.Int64).neq(0)))
+            return context.constant(True)
+
+        if targetVal.expr_type.typeRepresentation is int:
+            context.pushEffect(targetVal.expr.store(instance.nonref_expr.cast(native_ast.Int64)))
+            return context.constant(True)
+
+        if targetVal.expr_type.typeRepresentation is str:
+            asInt = instance.toInt64()
+            asStr = asInt.convert_str_cast()
+            targetVal.convert_copy_initialize(context.constant("0x") + asStr)
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)

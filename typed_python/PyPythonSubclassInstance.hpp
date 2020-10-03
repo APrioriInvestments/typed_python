@@ -22,7 +22,7 @@ class PyPythonSubclassInstance : public PyInstance {
 public:
     typedef PythonSubclass modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(PythonSubclass* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    static void copyConstructFromPythonInstanceConcrete(PythonSubclass* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
         std::pair<Type*, instance_ptr> typeAndPtr = extractTypeAndPtrFrom(pyRepresentation);
         Type* argType = typeAndPtr.first;
         instance_ptr argDataPtr = typeAndPtr.second;
@@ -37,7 +37,7 @@ public:
             return;
         }
 
-        PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, isExplicit);
+        PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, level);
     }
 
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
@@ -52,7 +52,7 @@ public:
         }, type()->getBaseType());
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* eltType, PyObject* pyRepresentation, bool isExplicit) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* eltType, PyObject* pyRepresentation, ConversionLevel level) {
         Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
         if (argType && Type::typesEquivalent(argType, eltType)) {

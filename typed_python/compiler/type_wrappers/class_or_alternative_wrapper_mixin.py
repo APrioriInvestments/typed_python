@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.native_ast import VoidPtr
 from typed_python import Int32
 import typed_python.compiler
@@ -22,10 +23,154 @@ from math import trunc, floor, ceil
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
 
+def initialize_str_from_method_call(strPtr, instance, mayThrowOnFailure):
+    """Internal function to try converting 'instance' to a str.
+
+    Args:
+        strPtr - a PointerTo(str) that we're supposed to initialize
+        instance - something with a __str__method
+        mayThrowOnFailure - if True, then we shouldn't swallow the exception
+
+    Returns:
+        True if strPtr is initialized successfully, False otherwise.
+    """
+    try:
+        res = instance.__str__()
+        if isinstance(res, str):
+            strPtr.initialize(res)
+            return True
+        else:
+            return False
+    except Exception: # noqa
+        if mayThrowOnFailure:
+            raise
+        return False
+
+
+def initialize_float_from_method_call(floatPtr, instance, mayThrowOnFailure):
+    """Internal function to try converting 'instance' to a float.
+
+    Args:
+        floatPtr - a PointerTo(float) that we're supposed to initialize
+        instance - something with a __float__method
+        mayThrowOnFailure - if True, then we shouldn't swallow the exception
+
+    Returns:
+        True if floatPtr is initialized successfully, False otherwise.
+    """
+    try:
+        res = instance.__float__()
+        if isinstance(res, float):
+            floatPtr.initialize(res)
+            return True
+        else:
+            return False
+    except Exception: # noqa
+        if mayThrowOnFailure:
+            raise
+        return False
+
+
+def initialize_bytes_from_method_call(bytesPtr, instance, mayThrowOnFailure):
+    """Internal function to try converting 'instance' to a bytes.
+
+    Args:
+        bytesPtr - a PointerTo(bytes) that we're supposed to initialize
+        instance - something with a __bytes__method
+        mayThrowOnFailure - if True, then we shouldn't swallow the exception
+
+    Returns:
+        True if bytesPtr is initialized successfully, False otherwise.
+    """
+    try:
+        res = instance.__bytes__()
+        if isinstance(res, bytes):
+            bytesPtr.initialize(res)
+            return True
+        else:
+            return False
+    except Exception: # noqa
+        if mayThrowOnFailure:
+            raise
+        return False
+
+
+def initialize_int_from_method_call(intPtr, instance, mayThrowOnFailure):
+    """Internal function to try converting 'instance' to an int.
+
+    Args:
+        intPtr - a PointerTo(int) that we're supposed to initialize
+        instance - something with a __int__method
+        mayThrowOnFailure - if True, then we shouldn't swallow the exception
+
+    Returns:
+        True if intPtr is initialized successfully, False otherwise.
+    """
+    try:
+        res = instance.__int__()
+        if isinstance(res, int):
+            intPtr.initialize(res)
+            return True
+        else:
+            return False
+    except Exception: # noqa
+        if mayThrowOnFailure:
+            raise
+        return False
+
+
+def initialize_bool_from_method_call(boolPtr, instance, mayThrowOnFailure):
+    """Internal function to try converting 'instance' to a bool.
+
+    Args:
+        floatPtr - a PointerTo(bool) that we're supposed to initialize
+        instance - something with a __bool__ method
+        mayThrowOnFailure - if True, then we shouldn't swallow the exception
+
+    Returns:
+        True if boolPtr is initialized successfully, False otherwise.
+    """
+    try:
+        res = instance.__bool__()
+        if isinstance(res, bool):
+            boolPtr.initialize(res)
+            return True
+        else:
+            return False
+    except Exception: # noqa
+        if mayThrowOnFailure:
+            raise
+        return False
+
+
+def initialize_bool_from_len_method_call(boolPtr, instance, mayThrowOnFailure):
+    """Internal function to try converting 'instance' to a bool using __len__.
+
+    Args:
+        floatPtr - a PointerTo(bool) that we're supposed to initialize
+        instance - something with a __len__ method
+        mayThrowOnFailure - if True, then we shouldn't swallow the exception
+
+    Returns:
+        True if boolPtr is initialized successfully, False otherwise.
+    """
+    try:
+        res = instance.__len__()
+        if isinstance(res, int):
+            boolPtr.initialize(res > 0)
+            return True
+        else:
+            return False
+    except Exception: # noqa
+        if mayThrowOnFailure:
+            raise
+        return False
+
+
 class ClassOrAlternativeWrapperMixin:
     """A Mixin class that defines conversions on class and alternatives in terms of method calls."""
     def convert_hash(self, context, expr):
-        if self.has_method(context, expr, "__hash__"):
+        if self.has_method("__hash__"):
             return self.convert_method_call(context, expr, "__hash__", (), {})
 
         return context.pushPod(
@@ -39,12 +184,12 @@ class ClassOrAlternativeWrapperMixin:
         return None
 
     def convert_call(self, context, expr, args, kwargs):
-        if self.has_method(context, expr, "__call__"):
+        if self.has_method("__call__"):
             return self.convert_method_call(context, expr, "__call__", args, kwargs)
         return super().convert_call(context, expr, args, kwargs)
 
     def convert_len(self, context, expr):
-        if self.has_method(context, expr, "__len__"):
+        if self.has_method("__len__"):
             return self.convert_method_call(context, expr, "__len__", (), {})
         return super().convert_len(self, context, expr)
 
@@ -52,75 +197,119 @@ class ClassOrAlternativeWrapperMixin:
         return self.convert_method_call(context, expr, "__abs__", (), {})
 
     def convert_getitem(self, context, instance, item):
-        if self.has_method(context, instance, "__getitem__"):
+        if self.has_method("__getitem__"):
             return self.convert_method_call(context, instance, "__getitem__", (item,), {})
         return super().convert_getitem(context, instance, item)
 
     def convert_setitem(self, context, instance, item, value):
-        if self.has_method(context, instance, "__setitem__"):
+        if self.has_method("__setitem__"):
             return self.convert_method_call(context, instance, "__setitem__", (item, value), {})
         return super().convert_setitem(context, instance, item, value)
 
     def convert_set_attribute(self, context, instance, attribute, value):
         if value is None:
-            if self.has_method(context, instance, "__delattr__"):
+            if self.has_method("__delattr__"):
                 return self.convert_method_call(context, instance, "__delattr__", (context.constant(attribute),), {})
 
             return super().convert_set_attribute(context, instance, attribute, value)
 
-        if self.has_method(context, instance, "__setattr__"):
+        if self.has_method("__setattr__"):
             return self.convert_method_call(context, instance, "__setattr__", (context.constant(attribute), value), {})
 
         return super().convert_set_attribute(context, instance, attribute, value)
 
     def convert_repr(self, context, instance):
-        if self.has_method(context, instance, "__repr__"):
+        if self.has_method("__repr__"):
             return self.convert_method_call(context, instance, "__repr__", (), {})
         return super().convert_repr(context, instance)
 
-    def can_cast_to_primitive(self, context, e, primitiveType):
-        if primitiveType is bool:
-            return True
+    def _can_convert_to_type(self, targetType, conversionLevel):
+        if not conversionLevel.isNewOrHigher():
+            return False
 
-        if primitiveType is str:
-            return self.has_method(context, e, "__str__")
+        # note we are not guaranteed conversion succeeds because these functions
+        # call user-defined code which might throw, rendering the conversion invalid.
+        if targetType.typeRepresentation is bool:
+            if not self.has_method("__bool__") and not self.has_method("__len__"):
+                return True
+            return "Maybe"
 
-        if primitiveType is int:
-            return self.has_method(context, e, "__int__")
+        if targetType.typeRepresentation is str:
+            return "Maybe"
 
-        if primitiveType is float:
-            return self.has_method(context, e, "__float__")
+        if targetType.typeRepresentation is int:
+            if self.has_method("__int__"):
+                return "Maybe"
+            return False
 
-        if primitiveType is bool:
-            return self.has_method(context, e, "__bool__")
+        if targetType.typeRepresentation is bytes:
+            if self.has_method("__bytes__"):
+                return "Maybe"
+            return False
 
-        return super().can_cast_to_primitive(context, e, primitiveType)
+        if targetType.typeRepresentation is float:
+            if self.has_method("__float__"):
+                return "Maybe"
+            return False
 
-    def convert_bool_cast(self, context, e):
-        if self.has_method(context, e, "__bool__"):
-            return self.convert_method_call(context, e, "__bool__", (), {})
+        return False
 
-        if self.has_method(context, e, "__len__"):
-            res = self.convert_method_call(context, e, "__len__", (), {})
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if targetVal.expr_type.typeRepresentation is bool:
+            if self.has_method("__bool__"):
+                return context.call_py_function(
+                    initialize_bool_from_method_call,
+                    (targetVal.asPointer(), instance, context.constant(mayThrowOnFailure)),
+                    {}
+                )
 
-            if res is not None:
-                return context.pushPod(bool, res.nonref_expr.neq(0))
-            return res
+            if self.has_method("__len__"):
+                return context.call_py_function(
+                    initialize_bool_from_len_method_call,
+                    (targetVal.asPointer(), instance, context.constant(mayThrowOnFailure)),
+                    {}
+                )
 
-        return context.constant(True)
+            targetVal.convert_copy_initialize(context.constant(True))
+            return context.constant(True)
 
-    def convert_str_cast(self, context, e):
-        if self.has_method(context, e, "__str__"):
-            return self.convert_method_call(context, e, "__str__", (), {})
-        return super().convert_str_cast(context, e)
+        if targetVal.expr_type.typeRepresentation is str:
+            if self.has_method("__str__"):
+                context.logDiagnostic("CALL IT! ", str(mayThrowOnFailure))
+                return context.call_py_function(
+                    initialize_str_from_method_call,
+                    (targetVal.asPointer(), instance, context.constant(mayThrowOnFailure)),
+                    {}
+                )
 
-    def convert_bytes_cast(self, context, e):
-        if self.has_method(context, e, "__bytes__"):
-            return self.convert_method_call(context, e, "__bytes__", (), {})
-        return super().convert_bytes_cast(context, e)
+        if targetVal.expr_type.typeRepresentation is float:
+            if self.has_method("__float__"):
+                return context.call_py_function(
+                    initialize_float_from_method_call,
+                    (targetVal.asPointer(), instance, context.constant(mayThrowOnFailure)),
+                    {}
+                )
+
+        if targetVal.expr_type.typeRepresentation is int:
+            if self.has_method("__int__"):
+                return context.call_py_function(
+                    initialize_int_from_method_call,
+                    (targetVal.asPointer(), instance, context.constant(mayThrowOnFailure)),
+                    {}
+                )
+
+        if targetVal.expr_type.typeRepresentation is bytes:
+            if self.has_method("__bytes__"):
+                return context.call_py_function(
+                    initialize_bytes_from_method_call,
+                    (targetVal.asPointer(), instance, context.constant(mayThrowOnFailure)),
+                    {}
+                )
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
     def convert_index_cast(self, context, e):
-        if self.has_method(context, e, '__index__'):
+        if self.has_method('__index__'):
             res = self.convert_method_call(context, e, "__index__", (), {})
             if res is None:
                 return None
@@ -130,7 +319,7 @@ class ClassOrAlternativeWrapperMixin:
 
             intRes = context.allocateUninitializedSlot(int)
 
-            succeeded = res.convert_to_type_with_target(intRes, explicit=False)
+            succeeded = res.convert_to_type_with_target(intRes, ConversionLevel.Signature, mayThrowOnFailure=False)
 
             with context.ifelse(succeeded.nonref_expr) as (ifTrue, ifFalse):
                 with ifFalse:
@@ -140,21 +329,11 @@ class ClassOrAlternativeWrapperMixin:
 
         return context.pushException(TypeError, f"__index__ not implemented for {self.typeRepresentation}")
 
-    def convert_int_cast(self, context, e):
-        if self.has_method(context, e, '__int__'):
-            return self.convert_method_call(context, e, "__int__", (), {})
-        return context.pushException(TypeError, f"__int__ not implemented for {self.typeRepresentation}")
-
-    def convert_float_cast(self, context, e):
-        if self.has_method(context, e, "__float__"):
-            return self.convert_method_call(context, e, "__float__", (), {})
-        return context.pushException(TypeError, f"__float__ not implemented for {self.typeRepresentation}")
-
     def convert_builtin(self, f, context, expr, a1=None):
         # TODO: this should go in some common wrapper base class for alternatives and classes, along with
         # generate method call
         if f is format:
-            if self.has_method(context, expr, "__format__"):
+            if self.has_method("__format__"):
                 return self.convert_method_call(
                     context,
                     expr,
@@ -167,7 +346,7 @@ class ClassOrAlternativeWrapperMixin:
             if a1 is None:
                 a1 = context.constant(0)
 
-            if self.has_method(context, expr, "__round__"):
+            if self.has_method("__round__"):
                 return self.convert_method_call(context, expr, "__round__", (a1,), {})
 
             expr = expr.toFloat64()
@@ -183,7 +362,7 @@ class ClassOrAlternativeWrapperMixin:
         methodName = {trunc: '__trunc__', floor: '__floor__', ceil: '__ceil__', complex: '__complex__', dir: '__dir__'}
 
         if f in methodName:
-            if self.has_method(context, expr, methodName[f]):
+            if self.has_method(methodName[f]):
                 return self.convert_method_call(context, expr, methodName[f], (), {})
 
             if f in (floor, ceil, trunc):
@@ -201,7 +380,7 @@ class ClassOrAlternativeWrapperMixin:
             "__not__" if op.matches.Not else \
             ""
 
-        if self.has_method(context, expr, magic):
+        if self.has_method(magic):
             return self.convert_method_call(context, expr, magic, (), {})
 
         return super().convert_unary_op(context, expr, op)
@@ -230,10 +409,10 @@ class ClassOrAlternativeWrapperMixin:
 
         magic_inplace = '__i' + magic[2:] if magic and inplace else None
 
-        if magic_inplace and self.has_method(context, l, magic_inplace):
+        if magic_inplace and self.has_method(magic_inplace):
             return self.convert_method_call(context, l, magic_inplace, (r,), {})
 
-        if self.has_method(context, l, magic):
+        if self.has_method(magic):
             return self.convert_method_call(context, l, magic, (r,), {})
 
         isComparison = (
@@ -255,7 +434,7 @@ class ClassOrAlternativeWrapperMixin:
 
     def convert_bin_op_reverse(self, context, r, op, l, inplace):
         if op.matches.In:
-            if self.has_method(context, r, "__contains__"):
+            if self.has_method("__contains__"):
                 ret = self.convert_method_call(context, r, "__contains__", (l,), {})
                 if ret is not None:
                     ret = ret.toBool()
@@ -280,7 +459,7 @@ class ClassOrAlternativeWrapperMixin:
             ""
         )
 
-        if self.has_method(context, r, magic):
+        if self.has_method(magic):
             return self.convert_method_call(context, r, magic, (l,), {})
 
         return super().convert_bin_op_reverse(context, r, op, l, inplace)

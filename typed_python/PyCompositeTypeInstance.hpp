@@ -32,12 +32,15 @@ public:
 
     Py_ssize_t mp_and_sq_length_concrete();
 
-    static void copyConstructFromPythonInstanceConcrete(CompositeType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
+    static void copyConstructFromPythonInstanceConcrete(CompositeType* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level);
 
     static bool compare_to_python_concrete(CompositeType* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
-        return PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation) || PySet_Check(pyRepresentation) || PyDict_Check(pyRepresentation);
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
+        return (
+          PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation)
+          || PySet_Check(pyRepresentation) || PyDict_Check(pyRepresentation)
+        );
     }
 
     int pyInquiryConcrete(const char* op, const char* opErrRep);
@@ -58,9 +61,14 @@ public:
 
     NamedTuple* type();
 
-    static void copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
+    static void copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level);
 
-    static void constructFromPythonArgumentsConcrete(NamedTuple* t, uint8_t* data, PyObject* args, PyObject* kwargs, bool isExplicit=true);
+    static void constructFromPythonArgumentsConcrete(
+        NamedTuple* t,
+        uint8_t* data,
+        PyObject* args,
+        PyObject* kwargs
+    );
 
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
 

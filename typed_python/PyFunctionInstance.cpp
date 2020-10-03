@@ -64,14 +64,18 @@ PyFunctionInstance::tryToCallAnyOverload(const Function* f, instance_ptr funcClo
         mappedKwargs.set(kwargs);
     }
 
-    //first try to match arguments with no explicit conversion.
-    //if that fails, try explicit conversion
-    for (long tryToConvertExplicitly = 0; tryToConvertExplicitly <= 1; tryToConvertExplicitly++) {
+    for (ConversionLevel conversionLevel: {
+        ConversionLevel::Signature,
+        ConversionLevel::Upcast,
+        ConversionLevel::UpcastContainers,
+        ConversionLevel::Implicit,
+        ConversionLevel::ImplicitContainers
+    }) {
         for (long overloadIx = 0; overloadIx < f->getOverloads().size(); overloadIx++) {
             std::pair<bool, PyObject*> res =
                 PyFunctionInstance::tryToCallOverload(
                     f, funcClosure, overloadIx, self,
-                    mappedArgs, mappedKwargs, tryToConvertExplicitly
+                    mappedArgs, mappedKwargs, conversionLevel
                 );
 
             if (res.first) {
@@ -99,7 +103,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
         PyObject* self,
         PyObject* args,
         PyObject* kwargs,
-        bool convertExplicitly
+        ConversionLevel conversionLevel
 ) {
     const Function::Overload& overload(f->getOverloads()[overloadIx]);
 
@@ -139,14 +143,19 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
         auto arg = overload.getArgs()[k];
 
         if (arg.getIsNormalArg() && arg.getTypeFilter()) {
-            if (!PyInstance::pyValCouldBeOfType(arg.getTypeFilter(), mapping.getSingleValueArgs()[k], convertExplicitly)) {
+            if (!PyInstance::pyValCouldBeOfType(
+                arg.getTypeFilter(),
+                mapping.getSingleValueArgs()[k],
+                conversionLevel
+                )
+            ) {
                 return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
             }
         }
     }
 
     //perform argument coercion
-    mapping.applyTypeCoercion(convertExplicitly);
+    mapping.applyTypeCoercion(conversionLevel);
 
     if (!mapping.isValid()) {
         return std::make_pair(false, nullptr);
@@ -184,7 +193,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
     if (overload.getReturnType()) {
         try {
             PyObject* newRes = PyInstance::initializePythonRepresentation(overload.getReturnType(), [&](instance_ptr data) {
-                copyConstructFromPythonInstance(overload.getReturnType(), data, result, true);
+                copyConstructFromPythonInstance(overload.getReturnType(), data, result, ConversionLevel::ImplicitContainers);
             });
 
             return std::make_pair(true, newRes);
@@ -363,7 +372,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
         if (arg.getIsNormalArg()) {
             Type* argType = specialization.getArgTypes()[k];
 
-            if (!PyInstance::pyValCouldBeOfType(argType, mapper.getSingleValueArgs()[k], false)) {
+            if (!PyInstance::pyValCouldBeOfType(argType, mapper.getSingleValueArgs()[k], ConversionLevel::Signature)) {
                 return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
             }
         }
@@ -439,9 +448,6 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
     if (!funcOverloadArg) {
         throw std::runtime_error("Internal error: couldn't find typed_python.internals.FunctionOverloadArg");
     }
-
-
-
 
     PyObjectStealer overloadTuple(PyTuple_New(f->getOverloads().size()));
 
@@ -766,7 +772,7 @@ PyObject* PyFunctionInstance::overload(PyObject* funcObj, PyObject* args, PyObje
             otherFuncAsInstance = Instance::createAndInitialize(
                 argT,
                 [&](instance_ptr ptr) {
-                    PyInstance::copyConstructFromPythonInstance(argT, ptr, arg, true);
+                    PyInstance::copyConstructFromPythonInstance(argT, ptr, arg, ConversionLevel::New);
                 }
             );
 
@@ -1017,7 +1023,7 @@ Function* PyFunctionInstance::convertPythonObjectToFunctionType(
 }
 
 /* static */
-bool PyFunctionInstance::pyValCouldBeOfTypeConcrete(Function* type, PyObject* pyRepresentation, bool isExplicit) {
+bool PyFunctionInstance::pyValCouldBeOfTypeConcrete(Function* type, PyObject* pyRepresentation, ConversionLevel level) {
     if (!PyFunction_Check(pyRepresentation)) {
         return false;
     }
@@ -1030,9 +1036,13 @@ bool PyFunctionInstance::pyValCouldBeOfTypeConcrete(Function* type, PyObject* py
 }
 
 /* static */
-void PyFunctionInstance::copyConstructFromPythonInstanceConcrete(Function* type, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-    if (!pyValCouldBeOfTypeConcrete(type, pyRepresentation, isExplicit)) {
-        throw std::runtime_error("Can't convert to " + type->name());
+void PyFunctionInstance::copyConstructFromPythonInstanceConcrete(Function* type, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
+    if (level < ConversionLevel::New) {
+        throw std::runtime_error("Can't convert to " + type->name() + " with " + format(conversionLevelToInt(level)));
+    }
+
+    if (!pyValCouldBeOfTypeConcrete(type, pyRepresentation, level)) {
+        throw std::runtime_error("Can't convert to " + type->name() + " pyrep");
     }
 
     if (!type->getClosureType()->isTuple()) {
@@ -1084,7 +1094,7 @@ void PyFunctionInstance::copyConstructFromPythonInstanceConcrete(Function* type,
                 closureType->getTypes()[index],
                 tgtCell,
                 PyCell_GET(cell),
-                isExplicit
+                ConversionLevel::Implicit
             );
         }
     });

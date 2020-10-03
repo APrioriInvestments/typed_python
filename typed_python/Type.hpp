@@ -141,8 +141,32 @@ public:
         return m_typeCategory == catTuple;
     }
 
+    bool isListOf() const {
+        return m_typeCategory == catListOf;
+    }
+
+    bool isTupleOrListOf() const {
+        return m_typeCategory == catListOf || m_typeCategory == catTupleOf;
+    }
+
+    bool isTupleOf() const {
+        return m_typeCategory == catTupleOf;
+    }
+
+    bool isDict() const {
+        return m_typeCategory == catDict;
+    }
+
+    bool isConstDict() const {
+        return m_typeCategory == catConstDict;
+    }
+
     bool isNamedTuple() const {
         return m_typeCategory == catNamedTuple;
+    }
+
+    bool isNone() const {
+        return m_typeCategory == catNone;
     }
 
     bool isFunction() const {
@@ -157,6 +181,30 @@ public:
         return m_typeCategory == catForward;
     }
 
+    bool isOneOf() const {
+        return m_typeCategory == catOneOf;
+    }
+
+    bool isValue() const {
+        return m_typeCategory == catValue;
+    }
+
+    bool isRegister() const {
+        return (
+            m_typeCategory == catBool
+            || m_typeCategory == catUInt8
+            || m_typeCategory == catUInt16
+            || m_typeCategory == catUInt32
+            || m_typeCategory == catUInt64
+            || m_typeCategory == catInt8
+            || m_typeCategory == catInt16
+            || m_typeCategory == catInt32
+            || m_typeCategory == catInt64
+            || m_typeCategory == catFloat32
+            || m_typeCategory == catFloat64
+        );
+    }
+
     bool isRecursive() {
         return getRecursiveTypeGroupMembers().size() != 1;
     }
@@ -164,6 +212,10 @@ public:
     bool isRefTo() const {
         return m_typeCategory == catRefTo;
     }
+
+    // is it legal (and will it always succeed) to cast values from
+    // fromType to toType?
+    static bool isValidUpcastType(Type* fromType, Type* toType);
 
     virtual ~Type() {
         throw std::runtime_error("Types should never get deleted.");

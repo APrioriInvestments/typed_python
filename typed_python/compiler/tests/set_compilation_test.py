@@ -17,7 +17,7 @@ from typed_python.compiler.type_wrappers.set_wrapper import set_union, set_inter
     set_symmetric_difference, set_union_multiple, set_intersection_multiple, set_difference_multiple, \
     set_disjoint, set_subset, set_subset_iterable, set_superset, set_proper_subset, set_equal, set_not_equal, \
     set_update, set_intersection_update, set_difference_update, set_symmetric_difference_update, \
-    initialize_set_from_other
+    initialize_set_from_other_implicit
 from flaky import flaky
 import typed_python._types as _types
 import time
@@ -48,10 +48,10 @@ class TestSetCompilation(unittest.TestCase):
             y = x
             return y
 
-        self.assertEqual(f({1, 2}), {1, 2})
+        self.assertEqual(f(Set(int)({1, 2})), {1, 2})
 
         @Entrypoint
-        def reversed(x: ListOf(Set(int))):
+        def reversedNative(x: ListOf(Set(int))):
             res = ListOf(Set(int))()
 
             i = len(x) - 1
@@ -64,10 +64,10 @@ class TestSetCompilation(unittest.TestCase):
         for length in range(100):
             sets = [{x * 2 + 1} for x in range(length)]
 
-            aList = ListOf(Set(int))(sets)
+            aList = ListOf(Set(int)).convert(sets)
 
             refcounts = [_types.refcount(x) for x in aList]
-            aListRev = reversed(aList)
+            aListRev = reversedNative(aList)
             self.assertEqual(aListRev, list(reversed(sets)))
             aListRev = None
 
@@ -116,8 +116,8 @@ class TestSetCompilation(unittest.TestCase):
         x1.add(1.0)
         self.assertEqual(set_in(x1, 1.0), True)
         self.assertEqual(set_in(x1, 1.2), False)
-        with self.assertRaises(TypeError):
-            set_in(x1, 1)
+        assert set_in(x1, 1)
+        assert 1 in x1
 
     def test_set_add(self):
         S = Set(int)
@@ -133,6 +133,9 @@ class TestSetCompilation(unittest.TestCase):
         self.assertEqual(x, {1, 9})
         set_add(x, 4)
         self.assertEqual(x, {1, 4, 9})
+
+        with self.assertRaises(TypeError):
+            x.add(1.5)
 
         with self.assertRaises(TypeError):
             set_add(x, 1.5)
@@ -981,11 +984,17 @@ class TestSetCompilation(unittest.TestCase):
         class P_mock:
             ElementType = Set(int)
 
-            def initialize(self, src):
+            def initialize(self, src=None):
+                self.s = set()
+
+            def destroy(self):
                 pass
 
+            def get(self):
+                return self.s
+
         p1 = P_mock()
-        initialize_set_from_other(p1, [1, 2])
+        initialize_set_from_other_implicit(p1, [1, 2], True)
 
     def test_compiled_set_constructors(self):
         def f_set(x):
@@ -1009,11 +1018,11 @@ class TestSetCompilation(unittest.TestCase):
             Tuple(int, int, int, int)((7, 8, 8, 7)),
             Dict(int, int)({101: 1, 202: 2}),
             ConstDict(int, int)({101: 1, 202: 2}),
-            Set(float)({1.0, 2.0}),
-            ListOf(float)([3.0, 3.0, 4.0, 4.0]),
+            ListOf(float)([3.0, 3.5, 4.0, 4.0]),
             TupleOf(float)((5.0, 6.0, 5.0, 6.0)),
             Tuple(float, float, float, float)((7.0, 8.0, 8.0, 7.0)),
             Dict(float, int)({101.0: 1, 102.0: 2}),
+            Set(float)({1.0, 2.0}),
         ]
 
         test_values_mismatch = [
@@ -1029,6 +1038,11 @@ class TestSetCompilation(unittest.TestCase):
             for v in test_values:
                 r1 = f(v)
                 r2 = Entrypoint(f)(v)
+                if r1 != r2:
+                    raise Exception(
+                        f"Calling {f.__name__} on {v} of type {type(v)} produced different"
+                        f" values under entrypoint: {r1} != {r2}"
+                    )
                 self.assertEqual(r1, r2)
 
             r1 = f(some_fibs())
@@ -1036,6 +1050,7 @@ class TestSetCompilation(unittest.TestCase):
             self.assertEqual(r1, r2)
 
             for v in test_values_mismatch:
+                print(f, v)
                 with self.assertRaises(TypeError):
                     f(v)
                 with self.assertRaises(TypeError):

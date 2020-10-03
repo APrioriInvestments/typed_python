@@ -19,6 +19,7 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 import types
 
 from typed_python.compiler.type_wrappers.slice_type_object_wrapper import SliceWrapper
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.SerializationContext import SerializationContext
 from typed_python.internals import makeFunctionType, FunctionOverload
 from typed_python.compiler.function_stack_state import FunctionStackState
@@ -27,7 +28,9 @@ from typed_python.compiler.python_object_representation import pythonObjectRepre
 from typed_python.compiler.python_object_representation import pythonObjectRepresentationType
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
-from typed_python import Alternative, OneOf, Int32, ListOf, Tuple, NamedTuple, TupleOf
+from typed_python import (
+    Alternative, OneOf, Int8, Int16, Int32, UInt8, UInt16, UInt32, UInt64, ListOf, Tuple, NamedTuple, TupleOf
+)
 from typed_python._types import TypeFor, pyInstanceHeldObjectAddress
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
@@ -100,6 +103,9 @@ class ExpressionConversionContext:
         Args:
             t - python representation of Type, e.g. int, UInt64, ListOf(str), ...
         """
+        if not isinstance(t, type):
+            raise Exception(f"Can't give a type pointer to {t} because its not a type")
+
         return native_ast.Expression.GlobalVariable(
             name="type_pointer_" + str(id(t)) + "_" + str(t)[:20],
             type=native_ast.VoidPtr,
@@ -306,6 +312,18 @@ class ExpressionConversionContext:
             return TypedExpression(self, native_ast.const_int_expr(x), int, False, constantValue=x)
         if isinstance(x, Int32):
             return TypedExpression(self, native_ast.const_int32_expr(int(x)), Int32, False, constantValue=x)
+        if isinstance(x, Int16):
+            return TypedExpression(self, native_ast.const_int16_expr(int(x)), Int16, False, constantValue=x)
+        if isinstance(x, Int8):
+            return TypedExpression(self, native_ast.const_int8_expr(int(x)), Int16, False, constantValue=x)
+        if isinstance(x, UInt64):
+            return TypedExpression(self, native_ast.const_uint64_expr(int(x)), UInt64, False, constantValue=x)
+        if isinstance(x, UInt32):
+            return TypedExpression(self, native_ast.const_uint32_expr(int(x)), UInt32, False, constantValue=x)
+        if isinstance(x, UInt16):
+            return TypedExpression(self, native_ast.const_uint16_expr(int(x)), UInt16, False, constantValue=x)
+        if isinstance(x, UInt8):
+            return TypedExpression(self, native_ast.const_uint8_expr(int(x)), UInt8, False, constantValue=x)
         if isinstance(x, float):
             return TypedExpression(self, native_ast.const_float_expr(x), float, False, constantValue=x)
         if x is None:
@@ -827,7 +845,7 @@ class ExpressionConversionContext:
 
             if functionOverload.args[curTargetIx].isStarArg:
                 if len(outArgs) <= curTargetIx:
-                    outArgs.append(FunctionArgMapping.StarArgs([a]))
+                    outArgs.append(FunctionArgMapping.StarArgs(ListOf(object)([a])))
                 else:
                     outArgs[-1].value.append(a)
             else:
@@ -842,7 +860,7 @@ class ExpressionConversionContext:
             arg = functionOverload.args[len(outArgs)]
 
             if arg.isStarArg:
-                outArgs.append(FunctionArgMapping.StarArgs(value=()))
+                outArgs.append(FunctionArgMapping.StarArgs())
             elif arg.isKwarg:
                 for name in unconsumedKwargs:
                     if name in consumedPositionalNames:
@@ -997,7 +1015,7 @@ class ExpressionConversionContext:
                 if overloadArg.typeFilter is None:
                     outArgs.append(mappingArg.value)
                 else:
-                    if mappingArg.value.can_convert_to_type(typeWrapper(overloadArg.typeFilter), True) is False:
+                    if mappingArg.value.can_convert_to_type(typeWrapper(overloadArg.typeFilter), ConversionLevel.Implicit) is False:
                         return None
                     outArgs.append(typeWrapper(overloadArg.typeFilter))
 
@@ -1007,7 +1025,7 @@ class ExpressionConversionContext:
                 if overloadArg.typeFilter is None:
                     outArgs.append(constType)
                 else:
-                    if constType.can_convert_to_type(typeWrapper(overloadArg.typeFilter), True) is False:
+                    if constType.can_convert_to_type(typeWrapper(overloadArg.typeFilter), ConversionLevel.Implicit) is False:
                         return None
 
                     outArgs.append(typeWrapper(overloadArg.typeFilter))
@@ -1016,7 +1034,7 @@ class ExpressionConversionContext:
                     outArgs.append(ExpressionConversionContext.makeStarArgTupleType(mappingArg.value))
                 else:
                     for t in mappingArg.value:
-                        if t.can_convert_to_type(typeWrapper(overloadArg.typeFilter), True) is False:
+                        if t.can_convert_to_type(typeWrapper(overloadArg.typeFilter), ConversionLevel.Implicit) is False:
                             return None
 
                     outArgs.append(ExpressionConversionContext.makeStarArgTupleType(
@@ -1027,11 +1045,11 @@ class ExpressionConversionContext:
                     outArgs.append(ExpressionConversionContext.makeKwargDictType(dict(mappingArg.value)))
                 else:
                     for _, t in mappingArg.value:
-                        if t.can_convert_to_type(typeWrapper(overloadArg.typeFilter), True) is False:
+                        if t.can_convert_to_type(typeWrapper(overloadArg.typeFilter), ConversionLevel.Implicit) is False:
                             return None
 
                     outArgs.append(ExpressionConversionContext.makeKwargDictType(
-                        dict({k: typeWrapper(overloadArg.typeFilter) for k, v in mappingArg.value.items()})
+                        dict({k: typeWrapper(overloadArg.typeFilter) for k, v in mappingArg.value})
                     ))
 
         return outArgs
@@ -1308,6 +1326,7 @@ class ExpressionConversionContext:
     def pushExceptionObjectWithCause(self, exceptionObject, causeObject, deferred=False):
         if exceptionObject is None:
             exceptionObject = self.zero(object)
+
         if causeObject.expr_type.typeRepresentation is type(None):  # noqa
             causeObject = self.zero(object)
 
@@ -1350,7 +1369,7 @@ class ExpressionConversionContext:
     def recastVariableAsRestrictedType(self, expr, varType):
         if varType is not None and varType != expr.expr_type.typeRepresentation:
             if getattr(expr.expr_type.typeRepresentation, "__typed_python_category__", None) == "OneOf":
-                return expr.convert_to_type(varType, explicit=False)
+                return expr.convert_to_type(varType, ConversionLevel.Signature)
 
             if getattr(expr.expr_type.typeRepresentation, "__typed_python_category__", None) == "Alternative" and \
                     getattr(varType, "__typed_python_category__", None) == "ConcreteAlternative":
@@ -1511,6 +1530,8 @@ class ExpressionConversionContext:
             # define a function to recursively walk through the expressions in our chain.
             # calling it pushes code that evaluates ast.values[depth:] in the current
             # context.
+            assert ast.values
+
             def convertBoolOp(depth=0):
                 value = self.convert_expression_ast(ast.values[depth])
 
@@ -1522,7 +1543,7 @@ class ExpressionConversionContext:
                 if depth == len(ast.values) - 1:
                     # this is the last node in the expression, and so therefore
                     # the value of the slot in this particular pathway.
-                    value.convert_to_type_with_target(result)
+                    value.convert_to_type_with_target(result, ConversionLevel.Signature)
                     self.markUninitializedSlotInitialized(result)
                 else:
                     bool_value = TypedExpression.asBool(value)
@@ -1535,12 +1556,12 @@ class ExpressionConversionContext:
                             with ifTrue:
                                 convertBoolOp(depth + 1)
                             with ifFalse:
-                                value.convert_to_type_with_target(result)
+                                value.convert_to_type_with_target(result, ConversionLevel.Signature)
                                 self.markUninitializedSlotInitialized(result)
                     elif ast.op.matches.Or:
                         with self.ifelse(bool_value) as (ifTrue, ifFalse):
                             with ifTrue:
-                                value.convert_to_type_with_target(result)
+                                value.convert_to_type_with_target(result, ConversionLevel.Signature)
                                 self.markUninitializedSlotInitialized(result)
                             with ifFalse:
                                 convertBoolOp(depth + 1)
@@ -1805,13 +1826,13 @@ class ExpressionConversionContext:
 
                 if true_res is not None:
                     with true_block:
-                        true_res = true_res.convert_to_type(out_type)
+                        true_res = true_res.convert_to_type(out_type, ConversionLevel.Signature)
                         out_slot.convert_copy_initialize(true_res)
                         self.markUninitializedSlotInitialized(out_slot)
 
                 if false_res is not None:
                     with false_block:
-                        false_res = false_res.convert_to_type(out_type)
+                        false_res = false_res.convert_to_type(out_type, ConversionLevel.Signature)
                         out_slot.convert_copy_initialize(false_res)
                         self.markUninitializedSlotInitialized(out_slot)
 

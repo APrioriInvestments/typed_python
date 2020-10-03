@@ -141,7 +141,7 @@ PyObject* PyConstDictInstance::constDictGet(PyObject* o, PyObject* args) {
         } else {
             try {
                 Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(self_w->type()->keyType(), data, item);
+                    copyConstructFromPythonInstance(self_w->type()->keyType(), data, item, ConversionLevel::UpcastContainers);
                 });
 
                 instance_ptr i = self_w->type()->lookupValueByKey(self_w->dataPtr(), key.data());
@@ -225,7 +225,7 @@ int PyConstDictInstance::sq_contains_concrete(PyObject* item) {
     if (mIteratorFlag == 1) {
         // we're a values iterator
         Instance value(type()->valueType(), [&](instance_ptr data) {
-            copyConstructFromPythonInstance(type()->valueType(), data, item);
+            copyConstructFromPythonInstance(type()->valueType(), data, item, ConversionLevel::UpcastContainers);
         });
 
         bool found = false;
@@ -248,7 +248,7 @@ int PyConstDictInstance::sq_contains_concrete(PyObject* item) {
         Type* tupType = Tuple::Make({type()->keyType(), type()->valueType()});
 
         Instance value(tupType, [&](instance_ptr data) {
-            copyConstructFromPythonInstance(tupType, data, item);
+            copyConstructFromPythonInstance(tupType, data, item, ConversionLevel::Implicit);
         });
 
         type()->visitKeyValuePairs(dataPtr(), [&](instance_ptr keyValuePairInst) {
@@ -275,7 +275,7 @@ int PyConstDictInstance::sq_contains_concrete(PyObject* item) {
         return 1;
     } else {
         Instance key(type()->keyType(), [&](instance_ptr data) {
-            copyConstructFromPythonInstance(type()->keyType(), data, item);
+            copyConstructFromPythonInstance(type()->keyType(), data, item, ConversionLevel::UpcastContainers);
         });
 
         instance_ptr i = type()->lookupValueByKey(dataPtr(), key.data());
@@ -324,7 +324,7 @@ PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
             }
 
             Instance other(type(), [&](instance_ptr data) {
-                copyConstructFromPythonInstance(type(), data, rhs, true);
+                copyConstructFromPythonInstance(type(), data, rhs, ConversionLevel::Implicit);
             });
 
             return PyInstance::initialize(type(), [&](instance_ptr data) {
@@ -339,7 +339,7 @@ PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
 
         //convert rhs to a relevant tuple of keys type.
         Instance keys(tupleOfKeysType, [&](instance_ptr data) {
-            copyConstructFromPythonInstance(tupleOfKeysType, data, rhs, true);
+            copyConstructFromPythonInstance(tupleOfKeysType, data, rhs, ConversionLevel::Implicit);
         });
 
         return PyInstance::initialize(type(), [&](instance_ptr data) {
@@ -394,7 +394,7 @@ PyObject* PyConstDictInstance::mp_subscript_concrete(PyObject* item) {
         return extractPythonObject(i, type()->valueType());
     } else {
         Instance key(type()->keyType(), [&](instance_ptr data) {
-            copyConstructFromPythonInstance(type()->keyType(), data, item);
+            copyConstructFromPythonInstance(type()->keyType(), data, item, ConversionLevel::UpcastContainers);
         });
 
         instance_ptr i = type()->lookupValueByKey(dataPtr(), key.data());
@@ -469,7 +469,12 @@ bool PyConstDictInstance::compare_to_python_concrete(ConstDictType* dictType, in
 
         try {
             keyInst = Instance(dictType->keyType(), [&](instance_ptr data) {
-                copyConstructFromPythonInstance(dictType->keyType(), data, key, !exact /* explicit */);
+                copyConstructFromPythonInstance(
+                    dictType->keyType(),
+                    data,
+                    key,
+                    exact ? ConversionLevel::Signature : ConversionLevel::UpcastContainers
+                );
             });
         } catch(PythonExceptionSet&) {
             PyErr_Clear();
@@ -493,8 +498,8 @@ bool PyConstDictInstance::compare_to_python_concrete(ConstDictType* dictType, in
     return true;
 }
 
-bool PyConstDictInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
-    if (isExplicit) {
+bool PyConstDictInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
+    if (level != ConversionLevel::Signature) {
         if (PyDict_Check(pyRepresentation)) {
             return true;
         }
@@ -505,21 +510,22 @@ bool PyConstDictInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObjec
     return false;
 }
 
-void PyConstDictInstance::copyConstructFromPythonInstanceConcrete(ConstDictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-    if (!isExplicit) {
-        PyInstance::copyConstructFromPythonInstanceConcrete(dictType, tgt, pyRepresentation, isExplicit);
+void PyConstDictInstance::copyConstructFromPythonInstanceConcrete(ConstDictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
+    if (level == ConversionLevel::Signature) {
+        return PyInstance::copyConstructFromPythonInstanceConcrete(dictType, tgt, pyRepresentation, level);
     }
 
-    if (PyDict_Check(pyRepresentation) && isExplicit) {
+    if (PyDict_Check(pyRepresentation)) {
         PyObject *key, *value;
         Py_ssize_t pos = 0;
 
         dictType->constructor(tgt, PyDict_Size(pyRepresentation), [&](instance_ptr outKey, instance_ptr outVal) {
             PyDict_Next(pyRepresentation, &pos, &key, &value);
 
-            copyConstructFromPythonInstance(dictType->keyType(), outKey, key, true);
+            copyConstructFromPythonInstance(dictType->keyType(), outKey, key, ConversionLevel::UpcastContainers);
+
             try {
-                copyConstructFromPythonInstance(dictType->valueType(), outVal, value, true);
+                copyConstructFromPythonInstance(dictType->valueType(), outVal, value, ConversionLevel::Implicit);
             } catch(...) {
                 dictType->keyType()->destroy(outKey);
                 throw;
@@ -559,10 +565,10 @@ void PyConstDictInstance::copyConstructFromPythonInstanceConcrete(ConstDictType*
             throw PythonExceptionSet();
         }
 
-        copyConstructFromPythonInstance(dictType->keyType(), outKey, key, true);
+        copyConstructFromPythonInstance(dictType->keyType(), outKey, key, ConversionLevel::UpcastContainers);
 
         try {
-            copyConstructFromPythonInstance(dictType->valueType(), outVal, value, true);
+            copyConstructFromPythonInstance(dictType->valueType(), outVal, value, ConversionLevel::Implicit);
         } catch(...) {
             dictType->keyType()->destroy(outKey);
             throw;

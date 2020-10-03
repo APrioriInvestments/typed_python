@@ -39,15 +39,3 @@ class NamedTupleMasqueradingAsDict(MasqueradeWrapper):
             )
 
         return emptyDict
-
-    def can_cast_to_primitive(self, context, instance, primitiveType):
-        return instance.convert_masquerade_to_typed().can_cast_to_primitive(primitiveType)
-
-    def convert_bool_cast(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_bool_cast()
-
-    def convert_int_cast(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_int_cast()
-
-    def convert_float_cast(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_float_cast()

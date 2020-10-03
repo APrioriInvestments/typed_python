@@ -585,6 +585,65 @@ PyObject* initializeGlobalStatics(PyObject* nullValue, PyObject* args, PyObject*
     return incref(Py_None);
 }
 
+PyObject* isValidArithmeticConversion(PyObject* nullValue, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {"fromType", "toType", "conversionLevel", NULL};
+
+    PyObject* fromTypeObj;
+    PyObject* toTypeObj;
+    long conversionLevel;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOl", (char**)kwlist, &fromTypeObj, &toTypeObj, &conversionLevel)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        Type* fromType = PyInstance::unwrapTypeArgToTypePtr(fromTypeObj);
+        Type* toType = PyInstance::unwrapTypeArgToTypePtr(toTypeObj);
+
+        if (!fromType || !fromType->isRegister()) {
+            return incref(Py_False);
+        }
+
+        if (!toType || !toType->isRegister()) {
+            return incref(Py_False);
+        }
+
+        return incref(RegisterTypeProperties::isValidConversion(
+            fromType,
+            toType,
+            intToConversionLevel(conversionLevel)
+        ) ? Py_True : Py_False);
+    });
+}
+
+PyObject* isValidArithmeticUpcast(PyObject* nullValue, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {"fromType", "toType", NULL};
+
+    PyObject* fromTypeObj;
+    PyObject* toTypeObj;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO", (char**)kwlist, &fromTypeObj, &toTypeObj)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        Type* fromType = PyInstance::unwrapTypeArgToTypePtr(fromTypeObj);
+        Type* toType = PyInstance::unwrapTypeArgToTypePtr(toTypeObj);
+
+        if (!fromType || !fromType->isRegister()) {
+            throw std::runtime_error("Expected 'fromType' to be an arithmetic type");
+        }
+
+        if (!toType || !toType->isRegister()) {
+            throw std::runtime_error("Expected 'toType' to be an arithmetic type");
+        }
+
+        return incref(RegisterTypeProperties::isValidUpcast(fromType, toType) ? Py_True : Py_False);
+    });
+}
+
 PyObject* classGetDispatchIndex(PyObject* nullValue, PyObject* args, PyObject* kwargs)
 {
     static const char *kwlist[] = {"instance", NULL};
@@ -1097,6 +1156,56 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     });
 }
 
+PyObject* convertObjectToTypeAtLevel(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    return translateExceptionToPyObject([&]() {
+        static const char *kwlist[] = {"toConvert", "toType", "levelAsInt", NULL};
+
+        PyObject* object;
+        PyObject* targetType;
+        long level;
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOl", (char**)kwlist, &object, &targetType, &level)) {
+            throw PythonExceptionSet();
+        }
+
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(targetType);
+
+        if (!t) {
+            PyErr_SetString(PyExc_TypeError, "second argument to 'convertObjectToTypeAtLevel' must be a Type object");
+            throw PythonExceptionSet();
+        }
+
+        Instance result = Instance::createAndInitialize(t, [&](instance_ptr p) {
+            PyInstance::copyConstructFromPythonInstance(t, p, object, intToConversionLevel(level));
+        });
+
+        return PyInstance::extractPythonObject(result);
+    });
+}
+
+PyObject* couldConvertObjectToTypeAtLevel(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    return translateExceptionToPyObject([&]() {
+        static const char *kwlist[] = {"toConvert", "toType", "levelAsInt", NULL};
+
+        PyObject* object;
+        PyObject* targetType;
+        long level;
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOl", (char**)kwlist, &object, &targetType, &level)) {
+            throw PythonExceptionSet();
+        }
+
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(targetType);
+
+        if (!t) {
+            PyErr_SetString(PyExc_TypeError, "second argument to 'convertObjectToTypeAtLevel' must be a Type object");
+            throw PythonExceptionSet();
+        }
+
+        return PyInstance::pyValCouldBeOfType(t, object, intToConversionLevel(level)) ? incref(Py_True) : incref(Py_False);
+    });
+}
+
 PyObject *pyInstanceHeldObjectAddress(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "pyInstanceHeldObjectAddress takes a PyInstance");
@@ -1310,7 +1419,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
     if (!serializeType) {
         PyErr_Format(
             PyExc_TypeError,
-            "first argument to serialize must be a native type object, not %S",
+            "first argument to serialize must be a type object, not %S",
             (PyObject*)a1
             );
         return NULL;
@@ -1344,7 +1453,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
         } else {
             //try to construct a 'serialize type' from the argument and then serialize that
             Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
-                PyInstance::copyConstructFromPythonInstance(serializeType, p, a2, true);
+                PyInstance::copyConstructFromPythonInstance(serializeType, p, a2, ConversionLevel::New);
             });
 
             PyEnsureGilReleased releaseTheGil;
@@ -1484,7 +1593,7 @@ PyObject *serializeStream(PyObject* nullValue, PyObject* args) {
     if (!serializeType) {
         PyErr_Format(
             PyExc_TypeError,
-            "first argument to serializeStream must be a native type object, not %S",
+            "first argument to serializeStream must be a type object, not %S",
             (PyObject*)a1
             );
         return NULL;
@@ -1527,7 +1636,7 @@ PyObject *serializeStream(PyObject* nullValue, PyObject* args) {
         TupleOfType* serializeTupleType = TupleOfType::Make(serializeType);
 
         Instance i = Instance::createAndInitialize(serializeTupleType, [&](instance_ptr p) {
-            PyInstance::copyConstructFromPythonInstance(serializeTupleType, p, a2, true);
+            PyInstance::copyConstructFromPythonInstance(serializeTupleType, p, a2, ConversionLevel::New);
         });
 
         {
@@ -1558,7 +1667,7 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     Type* serializeType = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!serializeType) {
-        PyErr_SetString(PyExc_TypeError, "first argument to deserialize must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "first argument to deserialize must be a type object");
         return NULL;
     }
     if (!PyBytes_Check(a2)) {
@@ -1759,7 +1868,7 @@ PyObject *deserializeStream(PyObject* nullValue, PyObject* args) {
     Type* serializeType = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!serializeType) {
-        PyErr_SetString(PyExc_TypeError, "first argument to deserialize must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "first argument to deserialize must be a type object");
         return NULL;
     }
     if (!PyBytes_Check(a2)) {
@@ -1815,7 +1924,7 @@ PyObject *isSimple(PyObject* nullValue, PyObject* args) {
     Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!t) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'isSimple' must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "first argument to 'isSimple' must be a type object");
         return NULL;
     }
 
@@ -1832,7 +1941,7 @@ PyObject *is_default_constructible(PyObject* nullValue, PyObject* args) {
     Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!t) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'is_default_constructible' must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "first argument to 'is_default_constructible' must be a type object");
         return NULL;
     }
 
@@ -1849,7 +1958,7 @@ PyObject *all_alternatives_empty(PyObject* nullValue, PyObject* args) {
     Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!t) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'all_alternatives_empty' must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "first argument to 'all_alternatives_empty' must be a type object");
         return NULL;
     }
 
@@ -1877,7 +1986,7 @@ PyObject *wantsToDefaultConstruct(PyObject* nullValue, PyObject* args) {
     Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!t) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'wantsToDefaultConstruct' must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "first argument to 'wantsToDefaultConstruct' must be a type object");
         return NULL;
     }
 
@@ -1894,7 +2003,7 @@ PyObject *bytecount(PyObject* nullValue, PyObject* args) {
     Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!t) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'bytecount' must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "first argument to 'bytecount' must be a type object");
         return NULL;
     }
 
@@ -1912,14 +2021,14 @@ PyObject *canConstructFrom(PyObject* nullValue, PyObject* args) {
     Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!t1) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'canConstructFrom' must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "first argument to 'canConstructFrom' must be a type object");
         return NULL;
     }
 
     Type* t2 = PyInstance::unwrapTypeArgToTypePtr(a2);
 
     if (!t2) {
-        PyErr_SetString(PyExc_TypeError, "second argument to 'canConstructFrom' must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "second argument to 'canConstructFrom' must be a type object");
         return NULL;
     }
 
@@ -2152,7 +2261,7 @@ PyObject *referencedTypes(PyObject* nullValue, PyObject* args) {
     Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!t1) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'referencedTypes' must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "first argument to 'referencedTypes' must be a type object");
         return NULL;
     }
 
@@ -2182,11 +2291,11 @@ PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
     Type* t2 = PyInstance::unwrapTypeArgToTypePtr(a2);
 
     if (!t1) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'isBinaryCompatible' must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "first argument to 'isBinaryCompatible' must be a type object");
         return NULL;
     }
     if (!t2) {
-        PyErr_SetString(PyExc_TypeError, "second argument to 'isBinaryCompatible' must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "second argument to 'isBinaryCompatible' must be a type object");
         return NULL;
     }
 
@@ -2405,6 +2514,10 @@ static PyMethodDef module_methods[] = {
     {"setClassOrStaticmethod", (PyCFunction)setClassOrStaticmethod, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setPropertyGetSetDel", (PyCFunction)setPropertyGetSetDel, METH_VARARGS | METH_KEYWORDS, NULL},
     {"initializeGlobalStatics", (PyCFunction)initializeGlobalStatics, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"convertObjectToTypeAtLevel", (PyCFunction)convertObjectToTypeAtLevel, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"couldConvertObjectToTypeAtLevel", (PyCFunction)couldConvertObjectToTypeAtLevel, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"isValidArithmeticUpcast", (PyCFunction)isValidArithmeticUpcast, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"isValidArithmeticConversion", (PyCFunction)isValidArithmeticConversion, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 
@@ -2470,9 +2583,12 @@ PyInit__types(void)
     PyModule_AddObject(module, "PythonObjectOfType", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPythonObjectOfType)));
     PyModule_AddObject(module, "PythonSubclass", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPythonSubclass)));
 
-
     if (module == NULL)
         return NULL;
+
+    // initialize a couple of global references to things in typed_python.internals
+    PythonObjectOfType::AnyPyObject();
+    PythonObjectOfType::AnyPyType();
 
     return module;
 }

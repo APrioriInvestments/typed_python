@@ -30,7 +30,9 @@ public:
 
     PyObject* mp_subscript_concrete(PyObject* item);
 
-    static void copyConstructFromPythonInstanceConcrete(TupleOrListOfType* tupT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
+    static void copyConstructFromPythonInstanceConcrete(
+        TupleOrListOfType* tupT, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level
+    );
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
 
@@ -42,7 +44,11 @@ public:
 
     static PyObject* toArray(PyObject* o, PyObject* args);
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit);
+    static PyObject* toBytes(PyObject* o, PyObject* args);
+
+    static PyObject* fromBytes(PyObject* o, PyObject* args, PyObject* kwds);
+
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level);
 
     static void mirrorTypeInformationIntoPyTypeConcrete(TupleOrListOfType* inType, PyTypeObject* pyType);
 };
@@ -54,6 +60,8 @@ public:
     ListOfType* type();
 
     static PyObject* listAppend(PyObject* o, PyObject* args);
+
+    static PyObject* listAppendDirect(PyObject* o, PyObject* args);
 
     static PyObject* listExtend(PyObject* o, PyObject* args);
 

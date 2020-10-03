@@ -39,7 +39,9 @@ public:
         return false;
     }
 
-    static void copyConstructFromPythonInstanceConcrete(Value* v, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    static void copyConstructFromPythonInstanceConcrete(
+        Value* v, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level
+    ) {
         const Instance& elt = v->value();
 
         if (elt.type()->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType &&
@@ -47,23 +49,27 @@ public:
             return;
         }
 
-        else if (compare_to_python(elt.type(), elt.data(), pyRepresentation, isExplicit ? false : true, Py_EQ)) {
+        else if (compare_to_python(elt.type(), elt.data(), pyRepresentation, level >= ConversionLevel::New ? false : true, Py_EQ)) {
             //it's the value we want
             return;
         }
 
-        throw std::logic_error("Can't initialize a " + v->name() + " from an instance of " +
-                std::string(pyRepresentation->ob_type->tp_name));
+        PyInstance::copyConstructFromPythonInstanceConcrete(v, tgt, pyRepresentation, level);
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* valType, PyObject* pyRepresentation, bool isExplicit) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* valType, PyObject* pyRepresentation, ConversionLevel level) {
         if (valType->value().type()->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
             PyObject* ourObj = ((PythonObjectOfType*)valType->value().type())->getPyObj(valType->value().data());
 
             return pyObjectsEquivalent(ourObj, pyRepresentation);
         }
 
-        return compare_to_python(valType->value().type(), valType->value().data(), pyRepresentation, true, Py_EQ);
+        return compare_to_python(
+            valType->value().type(),
+            valType->value().data(),
+            pyRepresentation, level >= ConversionLevel::New ? false : true,
+            Py_EQ
+        );
     }
 
     static PyObject* extractPythonObjectConcrete(Value* valueType, instance_ptr data) {

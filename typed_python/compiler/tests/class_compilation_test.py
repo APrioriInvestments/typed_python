@@ -19,7 +19,7 @@ import unittest
 from flaky import flaky
 from typed_python import (
     Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, UInt64, Int16,
-    Float32, Final, PointerTo, makeNamedTuple, Compiled, Function, Held, Value
+    Float32, Final, makeNamedTuple, Compiled, Function, Held, Value
 )
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime, CountCompilationsVisitor
@@ -1001,7 +1001,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             __rxor__ = lambda self, other: "rxor" + repr(other)
             __ror__ = lambda self, other: "ror" + repr(other)
 
-        values = [PointerTo(int)(), 1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
+        values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
                   ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"})]
         for v in values:
             T = type(v)
@@ -1615,7 +1615,10 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def __float__(self):
                 return 1.0
 
-        with self.assertRaisesRegex(TypeError, "Couldn't initialize type float from C"):
+        with self.assertRaisesRegex(
+            TypeError,
+            "Cannot implicitly convert an object of type C to an instance of float"
+        ):
             aList.append(C())
 
         @Function
@@ -1630,14 +1633,14 @@ class TestClassCompilationCompilation(unittest.TestCase):
             c = C()
             aList.append(c)
 
-        with self.assertRaisesRegex(TypeError, "Can't convert from type C to type float"):
+        with self.assertRaisesRegex(TypeError, "Couldn't initialize type float from C"):
             tryToAppend(aList)
 
         @Compiled
         def tryToCallRequiresAFloat():
             requiresAFloat(C())
 
-        with self.assertRaisesRegex(TypeError, "Failed to find an overload"):
+        with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
             tryToCallRequiresAFloat()
 
     def compileCheck(self, f):
@@ -1697,6 +1700,21 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(B().f(1.5, x=2.5), 0)
         self.compileCheck(lambda: B().f(1.5, x=2.5))
+
+    def test_class_method_star_arg_type_dispatch_unknown(self):
+        class B(Class):
+            def f(self, *args: int, **kwargs: int) -> str:
+                return "int"
+
+            def f(self, *args: float, **kwargs: float) -> str:  # noqa
+                return "float"
+
+        @Entrypoint
+        def callBWith(o: object):
+            return B().f(o)
+
+        assert callBWith(1.0) == "float"
+        assert callBWith(1) == "int"
 
     def test_class_methods_obey_star_arg_type_assignments(self):
         class B(Class):
@@ -2014,3 +2032,15 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert _types.refcount(theB) == 2
         clearList(aList)
         assert _types.refcount(theB) == 1
+
+    def test_class_member_assign_is_implicit_containers(self):
+        class C(Class, Final):
+            x = Member(ListOf(ListOf(int)))
+
+        C().x = [ListOf(int)([1, 2, 3])]
+
+        @Entrypoint
+        def assignX(c, x):
+            c.x = x
+
+        assignX(C(), [ListOf(int)([1, 2, 3])])

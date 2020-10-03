@@ -22,11 +22,11 @@ class PyForwardInstance : public PyInstance {
 public:
     typedef Forward modeled_type;
 
-    static bool pyValCouldBeOfTypeConcrete(Type* t, PyObject* pyRepresentation, bool isExplicit) {
+    static bool pyValCouldBeOfTypeConcrete(Type* t, PyObject* pyRepresentation, ConversionLevel level) {
         return false;
     }
 
-    static void copyConstructFromPythonInstanceConcrete(Forward* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    static void copyConstructFromPythonInstanceConcrete(Forward* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
         throw std::logic_error("Can't construct instances of a Forward.");
     }
 
@@ -113,4 +113,3 @@ public:
     }
 
 };
-

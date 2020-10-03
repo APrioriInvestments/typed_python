@@ -426,16 +426,16 @@ class TypesSerializationTest(unittest.TestCase):
 
         for items in [
                 (1, 2),
-                ("hi", None, 10, [1, 2, 3, 4]),
+                ("hi", None, 10, ListOf(int)([1, 2, 3, 4])),
                 ()]:
             self.assertEqual(
-                serializeStream(T, items),
+                serializeStream(T, [T(x) for x in items]),
                 b"".join([serialize(T, x) for x in items])
             )
 
             self.assertEqual(
-                deserializeStream(T, serializeStream(T, items)),
-                TupleOf(T)(items)
+                deserializeStream(T, serializeStream(T, [T(x) for x in items])),
+                TupleOf(T)([T(x) for x in items])
             )
 
     def test_serialize_recursive_object(self):

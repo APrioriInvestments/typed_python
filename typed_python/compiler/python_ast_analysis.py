@@ -74,6 +74,9 @@ def visitPyAstChildren(node, callback):
         if not callback(node):
             return
 
+        if node.matches.Constant:
+            return
+
         for name in node.ElementType.ElementNames:
             visitPyAstChildren(getattr(node, name), callback)
     else:

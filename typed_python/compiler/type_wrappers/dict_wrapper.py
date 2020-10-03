@@ -14,12 +14,13 @@
 
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.typed_expression import TypedExpression
+from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.native_hash import table_next_slot, table_clear, table_contains, \
     dict_delitem, dict_getitem, dict_get, dict_setitem
-from typed_python import Tuple, PointerTo, Int32, UInt8
+from typed_python import Tuple, PointerTo, Int32, UInt8, Dict, ConstDict
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -43,6 +44,34 @@ def dict_setdefault(dict, item, defaultValue):
     if item not in dict:
         dict[item] = defaultValue
     return dict[item]
+
+
+def initialize_dict_from_mappable(ptrToOutDict, mappable, mayThrow):
+    """Initialize a dictionary from an arbitrary object supporting the mapping protocol.
+
+    This is called internally by the compiler to support initializing
+    a Dict(T1, T2) from another Dict with different key/value types.
+
+    Args:
+        ptrToOutDict - a pointer to an uninitialized Dict instance.
+        mappable - something we can iterate over with a getitem.
+    Returns:
+        True if we succeeded, and ptrToOutDict is valid. False if
+        we failed, and ptrToOutDict will not point to an initialized
+        dictionary.
+    """
+    ptrToOutDict.initialize()
+
+    try:
+        for m in mappable:
+            ptrToOutDict.get()[m] = mappable[m]
+
+        return True
+    except: # noqa
+        ptrToOutDict.destroy()
+        if mayThrow:
+            raise
+        return False
 
 
 def dict_pop_nodefault(dict, item):
@@ -194,9 +223,42 @@ class DictWrapper(DictWrapperBase):
 
         return super().convert_attribute(context, expr, attr)
 
+    @staticmethod
+    def supportsMappingProtocol(T):
+        """Is T compiled and supporting the mapping protocol?"""
+        if issubclass(T, (Dict, ConstDict)):
+            return True
+
+        # when we support iterators in Class instances, we can revisit this:
+        # if issubclass(T, Class) and '__getitem__' in T.Methods and '__iter__' in T.Methods
+        #    return False
+
+        return False
+
+    def _can_convert_from_type(self, otherType, conversionLevel):
+        if (
+            conversionLevel.isImplicitContainersOrHigher()
+            and DictWrapper.supportsMappingProtocol(otherType.typeRepresentation)
+        ):
+            return "Maybe"
+
+        return super()._can_convert_from_type(otherType, conversionLevel)
+
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure=False):
+        if conversionLevel.isImplicitContainersOrHigher() and DictWrapper.supportsMappingProtocol(sourceVal.expr_type.typeRepresentation):
+            res = context.call_py_function(
+                initialize_dict_from_mappable,
+                (targetVal.asPointer(), sourceVal, context.constant(mayThrowOnFailure)),
+                {}
+            )
+
+            return res
+
+        return super().convert_to_self_with_target(context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure)
+
     def convert_set_attribute(self, context, instance, attr, expr):
         if attr == '_hash_table_count':
-            val = expr.convert_to_type(int)
+            val = expr.toInt64()
             if val is None:
                 return None
             context.pushEffect(
@@ -206,7 +268,7 @@ class DictWrapper(DictWrapperBase):
             return context.pushVoid()
 
         if attr == '_top_item_slot':
-            val = expr.convert_to_type(int)
+            val = expr.toInt64()
             if val is None:
                 return None
 
@@ -217,7 +279,7 @@ class DictWrapper(DictWrapperBase):
             return context.pushVoid()
 
         if attr == '_hash_table_empty_slots':
-            val = expr.convert_to_type(int)
+            val = expr.toInt64()
             if val is None:
                 return None
             context.pushEffect(
@@ -319,7 +381,7 @@ class DictWrapper(DictWrapperBase):
                 return self.convert_get(context, instance, args[0], context.constant(None))
 
             if methodname in ("getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe"):
-                index = args[0].convert_to_type(int)
+                index = args[0].toInt64()
                 if index is None:
                     return None
 
@@ -346,11 +408,11 @@ class DictWrapper(DictWrapperBase):
             if methodname == "get":
                 return self.convert_get(context, instance, args[0], args[1])
             if methodname in ("initializeValueByIndexUnsafe", 'assignValueByIndexUnsafe'):
-                index = args[0].convert_to_type(int)
+                index = args[0].toInt64()
                 if index is None:
                     return None
 
-                value = args[1].convert_to_type(self.valueType)
+                value = args[1].convert_to_type(self.valueType, ConversionLevel.Implicit)
                 if value is None:
                     return None
 
@@ -369,11 +431,11 @@ class DictWrapper(DictWrapperBase):
                 return context.pushVoid()
 
             if methodname == "initializeKeyByIndexUnsafe":
-                index = args[0].convert_to_type(int)
+                index = args[0].toInt64()
                 if index is None:
                     return None
 
-                key = args[1].convert_to_type(self.keyType)
+                key = args[1].convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
                 if key is None:
                     return None
 
@@ -394,7 +456,7 @@ class DictWrapper(DictWrapperBase):
         if item is None or expr is None:
             return None
 
-        item = item.convert_to_type(self.keyType, explicit=False)
+        item = item.convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
         if item is None:
             return None
 
@@ -404,7 +466,7 @@ class DictWrapper(DictWrapperBase):
         if item is None or expr is None:
             return None
 
-        item = item.convert_to_type(self.keyType, explicit=False)
+        item = item.convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
         if item is None:
             return None
 
@@ -414,7 +476,7 @@ class DictWrapper(DictWrapperBase):
         if item is None or expr is None:
             return None
 
-        item = item.convert_to_type(self.keyType, explicit=False)
+        item = item.convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
         if item is None:
             return None
 
@@ -424,11 +486,11 @@ class DictWrapper(DictWrapperBase):
         if key is None or expr is None or value is None:
             return None
 
-        key = key.convert_to_type(self.keyType, explicit=False)
+        key = key.convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
         if key is None:
             return None
 
-        value = value.convert_to_type(self.valueType)
+        value = value.convert_to_type(self.valueType, ConversionLevel.Implicit)
         if value is None:
             return None
 
@@ -457,7 +519,7 @@ class DictWrapper(DictWrapperBase):
 
     def convert_bin_op_reverse(self, context, left, op, right, inplace):
         if op.matches.In:
-            right = right.convert_to_type(self.keyType)
+            right = right.convert_to_type(self.keyType, ConversionLevel.UpcastContainers)
             if right is None:
                 return None
 
@@ -506,12 +568,31 @@ class DictWrapper(DictWrapperBase):
             if args[0].expr_type == self:
                 return context.call_py_function(dict_duplicate, (args[0],), {})
             else:
-                return args[0].convert_to_type(self, True)
+                return args[0].convert_to_type(self, ConversionLevel.New)
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
-    def convert_bool_cast(self, context, expr):
-        return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
+    def _can_convert_to_type(self, targetType, conversionLevel):
+        if not conversionLevel.isNewOrHigher():
+            return False
+
+        if targetType.typeRepresentation is bool:
+            return True
+
+        if targetType.typeRepresentation is str:
+            return "Maybe"
+
+        return False
+
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if targetVal.expr_type.typeRepresentation is bool:
+            res = context.pushPod(bool, self.convert_len_native(instance.nonref_expr).neq(0))
+            context.pushEffect(
+                targetVal.expr.store(res.nonref_expr)
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
 
 class DictMakeIteratorWrapper(DictWrapperBase):

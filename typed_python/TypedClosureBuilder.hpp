@@ -96,7 +96,7 @@ public:
             Instance funcAsInstance = Instance::createAndInitialize(
                 funcType,
                 [&](instance_ptr ptr) {
-                    PyInstance::copyConstructFromPythonInstance(funcType, ptr, o, true);
+                    PyInstance::copyConstructFromPythonInstance(funcType, ptr, o, ConversionLevel::New);
                 }
             );
 
@@ -442,7 +442,7 @@ public:
                 closureTuple->getTypes()[it->second],
                 data + closureTuple->getOffsets()[it->second],
                 pathAndContents.second,
-                true
+                ConversionLevel::New
             );
         }
     }

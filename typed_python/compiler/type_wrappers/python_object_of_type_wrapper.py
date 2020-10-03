@@ -16,6 +16,7 @@ import _thread
 
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
+from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python import OneOf
 import typed_python.compiler.native_ast as native_ast
@@ -88,7 +89,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         return nextRes, canContinue
 
     def convert_attribute(self, context, instance, attr):
-        if self.typeRepresentation in (_thread.LockType, _thread.RLock) and attr in ('acquire', 'release'):
+        if self.typeRepresentation in (_thread.LockType, _thread.RLock) and attr in ('acquire', 'release', "__enter__", "__exit__"):
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         assert isinstance(attr, str)
@@ -106,7 +107,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
     def convert_set_attribute(self, context, instance, attr, val):
         assert isinstance(attr, str)
 
-        valAsObj = val.convert_to_type(object)
+        valAsObj = val.convert_to_type(object, ConversionLevel.Signature)
         if valAsObj is None:
             return None
 
@@ -121,7 +122,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         return context.constant(None)
 
     def convert_getitem(self, context, instance, item):
-        itemAsObj = item.convert_to_type(object)
+        itemAsObj = item.convert_to_type(object, ConversionLevel.Signature)
         if itemAsObj is None:
             return None
 
@@ -137,7 +138,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         )
 
     def convert_delitem(self, context, instance, item):
-        itemAsObj = item.convert_to_type(object)
+        itemAsObj = item.convert_to_type(object, ConversionLevel.Signature)
         if itemAsObj is None:
             return None
 
@@ -170,7 +171,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         raise Exception(f"Unknown unary operator {op}")
 
     def convert_bin_op(self, context, l, op, r, inplace):
-        rAsObj = r.convert_to_type(object)
+        rAsObj = r.convert_to_type(object, ConversionLevel.Signature)
         if rAsObj is None:
             return None
 
@@ -207,18 +208,18 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         raise Exception(f"Unknown binary operator {op} (inplace={inplace})")
 
     def convert_bin_op_reverse(self, context, r, op, l, inplace):
-        lAsObj = l.convert_to_type(object)
+        lAsObj = l.convert_to_type(object, ConversionLevel.Signature)
         if lAsObj is None:
             return None
 
         return lAsObj.convert_bin_op(op, r, inplace)
 
     def convert_setitem(self, context, instance, index, value):
-        indexAsObj = index.convert_to_type(object)
+        indexAsObj = index.convert_to_type(object, ConversionLevel.Signature)
         if indexAsObj is None:
             return None
 
-        valueAsObj = value.convert_to_type(object)
+        valueAsObj = value.convert_to_type(object, ConversionLevel.Signature)
         if valueAsObj is None:
             return None
 
@@ -235,14 +236,14 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
     def convert_call(self, context, instance, args, kwargs):
         argsAsObjects = []
         for a in args:
-            argsAsObjects.append(a.convert_to_type(object))
+            argsAsObjects.append(a.convert_to_type(object, ConversionLevel.Signature))
             if argsAsObjects[-1] is None:
                 return None
 
         kwargsAsObjects = {}
 
         for k, a in kwargs.items():
-            kwargsAsObjects[k] = a.convert_to_type(object)
+            kwargsAsObjects[k] = a.convert_to_type(object, ConversionLevel.Signature)
 
             if kwargsAsObjects[k] is None:
                 return None
@@ -285,27 +286,14 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             )
         )
 
-    def _can_convert_to_type(self, otherType, explicit):
-        return super()._can_convert_to_type(otherType, explicit)
+    def _can_convert_to_type(self, otherType, conversionLevel):
+        return super()._can_convert_to_type(otherType, conversionLevel)
 
-    def _can_convert_from_type(self, otherType, explicit):
+    def _can_convert_from_type(self, otherType, conversionLevel):
         if self.typeRepresentation is object:
             return True
 
-        return super()._can_convert_from_type(otherType, explicit)
-
-    def can_cast_to_primitive(self, context, e, primitiveType):
-        # TODO: we should be checking this
-        return True
-
-    def convert_bool_cast(self, context, e):
-        e = context.constant(bool).convert_call((e,), {})
-        return context.pushPod(
-            bool,
-            runtime_functions.pyobj_to_bool.call(
-                e.nonref_expr.cast(VoidPtr)
-            )
-        )
+        return "Maybe"
 
     def convert_index_cast(self, context, e):
         return context.pushPod(
@@ -315,53 +303,15 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             )
         )
 
-    def convert_int_cast(self, context, e):
-        e = context.constant(int).convert_call((e,), {})
-        return context.pushPod(
-            int,
-            runtime_functions.pyobj_to_int64.call(
-                e.nonref_expr.cast(VoidPtr)
-            )
-        )
-
-    def convert_float_cast(self, context, e):
-        e = context.constant(float).convert_call((e,), {})
-        return context.pushPod(
-            float,
-            runtime_functions.pyobj_to_float64.call(
-                e.nonref_expr.cast(VoidPtr)
-            )
-        )
-
-    def convert_bytes_cast(self, context, e):
-        e = context.constant(bytes).convert_call((e,), {})
-        return context.push(
-            bytes,
-            lambda bytesOut:
-                bytesOut.expr.store(
-                    runtime_functions.pyobj_to_bytes.call(
-                        e.nonref_expr.cast(VoidPtr)
-                    ).cast(bytesOut.expr_type.getNativeLayoutType())
-                )
-        )
-
-    def convert_str_cast(self, context, e):
-        e = context.constant(str).convert_call((e,), {})
-        return context.push(
-            str,
-            lambda strOut:
-                strOut.expr.store(
-                    runtime_functions.pyobj_to_str.call(
-                        e.nonref_expr.cast(VoidPtr)
-                    ).cast(strOut.expr_type.getNativeLayoutType())
-                )
-        )
-
-    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         target_type = targetVal.expr_type
 
-        if targetVal.expr_type == typeWrapper(object) or targetVal.expr_type == self:
-            targetVal.convert_copy_initialize(e)
+        # check if we are a subclass of targetVal, in which case we are guaranteed
+        # that this will succeed.
+        if isinstance(targetVal.expr_type, PythonObjectOfTypeWrapper) and (
+            issubclass(self.typeRepresentation, targetVal.expr_type.typeRepresentation)
+        ):
+            targetVal.convert_copy_initialize(instance)
             return context.constant(True)
 
         t = target_type.typeRepresentation
@@ -370,18 +320,27 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             return context.pushPod(
                 bool,
                 runtime_functions.pyobj_to_typed.call(
-                    e.nonref_expr.cast(VoidPtr),
+                    instance.nonref_expr.cast(VoidPtr),
                     targetVal.expr.cast(VoidPtr),
                     context.getTypePointer(t),
-                    context.constant(explicit)
+                    context.constant(conversionLevel.LEVEL),
+                    native_ast.const_int_expr(1 if mayThrowOnFailure else 0)
                 )
             )
 
-        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
-    def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
-        if not explicit and self.typeRepresentation is not object:
-            return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure=False):
+        if self.typeRepresentation is not object:
+            # this isn't a python object yet
+            assert not isinstance(sourceVal.expr_type, PythonObjectOfTypeWrapper)
+
+            # convert to an object first, and then convert that down to the subtype
+            return sourceVal.convert_to_type(object, ConversionLevel.Signature).convert_to_type_with_target(
+                targetVal,
+                conversionLevel,
+                mayThrowOnFailure
+            )
 
         t = sourceVal.expr_type.typeRepresentation
 
@@ -401,10 +360,13 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         # if this is a regular python class, then we need to just convert it to an 'object' and call that.
-        return context.constant(self.typeRepresentation).convert_to_type(object).convert_call(args, kwargs)
+        return context.constant(self.typeRepresentation).convert_to_type(
+            object,
+            ConversionLevel.Signature
+        ).convert_call(args, kwargs)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        if self.typeRepresentation in (_thread.LockType, _thread.RLock) and methodname == "acquire" and len(args) == 0:
+        if self.typeRepresentation in (_thread.LockType, _thread.RLock) and methodname in ("acquire", "__enter__") and len(args) == 0:
             if self.typeRepresentation is _thread.LockType:
                 nativeFun = runtime_functions.pyobj_locktype_lock
             else:
@@ -412,7 +374,10 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
             return context.pushPod(bool, nativeFun.call(instance.nonref_expr.cast(VoidPtr)))
 
-        if self.typeRepresentation in (_thread.LockType, _thread.RLock) and methodname == "release" and len(args) == 0:
+        if self.typeRepresentation in (_thread.LockType, _thread.RLock) and (
+            methodname == "release" and len(args) == 0
+            or methodname == "__exit__" and len(args) == 3
+        ):
             if self.typeRepresentation is _thread.LockType:
                 nativeFun = runtime_functions.pyobj_locktype_unlock
             else:
