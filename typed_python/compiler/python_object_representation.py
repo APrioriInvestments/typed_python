@@ -48,7 +48,11 @@ from typed_python.compiler.type_wrappers.len_wrapper import LenWrapper
 from typed_python.compiler.type_wrappers.hash_wrapper import HashWrapper
 from typed_python.compiler.type_wrappers.range_wrapper import _RangeWrapper
 from typed_python.compiler.type_wrappers.print_wrapper import PrintWrapper
-from typed_python.compiler.type_wrappers.is_compiled_wrapper import IsCompiledWrapper
+from typed_python.compiler.type_wrappers.compiler_introspection_wrappers import (
+    IsCompiledWrapper,
+    TypeKnownToCompiler,
+    LocalVariableTypesKnownToCompiler,
+)
 from typed_python.compiler.type_wrappers.make_named_tuple_wrapper import MakeNamedTupleWrapper
 from typed_python.compiler.type_wrappers.math_wrappers import MathFunctionWrapper
 from typed_python.compiler.type_wrappers.builtin_wrappers import BuiltinWrapper
@@ -65,7 +69,9 @@ from typed_python._types import TypeFor, bytecount, prepareArgumentToBePassedToC
 from typed_python import (
     Type, Int32, Int16, Int8, UInt64, UInt32, UInt16,
     UInt8, Float32, makeNamedTuple,
-    ListOf, isCompiled
+    ListOf, isCompiled,
+    typeKnownToCompiler,
+    localVariableTypesKnownToCompiler
 )
 
 # the type of bound C methods on types.
@@ -236,6 +242,12 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
 
     if f is isCompiled:
         return TypedExpression(context, native_ast.nullExpr, IsCompiledWrapper(), False)
+
+    if f is typeKnownToCompiler:
+        return TypedExpression(context, native_ast.nullExpr, TypeKnownToCompiler(), False)
+
+    if f is localVariableTypesKnownToCompiler:
+        return TypedExpression(context, native_ast.nullExpr, LocalVariableTypesKnownToCompiler(), False)
 
     if f is makeNamedTuple:
         return TypedExpression(context, native_ast.nullExpr, MakeNamedTupleWrapper(), False)

@@ -590,6 +590,9 @@ class NativeTypesTests(unittest.TestCase):
         s2 = Set(type(None))
         assert s1.ElementType == s2.ElementType == type(None)  # noqa
 
+    def test_dict_equality_with_python(self):
+        assert Dict(int, int)({1: 2}) == {1: 2}
+
     def test_ordering(self):
         # TODO: investigate and correct: with the ordering 1, True, the assertion o(True) is True fails
         o = OneOf(None, "hi", 1.5, True, 1, b"hi2")

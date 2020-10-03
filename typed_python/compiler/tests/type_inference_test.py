@@ -14,7 +14,9 @@
 
 from typed_python import (
     Function, OneOf, Alternative,
-    Value, ListOf, NotCompiled, TupleOf, Tuple, UInt8
+    Value, ListOf, NotCompiled, TupleOf, Tuple, UInt8,
+    typeKnownToCompiler,
+    localVariableTypesKnownToCompiler
 )
 from typed_python.compiler.runtime import Entrypoint
 import unittest
@@ -264,3 +266,53 @@ class TestTypeInference(unittest.TestCase):
             return Tuple(int, int, float)(aTup)
 
         assert returnTupElts.resultTypeFor(float).typeRepresentation is Tuple(int, int, float)
+
+    def test_compiler_knows_type_of_arguments(self):
+        @Entrypoint
+        def returnTypeOfArgument(x):
+            return typeKnownToCompiler(x)
+
+        assert returnTypeOfArgument(10) is int
+        assert returnTypeOfArgument(10.5) is float
+        assert returnTypeOfArgument(float) is Value(float)
+
+    def test_compiler_knows_it_has_oneofs(self):
+        @Entrypoint
+        def returnTypeOfArgument(x):
+            if x > 0:
+                y = 0
+            else:
+                y = 1.0
+
+            return typeKnownToCompiler(y)
+
+        assert returnTypeOfArgument(10) is OneOf(int, float)
+
+    def test_compiler_knows_that_isinstance_constrains_types(self):
+        @Entrypoint
+        def returnTypeOfArgument(x):
+            if x > 0:
+                y = 0
+            else:
+                y = 1.0
+
+            if isinstance(y, float):
+                return typeKnownToCompiler(y)
+            elif isinstance(y, int):
+                return typeKnownToCompiler(y)
+
+        assert returnTypeOfArgument(10) is int
+        assert returnTypeOfArgument(0) is float
+
+    def test_compiler_knows_local_variable_types(self):
+        @Entrypoint
+        def localVariableTypes(x):
+            if x > 0:
+                y = 0 # noqa
+            else:
+                y = 1.0 # noqa
+
+            return localVariableTypesKnownToCompiler()
+
+        res = localVariableTypes(10)
+        assert res == dict(x=int, y=OneOf(int, float))

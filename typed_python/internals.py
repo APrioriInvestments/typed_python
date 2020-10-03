@@ -474,6 +474,31 @@ def isCompiled():
     return False
 
 
+def typeKnownToCompiler(x):
+    """Returns the type object that the compiler knows for 'x'
+
+    This can be used to check whether compiled code is fully understanding
+    the type structure of what you've written.
+
+    This returns None in the interpeter.
+    """
+    return None
+
+
+def localVariableTypesKnownToCompiler():
+    """Return all the types of local variables known to the compiler at this point.
+
+    Note that the actual values themselves won't be visible to the compiler - you'll
+    be getting a handle to a Dict(str, object) that contains the wrapper values that
+    you can use to print diagnostics for debugging your code.
+
+    Returns:
+        None from the interpreter. a dict containing the local variables
+        and their types as known to the compiler from the compiler.
+    """
+    return None
+
+
 def Held(T):
     if not issubclass(T, typed_python._types.Class):
         raise Exception(f"{T} is not a Class")
