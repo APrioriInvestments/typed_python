@@ -2460,6 +2460,11 @@ class NativeTypesTests(unittest.TestCase):
         T = Dict(OneOf(int, float), OneOf(int, float))
         self.assertEqual(T({1: 2.5}), {1: 2.5})
 
+    def test_dict_equality_with_python_and_object(self):
+        self.assertTrue(Dict(int, object)({1: 2}) == {1: 2})
+        self.assertTrue(Dict(int, object)({1: (7, 8, 9)}) == {1: (7, 8, 9)})
+        self.assertTrue(Dict(int, object)({1: 'two'}) == {1: 'two'})
+
     def test_const_dict_with_noncomparable_things(self):
         DictType = ConstDict(OneOf(int, str), int)
 
