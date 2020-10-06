@@ -773,3 +773,21 @@ class TestDictCompilation(unittest.TestCase):
         setIt(aDict, set([1]))
 
         assert len(aDict[10]) == 1
+
+    def test_dict_compiled_equality_with_python_and_object(self):
+        def f_compare(x, y):
+            return x == y
+
+        c_compare = Entrypoint(f_compare)
+
+        cases = [
+            (Dict(int, object), {1: 2}),
+            (Dict(int, object), {1: (7, 8, 9)}),
+            (Dict(int, object), {1: 'one'})
+        ]
+
+        for T, v in cases:
+            r1 = f_compare(T(v), v)
+            r2 = c_compare(T(v), v)
+            self.assertEqual(r2, True)
+            self.assertEqual(r1, r2)
