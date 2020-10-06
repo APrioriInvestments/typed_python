@@ -61,4 +61,8 @@ public:
             (PyObject*)inType->pyType()
         );
     }
+
+    static bool compare_to_python_concrete(PythonObjectOfType* oType, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+        return PyObject_RichCompareBool(oType->getPyObj(self), other, pyComparisonOp);
+    }
 };
