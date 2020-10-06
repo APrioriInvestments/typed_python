@@ -41,7 +41,7 @@ def reconstructTypeFunctionType(typeFunction, args, kwargs):
     return typeFunction(*args, **dict(kwargs))
 
 
-class ConcreteTypeFunction(object):
+class ConcreteTypeFunction:
     __typed_python_is_compile_time_constant__ = True
 
     def __init__(self, concreteTypeFunction):

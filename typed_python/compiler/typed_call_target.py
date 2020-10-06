@@ -16,7 +16,7 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
 
-class TypedCallTarget(object):
+class TypedCallTarget:
     def __init__(self, named_call_target, input_types, output_type, alwaysRaises=False):
         super().__init__()
 

@@ -59,7 +59,7 @@ FunctionArgMapping = Alternative(
 )
 
 
-class ExpressionConversionContext(object):
+class ExpressionConversionContext:
     """Context class when we're converting a single compound expression.
 
     This class tracks creation of temporaries so we can destroy them at the end of expression
