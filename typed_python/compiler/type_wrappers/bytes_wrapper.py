@@ -33,13 +33,20 @@ typeWrapper = lambda t: typed_python.compiler.python_object_representation.typed
 
 
 def bytesJoinIterable(sep, iterable):
-    """Converts the iterable container to list of bytes objects and call sep.join(iterable).
+    """Converts the iterable container to list of bytes objects and calls sep.join(iterable).
 
-    If any of the values in the container is not bytes type, an exception is thrown.
+    Compiling bytes.join on an iterable compiles this function.
+    This function is only intended to be executed in this compiled form.
 
-    :param sep: string to separate the items
-    :param iterable: iterable container with strings only
-    :return: string with joined values
+    Args:
+        sep: A bytes object to separate the items.
+        iterable: Iterable container with bytes objects only.
+
+    Returns:
+        A bytes object with joined values.
+
+    Raises:
+        TypeError: If any of the values in the container is not of bytes type.
     """
     items = ListOf(bytes)()
 
@@ -51,7 +58,21 @@ def bytesJoinIterable(sep, iterable):
     return sep.join(items)
 
 
-def bytes_replace(x, old, new, maxCount):
+def bytes_replace(x: bytes, old: bytes, new: bytes, maxCount: int) -> bytes:
+    """Given a bytes object, replaces old subsequence with new subsequence at most maxCount times.
+
+    Compiling bytes.replace compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: A bytes object to operate on.
+        old: The subsequence of bytes to search for.
+        new: The replacement value for each found subsequence.
+        maxCount: Replaces at most maxCount occurrences. Use -1 to indicate no limit.
+
+    Returns:
+        Adjusted bytes object with replacement(s).
+    """
     if maxCount == 0 or (maxCount >= 0 and len(x) == 0 and len(old) == 0):
         return x
 
@@ -84,7 +105,18 @@ def bytes_replace(x, old, new, maxCount):
             return new.join(accumulator)
 
 
-def bytes_isalnum(x):
+def bytes_isalnum(x: bytes) -> bool:
+    """Checks if given bytes object contains only alphanumeric elements.
+
+    Compiling bytes.isalum compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+
+    Returns:
+        Result of check.
+    """
     if len(x) == 0:
         return False
     for i in x:
@@ -93,7 +125,18 @@ def bytes_isalnum(x):
     return True
 
 
-def bytes_isalpha(x):
+def bytes_isalpha(x: bytes) -> bool:
+    """Checks if given bytes object contains only alphabetic elements.
+
+    Compiling bytes.isalpha compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+
+    Returns:
+        Result of check.
+    """
     if len(x) == 0:
         return False
     for i in x:
@@ -102,7 +145,18 @@ def bytes_isalpha(x):
     return True
 
 
-def bytes_isdigit(x):
+def bytes_isdigit(x: bytes) -> bool:
+    """Checks if given bytes object contains only digit elements.
+
+    Compiling bytes.isdigit compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+
+    Returns:
+        Result of check.
+    """
     if len(x) == 0:
         return False
     for i in x:
@@ -111,7 +165,18 @@ def bytes_isdigit(x):
     return True
 
 
-def bytes_islower(x):
+def bytes_islower(x: bytes) -> bool:
+    """Checks if given bytes object contains only lowercase elements.
+
+    Compiling bytes.islower compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+
+    Returns:
+        Result of check.
+    """
     found_lower = False
     for i in x:
         if ord('a') <= i <= ord('z'):
@@ -121,7 +186,18 @@ def bytes_islower(x):
     return found_lower
 
 
-def bytes_isspace(x):
+def bytes_isspace(x: bytes) -> bool:
+    """Checks if given bytes object contains only whitespace elements.
+
+    Compiling bytes.isspace compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+
+    Returns:
+        Result of check.
+    """
     if len(x) == 0:
         return False
     for i in x:
@@ -130,7 +206,18 @@ def bytes_isspace(x):
     return True
 
 
-def bytes_istitle(x):
+def bytes_istitle(x: bytes) -> bool:
+    """Checks if given bytes object contains only titlecase elements.
+
+    Compiling bytes.istitle compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+
+    Returns:
+        Result of check.
+    """
     if len(x) == 0:
         return False
     last_cased = False
@@ -148,7 +235,18 @@ def bytes_istitle(x):
     return found_one
 
 
-def bytes_isupper(x):
+def bytes_isupper(x: bytes) -> bool:
+    """Checks if given bytes object contains only uppercase elements.
+
+    Compiling bytes.isupper compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+
+    Returns:
+        Result of check.
+    """
     found_upper = False
     for i in x:
         if ord('A') <= i <= ord('Z'):
@@ -158,7 +256,19 @@ def bytes_isupper(x):
     return found_upper
 
 
-def bytes_startswith(x, prefix):
+def bytes_startswith(x: bytes, prefix: bytes) -> bool:
+    """Does given bytes object start with the subsequence prefix?
+
+    Compiling bytes.startswith, with no range arguments, compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+        prefix: The subsequence to look for.
+
+    Returns:
+        Result of check.
+    """
     if len(x) < len(prefix):
         return False
     index = 0
@@ -169,7 +279,21 @@ def bytes_startswith(x, prefix):
     return True
 
 
-def bytes_startswith_range(x, prefix, start, end):
+def bytes_startswith_range(x: bytes, prefix: bytes, start: int, end: int) -> bool:
+    """Does specified slice of given bytes object start with the subsequence prefix?
+
+    Compiling bytes.startswith with range arguments compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+        prefix: The subsequence to look for.
+        start: Beginning of slice of x.  Interpreted as slice notation.
+        end: End of slice of x.  Interpreted as slice notation.
+
+    Returns:
+        Result of check.
+    """
     if start < 0:
         start += len(x)
         if start < 0:
@@ -191,7 +315,19 @@ def bytes_startswith_range(x, prefix, start, end):
     return True
 
 
-def bytes_endswith(x, suffix):
+def bytes_endswith(x: bytes, suffix: bytes) -> bool:
+    """Does given bytes object end with the subsequence suffix?
+
+    Compiling bytes.endswith, with no range arguments, compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+        suffix: The subsequence to look for.
+
+    Returns:
+        Result of check.
+    """
     index = len(x) - len(suffix)
     if index < 0:
         return False
@@ -202,7 +338,21 @@ def bytes_endswith(x, suffix):
     return True
 
 
-def bytes_endswith_range(x, suffix, start, end):
+def bytes_endswith_range(x: bytes, suffix: bytes, start: int, end: int) -> bool:
+    """Does specified slice of given bytes object end with the subsequence suffix?
+
+    Compiling bytes.endswith with range arguments compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+        suffix: The subsequence to look for.
+        start: Beginning of slice of x.  Interpreted as slice notation.
+        end: End of slice of x.  Interpreted as slice notation.
+
+    Returns:
+        Result of check.
+    """
     if start < 0:
         start += len(x)
         if start < 0:
@@ -226,8 +376,21 @@ def bytes_endswith_range(x, suffix, start, end):
     return True
 
 
-# sub is a bytes-like object
-def bytes_count(x, sub, start, end):
+def bytes_count(x: bytes, sub: bytes, start: int, end: int) -> int:
+    """How many times does a subsequence occur within specified slice of given bytes object?
+
+    Compiling bytes.count compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+        sub: The subsequence to look for.
+        start: Beginning of slice of x.  Interpreted as slice notation.
+        end: End of slice of x.  Interpreted as slice notation.
+
+    Returns:
+        Count of non-overlapping matches.
+    """
     if start < 0:
         start += len(x)
     if start < 0:
@@ -263,8 +426,24 @@ def bytes_count(x, sub, start, end):
     return count
 
 
-# sub is an integer
-def bytes_count_single(x, sub, start, end):
+def bytes_count_single(x: bytes, sub: int, start: int, end: int) -> int:
+    """How many times does a single byte occur within specified slice of given bytes object?
+
+    Compiling bytes.count compiles this function, when sub is an integer 0 to 255.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object to examine.
+        sub: target to search for, as a single byte specified as an integer 0 to 255.
+        start: Beginning of slice of x.  Interpreted as slice notation.
+        end: End of slice of x.  Interpreted as slice notation.
+
+    Returns:
+        Count of matches.
+
+    Raises:
+        ValueError: The sub argument is out of valid range.
+    """
     if sub < 0 or sub > 255:
         raise ValueError("byte must be in range(0, 256)")
     if start < 0:
@@ -287,8 +466,21 @@ def bytes_count_single(x, sub, start, end):
     return count
 
 
-# sub is a bytes-like object
-def bytes_find(x, sub, start, end):
+def bytes_find(x: bytes, sub: bytes, start: int, end: int) -> int:
+    """Where is the first location of a subsequence within a given slice of a bytes object?
+
+    Compiling bytes.find compiles this function, when sub is a bytes object.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object in which to search.
+        sub: The subsequence to look for.
+        start: Beginning of slice of x.  Interpreted as slice notation.
+        end: End of slice of x.  Interpreted as slice notation.
+
+    Returns:
+        Lowest index of match within slice of x, or -1 if not found.
+    """
     if start < 0:
         start += len(x)
     if start < 0:
@@ -319,8 +511,24 @@ def bytes_find(x, sub, start, end):
     return -1
 
 
-# sub is an integer
-def bytes_find_single(x, sub, start, end):
+def bytes_find_single(x: bytes, sub: int, start: int, end: int) -> int:
+    """Where is the first location of a specified byte within a given slice of a bytes object?
+
+    Compiling bytes.find compiles this function, when sub is an integer 0 to 255.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object in which to search.
+        sub: The subsequence to look for, as a single byte specified as an integer 0 to 255.
+        start: Beginning of slice of x.  Interpreted as slice notation.
+        end: End of slice of x.  Interpreted as slice notation.
+
+    Returns:
+        Lowest index of match within slice of x, or -1 if not found.
+
+    Raises:
+        ValueError: The sub argument is out of valid range.
+    """
     if sub < 0 or sub > 255:
         raise ValueError("byte must be in range(0, 256)")
     if start < 0:
@@ -342,8 +550,21 @@ def bytes_find_single(x, sub, start, end):
     return -1
 
 
-# sub is a bytes-like object
-def bytes_rfind(x, sub, start, end):
+def bytes_rfind(x: bytes, sub: bytes, start: int, end: int) -> int:
+    """Where is the last location of a subsequence within a given slice of a bytes object?
+
+    Compiling bytes.rfind compiles this function, when sub is a bytes object.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object in which to search.
+        sub: The subsequence to look for.
+        start: Beginning of slice of x.  Interpreted as slice notation.
+        end: End of slice of x.  Interpreted as slice notation.
+
+    Returns:
+         Highest index of match within slice of x, or -1 if not found.
+    """
     if start < 0:
         start += len(x)
     if start < 0:
@@ -374,8 +595,24 @@ def bytes_rfind(x, sub, start, end):
     return -1
 
 
-# sub is an integer
-def bytes_rfind_single(x, sub, start, end):
+def bytes_rfind_single(x: bytes, sub: bytes, start: int, end: int) -> int:
+    """Where is the last location of a specified byte within a given slice of a bytes object?
+
+    Compiling bytes.rfind compiles this function, when sub is an integer 0 to 255.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object in which to search.
+        sub: The subsequence to look for, as a single byte specified as an integer 0 to 255.
+        start: Beginning of slice of x.  Interpreted as slice notation.
+        end: End of slice of x.  Interpreted as slice notation.
+
+    Returns:
+        Highest index of match within slice of x, or -1 if not found.
+
+    Raises:
+        ValueError: The sub argument is out of valid range.
+    """
     if sub < 0 or sub > 255:
         raise ValueError("byte must be in range(0, 256)")
     if start < 0:
@@ -397,35 +634,118 @@ def bytes_rfind_single(x, sub, start, end):
     return -1
 
 
-def bytes_index(x, sub, start, end):
+def bytes_index(x: bytes, sub: bytes, start: int, end: int) -> int:
+    """Where is the first location of a subsequence within a given slice of a bytes object?
+
+    Compiling bytes.index compiles this function, when sub is a bytes object.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object in which to search.
+        sub: The subsequence to look for.
+        start: Beginning of slice of x.  Interpreted as slice notation.
+        end: End of slice of x.  Interpreted as slice notation.
+
+    Returns:
+        Lowest index of match within slice of x.
+
+    Raises:
+        ValueError: If sub is not found.
+    """
     ret = bytes_find(x, sub, start, end)
     if ret == -1:
         raise ValueError("subsection not found")
     return ret
 
 
-def bytes_index_single(x, sub, start, end):
+def bytes_index_single(x: bytes, sub: int, start: int, end: int) -> int:
+    """Where is the first location of a specified byte within a given slice of a bytes object?
+
+    Compiling bytes.index compiles this function, when sub is an integer 0 to 255.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object in which to search.
+        sub: The subsequence to look for, as a single byte specified as an integer 0 to 255.
+        start: Beginning of slice of x.  Interpreted as slice notation.
+        end: End of slice of x.  Interpreted as slice notation.
+
+    Returns:
+        Lowest index of match within slice of x.
+
+    Raises:
+        ValueError: The sub argument is out of valid range, or sub is not found.
+    """
     ret = bytes_find_single(x, sub, start, end)
     if ret == -1:
         raise ValueError("subsection not found")
     return ret
 
 
-def bytes_rindex(x, sub, start, end):
+def bytes_rindex(x: bytes, sub: bytes, start: int, end: int) -> int:
+    """Where is the last location of a subsequence within a given slice of a bytes object?
+
+    Compiling bytes.rindex compiles this function, when sub is a bytes object.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object in which to search.
+        sub: The subsequence to look for.
+        start: Beginning of slice of x.  Interpreted as slice notation.
+        end: End of slice of x.  Interpreted as slice notation.
+
+    Returns:
+        Highest index of match within slice of x.
+
+    Raises:
+        ValueError: If sub is not found.
+    """
     ret = bytes_rfind(x, sub, start, end)
     if ret == -1:
         raise ValueError("subsection not found")
     return ret
 
 
-def bytes_rindex_single(x, sub, start, end):
+def bytes_rindex_single(x: bytes, sub: int, start: int, end: int) -> int:
+    """Where is the last location of a specified byte within a given slice of a bytes object?
+
+    Compiling bytes.rindex compiles this function, when sub is an integer 0 to 255.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: The bytes object in which to search.
+        sub: The subsequence to look for, as a single byte specified as an integer 0 to 255.
+        start: Beginning of slice of x.  Interpreted as slice notation.
+        end: End of slice of x.  Interpreted as slice notation.
+
+    Returns:
+        Highest index of match within slice of x.
+
+    Raises:
+        ValueError: The sub argument is out of valid range, or sub is not found.
+    """
     ret = bytes_rfind_single(x, sub, start, end)
     if ret == -1:
         raise ValueError("subsection not found")
     return ret
 
 
-def bytes_partition(x, sep):
+def bytes_partition(x: bytes, sep: bytes) -> Tuple(bytes, bytes, bytes):
+    """Given a bytes object and a separator, splits the object into three pieces.
+
+    Compiling bytes.partition compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: A bytes object.
+        sep: A separator.
+
+    Returns:
+        Tuple of three bytes objects:
+            (1) the piece up to the first separator,
+            (2) the separator,
+            (3) the remainder from the first separator to the end.
+    """
     if len(sep) == 0:
         raise ValueError("empty separator")
 
@@ -435,7 +755,22 @@ def bytes_partition(x, sep):
     return Tuple(bytes, bytes, bytes)((x[0:pos], sep, x[pos+len(sep):]))
 
 
-def bytes_rpartition(x, sep):
+def bytes_rpartition(x: bytes, sep: bytes) -> Tuple(bytes, bytes, bytes):
+    """Given a bytes object and a separator, reverse splits the object into three pieces.
+
+    Compiling bytes.rpartition compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: A bytes object.
+        sep: A separator.
+
+    Returns:
+        Tuple of three bytes objects:
+            (1) the piece from the last separator to the end,
+            (2) the separator,
+            (3) the remainder from the start to the last separator.
+    """
     if len(sep) == 0:
         raise ValueError("empty separator")
 
@@ -445,7 +780,21 @@ def bytes_rpartition(x, sep):
     return Tuple(bytes, bytes, bytes)((x[0:pos], sep, x[pos+len(sep):]))
 
 
-def bytes_center(x, width, fill):
+def bytes_center(x: bytes, width: int, fill: bytes) -> bytes:
+    """Given a bytes object, a line width, and a fill byte, centers the bytes object within the line.
+
+    Compiling bytes.center compiles this function.
+    This function is only intended to be executed in this compiled form.
+    Checking the fill length is assumed to be done outside this function.
+
+    Args:
+        x: A bytes object.
+        width: Line width.
+        fill: A bytes object of length 1.
+
+    Returns:
+        Transformed bytes object.
+    """
     if width <= len(x):
         return x
 
@@ -454,21 +803,61 @@ def bytes_center(x, width, fill):
     return fill * left + x + fill * right
 
 
-def bytes_ljust(x, width, fill):
+def bytes_ljust(x: bytes, width: int, fill: bytes) -> bytes:
+    """Given a bytes object, a line width, and a fill byte, left-justifies the bytes object within the line.
+
+    Compiling bytes.ljust compiles this function.
+    This function is only intended to be executed in this compiled form.
+    Checking the fill length is assumed to be done outside this function.
+
+    Args:
+        x: A bytes object.
+        width: Line width.
+        fill: A bytes object of length 1.
+
+    Returns:
+        Transformed bytes object.
+    """
     if width <= len(x):
         return x
 
     return x + fill * (width - len(x))
 
 
-def bytes_rjust(x, width, fill):
+def bytes_rjust(x: bytes, width: int, fill: bytes) -> bytes:
+    """Given a bytes object, a line width, and a fill byte, right-justifies the bytes object within the line.
+
+    Compiling bytes.rjust compiles this function.
+    This function is only intended to be executed in this compiled form.
+    Checking the fill length is assumed to be done outside this function.
+
+    Args:
+        x: A bytes object.
+        width: Line width.
+        fill: A bytes object of length 1.
+
+    Returns:
+        Transformed bytes object.
+    """
     if width <= len(x):
         return x
 
     return fill * (width - len(x)) + x
 
 
-def bytes_expandtabs(x, tabsize):
+def bytes_expandtabs(x: bytes, tabsize: int) -> bytes:
+    """Given a bytes object and a tab size, expands all tab characters to spaces.
+
+    Compiling bytes.expandtabs compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: A bytes object.
+        tabsize: Expand tab bytes to this number of spaces.
+
+    Returns:
+        Transformed bytes object.
+    """
     accumulator = ListOf(bytes)()
 
     col = 0  # column mod tabsize, not necessarily actual column
@@ -489,7 +878,19 @@ def bytes_expandtabs(x, tabsize):
     return b''.join(accumulator)
 
 
-def bytes_zfill(x, width):
+def bytes_zfill(x: bytes, width: int) -> bytes:
+    """Given a bytes object and width, left-pad with '0' after any initial sign character.
+
+    Compiling bytes.zfill compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        x: A bytes object.
+        width: Desired length of result.
+
+    Returns:
+        Transformed bytes object.
+    """
     accumulator = ListOf(bytes)()
 
     sign = False
@@ -509,6 +910,15 @@ def bytes_zfill(x, width):
 
 
 def no_more_kwargs(context, **kwargs):
+    """Helper function used when parsing arguments of compiled function calls.
+
+    If there are any keyword arguments left, generates code that raises TypeError.
+
+    Args:
+        context: ExpressionConversionContext
+        **kwargs: keyword argument dict
+
+    """
     for e in kwargs:
         context.pushException(TypeError, f"'{e}' is an invalid keyword argument for this function")
         # just need to generate the first exception
@@ -516,6 +926,14 @@ def no_more_kwargs(context, **kwargs):
 
 
 class BytesWrapper(RefcountedWrapper):
+    """Code-generation wrapper for bytes type.
+
+    Corresponds to interpreted BytesType.
+    Code generated here, when compiled, is intended to behave the same as interpreted operations on BytesType.
+
+    In all comments below, read 'bytes' as 'instance of BytesType'.
+    """
+
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -531,21 +949,61 @@ class BytesWrapper(RefcountedWrapper):
         ), name='BytesLayout').pointer()
 
     def getNativeLayoutType(self):
+        """Returns native layout of bytes (BytesType).
+        """
         return self.layoutType
 
     def convert_hash(self, context, expr):
+        """Generates code for hash of bytes (BytesType)
+
+        Returns:
+            TypedExpression representing hash of BytesType instance.
+        """
         return context.pushPod(Int32, runtime_functions.hash_bytes.call(expr.nonref_expr.cast(VoidPtr)))
 
     def on_refcount_zero(self, context, instance):
+        """ Generates code to dispose of bytes (BytesType) instance when refcount reaches zero.
+
+        Args:
+             context: ExpressionConversionContext
+             instance: Reference to bytes (BytesType) instance.
+
+        Returns:
+            native_ast code to be executed when this instance has refcount zero.
+        """
         assert instance.isReference
         return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
 
     def convert_builtin(self, f, context, expr, a1=None):
+        """Generates code for builtin functions on bytes.
+
+        Only applicable builtin is 'bytes'
+
+        Args:
+            f: builtin function
+            context: ExpressionConversionContext
+            expr: BytesType expression
+            a1: first argument of builtin function
+
+        Returns:
+            Code for builtin function.
+        """
         if f is bytes and a1 is None:
             return expr
         return super().convert_builtin(f, context, expr, a1)
 
     def convert_bin_op(self, context, left, op, right, inplace):
+        """Generates code for bytes binary operators.
+
+        Args:
+            context: ExpressionConversionContext
+            left: left operand TypedExpression of type bytes
+            op: python_ast.BinaryOp operator
+            right: left operand TypedExpression
+
+        Returns:
+            TypedExpression of result of operator
+        """
         if op.matches.Mult and isInteger(right.expr_type.typeRepresentation):
             if left.isConstant and right.isConstant:
                 return context.constant(left.constantValue * right.constantValue)
@@ -640,8 +1098,26 @@ class BytesWrapper(RefcountedWrapper):
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_getslice(self, context, expr, lower, upper, step):
+        """Generates code for bytes slice operation.
+
+        The numeric slice arguments are interpreted as usual slice notation.
+        They can be TypedExpressions of type int or any type that supports __index__.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression of type bytes being sliced
+            lower: lower bound of slice, as TypedExpression.  Must be an index-able type.
+            upper: upper bound of slice, as TypedExpression.  Must be an index-able type.
+            step: step of slice, as TypedExpression
+
+        Returns:
+            TypedExpression of slice
+
+        Raises:
+            NotImplementedError if an unimplemented operation is attempted.
+        """
         if step is not None:
-            raise Exception("Slicing with a step isn't supported yet")
+            raise NotImplementedError("Slicing with a step isn't supported yet")
 
         if lower is None and upper is None:
             return self
@@ -676,6 +1152,18 @@ class BytesWrapper(RefcountedWrapper):
         )
 
     def convert_getitem(self, context, expr, item):
+        """Generates code for bytes getitem operation.
+
+        The index item can be a TypedExpression of type int or any type that supports __index__.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression of type bytes
+            item: index of item, as TypedExpression.  Must be an index-able type.
+
+        Returns:
+            TypedExpression of indexed item
+        """
         item = item.toIndex()
 
         if item is None:
@@ -702,7 +1190,7 @@ class BytesWrapper(RefcountedWrapper):
             ).load().cast(native_ast.Int64)
         )
 
-    # these map to py functions
+    # bytes methods that return bool, and that map to py functions
     _bool_methods = dict(
         isalnum=bytes_isalnum,
         isalpha=bytes_isalpha,
@@ -713,7 +1201,7 @@ class BytesWrapper(RefcountedWrapper):
         isupper=bytes_isupper
     )
 
-    # these map to py functions
+    # bytes methods with the same signature as find, and that map to py functions
     _find_methods = dict(
         count=(bytes_count, bytes_count_single),
         find=(bytes_find, bytes_find_single),
@@ -722,7 +1210,7 @@ class BytesWrapper(RefcountedWrapper):
         rindex=(bytes_rindex, bytes_rindex_single),
     )
 
-    # these map to c++ functions
+    # bytes methods that map to c++ functions
     _bytes_methods = dict(
         lower=runtime_functions.bytes_lower,
         upper=runtime_functions.bytes_upper,
@@ -731,18 +1219,46 @@ class BytesWrapper(RefcountedWrapper):
         title=runtime_functions.bytes_title,
     )
 
+    # list of all method names for bytes type
     _methods = ['decode', 'translate', 'maketrans', 'split', 'rsplit', 'join', 'partition', 'rpartition',
                 'strip', 'rstrip', 'lstrip', 'startswith', 'endswith', 'replace',
                 '__iter__', 'center', 'ljust', 'rjust', 'expandtabs', 'splitlines', 'zfill'] \
         + list(_bool_methods) + list(_bytes_methods) + list(_find_methods)
 
-    def convert_attribute(self, context, instance, attr):
+    def convert_attribute(self, context, instance, attr: str):
+        """Generates code for bytes attribute operation.
+
+        Args:
+            context: ExpressionConversionContext
+            instance: TypedExpression of type bytes
+            attr: attribute name
+
+        Returns:
+            TypedExpression of attribute value.
+        """
         if attr in self._methods:
+            # make attributes that are method names callable
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
 
-    def convert_method_call(self, context, instance, methodname, args, kwargs0):
+    def convert_method_call(self, context, instance, methodname: str, args, kwargs0):
+        """Generates code for bytes method calls.
+
+        Generates code raising AttributeError if methodname is invalid.
+        Generates code raising TypeError if argument type is invalid.
+        Generates code raising ValueError if argument value is invalid.
+
+        Args:
+            context: ExpressionConversionContext
+            instance: TypedExpression of type bytes
+            methodname: method name
+            args: positional arguments, as tuple of TypedExpressions
+            kwargs0: keyword arguments, as dict(str, TypedExpression)
+
+        Returns:
+            TypedExpression of return value of method call.
+        """
         if methodname not in self._methods:
             return context.pushException(AttributeError, methodname)
 
@@ -884,6 +1400,7 @@ class BytesWrapper(RefcountedWrapper):
 
                 arg2 = context.constant(-1) if len(args) == 2 else args[2]
                 return context.call_py_function(bytes_replace, (instance, args[0], args[1], arg2), {})
+                # code below is for experimenting with compiling to C++ call instead of compiled python.
                 # return context.push(
                 #     bytes,
                 #     lambda bytesRef: bytesRef.expr.store(
@@ -1060,6 +1577,19 @@ class BytesWrapper(RefcountedWrapper):
         return context.pushException(AttributeError, methodname)
 
     def convert_getitem_unsafe(self, context, expr, item):
+        """Generates code for bytes getitem operation, without any argument checks.
+
+        The index item can be a TypedExpression that can convert to int.
+        Does not support __index__.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression of type bytes
+            item: index of item, as TypedExpression.  Must be convertible to int.
+
+        Returns:
+            TypedExpression of item got.
+        """
         return context.push(
             UInt8,
             lambda intRef: intRef.expr.store(
@@ -1069,6 +1599,14 @@ class BytesWrapper(RefcountedWrapper):
         )
 
     def convert_len_native(self, expr):
+        """Native code for bytes len operation.
+
+        Args:
+            TypedExpression of bytes type
+
+        Returns:
+            native_ast of this len operation (not a TypedExpression)
+        """
         return native_ast.Expression.Branch(
             cond=expr,
             false=native_ast.const_int_expr(0),
@@ -1078,12 +1616,30 @@ class BytesWrapper(RefcountedWrapper):
         )
 
     def convert_len(self, context, expr):
+        """Generates code for bytes len operation.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression of type bytes
+
+        Returns:
+            TypedExpression representing len of bytes instance
+        """
         if expr.isConstant:
             return context.constant(len(expr.constantValue))
 
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
-    def constant(self, context, s):
+    def constant(self, context, s: bytes):
+        """Generates code for constant bytes expression
+
+        Args:
+            context: ExpressionConversionContext
+            s: constant value of type bytes (really bytes, not BytesType or a TypedExpression)
+
+        Returns:
+            TypedExpression representing this constant.
+        """
         return typed_python.compiler.typed_expression.TypedExpression(
             context,
             native_ast.Expression.GlobalVariable(
@@ -1100,12 +1656,30 @@ class BytesWrapper(RefcountedWrapper):
         return primitiveType in (bytes, float, int, bool)
 
     def convert_bool_cast(self, context, expr):
+        """Generates code for casting bytes to bool.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression to be cast
+
+        Returns:
+            TypedExpression representing this cast.
+        """
         if expr.isConstant:
             return context.constant(bool(expr.constantValue))
 
         return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
 
     def convert_int_cast(self, context, expr):
+        """Generates code for casting bytes to int.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression to be cast
+
+        Returns:
+            TypedExpression representing this cast.
+        """
         if expr.isConstant:
             try:
                 return context.constant(int(expr.constantValue))
@@ -1115,6 +1689,15 @@ class BytesWrapper(RefcountedWrapper):
         return context.pushPod(int, runtime_functions.bytes_to_int64.call(expr.nonref_expr.cast(VoidPtr)))
 
     def convert_float_cast(self, context, expr):
+        """Generates code for casting bytes to float.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression to be cast
+
+        Returns:
+            TypedExpression representing this cast.
+        """
         if expr.isConstant:
             try:
                 return context.constant(float(expr.constantValue))
@@ -1124,9 +1707,29 @@ class BytesWrapper(RefcountedWrapper):
         return context.pushPod(float, runtime_functions.bytes_to_float64.call(expr.nonref_expr.cast(VoidPtr)))
 
     def convert_bytes_cast(self, context, expr):
+        """Generates code for casting bytes to bytes, i.e. doing nothing
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression to be cast
+
+        Returns:
+            TypedExpression representing this cast.
+        """
         return expr
 
     def get_iteration_expressions(self, context, expr):
+        """Generates fixed list of iteration values of the bytes expression.
+
+        Possible for constant bytes expressions only.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression of type bytes to be iterated
+
+        Returns:
+            list of TypedExpressions unrolling iteration of this bytes expression
+        """
         if expr.isConstant:
             return [context.constant(expr.constantValue[i]) for i in range(len(expr.constantValue))]
         else:
@@ -1134,6 +1737,12 @@ class BytesWrapper(RefcountedWrapper):
 
 
 class BytesIteratorWrapper(Wrapper):
+    """Code-generation wrapper for bytes iterator.
+
+    Code generated here, when compiled, is intended to behave the same as iterating BytesType in the interpreter.
+
+    In all comments below, read 'bytes' as 'instance of BytesType'.
+    """
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -1142,12 +1751,23 @@ class BytesIteratorWrapper(Wrapper):
         super().__init__((bytes, "iterator"))
 
     def getNativeLayoutType(self):
+        """Returns layout of bytes iterator.
+        """
         return native_ast.Type.Struct(
             element_types=(("pos", native_ast.Int64), ("bytes", typeWrapper(bytes).getNativeLayoutType())),
             name="bytes_iterator"
         )
 
     def convert_next(self, context, inst):
+        """Generates code for inst.__next__() where inst is a bytes iterator instance.
+
+        Args:
+            context: ExpressionConversionContext
+            inst: bytes (BytesType) iterator instance
+
+        Returns:
+            TypedExpression of next element in iteration.
+        """
         context.pushEffect(
             inst.expr.ElementPtrIntegers(0, 0).store(
                 inst.expr.ElementPtrIntegers(0, 0).load().add(1)
@@ -1162,7 +1782,17 @@ class BytesIteratorWrapper(Wrapper):
         nextIx = context.pushReference(int, inst.expr.ElementPtrIntegers(0, 0))
         return self.iteratedItemForReference(context, inst, nextIx), canContinue
 
-    def refAs(self, context, expr, which):
+    def refAs(self, context, expr, which: int):
+        """Generates code to access an internal field of the bytes (BytesType) iterator.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: bytes (BytesType) iterator instance
+            which: int giving index of which field to access
+
+        Returns:
+            TypedExpression that is a reference to this field.
+        """
         assert expr.expr_type == self
 
         if which == 0:
@@ -1177,6 +1807,16 @@ class BytesIteratorWrapper(Wrapper):
             )
 
     def iteratedItemForReference(self, context, expr, ixExpr):
+        """Generates code to access an iteration element by reference
+
+        Args:
+            context: ExpressionConversionContext
+            expr: bytes (BytesType) iterator instance
+            ixExpr: TypedExpression giving index of which element to access
+
+        Returns:
+            TypedExpression that is a reference to this element.
+        """
         return typeWrapper(bytes).convert_getitem_unsafe(
             context,
             self.refAs(context, expr, 1),
@@ -1184,16 +1824,32 @@ class BytesIteratorWrapper(Wrapper):
         ).heldToRef()
 
     def convert_assign(self, context, expr, other):
+        """Generates code to assign a bytes (BytesType) iterator to another.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: bytes (BytesType) iterator instance to be assigned to
+            other: bytes (BytesType) iterator instance to be assigned
+        """
         assert expr.isReference
 
         for i in range(2):
             self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
 
     def convert_copy_initialize(self, context, expr, other):
+        """Generates code to initialize a bytes (BytesType) iterator by copying from another.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: bytes (BytesType) iterator instance to be initialized
+            other: bytes (BytesType) iterator instance to be copied
+        """
         for i in range(2):
             self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
 
     def convert_destroy(self, context, expr):
+        """Generates code to destroy a bytes (BytesType) iterator.
+        """
         self.refAs(context, expr, 1).convert_destroy()
 
 
@@ -1201,6 +1857,12 @@ _BytesIteratorWrapper = BytesIteratorWrapper()
 
 
 class BytesMaketransWrapper(Wrapper):
+    """Code-generation wrapper for the bytes.maketrans static builtin function.
+
+    Code generated here, when compiled, is intended to behave the same as bytes.maketrans in the interpreter.
+
+    In all comments below, read 'bytes' as 'instance of BytesType'.
+    """
     is_pod = True
     is_empty = False
     is_pass_by_ref = False
@@ -1209,9 +1871,21 @@ class BytesMaketransWrapper(Wrapper):
         super().__init__(bytes.maketrans)
 
     def getNativeLayoutType(self):
+        """bytes.maketrans has no layout.
+        """
         return native_ast.Type.Void()
 
     def convert_call(self, context, expr, args, kwargs):
+        """Generate code for calling the bytes.maketrans static builtin function.
+
+        Args:
+            expr: TypedExpression of bytes.maketrans type
+            args: positional arguments of bytes.maketrans
+            kwargs: keyword arguments of bytes.maketrans (N/A)
+
+        Returns:
+            TypedExpression representing return value of bytes.maketrans
+        """
         if len(args) == 2 and not kwargs:
             return args[0].convert_method_call("maketrans", (args[0], args[1]), {})
 

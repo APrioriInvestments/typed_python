@@ -32,7 +32,7 @@ def replaceDictElt(dct, key, newValue):
     return res
 
 
-class Wrapper(object):
+class Wrapper:
     """Represents a code-generation wrapper for objects of a particular type.
 
     For each type we can represent in typed python, and for types that have

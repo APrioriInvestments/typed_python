@@ -2372,7 +2372,9 @@ extern "C" {
         else {
             PyEnsureGilAcquired getTheGil;
             std::string asString(s->data, s->data + s->bytecount);
-            PyErr_Format(PyExc_ValueError, "could not convert string to float: '%s'", asString.c_str());
+            // To match interpreter behavior, the error string reads 'could not convert string to float'
+            // instead of 'could not convert bytes to float'.
+            PyErr_Format(PyExc_ValueError, "could not convert string to float: b'%s'", asString.c_str());
             throw PythonExceptionSet();
         }
     }

@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -168,7 +168,7 @@ def constant_to_typed_llvm_value(module, builder, c):
     assert False, (c, type(c))
 
 
-class TypedLLVMValue(object):
+class TypedLLVMValue:
     def __init__(self, llvm_value, native_type):
         object.__init__(self)
 
@@ -1417,7 +1417,7 @@ def populate_needed_externals(external_function_references, module):
     define("__gxx_personality_v0", llvm_i32, [], vararg=True)
 
 
-class Converter(object):
+class Converter:
     def __init__(self):
         object.__init__(self)
         self._modules = {}

@@ -112,7 +112,7 @@ class FunctionDependencyGraph:
             self.markDirty(caller)
 
 
-class PythonToNativeConverter(object):
+class PythonToNativeConverter:
     def __init__(self, llvmCompiler, compilerCache):
         object.__init__(self)
 

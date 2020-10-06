@@ -22,7 +22,7 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
-class TypedExpression(object):
+class TypedExpression:
     def __init__(self, context, expr, t, isReference, constantValue=None):
         """Initialize a TypedExpression
 

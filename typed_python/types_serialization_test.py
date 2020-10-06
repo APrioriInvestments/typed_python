@@ -110,13 +110,13 @@ class E(C):
         return ()
 
 
-class H(object):
+class H:
     pass
 
 # Hashable mutable key
 
 
-class K(object):
+class K:
     def __init__(self, value):
         self.value = value
 
@@ -254,7 +254,7 @@ myclasses = [MyInt, MyFloat,
 REDUCE_A = 'reduce_A'
 
 
-class AAA(object):
+class AAA:
     def __reduce__(self):
         return str, (REDUCE_A,)
 
@@ -1316,7 +1316,7 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_untyped_classes(self):
         sc = SerializationContext()
 
-        class B(object):
+        class B:
             def __init__(self, x):
                 self.x = x
 
@@ -2085,7 +2085,7 @@ class TypesSerializationTest(unittest.TestCase):
         check(types.ModuleType)
 
     def test_serialize_self_referential_class(self):
-        class SeesItself(object):
+        class SeesItself:
             @staticmethod
             def factory(kwargs):
                 return lambda a, b, c: SeesItself(a, b, c)
