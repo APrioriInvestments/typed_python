@@ -22,6 +22,12 @@
 
 #include <unordered_map>
 
+PyDoc_STRVAR(DictType_doc,
+    "Dict(K, V)() -> new empty typed dictionary with keytype K and valuetype V\n"
+    "Dict(K, V)(d) -> new typed dictionary initialized from dict d\n"
+    "    Raises TypeError if types don't match.\n"
+    );
+
 class DictType : public Type {
 public:
     DictType(Type* key, Type* value) :
@@ -29,8 +35,10 @@ public:
             m_key(key),
             m_value(value)
     {
+        m_doc = DictType_doc;
         endOfConstructorInitialization(); // finish initializing the type object.
     }
+
 
     void _updateTypeMemosAfterForwardResolution() {
         DictType::Make(m_key, m_value, this);

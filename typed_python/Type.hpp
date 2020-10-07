@@ -247,6 +247,10 @@ public:
         return m_name;
     }
 
+    const char* doc() const {
+        return m_doc;
+    }
+
     size_t bytecount() const {
         return m_size;
     }
@@ -785,6 +789,7 @@ protected:
             m_size(0),
             m_is_default_constructible(false),
             m_name("Undefined"),
+            m_doc(nullptr),
             mTypeRep(nullptr),
             m_base(nullptr),
             m_is_simple(true),
@@ -807,6 +812,8 @@ protected:
     std::string m_name;
 
     mutable std::string m_stripped_name;
+
+    const char* m_doc;
 
     PyTypeObject* mTypeRep;
 

@@ -3193,3 +3193,18 @@ class NativeTypesTests(unittest.TestCase):
                     self.assertEqual(t1 >= t2, t1Untyped >= t2Untyped)
                     self.assertEqual(t1 != t2, t1Untyped != t2Untyped)
                     self.assertEqual(t1 == t2, t1Untyped == t2Untyped)
+
+    def test_docstrings_all_types(self):
+        # TODO: actually test all types
+        types = [int, str, bytes, Dict(int, str)]
+        for T in types:
+            type_docstring = T.__doc__
+            self.assertTrue(type_docstring, f"Type {T} missing docstring")
+            for a in dir(T):
+                m = getattr(T, a)
+                if callable(m):
+                    docstring = m.__doc__
+                    # ignore certain magic methods that don't always have docstrings, even for builtin types
+                    if a in ['__format__', '__getnewargs__']:
+                        continue
+                    self.assertTrue(docstring, f"Type {T} missing docstring for '{a}'")

@@ -21,6 +21,9 @@ DictType* PyDictInstance::type() {
 }
 
 // static
+PyDoc_STRVAR(dictItems_doc,
+    "D.items() -> an iterable containing D's items."
+    );
 PyObject* PyDictInstance::dictItems(PyObject *o) {
     if (((PyInstance*)o)->mIteratorOffset != -1) {
         PyErr_SetString(PyExc_TypeError, "dict iterators don't support 'items'");
@@ -37,6 +40,9 @@ PyObject* PyDictInstance::dictItems(PyObject *o) {
 }
 
 // static
+PyDoc_STRVAR(dictKeys_doc,
+    "D.keys() -> an iterable containing D's keys."
+    );
 PyObject* PyDictInstance::dictKeys(PyObject *o) {
     if (((PyInstance*)o)->mIteratorOffset != -1) {
         PyErr_SetString(PyExc_TypeError, "dict iterators don't support 'keys'");
@@ -53,6 +59,9 @@ PyObject* PyDictInstance::dictKeys(PyObject *o) {
 }
 
 // static
+PyDoc_STRVAR(dictValues_doc,
+    "D.values() -> an iterable containing D's values."
+    );
 PyObject* PyDictInstance::dictValues(PyObject *o) {
     if (((PyInstance*)o)->mIteratorOffset != -1) {
         PyErr_SetString(PyExc_TypeError, "dict iterators don't support 'values'");
@@ -68,6 +77,10 @@ PyObject* PyDictInstance::dictValues(PyObject *o) {
     return (PyObject*)result;
 }
 
+PyDoc_STRVAR(dictUpdate_doc,
+    "D.update(F) -> None.  Update D from dict F.\n"
+    "    for k in F:  D[k]=F[k]\n"
+    );
 // static
 PyObject* PyDictInstance::dictUpdate(PyObject* o, PyObject* args) {
     PyDictInstance* self_w = (PyDictInstance*)o;
@@ -125,6 +138,9 @@ PyObject* PyDictInstance::dictUpdate(PyObject* o, PyObject* args) {
 }
 
 // static
+PyDoc_STRVAR(dictGet_doc,
+    "D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."
+    );
 PyObject* PyDictInstance::dictGet(PyObject* o, PyObject* args) {
     PyDictInstance* self_w = (PyDictInstance*)o;
 
@@ -185,6 +201,9 @@ PyObject* PyDictInstance::dictGet(PyObject* o, PyObject* args) {
 }
 
 // static
+PyDoc_STRVAR(dictClear_doc,
+    "D.clear() -> None.  Removes all items from D."
+    );
 PyObject* PyDictInstance::dictClear(PyObject* o) {
     PyDictInstance* self_w = (PyDictInstance*)o;
 
@@ -442,20 +461,6 @@ int PyDictInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
     }
 }
 
-PyMethodDef* PyDictInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [9] {
-        {"get", (PyCFunction)PyDictInstance::dictGet, METH_VARARGS, NULL},
-        {"clear", (PyCFunction)PyDictInstance::dictClear, METH_NOARGS, NULL},
-        {"update", (PyCFunction)PyDictInstance::dictUpdate, METH_VARARGS, NULL},
-        {"items", (PyCFunction)PyDictInstance::dictItems, METH_NOARGS, NULL},
-        {"keys", (PyCFunction)PyDictInstance::dictKeys, METH_NOARGS, NULL},
-        {"values", (PyCFunction)PyDictInstance::dictValues, METH_NOARGS, NULL},
-        {"setdefault", (PyCFunction)PyDictInstance::setDefault, METH_VARARGS, NULL},
-        {"pop", (PyCFunction)PyDictInstance::pop, METH_VARARGS, NULL},
-        {NULL, NULL}
-    };
-}
-
 void PyDictInstance::mirrorTypeInformationIntoPyTypeConcrete(DictType* dictT, PyTypeObject* pyType) {
     PyDict_SetItemString(pyType->tp_dict, "KeyType",
         typePtrToPyTypeRepresentation(dictT->keyType())
@@ -644,6 +649,9 @@ bool PyDictInstance::compare_to_python_concrete(DictType* dictType, instance_ptr
 }
 
 //static
+PyDoc_STRVAR(setDefault_doc,
+    "D.setdefault(k[,d]) -> D.get(k,d), also set D[k]=d if k not in D."
+    );
 PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
     return translateExceptionToPyObject([&]() {
         const int argsNumber = PyTuple_Size(args);
@@ -733,6 +741,10 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
 }
 
 //static
+PyDoc_STRVAR(pop_doc,
+    "D.pop(k[,d]) -> v, remove key k and return corresponding value v.\n"
+    "If k is not found, d is returned if given, otherwise KeyError is raised.\n"
+    );
 PyObject* PyDictInstance::pop(PyObject* o, PyObject* args) {
     return translateExceptionToPyObject([&]() {
         const int argsNumber = PyTuple_Size(args);
@@ -824,4 +836,18 @@ PyObject* PyDictInstance::tp_repr_concrete() {
     }
 
     return PyUnicode_FromString(str.str().c_str());
+}
+
+PyMethodDef* PyDictInstance::typeMethodsConcrete(Type* t) {
+    return new PyMethodDef [9] {
+        {"get", (PyCFunction)PyDictInstance::dictGet, METH_VARARGS, dictGet_doc},
+        {"clear", (PyCFunction)PyDictInstance::dictClear, METH_NOARGS, dictClear_doc},
+        {"update", (PyCFunction)PyDictInstance::dictUpdate, METH_VARARGS, dictUpdate_doc},
+        {"items", (PyCFunction)PyDictInstance::dictItems, METH_NOARGS, dictItems_doc},
+        {"keys", (PyCFunction)PyDictInstance::dictKeys, METH_NOARGS, dictKeys_doc},
+        {"values", (PyCFunction)PyDictInstance::dictValues, METH_NOARGS, dictValues_doc},
+        {"setdefault", (PyCFunction)PyDictInstance::setDefault, METH_VARARGS, setDefault_doc},
+        {"pop", (PyCFunction)PyDictInstance::pop, METH_VARARGS, pop_doc},
+        {NULL, NULL}
+    };
 }

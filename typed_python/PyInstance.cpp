@@ -1142,7 +1142,7 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_flags = typeCanBeSubclassed(inType) ?
                 Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
             :   Py_TPFLAGS_DEFAULT,                     // unsigned long
-            .tp_doc = 0,                                // const char*
+            .tp_doc = inType->doc(),                    // const char*
             .tp_traverse = 0,                           // traverseproc
             .tp_clear = 0,                              // inquiry
             .tp_richcompare = tp_richcompare,           // richcmpfunc
