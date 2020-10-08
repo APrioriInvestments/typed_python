@@ -871,7 +871,7 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
             "convertFunctionToAlgebraicPyAst requires a function object, or a code object."
         )
 
-    if fCode in _algebraicAstCache:
+    if (fCode, keepLineInformation) in _algebraicAstCache:
         return _algebraicAstCache[fCode, keepLineInformation]
 
     if fCode in _originalAstCache:
@@ -880,7 +880,6 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
         else:
             # we need to strip the line information from the ast and place it
             # in _algebraicAstCache
-
             algebraicAst = _originalAstCache[fCode]
             pyast = convertAlgebraicToPyAst(algebraicAst)
             _algebraicAstCache[fCode, False] = convertPyAstToAlgebraic(pyast, "", False)
