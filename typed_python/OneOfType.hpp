@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -18,6 +18,12 @@
 
 #include "Type.hpp"
 
+PyDoc_STRVAR(OneOf_doc,
+    "OneOfType(T1, T2, ...)() -> default-initialized variable type\n"
+    "\n"
+    "Each of T1, T2, ... may be a typed_python type, or any python primitive value.\n"
+    );
+
 class OneOfType : public Type {
 public:
     OneOfType(const std::vector<Type*>& types) noexcept :
@@ -27,6 +33,8 @@ public:
         if (m_types.size() > 255) {
             throw std::runtime_error("OneOf types are limited to 255 alternatives in this implementation");
         }
+
+        m_doc = OneOf_doc;
 
         endOfConstructorInitialization(); // finish initializing the type object.
     }

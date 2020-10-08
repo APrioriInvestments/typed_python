@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -27,6 +27,13 @@ typedef VTable* vtable_ptr;
 
 #define BOTTOM_48_BITS 0xFFFFFFFFFFFF
 
+PyDoc_STRVAR(Class_doc,
+    "Class: subclass Class to produce typed python classes.\n"
+    "\n"
+    "Methods become TypedFunction instances, and support overloading.\n"
+    "Define data members with Member.\n"
+    );
+
 class Class : public Type {
 public:
     class layout {
@@ -43,13 +50,13 @@ public:
         m_size = sizeof(layout*);
         m_is_default_constructible = inClass->is_default_constructible();
         m_name = name;
+        m_doc = Class_doc;
         m_is_simple = false;
 
         endOfConstructorInitialization(); // finish initializing the type object.
 
         inClass->setClassType(this);
     }
-
 
     // convert an instance of the class to an actual layout pointer. Because
     // we encode the offset of the dispatch table we're supposed to use for

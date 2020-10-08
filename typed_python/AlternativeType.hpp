@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -18,6 +18,16 @@
 
 #include "Type.hpp"
 #include "CompositeType.hpp"
+
+PyDoc_STRVAR(Alternative_doc,
+    "Alternative(n, subs...[, methods...])() -> new tagged union with specified subtypes and shared methods\n"
+    "\n"
+    "n is the name of the Alternative type, as a str.\n"
+    "subs are given as kwargs and specify the subtypes of the type.\n"
+    "    Each subtype in subs is a dict giving the fields in the subtype.\n"
+    "methods are also given as kwargs and specify methods that are shared among all subtypes.\n"
+    "    Each method in methods is a function with at least one argument 'self'.\n"
+    );
 
 class Alternative : public Type {
 public:
@@ -49,6 +59,8 @@ public:
         if (m_subtypes.size() > 255) {
             throw std::runtime_error("Can't have an alternative with more than 255 subelements");
         }
+
+        m_doc = Alternative_doc;
 
         // call this _first_, so that our core properties, (which we know) are created
         // before we walk down to the ConcreteAlternatives

@@ -154,6 +154,13 @@ PyObject* PyTupleOrListOfInstance::pyOperatorAdd(PyObject* rhs, const char* op, 
 
 
 //static
+PyDoc_STRVAR(listSetSizeUnsafe_doc,
+    "lst.setSizeUnsafe(n) -> None, and set length of lst to n\n"
+    "\n"
+    "No adjustments to elements or reallocations are done.\n"
+    "The size field is simply set to n."
+    "This is intended for compiled code.\n"
+    );
 PyObject* PyListOfInstance::listSetSizeUnsafe(PyObject* o, PyObject* args) {
     PyListOfInstance* self_w = (PyListOfInstance*)o;
 
@@ -431,6 +438,18 @@ PyObject* PyTupleOrListOfInstance::fromBytes(PyObject* o, PyObject* args, PyObje
     return PyInstance::fromInstance(outConverted);
 }
 
+PyDoc_STRVAR(TupleOf_toArray_doc,
+    "t.toarray() -> numpy array\n"
+    "\n"
+    "Converts a TupleOf() instance to a numpy array\n"
+    "Raises TypeError on failure.\n"
+    );
+PyDoc_STRVAR(ListOf_toArray_doc,
+    "lst.toarray() -> numpy array\n"
+    "\n"
+    "Converts a ListOf() instance to a numpy array\n"
+    "Raises TypeError on failure.\n"
+    );
 PyObject* PyTupleOrListOfInstance::toArray(PyObject* o, PyObject* args) {
     PyListOfInstance* self_w = (PyListOfInstance*)o;
     npy_intp dims[1] = { self_w->type()->count(self_w->dataPtr()) };
@@ -609,15 +628,23 @@ const char* TUPLE_FROM_BYTES_DOCSTRING =
 
 PyMethodDef* PyTupleOfInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef [6] {
-        {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
+        {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, TupleOf_toArray_doc},
         {"toBytes", (PyCFunction)PyTupleOrListOfInstance::toBytes, METH_VARARGS, TUPLE_TO_BYTES_DOCSTRING},
         {"fromBytes", (PyCFunction)PyTupleOrListOfInstance::fromBytes, METH_VARARGS | METH_KEYWORDS | METH_CLASS, TUPLE_FROM_BYTES_DOCSTRING},
-        {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
         {NULL, NULL}
     };
 }
 
 //static
+PyDoc_STRVAR(listPointerUnsafe_doc,
+    "lst.pointerUnsafe(i) -> pointer to element i of lst\n"
+    "\n"
+    "If lst if of type ListOf(T), the return value is of type PointerTo(T).\n"
+    "This is intended for compiled code, where pointerUnsafe is expected to be\n"
+    "faster than the usual bounds-checked indexed access to an instance of\n"
+    "ListOf(T).\n"
+    "In C++ terms, lst.pointerUnsafe(i) is &lst[i].\n"
+    );
 PyObject* PyListOfInstance::listPointerUnsafe(PyObject* o, PyObject* args) {
     PyListOfInstance* self_w = (PyListOfInstance*)o;
 
@@ -634,6 +661,9 @@ PyObject* PyListOfInstance::listPointerUnsafe(PyObject* o, PyObject* args) {
 }
 
 // static
+PyDoc_STRVAR(listAppend_doc,
+    "lst.append(e) -> None, and appends element e to lst"
+    );
 PyObject* PyListOfInstance::listAppend(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "ListOf.append takes one argument");
@@ -679,6 +709,9 @@ PyObject* PyListOfInstance::listAppendDirect(PyObject* o, PyObject* value) {
 
 
 // static
+PyDoc_STRVAR(listExtend_doc,
+    "lst.extend(c) -> None, and appends elements of the container c to lst"
+    );
 PyObject* PyListOfInstance::listExtend(PyObject* o, PyObject* args) {
     return translateExceptionToPyObject([&]() {
         if (PyTuple_Size(args) != 1) {
@@ -725,6 +758,12 @@ PyObject* PyListOfInstance::listExtend(PyObject* o, PyObject* args) {
 }
 
 // static
+PyDoc_STRVAR(listReserved_doc,
+    "lst.reserved() -> number of elements lst could hold, as currently allocated\n"
+    "\n"
+    "Contrast this with the actual length len(lst) of the lst.\n"
+    "lst.reserved() >= len(lst)\n"
+    );
 PyObject* PyListOfInstance::listReserved(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) != 0) {
         PyErr_SetString(PyExc_TypeError, "ListOf.reserved takes no arguments");
@@ -736,16 +775,24 @@ PyObject* PyListOfInstance::listReserved(PyObject* o, PyObject* args) {
     return PyLong_FromLong(self_w->type()->reserved(self_w->dataPtr()));
 }
 
+PyDoc_STRVAR(listReserve_doc,
+    "lst.reserve(n) -> None, and allocates space to potentially hold n elements\n"
+    "\n"
+    "Expands or shrinks the memory allocated for lst.\n"
+    "Won't shrink lst smaller than the elements it currently contains.\n"
+    "For example, n=0 will reallocate lst to the minimum possible size, \n"
+    "containing len(lst) elements and no unused allocation.\n"
+    );
 PyObject* PyListOfInstance::listReserve(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "ListOf.append takes one argument");
+        PyErr_SetString(PyExc_TypeError, "ListOf.reserve takes one argument");
         return NULL;
     }
 
     PyObject* pyReserveSize = PyTuple_GetItem(args, 0);
 
     if (!PyLong_Check(pyReserveSize)) {
-        PyErr_SetString(PyExc_TypeError, "ListOf.append takes an integer");
+        PyErr_SetString(PyExc_TypeError, "ListOf.reserve takes an integer");
         return NULL;
     }
 
@@ -758,6 +805,9 @@ PyObject* PyListOfInstance::listReserve(PyObject* o, PyObject* args) {
     return incref(Py_None);
 }
 
+PyDoc_STRVAR(listClear_doc,
+    "lst.clear() -> None, and resize lst to 0."
+    );
 PyObject* PyListOfInstance::listClear(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) != 0) {
         PyErr_SetString(PyExc_TypeError, "ListOf.clear takes no arguments");
@@ -771,17 +821,24 @@ PyObject* PyListOfInstance::listClear(PyObject* o, PyObject* args) {
     return incref(Py_None);
 }
 
+PyDoc_STRVAR(listResize_doc,
+    "lst.resize(n[, e]) -> None, and lst now contains n elements\n"
+    "\n"
+    "if n > len(lst), default-constructed elements (or e if provided) are\n"
+    "placed the end of lst.\n"
+    "if n < len(lst), elements are deleted from the end of lst.\n"
+    );
 PyObject* PyListOfInstance::listResize(PyObject* o, PyObject* args) {
     try {
         if (PyTuple_Size(args) != 1 && PyTuple_Size(args) != 2) {
-            PyErr_SetString(PyExc_TypeError, "ListOf.append takes one argument");
+            PyErr_SetString(PyExc_TypeError, "ListOf.resize takes one argument");
             return NULL;
         }
 
         PyObject* pySize = PyTuple_GetItem(args, 0);
 
         if (!PyLong_Check(pySize)) {
-            PyErr_SetString(PyExc_TypeError, "ListOf.append takes an integer");
+            PyErr_SetString(PyExc_TypeError, "ListOf.resize takes an integer");
             return NULL;
         }
 
@@ -824,6 +881,14 @@ PyObject* PyListOfInstance::listResize(PyObject* o, PyObject* args) {
     }
 }
 
+PyDoc_STRVAR(listPop_doc,
+    "lst.pop() -> last element of lst, and remove last element from lst\n"
+    "lst.pop(n) -> nth element of lst, and remove nth element from lst\n"
+    "\n"
+    "Raises IndexError when called on an empty list.\n"
+    "Raises IndexError when n is out of range.\n"
+    "Negative n is interpreted as in slice notation.\n"
+    );
 PyObject* PyListOfInstance::listPop(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) != 0 && PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "ListOf.pop takes zero or one argument");
@@ -836,7 +901,7 @@ PyObject* PyListOfInstance::listPop(PyObject* o, PyObject* args) {
         PyObject* pySize = PyTuple_GetItem(args, 0);
 
         if (!PyLong_Check(pySize)) {
-            PyErr_SetString(PyExc_TypeError, "ListOf.append takes an integer");
+            PyErr_SetString(PyExc_TypeError, "ListOf.pop takes an integer");
             return NULL;
         }
 
@@ -848,7 +913,7 @@ PyObject* PyListOfInstance::listPop(PyObject* o, PyObject* args) {
     int64_t listSize = self_w->type()->count(self_w->dataPtr());
 
     if (listSize == 0) {
-        PyErr_SetString(PyExc_TypeError, "pop from empty list");
+        PyErr_SetString(PyExc_IndexError, "pop from empty list");
         return NULL;
     }
 
@@ -871,6 +936,15 @@ PyObject* PyListOfInstance::listPop(PyObject* o, PyObject* args) {
     return result;
 }
 
+PyDoc_STRVAR(listTranspose_doc,
+    "lst.transpose() -> transposition of ListOf(Tuple()) or ListOf(NamedTuple())\n"
+    "\n"
+    "This is a matrix transposition that swaps the types of the rows and columns.\n"
+    "If lst is a ListOf(Tuple(X1, X2, X3)), then lst.transpose() is a\n"
+    "Tuple(ListOf(X1), ListOf(X2), ListOf(X3)).\n"
+    "If lst is a ListOf(NamedTuple(a=X1, b=X2, c=X3)), then lst.transpose() is a\n"
+    "NamedTuple(a=ListOf(X1), b=ListOf(X2), c=ListOf(X3)).\n"
+    );
 PyObject* PyListOfInstance::listTranspose(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) != 0) {
         PyErr_SetString(PyExc_TypeError, "ListOf.transpose takes zero arguments");
@@ -1003,46 +1077,37 @@ int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value)
     return PyInstance::mp_ass_subscript_concrete(item, value);
 }
 
-
-const char* LIST_CONVERT_DOCSTRING =
-    "Convert an arbitrary value to a `ListOf(T)`\n\n"
-    "Unlike calling `ListOf(T)`, `ListOf(T).convert` will recursively attempt\n"
-    "to convert all of the interior values in the argument as well.\n"
-    "Normally, `ListOf(T)([x])` will only succeed if `x` is implicitly convertible to `T`\n"
-    "ListOf(T).convert([x]) will call 'convert' on each of the members of the iterable.\n"
-    "Note that this means that you may get deepcopies of objects: `ListOf(ListOf(int))([[x]])`\n"
-    "will duplicate the inner list as a `ListOf(int)`."
-;
-
-const char* LIST_TO_BYTES_DOCSTRING =
-    "Convert a ListOf(T) to the raw bytes underneath it.\n\n"
+PyDoc_STRVAR(
+    LIST_TO_BYTES_DOCSTRING,
+    "ListOf(T).toBytes(self) -> bytes\n\nConvert a ListOf(T) to the raw bytes underneath it.\n\n"
     "This is only valid if T is \"POD\" (Plain Old Data), meaning it must be\n"
     "an integer, float, or bool type, or some combination of those in a Tuple or \n"
     "NamedTuple."
-;
+);
 
-const char* LIST_FROM_BYTES_DOCSTRING =
-    "Construct a ListOf(T) from the raw bytes that would underly it.\n\n"
+PyDoc_STRVAR(
+    LIST_FROM_BYTES_DOCSTRING,
+    "ListOf(T).fromBytes(b: bytes) -> ListOf(T)\n\nConstruct a ListOf(T) from the raw bytes that would underly it.\n\n"
     "This is only valid if T is \"POD\" (Plain Old Data), meaning it must be\n"
     "an integer, float, or bool type, or some combination of those in a Tuple or \n"
     "NamedTuple."
-;
+);
 
 PyMethodDef* PyListOfInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [15] {
-        {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
+    return new PyMethodDef [14] {
+        {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, ListOf_toArray_doc},
         {"toBytes", (PyCFunction)PyTupleOrListOfInstance::toBytes, METH_VARARGS, LIST_TO_BYTES_DOCSTRING},
         {"fromBytes", (PyCFunction)PyTupleOrListOfInstance::fromBytes, METH_VARARGS | METH_KEYWORDS | METH_CLASS, LIST_FROM_BYTES_DOCSTRING},
-        {"append", (PyCFunction)PyListOfInstance::listAppend, METH_VARARGS, NULL},
-        {"extend", (PyCFunction)PyListOfInstance::listExtend, METH_VARARGS, NULL},
-        {"clear", (PyCFunction)PyListOfInstance::listClear, METH_VARARGS, NULL},
-        {"reserved", (PyCFunction)PyListOfInstance::listReserved, METH_VARARGS, NULL},
-        {"reserve", (PyCFunction)PyListOfInstance::listReserve, METH_VARARGS, NULL},
-        {"resize", (PyCFunction)PyListOfInstance::listResize, METH_VARARGS, NULL},
-        {"pop", (PyCFunction)PyListOfInstance::listPop, METH_VARARGS, NULL},
-        {"setSizeUnsafe", (PyCFunction)PyListOfInstance::listSetSizeUnsafe, METH_VARARGS, NULL},
-        {"pointerUnsafe", (PyCFunction)PyListOfInstance::listPointerUnsafe, METH_VARARGS, NULL},
-        {"transpose", (PyCFunction)PyListOfInstance::listTranspose, METH_VARARGS, NULL},
+        {"append", (PyCFunction)PyListOfInstance::listAppend, METH_VARARGS, listAppend_doc},
+        {"extend", (PyCFunction)PyListOfInstance::listExtend, METH_VARARGS, listExtend_doc},
+        {"clear", (PyCFunction)PyListOfInstance::listClear, METH_VARARGS, listClear_doc},
+        {"reserved", (PyCFunction)PyListOfInstance::listReserved, METH_VARARGS, listReserved_doc},
+        {"reserve", (PyCFunction)PyListOfInstance::listReserve, METH_VARARGS, listReserve_doc},
+        {"resize", (PyCFunction)PyListOfInstance::listResize, METH_VARARGS, listResize_doc},
+        {"pop", (PyCFunction)PyListOfInstance::listPop, METH_VARARGS, listPop_doc},
+        {"setSizeUnsafe", (PyCFunction)PyListOfInstance::listSetSizeUnsafe, METH_VARARGS, listSetSizeUnsafe_doc},
+        {"pointerUnsafe", (PyCFunction)PyListOfInstance::listPointerUnsafe, METH_VARARGS, listPointerUnsafe_doc},
+        {"transpose", (PyCFunction)PyListOfInstance::listTranspose, METH_VARARGS, listTranspose_doc},
         {NULL, NULL}
     };
 }

@@ -21,6 +21,9 @@ ConstDictType* PyConstDictInstance::type() {
 }
 
 // static
+PyDoc_STRVAR(constDictItems_doc,
+    "D.items() -> an iterable containing D's items."
+    );
 PyObject* PyConstDictInstance::constDictItems(PyObject *o) {
     if (((PyInstance*)o)->mIteratorOffset != -1) {
         PyErr_SetString(PyExc_TypeError, "ConstDict iterators don't support 'items'");
@@ -51,6 +54,9 @@ PyObject* PyConstDictInstance::constDictItems(PyObject *o) {
 }
 
 // static
+PyDoc_STRVAR(constDictKeys_doc,
+    "D.keys() -> an iterable containing D's keys."
+    );
 PyObject* PyConstDictInstance::constDictKeys(PyObject *o) {
     if (((PyInstance*)o)->mIteratorOffset != -1) {
         PyErr_SetString(PyExc_TypeError, "ConstDict iterators don't support 'keys'");
@@ -79,6 +85,9 @@ PyObject* PyConstDictInstance::constDictKeys(PyObject *o) {
 }
 
 // static
+PyDoc_STRVAR(constDictValues_doc,
+    "D.values() -> an iterable containing D's values."
+    );
 PyObject* PyConstDictInstance::constDictValues(PyObject *o) {
     if (((PyInstance*)o)->mIteratorOffset != -1) {
         PyErr_SetString(PyExc_TypeError, "ConstDict iterators don't support 'values'");
@@ -108,6 +117,9 @@ PyObject* PyConstDictInstance::constDictValues(PyObject *o) {
 }
 
 // static
+PyDoc_STRVAR(constDictGet_doc,
+    "D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."
+    );
 PyObject* PyConstDictInstance::constDictGet(PyObject* o, PyObject* args) {
     if (((PyInstance*)o)->mIteratorOffset != -1) {
         PyErr_SetString(PyExc_TypeError, "ConstDict iterators don't support 'get'");
@@ -413,10 +425,10 @@ PyObject* PyConstDictInstance::mp_subscript_concrete(PyObject* item) {
 
 PyMethodDef* PyConstDictInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef [5] {
-        {"get", (PyCFunction)PyConstDictInstance::constDictGet, METH_VARARGS, NULL},
-        {"items", (PyCFunction)PyConstDictInstance::constDictItems, METH_NOARGS, NULL},
-        {"keys", (PyCFunction)PyConstDictInstance::constDictKeys, METH_NOARGS, NULL},
-        {"values", (PyCFunction)PyConstDictInstance::constDictValues, METH_NOARGS, NULL},
+        {"get", (PyCFunction)PyConstDictInstance::constDictGet, METH_VARARGS, constDictGet_doc},
+        {"items", (PyCFunction)PyConstDictInstance::constDictItems, METH_NOARGS, constDictItems_doc},
+        {"keys", (PyCFunction)PyConstDictInstance::constDictKeys, METH_NOARGS, constDictKeys_doc},
+        {"values", (PyCFunction)PyConstDictInstance::constDictValues, METH_NOARGS, constDictValues_doc},
         {NULL, NULL}
     };
 }

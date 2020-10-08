@@ -3196,7 +3196,31 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_docstrings_all_types(self):
         # TODO: actually test all types
-        types = [int, str, bytes, Dict(int, str)]
+        types = [
+            bool,
+            Int8,
+            Int16,
+            Int32,
+            int,
+            UInt8,
+            UInt16,
+            UInt32,
+            UInt64,
+            str,
+            bytes,
+            ListOf(str),
+            TupleOf(int),
+            Tuple(int, str, int),
+            NamedTuple(a=int, b=str),
+            Dict(int, str),
+            ConstDict(int, str),
+            Set(str),
+            Alternative("a", s1={'f1': int, 'f2': str}, s2={'f3': bool}),
+            Value(3),
+            PointerTo(str),
+        ]
+
+        good = True
         for T in types:
             type_docstring = T.__doc__
             self.assertTrue(type_docstring, f"Type {T} missing docstring")
@@ -3204,7 +3228,25 @@ class NativeTypesTests(unittest.TestCase):
                 m = getattr(T, a)
                 if callable(m):
                     docstring = m.__doc__
-                    # ignore certain magic methods that don't always have docstrings, even for builtin types
-                    if a in ['__format__', '__getnewargs__']:
+
+                    # Ignore certain magic methods that don't always have docstrings, even for builtin types.
+                    # And ignore some specific Alternative subtypes defined in the test cases.
+                    if a in ['__format__', '__getnewargs__', 's1', 's2']:
                         continue
+                    if not docstring:
+                        print(f"Type {T} missing docstring for '{a}'")
+                        good = False
+                        continue
+
                     self.assertTrue(docstring, f"Type {T} missing docstring for '{a}'")
+
+                    # Check for overlong lines
+                    max_line_len = 80
+                    if a in ['__index__']:  # Ignore some builtin docstrings with overlong lines.
+                        continue
+                    for l in docstring.splitlines():
+                        if len(l) > max_line_len:
+                            print(f"docstring line too long {len(l)} > {max_line_len} for '{T}.{a}':\n{l}")
+                            good = False
+
+        self.assertTrue(good)  # see output for specific problems

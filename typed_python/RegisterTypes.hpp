@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -259,11 +259,16 @@ public:
     }
 };
 
+
+PyDoc_STRVAR(Bool_doc,
+    "Bool(x=False) -> register type for bool"
+    );
 class Bool : public RegisterType<bool> {
 public:
     Bool() : RegisterType(TypeCategory::catBool)
     {
         m_name = "bool";
+        m_doc = Bool_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -276,11 +281,15 @@ public:
     }
 };
 
+PyDoc_STRVAR(UInt8_doc,
+    "UInt8(x=0) -> register type for uint8_t"
+    );
 class UInt8 : public RegisterType<uint8_t> {
 public:
     UInt8() : RegisterType(TypeCategory::catUInt8)
     {
         m_name = "UInt8";
+        m_doc = UInt8_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -293,11 +302,15 @@ public:
     }
 };
 
+PyDoc_STRVAR(UInt16_doc,
+    "UInt16(x=0) -> register type for uint16_t"
+    );
 class UInt16 : public RegisterType<uint16_t> {
 public:
     UInt16() : RegisterType(TypeCategory::catUInt16)
     {
         m_name = "UInt16";
+        m_doc = UInt16_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -307,11 +320,15 @@ public:
     static UInt16* Make() { static UInt16* res = new UInt16(); return res; }
 };
 
+PyDoc_STRVAR(UInt32_doc,
+    "UInt32(x=0) -> register type for uint32_t"
+    );
 class UInt32 : public RegisterType<uint32_t> {
 public:
     UInt32() : RegisterType(TypeCategory::catUInt32)
     {
         m_name = "UInt32";
+        m_doc = UInt32_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -321,11 +338,15 @@ public:
     static UInt32* Make() { static UInt32* res = new UInt32(); return res; }
 };
 
+PyDoc_STRVAR(UInt64_doc,
+    "UInt64(x=0) -> register type for uint64_t"
+    );
 class UInt64 : public RegisterType<uint64_t> {
 public:
     UInt64() : RegisterType(TypeCategory::catUInt64)
     {
         m_name = "UInt64";
+        m_doc = UInt64_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -335,12 +356,16 @@ public:
     static UInt64* Make() { static UInt64* res = new UInt64(); return res; }
 };
 
+PyDoc_STRVAR(Int8_doc,
+    "Int8(x=0) -> register type for int8_t"
+    );
 class Int8 : public RegisterType<int8_t> {
 public:
     Int8() : RegisterType(TypeCategory::catInt8)
     {
         m_name = "Int8";
-        m_size = 1;
+        m_doc = Int8_doc;
+        m_size = 1; // Why only specify this here and not in other specializations?
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -350,11 +375,15 @@ public:
     static Int8* Make() { static Int8* res = new Int8(); return res; }
 };
 
+PyDoc_STRVAR(Int16_doc,
+    "Int16(x=0) -> register type for int16_t"
+    );
 class Int16 : public RegisterType<int16_t> {
 public:
     Int16() : RegisterType(TypeCategory::catInt16)
     {
         m_name = "Int16";
+        m_doc = Int16_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -364,11 +393,15 @@ public:
     static Int16* Make() { static Int16* res = new Int16(); return res; }
 };
 
+PyDoc_STRVAR(Int32_doc,
+    "Int32(x=0) -> register type for int32_t"
+    );
 class Int32 : public RegisterType<int32_t> {
 public:
     Int32() : RegisterType(TypeCategory::catInt32)
     {
         m_name = "Int32";
+        m_doc = Int32_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -378,11 +411,15 @@ public:
     static Int32* Make() { static Int32* res = new Int32(); return res; }
 };
 
+PyDoc_STRVAR(Int64_doc,
+    "Int64(x=0) -> register type for int64_t"
+    );
 class Int64 : public RegisterType<int64_t> {
 public:
     Int64() : RegisterType(TypeCategory::catInt64)
     {
         m_name = "int";
+        m_doc = Int64_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -392,11 +429,15 @@ public:
     static Int64* Make() { static Int64* res = new Int64(); return res; }
 };
 
+PyDoc_STRVAR(Float32_doc,
+    "Float32(x=0) -> register type for (C++) float"
+    );
 class Float32 : public RegisterType<float> {
 public:
     Float32() : RegisterType(TypeCategory::catFloat32)
     {
         m_name = "Float32";
+        m_doc = Float32_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -406,11 +447,15 @@ public:
     static Float32* Make() { static Float32* res = new Float32(); return res; }
 };
 
+PyDoc_STRVAR(Float64_doc,
+    "Float64(x=0) -> register type for (C++) double"
+    );
 class Float64 : public RegisterType<double> {
 public:
     Float64() : RegisterType(TypeCategory::catFloat64)
     {
         m_name = "float";
+        m_doc = Float64_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {

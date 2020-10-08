@@ -32,28 +32,6 @@ void PySetInstance::getDataFromNative(PyTupleOrListOfInstance* src,
     }
 }
 
-
-PyMethodDef* PySetInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef[18]{{"add", (PyCFunction)PySetInstance::setAdd, METH_VARARGS, NULL},
-                              {"pop", (PyCFunction)PySetInstance::setPop, METH_VARARGS, NULL},
-                              {"discard", (PyCFunction)PySetInstance::setDiscard, METH_VARARGS, NULL},
-                              {"remove", (PyCFunction)PySetInstance::setRemove, METH_VARARGS, NULL},
-                              {"clear", (PyCFunction)PySetInstance::setClear, METH_VARARGS, NULL},
-                              {"copy", (PyCFunction)PySetInstance::setCopy, METH_VARARGS, NULL},
-                              {"union", (PyCFunction)PySetInstance::setUnion, METH_VARARGS, NULL},
-                              {"update", (PyCFunction)PySetInstance::setUpdate, METH_VARARGS, NULL},
-                              {"intersection", (PyCFunction)PySetInstance::setIntersection, METH_VARARGS, NULL},
-                              {"intersection_update", (PyCFunction)PySetInstance::setIntersectionUpdate, METH_VARARGS, NULL},
-                              {"difference", (PyCFunction)PySetInstance::setDifference, METH_VARARGS, NULL},
-                              {"difference_update", (PyCFunction)PySetInstance::setDifferenceUpdate, METH_VARARGS, NULL},
-                              {"symmetric_difference", (PyCFunction)PySetInstance::setSymmetricDifference, METH_VARARGS, NULL},
-                              {"symmetric_difference_update", (PyCFunction)PySetInstance::setSymmetricDifferenceUpdate, METH_VARARGS, NULL},
-                              {"issubset", (PyCFunction)PySetInstance::setIsSubset, METH_VARARGS, NULL},
-                              {"issuperset", (PyCFunction)PySetInstance::setIsSuperset, METH_VARARGS, NULL},
-                              {"isdisjoint", (PyCFunction)PySetInstance::setIsDisjoint, METH_VARARGS, NULL},
-                              {NULL, NULL}};
-}
-
 PyObject* PySetInstance::try_remove(PyObject* o, PyObject* item, bool assertKeyError) {
     PySetInstance* self_w = (PySetInstance*)o;
     Type* item_type = extractTypeFrom(item->ob_type);
@@ -132,6 +110,11 @@ PyObject* PySetInstance::try_add_if_not_found(PyObject* o, PySetInstance* to_be_
     Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(setRemove_doc,
+    "s.remove(item) -> None, and item is removed from s\n"
+    "\n"
+    "Raises KeyError if item is not in set.\n"
+    );
 PyObject* PySetInstance::setRemove(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "Set.remove takes one argument");
@@ -142,6 +125,11 @@ PyObject* PySetInstance::setRemove(PyObject* o, PyObject* args) {
     return try_remove(o, item, true);
 }
 
+PyDoc_STRVAR(setDiscard_doc,
+    "s.discard(item) -> None, and item is removed from s\n"
+    "\n"
+    "No action if item not found.  Compare s.remove().\n"
+    );
 PyObject* PySetInstance::setDiscard(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "Set.discard takes one argument");
@@ -152,6 +140,9 @@ PyObject* PySetInstance::setDiscard(PyObject* o, PyObject* args) {
     return try_remove(o, item, false);
 }
 
+PyDoc_STRVAR(setClear_doc,
+    "s.clear() -> None, and s becomes the empty set"
+    );
 PyObject* PySetInstance::setClear(PyObject* o, PyObject* args) {
     if (args && PyTuple_Size(args) != 0) {
         PyErr_SetString(PyExc_TypeError, "Set.clear takes no arguments");
@@ -190,6 +181,9 @@ void PySetInstance::copy_elements(PyObject* dst, PyObject* src) {
     }
 }
 
+PyDoc_STRVAR(setCopy_doc,
+    "s.copy() -> shallow copy of s"
+    );
 PyObject* PySetInstance::setCopy(PyObject* o, PyObject* args) {
     if (args && PyTuple_Size(args) != 0) {
         PyErr_SetString(PyExc_TypeError, "Set.copy takes no arguments");
@@ -610,6 +604,12 @@ PyObject* PySetInstance::set_union(PyObject* o, PyObject* other) {
     return (PyObject*)new_inst;
 }
 
+PyDoc_STRVAR(setDifference_doc,
+    "s.difference(s1) -> set that contain elements that are in s but not s1\n"
+    "s.difference(s1, s2, ...) -> set of elements that are in s but not s1, s2, ...\n"
+    "\n"
+    "s1, s2, ... can be sets or any iterable yielding the same element type as s.\n"
+    );
 PyObject* PySetInstance::setDifference(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) == 0) {
         return setCopy(o, NULL);
@@ -633,6 +633,11 @@ PyObject* PySetInstance::setDifference(PyObject* o, PyObject* args) {
     return result;
 }
 
+PyDoc_STRVAR(setSymmetricDifference_doc,
+    "s.symmetric_difference(s1) -> set of elements in one of s or s1, but not both\n"
+    "\n"
+    "s1 can be a set or any iterable yielding the same element type as s.\n"
+    );
 PyObject* PySetInstance::setSymmetricDifference(PyObject* o, PyObject* args) {
     if (Py_ssize_t n = PyTuple_Size(args) != 1) {
         PyErr_Format(PyExc_TypeError, "symmetric_difference() takes exactly one argument (%d given)", n);
@@ -645,6 +650,9 @@ PyObject* PySetInstance::setSymmetricDifference(PyObject* o, PyObject* args) {
     return result;
 }
 
+PyDoc_STRVAR(setIsSubset_doc,
+    "s.issubset(s1) -> Is s a subset of s1?"
+    );
 PyObject* PySetInstance::setIsSubset(PyObject* o, PyObject* args) {
     if (Py_ssize_t n = PyTuple_Size(args) != 1) {
         PyErr_Format(PyExc_TypeError, "issubset() takes exactly one argument (%d given)", n);
@@ -664,6 +672,9 @@ PyObject* PySetInstance::setIsSubset(PyObject* o, PyObject* args) {
     return incref(ret ? Py_True : Py_False);
 }
 
+PyDoc_STRVAR(setIsSuperset_doc,
+    "s.issuperset(s1) -> Is s a superset of s1?"
+    );
 PyObject* PySetInstance::setIsSuperset(PyObject* o, PyObject* args) {
     if (Py_ssize_t n = PyTuple_Size(args) != 1) {
         PyErr_Format(PyExc_TypeError, "issuperset() takes exactly one argument (%d given)", n);
@@ -682,6 +693,9 @@ PyObject* PySetInstance::setIsSuperset(PyObject* o, PyObject* args) {
     return incref(ret ? Py_True : Py_False);
 }
 
+PyDoc_STRVAR(setIsDisjoint_doc,
+    "s.isdisjoint(s1) -> Are s and s1 disjoint?"
+    );
 PyObject* PySetInstance::setIsDisjoint(PyObject* o, PyObject* args) {
     if (Py_ssize_t n = PyTuple_Size(args) != 1) {
         PyErr_Format(PyExc_TypeError, "isdisjoint() takes exactly one argument (%d given)", n);
@@ -700,6 +714,12 @@ PyObject* PySetInstance::setIsDisjoint(PyObject* o, PyObject* args) {
     return incref(ret ? Py_True : Py_False);
 }
 
+PyDoc_STRVAR(setIntersection_doc,
+    "s.intersection(s1) -> set of elements that are in both s and s1\n"
+    "s.intersection(s1, s2, ...) -> set of elements that are in s, s1, s2, ...\n"
+    "\n"
+    "s1, s2, ... can be sets or any iterable yielding the same element type as s.\n"
+    );
 PyObject* PySetInstance::setIntersection(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) == 0) {
         return setCopy(o, NULL);
@@ -738,6 +758,12 @@ PyObject* PySetInstance::setIntersection(PyObject* o, PyObject* args) {
     return self_w;
 }
 
+PyDoc_STRVAR(setUnion_doc,
+    "s.union(s1) -> set of elements that are in s or s1\n"
+    "s.union(s1, s2, ...) -> set of elements that are in one of s, s1, s2, ...\n"
+    "\n"
+    "s1, s2, ... can be sets or any iterable yielding the same element type as s.\n"
+    );
 PyObject* PySetInstance::setUnion(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) == 0) {
         return setCopy(o, NULL);
@@ -808,6 +834,12 @@ void PySetInstance::constructFromPythonArgumentsConcrete(SetType* t, uint8_t* da
     PyInstance::constructFromPythonArgumentsConcrete(t, data, args, kwargs);
 }
 
+PyDoc_STRVAR(setIntersectionUpdate_doc,
+    "s.intersection_update(s1) -> None, and s=s.intersection(s1)\n"
+    "s.intersection_update(s1, s2, ...) -> None, and s=s.intersection(s1, s2, ...)\n"
+    "\n"
+    "s1, s2, ... can be sets or any iterable yielding the same element type as s.\n"
+    );
 PyObject* PySetInstance::setIntersectionUpdate(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) == 0) {
         Py_RETURN_NONE;
@@ -839,6 +871,12 @@ PyObject* PySetInstance::setIntersectionUpdate(PyObject* o, PyObject* args) {
     Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(setDifferenceUpdate_doc,
+    "s.difference_update(s1) -> None, and s=s.difference(s1)\n"
+    "s.difference_update(s1, s2, ...) -> None, and s=s.difference(s1, s2, ...)\n"
+    "\n"
+    "s1, s2, ... can be sets or any iterable yielding the same element type as s.\n"
+    );
 PyObject* PySetInstance::setDifferenceUpdate(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) == 0) {
         Py_RETURN_NONE;
@@ -870,6 +908,11 @@ PyObject* PySetInstance::setDifferenceUpdate(PyObject* o, PyObject* args) {
     Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(setSymmetricDifferenceUpdate_doc,
+    "s.symmetric_difference_update(s1) -> None, and s=s.symmetric_difference(s1)\n"
+    "\n"
+    "s1 can be a set or any iterable yielding the same element type as s.\n"
+    );
 PyObject* PySetInstance::setSymmetricDifferenceUpdate(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "symmetric_difference_update takes exactly one argument");
@@ -898,6 +941,12 @@ PyObject* PySetInstance::setSymmetricDifferenceUpdate(PyObject* o, PyObject* arg
     Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(setUpdate_doc,
+    "s.update(s1) -> None, and s=s.union(s1)\n"
+    "s.update(s1, s2, ...) -> None, and s=s.union(s1, s2, ...)\n"
+    "\n"
+    "s1, s2, ... can be sets or any iterable yielding the same element type as s.\n"
+    );
 PyObject* PySetInstance::setUpdate(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) == 0) {
         Py_RETURN_NONE;
@@ -949,6 +998,9 @@ int PySetInstance::sq_contains_concrete(PyObject* item) {
     }
 }
 
+PyDoc_STRVAR(setPop_doc,
+    "s.pop() -> an arbitrary element of the set, which is removed"
+    );
 PyObject* PySetInstance::setPop(PyObject* o, PyObject* args) {
     PySetInstance* self_w = (PySetInstance*)o;
     if (PyTuple_Size(args) != 0) {
@@ -980,6 +1032,9 @@ PyObject* PySetInstance::setPop(PyObject* o, PyObject* args) {
     return result;
 }
 
+PyDoc_STRVAR(setAdd_doc,
+    "s.add(item) -> None, and item is added to the set s"
+    );
 PyObject* PySetInstance::setAdd(PyObject* o, PyObject* args) {
     PySetInstance* self_w = (PySetInstance*)o;
     if (PyTuple_Size(args) != 1) {
@@ -1341,4 +1396,25 @@ bool PySetInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyR
     }
 
     return false;
+}
+
+PyMethodDef* PySetInstance::typeMethodsConcrete(Type* t) {
+    return new PyMethodDef[18]{{"add", (PyCFunction)PySetInstance::setAdd, METH_VARARGS, setAdd_doc},
+                              {"pop", (PyCFunction)PySetInstance::setPop, METH_VARARGS, setPop_doc},
+                              {"discard", (PyCFunction)PySetInstance::setDiscard, METH_VARARGS, setDiscard_doc},
+                              {"remove", (PyCFunction)PySetInstance::setRemove, METH_VARARGS, setRemove_doc},
+                              {"clear", (PyCFunction)PySetInstance::setClear, METH_VARARGS, setClear_doc},
+                              {"copy", (PyCFunction)PySetInstance::setCopy, METH_VARARGS, setCopy_doc},
+                              {"union", (PyCFunction)PySetInstance::setUnion, METH_VARARGS, setUnion_doc},
+                              {"update", (PyCFunction)PySetInstance::setUpdate, METH_VARARGS, setUpdate_doc},
+                              {"intersection", (PyCFunction)PySetInstance::setIntersection, METH_VARARGS, setIntersection_doc},
+                              {"intersection_update", (PyCFunction)PySetInstance::setIntersectionUpdate, METH_VARARGS, setIntersectionUpdate_doc},
+                              {"difference", (PyCFunction)PySetInstance::setDifference, METH_VARARGS, setDifference_doc},
+                              {"difference_update", (PyCFunction)PySetInstance::setDifferenceUpdate, METH_VARARGS, setDifferenceUpdate_doc},
+                              {"symmetric_difference", (PyCFunction)PySetInstance::setSymmetricDifference, METH_VARARGS, setSymmetricDifference_doc},
+                              {"symmetric_difference_update", (PyCFunction)PySetInstance::setSymmetricDifferenceUpdate, METH_VARARGS, setSymmetricDifferenceUpdate_doc},
+                              {"issubset", (PyCFunction)PySetInstance::setIsSubset, METH_VARARGS, setIsSubset_doc},
+                              {"issuperset", (PyCFunction)PySetInstance::setIsSuperset, METH_VARARGS, setIsSuperset_doc},
+                              {"isdisjoint", (PyCFunction)PySetInstance::setIsDisjoint, METH_VARARGS, setIsDisjoint_doc},
+                              {NULL, NULL}};
 }

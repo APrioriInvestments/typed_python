@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -18,6 +18,25 @@
 
 #include "Type.hpp"
 
+PyDoc_STRVAR(PointerTo_doc,
+    "PointerTo(T) is a type that holds unsafe pointers to instances of type T.\n"
+    "\n"
+    "If t is of type T, PointerTo(T) is used to hold the value p=t.pointerUnsafe().\n"
+    "The pointed to object is accessed with p.get().\n"
+    "In compiled code, this access is faster than bounds-checked index access.\n"
+    "Instances of this type are valid only as long as the pointed-to object is not modified in a\n"
+    "way that affects the in-memory representation of the object (e.g. resizing or reallocation).\n\n"
+    "An instance p of PointerTo(T) can be used as follows:\n"
+    "p.get() is like C++ '*p'\n"
+    "p.set(v) is like C++ '*p = v;'\n"
+    "p.initialize(v) is like C++ 'p = new T(v);'\n"
+    "p.cast(T) is like C++ '(T*)p'\n"
+    "The expression p[3] is of type T, like the C++ expression 'p[3]'\n"
+    "The statement p[3]=v is like the C++ statement 'p[3]=v;'\n"
+    "The expression p+3 is of type PointerTo(T), like the C++ expression 'p+3'\n"
+    "The expression p1-p2 is of type int, like the C++ expression 'p1-p2'\n"
+    );
+
 class PointerTo : public Type {
 protected:
     typedef void* instance;
@@ -29,6 +48,7 @@ public:
     {
         m_size = sizeof(instance);
         m_is_default_constructible = true;
+        m_doc = PointerTo_doc;
 
         endOfConstructorInitialization(); // finish initializing the type object.
     }

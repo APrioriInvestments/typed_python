@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -400,6 +400,11 @@ int PyNamedTupleInstance::findElementIndex(const std::vector<std::string>& conta
 }
 
 // static
+PyDoc_STRVAR(replacing_doc,
+    "t.replacing(**kwargs) -> copy of t with updated fields and values\n"
+    "\n"
+    "Each keyword argument specifies a field and value to update.\n"
+    );
 PyObject* PyNamedTupleInstance::replacing(PyObject* o, PyObject* args, PyObject* kwargs) {
     PyNamedTupleInstance* self = (PyNamedTupleInstance*)o;
 
@@ -469,7 +474,7 @@ PyObject* PyNamedTupleInstance::replacing(PyObject* o, PyObject* args, PyObject*
 
 PyMethodDef* PyNamedTupleInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef[2] {
-        {"replacing", (PyCFunction)PyNamedTupleInstance::replacing, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"replacing", (PyCFunction)PyNamedTupleInstance::replacing, METH_VARARGS | METH_KEYWORDS, replacing_doc},
         {NULL, NULL}
     };
 

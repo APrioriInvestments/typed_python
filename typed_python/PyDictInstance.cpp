@@ -79,7 +79,8 @@ PyObject* PyDictInstance::dictValues(PyObject *o) {
 
 PyDoc_STRVAR(dictUpdate_doc,
     "D.update(F) -> None.  Update D from dict F.\n"
-    "    for k in F:  D[k]=F[k]\n"
+    "\n"
+    "for k in F:  D[k]=F[k]\n"
     );
 // static
 PyObject* PyDictInstance::dictUpdate(PyObject* o, PyObject* args) {
@@ -743,6 +744,7 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
 //static
 PyDoc_STRVAR(pop_doc,
     "D.pop(k[,d]) -> v, remove key k and return corresponding value v.\n"
+    "\n"
     "If k is not found, d is returned if given, otherwise KeyError is raised.\n"
     );
 PyObject* PyDictInstance::pop(PyObject* o, PyObject* args) {

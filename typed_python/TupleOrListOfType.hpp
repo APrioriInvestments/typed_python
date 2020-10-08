@@ -192,10 +192,17 @@ protected:
     bool m_is_tuple;
 };
 
+PyDoc_STRVAR(ListOf_doc,
+    "ListOf(T)() -> empty typed list\n"
+    "ListOf(T)(lst) -> typed list containing elements of type T, initialized from list lst\n"
+    "ListOf(T)(x) -> typed list containing elements of type T, initialized from iterable x\n"
+    );
+
 class ListOfType : public TupleOrListOfType {
 public:
     ListOfType(Type* type) : TupleOrListOfType(type, false)
     {
+        m_doc = ListOf_doc;
     }
 
     static ListOfType* Make(Type* elt, ListOfType* knownType=nullptr);
@@ -314,10 +321,17 @@ public:
     }
 };
 
+PyDoc_STRVAR(TupleOf_doc,
+    "TupleOf(T)() -> empty typed tuple\n"
+    "TupleOf(T)(t) -> typed tuple containing elements of type T, initialized from tuple t\n"
+    "TupleOf(T)(x) -> typed tuple containing elements of type T, initialized from iterable x\n"
+    );
+
 class TupleOfType : public TupleOrListOfType {
 public:
     TupleOfType(Type* type) : TupleOrListOfType(type, true)
     {
+        m_doc = TupleOf_doc;
     }
 
     void _updateTypeMemosAfterForwardResolution() {

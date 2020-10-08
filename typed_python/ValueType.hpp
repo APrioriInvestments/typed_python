@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -17,6 +17,10 @@
 #pragma once
 
 #include "Type.hpp"
+
+PyDoc_STRVAR(Value_doc,
+    "Value(x) -> type representing the single immutable value x"
+    );
 
 class Value : public Type {
 public:
@@ -119,6 +123,7 @@ private:
         m_size = 0;
         m_is_default_constructible = true;
         m_name = mInstance.repr();
+        m_doc = Value_doc;
 
         endOfConstructorInitialization(); // finish initializing the type object.
     }

@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -25,7 +25,8 @@
 PyDoc_STRVAR(DictType_doc,
     "Dict(K, V)() -> new empty typed dictionary with keytype K and valuetype V\n"
     "Dict(K, V)(d) -> new typed dictionary initialized from dict d\n"
-    "    Raises TypeError if types don't match.\n"
+    "\n"
+    "Raises TypeError if types don't match.\n"
     );
 
 class DictType : public Type {

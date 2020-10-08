@@ -19,6 +19,12 @@
 #include "Type.hpp"
 #include "ReprAccumulator.hpp"
 
+PyDoc_STRVAR(Forward_doc,
+    "Forward(n) -> new forward type named n\n"
+    "\n"
+    "Forward types must be resolved before any types that contain them can be used.\n"
+    );
+
 // forward types must be resolved (removed from the graph) before
 // any types that contain them can be used.
 class Forward : public Type {
@@ -27,9 +33,9 @@ public:
         Type(TypeCategory::catForward),
         mTarget(nullptr),
         mIndex(index)
-
     {
         m_name = name;
+        m_doc = Forward_doc;
 
         // deliberately don't invoke 'endOfConstructorInitialization'
     }

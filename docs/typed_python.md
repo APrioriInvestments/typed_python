@@ -382,11 +382,12 @@ its tag name as `Name`, and the `NamedTuple` that makes up its body as `ElementT
 * Each `Class` has a list of `MemberNames` and `MemberTypes`, along with `BaseClasses`, `MRO`, and `IsFinal`.
 * Each `Tuple` has its items in `ElementTypes`
 * Each `NamedTuple` has its names in `ElementNames` and its types in `ElementTypes`
-* Each `ConstDict` and `Dict` has its key type as `KeyType` and its value type as `ValueType`.
+* Each `ConstDict` and `Dict` has its key type as `KeyType` and its value type as `ValueType`.  The key type is also in `ElementType`.
 * Each `Function` has a list of the individual function overloads as `overloads`. See `typed_python.internals.FunctionOverload`.
 * Each `PointerTo` has the pointed-to type as `ElementType`.
-* Each `Set` has the item type as `KeyType`
+* Each `Set` has the item type as `KeyType` and also as `ElementType`
 * Each `ListOf` and `TupleOf` has its element type as `ElementType`.
+* (For any container, `ElementType` is intended to give the type of an element that you get as you iterate.)
 
 ## The Compiler
 

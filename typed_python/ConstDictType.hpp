@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -19,6 +19,13 @@
 #include "Type.hpp"
 #include "ReprAccumulator.hpp"
 
+PyDoc_STRVAR(ConstDictType_doc,
+    "ConstDict(K, V)() -> new empty typed immutable dictionary with keytype K and valuetype V\n"
+    "ConstDict(K, V)(d) -> new typed immutable dictionary initialized from dict d\n"
+    "\n"
+    "Raises TypeError if types don't match.\n"
+    );
+
 class ConstDictType : public Type {
     class layout {
     public:
@@ -36,6 +43,7 @@ public:
             m_key(key),
             m_value(value)
     {
+        m_doc = ConstDictType_doc;
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 

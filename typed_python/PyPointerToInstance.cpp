@@ -21,6 +21,14 @@ PointerTo* PyPointerToInstance::type() {
 }
 
 //static
+PyDoc_STRVAR(pointerInitialize_doc,
+    "p.initialize() -> None, and sets p to point to default-initialized value\n"
+    "p.initialize(v) -> None, and sets p to point to a copy of v\n"
+    "\n"
+    "In C++ terms, if p is type PointerTo(T):\n"
+    "(no arguments) p = new T;\n"
+    "(one argument) p = new T(v);\n"
+    );
 PyObject* PyPointerToInstance::pointerInitialize(PyObject* o, PyObject* args) {
     PyInstance* self_w = (PyInstance*)o;
     PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
@@ -56,6 +64,11 @@ PyObject* PyPointerToInstance::pointerInitialize(PyObject* o, PyObject* args) {
 }
 
 //static
+PyDoc_STRVAR(pointerSet_doc,
+    "p.set(v) -> None, and sets where p points to to v.\n"
+    "\n"
+    "In C++ terms: *p = v;\n"
+    );
 PyObject* PyPointerToInstance::pointerSet(PyObject* o, PyObject* args) {
     PyInstance* self_w = (PyInstance*)o;
     PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
@@ -87,6 +100,13 @@ PyObject* PyPointerToInstance::pointerSet(PyObject* o, PyObject* args) {
 
     return incref(Py_None);
 }
+
+PyDoc_STRVAR(
+    pointerDestroy_doc,
+    "p.destroy() -> None, and destroys the value pointed to by 'p'.\n"
+    "\n"
+    "In C++ terms, if p is type PointerTo(T), then this would be `p->~T()`.\n"
+);
 
 //static
 PyObject* PyPointerToInstance::pointerDestroy(PyObject* o, PyObject* args) {
@@ -142,9 +162,13 @@ int PyPointerToInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* val
     });
 }
 
-
-
 //static
+PyDoc_STRVAR(pointerGet_doc,
+    "p.get() -> element pointed to by p\n"
+    "\n"
+    "If p is type PointerTo(T), p.get() is type T.\n"
+    "In C++ terms: *p\n"
+    );
 PyObject* PyPointerToInstance::pointerGet(PyObject* o, PyObject* args) {
     PyInstance* self_w = (PyInstance*)o;
     PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
@@ -160,6 +184,11 @@ PyObject* PyPointerToInstance::pointerGet(PyObject* o, PyObject* args) {
 }
 
 //static
+PyDoc_STRVAR(pointerCast_doc,
+    "p.cast(T) -> pointer p cast to PointerTo(T)\n"
+    "\n"
+    "In C++ terms: (T*)p\n"
+    );
 PyObject* PyPointerToInstance::pointerCast(PyObject* o, PyObject* args) {
     PyInstance* self_w = (PyInstance*)o;
 
@@ -222,11 +251,11 @@ PyObject* PyPointerToInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
 
 PyMethodDef* PyPointerToInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef [6] {
-        {"initialize", (PyCFunction)PyPointerToInstance::pointerInitialize, METH_VARARGS, NULL},
-        {"set", (PyCFunction)PyPointerToInstance::pointerSet, METH_VARARGS, NULL},
-        {"get", (PyCFunction)PyPointerToInstance::pointerGet, METH_VARARGS, NULL},
-        {"cast", (PyCFunction)PyPointerToInstance::pointerCast, METH_VARARGS, NULL},
-        {"destroy", (PyCFunction)PyPointerToInstance::pointerDestroy, METH_VARARGS, NULL},
+        {"initialize", (PyCFunction)PyPointerToInstance::pointerInitialize, METH_VARARGS, pointerInitialize_doc},
+        {"set", (PyCFunction)PyPointerToInstance::pointerSet, METH_VARARGS, pointerSet_doc},
+        {"get", (PyCFunction)PyPointerToInstance::pointerGet, METH_VARARGS, pointerGet_doc},
+        {"cast", (PyCFunction)PyPointerToInstance::pointerCast, METH_VARARGS, pointerCast_doc},
+        {"destroy", (PyCFunction)PyPointerToInstance::pointerDestroy, METH_VARARGS, pointerDestroy_doc},
         {NULL, NULL}
     };
 }

@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2020 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -226,12 +226,21 @@ protected:
     std::unordered_map<size_t, size_t> m_serialize_typecodes_to_position; //codes to use when serializing/deserializing
 };
 
+PyDoc_STRVAR(NamedTuple_doc,
+    "NamedTuple(kw)() -> new default-initialized typed named tuple with names and types from kwargs kw\n"
+    "NamedTuple(kw)(t) -> new typed named tuple with names and types from kw, initialized from tuple t\n"
+    "\n"
+    "Raises TypeError if types don't match.\n"
+    );
+
 class NamedTuple : public CompositeType {
 public:
     NamedTuple(const std::vector<Type*>& types, const std::vector<std::string>& names) :
             CompositeType(TypeCategory::catNamedTuple, types, names)
     {
         assert(types.size() == names.size());
+
+        m_doc = NamedTuple_doc;
 
         endOfConstructorInitialization(); // finish initializing the type object.
     }
@@ -250,11 +259,19 @@ public:
     }
 };
 
+PyDoc_STRVAR(Tuple_doc,
+    "Tuple(T1, T2, ...)() -> new default-initialized typed tuple with element types T1, T2, ...\n"
+    "Tuple(T1, T2, ...)(t) -> new typed tuple with types T1, T2, ..., initialized from tuple t\n"
+    "\n"
+    "Raises TypeError if types don't match.\n"
+    );
+
 class Tuple : public CompositeType {
 public:
     Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) :
             CompositeType(TypeCategory::catTuple, types, names)
     {
+        m_doc = Tuple_doc;
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 

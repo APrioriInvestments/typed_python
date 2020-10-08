@@ -21,6 +21,38 @@
 #include "PromotesTo.hpp"
 #include <cmath>
 
+PyDoc_STRVAR(_complex_doc,
+    "complex(n) -> complex\n"
+    "\n"
+    "Creates a complex number with real part n and zero imaginary part.\n"
+    );
+PyDoc_STRVAR(_round_doc,
+    "round(n[, d=0]) -> number\n"
+    "\n"
+    "Without d, returns the integer closest to x, rounding 0.5 towards even.\n"
+    "With d, rounds to precision of d decimal digits.\n"
+    "d may be negative.\n"
+    "Returned value has same type as n.\n"
+    );
+PyDoc_STRVAR(_trunc_doc,
+    "trunc(n) -> number\n"
+    "\n"
+    "Returns n with decimal part truncated to the nearest integer toward 0.\n"
+    "Returned value has same type as n.\n"
+    );
+PyDoc_STRVAR(_floor_doc,
+    "floor(n) -> number\n"
+    "\n"
+    "Returns the largest integer <= n.\n"
+    "Returned value has same type as n.\n"
+    );
+PyDoc_STRVAR(_ceil_doc,
+    "ceil(n) -> number\n"
+    "\n"
+    "Returns the smallest integer >= n.\n"
+    "Returned value has same type as n.\n"
+    );
+
 template<class T>
 static PyObject* registerValueToPyValue(T val) {
     static Type* typeObj = GetRegisterType<T>()();
@@ -1031,11 +1063,11 @@ private:
 public:
     static PyMethodDef* typeMethodsConcrete(Type* t) {
         return new PyMethodDef [6] {
-            {"__complex__", (PyCFunction)_complex, METH_VARARGS | METH_KEYWORDS, NULL},
-            {"__round__", (PyCFunction)_round, METH_VARARGS | METH_KEYWORDS, NULL},
-            {"__trunc__", (PyCFunction)_trunc, METH_VARARGS | METH_KEYWORDS, NULL},
-            {"__floor__", (PyCFunction)_floor, METH_VARARGS | METH_KEYWORDS, NULL},
-            {"__ceil__", (PyCFunction)_ceil, METH_VARARGS | METH_KEYWORDS, NULL},
+            {"__complex__", (PyCFunction)_complex, METH_VARARGS | METH_KEYWORDS, _complex_doc},
+            {"__round__", (PyCFunction)_round, METH_VARARGS | METH_KEYWORDS, _round_doc},
+            {"__trunc__", (PyCFunction)_trunc, METH_VARARGS | METH_KEYWORDS, _trunc_doc},
+            {"__floor__", (PyCFunction)_floor, METH_VARARGS | METH_KEYWORDS, _floor_doc},
+            {"__ceil__", (PyCFunction)_ceil, METH_VARARGS | METH_KEYWORDS, _ceil_doc},
             {NULL, NULL}
             };
         }
