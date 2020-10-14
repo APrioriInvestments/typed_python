@@ -14,8 +14,17 @@ NODE_ENV ?= .nodeenv
 
 TP_SRC_PATH ?= typed_python
 
-TP_BUILD_PATH ?= build/temp.linux-x86_64-3.6/typed_python
-TP_LIB_PATH ?= build/lib.linux-x86_64-3.6/typed_python
+TP_BUILD_PATH ?= build/temp.linux-x86_64/typed_python
+TP_LIB_PATH ?= build/lib.linux-x86_64/typed_python
+
+# location of python include paths
+PYINCLUDE = $(shell python3 -c 'import sysconfig; print(sysconfig.get_paths()["include"])')
+# location of python site-packages
+PYSITE = $(shell python3 -c 'import sysconfig; print(sysconfig.get_paths()["platlib"])')
+# location of numpy
+NUMPYINCLUDE = $(shell python3 -c 'import pkg_resources; print(pkg_resources.resource_filename("numpy", "core/include"))')
+# name of the _types binary, which we can infer from the name of the _ssl binary
+TYPES_SO_NAME = $(shell python3 -c 'import _ssl; import os; print(os.path.split(_ssl.__file__)[1].replace("_ssl", "_types"))')
 
 CPP_FLAGS = -std=c++14  -O2  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
             -fstack-protector-strong  -D_FORTIFY_SOURCE=2  -fPIC            \
@@ -23,11 +32,9 @@ CPP_FLAGS = -std=c++14  -O2  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
             -Wno-cpp \
             -Wformat  -Werror=format-security  -Wdate-time -Wno-reorder     \
             -Wno-sign-compare  -Wno-narrowing  -Wno-int-in-bool-context     \
-            -I$(VIRTUAL_ENV)/include/python3.6m                             \
-            -I$(VIRTUAL_ENV)/lib/python3.6/site-packages/numpy/core/include \
-            -I/usr/include/python3.6m                                       \
-            -I/usr/local/lib/python3.6/dist-packages/numpy/core/include     \
-            -DTYPED_PYTHON_HAS_OPENSSL=1
+            -I$(PYINCLUDE)                                       			\
+            -I$(NUMPYINCLUDE)											    \
+
 
 LINKER_FLAGS = -Wl,-O1 \
                -Wl,-Bsymbolic-functions \
@@ -77,7 +84,7 @@ vlint: $(VIRTUAL_ENV)
 		make lint
 
 .PHONY: lib
-lib: typed_python/_types.cpython-36m-x86_64-linux-gnu.so
+lib: typed_python/$(TYPES_SO_NAME)
 
 .PHONY: unicodeprops
 unicodeprops: ./unicodeprops.py
@@ -115,13 +122,14 @@ $(VIRTUAL_ENV): $(PYTHON) .env
 $(TP_BUILD_PATH)/all.o: $(TP_SRC_PATH)/*.hpp $(TP_SRC_PATH)/*.cpp
 	$(CC) $(CPP_FLAGS) -c $(TP_SRC_PATH)/all.cpp $ -o $@
 
-typed_python/_types.cpython-36m-x86_64-linux-gnu.so: $(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so
-	cp $(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so  typed_python
+typed_python/$(TYPES_SO_NAME): $(TP_LIB_PATH)/$(TYPES_SO_NAME)
+	echo "python is " $(PYTHON)
+	cp $(TP_LIB_PATH)/$(TYPES_SO_NAME)  typed_python
 
-$(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so: $(TP_LIB_PATH) $(TP_BUILD_PATH) $(TP_O_FILES)
+$(TP_LIB_PATH)/$(TYPES_SO_NAME): $(TP_LIB_PATH) $(TP_BUILD_PATH) $(TP_O_FILES)
 	$(CXX) $(SHAREDLIB_FLAGS) $(LINKER_FLAGS) \
 		$(TP_O_FILES) \
-		-o $(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so $(LINK_FLAGS_POST)
+		-o $(TP_LIB_PATH)/$(TYPES_SO_NAME) $(LINK_FLAGS_POST)
 
 $(TP_BUILD_PATH):
 	mkdir -p $(TP_BUILD_PATH)
