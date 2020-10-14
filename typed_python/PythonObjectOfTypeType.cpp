@@ -85,14 +85,14 @@ PythonObjectOfType* PythonObjectOfType::Make(PyTypeObject* pyType, PyObject* giv
 }
 
 PythonObjectOfType* PythonObjectOfType::AnyPyObject() {
-    static PyObject* module = PyImport_ImportModule("typed_python.internals");
+    static PyObject* module = internalsModule();
     static PyObject* t = PyObject_GetAttrString(module, "object");
 
     return Make((PyTypeObject*)t);
 }
 
 PythonObjectOfType* PythonObjectOfType::AnyPyType() {
-    static PyObject* module = PyImport_ImportModule("typed_python.internals");
+    static PyObject* module = internalsModule();
     static PyObject* t = PyObject_GetAttrString(module, "type");
 
     return Make((PyTypeObject*)t);

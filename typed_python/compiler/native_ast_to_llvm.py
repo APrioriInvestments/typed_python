@@ -16,6 +16,7 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.module_definition import ModuleDefinition
 from typed_python.compiler.global_variable_definition import GlobalVariableDefinition
 import llvmlite.ir
+import os
 
 llvm_i8ptr = llvmlite.ir.IntType(8).as_pointer()
 llvm_i8 = llvmlite.ir.IntType(8)
@@ -1219,6 +1220,27 @@ class FunctionConverter:
                 target = target_or_ptr.target
 
                 func = self.namedCallTargetToLLVM(target)
+
+                if self.converter._printAllNativeCalls:
+                    self.builder.call(
+                        self.namedCallTargetToLLVM(
+                            native_ast.NamedCallTarget(
+                                name="np_print_bytes",
+                                arg_types=(native_ast.UInt8.pointer(),),
+                                output_type=native_ast.Void,
+                                external=True,
+                                varargs=False,
+                                intrinsic=False,
+                                can_throw=False
+                            )
+                        ).llvm_value,
+                        [constant_to_typed_llvm_value(
+                            self.module,
+                            self.builder, native_ast.Constant.ByteArray(
+                                ("calling native fun " + target.name + "\n").encode("ASCII")
+                            )
+                        ).llvm_value]
+                    )
             else:
                 target = self.convert(target_or_ptr.expr)
 
@@ -1433,6 +1455,7 @@ class Converter:
 
         self._inlineRequests = []
 
+        self._printAllNativeCalls = os.getenv("TP_COMPILER_LOG_NATIVE_CALLS")
         self.verbose = False
 
     def markExternal(self, functionNameToType):

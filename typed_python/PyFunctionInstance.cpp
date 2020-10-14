@@ -277,7 +277,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(
             }
         }
 
-        static PyObject* runtimeModule = PyImport_ImportModule("typed_python.compiler.runtime");
+        static PyObject* runtimeModule = ::runtimeModule();
 
         if (!runtimeModule) {
             throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime");
@@ -416,7 +416,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
 
 // static
 PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
-    static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");
+    static PyObject* internalsModule = ::internalsModule();
 
     if (!internalsModule) {
         throw std::runtime_error("Internal error: couldn't find typed_python.internals");
@@ -795,7 +795,7 @@ PyObject* PyFunctionInstance::overload(PyObject* funcObj, PyObject* args, PyObje
 
 /* static */
 PyObject* PyFunctionInstance::resultTypeFor(PyObject* funcObj, PyObject* args, PyObject* kwargs) {
-    static PyObject* runtimeModule = PyImport_ImportModule("typed_python.compiler.runtime");
+    static PyObject* runtimeModule = ::runtimeModule();
 
     if (!runtimeModule) {
         throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime");
@@ -959,7 +959,7 @@ Function* PyFunctionInstance::convertPythonObjectToFunctionType(
         return memo_it->second;
     }
 
-    static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");
+    static PyObject* internalsModule = ::internalsModule();
 
     if (!internalsModule) {
         PyErr_SetString(PyExc_TypeError, "Internal error: couldn't find typed_python.internals");

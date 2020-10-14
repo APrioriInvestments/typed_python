@@ -69,14 +69,14 @@ instance_ptr PyInstance::dataPtr() {
 
 //static
 PyObject* PyInstance::undefinedBehaviorException() {
-    static PyObject* module = PyImport_ImportModule("typed_python.internals");
+    static PyObject* module = ::internalsModule();
     static PyObject* t = PyObject_GetAttrString(module, "UndefinedBehaviorException");
     return t;
 }
 
 //static
 PyObject* PyInstance::nonTypesAcceptedAsTypes() {
-    static PyObject* module = PyImport_ImportModule("typed_python.internals");
+    static PyObject* module = ::internalsModule();
     static PyObject* t = PyObject_GetAttrString(module, "_nonTypesAcceptedAsTypes");
     return t;
 }
@@ -904,7 +904,7 @@ std::pair<Type*, instance_ptr> PyInstance::extractTypeAndPtrFrom(PyObject* obj) 
 
 
 PyObject* PyInstance::getInternalModuleMember(const char* name) {
-    static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");
+    static PyObject* internalsModule = ::internalsModule();
 
     if (!internalsModule) {
         PyErr_SetString(PyExc_TypeError, "Internal error: couldn't find typed_python.internals");

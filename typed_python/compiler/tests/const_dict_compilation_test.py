@@ -158,7 +158,7 @@ class TestConstDictCompilation(unittest.TestCase):
         self.assertTrue(compiledContains({k*2: k*2 for k in range(10)}, 4))
         self.assertFalse(compiledContains({k*2: k*2 for k in range(10)}, 5))
 
-    def test_const_dict_loops(self):
+    def test_const_dict_loops_perf(self):
         def loop(x: ConstDict(int, int)):
             res = 0
             i = 0

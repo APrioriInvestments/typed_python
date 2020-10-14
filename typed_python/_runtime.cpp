@@ -16,16 +16,16 @@
 PyObject* getRuntimeSingleton() {
     assertHoldingTheGil();
 
-    static PyObject* runtimeModule = PyImport_ImportModule("typed_python.compiler.runtime");
+    static PyObject* pyRuntimeModule = runtimeModule();
 
-    if (!runtimeModule) {
+    if (!pyRuntimeModule) {
         if (!PyErr_Occurred()) {
             PyErr_Format(PyExc_RuntimeError, "Internal error: couldn't find typed_python.compiler.runtime");
         }
         throw PythonExceptionSet();
     }
 
-    static PyObject* runtimeClass = PyObject_GetAttrString(runtimeModule, "Runtime");
+    static PyObject* runtimeClass = PyObject_GetAttrString(pyRuntimeModule, "Runtime");
 
     if (!runtimeClass) {
         if (!PyErr_Occurred()) {
@@ -1239,7 +1239,7 @@ extern "C" {
     PythonObjectOfType::layout_type* np_builtin_pyobj_by_name(const char* utf8_name) {
         PyEnsureGilAcquired getTheGil;
 
-        static PyObject* module = PyImport_ImportModule("builtins");
+        static PyObject* module = builtinsModule();
 
         return PythonObjectOfType::createLayout(PyObject_GetAttrString(module, utf8_name));
     }
@@ -1668,6 +1668,10 @@ extern "C" {
         }
 
         return PythonObjectOfType::stealToCreateLayout(res);
+    }
+
+    void np_print_bytes(uint8_t* bytes) {
+        std::cout << bytes << std::flush;
     }
 
     void nativepython_print_string(StringType::layout* layout) {
@@ -2476,7 +2480,7 @@ extern "C" {
     void np_raise_exception_fastpath(const char* message, const char* exceptionTypeName) {
         PyEnsureGilAcquired getTheGil;
 
-        static PyObject* module = PyImport_ImportModule("builtins");
+        PyObject* module = builtinsModule();
 
         PyObject* excType = PyObject_GetAttrString(module, exceptionTypeName);
         if (!excType) {

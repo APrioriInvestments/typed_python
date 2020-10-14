@@ -425,7 +425,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(aTup.ElementTypes[0].__typed_python_category__, "Function")
 
     @flaky(max_runs=3, min_passes=1)
-    def test_tuple_of_tuple_of(self):
+    def test_tuple_of_tuple_of_perf(self):
         tupleOfInt = TupleOf(int)
         tupleOfTupleOfInt = TupleOf(tupleOfInt)
 

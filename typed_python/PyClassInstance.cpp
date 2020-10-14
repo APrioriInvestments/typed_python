@@ -297,6 +297,7 @@ std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name,
     if (res.first) {
         return res;
     }
+
     PyErr_Format(
         PyExc_TypeError,
         "'%s.%s' cannot find a valid overload with these arguments",
@@ -970,9 +971,9 @@ PyObject* PyClassInstance::clsExit(PyObject* o, PyObject* args, PyObject* kwargs
             PyErr_Format(PyExc_TypeError, "__exit__ invalid number of parameters");
             return NULL;
         }
-        PyObjectStealer arg0(PyTuple_GetItem(args, 0));
-        PyObjectStealer arg1(PyTuple_GetItem(args, 1));
-        PyObjectStealer arg2(PyTuple_GetItem(args, 2));
+        PyObject* arg0(PyTuple_GetItem(args, 0));
+        PyObject* arg1(PyTuple_GetItem(args, 1));
+        PyObject* arg2(PyTuple_GetItem(args, 2));
 
         auto result = self->callMemberFunction("__exit__", arg0, arg1, arg2);
         if (!result.first) {

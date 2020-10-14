@@ -1917,4 +1917,7 @@ class ExpressionConversionContext:
                 self.functionContext.functionDefToType[ast]
             )
 
+        if ast.matches.Constant:
+            return self.constant(ast.value, allowArbitrary=True)
+
         raise ConversionException("can't handle python expression type %s" % ast.Name)

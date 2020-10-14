@@ -2001,6 +2001,30 @@ class TestCompilationStructures(unittest.TestCase):
                     r2 = result_or_exception_tb(c_f, a, b)
                     self.assertEqual(r1, r2, (str(f), a, b))
 
+    def test_compile_chained_context_managers(self):
+        class CM(Class, Final):
+            lst = Member(ListOf(int))
+
+            def __init__(self, l):
+                self.lst = l
+
+            def __enter__(self):
+                self.lst.append(1)
+
+            def __exit__(self, a, b, c):
+                self.lst.pop()
+
+        def chainTwoOfThem():
+            aList = ListOf(int)()
+
+            with CM(aList), CM(aList):
+                assert len(aList) == 2
+
+            assert len(aList) == 0
+
+        chainTwoOfThem()
+        Entrypoint(chainTwoOfThem)()
+
     def test_try_reraise(self):
 
         # Test reraise directly in exception handler
@@ -2370,14 +2394,14 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(r1, r2)
 
         c_with_no_enter = Compiled(with_no_enter)
-        r1 = result_or_exception_tb(with_no_enter)
-        r2 = result_or_exception_tb(c_with_no_enter)
+        r1 = result_or_exception(with_no_enter)
+        r2 = result_or_exception(c_with_no_enter)
         self.assertEqual(r1, r2)
 
         c_with_no_exit = Compiled(with_no_exit)
         for a in [0, 1, 2]:
-            r1 = result_or_exception_tb(with_no_exit, a)
-            r2 = result_or_exception_tb(c_with_no_exit, a)
+            r1 = result_or_exception(with_no_exit, a)
+            r2 = result_or_exception(c_with_no_exit, a)
             self.assertEqual(r1, r2, a)
 
         for a in [0, 1]:
@@ -2403,6 +2427,11 @@ class TestCompilationStructures(unittest.TestCase):
                         r1 = result_or_exception(with_cm_loop1, a, b, c, d, t1)
                         t2 = ListOf(str)([])
                         r2 = result_or_exception(Compiled(with_cm_loop2), a, b, c, d, t2)
+                        if r1 != r2 or t1 != t2:
+                            print(r1)
+                            print(r2)
+                            print(t1)
+                            print(t2)
                         self.assertEqual(r1, r2, (a, b, c, d))
                         self.assertEqual(t1, t2, (a, b, c, d))
 
@@ -2509,30 +2538,7 @@ class TestCompilationStructures(unittest.TestCase):
             self.assertLessEqual(m3 - m2, m1 - m0 + 1024, (f1.__name__, a))
 
     def test_context_manager_assignment(self):
-
-        class ConMan1():
-            def __init__(self, a, b, c, t):
-                self.a = a
-                self.b = b
-                self.c = c
-                self.t = t  # trace
-
-            def __enter__(self):
-                self.t.append("__enter__")
-                if self.a == 1:
-                    self.t.append("raise in __enter__")
-                    raise SyntaxError()
-                return self
-
-            def __exit__(self, exc_type, exc_val, exc_tb):
-                self.t.append(f"__exit__ {str(exc_type)}")
-                if self.b == 1:
-                    self.t.append("raise in __exit__")
-                    raise NotImplementedError()
-                self.t.append(f"__exit__ returns {self.c == 1}")
-                return self.c == 1
-
-        class ConMan2(Class, Final):
+        class ConMan(Class, Final):
             a = Member(int)
             b = Member(int)
             c = Member(int)
@@ -2559,53 +2565,15 @@ class TestCompilationStructures(unittest.TestCase):
                 self.t.append(f"__exit__ returns {self.c == 1}")
                 return self.c == 1
 
-        def with_cm_assign1(a, b, c, d, t) -> int:
+        def with_cm_assign(a: int, b: int, c: int, d: int, t: ListOf(str)) -> int:
             t.append("start")
-            with ConMan1(a, b, c, t) as x:
+
+            with ConMan(a, b, c, t) as x:
                 t.append(f"body {x.a} {x.b} {x.c}")
                 if d == 1:
                     t.append("raise")
                     raise ZeroDivisionError()
                 elif d == 2:
-                    t.append("return1")
-                    return 1
-            t.append("return2")
-            return 2
-
-        def with_cm_assign2(a: int, b: int, c: int, d: int, t: ListOf(str)) -> int:
-            t.append("start")
-            with ConMan2(a, b, c, t) as x:
-                t.append(f"body {x.a} {x.b} {x.c}")
-                if d == 1:
-                    t.append("raise")
-                    raise ZeroDivisionError()
-                elif d == 2:
-                    t.append("return1")
-                    return 1
-            t.append("return2")
-            return 2
-
-        def with_cm_multiple1(a, b, c, d, e, f, g, h, t):
-            t.append("start")
-            with ConMan1(a, b, c, t) as x, ConMan1(e, f, g, t) as y:
-                t.append(f"body {x.a} {x.b} {x.c} {y.a} {y.b} {y.c}")
-                if d == 1 or h == 1:
-                    t.append("raise")
-                    raise ZeroDivisionError()
-                elif d == 2 or h == 2:
-                    t.append("return1")
-                    return 1
-            t.append("return2")
-            return 2
-
-        def with_cm_multiple2(a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: int, t: ListOf(str)):
-            t.append("start")
-            with ConMan2(a, b, c, t) as x, ConMan2(e, f, g, t) as y:
-                t.append(f"body {x.a} {x.b} {x.c} {y.a} {y.b} {y.c}")
-                if d == 1 or h == 1:
-                    t.append("raise")
-                    raise ZeroDivisionError()
-                elif d == 2 or h == 2:
                     t.append("return1")
                     return 1
             t.append("return2")
@@ -2615,28 +2583,22 @@ class TestCompilationStructures(unittest.TestCase):
             for b in [0, 1]:
                 for c in [0, 1]:
                     for d in [0, 1, 2]:
-                        t1 = []
-                        r1 = result_or_exception(with_cm_assign1, a, b, c, d, t1)
+                        t1 = ListOf(str)([])
                         t2 = ListOf(str)([])
-                        r2 = result_or_exception(Compiled(with_cm_assign2), a, b, c, d, t2)
+
+                        with_cm_assign_c = Compiled(with_cm_assign)
+
+                        r1 = result_or_exception_str(with_cm_assign, a, b, c, d, t1)
+                        r2 = result_or_exception_str(with_cm_assign_c, a, b, c, d, t2)
+
+                        if r1 != r2 or t1 != t2:
+                            print(r1)
+                            print(r2)
+                            print(t1)
+                            print(t2)
+
                         self.assertEqual(r1, r2, (a, b, c, d))
                         self.assertEqual(t1, t2, (a, b, c, d))
-
-        # TODO: support multiple context managers
-        # for a in [0]:
-        #     for b in [0]:
-        #         for c in [0]:
-        #             for d in [0]:
-        #                 for e in [0, 1]:
-        #                     for f in [0, 1]:
-        #                         for g in [0, 1]:
-        #                             for h in [0, 1, 2]:
-        #                                 t1 = []
-        #                                 r1 = result_or_exception(with_cm_multiple1, a, b, c, d, e, f, g, h, t1)
-        #                                 t2 = ListOf(str)([])
-        #                                 r2 = result_or_exception(Compiled(with_cm_multiple2), a, b, c, d, e, f, g, h, t2)
-        #                                 self.assertEqual(r1, r2, (a, b, c, d, e, f, g, h))
-        #                                 self.assertEqual(t1, t2, (a, b, c, d, e, f, g, h))
 
     def test_catch_definite_exception(self):
         @Entrypoint

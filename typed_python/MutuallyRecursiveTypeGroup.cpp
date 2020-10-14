@@ -167,7 +167,7 @@ void visitCompilerVisibleTypesAndPyobjects(
 
     // don't walk into canonical modules
     if (PyModule_Check(obj.pyobj())) {
-        static PyObject* sysModule = PyImport_ImportModule("sys");
+        static PyObject* sysModule = ::sysModule();
         static PyObject* sysModuleModules = PyObject_GetAttrString(sysModule, "modules");
 
         PyObjectStealer name(PyObject_GetAttrString(obj.pyobj(), "__name__"));
@@ -334,7 +334,7 @@ void visitCompilerVisibleTypesAndPyobjects(
         return;
     }
 
-    static PyObject* weakrefModule = PyImport_ImportModule("weakref");
+    static PyObject* weakrefModule = ::weakrefModule();
     static PyObject* weakSetType = PyObject_GetAttrString(weakrefModule, "WeakSet");
     static PyObject* weakKeyDictType = PyObject_GetAttrString(weakrefModule, "WeakKeyDictionary");
     static PyObject* weakValueDictType = PyObject_GetAttrString(weakrefModule, "WeakValueDictionary");
@@ -1057,7 +1057,7 @@ ShaHash MutuallyRecursiveTypeGroup::computePyObjectShaHashConstant(PyObject* h) 
         return ShaHash(100, 6) + ShaHash::SHA1(c, s);
     }
 
-    static PyObject* builtinsModule = PyImport_ImportModule("builtins");
+    static PyObject* builtinsModule = ::builtinsModule();
     static PyObject* builtinsModuleDict = PyObject_GetAttrString(builtinsModule, "__dict__");
 
     if (h == builtinsModule) {
@@ -1178,7 +1178,7 @@ ShaHash MutuallyRecursiveTypeGroup::computePyObjectShaHashConstant(PyObject* h) 
 }
 
 bool MutuallyRecursiveTypeGroup::isSimpleConstant(PyObject* h) {
-    static PyObject* builtinsModule = PyImport_ImportModule("builtins");
+    static PyObject* builtinsModule = ::builtinsModule();
     static PyObject* builtinsModuleDict = PyObject_GetAttrString(builtinsModule, "__dict__");
 
     // handle basic constants

@@ -383,3 +383,30 @@ std::string qualname_to_name(std::string n) {
 
     return n.substr(ix + 1);
 }
+
+
+inline PyObject* internalsModule() {
+    static PyObject* module = PyImport_ImportModule("typed_python.internals");
+    return module;
+}
+
+
+inline PyObject* runtimeModule() {
+    static PyObject* module = PyImport_ImportModule("typed_python.compiler.runtime");
+    return module;
+}
+
+inline PyObject* builtinsModule() {
+    static PyObject* module = PyImport_ImportModule("builtins");
+    return module;
+}
+
+inline PyObject* sysModule() {
+    static PyObject* module = PyImport_ImportModule("sys");
+    return module;
+}
+
+inline PyObject* weakrefModule() {
+    static PyObject* module = PyImport_ImportModule("weakref");
+    return module;
+}

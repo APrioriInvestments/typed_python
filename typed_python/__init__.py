@@ -54,3 +54,5 @@ from typed_python.compiler.runtime import Entrypoint, Compiled, NotCompiled, Run
 from typed_python.lib.map import map  # noqa
 from typed_python.lib.pmap import pmap  # noqa
 from typed_python.lib.reduce import reduce  # noqa
+
+_types.initializeGlobalStatics()

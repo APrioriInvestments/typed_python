@@ -17,6 +17,8 @@ TP_SRC_PATH ?= typed_python
 TP_BUILD_PATH ?= build/temp.linux-x86_64/typed_python
 TP_LIB_PATH ?= build/lib.linux-x86_64/typed_python
 
+TP_BUILD_OPT_LEVEL ?= 2
+
 # location of python include paths
 PYINCLUDE = $(shell python3 -c 'import sysconfig; print(sysconfig.get_paths()["include"])')
 # location of python site-packages
@@ -26,7 +28,7 @@ NUMPYINCLUDE = $(shell python3 -c 'import pkg_resources; print(pkg_resources.res
 # name of the _types binary, which we can infer from the name of the _ssl binary
 TYPES_SO_NAME = $(shell python3 -c 'import _ssl; import os; print(os.path.split(_ssl.__file__)[1].replace("_ssl", "_types"))')
 
-CPP_FLAGS = -std=c++14  -O2  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
+CPP_FLAGS = -std=c++14  -O$(TP_BUILD_OPT_LEVEL)  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
             -fstack-protector-strong  -D_FORTIFY_SOURCE=2  -fPIC            \
             -Wno-terminate -Wno-bool-compare \
             -Wno-cpp \

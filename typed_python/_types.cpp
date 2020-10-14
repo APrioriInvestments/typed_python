@@ -564,6 +564,27 @@ PyObject *getDispatchIndexForType(PyObject* nullValue, PyObject* args, PyObject*
     });
 }
 
+PyObject* initializeGlobalStatics(PyObject* nullValue, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+        return NULL;
+    }
+
+    // initialize all global references to modules.
+    // we can't initialize these lazily, because it may happen when we are
+    // doing something that prevents importing modules, like handling
+    // an exception
+    internalsModule();
+    runtimeModule();
+    builtinsModule();
+    sysModule();
+    weakrefModule();
+
+    return incref(Py_None);
+}
+
 PyObject* classGetDispatchIndex(PyObject* nullValue, PyObject* args, PyObject* kwargs)
 {
     static const char *kwlist[] = {"instance", NULL};
@@ -2383,6 +2404,7 @@ static PyMethodDef module_methods[] = {
     {"setFunctionClosure", (PyCFunction)setFunctionClosure, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setClassOrStaticmethod", (PyCFunction)setClassOrStaticmethod, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setPropertyGetSetDel", (PyCFunction)setPropertyGetSetDel, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"initializeGlobalStatics", (PyCFunction)initializeGlobalStatics, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 
