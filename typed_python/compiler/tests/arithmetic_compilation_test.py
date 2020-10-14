@@ -19,7 +19,7 @@ from typed_python import (
     OneOf,
     Int8, Int16, Int32,
     UInt8, UInt16, UInt32, UInt64,
-    Float32, Compiled, makeNamedTuple
+    Float32, Compiled, makeNamedTuple, ListOf
 )
 from typed_python.type_promotion import (
     computeArithmeticBinaryResultType, isSignedInt, isUnsignedInt, bitness
@@ -652,3 +652,27 @@ class TestArithmeticCompilation(unittest.TestCase):
             return f"{x:.6g}"
 
         assert format(1.0) == f"{1.0:.6g}"
+
+    def test_formatting_strings_in_loop(self):
+        @Entrypoint
+        def format(a, b, c, d):
+            res = ListOf(str)()
+            for i in range(10000):
+                res.append(f"{i} {a} {b} {c} {d}")
+            return res
+
+        format(1, 2, 3, 4)
+
+    def test_string_joining_in_loop(self):
+        @Entrypoint
+        def format(a, b, c, d):
+            res = ListOf(str)()
+            for i in range(10000):
+                l = ListOf(str)()
+                l.append(str(a))
+                l.append(str(b))
+                l.append(str(c))
+                res.append("".join(l))
+            return res
+
+        format(1, 2, 3, 4)
