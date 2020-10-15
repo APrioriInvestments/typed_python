@@ -39,8 +39,7 @@ class ConversionLevel:
             ConversionLevel.UpcastContainers,
             ConversionLevel.Implicit,
             ConversionLevel.ImplicitContainers,
-            ConversionLevel.New,
-            ConversionLevel.DeepNew
+            ConversionLevel.New
         ]:
             if level.LEVEL == intLevel:
                 return level
@@ -93,7 +92,8 @@ class UpcastContainers(ConversionLevel):
     This means that an empty TupleOf(T1) and TupleOf(T2) are essentially equivalent,
 
     This is the cast level used by dictionary key lookups, and so
-    Dict(TupleOf(int), int) allows lookup from untyped (1, 2, 3)
+    Dict(TupleOf(int), int) allows lookup from untyped (1, 2, 3). Similarly
+    for set values.
     """
     LEVEL = 2
 
@@ -102,8 +102,8 @@ class Implicit(ConversionLevel):
     """Just like UpcastContainers, except that all integer / float conversions
     are allowed.
 
-    This is the standard conversion level for adding values to mutable containers
-    like Dict and ListOfs, and to setting class members.
+    This is the standard conversion level when converting the contents of
+    a container triggered by ImplicitContainers or New.
     """
     LEVEL = 3
 
@@ -114,27 +114,25 @@ class ImplicitContainers(ConversionLevel):
     This is the standard conversion level applied by New on interior elements
     of structured types (like NamedTuple) where we want to allow container
     conversion, but not conversions like -> str.
+
+    It also applies to setting dictionary values, list values,
+    and class members.
+
+    Container types apply this to their interior elements as well, which
+    ensures that we can use idiomatic expressions like
+
+        ListOf(ListOf(int))([[]])
+
+    And have them work.
     """
     LEVEL = 4
 
 
 class New(ConversionLevel):
     """Invoked by an explicit call to a type constructor. Allows the construction of a
-    new instance of the type itself. Internal conversions are done as 'Implicit' calls.
-    This means a ListOf(ListOf(int))([[1]]) will fail because the inner list is
-    a mutable instance.
+    new instance of the type itself. Internal conversions are done as 'ImplicitContainers' calls.
     """
     LEVEL = 5
-
-
-class DeepNew(ConversionLevel):
-    """Invoked by a call to a type's 'convert' function. Allows the construction of a
-    new instance of the type itself and recursively converts child elements with
-    'DeepNew'.
-
-    This means a ListOf(ListOf(int))([[1]]) will succeed, and will create new lists.
-    """
-    LEVEL = 6
 
 
 ConversionLevel.Signature = Signature()
@@ -143,4 +141,3 @@ ConversionLevel.UpcastContainers = UpcastContainers()
 ConversionLevel.Implicit = Implicit()
 ConversionLevel.ImplicitContainers = ImplicitContainers()
 ConversionLevel.New = New()
-ConversionLevel.DeepNew = DeepNew()

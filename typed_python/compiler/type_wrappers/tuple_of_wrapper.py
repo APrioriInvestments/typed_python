@@ -19,7 +19,7 @@ from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python.compiler.converter_utils import (
     InitializeRefAsImplicit,
-    InitializeRefAsDeepNew,
+    InitializeRefAsImplicitContainers,
     InitializeRefAsUpcastContainers
 )
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -449,9 +449,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         # note that if the other object is an untyped container, then the
         # pathway in python_object_of_type will take care of it.
         childLevel = (
-            ConversionLevel.DeepNew if conversionLevel == ConversionLevel.DeepNew
-            else
-            ConversionLevel.Implicit if conversionLevel.isImplicitContainersOrHigher()
+            ConversionLevel.ImplicitContainers if conversionLevel.isImplicitContainersOrHigher()
             else
             conversionLevel
         )
@@ -490,12 +488,12 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         if canConvert is False:
             return super().convert_to_self_with_target(context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure)
 
-        if conversionLevel == ConversionLevel.DeepNew:
-            converter_class = InitializeRefAsDeepNew
+        if conversionLevel >= ConversionLevel.ImplicitContainers:
+            converter_class = InitializeRefAsImplicitContainers
+        elif conversionLevel == ConversionLevel.Implicit:
+            converter_class = InitializeRefAsImplicit
         elif conversionLevel == ConversionLevel.UpcastContainers:
             converter_class = InitializeRefAsUpcastContainers
-        else:
-            converter_class = InitializeRefAsImplicit
 
         res = context.call_py_function(
             initialize_tuple_or_list_from_other,

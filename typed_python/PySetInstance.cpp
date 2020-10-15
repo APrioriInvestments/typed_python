@@ -1072,12 +1072,17 @@ void PySetInstance::copyConstructFromPythonInstanceConcrete(
     PyObject* pyRepresentation,
     ConversionLevel level
 ) {
-    if (level < ConversionLevel::New) {
+    if (level < ConversionLevel::ImplicitContainers) {
         return PyInstance::copyConstructFromPythonInstanceConcrete(setType, tgt, pyRepresentation, level);
     }
 
-    ConversionLevel childLevel = level == ConversionLevel::DeepNew ? ConversionLevel::DeepNew : ConversionLevel::Implicit;
+    ConversionLevel childLevel;
 
+    if (level == ConversionLevel::ImplicitContainers) {
+        childLevel = ConversionLevel::UpcastContainers;
+    } else {
+        childLevel = ConversionLevel::Implicit;
+    }
 
     bool setIsInitialized = false;
 
@@ -1331,17 +1336,8 @@ bool PySetInstance::compare_to_python_concrete(SetType* setT, instance_ptr left,
 }
 
 bool PySetInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
-    if (level >= ConversionLevel::New) {
-        return (
-            PySet_Check(pyRepresentation) ||
-            PyTuple_Check(pyRepresentation) ||
-            PyList_Check(pyRepresentation) ||
-            PyDict_Check(pyRepresentation) ||
-            PySet_Check(pyRepresentation) ||
-            PyIter_Check(pyRepresentation) ||
-            PySequence_Check(pyRepresentation) ||
-            PyArray_Check(pyRepresentation)
-        );
+    if (level >= ConversionLevel::ImplicitContainers) {
+        return true;
     }
 
     return false;

@@ -12,12 +12,19 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Set, ListOf, Entrypoint, Compiled, Tuple, TupleOf, NamedTuple, Dict, ConstDict, OneOf
-from typed_python.compiler.type_wrappers.set_wrapper import set_union, set_intersection, set_difference, \
-    set_symmetric_difference, set_union_multiple, set_intersection_multiple, set_difference_multiple, \
-    set_disjoint, set_subset, set_subset_iterable, set_superset, set_proper_subset, set_equal, set_not_equal, \
-    set_update, set_intersection_update, set_difference_update, set_symmetric_difference_update, \
-    initialize_set_from_other_implicit
+from typed_python import (
+    Set, ListOf, Entrypoint, Compiled, Tuple, TupleOf, NamedTuple, Dict, ConstDict, OneOf,
+    UInt8
+)
+from typed_python.compiler.type_wrappers.set_wrapper import (
+    set_union, set_intersection, set_difference,
+    set_symmetric_difference, set_union_multiple, set_intersection_multiple, set_difference_multiple,
+    set_disjoint, set_subset, set_subset_iterable, set_superset, set_proper_subset, set_equal, set_not_equal,
+    set_update, set_intersection_update, set_difference_update, set_symmetric_difference_update,
+    initialize_set_from_other_implicit_containers,
+    initialize_set_from_other_upcast_containers
+)
+
 from flaky import flaky
 import typed_python._types as _types
 import time
@@ -64,7 +71,7 @@ class TestSetCompilation(unittest.TestCase):
         for length in range(100):
             sets = [{x * 2 + 1} for x in range(length)]
 
-            aList = ListOf(Set(int)).convert(sets)
+            aList = ListOf(Set(int))(sets)
 
             refcounts = [_types.refcount(x) for x in aList]
             aListRev = reversedNative(aList)
@@ -994,7 +1001,8 @@ class TestSetCompilation(unittest.TestCase):
                 return self.s
 
         p1 = P_mock()
-        initialize_set_from_other_implicit(p1, [1, 2], True)
+        initialize_set_from_other_implicit_containers(p1, [1, 2], True)
+        initialize_set_from_other_upcast_containers(p1, [1, 2], True)
 
     def test_compiled_set_constructors(self):
         def f_set(x):
@@ -1104,3 +1112,30 @@ class TestSetCompilation(unittest.TestCase):
         t1.add(10)
 
         assert len(t2) == 0
+
+    def test_set_adding_allows_container_upcast(self):
+        T = Set(TupleOf(float))
+
+        def f():
+            aT = T()
+
+            # these work
+            aT.add((1, 2, 3))
+            aT.add([1, 2, 3])
+            aT.add(TupleOf(UInt8)([1, 2, 3]))
+
+            return len(aT) == 1
+
+        assert f()
+        assert Entrypoint(f)()
+
+        aT = T()
+        with self.assertRaises(TypeError):
+            aT.add([1, 2, "3"])
+
+        with self.assertRaises(TypeError):
+            @Entrypoint
+            def addIt():
+                aT = T()
+                aT.add([1, 2, "3"])
+            addIt()

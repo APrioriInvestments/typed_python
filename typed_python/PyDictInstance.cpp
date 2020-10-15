@@ -420,7 +420,7 @@ int PyDictInstance::mp_ass_subscript_concrete_keytyped(PyObject* pyKey, instance
         return mp_ass_subscript_concrete_typed(key, value_w->dataPtr());
     } else {
         Instance val(type()->valueType(), [&](instance_ptr data) {
-            copyConstructFromPythonInstance(type()->valueType(), data, value, ConversionLevel::Implicit);
+            copyConstructFromPythonInstance(type()->valueType(), data, value, ConversionLevel::ImplicitContainers);
         });
 
         return mp_ass_subscript_concrete_typed(key, val.data());
@@ -500,7 +500,12 @@ void PyDictInstance::copyConstructFromPythonInstanceConcrete(DictType* dictType,
         return PyInstance::copyConstructFromPythonInstanceConcrete(dictType, dictTgt, pyRepresentation, level);
     }
 
-    ConversionLevel childLevel = level == ConversionLevel::DeepNew ? ConversionLevel::DeepNew : ConversionLevel::Implicit;
+    ConversionLevel childLevelKey = ConversionLevel::UpcastContainers;
+    ConversionLevel childLevelValue = ConversionLevel::ImplicitContainers;
+
+    if (level == ConversionLevel::New) {
+        childLevelKey = ConversionLevel::Implicit;
+    }
 
     if (PyDict_Check(pyRepresentation)) {
         dictType->constructor(dictTgt);
@@ -511,11 +516,11 @@ void PyDictInstance::copyConstructFromPythonInstanceConcrete(DictType* dictType,
 
             while (PyDict_Next(pyRepresentation, &pos, &key, &value)) {
                 Instance keyInst(dictType->keyType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(dictType->keyType(), data, key, childLevel);
+                    copyConstructFromPythonInstance(dictType->keyType(), data, key, childLevelKey);
                 });
 
                 Instance valueInst(dictType->valueType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(dictType->valueType(), data, value, childLevel);
+                    copyConstructFromPythonInstance(dictType->valueType(), data, value, childLevelValue);
                 });
 
                 instance_ptr valueTgt = dictType->lookupValueByKey(dictTgt, keyInst.data());
@@ -547,11 +552,11 @@ void PyDictInstance::copyConstructFromPythonInstanceConcrete(DictType* dictType,
                 }
 
                 Instance keyInst(dictType->keyType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(dictType->keyType(), data, key, childLevel);
+                    copyConstructFromPythonInstance(dictType->keyType(), data, key, childLevelKey);
                 });
 
                 Instance valueInst(dictType->valueType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(dictType->valueType(), data, value, childLevel);
+                    copyConstructFromPythonInstance(dictType->valueType(), data, value, childLevelValue);
                 });
 
                 instance_ptr valueTgt = dictType->lookupValueByKey(dictTgt, keyInst.data());
@@ -712,7 +717,7 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
                 return extractPythonObject(valueTgt, self->type()->valueType());
             } else {
                 Instance i(valueType, [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(valueType, data, ifNotFound, ConversionLevel::Implicit);
+                    copyConstructFromPythonInstance(valueType, data, ifNotFound, ConversionLevel::ImplicitContainers);
                 });
                 instance_ptr ifNotFoundValue = i.data();
                 instance_ptr valueTgt = self->type()->insertKey(self->dataPtr(), lookupKey);

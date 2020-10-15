@@ -365,12 +365,6 @@ class OneOfWrapper(Wrapper):
 
         conversionLevels = [x for x in ConversionLevel.functionConversionSequence() if x <= conversionLevel]
 
-        # don't pass a 'New' level of conversion into the interior types
-        # or else something like OneOf(None, str)(1.0) will attempt to convert
-        # the 1.0 to a 'str', which is not the point of a OneOf.
-        if conversionLevel >= ConversionLevel.DeepNew:
-            conversionLevels.append(conversionLevel)
-
         for eltConversionLevel in conversionLevels:
             for ix, type in enumerate(self.typeRepresentation.Types):
                 # get a pointer to the uninitialized target as if it were the 'ix'th type

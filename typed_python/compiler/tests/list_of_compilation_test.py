@@ -471,7 +471,10 @@ class TestListOfCompilation(unittest.TestCase):
 
         # in a loop, so we can see we're not violating any refcounts
         for _ in range(100):
-            with self.assertRaisesRegex(TypeError, "Cannot implicitly convert an object of type str to an instance of float"):
+            with self.assertRaisesRegex(
+                TypeError,
+                "Cannot construct a new float from an instance of str"
+            ):
                 convertTo(TupleOf(float)([1.5, 2.5, "3.5"]), ListOf(OneOf(int, str)))
 
     def test_pop_behind_if(self):
@@ -747,3 +750,37 @@ class TestListOfCompilation(unittest.TestCase):
         assert fromBytes(ListOf(int), aList.toBytes()) == aList
 
         assert fromBytes(ListOf(UInt8), aList.toBytes()) == ListOf(UInt8).fromBytes(aList.toBytes())
+
+    def test_assign_list_conversion(self):
+        L = ListOf(ListOf(int))
+
+        aList = L()
+
+        # this casts the list
+        aList.append([1, 2])
+
+        # this also casts the list
+        aList[0] = [1, 2, 3]
+
+        @Entrypoint
+        def appendIt(l, x):
+            l.append(x)
+
+        @Entrypoint
+        def assignIt(l, x):
+            l[0] = x
+
+        appendIt(aList, [1, 2])
+        assignIt(aList, [1, 2, 3])
+
+        with self.assertRaises(TypeError):
+            appendIt(aList, ["hi"])
+
+        with self.assertRaises(TypeError):
+            assignIt(aList, ["hi"])
+
+        with self.assertRaises(TypeError):
+            aList.append("hi")
+
+        with self.assertRaises(TypeError):
+            aList[0] = "hi"

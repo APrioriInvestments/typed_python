@@ -201,10 +201,10 @@ class ForwardTypesTests(unittest.TestCase):
             module = Module("M")
             module.RecursiveThing = OneOf(None, DictKind(int, module.RecursiveThing), DictKind(module.RecursiveThing, int))
 
-            aRecursiveThing = module.RecursiveThing.convert({1: None})
+            aRecursiveThing = module.RecursiveThing({1: None})
             self.assertEqual(type(aRecursiveThing), DictKind(int, module.RecursiveThing))
 
-            aRecursiveThing = module.RecursiveThing.convert({None: 1})
+            aRecursiveThing = module.RecursiveThing({None: 1})
             self.assertEqual(type(aRecursiveThing), DictKind(module.RecursiveThing, int))
 
     def test_forward_types_twice(self):

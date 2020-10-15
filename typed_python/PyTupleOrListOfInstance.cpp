@@ -143,7 +143,7 @@ PyObject* PyTupleOrListOfInstance::pyOperatorAdd(PyObject* rhs, const char* op, 
                             throw PythonExceptionSet();
                         }
 
-                        PyInstance::copyConstructFromPythonInstance(eltType, eltPtr, o, ConversionLevel::Implicit);
+                        PyInstance::copyConstructFromPythonInstance(eltType, eltPtr, o, ConversionLevel::ImplicitContainers);
                     }
                 });
         });
@@ -284,9 +284,7 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
         }
     }
 
-    ConversionLevel childLevel = (
-        level == ConversionLevel::DeepNew ? ConversionLevel::DeepNew : ConversionLevel::Implicit
-    );
+    ConversionLevel childLevel = ConversionLevel::ImplicitContainers;
 
     // determine the level of conversion we'll use when converting the children if we're not a New call
     if (level < ConversionLevel::ImplicitContainers) {
@@ -615,7 +613,6 @@ PyMethodDef* PyTupleOfInstance::typeMethodsConcrete(Type* t) {
         {"toBytes", (PyCFunction)PyTupleOrListOfInstance::toBytes, METH_VARARGS, TUPLE_TO_BYTES_DOCSTRING},
         {"fromBytes", (PyCFunction)PyTupleOrListOfInstance::fromBytes, METH_VARARGS | METH_KEYWORDS | METH_CLASS, TUPLE_FROM_BYTES_DOCSTRING},
         {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
-        {"convert", (PyCFunction)PyInstance::pyDeepNewConvert, METH_VARARGS | METH_KEYWORDS | METH_CLASS, TUPLE_CONVERT_DOCSTRING},
         {NULL, NULL}
     };
 }
@@ -660,7 +657,12 @@ PyObject* PyListOfInstance::listAppendDirect(PyObject* o, PyObject* value) {
             self_w->type()->append(self_w->dataPtr(), value_w->dataPtr());
         } else {
             Instance temp(eltType, [&](instance_ptr data) {
-                PyInstance::copyConstructFromPythonInstance(eltType, data, value, ConversionLevel::Implicit);
+                PyInstance::copyConstructFromPythonInstance(
+                    eltType,
+                    data,
+                    value,
+                    ConversionLevel::ImplicitContainers
+                );
             });
 
             self_w->type()->append(self_w->dataPtr(), temp.data());
@@ -797,7 +799,7 @@ PyObject* PyListOfInstance::listResize(PyObject* o, PyObject* args) {
                         eltType,
                         data,
                         PyTuple_GetItem(args, 1),
-                        ConversionLevel::Implicit
+                        ConversionLevel::ImplicitContainers
                     );
                 });
 
@@ -985,7 +987,7 @@ int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value)
                     eltType,
                     data,
                     value,
-                    ConversionLevel::Implicit
+                    ConversionLevel::ImplicitContainers
                 );
             });
 
@@ -1041,7 +1043,6 @@ PyMethodDef* PyListOfInstance::typeMethodsConcrete(Type* t) {
         {"setSizeUnsafe", (PyCFunction)PyListOfInstance::listSetSizeUnsafe, METH_VARARGS, NULL},
         {"pointerUnsafe", (PyCFunction)PyListOfInstance::listPointerUnsafe, METH_VARARGS, NULL},
         {"transpose", (PyCFunction)PyListOfInstance::listTranspose, METH_VARARGS, NULL},
-        {"convert", (PyCFunction)PyInstance::pyDeepNewConvert, METH_VARARGS | METH_KEYWORDS | METH_CLASS, LIST_CONVERT_DOCSTRING},
         {NULL, NULL}
     };
 }

@@ -209,7 +209,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 if count is None:
                     return
 
-                val = args[1].convert_to_type(self.underlyingWrapperType, ConversionLevel.Implicit)
+                val = args[1].convert_to_type(self.underlyingWrapperType, ConversionLevel.ImplicitContainers)
                 if val is None:
                     return
 
@@ -230,7 +230,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
         if methodname == "append":
             if len(args) == 1:
-                val = args[0].convert_to_type(self.underlyingWrapperType, ConversionLevel.Implicit)
+                val = args[0].convert_to_type(self.underlyingWrapperType, ConversionLevel.ImplicitContainers)
                 if val is None:
                     return
 
@@ -474,7 +474,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
         item = item.refToHeld()
 
-        item = item.convert_to_type(self.underlyingWrapperType, ConversionLevel.Implicit)
+        item = item.convert_to_type(self.underlyingWrapperType, ConversionLevel.ImplicitContainers)
 
         if item is None:
             return None

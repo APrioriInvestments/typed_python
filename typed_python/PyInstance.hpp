@@ -385,8 +385,6 @@ public:
 
     static PyObject* nb_rshift(PyObject* lhs, PyObject* rhs);
 
-    static PyObject* pyDeepNewConvert(PyObject* o, PyObject* args, PyObject* kwargs);
-
     static PyObject* pyUnaryOperator(PyObject* lhs, const char* op, const char* opErrRep);
 
     static PyObject* pyOperator(PyObject* lhs, PyObject* rhs, const char* op, const char* opErrRep);

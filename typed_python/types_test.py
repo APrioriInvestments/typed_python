@@ -2164,7 +2164,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertNotEqual(x, y)
 
     def test_list_of_indexing_with_numpy_ints(self):
-        x = ListOf(ListOf(int)).convert(((1, 2, 3), (4, 5, 6)))
+        x = ListOf(ListOf(int))([[1, 2, 3], [4, 5, 6]])
         self.assertEqual(x[numpy.int64(0)][numpy.int64(0)], 1)
 
     def test_error_message_on_bad_dispatch(self):
@@ -2328,7 +2328,7 @@ class NativeTypesTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             TypeError,
-            "Cannot implicitly convert an object of type NoneType to an instance of str"
+            "Cannot construct a new str from an instance of NoneType"
         ):
             d.setdefault(3, None)
 

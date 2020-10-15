@@ -490,7 +490,7 @@ class DictWrapper(DictWrapperBase):
         if key is None:
             return None
 
-        value = value.convert_to_type(self.valueType, ConversionLevel.Implicit)
+        value = value.convert_to_type(self.valueType, ConversionLevel.ImplicitContainers)
         if value is None:
             return None
 

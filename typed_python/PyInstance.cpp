@@ -1687,29 +1687,6 @@ Type* PyInstance::tryUnwrapPyInstanceToType(PyObject* arg) {
     return  PyInstance::tryUnwrapPyInstanceToValueType(arg, false);
 }
 
-PyObject* PyInstance::pyDeepNewConvert(PyObject* cls, PyObject* args, PyObject* kwargs) {
-    static const char *kwlist[] = {"newType", NULL};
-
-    PyObject* arg;
-
-    if (!PyArg_ParseTupleAndKeywords(args, NULL, "O", (char**)kwlist, &arg)) {
-        return nullptr;
-    }
-
-    Type* selfType = PyInstance::unwrapTypeArgToTypePtr(cls);
-
-    if (!selfType) {
-        PyErr_Format(PyExc_TypeError, "Expected cls to be a Type");
-        return nullptr;
-    }
-
-    Instance outConverted(selfType, [&](instance_ptr data) {
-        PyInstance::copyConstructFromPythonInstance(selfType, data, arg, ConversionLevel::DeepNew);
-    });
-
-    return PyInstance::fromInstance(outConverted);
-}
-
 // static
 Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
     if (PyType_Check(typearg)) {

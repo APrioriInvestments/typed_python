@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Dict, ListOf, Tuple, TupleOf, Entrypoint, OneOf
+from typed_python import Dict, ListOf, Tuple, TupleOf, Entrypoint, OneOf, Set
 import typed_python._types as _types
 import unittest
 import time
@@ -44,11 +44,11 @@ class TestDictCompilation(unittest.TestCase):
         for length in range(100):
             dicts = [{x: x * 2 + 1} for x in range(length)]
 
-            aList = ListOf(Dict(int, int)).convert(dicts)
+            aList = ListOf(Dict(int, int))(dicts)
 
             refcounts = [_types.refcount(x) for x in aList]
             aListRev = reversed(aList)
-            self.assertEqual(aListRev, reversed(ListOf(Dict(int, int)).convert(dicts)))
+            self.assertEqual(aListRev, reversed(ListOf(Dict(int, int))(dicts)))
             aListRev = None
 
             refcounts2 = [_types.refcount(x) for x in aList]
@@ -743,3 +743,33 @@ class TestDictCompilation(unittest.TestCase):
         t1[10] = 20
 
         assert len(t2) == 0
+
+    def test_dict_assign_untyped_containers(self):
+        T = Dict(int, ListOf(int))
+
+        aDict = T()
+
+        aDict[10] = []
+
+        @Entrypoint
+        def setIt(d, x):
+            d[10] = x
+
+        setIt(aDict, [1])
+
+        assert len(aDict[10]) == 1
+
+    def test_dict_assign_untyped_sets(self):
+        T = Dict(int, Set(int))
+
+        aDict = T()
+
+        aDict[10] = set()
+
+        @Entrypoint
+        def setIt(d, x):
+            d[10] = x
+
+        setIt(aDict, set([1]))
+
+        assert len(aDict[10]) == 1

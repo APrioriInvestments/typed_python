@@ -67,8 +67,7 @@ levels = [
     ConversionLevel.UpcastContainers,
     ConversionLevel.Implicit,
     ConversionLevel.ImplicitContainers,
-    ConversionLevel.New,
-    ConversionLevel.DeepNew
+    ConversionLevel.New
 ]
 
 
@@ -97,10 +96,6 @@ def makeConverterDict():
     def convert5(arg, T):
         return TriggerConvert(T, 5)(arg)
 
-    @Entrypoint
-    def convert6(arg, T):
-        return TriggerConvert(T, 6)(arg)
-
     return {
         ConversionLevel.Signature: convert0,
         ConversionLevel.Upcast: convert1,
@@ -108,7 +103,6 @@ def makeConverterDict():
         ConversionLevel.Implicit: convert3,
         ConversionLevel.ImplicitContainers: convert4,
         ConversionLevel.New: convert5,
-        ConversionLevel.DeepNew: convert6,
     }
 
 
@@ -226,7 +220,7 @@ def test_untyped_dict_conversion_semantics():
     checkConversionToType(aDict, TupleOf(float), ConversionLevel.ImplicitContainers)
     checkConversionToType(aDict, Tuple(float), ConversionLevel.New)
     checkConversionToType(aDict, Tuple(float, float), None)
-    checkConversionToType(aDict, Set(float), ConversionLevel.New)
+    checkConversionToType(aDict, Set(float), ConversionLevel.ImplicitContainers)
 
 
 def test_untyped_list_of_conversion_semantics():
@@ -236,8 +230,8 @@ def test_untyped_list_of_conversion_semantics():
     checkConversionToType(aList, TupleOf(int), ConversionLevel.UpcastContainers)
     checkConversionToType(aList, Tuple(int, int), ConversionLevel.Upcast)
     checkConversionToType(aList, Tuple(int), None)
-    checkConversionToType(aList, Set(int), ConversionLevel.New)
-    checkConversionToType(aList, Set(float), ConversionLevel.New)
+    checkConversionToType(aList, Set(int), ConversionLevel.ImplicitContainers)
+    checkConversionToType(aList, Set(float), ConversionLevel.ImplicitContainers)
 
 
 def test_untyped_tuple_of_conversion_semantics():
@@ -247,8 +241,8 @@ def test_untyped_tuple_of_conversion_semantics():
     checkConversionToType(aTup, TupleOf(int), ConversionLevel.UpcastContainers)
     checkConversionToType(aTup, Tuple(int, int), ConversionLevel.Upcast)
     checkConversionToType(aTup, Tuple(int), None)
-    checkConversionToType(aTup, Set(int), ConversionLevel.New)
-    checkConversionToType(aTup, Set(float), ConversionLevel.New)
+    checkConversionToType(aTup, Set(int), ConversionLevel.ImplicitContainers)
+    checkConversionToType(aTup, Set(float), ConversionLevel.ImplicitContainers)
 
 
 def test_typed_dict_conversion_semantics():
@@ -258,8 +252,8 @@ def test_typed_dict_conversion_semantics():
     checkConversionToType(aDict, Dict(float, float), ConversionLevel.ImplicitContainers)
     checkConversionToType(aDict, ListOf(float), ConversionLevel.ImplicitContainers)
     checkConversionToType(aDict, ListOf(int), ConversionLevel.ImplicitContainers)
-    checkConversionToType(aDict, ListOf(str), ConversionLevel.DeepNew)
-    checkConversionToType(aDict, TupleOf(str), ConversionLevel.DeepNew)
+    checkConversionToType(aDict, ListOf(str), None)
+    checkConversionToType(aDict, TupleOf(str), None)
 
 
 def test_numpy_scalar_conversion():
@@ -294,20 +288,20 @@ def test_convert_things_to_object():
 
 
 def test_list_of_conversion_semantics():
-    checkConversionToType(ListOf(int)([1, 2]), Set(int), ConversionLevel.New)
+    checkConversionToType(ListOf(int)([1, 2]), Set(int), ConversionLevel.ImplicitContainers)
     checkConversionToType(ListOf(float)([1, 2]), Set(int), ConversionLevel.New)
-    checkConversionToType(ListOf(int)([1, 2]), Set(float), ConversionLevel.New)
+    checkConversionToType(ListOf(int)([1, 2]), Set(float), ConversionLevel.ImplicitContainers)
 
 
 def test_typed_set_conversion_semantics():
-    checkConversionToType({1}, Set(int), ConversionLevel.New)
+    checkConversionToType({1}, Set(int), ConversionLevel.ImplicitContainers)
 
 
 def test_convert_containers_to_oneof():
     checkConversionToType(ListOf(int)(), OneOf(None, ListOf(int)), ConversionLevel.Signature)
     checkConversionToType(ListOf(int)(), OneOf(None, ListOf(float)), ConversionLevel.ImplicitContainers)
     checkConversionToType(ListOf(str)(["hi"]), OneOf(None, ListOf(float)), None)
-    checkConversionToType(ListOf(str)(["1.0"]), OneOf(None, ListOf(float)), ConversionLevel.DeepNew)
+    checkConversionToType(ListOf(str)(["1.0"]), OneOf(None, ListOf(float)), None)
 
 
 def test_convert_to_bytes():

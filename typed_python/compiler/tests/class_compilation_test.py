@@ -1617,7 +1617,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(
             TypeError,
-            "Cannot implicitly convert an object of type C to an instance of float"
+            "Cannot construct a new float from an instance of C"
         ):
             aList.append(C())
 

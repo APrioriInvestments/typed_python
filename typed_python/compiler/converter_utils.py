@@ -17,31 +17,6 @@ from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python._types import convertObjectToTypeAtLevel
 
 
-class ConvertDeep(CompilableBuiltin):
-    def __init__(self, T):
-        self.T = T
-
-    def __eq__(self, other):
-        return isinstance(other, ConvertDeep) and self.T == other.T
-
-    def __hash__(self):
-        return hash(("ConvertDeep", self.T))
-
-    def convert_call(self, context, instance, args, kwargs):
-        """ConvertDeep(T)(sourceVal).
-
-        Construct a new instance of type 'T' using 'sourceVal' converted
-        using ConversionLevel.DeepNew
-        """
-        if len(args) == 1:
-            return args[0].convert_to_type(self.T, ConversionLevel.DeepNew)
-
-        return super().convert_call(context, instance, args, kwargs)
-
-    def __call__(self, x):
-        return convertObjectToTypeAtLevel(x, self.T, ConversionLevel.DeepNew.LEVEL)
-
-
 class ConvertImplicit(CompilableBuiltin):
     def __init__(self, T):
         self.T = T
@@ -65,6 +40,84 @@ class ConvertImplicit(CompilableBuiltin):
 
     def __call__(self, x):
         return convertObjectToTypeAtLevel(x, self.T, ConversionLevel.Implicit.LEVEL)
+
+
+class ConvertImplicitContainers(CompilableBuiltin):
+    def __init__(self, T):
+        self.T = T
+
+    def __eq__(self, other):
+        return isinstance(other, ConvertImplicitContainers) and self.T == other.T
+
+    def __hash__(self):
+        return hash(("ConvertImplicitContainers", self.T))
+
+    def convert_call(self, context, instance, args, kwargs):
+        """ConvertImplicitContainers(T)(sourceVal).
+
+        Construct a new instance of type 'T' using 'sourceVal' converted
+        using ConversionLevel.ImplicitContainers
+        """
+        if len(args) == 1:
+            return args[0].convert_to_type(self.T, ConversionLevel.ImplicitContainers)
+
+        return super().convert_call(context, instance, args, kwargs)
+
+    def __call__(self, x):
+        return convertObjectToTypeAtLevel(x, self.T, ConversionLevel.ImplicitContainers.LEVEL)
+
+
+class ConvertUpcastContainers(CompilableBuiltin):
+    def __init__(self, T):
+        self.T = T
+
+    def __eq__(self, other):
+        return isinstance(other, ConvertUpcastContainers) and self.T == other.T
+
+    def __hash__(self):
+        return hash(("ConvertImplicit", self.T))
+
+    def convert_call(self, context, instance, args, kwargs):
+        """ConvertImplicit(T)(sourceVal).
+
+        Construct a new instance of type 'T' using 'sourceVal' converted
+        using ConversionLevel.UpcastContainers
+        """
+        if len(args) == 1:
+            return args[0].convert_to_type(self.T, ConversionLevel.UpcastContainers)
+
+        return super().convert_call(context, instance, args, kwargs)
+
+    def __call__(self, x):
+        return convertObjectToTypeAtLevel(x, self.T, ConversionLevel.UpcastContainers.LEVEL)
+
+
+class InitializeRefAsImplicitContainers(CompilableBuiltin):
+    def __eq__(self, other):
+        return isinstance(other, InitializeRefAsImplicit)
+
+    def __hash__(self):
+        return hash("InitializeRefAsImplicitContainers")
+
+    def convert_call(self, context, instance, args, kwargs):
+        """InitializeRefAsImplicit()(target, sourceVal) -> bool.
+
+        Initializes 'target' with the contents of 'sourceVal', returning True on success
+        and False on failure.
+
+        'target' must be a reference expression to an uninitialized value.
+
+        We attempt to convert types using 'ImplicitContainers'.
+        """
+        if len(args) == 2:
+            return args[0].expr_type.convert_to_type_with_target(
+                context,
+                args[0],
+                args[1],
+                ConversionLevel.ImplicitContainers
+            )
+
+        return super().convert_call(context, instance, args, kwargs)
 
 
 class InitializeRefAsImplicit(CompilableBuiltin):
@@ -118,34 +171,6 @@ class InitializeRefAsUpcastContainers(CompilableBuiltin):
                 args[0],
                 args[1],
                 ConversionLevel.UpcastContainers
-            )
-
-        return super().convert_call(context, instance, args, kwargs)
-
-
-class InitializeRefAsDeepNew(CompilableBuiltin):
-    def __eq__(self, other):
-        return isinstance(other, InitializeRefAsDeepNew)
-
-    def __hash__(self):
-        return hash("InitializeRefAsDeepNew")
-
-    def convert_call(self, context, instance, args, kwargs):
-        """InitializeRefAsDeepNew()(target, sourceVal) -> bool.
-
-        Initializes 'target' with the contents of 'sourceVal', returning True on success
-        and False on failure.
-
-        'target' must be a reference expression to an uninitialized value.
-
-        We attempt to convert types using 'DeepNew'
-        """
-        if len(args) == 2:
-            return args[0].expr_type.convert_to_type_with_target(
-                context,
-                args[0],
-                args[1],
-                ConversionLevel.DeepNew
             )
 
         return super().convert_call(context, instance, args, kwargs)

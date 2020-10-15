@@ -25,18 +25,20 @@ from typed_python import PointerTo, Int32, UInt8, ListOf, TupleOf, Set, Tuple, N
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 from typed_python.compiler.converter_utils import (
-    ConvertDeep,
-    ConvertImplicit
+    ConvertUpcastContainers,
+    ConvertImplicitContainers
 )
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
-def initialize_set_from_other_implicit(ptrToOutSet, iterable, mayThrowOnFailure):
+def initialize_set_from_other_upcast_containers(ptrToOutSet, iterable, mayThrowOnFailure):
     """Initialize a set from an arbitrary iterable object
 
     This is called internally by the compiler to support initializing
     a Set(T) from any other iterable object.
+
+    Applies 'UpcastContainers' casting to each element in the set.
 
     Args:
         ptrToOutSet - a pointer to an uninitialized Set instance.
@@ -53,7 +55,7 @@ def initialize_set_from_other_implicit(ptrToOutSet, iterable, mayThrowOnFailure)
 
     try:
         for m in iterable:
-            ptrToOutSet.get().add(ConvertImplicit(T)(m))
+            ptrToOutSet.get().add(ConvertUpcastContainers(T)(m))
 
         return True
     except: # noqa
@@ -65,11 +67,13 @@ def initialize_set_from_other_implicit(ptrToOutSet, iterable, mayThrowOnFailure)
         return False
 
 
-def initialize_set_from_other_deep(ptrToOutSet, iterable, mayThrowOnFailure):
+def initialize_set_from_other_implicit_containers(ptrToOutSet, iterable, mayThrowOnFailure):
     """Initialize a set from an arbitrary iterable object
 
     This is called internally by the compiler to support initializing
     a Set(T) from any other iterable object.
+
+    Applies 'ImplicitContainers' casting to each element in the set.
 
     Args:
         ptrToOutSet - a pointer to an uninitialized Set instance.
@@ -86,7 +90,7 @@ def initialize_set_from_other_deep(ptrToOutSet, iterable, mayThrowOnFailure):
 
     try:
         for m in iterable:
-            ptrToOutSet.get().add(ConvertDeep(T)(m))
+            ptrToOutSet.get().add(ConvertImplicitContainers(T)(m))
 
         return True
     except: # noqa
@@ -725,16 +729,16 @@ class SetWrapper(SetWrapperBase):
         return super().convert_type_call(context, typeInst, args, kwargs)
 
     def _can_convert_from_type(self, otherType, conversionLevel):
-        if not conversionLevel.isNewOrHigher():
-            # Set only allows 'new' conversions.
+        if not conversionLevel.isImplicitContainersOrHigher():
+            # Set only allows 'implicit containers' conversions or higher
             return False
 
         # note that if the other object is an untyped container, then the
         # pathway in python_object_of_type will take care of it.
         childLevel = (
-            ConversionLevel.DeepNew if conversionLevel == ConversionLevel.DeepNew
-            else
-            ConversionLevel.Implicit
+            ConversionLevel.ImplicitContainers
+            if conversionLevel.isNewOrHigher() else
+            ConversionLevel.UpcastContainers
         )
 
         if issubclass(otherType.typeRepresentation, (ListOf, TupleOf, Set, Dict, ConstDict)):
@@ -771,11 +775,10 @@ class SetWrapper(SetWrapperBase):
         if canConvert is False:
             return super().convert_to_self_with_target(context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure)
 
-        converter = (
-            initialize_set_from_other_deep if conversionLevel == ConversionLevel.DeepNew
-            else
-            initialize_set_from_other_implicit
-        )
+        if conversionLevel.isNewOrHigher():
+            converter = initialize_set_from_other_implicit_containers
+        else:
+            converter = initialize_set_from_other_upcast_containers
 
         res = context.call_py_function(
             converter,

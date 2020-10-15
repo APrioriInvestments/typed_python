@@ -56,16 +56,6 @@ public:
             }
         }
 
-        // if we're deep new, just pass that through
-        // but don't pass 'new' to 'new' because then OneOf(None, T)(x)
-        // would attempt to new-convert 'T' which is really not the point of
-        // OneOf!
-        if (level == ConversionLevel::DeepNew) {
-            if (tryToConvert(level)) {
-                return;
-            }
-        }
-
         PyInstance::copyConstructFromPythonInstanceConcrete(oneOf, tgt, pyRepresentation, level);
     }
 
@@ -93,22 +83,4 @@ public:
         //expose 'ElementType' as a member of the type object
         PyDict_SetItemString(pyType->tp_dict, "Types", types);
     }
-
-    static PyMethodDef* typeMethodsConcrete(Type* t) {
-        static const char* ONEOF_CONVERT_DOCSTRING =
-            "Convert an arbitrary value to a `OneOf(T1, T2, ...)`\n\n"
-            "Unlike calling `OneOf(T1, T2, ...)`, `OneOf(T1, T2, ...).convert` will recursively attempt\n"
-            "to convert all of the interior values in the argument as well.\n"
-            "Normally, `ListOf(T1, T2, ...)(x)` will only succeed if `x` is implicitly convertible to one of\n"
-            "`T1`, `T2`, ... OneOf(T1, T2, ...).convert(x) will try to deeply-convert x to each type until it\n"
-            "finds a list. Note that you may get deepcopies of objects: `ListOf(ListOf(int))([[x]])`\n"
-            "will duplicate the inner list as a `ListOf(int)`. In some cases this can produce very large lists.\n"
-        ;
-
-        return new PyMethodDef[2] {
-            {"convert", (PyCFunction)PyInstance::pyDeepNewConvert, METH_VARARGS | METH_KEYWORDS | METH_CLASS, ONEOF_CONVERT_DOCSTRING},
-            {NULL, NULL}
-        };
-    }
-
 };
