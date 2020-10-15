@@ -199,46 +199,53 @@ class Runtime:
         """
         overload = functionType.overloads[overloadIx]
 
-        assert len(arguments) == len(overload.args)
+        import time
+        t0 = time.time()
+        try:
+            assert len(arguments) == len(overload.args)
 
-        with self.lock:
-            inputWrappers = []
+            with self.lock:
+                inputWrappers = []
 
-            for i in range(len(arguments)):
-                inputWrappers.append(
-                    self.pickSpecializationTypeFor(overload.args[i], arguments[i], argumentsAreTypes)
+                for i in range(len(arguments)):
+                    inputWrappers.append(
+                        self.pickSpecializationTypeFor(overload.args[i], arguments[i], argumentsAreTypes)
+                    )
+
+                if any(x is None for x in inputWrappers):
+                    # this signature is unmatchable with these arguments.
+                    return None
+
+                self.timesCompiled += 1
+
+                callTarget = self.converter.convertTypedFunctionCall(
+                    functionType,
+                    overloadIx,
+                    inputWrappers,
+                    assertIsRoot=True
                 )
 
-            if any(x is None for x in inputWrappers):
-                # this signature is unmatchable with these arguments.
-                return None
+                callTarget = self.converter.demasqueradeCallTargetOutput(callTarget)
 
-            self.timesCompiled += 1
+                assert callTarget is not None
 
-            callTarget = self.converter.convertTypedFunctionCall(
-                functionType,
-                overloadIx,
-                inputWrappers,
-                assertIsRoot=True
-            )
+                wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
 
-            callTarget = self.converter.demasqueradeCallTargetOutput(callTarget)
+                self.converter.buildAndLinkNewModule()
 
-            assert callTarget is not None
+                fp = self.converter.functionPointerByName(wrappingCallTargetName)
 
-            wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
+                overload._installNativePointer(
+                    fp.fp,
+                    callTarget.output_type.typeRepresentation if callTarget.output_type is not None else type(None),
+                    [i.typeRepresentation for i in callTarget.input_types]
+                )
 
-            self.converter.buildAndLinkNewModule()
+                return callTarget
+        finally:
+            if time.time() - t0 > .01:
+                print(f"{time.time() - t0:0.3f} to compile ", functionType, [type(x) for x in arguments] if not argumentsAreTypes else arguments)
 
-            fp = self.converter.functionPointerByName(wrappingCallTargetName)
-
-            overload._installNativePointer(
-                fp.fp,
-                callTarget.output_type.typeRepresentation if callTarget.output_type is not None else type(None),
-                [i.typeRepresentation for i in callTarget.input_types]
-            )
-
-            return callTarget
 
     def compileClassDispatch(self, interfaceClass, implementingClass, slotIndex):
         with self.lock:

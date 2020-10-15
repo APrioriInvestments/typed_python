@@ -43,7 +43,25 @@ def createFunctionWithLocalsAndGlobals(code, globals):
     return _types.buildPyFunctionObject(code, globals, ())
 
 
-def astToCodeObject(ast, freevars):
+def buildCodeObjectAndStashAst(
+    ast,
+    co_argcount,
+    co_kwonlyargcount,
+    co_nlocals,
+    co_stacksize,
+    co_flags,
+    co_code,
+    co_consts,
+    co_names,
+    co_varnames,
+    co_freevars,
+    co_cellvars,
+    co_filename,
+    co_name,
+    co_firstlineno,
+    co_lnotab
+):
+    """Construct a new code object and associate it with an ast."""
     return evaluateFunctionDefWithLocalsInCells(
         ast,
         globals={},
@@ -78,8 +96,7 @@ class SerializationContext:
         compressionEnabled=True,
         encodeLineInformationForCode=True,
         objectToNameOverride=None,
-        internalizeTypeGroups=True,
-        serializeFunctionsAsNonAst=False
+        internalizeTypeGroups=True
     ):
         super().__init__()
 
@@ -92,7 +109,6 @@ class SerializationContext:
         self.compressionEnabled = compressionEnabled
         self.encodeLineInformationForCode = encodeLineInformationForCode
         self.internalizeTypeGroups = internalizeTypeGroups
-        self.serializeFunctionsAsNonAst = serializeFunctionsAsNonAst
 
     def addNamedObject(self, name, obj):
         self.nameToObjectOverride[name] = obj
@@ -117,23 +133,6 @@ class SerializationContext:
         else:
             return bytes
 
-    def withoutFunctionsSerializedAsNonAst(self):
-        """Just serialize a function's code, not its AST (from source).
-
-        this means we can't deserialize it, but is good for hashing.
-        """
-        if self.serializeFunctionsAsNonAst:
-            return self
-
-        return SerializationContext(
-            nameToObjectOverride=self.nameToObjectOverride,
-            compressionEnabled=self.compressionEnabled,
-            encodeLineInformationForCode=self.encodeLineInformationForCode,
-            objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=True
-        )
-
     def withoutInternalizingTypeGroups(self):
         """Make sure we fully deserialize types.
 
@@ -148,8 +147,7 @@ class SerializationContext:
             compressionEnabled=self.compressionEnabled,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=False,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst
+            internalizeTypeGroups=False
         )
 
     def withoutLineInfoEncoded(self):
@@ -161,8 +159,7 @@ class SerializationContext:
             compressionEnabled=self.compressionEnabled,
             encodeLineInformationForCode=False,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst
+            internalizeTypeGroups=self.internalizeTypeGroups
         )
 
     def withoutCompression(self):
@@ -174,8 +171,7 @@ class SerializationContext:
             compressionEnabled=False,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst
+            internalizeTypeGroups=self.internalizeTypeGroups
         )
 
     def withCompression(self):
@@ -187,8 +183,7 @@ class SerializationContext:
             compressionEnabled=True,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst
+            internalizeTypeGroups=self.internalizeTypeGroups
         )
 
     def nameForObject(self, t):
@@ -449,19 +444,37 @@ class SerializationContext:
             return inst.__reduce__() + (None,)
 
         if isinstance(inst, CodeType):
-            if self.serializeFunctionsAsNonAst:
-                # serialize only enough to hash this
-                return (
-                    astToCodeObject,
-                    (inst.co_freevars, inst.co_code, inst.co_names, inst.co_consts, inst.co_varnames,
-                     inst.co_filename if self.encodeLineInformationForCode else None,
-                     inst.co_firstlineno if self.encodeLineInformationForCode else None),
-                    None
-                )
-            else:
-                pyast = convertFunctionToAlgebraicPyAst(inst, keepLineInformation=self.encodeLineInformationForCode)
+            # convert this code object to an AST. We have to send this along
+            # with the code so that we can compile it on machines that don't happen
+            # to have the source code.
+            pyast = convertFunctionToAlgebraicPyAst(
+                inst,
+                keepLineInformation=self.encodeLineInformationForCode
+            )
 
-                return (astToCodeObject, (pyast, inst.co_freevars), {})
+            return (
+                buildCodeObjectAndStashAst,
+                (
+                    pyast,
+                    self.encodeLineInformationForCode,
+                    inst.co_argcount,
+                    inst.co_kwonlyargcount,
+                    inst.co_nlocals,
+                    inst.co_stacksize,
+                    inst.co_flags,
+                    inst.co_code,
+                    inst.co_consts,
+                    inst.co_names,
+                    inst.co_varnames,
+                    inst.co_freevars,
+                    inst.co_cellvars,
+                    inst.co_filename,
+                    inst.co_name,
+                    inst.co_firstlineno,
+                    inst.co_lnotab
+                ),
+                {}
+            )
 
         if isinstance(inst, FunctionType):
             representation = {}

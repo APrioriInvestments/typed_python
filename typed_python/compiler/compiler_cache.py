@@ -89,6 +89,8 @@ class CompilerCache:
 
         targetDir = os.path.join(self.cacheDir, moduleHash)
 
+        import time
+        t0 = time.time()
         try:
             with open(os.path.join(targetDir, "type_manifest.dat"), "rb") as f:
                 callTargets = SerializationContext().deserialize(f.read())
@@ -105,6 +107,8 @@ class CompilerCache:
             # this module is bad
             self.markModuleHashInvalid(moduleHash)
             return False
+
+        print(f"took {time.time() - t0} to load ", moduleHash)
 
         if not LoadedModule.validateGlobalVariables(globalVarDefs):
             self.markModuleHashInvalid(moduleHash)
