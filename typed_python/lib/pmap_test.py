@@ -17,7 +17,8 @@ import os
 import traceback
 
 from typed_python.lib.pmap import pmap
-from typed_python import ListOf, Entrypoint, Class, Member, Final
+from typed_python.typed_queue import TypedQueue
+from typed_python import ListOf, Entrypoint, Class, Member, Final, Tuple
 import time
 
 
@@ -147,3 +148,24 @@ def test_pmap_with_no_output():
 
     for i in range(100):
         assert aList[i] == i
+
+
+def test_recursive_pmap():
+    tq = TypedQueue(Tuple(int, int))()
+
+    def doIt(xy):
+        x, y = xy
+        if y < 0:
+            return
+
+        tq.put(Tuple(int, int)((x, y)))
+
+        l = ListOf(Tuple(int, int))()
+        for i in range(10):
+            l.append(Tuple(int, int)((i, y - 1)))
+
+        pmap(l, doIt, None)
+
+    pmap(ListOf(Tuple(int, int))([(0, 3)]), doIt, None)
+
+    assert len(tq) == 1111

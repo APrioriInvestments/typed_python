@@ -26,6 +26,9 @@ import os
 _threads = []
 
 
+isJobExecutor = threading.local()
+
+
 class Job(Class):
     def execute(self, i: int) -> None:
         pass
@@ -71,8 +74,15 @@ def ListJob(InputT, FuncT, OutT):
     return ListJob
 
 
+@NotCompiled
+def isExecutorThread() -> bool:
+    return getattr(isJobExecutor, 'isExecutor', False)
+
+
 @Entrypoint
 def workExecutor():
+    isJobExecutor.isExecutor = True
+
     while True:
         Job, ix = work_queue.get()
 
@@ -139,7 +149,26 @@ def pmap(lst, f, OutT):
         work_queue.put(tup)
 
     # block until the work queue is complete
-    job.outputQueue.getMany(jobCount, jobCount)
+    # if we're an executor thread, then we are part of a
+    # 'recursive' pmap call, and we need to do work!
+    if isExecutorThread():
+        while True:
+            jobAndIndex = work_queue.getNonblocking()
+            if jobAndIndex is None:
+                # it's OK to block now because if
+                # there are no outstanding jobs, then
+                # all of _our_ jobs have been picked up
+                job.outputQueue.getMany(jobCount, jobCount)
+                break
+            else:
+                j = jobAndIndex[0]
+                ix = jobAndIndex[1]
+
+                if ix >= 0:
+                    j.execute(ix)
+    else:
+        # we can just block on the queue
+        job.outputQueue.getMany(jobCount, jobCount)
 
     # check if any of our threads excepted, and if so
     # raise the earliest one in the sequence.
