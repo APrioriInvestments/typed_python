@@ -34,6 +34,7 @@ from typed_python._types import (
     TypedCell, pointerTo, refTo, copy, identityHash
 )
 import typed_python._types as _types
+import threading
 
 # in the c module, these are functions, but because they're not parametrized,
 # we want them to be actual values.
@@ -56,3 +57,15 @@ from typed_python.lib.pmap import pmap  # noqa
 from typed_python.lib.reduce import reduce  # noqa
 
 _types.initializeGlobalStatics()
+
+# start a background thread to release the GIL for us. Instead of immediately releasing the GIL,
+# we prefer to release it a short time after our C code no longer needs it, in case it
+# reacquires it immediately, which is very slow.
+# this is needed primarily because we often can't tell whether we're about to enter code
+# that acquires and releases the GIL very frequently (say, in a tight loop), which has
+# a huge performance penalty (a few thousand context switches per second!)
+# instead, we have a thread that checks in the background whether any thread wants us
+# to release, and if so, swap it out. This can yield a 10-50x performance improvement
+# when we're acquiring and releasing frequently.
+gilReleaseThreadLoop = threading.Thread(target=_types.gilReleaseThreadLoop, daemon=True)
+gilReleaseThreadLoop.start()

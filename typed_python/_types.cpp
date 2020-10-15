@@ -2464,6 +2464,14 @@ PyObject *getTypePointer(PyObject* nullValue, PyObject* args) {
     return PyLong_FromLong((uint64_t)type);
 }
 
+PyObject* gilReleaseThreadLoop(PyObject* null, PyObject* args, PyObject* kwargs) {
+    PyEnsureGilReleased releaseTheGil;
+
+    PyEnsureGilReleased::gilReleaseThreadLoop();
+
+    return incref(Py_None);
+}
+
 static PyMethodDef module_methods[] = {
     {"TypeFor", (PyCFunction)MakeTypeFor, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
@@ -2518,6 +2526,7 @@ static PyMethodDef module_methods[] = {
     {"couldConvertObjectToTypeAtLevel", (PyCFunction)couldConvertObjectToTypeAtLevel, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isValidArithmeticUpcast", (PyCFunction)isValidArithmeticUpcast, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isValidArithmeticConversion", (PyCFunction)isValidArithmeticConversion, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"gilReleaseThreadLoop", (PyCFunction)gilReleaseThreadLoop, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 

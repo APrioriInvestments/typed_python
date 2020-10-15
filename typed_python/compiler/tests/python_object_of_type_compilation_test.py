@@ -19,11 +19,12 @@ from typed_python import (
     Int8, Int16, Int32,
     UInt8, UInt16, UInt32, UInt64,
     Float32, Final,
-    PointerTo, Compiled
+    PointerTo, Compiled, NotCompiled
 )
-
+import threading
 import unittest
 import psutil
+import time
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
 from typed_python._types import refcount
 from typed_python import Entrypoint
@@ -874,3 +875,32 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             return x()
 
         assert callIt(Dict(int, int)) == Dict(int, int)()
+
+    def test_gil_contention(self):
+        @NotCompiled
+        def f(x: int) -> int:
+            return x
+
+        @Entrypoint
+        def callInLoop(ct):
+            y = 0
+            for i in range(ct):
+                y += f(i)
+            return y
+
+        t0 = time.time()
+        callInLoop(100000)
+        print(time.time() - t0, " to do 1mm single threaded")
+
+        from typed_python import _types
+        loop = threading.Thread(target=_types.gilReleaseThreadLoop, daemon=True)
+        loop.start()
+
+        t0 = time.time()
+        t1 = threading.Thread(target=callInLoop, args=(1000000,), daemon=True)
+        t2 = threading.Thread(target=callInLoop, args=(1000000,), daemon=True)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+        print(time.time() - t0, " to do 2mm in two threads")
