@@ -37,10 +37,7 @@ public:
     static bool compare_to_python_concrete(CompositeType* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
-        return (
-          PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation)
-          || PySet_Check(pyRepresentation) || PyDict_Check(pyRepresentation)
-        );
+        return true;
     }
 
     int pyInquiryConcrete(const char* op, const char* opErrRep);
@@ -68,6 +65,14 @@ public:
         uint8_t* data,
         PyObject* args,
         PyObject* kwargs
+    );
+
+    static void constructFromPythonArgumentsConcreteWithLevel(
+        NamedTuple* t,
+        uint8_t* data,
+        PyObject* args,
+        PyObject* kwargs,
+        ConversionLevel level
     );
 
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);

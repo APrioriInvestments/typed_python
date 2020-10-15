@@ -240,11 +240,15 @@ void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(
     NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level)
  {
     // allow implicit conversion of dict to named tuple.
-    if (level >= ConversionLevel::Implicit && PyDict_Check(pyRepresentation)) {
+    if (level >= ConversionLevel::UpcastContainers && PyDict_Check(pyRepresentation)) {
         static PyObject* emptyTuple = PyTuple_New(0);
 
-        constructFromPythonArgumentsConcrete(
-            namedTupleT, tgt, emptyTuple, pyRepresentation
+        constructFromPythonArgumentsConcreteWithLevel(
+            namedTupleT, tgt, emptyTuple, pyRepresentation,
+            // convert at our level, but no higher than implicit containers
+            level >= ConversionLevel::ImplicitContainers ?
+                ConversionLevel::ImplicitContainers
+            :   level
         );
 
         return;
@@ -255,6 +259,12 @@ void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(
 
 void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(
     NamedTuple* namedTupleT, uint8_t* data, PyObject* args, PyObject* kwargs
+) {
+    constructFromPythonArgumentsConcreteWithLevel(namedTupleT, data, args, kwargs, ConversionLevel::ImplicitContainers);
+}
+
+void PyNamedTupleInstance::constructFromPythonArgumentsConcreteWithLevel(
+    NamedTuple* namedTupleT, uint8_t* data, PyObject* args, PyObject* kwargs, ConversionLevel level
 ) {
     if (kwargs) {
         iterate(kwargs, [&](PyObject* name) {
@@ -286,7 +296,7 @@ void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(
                             t,
                             eltPtr,
                             o,
-                            ConversionLevel::ImplicitContainers
+                            level
                         );
                     } catch(PythonExceptionSet&) {
                         PyErr_Clear();

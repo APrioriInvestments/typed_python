@@ -14,7 +14,9 @@
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
-from typed_python import _types, Int32, Tuple, NamedTuple, Function
+from typed_python import (
+    _types, Int32, Tuple, NamedTuple, Function, Dict, Set, ConstDict, ListOf, TupleOf
+)
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
@@ -360,6 +362,95 @@ class TupleWrapper(Wrapper):
 
         # the tuple is now initialized
         return uninitializedTuple
+
+    def _can_convert_from_type(self, sourceType, conversionLevel):
+        if issubclass(sourceType.typeRepresentation, (NamedTuple, Tuple)):
+            if conversionLevel < ConversionLevel.Upcast:
+                return False
+
+            if len(sourceType.typeRepresentation.ElementTypes) != len(self.typeRepresentation.ElementTypes):
+                return False
+
+            someNotTrue = False
+
+            for i in range(len(self.typeRepresentation.ElementTypes)):
+                canConvert = typeWrapper(sourceType.typeRepresentation.ElementTypes[i]).can_convert_to_type(
+                    typeWrapper(self.typeRepresentation.ElementTypes[i]),
+                    conversionLevel
+                )
+
+                if canConvert is False:
+                    return False
+
+                if canConvert is not True:
+                    someNotTrue = True
+
+            if someNotTrue:
+                return "Maybe"
+            return True
+
+        if issubclass(sourceType.typeRepresentation, (ListOf, TupleOf, Dict, Set, ConstDict)):
+            return "Maybe"
+
+        return False
+
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure=False):
+        if issubclass(sourceVal.expr_type.typeRepresentation, (NamedTuple, Tuple)):
+            if self._can_convert_from_type(sourceVal.expr_type, conversionLevel) is True:
+                # this is the simple case
+                for i in range(len(self.typeRepresentation.ElementTypes)):
+                    sourceVal.refAs(i).convert_to_type_with_target(targetVal.refAs(i), conversionLevel, mayThrowOnFailure)
+                return context.constant(True)
+            else:
+                native = context.converter.defineNativeFunction(
+                    f'type_convert({sourceVal.expr_type} -> {targetVal.expr_type}, conversionLevel={conversionLevel.LEVEL})',
+                    ('type_convert', sourceVal.expr_type, targetVal.expr_type, conversionLevel.LEVEL),
+                    [self.typeRepresentation, sourceVal.expr_type],
+                    bool,
+                    lambda *args: self.generateConvertOtherTupToSelf(*args, conversionLevel=conversionLevel)
+                )
+
+                return context.pushPod(
+                    bool,
+                    native.call(
+                        targetVal.asPointer(),
+                        sourceVal
+                    )
+                )
+
+        return sourceVal.convert_to_type(
+            object,
+            ConversionLevel.Signature
+        ).convert_to_type_with_target(targetVal, conversionLevel, mayThrowOnFailure)
+
+    def generateConvertOtherTupToSelf(self, context, _, targetVal, sourceVal, conversionLevel):
+        convertedValues = []
+        sourceT = sourceVal.expr_type.typeRepresentation
+        destT = targetVal.expr_type.typeRepresentation
+
+        for i in range(len(sourceT.ElementTypes)):
+            val = context.allocateUninitializedSlot(destT.ElementTypes[i])
+
+            res = sourceVal.refAs(i).convert_to_type_with_target(val, conversionLevel)
+
+            convertedValues.append(val)
+
+            with context.ifelse(res.nonref_expr) as (ifTrue, ifFalse):
+                with ifTrue:
+                    context.markUninitializedSlotInitialized(val)
+
+                with ifFalse:
+                    context.pushEffect(
+                        native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
+                    )
+
+        # if we're here, we can simply copy the values over to the other tuple
+        for i in range(len(sourceT.ElementTypes)):
+            targetVal.refAs(i).convert_copy_initialize(convertedValues[i])
+
+        context.pushEffect(
+            native_ast.Expression.Return(arg=native_ast.const_bool_expr(True))
+        )
 
     def _can_convert_to_type(self, targetType, conversionLevel):
         if not conversionLevel.isNewOrHigher():

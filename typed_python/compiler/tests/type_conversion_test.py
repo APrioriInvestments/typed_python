@@ -17,7 +17,8 @@ import traceback
 import numpy
 
 from typed_python import (
-    OneOf, Entrypoint, UInt16, Dict, Set, TupleOf, ListOf, Tuple, Int32
+    OneOf, Entrypoint, UInt16, Dict, Set, TupleOf, ListOf, Tuple, Int32,
+    NamedTuple
 )
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
@@ -326,3 +327,12 @@ def test_convert_untyped_classes():
 
     checkConversionToType(C2(), C1, ConversionLevel.Signature)
     checkConversionToType(C1(), C2, None)
+
+
+def test_convert_to_named_tuple():
+    checkConversionToType(NamedTuple(x=int)(x=1), NamedTuple(x=float), ConversionLevel.Upcast)
+    checkConversionToType(NamedTuple(x=OneOf(int, float))(x=1), NamedTuple(x=int), ConversionLevel.Upcast)
+    checkConversionToType(dict(x=1, y=1), NamedTuple(x=int, y=float), ConversionLevel.UpcastContainers)
+    checkConversionToType(dict(x=1.5, y=1), NamedTuple(x=int, y=float), ConversionLevel.Implicit)
+    checkConversionToType(ListOf(float)([1.5]), ListOf(int), ConversionLevel.ImplicitContainers)
+    checkConversionToType(dict(x=ListOf(float)([1.5]), y=1), NamedTuple(x=ListOf(int), y=float), ConversionLevel.ImplicitContainers)
