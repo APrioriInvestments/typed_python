@@ -19,6 +19,7 @@ import psutil
 import sys
 import time
 import unittest
+import pytest
 
 import typed_python._types as _types
 
@@ -409,6 +410,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(aTup.ElementTypes[0].__typed_python_category__, "Function")
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_tuple_of_tuple_of_perf(self):
         tupleOfInt = TupleOf(int)
         tupleOfTupleOfInt = TupleOf(tupleOfInt)
@@ -432,6 +434,7 @@ class NativeTypesTests(unittest.TestCase):
         self.check_expected_performance(elapsed)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_tuple_of_string_perf(self):
         t = NamedTuple(a=str, b=str)
 
