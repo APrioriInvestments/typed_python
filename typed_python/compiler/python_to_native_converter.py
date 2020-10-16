@@ -254,6 +254,11 @@ class PythonToNativeConverter:
 
         self._allDefinedNames.add(linkName)
 
+        self._loadFromCompilerCache(linkName)
+
+        return True
+
+    def _loadFromCompilerCache(self, linkName):
         if self.compilerCache:
             if self.compilerCache.hasSymbol(linkName):
                 callTargetsAndTypes = self.compilerCache.loadForSymbol(linkName)
@@ -266,8 +271,6 @@ class PythonToNativeConverter:
 
                     self._allDefinedNames.update(newNativeFunctionTypes)
                     self._allCachedNames.update(newNativeFunctionTypes)
-
-        return True
 
     def defineNonPythonFunction(self, name, identityTuple, context):
         """Define a non-python generating function (if we haven't defined it before already)
@@ -426,6 +429,10 @@ class PythonToNativeConverter:
         identifier = "call_converter_" + callTarget.name
         linkName = callTarget.name + ".dispatch"
 
+        if linkName in self._allDefinedNames:
+            return linkName
+
+        self._loadFromCompilerCache(linkName)
         if linkName in self._allDefinedNames:
             return linkName
 
