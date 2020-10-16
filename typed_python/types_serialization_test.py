@@ -33,6 +33,7 @@ import tempfile
 import types
 import typed_python.dummy_test_module as dummy_test_module
 
+import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.native_ast import Expression, NamedCallTarget
 from typed_python.test_util import currentMemUsageMb
 
@@ -2014,7 +2015,13 @@ class TypesSerializationTest(unittest.TestCase):
         sc.deserialize(sc.serialize(Expression))
         sc.deserialize(sc.serialize(Expression.Load))
 
-        sc.deserialize(sc.serialize(NamedCallTarget))
+        assert sc.deserialize(sc.serialize(native_ast.Type)) is native_ast.Type
+        assert sc.deserialize(sc.serialize(TupleOf(native_ast.Type))) is TupleOf(native_ast.Type)
+        assert sc.deserialize(sc.serialize(NamedCallTarget)) is NamedCallTarget
+
+        assert len(sc.serialize(native_ast.Type)) < 100
+        assert len(sc.serialize(TupleOf(native_ast.Type))) < 100
+        assert len(sc.serialize(NamedCallTarget)) < 100
 
     def test_badly_named_module_works(self):
         sc = SerializationContext()

@@ -573,7 +573,6 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
     std::map<int32_t, int32_t> indexOfObjToIndexOfType;
 
     std::map<int32_t, Type*> indicesOfNativeTypes;
-    std::set<int32_t> indicesWrittenAsNamedObjects;
     std::map<int32_t, PyObject*> indicesWrittenAsObjectAndRep;
 
     std::map<int32_t, PyObject*> indicesWithSerializedBodies;
@@ -649,20 +648,13 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                         setSomething = true;
                     } else
                     if (fieldInIndex == 1 && kind == 1) {
-                        // this is a named object. we can just look it up
-                        std::string objectName = b.readStringObject();
-
-                        if (actuallyBuildGroup) {
-                            PyObjectStealer namedObj(PyObject_CallMethod(mContextObj, "objectFromName", "s", objectName.c_str()));
-
-                            if (!namedObj) {
-                                throw PythonExceptionSet();
-                            }
-
-                            outGroup->setIndexToObject(indexInGroup, (PyObject*)namedObj);
-                        }
-                        setSomething = true;
-                        indicesWrittenAsNamedObjects.insert(indexInGroup);
+                        // this is the now-deprecated field code for sending a named object.
+                        // now if we send a named object, we just send one and use it to find
+                        // the MRTG.
+                        throw std::runtime_error(
+                            "Deprecated object-by-name in MRTG. This stream was written by an earlier "
+                            "and not compatible version of typed_python."
+                        );
                     } else
                     if (fieldInIndex == 1 && kind == 2) {
                         // this is a representation object
@@ -878,9 +870,6 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                         }
                     }
                 } else
-                if (indicesWrittenAsNamedObjects.find(indexInGroup) != indicesWrittenAsNamedObjects.end()) {
-                    throw std::runtime_error("Corrupt MutuallyRecursiveTypeGroup group: named objects have no state");
-                } else
                 if (indicesOfNativeTypes.find(indexInGroup) != indicesOfNativeTypes.end()) {
                     Type* t = deserializeNativeTypeInner(b, subWireType, actuallyBuildGroup);
 
@@ -931,7 +920,55 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                     }
                 });
             });
+        } else
+        if (fieldNumber == 5) {
+            // field 5 indicates that this is a mutually recursive type group
+            // identified by the name of an object inside of the group.
+            std::string name = b.readStringObject();
 
+            PyObjectStealer namedObj(PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str()));
+
+            if (!namedObj) {
+                throw PythonExceptionSet();
+            }
+
+            if (namedObj == Py_None) {
+                throw std::runtime_error(
+                    "Named object " + name + " doesn't exist. This serialized data must "
+                    "have come from a different version of the codebase."
+                );
+            }
+
+            MutuallyRecursiveTypeGroup* group = nullptr;
+
+            if (PyType_Check(namedObj)) {
+                Type* typeArg = PyInstance::extractTypeFrom(namedObj);
+                if (typeArg) {
+                    group = typeArg->getRecursiveTypeGroup();
+                }
+            }
+
+            if (!group) {
+                group = (
+                    MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(namedObj).first
+                );
+            }
+
+            if (group->hash() != groupHash) {
+                throw std::runtime_error(
+                    "Named object " + name + " identifies a group with hash "
+                    + group->hash().digestAsHexString() + " which doesn't equal the "
+                    + "expected hash of " + groupHash.digestAsHexString() + " that's embedded "
+                    + "in the serialized stream."
+                );
+            }
+
+            if (!outGroup) {
+                outGroup = group;
+                if (memo != -1) {
+                    b.addCachedPointer(memo, (void*)outGroup, nullptr);
+                }
+            }
         } else {
             throw std::runtime_error("Invalid subfield");
         }
@@ -1177,11 +1214,11 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             throw std::runtime_error("Corrupt native type: index " + format(indexInGroup) + " doesn't exist in group");
         }
 
-        if (!it->second.type())  {
+        if (!it->second.typeOrPyobjAsType())  {
             throw std::runtime_error("Corrupt native type: indexed group item is not a Type");
         }
 
-        Type* resultType = it->second.type();
+        Type* resultType = it->second.typeOrPyobjAsType();
 
         if (resultType->getTypeCategory() == Type::TypeCategory::catForward) {
             Type* target = ((Forward*)resultType)->getTarget();

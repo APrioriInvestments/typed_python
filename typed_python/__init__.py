@@ -14,6 +14,20 @@
 
 __version__ = "0.1.1"
 
+# incremented every time the way we serialize a fully-typed
+# TP object changes. Consumers who only serialize fully-typed
+# instances, where no fields have type 'object' or 'type', and so
+# therefore don't depend in any way on looking up types in the serialized
+# stream can depend on this number to indicate whether their binaries
+# will be out of date.
+__fully_typed_serialization_version__ = 1
+
+# incremented every time we change the way we serialize type objects
+# or look them up in a codebase. Clients that serialize 'object' and 'type'
+# and who want a way to check that they are reading the correct protocol
+# can check this version.
+__untyped_serialization_version__ = 1
+
 from typed_python.internals import (
     Member, Final, Function, UndefinedBehaviorException,
     makeNamedTuple, DisableCompiledCode, isCompiled, Held,

@@ -30,6 +30,15 @@ Type* TypeOrPyobj::typeOrPyobjAsType() const {
     return PyInstance::extractTypeFrom((PyTypeObject*)mPyObj);
 }
 
+  // return pyobj(), or convert the Type to its pyobj and return that.
+PyObject* TypeOrPyobj::typeOrPyobjAsObject() const {
+    if (mType) {
+        return (PyObject*)PyInstance::typeObj(mType);
+    }
+
+    return mPyObj;
+}
+
 
 ShaHash TypeOrPyobj::identityHash() {
     if (mType) {

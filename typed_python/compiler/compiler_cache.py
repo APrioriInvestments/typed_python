@@ -102,7 +102,6 @@ class CompilerCache:
             with open(os.path.join(targetDir, "submodules.dat"), "rb") as f:
                 submodules = SerializationContext().deserialize(f.read(), ListOf(str))
         except Exception:
-            # this module is bad
             self.markModuleHashInvalid(moduleHash)
             return False
 

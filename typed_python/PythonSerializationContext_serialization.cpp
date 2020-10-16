@@ -413,7 +413,28 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
         // group hash
         b.writeStringObject(1, group->hash().digestAsString());
 
-        std::set<int32_t> indicesWrittenAsNamedObjects;
+        // check if any element of this group is named. If so, we can just write the name and
+        // then grab the group on the other side
+        for (auto& indexAndObj: group->getIndexToObject()) {
+            std::string name;
+
+            if (indexAndObj.second.typeOrPyobjAsType()) {
+                name = getNameForPyObj((PyObject*)PyInstance::typeObj(indexAndObj.second.typeOrPyobjAsType()));
+            } else {
+                name = getNameForPyObj(indexAndObj.second.pyobj());
+            }
+
+            if (name.size()) {
+                // field '5' indicates that this is a mutually recursive type group
+                // identified by the name of an object within it. We can skip writing
+                // the rest of the group since the other side will have the same
+                // representation.
+                b.writeStringObject(5, name);
+                b.writeEndCompound();
+                return;
+            }
+        }
+
         std::map<int32_t, PyObjectHolder> indicesWrittenAsObjectAndRep;
         std::set<int32_t> indicesWrittenAsExternalObjectAndDict;
         std::set<int32_t> indicesWrittenAsInternalObjectAndDict;
@@ -433,67 +454,60 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                 b.writeBeginCompound(index);
 
                 if (indexAndObj.second.typeOrPyobjAsType()) {
-                    // it's a type object. write the name
+                    // it's a type object. write it as a native type and serialize its inner pieces.
                     b.writeUnsignedVarintObject(0, 0);
                     b.writeStringObject(1, indexAndObj.second.typeOrPyobjAsType()->name());
                 } else {
-                    std::string name = getNameForPyObj(indexAndObj.second.pyobj());
-                    if (name.size()) {
-                        b.writeUnsignedVarintObject(0, 1);
-                        b.writeStringObject(1, name);
-                        indicesWrittenAsNamedObjects.insert(index);
-                    } else {
-                        //give the plugin a chance to convert the instance to something else
-                        PyObjectStealer representation(
-                            PyObject_CallMethod(mContextObj, "representationFor", "(O)", indexAndObj.second.pyobj())
-                        );
+                    //give the plugin a chance to convert the instance to something else
+                    PyObjectStealer representation(
+                        PyObject_CallMethod(mContextObj, "representationFor", "(O)", indexAndObj.second.pyobj())
+                    );
 
-                        if (!representation) {
-                            throw PythonExceptionSet();
+                    if (!representation) {
+                        throw PythonExceptionSet();
+                    }
+
+                    if (representation != Py_None) {
+                        if (!PyTuple_Check(representation) || PyTuple_Size(representation) != 3) {
+                            throw std::runtime_error("representationFor should return None or a tuple with 3 things");
+                        }
+                        if (!PyTuple_Check(PyTuple_GetItem(representation, 1))) {
+                            throw std::runtime_error("representationFor second arguments should be a tuple");
                         }
 
-                        if (representation != Py_None) {
-                            if (!PyTuple_Check(representation) || PyTuple_Size(representation) != 3) {
-                                throw std::runtime_error("representationFor should return None or a tuple with 3 things");
-                            }
-                            if (!PyTuple_Check(PyTuple_GetItem(representation, 1))) {
-                                throw std::runtime_error("representationFor second arguments should be a tuple");
-                            }
+                        // indicate that this is a 'representation' object
+                        b.writeUnsignedVarintObject(0, 2);
 
-                            // indicate that this is a 'representation' object
-                            b.writeUnsignedVarintObject(0, 2);
+                        // and serialize the first two parts of the representation, which are
+                        // the object factory and its arguments. we'll include the state later.
+                        serializePythonObject(PyTuple_GetItem(representation, 0), b, 1);
+                        serializePythonObject(PyTuple_GetItem(representation, 1), b, 2);
 
-                            // and serialize the first two parts of the representation, which are
-                            // the object factory and its arguments. we'll include the state later.
-                            serializePythonObject(PyTuple_GetItem(representation, 0), b, 1);
-                            serializePythonObject(PyTuple_GetItem(representation, 1), b, 2);
+                        indicesWrittenAsObjectAndRep[index].set(PyTuple_GetItem(representation, 2));
+                    } else
+                    if (PyTuple_Check(indexAndObj.second.pyobj())) {
+                        b.writeUnsignedVarintObject(0, 5);
+                        b.writeUnsignedVarintObject(1, PyTuple_Size(indexAndObj.second.pyobj()));
+                        indicesWrittenAsExternalObjectAndDict.insert(index);
+                    } else {
+                        // we're going to serialize this as a regular python object with
+                        // a dict. we need to serialize the type object first.
 
-                            indicesWrittenAsObjectAndRep[index].set(PyTuple_GetItem(representation, 2));
-                        } else
-                        if (PyTuple_Check(indexAndObj.second.pyobj())) {
-                            b.writeUnsignedVarintObject(0, 5);
-                            b.writeUnsignedVarintObject(1, PyTuple_Size(indexAndObj.second.pyobj()));
+                        // it's either a native type, or not.
+                        // and it's either in our group or not.
+
+                        int32_t indexInThisGroup = group->indexOfObjectInThisGroup(
+                            (PyObject*)indexAndObj.second.pyobj()->ob_type
+                        );
+
+                        if (indexInThisGroup == -1) {
                             indicesWrittenAsExternalObjectAndDict.insert(index);
+                            b.writeUnsignedVarintObject(0, 3);
+                            serializePythonObject((PyObject*)indexAndObj.second.pyobj()->ob_type, b, 1);
                         } else {
-                            // we're going to serialize this as a regular python object with
-                            // a dict. we need to serialize the type object first.
-
-                            // it's either a native type, or not.
-                            // and it's either in our group or not.
-
-                            int32_t indexInThisGroup = group->indexOfObjectInThisGroup(
-                                (PyObject*)indexAndObj.second.pyobj()->ob_type
-                            );
-
-                            if (indexInThisGroup == -1) {
-                                indicesWrittenAsExternalObjectAndDict.insert(index);
-                                b.writeUnsignedVarintObject(0, 3);
-                                serializePythonObject((PyObject*)indexAndObj.second.pyobj()->ob_type, b, 1);
-                            } else {
-                                indicesWrittenAsInternalObjectAndDict.insert(index);
-                                b.writeUnsignedVarintObject(0, 4);
-                                b.writeUnsignedVarintObject(1, indexInThisGroup);
-                            }
+                            indicesWrittenAsInternalObjectAndDict.insert(index);
+                            b.writeUnsignedVarintObject(0, 4);
+                            b.writeUnsignedVarintObject(1, indexInThisGroup);
                         }
                     }
                 }
@@ -508,9 +522,6 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
         // we end up with uninstantiated forwards leaking into our object graph
         b.writeBeginCompound(3);
             auto writeObjectBody = [&](int index, TypeOrPyobj obj) {
-                if (indicesWrittenAsNamedObjects.find(index) != indicesWrittenAsNamedObjects.end()) {
-                    // do nothing
-                } else
                 if (indicesWrittenAsObjectAndRep.find(index) != indicesWrittenAsObjectAndRep.end()) {
                     // write the context
                     serializePythonObject(
@@ -556,14 +567,20 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
 
             // write functions first
             for (auto& indexAndObj: group->getIndexToObject()) {
-                if (indexAndObj.second.typeOrPyobjAsType() && indexAndObj.second.typeOrPyobjAsType()->isFunction()) {
+                if (
+                    indexAndObj.second.typeOrPyobjAsType() &&
+                    indexAndObj.second.typeOrPyobjAsType()->isFunction()
+                ) {
                     writeObjectBody(indexAndObj.first, indexAndObj.second);
                 }
             }
 
             // then Class objects
             for (auto& indexAndObj: group->getIndexToObject()) {
-                if (indexAndObj.second.typeOrPyobjAsType() && indexAndObj.second.typeOrPyobjAsType()->isClass()) {
+                if (
+                    indexAndObj.second.typeOrPyobjAsType() &&
+                    indexAndObj.second.typeOrPyobjAsType()->isClass()
+                ) {
                     writeObjectBody(indexAndObj.first, indexAndObj.second);
                 }
             }
@@ -613,7 +630,6 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                     b.writeEndCompound();
                 }
             }
-
 
         b.writeEndCompound();
 

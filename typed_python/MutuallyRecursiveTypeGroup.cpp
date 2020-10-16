@@ -176,7 +176,7 @@ void visitCompilerVisibleTypesAndPyobjects(
                 PyObjectStealer moduleObject(PyObject_GetItem(sysModuleModules, name));
                 if (moduleObject) {
                     if (moduleObject == obj.pyobj()) {
-                        // this module is a canonical module. Lets not walk it its a standard
+                        // this module is a canonical module. Lets not walk it as it's a standard
                         // system module
                         std::string moduleName = PyUnicode_AsUTF8(name);
 
