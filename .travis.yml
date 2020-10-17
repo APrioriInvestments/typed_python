@@ -100,4 +100,4 @@ jobs:
             echo "Expected python version >= 3.7 but found $version"; exit 1;
           fi
         - echo "Expected python version >= 3.7 and found $version, which is acceptable"
-        - pytest
+        - pytest -k 'not perf'
