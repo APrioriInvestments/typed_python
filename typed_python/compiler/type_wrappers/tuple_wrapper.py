@@ -21,6 +21,7 @@ from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
+import types
 import typed_python.compiler.native_ast as native_ast
 import typed_python.python_ast as python_ast
 import typed_python.compiler
@@ -476,6 +477,8 @@ class NamedTupleWrapper(TupleWrapper):
     def __init__(self, t):
         super().__init__(t)
 
+        self.isSubclassOfNamedTuple = NamedTuple not in t.__bases__
+
         self.namesToIndices = {n: i for i, n in enumerate(t.ElementNames)}
         self.namesToTypes = {n: t.ElementTypes[i] for i, n in enumerate(t.ElementNames)}
 
@@ -484,11 +487,34 @@ class NamedTupleWrapper(TupleWrapper):
             return instance.changeType(BoundMethodWrapper.Make(self, attribute))
 
         ix = self.namesToIndices.get(attribute)
-        if ix is None:
-            context.pushException(AttributeError, "'%s' object has no attribute '%s'" % (str(self.typeRepresentation), attribute))
-            return
+        if ix is not None:
+            return self.refAs(context, instance, ix)
 
-        return self.refAs(context, instance, ix)
+        if self.isSubclassOfNamedTuple:
+            # check if this method exists in the class object
+            # this is a little different than what we do with Class objects, where
+            # we have already separated the class definition methods into properties
+            # methods, staticmethods, etc.
+            methodDef = self.typeRepresentation.__dict__.get(attribute)
+
+            if methodDef is not None:
+                if isinstance(methodDef, staticmethod):
+                    return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+                        context, methodDef.__func__
+                    )
+
+                if isinstance(methodDef, property):
+                    return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+                        context, methodDef.fget
+                    ).convert_call((instance,), {})
+
+                if isinstance(methodDef, (types.FunctionType, Function)):
+                    return instance.changeType(BoundMethodWrapper.Make(self, attribute))
+
+        return context.pushException(
+            AttributeError,
+            "'%s' object has no attribute '%s'" % (str(self.typeRepresentation), attribute)
+        )
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0:
@@ -533,6 +559,11 @@ class NamedTupleWrapper(TupleWrapper):
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         if methodname == 'replacing' and not args:
             return context.push(self, lambda newInstance: self.initializeReplacing(context, newInstance, instance, kwargs))
+
+        method = getattr(self.typeRepresentation, methodname, None)
+
+        if isinstance(method, types.FunctionType):
+            return context.call_py_function(method, (instance,) + tuple(args), kwargs)
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
