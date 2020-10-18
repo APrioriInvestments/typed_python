@@ -546,7 +546,7 @@ class Wrapper:
         else:
             return instance.convert_to_type(object, ConversionLevel.Signature).convert_method_call(
                 "__format__",
-                (context.constant(formatSpecOrNone),),
+                (formatSpecOrNone,),
                 {}
             ).convert_to_type(str, ConversionLevel.New)
 

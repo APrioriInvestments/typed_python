@@ -18,6 +18,7 @@ Algebraic types. These are easier to work with than the
 Python ast directly.
 """
 
+import sys
 import ast
 import typed_python.compiler.python_ast_util as python_ast_util
 import weakref
@@ -43,13 +44,22 @@ Arguments = Forward("Arguments")
 Keyword = Forward("Keyword")
 Alias = Forward("Alias")
 WithItem = Forward("WithItem")
+TypeIgnore = Forward("TypeIgnore")
 
 Module = Module.define(Alternative(
     "Module",
-    Module={"body": TupleOf(Statement)},
+    Module={
+        "body": TupleOf(Statement),
+        **({"type_ignores": TupleOf(TypeIgnore)} if sys.version_info.minor >= 8 else {})
+    },
     Expression={'body': Expr},
     Interactive={'body': TupleOf(Statement)},
     Suite={"body": TupleOf(Statement)}
+))
+
+TypeIgnore = TypeIgnore.define(Alternative(
+    "TypeIgnore",
+    Item={'lineno': int, 'tag': str}
 ))
 
 Statement = Statement.define(Alternative(
@@ -434,6 +444,7 @@ Expr = Expr.define(Alternative(
     },
     Constant={
         'value': OneOf(object, None),
+        **({'kind': OneOf(None, str)} if sys.version_info.minor >= 8 else {}),
         'line_number': int,
         'col_offset': int,
         'filename': str
@@ -551,12 +562,13 @@ ExceptionHandler = ExceptionHandler.define(Alternative(
 Arguments = Arguments.define(Alternative(
     "Arguments",
     Item={
+        **({'posonlyargs': TupleOf(Arg)} if sys.version_info.minor >= 8 else {}),
         "args": TupleOf(Arg),
         "vararg": OneOf(Arg, None),
         "kwonlyargs": TupleOf(Arg),
         "kw_defaults": TupleOf(Expr),
         "kwarg": OneOf(Arg, None),
-        "defaults": TupleOf(Expr)
+        "defaults": TupleOf(Expr),
     },
     totalArgCount=lambda self:
         len(self.args)
@@ -747,6 +759,7 @@ converters = {
     ast.keyword: Keyword.Item,
     ast.alias: Alias.Item,
     ast.withitem: WithItem.Item,
+    **({'ast.type_ignore': TypeIgnore.Item} if sys.version_info.minor >= 8 else {})
 }
 
 # most converters map to an alternative type
@@ -807,7 +820,9 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
         args = {}
 
         for f in tree._fields:
-            args[f] = convertPyAstToAlgebraic(getattr(tree, f), fname, keepLineInformation)
+            # type_comment was introduced in 3.8, but we don't need it
+            if f != "type_comment":
+                args[f] = convertPyAstToAlgebraic(getattr(tree, f), fname, keepLineInformation)
 
         try:
             if keepLineInformation:
@@ -822,6 +837,12 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
             pass
 
         try:
+            # 'type_comment' is introduced in 3.8, but we don't need it
+            # and don't do anything with it, and it's just a comment so it doesn't
+            # affect execution semantics.
+            if 'type_comment' in args:
+                args.pop('type_comment')
+
             return converter(**args)
         except Exception:
             if 'line_number' in args:

@@ -1845,7 +1845,9 @@ class ExpressionConversionContext:
                 return None
 
             if ast.format_spec is not None:
-                format_spec = "".join(x.s for x in ast.format_spec.values)
+                format_spec = self.convert_expression_ast(ast.format_spec)
+                if format_spec is None:
+                    return None
             else:
                 format_spec = None
 
@@ -1861,14 +1863,19 @@ class ExpressionConversionContext:
             return result
 
         if ast.matches.JoinedStr:
-            items_to_join = self.push(ListOf(str), lambda s: s.convert_default_initialize())
+            converted = [self.convert_expression_ast(v) for v in ast.values]
 
-            for v in ast.values:
-                value = self.convert_expression_ast(v)
-                if value is None:
+            for v in converted:
+                if v is None:
                     return None
 
-                if items_to_join.convert_method_call("append", (value,), {}) is None:
+            if all(v.isConstant and isinstance(v.constantValue, str) for v in converted):
+                return self.constant("".join(v.constantValue for v in converted))
+
+            items_to_join = self.push(ListOf(str), lambda s: s.convert_default_initialize())
+
+            for v in converted:
+                if items_to_join.convert_method_call("append", (v,), {}) is None:
                     return None
 
             return pythonObjectRepresentation(self, "").convert_method_call("join", (items_to_join,), {})

@@ -389,7 +389,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                     else:
                         r2 = compiled(v1, v2)
                         self.assertIsInstance(r2, float)
-                        self.assertEqual(r1, r2, (mathFun, v1, v2))
+                        self.assertTrue(abs(r1 - r2) < 1e-10, (mathFun, v1, v2))
 
                     if raisesValueError:
                         with self.assertRaises(ValueError):

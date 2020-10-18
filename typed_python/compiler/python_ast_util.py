@@ -161,6 +161,12 @@ class AtLineNumberVisitor(ast.NodeVisitor):
     def visit_FunctionDef(self, node):
         if node.lineno == self.lineNumber:
             self.funcDefSubnodesAtLineNumber.append(node)
+        else:
+            for d in node.decorator_list:
+                if d.lineno == self.lineNumber:
+                    self.funcDefSubnodesAtLineNumber.append(node)
+                    break
+
         ast.NodeVisitor.generic_visit(self, node)
 
     def visit_AsyncFunctionDef(self, node):
