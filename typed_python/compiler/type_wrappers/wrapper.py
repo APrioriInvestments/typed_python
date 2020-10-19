@@ -44,29 +44,29 @@ class Wrapper:
     to perform the relevant operations on objects of the wrapped type.
     """
 
-    # is this 'plain old data' with no constructor/destructor semantics?
-    # if so, we can dispense with destructors entirely.
+    # Is this 'plain old data' with no constructor/destructor semantics?
+    # If so, we can dispense with destructors entirely.
     is_pod = False
 
-    # does this boil down to a void type? if so, it will always be excluded
-    # from function argument lists (both in the defeinitions and in calls)
+    # Does this boil down to a void type? if so, it will always be excluded
+    # from function argument lists (both in the definitions and in calls)
     is_empty = False
 
-    # do we pass this as a reference to a stackslot or as registers?
-    # if true, then when this is a return value, we also have to pass a pointer
+    # Do we pass this as a reference to a stackslot or as registers?
+    # If true, then when this is a return value, we also have to pass a pointer
     # to the output location as the first argument (and return void) rather
     # than returning registers.
     is_pass_by_ref = True
 
-    # are we a Value or OneOf, where we need to be lowered to a different representation
+    # Are we a Value or OneOf, where we need to be lowered to a different representation
     # for most operations to succeed?
     can_unwrap = False
 
-    # are we a simple arithmetic type
+    # Are we a simple arithmetic type?
     is_arithmetic = False
 
-    # can we be converted to a pure python representation?
-    # if this is true, then we must also have a 'getCompileTimeConstant' method
+    # Can we be converted to a pure python representation?
+    # If this is true, then we must also have a 'getCompileTimeConstant' method.
     is_compile_time_constant = False
 
     def __repr__(self):
@@ -89,6 +89,8 @@ class Wrapper:
         self._conversionCache = {}
 
     def identityHash(self):
+        """TODO: Explain purpose of identityHash, or at least the rules it follows.
+        """
         return (
             Hash(_types.identityHash(self.typeRepresentation))
             + Hash(_types.identityHash(self.interpreterTypeRepresentation))
@@ -101,11 +103,16 @@ class Wrapper:
         return self.typeRepresentation == other.typeRepresentation
 
     def __hash__(self):
+        """hash function used by python for hashed collections such as set and dict.
+
+        Two objects that compare __eq__ must have the same __hash__ value, but not necessarily
+        the reverse.
+        """
         return hash((type(self), self.typeRepresentation))
 
     @property
     def interpreterTypeRepresentation(self):
-        """Return the typeRepresentation we should use _at the interpreter_ level.
+        """The typeRepresentation we should use _at the interpreter_ level.
 
         This can be different than self.typeRepresentation if we are masquerading
         as another type. This should be the type we would expect if we called
@@ -117,6 +124,8 @@ class Wrapper:
         return self.typeRepresentation
 
     def getNativePassingType(self):
+        """Returns the native_ast Type used to pass the wrapper's typed_python Type as an argument.
+        """
         if self.is_pass_by_ref:
             return self.getNativeLayoutType().pointer()
         else:
@@ -135,7 +144,7 @@ class Wrapper:
         raise NotImplementedError(self)
 
     def convert_next(self, context, expr):
-        """Return a pair of typed_expressions (next_value, continue_iteration) for the result of __next__.
+        """Returns a pair of typed_expressions (next_value, continue_iteration) for the result of __next__.
 
         If continue_iteration is False, then next_value will be ignored. It should be a reference.
         """
@@ -146,8 +155,17 @@ class Wrapper:
 
         return None, None
 
-    def convert_attribute(self, context, instance, attribute):
-        """Produce code to access 'attribute' on an object represented by TypedExpression 'instance'."""
+    def convert_attribute(self, context, instance, attribute: str):
+        """Generates code to access 'attribute' on an object represented by TypedExpression 'instance'.
+
+        Args:
+            context: ExpressionConversionContext
+            instance: TypedExpression
+            attribute: attribute name (str)
+
+        Returns:
+            TypedExpression of attribute value
+        """
         if isinstance(self.typeRepresentation, type) and hasattr(self.typeRepresentation, attribute):
             return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
                 context,
@@ -172,12 +190,34 @@ class Wrapper:
         )
 
     def convert_getitem(self, context, instance, item):
+        """Generates code for getting an indexed item from expr.
+
+        Args:
+            context: ExpressionConversionContext
+            instance: TypedExpression (Class or Alternative)
+            item: TypedExpression index for getitem
+
+        Returns:
+            TypedExpression of result of getitem, i.e. instance[item]
+        """
         return context.pushException(
             AttributeError,
             "%s is not subscriptable" % str(self)
         )
 
     def convert_getslice(self, context, instance, start, stop, step):
+        """Generates code for a slice of instance.
+
+        Args:
+            context: ExpressionConversionContext
+            instance: TypedExpression
+            start: TypedExpression
+            stop: TypedExpression
+            step: TypedExpression
+
+        Returns:
+            TypedExpression of value of slice
+        """
         # have to import this here to break the import cycle
         from typed_python.compiler.type_wrappers.slice_type_object_wrapper import SliceWrapper
 
@@ -197,12 +237,34 @@ class Wrapper:
         )
 
     def convert_setitem(self, context, instance, index, value):
+        """Generates code for setting an indexed item in expr.
+
+        In other words, generates code for instance[item] = value
+
+        Args:
+            context: ExpressionConversionContext
+            instance: TypedExpression (Class or Alternative)
+            item: TypedExpression index for setitem
+            value: TypedExpression for value
+        """
         return context.pushException(
             AttributeError,
             "%s does not support item assignment" % str(self)
         )
 
     def convert_assign(self, context, target, toStore):
+        """Generates code that assigns the value other to expr.
+
+        Original value of expr is cleaned up, then value of other is copied to expr.
+
+        Args:
+            context: ExpressionConversionContext
+            target: TypedExpression of destination slot
+            toStore: TypedExpression to copy from
+
+        Raises:
+            NotImplementedError when operation not implemented.
+        """
         if self.is_pod:
             assert target.isReference
             context.pushEffect(
@@ -212,6 +274,18 @@ class Wrapper:
             raise NotImplementedError()
 
     def convert_copy_initialize(self, context, target, toStore):
+        """Generates code to initialize with given value.
+
+        Value is copied to target, which is an uninitialized slot.
+
+        Args:
+            context: ExpressionConversionContext
+            target: TypedExpression of destination slot
+            toStore: TypedExpression to copy from
+
+        Raises:
+            NotImplementedError when operation not implemented.
+        """
         assert target.isReference
         if self.is_pod:
             context.pushEffect(
@@ -221,23 +295,37 @@ class Wrapper:
             raise NotImplementedError()
 
     def convert_destroy(self, context, instance):
+        """Generates code to destroy an instance of this type.
+
+        Non-pod subclasses must implement this.
+
+        Raises:
+            NotImplementedError when operation not implemented.
+        """
         if self.is_pod:
             pass
         else:
             raise NotImplementedError()
 
     def convert_default_initialize(self, context, target):
+        """Generates code to set target to default value of this type.
+
+        Subclasses must implement this in order to have default initialization.
+
+        Raises:
+            NotImplementedError when operation not implemented.
+        """
         raise NotImplementedError(type(self))
 
     def convert_masquerade_to_untyped(self, context, instance):
-        """If we are masquerading as an untyped type, convert us to that type."""
+        """If we are masquerading as an untyped type, converts to that type."""
         return instance
 
-    def can_cast_to_primitive(self, context, e, primitiveType):
-        """Returns true if we can call one of the 'convert_X_cast' functions.
+    def can_cast_to_primitive(self, context, e, primitiveType) -> bool:
+        """Returns true if we can call the specified 'convert_primitiveType_cast' function.
 
         Args:
-            primitiveType - one of bool, int, float, str, bytes
+            primitiveType: one of bool, int, float, str, bytes
         """
         if primitiveType is str:
             return True
@@ -246,54 +334,137 @@ class Wrapper:
         assert False, "Invalid primitive type argument " + str(primitiveType)
 
     def convert_call(self, context, left, args, kwargs):
+        """Generates code to call an instance of this type.
+
+        Args:
+            context: ExpressionConversionContext
+            left: instance to be called.
+            args:
+            kwargs:
+
+        Returns:
+            TypedExpression of the result of the call, or None if control does not return
+        """
         return context.pushException(TypeError, "Can't call %s with args of type (%s)" % (
             str(self) + " (of type " + str(self.typeRepresentation) + ")",
             ",".join([str(a.expr_type) for a in args] + ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()])
         ))
 
     def convert_len(self, context, expr):
+        """Generates code to call len on this expr.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression
+
+        Returns:
+            TypedExpression of type int, or None if control does not return
+        """
         return context.pushException(
             TypeError,
             "Can't take 'len' of instance of type '%s'" % (str(self),)
         )
 
     def convert_hash(self, context, expr):
+        """Generates code to hash this expr.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression
+
+        Returns:
+            TypedExpression of type Int32, or None if control does not return
+        """
         return context.pushException(
             TypeError,
             "Can't hash instance of type '%s'" % (str(self),)
         )
 
     def convert_abs(self, context, expr):
+        """Generates code to call abs on this expr.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression
+
+        Returns:
+            TypedExpression, or None if control does not return
+        """
         return context.pushException(
             TypeError,
             "Can't take 'abs' of instance of type '%s'" % (str(self),)
         )
 
     def convert_bool_cast(self, context, expr):
+        """Generates code to cast this expr to bool.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression
+
+        Returns:
+            TypedExpression of type bool, or None if control does not return
+        """
         return context.pushException(
             TypeError,
             "Can't take 'bool' of instance of type '%s'" % (str(self),)
         )
 
     def convert_int_cast(self, context, expr):
+        """Generates code to cast this expr to int.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression
+
+        Returns:
+            TypedExpression of type int, or None if control does not return
+        """
         return context.pushException(
             TypeError,
             "Can't take 'int' of instance of type '%s'" % (str(self),)
         )
 
     def convert_index_cast(self, context, expr):
+        """Generates code to cast this expr to an index.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression
+
+        Returns:
+            TypedExpression of type int, or None if control does not return
+        """
         return context.pushException(
             TypeError,
             "Can't take instance of type '%s' to an integer index" % (str(self),)
         )
 
     def convert_float_cast(self, context, expr):
+        """Generates code to cast this expr to an float.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression
+
+        Returns:
+            TypedExpression of type float, or None if control does not return
+        """
         return context.pushException(
             TypeError,
             "Can't take 'float' of instance of type '%s'" % (str(self),)
         )
 
     def convert_str_cast(self, context, instance):
+        """Generates code to cast this expr to a str.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression
+
+        Returns:
+            TypedExpression of type str, or None if control does not return
+        """
         t = instance.expr_type.typeRepresentation
 
         if not instance.isReference:
@@ -311,12 +482,30 @@ class Wrapper:
         )
 
     def convert_bytes_cast(self, context, expr):
+        """Generates code to cast this expr to bytes.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression
+
+        Returns:
+            TypedExpression of type bytes (BytesType), or None if control does not return
+        """
         return context.pushException(
             TypeError,
             "Can't take 'bytes' of instance of type '%s'" % (str(self),)
         )
 
     def convert_builtin(self, f, context, expr, a1=None):
+        """Generates code to call one of the BuiltinWrapper functions.
+
+        See BuiltinWrapper for list of functions.
+        Builtins that can be handled generically for all types can be handled here.
+        Builtins that need specific handling should be in the specific type's convert_builtin.
+
+        Returns:
+            TypedExpression of return value, or None if control does not return
+        """
         if f is dir and a1 is None:
             if not expr.isReference:
                 expr = context.pushMove(expr)
@@ -343,6 +532,15 @@ class Wrapper:
         )
 
     def convert_repr(self, context, expr):
+        """Generates code to call repr on expr.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression to get repr of
+
+        Returns:
+            TypedExpression of type str
+        """
         if not expr.isReference:
             expr = context.pushMove(expr)
 
@@ -357,6 +555,16 @@ class Wrapper:
         )
 
     def convert_unary_op(self, context, expr, op):
+        """Generates code for unary operator op on expr.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression operand
+            op: python_ast.UnaryOp operator
+
+        Returns:
+            TypedExpression, or None if control does not return
+        """
         if op.matches.Not:
             res = self.convert_bool_cast(context, expr)
             if res is None:
@@ -368,22 +576,22 @@ class Wrapper:
             "Can't apply unary op %s to type '%s'" % (op, expr.expr_type)
         )
 
-    def can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
+    def can_convert_to_type(self, otherType, explicit: bool) -> OneOf(False, True, "Maybe"):  # noqa
         """Can we convert to another type? This should match what typed_python does.
 
         Subclasses may not override this! If either of (self, otherType) knows what to do here,
         we assume that that works. If either has 'Maybe', then we're 'Maybe'
 
         Args:
-            otherType - another Wrapper instance.
-            explicit - are we allowing explicit conversion?
+            otherType: another Wrapper.
+            explicit: are we allowing explicit conversion?
 
         Returns:
             True if we can always convert to this other type
             False if we can never convert
             "Maybe" if it depends on the types involved.
         """
-        otherType = typeWrapper(otherType)
+        assert isinstance(otherType, Wrapper)
 
         if otherType == self:
             return True
@@ -399,10 +607,30 @@ class Wrapper:
 
         return "Maybe"
 
-    def _can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
+    def _can_convert_to_type(self, otherType, explicit: bool) -> OneOf(False, True, "Maybe"):  # noqa
         """Does this wrapper know how to convert to 'otherType'?
 
-        Return True if we can convert to this type in all cases. Return False if we
+        Analagous to _can_convert_from_type.
+        Override this in child classes as needed.
+
+        Returns:
+            True if we can convert to this type in all cases. Return False if we
+        definitely don't know how. Return "Maybe" if we sometimes can.
+
+        """
+        if otherType == self:
+            return True
+
+        return "Maybe"
+
+    def _can_convert_from_type(self, otherType, explicit: bool) -> OneOf(False, True, "Maybe"):  # noqa
+        """Does this wrapper know how to convert from 'otherType'?
+
+        Analagous to _can_convert_to_type.
+        Override this in child classes as needed.
+
+        Returns:
+            True if we can convert from this type in all cases. Return False if we
         definitely don't know how. Return "Maybe" if we sometimes can.
         """
         if otherType == self:
@@ -410,18 +638,10 @@ class Wrapper:
 
         return "Maybe"
 
-    def _can_convert_from_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):  # noqa
-        """Analagous to _can_convert_to_type.
-        """
-        if otherType == self:
-            return True
-
-        return "Maybe"
-
-    def convert_to_type(self, context, expr, target_type, explicit=True):
+    def convert_to_type(self, context, expr, target_type, explicit: bool = True):
         """Convert to 'target_type' and return a handle on the resulting expression.
 
-        If 'explicit', then we're requesting an agressive conversion that may lose information.
+        If 'explicit', then we're requesting an aggressive conversion that may lose information.
 
         If non-explicit, then we only allow conversion that's an obvious upcast (say, from float
         to OneOf(None, float))
@@ -443,8 +663,10 @@ class Wrapper:
             target_type - a Wrapper for the target type we're converting to
             explicit (bool) - should we allow conversion or not?
         """
+        assert isinstance(target_type, Wrapper)
+
         # check if there's nothing to do
-        if target_type == self.typeRepresentation or target_type == self:
+        if target_type == self:
             return expr
 
         canConvert = self.can_convert_to_type(target_type, explicit)
@@ -486,26 +708,80 @@ class Wrapper:
 
         return targetVal
 
-    def convert_to_type_with_target(self, context, expr, targetVal, explicit):
-        """Convert 'expr' into the slot contained by 'targetVal', returning True if initialized.
+    def convert_to_type_with_target(self, context, expr, targetVal, explicit: bool):
+        """Generates code to convert the type while copying expr to targetVal.
 
-        This is the method child classes are expected to override in order to control how they convert.
+        Specifically, the code will convert 'expr' into the slot contained by 'targetVal',
+        returning True if successful (that is, targetVal is initialized).
+
+        This is a method child classes are expected to override in order to control how they convert.
         If no conversion to the target type is available, we're expected to call the super implementation
         which defers to 'convert_to_self_with_target'
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression to convert
+            targetVal: TypedExpression containing target slot (and of target type)
+            explicit: Do an explicit conversion?
+
+        Returns:
+            TypedExpression of type bool indicating conversion success.
         """
         return targetVal.expr_type.convert_to_self_with_target(context, targetVal, expr, explicit)
 
     def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
+        """Generates code to convert the type while copying sourceVal to targetVal.
+
+        Specifically, targetVal is of the same type as self, and the code will convert 'sourceVal' into the slot
+        contained by 'targetVal', returning True if successful (that is, targetVal is initialized).
+
+        This is a method child classes are expected to override in order to control how they convert.
+        If no conversion to self is available, we're expected to call the super implementation,
+        which fails unless the type Wrappers match.
+
+        Args:
+            context: ExpressionConversionContext
+            targetVal: TypedExpression containing target slot (of same type as self)
+            sourceVal: TypedExpression to be converted
+            explicit: Do an explicit conversion?
+
+        Returns:
+            TypedExpression of type bool indicating conversion success.
+        """
         if sourceVal.expr_type == self:
             targetVal.convert_copy_initialize(sourceVal)
             return context.constant(True)
 
         return context.constant(False)
 
-    def convert_bin_op(self, context, l, op, r, inplace):
+    def convert_bin_op(self, context, l, op, r, inplace: bool):
+        """Generates code for binary operator op on l and r: l op r
+
+        Args:
+            context: ExpressionConversionContext
+            l: left operand, a TypedExpression of this wrapper's type
+            op: operator, python_ast.BinaryOp
+            r: right operand, TypedExpression, possibly of another type
+            inplace: Is this operation done in-place? (l = l op r)
+
+        Returns:
+            TypedExpression, or None if control does not return
+        """
         return r.expr_type.convert_bin_op_reverse(context, r, op, l, inplace)
 
-    def convert_bin_op_reverse(self, context, r, op, l, inplace):
+    def convert_bin_op_reverse(self, context, r, op, l, inplace: bool):
+        """Generates code for binary operator op on l and r: l op r
+
+        Args:
+            context: ExpressionConversionContext
+            r: right operand, a TypedExpression of this wrapper's type
+            op: operator, python_ast.BinaryOp
+            l: left operand, TypedExpression, possibly of another type
+            inplace: Is this operation done in-place? (l = l op r)
+
+        Returns:
+            TypedExpression, or None if control does not return
+        """
         if op.matches.Is:
             return context.constant(False)
 
@@ -533,7 +809,16 @@ class Wrapper:
             (op, str(l.expr_type), str(r.expr_type))
         )
 
-    def convert_format(self, context, instance, formatSpecOrNone=None):
+    def convert_format(self, context, instance, formatSpecOrNone: OneOf(str, None) = None):
+        """Generates code to call format on instance
+
+        Args:
+            context: ExpressionConversionContext
+            instance: TypedExpression to format
+            formatSpecOrNone: format str or None
+        Returns:
+            TypedExpression of type str
+        """
         if formatSpecOrNone is None:
             return instance.convert_str_cast()
         else:
@@ -544,13 +829,24 @@ class Wrapper:
             ).convert_str_cast()
 
     def convert_type_call(self, context, typeInst, args, kwargs):
+        """Generates code to call type
+        Args:
+            context: ExpressionConversionContext
+            typeInst: a TypedExpression giving the instance of the type object itself,
+                which we probably don't care about since most type objects are represented
+                as 'void' and have no actual instance information.
+            args: Calls type with these arguments
+            kwargs: Calls type with these keyword arguments
+        Returns:
+            TypedExpression of return value, or None if control does not return
+        """
         context.pushException(
             TypeError,
             f"We can't call type {self.typeRepresentation} with args {args} and kwargs {kwargs}"
         )
 
     def convert_call_on_container_expression(self, context, inst, argExpr):
-        """Convert a case where we are calling x([...]) or similar.
+        """Converts a case where we are calling x([...]) or similar.
 
         We can't just convert expressions like (1, 2, 3) to containers directly because
         we'd lose the information about what kind of object they are (they have to be
@@ -565,9 +861,9 @@ class Wrapper:
         it.
 
         Args:
-            context - an ExpressionConversionContext
-            inst - a TypedExpression giving the instance being called.
-            argExpr - a python_ast.Expr object representing the expression we're converting
+            context: an ExpressionConversionContext
+            inst: a TypedExpression giving the instance being called.
+            argExpr: a python_ast.Expr object representing the expression we're converting
         """
         argVal = context.convert_expression_ast(argExpr)
 
@@ -593,11 +889,29 @@ class Wrapper:
 
         return typeInst.convert_call((argVal,), {})
 
-    def has_method(self, context, instance, methodName):
+    def has_method(self, context, instance, methodName: str) -> bool:
+        """Does instance.methodName exist?
+        """
         assert isinstance(methodName, str)
         return False
 
-    def convert_method_call(self, context, instance, methodname, args, kwargs):
+    def convert_method_call(self, context, instance, methodname: str, args, kwargs):
+        """Generates code to call instance.methodname with arguments.
+
+        Generates code raising AttributeError if methodname is invalid.
+        Generates code raising TypeError if argument type is invalid.
+        Generates code raising ValueError if argument value is invalid.
+
+        Args:
+            context: ExpressionConversionContext
+            instance: TypedExpression
+            methodname: str
+            args: positional arguments, as tuple of TypedExpressions
+            kwargs: keyword arguments, as dict(str, TypedExpression)
+
+        Returns:
+            TypedExpression of return value of method call, or None if control does not return
+        """
         return context.pushException(
             TypeError,
             "Can't call %s.%s with args of type (%s)" % (
@@ -628,16 +942,20 @@ class Wrapper:
         return None
 
     def convert_context_manager_enter(self, context, instance):
+        """Generates code for entering a context manager instance
+        """
         return instance.convert_method_call("__enter__", (), {})
 
     def convert_context_manager_exit(self, context, instance, args):
+        """Generates code for exiting a context manager instance
+        """
         return instance.convert_method_call("__exit__", args, {})
 
     @staticmethod
     def unwrapOneOfAndValue(f):
-        """Decorator for 'f' to unwrap value and oneof arguments to their composite forms.
+        """Decorator for 'f' to unwrap Value and OneOf arguments to their composite forms.
 
-        We loop over each argument to 'f' and check if its a TypedExpression. if so, and if its
+        We loop over each argument to 'f' and check if its a TypedExpression. if so, and if it's
         'unwrappable', we call 'f' with the unwrapped form. For OneOf and Value, this means we
         never see actual instances of those objects, just their lowered forms.
 

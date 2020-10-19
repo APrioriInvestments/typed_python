@@ -18,6 +18,7 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python import UInt64, Float32, Tuple, ListOf
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.tuple_wrapper import MasqueradingTupleWrapper
+from typed_python.type_promotion import floatness
 
 from math import (
     acos,
@@ -146,7 +147,7 @@ class MathFunctionWrapper(Wrapper):
                 return context.pushException(TypeError, f"Expected an int as second argument to ldexp.")
             argType1 = arg1.expr_type.typeRepresentation
             argType2 = arg2.expr_type.typeRepresentation
-            if argType1 not in (Float32, float):
+            if not floatness(argType1):
                 arg1 = arg1.convert_to_type(float)
                 if arg1 is None:
                     return None
@@ -165,9 +166,9 @@ class MathFunctionWrapper(Wrapper):
             arg2 = args[1]
             argType1 = arg1.expr_type.typeRepresentation
             argType2 = arg2.expr_type.typeRepresentation
-            if argType1 in (Float32, float) or not arg1.expr_type.is_arithmetic:
+            if floatness(argType1) or not arg1.expr_type.is_arithmetic:
                 return context.pushException(ValueError, f"'{argType1}' object cannot be interpreted as an integer")
-            if argType2 in (Float32, float) or not arg2.expr_type.is_arithmetic:
+            if floatness(argType2) or not arg2.expr_type.is_arithmetic:
                 return context.pushException(ValueError, f"'{argType2}' object cannot be interpreted as an integer")
             arg1 = arg1.convert_abs()
             if arg1 is None:
@@ -192,12 +193,12 @@ class MathFunctionWrapper(Wrapper):
                 return context.pushException(TypeError, f"must be a real number, not {arg2.expr_type}")
             argType1 = arg1.expr_type.typeRepresentation
             argType2 = arg2.expr_type.typeRepresentation
-            if argType1 not in (Float32, float):
+            if not floatness(argType1):
                 arg1 = arg1.convert_to_type(float)
                 if arg1 is None:
                     return None
                 argType1 = float
-            if argType2 not in (Float32, float):
+            if not floatness(argType2):
                 arg2 = arg2.convert_to_type(float)
                 if arg2 is None:
                     return None
@@ -268,7 +269,7 @@ class MathFunctionWrapper(Wrapper):
                 return context.pushException(TypeError, f"must be a real number, not {arg.expr_type}")
 
             argType = arg.expr_type.typeRepresentation
-            if argType not in (Float32, float):
+            if not floatness(argType):
                 if argType not in (int,):
                     arg = arg.convert_to_type(int, explicit=True)
                     if arg is None:
@@ -290,7 +291,7 @@ class MathFunctionWrapper(Wrapper):
 
             argType = arg.expr_type.typeRepresentation
 
-            if argType not in (Float32, float):
+            if not floatness(argType):
                 if self.typeRepresentation in (isnan, isinf):
                     return context.constant(False)
                 elif self.typeRepresentation in (isfinite,):

@@ -962,14 +962,14 @@ class BytesWrapper(RefcountedWrapper):
         return context.pushPod(Int32, runtime_functions.hash_bytes.call(expr.nonref_expr.cast(VoidPtr)))
 
     def on_refcount_zero(self, context, instance):
-        """ Generates code to dispose of bytes (BytesType) instance when refcount reaches zero.
+        """ Returns code to be executed on BytesType instance when refcount reaches zero.
 
         Args:
              context: ExpressionConversionContext
-             instance: Reference to bytes (BytesType) instance.
+             instance: TypedExpression, reference to bytes (BytesType) instance.
 
         Returns:
-            native_ast code to be executed when this instance has refcount zero.
+            native_ast code
         """
         assert instance.isReference
         return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
@@ -1257,7 +1257,7 @@ class BytesWrapper(RefcountedWrapper):
             kwargs0: keyword arguments, as dict(str, TypedExpression)
 
         Returns:
-            TypedExpression of return value of method call.
+            TypedExpression of return value of method call, or None if control does not return.
         """
         if methodname not in self._methods:
             return context.pushException(AttributeError, methodname)
@@ -1876,7 +1876,7 @@ class BytesMaketransWrapper(Wrapper):
         return native_ast.Type.Void()
 
     def convert_call(self, context, expr, args, kwargs):
-        """Generate code for calling the bytes.maketrans static builtin function.
+        """Generates code for calling the bytes.maketrans static builtin function.
 
         Args:
             expr: TypedExpression of bytes.maketrans type

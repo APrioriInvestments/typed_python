@@ -27,7 +27,19 @@ import typed_python.compiler
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
-def const_dict_eq(l, r):
+def const_dict_eq(l, r) -> bool:
+    """Given two ConstDicts instances, checks for equality by comparing their individual elements.
+
+    Compiling == or ConstDict.__eq__  compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        l: left operand
+        r: right operand
+
+    Returns:
+        bool result of equality comparison
+    """
     if len(l) != len(r):
         return False
 
@@ -42,11 +54,34 @@ def const_dict_eq(l, r):
 
 
 def const_dict_neq(l, r):
+    """Given two ConstDict instances, checks for inequality by comparing their individual elements.
+
+    Compiling != or ConstDict.__ne__  compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        l: left operand
+        r: right operand
+
+    Returns:
+        bool result of inequality comparison
+    """
     return not const_dict_eq(l, r)
 
 
 def const_dict_lt(left, right):
-    """Compare two 'ConstDict' instances by comparing their individual elements."""
+    """Is a ConstDict instance < another, comparing their individual elements?
+
+    Compiling < or ConstDict.__lt__  compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        l: left operand
+        r: right operand
+
+    Returns:
+        bool result of < comparison
+    """
     for i in range(min(len(left), len(right))):
         if left.get_key_by_index_unsafe(i) > right.get_key_by_index_unsafe(i):
             return False
@@ -64,7 +99,8 @@ def const_dict_lt(left, right):
 
 
 def const_dict_lte(left, right):
-    """Compare two 'ConstDict' instances by comparing their individual elements."""
+    """Is a ConstDict instance <= another, comparing their individual elements?
+    """
     for i in range(min(len(left), len(right))):
         if left.get_key_by_index_unsafe(i) > right.get_key_by_index_unsafe(i):
             return False
@@ -82,14 +118,33 @@ def const_dict_lte(left, right):
 
 
 def const_dict_gt(left, right):
+    """Is a ConstDict instance > another, comparing their individual elements?
+    """
     return not const_dict_lte(left, right)
 
 
 def const_dict_gte(left, right):
+    """Is a ConstDict instance >= another, comparing their individual elements?
+    """
     return not const_dict_lt(left, right)
 
 
 def const_dict_getitem(constDict, key):
+    """Get value associated with key from a ConstDict instance.
+
+    Compiling constDict[k] compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        constDict:
+        key: key to search for, must be comparable to constDict.elementType
+
+    Returns:
+        value of key in constDict
+
+    Raises:
+        KeyError if not found
+    """
     # perform a binary search
     lowIx = 0
     highIx = len(constDict)
@@ -110,6 +165,18 @@ def const_dict_getitem(constDict, key):
 
 
 def const_dict_get(constDict, key, default):
+    """Get value associated with key from a ConstDict instance, using default value if not found.
+
+    Compiling constDict.get(k,default) compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        constDict:
+        key: key to search for, must be comparable to constDict.elementType
+
+    Returns:
+        value of key in constDict, or default if not found
+    """
     # perform a binary search
     lowIx = 0
     highIx = len(constDict)
@@ -130,6 +197,11 @@ def const_dict_get(constDict, key, default):
 
 
 def const_dict_contains(constDict, key):
+    """Does constDict contain key?
+
+    Compiling key in constDict compiles this function.
+    This function is only intended to be executed in this compiled form.
+    """
     # perform a binary search
     lowIx = 0
     highIx = len(constDict)
@@ -183,6 +255,15 @@ class ConstDictWrapperBase(RefcountedWrapper):
         return self.layoutType
 
     def on_refcount_zero(self, context, instance):
+        """ Returns code to be executed on ConstDict instance when refcount reaches zero.
+
+        Args:
+             context: ExpressionConversionContext
+             instance: TypedExpression, reference to ConstDict instance.
+
+        Returns:
+            native_ast code
+        """
         assert instance.isReference
 
         if self.keyType.is_pod and self.valueType.is_pod:
@@ -200,6 +281,8 @@ class ConstDictWrapperBase(RefcountedWrapper):
             )
 
     def generateNativeDestructorFunction(self, context, out, inst):
+        """ Returns code that destroys (tears down) a ConstDict instance.
+        """
         with context.loop(inst.convert_len()) as i:
             self.convert_getkey_by_index_unsafe(context, inst, i).convert_destroy()
             self.convert_getvalue_by_index_unsafe(context, inst, i).convert_destroy()
@@ -214,12 +297,30 @@ class ConstDictWrapper(ConstDictWrapperBase):
         super().__init__(constDictType, None)
 
     def convert_attribute(self, context, instance, attr):
+        """Generates code for ConstDict attribute access.
+        """
         if attr in ("get_key_by_index_unsafe", "get_value_by_index_unsafe", "keys", "values", "items", "get"):
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
 
-    def convert_method_call(self, context, instance, methodname, args, kwargs):
+    def convert_method_call(self, context, instance, methodname: str, args, kwargs):
+        """Generates code for calling a ConstDict method.
+
+        Generates code raising AttributeError if methodname is invalid.
+        Generates code raising TypeError if argument type is invalid.
+        Generates code raising ValueError if argument value is invalid.
+
+        Args:
+            context: ExpressionConversionContext
+            instance: TypedExpression of type ConstDict
+            methodname: method name
+            args: positional arguments, as tuple of TypedExpressions
+            kwargs: keyword arguments, as dict(str, TypedExpression)
+
+        Returns:
+            TypedExpression of return value of method call, or None if control does not return
+        """
         if methodname == "__iter__" and not args and not kwargs:
             res = context.push(
                 ConstDictKeysIteratorWrapper(self.constDictType),
@@ -272,32 +373,50 @@ class ConstDictWrapper(ConstDictWrapperBase):
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
-    def convert_getkey_by_index_unsafe(self, context, expr, item):
+    def convert_getkey_by_index_unsafe(self, context, expr, index):
+        """Generates code for compiling unsafe indexed access to a key in a ConstDict instance.
+        """
         return context.pushReference(
             self.keyType,
             expr.nonref_expr.ElementPtrIntegers(0, 4).elemPtr(
-                item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
+                index.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
             ).cast(self.keyType.getNativeLayoutType().pointer())
         )
 
-    def convert_getitem_by_index_unsafe(self, context, expr, item):
+    def convert_getitem_by_index_unsafe(self, context, expr, index):
+        """Generates code for compiling unsafe indexed access to an item in a ConstDict instance.
+        """
         return context.pushReference(
             self.itemType,
             expr.nonref_expr.ElementPtrIntegers(0, 4).elemPtr(
-                item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
+                index.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
             ).cast(self.itemType.getNativeLayoutType().pointer())
         )
 
-    def convert_getvalue_by_index_unsafe(self, context, expr, item):
+    def convert_getvalue_by_index_unsafe(self, context, expr, index):
+        """Generates code for compiling unsafe indexed access to a value in a ConstDict instance.
+        """
         return context.pushReference(
             self.valueType,
             expr.nonref_expr.ElementPtrIntegers(0, 4).elemPtr(
-                item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
+                index.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
                 .add(native_ast.const_int_expr(self.keyBytecount))
             ).cast(self.valueType.getNativeLayoutType().pointer())
         )
 
-    def convert_bin_op(self, context, left, op, right, inplace):
+    def convert_bin_op(self, context, left, op, right, inplace: bool):
+        """Generates code for binary operator op on l and r: l op r
+
+        Args:
+            context: ExpressionConversionContext
+            l: left operand, a ConstDict TypedExpression
+            op: operator, python_ast.BinaryOp
+            r: right operand, TypedExpression, possibly of another type
+            inplace: Is this operation done in-place? (l = l op r)
+
+        Returns:
+            TypedExpression, or None if control does not return
+        """
         if right.expr_type == left.expr_type:
             if op.matches.Eq:
                 return context.call_py_function(const_dict_eq, (left, right), {})
@@ -315,6 +434,10 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_bin_op_reverse(self, context, left, op, right, inplace):
+        """Generates code for binary operator op on l and r: l op r, where r is of this wrapper's type.
+
+        See Wrapper.convert_bin_op_reverse.
+        """
         if op.matches.In:
             right = right.convert_to_type(self.keyType)
             if right is None:
@@ -325,6 +448,8 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return super().convert_bin_op_reverse(context, left, op, right, inplace)
 
     def convert_getitem(self, context, instance, item):
+        """Generates code for instance[item].
+        """
         item = item.convert_to_type(self.keyType, explicit=False)
         if item is None:
             return None
@@ -332,6 +457,8 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return context.call_py_function(const_dict_getitem, (instance, item), {})
 
     def convert_get(self, context, expr, item, default):
+        """Generates code for instance.get(item, default).
+        """
         if item is None or expr is None or default is None:
             return None
 
@@ -342,6 +469,8 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return context.call_py_function(const_dict_get, (expr, item, default), {})
 
     def convert_len_native(self, expr):
+        """Returns code for len of a ConstDict expr.
+        """
         if isinstance(expr, TypedExpression):
             expr = expr.nonref_expr
         return native_ast.Expression.Branch(
@@ -351,14 +480,22 @@ class ConstDictWrapper(ConstDictWrapperBase):
         )
 
     def convert_len(self, context, expr):
+        """Generates code for len of a ConstDict expr.
+        """
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
     def convert_bool_cast(self, context, expr):
+        """Generates code to cast this ConstDict to bool.
+        """
         return context.pushPod(bool, self.convert_len_native(expr.nonref_expr).neq(0))
 
 
 class ConstDictMakeIteratorWrapper(ConstDictWrapperBase):
+    """Code-generation wrapper for ConstDict iterators.
+    """
     def convert_method_call(self, context, expr, methodname, args, kwargs):
+        """Generates code to call ConstDict iterator methods.
+        """
         if methodname == "__iter__" and not args and not kwargs:
             res = context.push(
                 # self.iteratorType is inherited from our specialized children
@@ -379,24 +516,32 @@ class ConstDictMakeIteratorWrapper(ConstDictWrapperBase):
 
 
 class ConstDictKeysWrapper(ConstDictMakeIteratorWrapper):
+    """Code-generation wrapper for ConstDict.keys.
+    """
     def __init__(self, constDictType):
         super().__init__(constDictType, "keys")
         self.iteratorType = ConstDictKeysIteratorWrapper(constDictType)
 
 
 class ConstDictValuesWrapper(ConstDictMakeIteratorWrapper):
+    """Code-generation wrapper for ConstDict.values.
+    """
     def __init__(self, constDictType):
         super().__init__(constDictType, "values")
         self.iteratorType = ConstDictValuesIteratorWrapper(constDictType)
 
 
 class ConstDictItemsWrapper(ConstDictMakeIteratorWrapper):
+    """Code-generation wrapper for ConstDict.items.
+    """
     def __init__(self, constDictType):
         super().__init__(constDictType, "items")
         self.iteratorType = ConstDictItemsIteratorWrapper(constDictType)
 
 
 class ConstDictIteratorWrapper(Wrapper):
+    """Code-generation wrapper for ConstDict iterators.
+    """
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -413,6 +558,8 @@ class ConstDictIteratorWrapper(Wrapper):
         )
 
     def convert_next(self, context, expr):
+        """Generates code for expr.__next__() for ConstDict iterator.
+        """
         context.pushEffect(
             expr.expr.ElementPtrIntegers(0, 0).store(
                 expr.expr.ElementPtrIntegers(0, 0).load().add(1)
@@ -426,9 +573,11 @@ class ConstDictIteratorWrapper(Wrapper):
 
         nextIx = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
 
-        return self.iteratedItemForReference(context, expr, nextIx), canContinue
+        return self.iteratedElementForReference(context, expr, nextIx), canContinue
 
     def refAs(self, context, expr, which):
+        """Generates code to access an internal field of the ConstDict iterator.
+        """
         assert expr.expr_type == self
 
         if which == 0:
@@ -457,10 +606,14 @@ class ConstDictIteratorWrapper(Wrapper):
 
 
 class ConstDictKeysIteratorWrapper(ConstDictIteratorWrapper):
+    """Code-generation wrapper for ConstDict keys iterator.
+    """
     def __init__(self, constDictType):
         super().__init__(constDictType, "keys")
 
-    def iteratedItemForReference(self, context, expr, ixExpr):
+    def iteratedElementForReference(self, context, expr, ixExpr):
+        """Generates code to access an iteration key by reference.
+        """
         return ConstDictWrapper(self.constDictType).convert_getkey_by_index_unsafe(
             context,
             self.refAs(context, expr, 1),
@@ -469,10 +622,14 @@ class ConstDictKeysIteratorWrapper(ConstDictIteratorWrapper):
 
 
 class ConstDictItemsIteratorWrapper(ConstDictIteratorWrapper):
+    """Code-generation wrapper for ConstDict items iterator.
+    """
     def __init__(self, constDictType):
         super().__init__(constDictType, "items")
 
-    def iteratedItemForReference(self, context, expr, ixExpr):
+    def iteratedElementForReference(self, context, expr, ixExpr):
+        """Generates code to access an iteration item by reference.
+        """
         return ConstDictWrapper(self.constDictType).convert_getitem_by_index_unsafe(
             context,
             self.refAs(context, expr, 1),
@@ -481,10 +638,14 @@ class ConstDictItemsIteratorWrapper(ConstDictIteratorWrapper):
 
 
 class ConstDictValuesIteratorWrapper(ConstDictIteratorWrapper):
+    """Code-generation wrapper for ConstDict values iterator.
+    """
     def __init__(self, constDictType):
         super().__init__(constDictType, "values")
 
-    def iteratedItemForReference(self, context, expr, ixExpr):
+    def iteratedElementForReference(self, context, expr, ixExpr):
+        """Generates code to access an iteration value by reference.
+        """
         return ConstDictWrapper(self.constDictType).convert_getvalue_by_index_unsafe(
             context,
             self.refAs(context, expr, 1),

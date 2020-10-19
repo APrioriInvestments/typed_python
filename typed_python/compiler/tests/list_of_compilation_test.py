@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import ListOf, Function, TupleOf, OneOf, Compiled, Entrypoint
-from typed_python import UInt8, UInt16, Class, Final, Member
+from typed_python import UInt8, UInt16, Float32, Class, Final, Member
 import typed_python._types as _types
 import unittest
 import time
@@ -615,34 +615,35 @@ class TestListOfCompilation(unittest.TestCase):
         aLst.resize(20)
 
         @Entrypoint
-        def addTwo(l):
-            l[10.5] += 2
+        def addTwo(l, f):
+            l[f] += 2
 
         @Entrypoint
-        def lookup(l):
-            return l[10.5]
+        def lookup(l, f):
+            return l[f]
 
         @Entrypoint
-        def assign(l):
-            l[10.5] = 0
+        def assign(l, f):
+            l[f] = 0
 
-        with self.assertRaisesRegex(TypeError, "Can't take.*integer index"):
-            addTwo(aLst)
+        for T in [float, Float32]:
+            with self.assertRaisesRegex(TypeError, "Can't take.*integer index"):
+                addTwo(aLst, T(10.5))
 
-        with self.assertRaisesRegex(TypeError, "Can't take.*integer index"):
-            lookup(aLst)
+            with self.assertRaisesRegex(TypeError, "Can't take.*integer index"):
+                lookup(aLst, T(10.5))
 
-        with self.assertRaisesRegex(TypeError, "Can't take.*integer index"):
-            assign(aLst)
+            with self.assertRaisesRegex(TypeError, "Can't take.*integer index"):
+                assign(aLst, T(10.5))
 
-        with self.assertRaises(TypeError):
-            aLst[1.2]
+            with self.assertRaises(TypeError):
+                aLst[T(1.2)]
 
-        with self.assertRaises(TypeError):
-            aLst[1.2] = 1
+            with self.assertRaises(TypeError):
+                aLst[T(1.2)] = 1
 
-        with self.assertRaises(TypeError):
-            aLst[1.2] += 1
+            with self.assertRaises(TypeError):
+                aLst[T(1.2)] += 1
 
     def test_list_index_with_class_with_index(self):
         aLst = ListOf(UInt16)()

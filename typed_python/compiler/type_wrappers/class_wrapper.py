@@ -69,6 +69,8 @@ vtable_type = native_ast.Type.Struct(
 
 
 class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
+    """Code-generation wrapper for Class type
+    """
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -108,6 +110,9 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         ).load()
 
     def _can_convert_to_type(self, otherType, explicit):
+        """Can the Class otherType be converted to this Class?
+        """
+
         if otherType.typeRepresentation is bool:
             return True
         if isinstance(otherType, ClassWrapper):
@@ -126,6 +131,8 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         return False
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        """Generates code to convert Class TypedExpression e to targetVal.
+        """
         otherType = targetVal.expr_type
 
         if isinstance(otherType, ClassWrapper):
@@ -468,7 +475,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         return context.call_typed_call_target(dispatchToOverloads, [instance] + args)
 
     def generateMethodDispatch(self, context, methodName, methodReturnType, args, argNames):
-        """Generate native code that tries to dispatch to each of func's overloads
+        """Generates native code that tries to dispatch to each of func's overloads.
 
         We try each overload, first with 'isExplicit' as False, then with True. The first one that
         succeeds gets to produce the output.

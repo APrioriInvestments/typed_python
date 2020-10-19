@@ -19,6 +19,10 @@ from typed_python._types import bytecount
 
 
 class BytecountWrapper(Wrapper):
+    """Code-generation wrapper for builtin bytecount function.
+
+    Code generated here, when compiled, is intended to behave the same as interpreted bytecount function.
+    """
     is_pod = True
     is_empty = False
     is_pass_by_ref = False
@@ -30,6 +34,16 @@ class BytecountWrapper(Wrapper):
         return native_ast.Type.Void()
 
     def convert_call(self, context, expr, args, kwargs):
+        """Generates code to call bytecount.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression of type bytecount
+            args: arguments of bytecount call
+            kwargs: should be empty
+        Returns:
+            TypedExpression of type int of result
+        """
         if len(args) == 1 and isinstance(args[0].expr_type, PythonTypeObjectWrapper) and not kwargs:
             return context.constant(bytecount(args[0].expr_type.typeRepresentation.Value))
 

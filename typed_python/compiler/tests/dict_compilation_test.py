@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -534,8 +534,14 @@ class TestDictCompilation(unittest.TestCase):
         def updateCompiled(d, d2):
             d.update(d2)
 
+        def dictToListOfTuples(d):
+            return [(k, d[k]) for k in d]
+
+        def dictToListOfLists(d):
+            return [[k, d[k]] for k in d]
+
         someDicts = [
-            {str(i): str(i % mod) for i in range(iVals)}
+            {str(i)*(i+1): str(i % mod)*(i+1) for i in range(iVals)}
             for iVals in range(10) for mod in range(2, 10)
         ]
 
@@ -546,8 +552,24 @@ class TestDictCompilation(unittest.TestCase):
 
                 aDict2 = T(d1)
                 updateCompiled(aDict2, T(d2))
-
                 self.assertEqual(aDict, aDict2)
+
+                aDict3 = T(d1)
+                updateCompiled(aDict3, d2)
+                self.assertEqual(aDict, aDict3)
+
+                aDict4 = T(d1)
+                updateCompiled(aDict4, dictToListOfTuples(d2))
+                self.assertEqual(aDict, aDict4)
+
+                aDict5 = T(d1)
+                updateCompiled(aDict5, dictToListOfLists(d2))
+                self.assertEqual(aDict, aDict5)
+
+        badList = [('a', 'b'), ('c', 'd', 'e')]
+        aDict6 = T(d1)
+        with self.assertRaises(ValueError):
+            updateCompiled(aDict6, badList)
 
     def test_dict_pop_many(self):
         @Entrypoint

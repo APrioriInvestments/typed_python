@@ -22,6 +22,8 @@ typeWrapper = lambda t: typed_python.compiler.python_object_representation.typed
 
 
 def slice_repr(sliceObj):
+    """This function will be compiled and invoked for repr(NamedTuple masquerading as slice).
+    """
     return f"slice({repr(sliceObj.start)}, {repr(sliceObj.stop)}, {repr(sliceObj.step)})"
 
 

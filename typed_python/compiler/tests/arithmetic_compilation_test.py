@@ -374,10 +374,8 @@ class TestArithmeticCompilation(unittest.TestCase):
 
             if T is not bool:
                 self.assertEqual(T(1) + T(2), T(3))
-            if T in [bool]:
-                suitable_ops = [not_]
-            else:
-                suitable_ops = [invert, neg, pos, abs_]
+
+            suitable_ops = [not_, invert, neg, pos, abs_]
 
             typed_to_native_op = {
                 invert: operator.__inv__,

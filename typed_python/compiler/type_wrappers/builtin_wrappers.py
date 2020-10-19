@@ -19,6 +19,12 @@ from math import trunc, floor, ceil
 
 
 class BuiltinWrapper(Wrapper):
+    """Code-generation wrapper for builtin functions.
+
+    Specifically handles BuiltinWrapper.SUPPORTED_FUNCTIONS.
+    Not all builtin functions are handled here: see also AbsWrapper, BytecountWrapper, ...
+    Code generated here, when compiled, is intended to behave the same as interpreted builtin functions.
+    """
     is_pod = True
     is_empty = False
     is_pass_by_ref = False
@@ -33,6 +39,17 @@ class BuiltinWrapper(Wrapper):
         return native_ast.Type.Void()
 
     def convert_call(self, context, expr, args, kwargs):
+        """Generates code to call a builtin function.
+
+        Args:
+            context: ExpressionConversionContext
+            expr: TypedExpression of BuiltInWrapper type
+            args: arguments of builtin call
+            kwargs: should be empty
+
+        Returns:
+            TypedExpression of return value of call
+        """
         builtin = self.typeRepresentation
 
         if len(args) == 1 and not kwargs:

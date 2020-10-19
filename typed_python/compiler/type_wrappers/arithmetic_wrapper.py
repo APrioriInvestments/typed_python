@@ -63,6 +63,8 @@ class ArithmeticTypeWrapper(Wrapper):
     is_arithmetic = True
 
     def convert_default_initialize(self, context, target):
+        """Generates code to default-initialize arithemetic TypedExpression target.
+        """
         self.convert_copy_initialize(
             context,
             target,
@@ -73,30 +75,37 @@ class ArithmeticTypeWrapper(Wrapper):
         )
 
     def convert_assign(self, context, target, toStore):
+        """Generates code to assign arithmetic TypedExpression toStore to target.
+        """
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
         )
 
     def convert_copy_initialize(self, context, target, toStore):
+        """Generates code to initialize arithmetic TypedExpression target with value of toStore.
+        """
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
         )
 
-    def convert_destroy(self, context, instance):
-        pass
-
     def can_cast_to_primitive(self, context, expr, primitiveType):
+        """Can this arithmetic type be cast to primitiveType?
+        """
         return primitiveType in (str, float, int, bool)
 
     def convert_index_cast(self, context, expr):
-        if expr.expr_type.typeRepresentation is float:
+        """Generates code to cast arithmetic type to an index.
+        """
+        if floatness(expr.expr_type.typeRepresentation):
             return super().convert_index_cast(context, expr)
 
         return self.convert_int_cast(context, expr)
 
     def convert_bool_cast(self, context, expr):
+        """Generates code to cast arithmetic type to bool.
+        """
         if expr.expr_type.typeRepresentation is bool:
             return expr
 
@@ -116,6 +125,8 @@ class ArithmeticTypeWrapper(Wrapper):
         )
 
     def convert_int_cast(self, context, expr, raiseException=True):
+        """Generates code to cast arithmetic type to int.
+        """
         if expr.expr_type.typeRepresentation is int:
             return expr
 
@@ -134,6 +145,8 @@ class ArithmeticTypeWrapper(Wrapper):
         )
 
     def convert_float_cast(self, context, expr, raiseException=True):
+        """Generates code to cast arithmetic type to float.
+        """
         if expr.expr_type.typeRepresentation is float:
             return expr
 
@@ -152,6 +165,8 @@ class ArithmeticTypeWrapper(Wrapper):
         )
 
     def convert_unary_op(self, context, instance, op):
+        """Generates code for python_ast.UnaryOp op on TypedExpression instance.
+        """
         if op.matches.USub:
             return context.pushPod(self, instance.nonref_expr.negate())
 
@@ -160,16 +175,22 @@ class ArithmeticTypeWrapper(Wrapper):
 
         return super().convert_unary_op(context, instance, op)
 
-    def _can_convert_to_type(self, otherType, explicit):
+    def _can_convert_to_type(self, otherType, explicit: bool):
+        """Does this wrapper know how to convert to 'otherType'?
+        """
         if not explicit:
             return self == otherType
 
         return isinstance(otherType, ArithmeticTypeWrapper)
 
     def _can_convert_from_type(self, otherType, explicit):
+        """Does this wrapper know how to convert from 'otherType'?
+        """
         return False
 
     def convert_type_call(self, context, typeInst, args, kwargs):
+        """Generates code to convert calling this arithmetic type.
+        """
         if len(args) == 0 and not kwargs:
             return context.push(self, lambda x: x.convert_default_initialize())
 
@@ -207,6 +228,8 @@ class IntWrapper(ArithmeticTypeWrapper):
         return native_ast.Type.Int(bits=bitness(T), signed=signedness(T))
 
     def convert_hash(self, context, expr):
+        """Generates code to calculate hash of integer TypedExpression expr.
+        """
         if self.typeRepresentation == int:
             return context.pushPod(Int32, runtime_functions.hash_int64.call(expr.nonref_expr))
 
@@ -216,6 +239,10 @@ class IntWrapper(ArithmeticTypeWrapper):
         return expr.convert_to_type(Int32)
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        """Generates code to convert integer TypedExpression e into targetVal.
+
+        See Wrapper.convert_to_type_with_target.
+        """
         assert targetVal.isReference
 
         target_type = targetVal.expr_type
@@ -259,6 +286,8 @@ class IntWrapper(ArithmeticTypeWrapper):
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_str_cast(self, context, expr):
+        """Generates code to cast integer to str.
+        """
         if expr.isConstant:
             try:
                 return context.constant(str(expr.constantValue))
@@ -292,6 +321,8 @@ class IntWrapper(ArithmeticTypeWrapper):
             return expr.convert_to_type(int).convert_str_cast() + context.constant(suffix)
 
     def convert_abs(self, context, expr):
+        """Generates code to calculate abs function on integer.
+        """
         if isSignedInt(self.typeRepresentation):
             return context.pushPod(
                 self,
@@ -305,6 +336,10 @@ class IntWrapper(ArithmeticTypeWrapper):
             return context.pushPod(self, expr.nonref_expr)
 
     def convert_builtin(self, f, context, expr, a1=None):
+        """Generates code to calculate certain builtin functions.
+
+        See BuiltinWrapper.
+        """
         if f is chr and a1 is None:
             if expr.isConstant:
                 return context.constant(chr(expr.constantValue))
@@ -336,6 +371,8 @@ class IntWrapper(ArithmeticTypeWrapper):
         return super().convert_builtin(f, context, expr, a1)
 
     def convert_unary_op(self, context, left, op):
+        """Generates code for python_ast.UnaryOp op on integer TypedExpression left.
+        """
         if op.matches.Not:
             return context.pushPod(bool, left.nonref_expr.logical_not())
         if op.matches.Invert:
@@ -348,6 +385,8 @@ class IntWrapper(ArithmeticTypeWrapper):
         return super().convert_unary_op(context, left, op)
 
     def convert_bin_op(self, context, left, op, right, inplace):
+        """Generates code for python_ast.BinaryOp op on integer TypedExpression left and TypedExpression right.
+        """
         if op.matches.Div and isinstance(right.expr_type, ArithmeticTypeWrapper):
             T = toWrapper(
                 computeArithmeticBinaryResultType(
@@ -489,9 +528,15 @@ class BoolWrapper(ArithmeticTypeWrapper):
         return native_ast.Type.Int(bits=1, signed=False)
 
     def convert_hash(self, context, expr):
+        """Generates code to calculate hash of bool TypedExpression expr.
+        """
         return expr.convert_to_type(Int32)
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        """Generates code to convert bool TypedExpression e into targetVal
+
+        See Wrapper.convert_to_type_with_target.
+        """
         target_type = targetVal.expr_type
 
         if not explicit:
@@ -525,6 +570,8 @@ class BoolWrapper(ArithmeticTypeWrapper):
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_str_cast(self, context, expr):
+        """Generates code to cast bool to str.
+        """
         if expr.isConstant:
             try:
                 return context.constant(str(expr.constantValue))
@@ -538,7 +585,17 @@ class BoolWrapper(ArithmeticTypeWrapper):
             )
         )
 
+    def convert_abs(self, context, expr):
+        """Generates code to calculate abs function on bool.
+        """
+        # For compatibility with Python interpreter, this is an int, not a bool
+        return context.pushPod(int, expr.nonref_expr.cast(native_ast.Int64))
+
     def convert_builtin(self, f, context, expr, a1=None):
+        """Generates code to calculate certain builtin functions.
+
+        See BuiltinWrapper.
+        """
         if f is round and a1 is not None:
             return context.pushPod(
                 self,
@@ -554,12 +611,22 @@ class BoolWrapper(ArithmeticTypeWrapper):
         return super().convert_builtin(f, context, expr, a1)
 
     def convert_unary_op(self, context, left, op):
+        """Generates code for python_ast.UnaryOp op on bool TypedExpression left.
+        """
         if op.matches.Not:
             return context.pushPod(bool, left.nonref_expr.logical_not())
+        if op.matches.Invert:  # For compatibility, bitwise not of a bool is an int, not a bool.
+            return context.pushPod(int, left.nonref_expr.cast(native_ast.Int64).bitwise_not())
+        if op.matches.USub:  # For compatibility, negation of a bool is an int, not a bool.
+            return context.pushPod(int, left.nonref_expr.cast(native_ast.Int64))
+        if op.matches.UAdd:  # For compatibility, unary plus of a bool is an int, not a bool.
+            return context.pushPod(int, left.nonref_expr.cast(native_ast.Int64))
 
         return super().convert_unary_op(context, left, op)
 
     def convert_bin_op(self, context, left, op, right, inplace):
+        """Generates code for python_ast.BinaryOp op on bool TypedExpression left and TypedExpression right.
+        """
         if op.matches.Is and right.expr_type == self:
             op = python_ast.ComparisonOp.Eq()
 
@@ -626,6 +693,8 @@ class FloatWrapper(ArithmeticTypeWrapper):
         return native_ast.Type.Float(bits=bitness(self.typeRepresentation))
 
     def convert_int_cast(self, context, expr, raiseException=True):
+        """Generates code to cast floating-point type to int.
+        """
         if expr.isConstant:
             try:
                 return context.constant(int(expr.constantValue))
@@ -643,6 +712,8 @@ class FloatWrapper(ArithmeticTypeWrapper):
         )
 
     def convert_hash(self, context, expr):
+        """Generates code to calculate hash of floating-point TypedExpression expr.
+        """
         if self.typeRepresentation == Float32:
             return context.pushPod(Int32, runtime_functions.hash_float32.call(expr.nonref_expr))
         if self.typeRepresentation == float:
@@ -651,6 +722,10 @@ class FloatWrapper(ArithmeticTypeWrapper):
         assert False
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        """Generates code to convert float TypedExpression e into targetVal.
+
+        See Wrapper.convert_to_type_with_target.
+        """
         target_type = targetVal.expr_type
 
         if not explicit:
@@ -692,6 +767,8 @@ class FloatWrapper(ArithmeticTypeWrapper):
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_str_cast(self, context, instance):
+        """Generates code to cast float to str.
+        """
         if self.typeRepresentation == float:
             func = runtime_functions.float64_to_string
         else:
@@ -704,6 +781,8 @@ class FloatWrapper(ArithmeticTypeWrapper):
         )
 
     def convert_abs(self, context, expr):
+        """Generates code to calculate abs function on floating-point.
+        """
         return context.pushPod(
             self,
             native_ast.Expression.Branch(
@@ -714,6 +793,10 @@ class FloatWrapper(ArithmeticTypeWrapper):
         )
 
     def convert_builtin(self, f, context, expr, a1=None):
+        """Generates code to calculate certain builtin functions.
+
+        See BuiltinWrapper.
+        """
         if f is round:
             if a1:
                 return context.pushPod(
@@ -735,6 +818,8 @@ class FloatWrapper(ArithmeticTypeWrapper):
         return super().convert_builtin(f, context, expr, a1)
 
     def convert_unary_op(self, context, left, op):
+        """Generates code for python_ast.UnaryOp op on floating-point TypedExpression left.
+        """
         if op.matches.Not:
             return context.pushPod(bool, left.nonref_expr.eq(self.getNativeLayoutType().zero()))
         if op.matches.USub:
@@ -745,6 +830,8 @@ class FloatWrapper(ArithmeticTypeWrapper):
         return super().convert_unary_op(context, left, op)
 
     def convert_bin_op(self, context, left, op, right, inplace):
+        """Generates code for python_ast.BinaryOp op on floating-point TypedExpression left and TypedExpression right.
+        """
         if right.expr_type != self:
             if isinstance(right.expr_type, ArithmeticTypeWrapper):
                 if op.matches.Pow:

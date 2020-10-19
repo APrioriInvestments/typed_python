@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -12,11 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python.compiler.native_ast import VoidPtr
-from typed_python import Int32
 import typed_python.compiler
-
 from math import trunc, floor, ceil
 
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
@@ -24,44 +20,77 @@ typeWrapper = lambda x: typed_python.compiler.python_object_representation.typed
 
 class ClassOrAlternativeWrapperMixin:
     """A Mixin class that defines conversions on class and alternatives in terms of method calls."""
-    def convert_hash(self, context, expr):
-        if self.has_method(context, expr, "__hash__"):
-            return self.convert_method_call(context, expr, "__hash__", (), {})
-
-        return context.pushPod(
-            Int32,
-            runtime_functions.hash_alternative.call(
-                expr.nonref_expr.cast(VoidPtr),
-                context.getTypePointer(expr.expr_type.typeRepresentation)
-            )
-        )
-
-        return None
 
     def convert_call(self, context, expr, args, kwargs):
+        """Generates code for calling expr (Class or Alternative).
+
+        Returns:
+            TypedExpression of result of call
+        """
         if self.has_method(context, expr, "__call__"):
             return self.convert_method_call(context, expr, "__call__", args, kwargs)
         return super().convert_call(context, expr, args, kwargs)
 
     def convert_len(self, context, expr):
+        """Generates code for calling len on expr (Class or Alternative).
+
+        Returns:
+            TypedExpression of type int representing len
+        """
         if self.has_method(context, expr, "__len__"):
             return self.convert_method_call(context, expr, "__len__", (), {})
         return super().convert_len(self, context, expr)
 
     def convert_abs(self, context, expr):
+        """Generates code for calling abs on expr (Class or Alternative).
+
+        Returns:
+            TypedExpression of abs result
+        """
         return self.convert_method_call(context, expr, "__abs__", (), {})
 
     def convert_getitem(self, context, instance, item):
+        """Generates code for getting an item in expr (Class or Alternative).
+
+        Args:
+            context: ExpressionConversionContext
+            instance: TypedExpression (Class or Alternative)
+            item: TypedExpression index for getitem
+        Returns:
+            TypedExpression of result of getitem, i.e. instance[item]
+        """
         if self.has_method(context, instance, "__getitem__"):
             return self.convert_method_call(context, instance, "__getitem__", (item,), {})
         return super().convert_getitem(context, instance, item)
 
     def convert_setitem(self, context, instance, item, value):
+        """Generates code for setting an item in expr (Class or Alternative).
+
+        In other words, generates code for instance[item] = value
+
+        Args:
+            context: ExpressionConversionContext
+            instance: TypedExpression (Class or Alternative)
+            item: TypedExpression index for setitem
+            value: TypedExpression for value
+        """
+
         if self.has_method(context, instance, "__setitem__"):
             return self.convert_method_call(context, instance, "__setitem__", (item, value), {})
         return super().convert_setitem(context, instance, item, value)
 
     def convert_set_attribute(self, context, instance, attribute, value):
+        """Generates code for setting an attribute of a Class or Alternative.
+
+        In other words, generates code for instance.attribute = value.
+        Use value=None to indicate deleting an attribute.
+
+        Args:
+            context: ExpressionConversionContext
+            instance: TypedExpression (Class or Alternative)
+            attribute: TypedExpression name of attribute
+            value: TypedExpression value to be set
+        """
         if value is None:
             if self.has_method(context, instance, "__delattr__"):
                 return self.convert_method_call(context, instance, "__delattr__", (context.constant(attribute),), {})
@@ -74,16 +103,28 @@ class ClassOrAlternativeWrapperMixin:
         return super().convert_set_attribute(context, instance, attribute, value)
 
     def convert_repr(self, context, instance):
+        """Generates code for calling repr on a Class or Alternative instance.
+
+        Returns:
+            TypedExpression of type str
+        """
         if self.has_method(context, instance, "__repr__"):
             return self.convert_method_call(context, instance, "__repr__", (), {})
         return super().convert_repr(context, instance)
 
-    def can_cast_to_primitive(self, context, e, primitiveType):
+    def can_cast_to_primitive(self, context, e, primitiveType) -> bool:
+        """Returns true if we can call the specified 'convert_X_cast' function.
+
+        Args:
+            context: ExpressionConversionContext
+            e: TypedExpression (Class or Alternative)
+            primitiveType: one of bool, int, float, str, bytes
+        """
         if primitiveType is bool:
             return True
 
         if primitiveType is str:
-            return self.has_method(context, e, "__str__")
+            return True
 
         if primitiveType is int:
             return self.has_method(context, e, "__int__")
@@ -97,6 +138,8 @@ class ClassOrAlternativeWrapperMixin:
         return super().can_cast_to_primitive(context, e, primitiveType)
 
     def convert_bool_cast(self, context, e):
+        """Generates code to cast e to bool.
+        """
         if self.has_method(context, e, "__bool__"):
             return self.convert_method_call(context, e, "__bool__", (), {})
 
@@ -110,16 +153,22 @@ class ClassOrAlternativeWrapperMixin:
         return context.constant(True)
 
     def convert_str_cast(self, context, e):
+        """Generates code to cast e to str.
+        """
         if self.has_method(context, e, "__str__"):
             return self.convert_method_call(context, e, "__str__", (), {})
         return super().convert_str_cast(context, e)
 
     def convert_bytes_cast(self, context, e):
+        """Generates code to cast e to bytes.
+        """
         if self.has_method(context, e, "__bytes__"):
             return self.convert_method_call(context, e, "__bytes__", (), {})
         return super().convert_bytes_cast(context, e)
 
     def convert_index_cast(self, context, e):
+        """Generates code to cast e to index.
+        """
         if self.has_method(context, e, '__index__'):
             res = self.convert_method_call(context, e, "__index__", (), {})
             if res is None:
@@ -141,18 +190,24 @@ class ClassOrAlternativeWrapperMixin:
         return context.pushException(TypeError, f"__index__ not implemented for {self.typeRepresentation}")
 
     def convert_int_cast(self, context, e):
+        """Generates code to cast e to int.
+        """
         if self.has_method(context, e, '__int__'):
             return self.convert_method_call(context, e, "__int__", (), {})
         return context.pushException(TypeError, f"__int__ not implemented for {self.typeRepresentation}")
 
     def convert_float_cast(self, context, e):
+        """Generates code to cast e to float.
+        """
         if self.has_method(context, e, "__float__"):
             return self.convert_method_call(context, e, "__float__", (), {})
         return context.pushException(TypeError, f"__float__ not implemented for {self.typeRepresentation}")
 
     def convert_builtin(self, f, context, expr, a1=None):
-        # TODO: this should go in some common wrapper base class for alternatives and classes, along with
-        # generate method call
+        """Generates code to call one of the BuiltinWrapper functions.
+
+        See BuiltinWrapper for list of functions.
+        """
         if f is format:
             if self.has_method(context, expr, "__format__"):
                 return self.convert_method_call(
@@ -195,6 +250,8 @@ class ClassOrAlternativeWrapperMixin:
         return super().convert_builtin(f, context, expr, a1)
 
     def convert_unary_op(self, context, expr, op):
+        """Generates code for unary operator op on expr.
+        """
         magic = "__pos__" if op.matches.UAdd else \
             "__neg__" if op.matches.USub else \
             "__invert__" if op.matches.Invert else \
@@ -206,7 +263,9 @@ class ClassOrAlternativeWrapperMixin:
 
         return super().convert_unary_op(context, expr, op)
 
-    def convert_bin_op(self, context, l, op, r, inplace):
+    def convert_bin_op(self, context, l, op, r, inplace: bool):
+        """Generates code for binary operator op on l and r: l op r
+        """
         magic = "__add__" if op.matches.Add else \
             "__sub__" if op.matches.Sub else \
             "__mul__" if op.matches.Mult else \
@@ -254,6 +313,8 @@ class ClassOrAlternativeWrapperMixin:
         return super().convert_bin_op(context, l, op, r, False)
 
     def convert_bin_op_reverse(self, context, r, op, l, inplace):
+        """Generates code for binary operator op on l and r: l op r, where r is of this wrapper's type.
+        """
         if op.matches.In:
             if self.has_method(context, r, "__contains__"):
                 ret = self.convert_method_call(context, r, "__contains__", (l,), {})

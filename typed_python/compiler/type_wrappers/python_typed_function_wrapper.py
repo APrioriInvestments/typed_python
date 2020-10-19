@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -467,7 +467,7 @@ class PythonTypedFunctionWrapper(Wrapper):
         return None
 
     def generateMethodImplementation(self, context, returnType, args, argNames, provideClosureArgument):
-        """Generate native code that calls us with a given return type and set of arguments.
+        """Generates native code that calls us with a given return type and set of arguments.
 
         We try each overload, first with 'isExplicit' as False, then with True. The first one that
         succeeds gets to produce the output.

@@ -19,7 +19,7 @@ from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethod
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.native_hash import table_next_slot, table_clear, table_contains, \
     dict_delitem, dict_getitem, dict_get, dict_setitem
-from typed_python import Tuple, PointerTo, Int32, UInt8
+from typed_python import Tuple, PointerTo, Int32, UInt8, Dict
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -29,8 +29,27 @@ typeWrapper = lambda t: typed_python.compiler.python_object_representation.typed
 
 
 def dict_update(instance, other):
-    for key in other:
-        instance[key] = other[key]
+    """Update Dict instance with key/value paris from other.
+
+    Compiling instance.update(other)  compiles this function.
+    This function is only intended to be executed in this compiled form.
+
+    Args:
+        instance: Dict to operate on
+        other: Dict, or dict, or iterable of key/value pairs
+
+    Returns:
+        bool result of equality comparison
+    """
+    if isinstance(other, Dict) or isinstance(other, dict):
+        for key in other:
+            instance[key] = other[key]
+    else:
+        # This might fail: for instance a dict that is typed as an object will be processed here.
+        for kv in other:
+            if len(kv) != 2:
+                raise ValueError(f"dictionary update sequence element has length {len(kv)}; 2 is required")
+            instance[kv[0]] = kv[1]
 
 
 def dict_setdefault_nodefault(dict, item):
