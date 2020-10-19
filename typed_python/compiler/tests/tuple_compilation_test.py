@@ -359,3 +359,17 @@ class TestTupleCompilation(unittest.TestCase):
 
         # I get about .001 seconds for this.
         assert time.time() - t0 < .01
+
+    def test_bound_method_on_named_tuple(self):
+        class NT(NamedTuple(x=str)):
+            @Function
+            def f(self, x):
+                return x + self.x
+
+        @Entrypoint
+        def callIt(n):
+            method = n.f
+
+            return method("asdf")
+
+        assert callIt(NT(x="hi")) == "asdfhi"

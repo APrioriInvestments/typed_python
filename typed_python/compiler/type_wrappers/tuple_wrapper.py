@@ -17,6 +17,7 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python import (
     _types, Int32, Tuple, NamedTuple, Function, Dict, Set, ConstDict, ListOf, TupleOf
 )
+import typed_python._types
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
@@ -508,7 +509,7 @@ class NamedTupleWrapper(TupleWrapper):
                         context, methodDef.fget
                     ).convert_call((instance,), {})
 
-                if isinstance(methodDef, (types.FunctionType, Function)):
+                if isinstance(methodDef, (types.FunctionType, typed_python._types.Function)):
                     return instance.changeType(BoundMethodWrapper.Make(self, attribute))
 
         return context.pushException(
@@ -564,6 +565,11 @@ class NamedTupleWrapper(TupleWrapper):
 
         if isinstance(method, types.FunctionType):
             return context.call_py_function(method, (instance,) + tuple(args), kwargs)
+
+        if isinstance(method, typed_python._types.Function):
+            return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+                context, method
+            ).convert_call((instance,) + tuple(args), kwargs)
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
