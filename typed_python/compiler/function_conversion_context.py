@@ -1305,12 +1305,16 @@ class FunctionConversionContext(ConversionContextBase):
             # .exception_occurred turns on once any exception occurs
             # .control_flow indicates the control flow instruction that is deferred until after the 'finally' block
             #   0=default, 1=unhandled exception, 2=break, 3=continue, 4=return
-            exception_occurred = native_ast.Expression.StackSlot(name=f".exception_occurred{ast.line_number}", type=native_ast.Bool)
-            control_flow = native_ast.Expression.StackSlot(name=f".control_flow{ast.line_number}", type=native_ast.Int64)
+            exception_occurred_name = f".exc_occurred{ast.line_number}.{ast.col_offset}"
+            control_flow_name = f".control_flow{ast.line_number}.{ast.col_offset}"
+            end_of_try_marker = f"end_of_try{ast.line_number}.{ast.col_offset}"
+            end_of_finally_marker = f"end_of_finally{ast.line_number}.{ast.col_offset}"
+            exception_occurred = native_ast.Expression.StackSlot(name=exception_occurred_name, type=native_ast.Bool)
+            control_flow = native_ast.Expression.StackSlot(name=control_flow_name, type=native_ast.Int64)
 
             body_context = ExpressionConversionContext(self, variableStates)
             body, body_returns = self.convert_statement_list_ast(
-                ast.body, variableStates, in_loop=in_loop, return_to=f"end_of_try{ast.line_number}", try_flow=control_flow
+                ast.body, variableStates, in_loop=in_loop, return_to=end_of_try_marker, try_flow=control_flow
             )
             body_context.pushEffect(body)
 
@@ -1347,7 +1351,7 @@ class FunctionConversionContext(ConversionContextBase):
                     self.assignToLocalVariable(h_name, handler_context.fetchExceptionObject(exc_type), variableStatesHandler)
 
                 handler, handler_returns = self.convert_statement_list_ast(
-                    h.body, variableStatesHandler, in_loop=in_loop, return_to=f"end_of_try{ast.line_number}", try_flow=control_flow
+                    h.body, variableStatesHandler, in_loop=in_loop, return_to=end_of_try_marker, try_flow=control_flow
                 )
 
                 if h.name is not None:
@@ -1380,7 +1384,7 @@ class FunctionConversionContext(ConversionContextBase):
             orelse_context = ExpressionConversionContext(self, variableStates)
             if len(ast.orelse) > 0:
                 orelse, orelse_returns = self.convert_statement_list_ast(
-                    ast.orelse, variableStates, in_loop=in_loop, return_to=f"end_of_try{ast.line_number}", try_flow=control_flow
+                    ast.orelse, variableStates, in_loop=in_loop, return_to=end_of_try_marker, try_flow=control_flow
                 )
                 orelse_context.pushEffect(orelse)
             else:
@@ -1389,9 +1393,9 @@ class FunctionConversionContext(ConversionContextBase):
             final_context = ExpressionConversionContext(self, variableStates)
             if ast.finalbody is not None:
                 final, final_returns = self.convert_statement_list_ast(
-                    ast.finalbody, variableStates, in_loop=in_loop, return_to=f"end_of_finally{ast.line_number}", try_flow=control_flow
+                    ast.finalbody, variableStates, in_loop=in_loop, return_to=end_of_finally_marker, try_flow=control_flow
                 )
-                final = final.withReturnTargetName(f"end_of_finally{ast.line_number}")
+                final = final.withReturnTargetName(end_of_finally_marker)
                 final_returns = True
                 final_context.pushEffect(final)
             else:
@@ -1419,7 +1423,7 @@ class FunctionConversionContext(ConversionContextBase):
                     )
                 )
 
-            complete = complete.withReturnTargetName(f"end_of_try{ast.line_number}")
+            complete = complete.withReturnTargetName(end_of_try_marker)
 
             if final:
                 complete = complete >> native_ast.Expression.TryCatch(
@@ -1632,9 +1636,10 @@ class FunctionConversionContext(ConversionContextBase):
 
         if ast.matches.With:
             if len(ast.items) > 1:
-                # we can break 'with a, b:' down to
+                # We can break 'with a, b:' down to
                 # with a: with b:
-                # and proceed recursively
+                # and proceed recursively.
+                # Assign col_offset in a way that gives each WithItem a different col_offset that is still meaningful.
                 newBlock = python_ast.Statement.With(
                     items=[ast.items[0]],
                     body=[
@@ -1642,7 +1647,7 @@ class FunctionConversionContext(ConversionContextBase):
                             items=ast.items[1:],
                             body=ast.body,
                             line_number=ast.line_number,
-                            col_offset=ast.col_offset,
+                            col_offset=ast.items[1].context_expr.col_offset,
                             filename=ast.filename,
                         )
                     ],
@@ -1660,9 +1665,9 @@ class FunctionConversionContext(ConversionContextBase):
                 )
 
             # directly expand the context manager code in terms of python primitives
-            hasNoException = f".with_hit_except{ast.line_number}"
-            withExceptionVar = f".with_exception{ast.line_number}"
-            managerVar = f".with_cm_var{ast.line_number}"
+            hasNoException = f".with_has_no_except{ast.line_number}.{ast.col_offset}"
+            withExceptionVar = f".with_exception{ast.line_number}.{ast.col_offset}"
+            managerVar = f".with_cm_var{ast.line_number}.{ast.col_offset}"
 
             # with EXPRESSION as TARGET:
             #     SUITE
@@ -1683,7 +1688,7 @@ class FunctionConversionContext(ConversionContextBase):
             # finally:
             #     if not hit_except:
             #         exit(manager, None, None, None)
-            #             assert len(ast.items) == 1
+
             def makeStatement(ast, kind, **kwargs):
                 """Helper function to make a Statement of type 'kind'
 

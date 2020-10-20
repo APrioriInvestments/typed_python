@@ -2447,8 +2447,8 @@ class TestCompilationStructures(unittest.TestCase):
                                         r1 = result_or_exception(with_cm_nested1, a, b, c, d, e, f, g, h, t1)
                                         t2 = ListOf(str)([])
                                         r2 = result_or_exception(Compiled(with_cm_nested2), a, b, c, d, e, f, g, h, t2)
-                                        self.assertEqual(r1, r2, (a, b, c, d))
-                                        self.assertEqual(t1, t2, (a, b, c, d))
+                                        self.assertEqual(r1, r2, (a, b, c, d, e, f, g, h))
+                                        self.assertEqual(t1, t2, (a, b, c, d, e, f, g, h))
 
     def test_context_manager_perf(self):
 
@@ -2511,6 +2511,18 @@ class TestCompilationStructures(unittest.TestCase):
             (with_cm_simple1, with_cm_simple2, (0, 0, 1, 1), 1.0),
             (with_cm_simple1, with_cm_simple2, (0, 1, 0, 0), 1.0),
             (with_cm_simple1, with_cm_simple2, (1, 0, 0, 0), 1.0),
+            (with_cm_simple1, with_cm_simple1, (0, 0, 0, 0), 1.0),
+            (with_cm_simple1, with_cm_simple1, (0, 0, 0, 1), 1.0),
+            (with_cm_simple1, with_cm_simple1, (0, 0, 1, 0), 1.0),
+            (with_cm_simple1, with_cm_simple1, (0, 0, 1, 1), 1.0),
+            (with_cm_simple1, with_cm_simple1, (0, 1, 0, 0), 1.0),
+            (with_cm_simple1, with_cm_simple1, (1, 0, 0, 0), 1.0),
+            (with_cm_simple2, with_cm_simple2, (0, 0, 0, 0), 1.0),
+            (with_cm_simple2, with_cm_simple2, (0, 0, 0, 1), 1.0),
+            (with_cm_simple2, with_cm_simple2, (0, 0, 1, 0), 1.0),
+            (with_cm_simple2, with_cm_simple2, (0, 0, 1, 1), 1.0),
+            (with_cm_simple2, with_cm_simple2, (0, 1, 0, 0), 1.0),
+            (with_cm_simple2, with_cm_simple2, (1, 0, 0, 0), 1.0),
         ]
 
         for f1, f2, a, limit in perf_test_cases:
@@ -3144,3 +3156,156 @@ class TestCompilationStructures(unittest.TestCase):
             return x
 
         assert toList([1, 2]) == toListC([1, 2]) == ListOf(int)([1, 2])
+
+    def test_with_exception(self):
+        class SimpleCM1():
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                return False
+
+        class SimpleCM2(Class, Final):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                return True
+
+        class SimpleCM3(Class, Final):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                return False
+
+        def testCM(cm):
+            try:
+                with cm:
+                    raise ZeroDivisionError()
+            except Exception:
+                return 1
+            return 0
+
+        r1 = testCM(SimpleCM1())  # ok
+        r2 = testCM(SimpleCM2())  # ok
+        r3 = testCM(SimpleCM3())  # segfault
+        self.assertEqual(r1, 1)
+        self.assertEqual(r2, 0)
+        self.assertEqual(r3, 1)
+
+    def test_context_manager_corruption(self):
+        class CM():
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                return True
+
+        def f():
+            with CM():
+                raise NotImplementedError()
+
+        def repeat_a(n):
+            for i in range(n):
+                try:
+                    f()
+                except Exception as e:  # noqa: F841
+                    pass
+            return 1/0
+
+        def repeat_b(n):
+            for i in range(n):
+                try:
+                    Compiled(f)()
+                except Exception as e:  # noqa: F841
+                    pass
+            return 1/0
+
+        with self.assertRaises(ZeroDivisionError):
+            repeat_a(1000)
+        # At one point, this raised RecursionError instead of ZeroDivisionError
+        with self.assertRaises(ZeroDivisionError):
+            repeat_b(1000)
+
+    def test_context_manager_multiple_on_one_line1(self):
+        class ConMan1():
+            def __enter__(self):
+                return 1
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                return True
+
+        class ConMan2():
+            def __enter__(self):
+                return 2
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                raise NotImplementedError('ConMan2')
+
+        def f():
+            with ConMan1() as x, ConMan2() as y:
+                result = x + y
+            return result
+
+        c_f = Entrypoint(f)
+        c_f()
+        r1 = result_or_exception(f)
+        r2 = result_or_exception(c_f)
+        # Former problem: c_f raises RuntimeError 'No active exception to reraise'
+        self.assertEqual(r1, r2)
+
+    def test_context_manager_multiple_on_one_line2(self):
+        class ConMan():
+            def __init__(self, a, b, c, t):
+                self.a = a
+                self.b = b
+                self.c = c
+                self.t = t  # trace
+
+            def __enter__(self):
+                self.t.append("__enter__")
+                if self.a == 1:
+                    self.t.append("raise in __enter__")
+                    raise SyntaxError()
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                self.t.append(f"__exit__ {str(exc_type)} {exc_val}")
+                if self.b == 1:
+                    self.t.append("raise in __exit__")
+                    raise NotImplementedError()
+                self.t.append(f"__exit__ returns {self.c == 1}")
+                return self.c == 1
+
+        def with_cm_multiple(a, b, c, d, e, f, g, t) -> int:
+            t.append("start")
+            with ConMan(a, b, c, t) as x, ConMan(e, f, g, t) as y:
+                t.append(f"outerbody {x.a} {x.b} {x.c}")
+                t.append(f"innerbody {y.a} {y.b} {y.c}")
+                if d == 1:
+                    t.append("outerraise")
+                    raise ZeroDivisionError()
+                elif d == 2:
+                    t.append("outerreturn1")
+                    return 1
+            t.append("return2")
+            return 2
+
+        for a in [0, 1]:
+            for b in [0, 1]:
+                for c in [0, 1]:
+                    for d in [0, 1, 2]:
+                        for e in [0, 1]:
+                            for f in [0, 1]:
+                                for g in [0, 1]:
+                                    t1 = []
+                                    r1 = result_or_exception(with_cm_multiple, a, b, c, d, e, f, g, t1)
+                                    t2 = []
+                                    r2 = result_or_exception(Entrypoint(with_cm_multiple), a, b, c, d, e, f, g, t2)
+                                    if r1 != r2 or t1 != t2:
+                                        print(f"mismatch {a}{b}{c}.{d}.{e}{f}{g} {r1} {r2}")
+                                        print(t1)
+                                        print(t2)
+                                    self.assertEqual(r1, r2, (a, b, c, d, e, f, g))
+                                    self.assertEqual(t1, t2, (a, b, c, d, e, f, g))
