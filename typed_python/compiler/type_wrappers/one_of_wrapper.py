@@ -135,14 +135,41 @@ class OneOfWrapper(Wrapper):
             ("oneof", self, "attribute", attribute)
         )
 
-    def convert_call(self, context, left, args, kwargs):
+    def convert_method_call(self, context, instance, methodName, args, kwargs):
         # just unwrap us
         kwargNames = list(kwargs)
         kwargVals = tuple(kwargs.values())
 
         return context.expressionAsFunctionCall(
             "oneof_call",
-            (left,) + tuple(args) + kwargVals,
+            (instance,) + tuple(args) + kwargVals,
+            lambda instance, *packedArgs: self.unwrap(
+                instance.context,
+                instance,
+                lambda realInstance: realInstance.convert_method_call(
+                    methodName,
+                    packedArgs[:len(args)],
+                    {kwargNames[i]: packedArgs[len(args) + i] for i in range(len(kwargs))}
+                )
+            ),
+            (
+                "oneof",
+                self,
+                "method_call",
+                methodName,
+                tuple(x.expr_type for x in args),
+                tuple((name, kwargs[name].expr_type) for name in kwargs)
+            )
+        )
+
+    def convert_call(self, context, instance, args, kwargs):
+        # just unwrap us
+        kwargNames = list(kwargs)
+        kwargVals = tuple(kwargs.values())
+
+        return context.expressionAsFunctionCall(
+            "oneof_call",
+            (instance,) + tuple(args) + kwargVals,
             lambda instance, *packedArgs: self.unwrap(
                 instance.context,
                 instance,

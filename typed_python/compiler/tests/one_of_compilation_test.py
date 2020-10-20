@@ -609,3 +609,12 @@ class TestOneOfCompilation(unittest.TestCase):
             return ''.join(accumulator)
 
         strTranslate("hi", {})
+
+    def test_oneof_method_call(self):
+        @Entrypoint
+        def append(x: OneOf(ListOf(int), ListOf(float))):
+            x.append(1)
+
+        l = ListOf(int)([1, 2, 3])
+        append(l)
+        assert len(l) == 4
