@@ -14,7 +14,7 @@ def expandWithBlockIntoTryCatch(ast):
                     items=ast.items[1:],
                     body=ast.body,
                     line_number=ast.line_number,
-                    col_offset=ast.col_offset,
+                    col_offset=ast.items[1].context_expr.col_offset,
                     filename=ast.filename,
                 )
             ],
@@ -26,10 +26,10 @@ def expandWithBlockIntoTryCatch(ast):
         return expandWithBlockIntoTryCatch(newBlock)
 
     # directly expand the context manager code in terms of python primitives
-    hasNoException = f".with_hit_except{ast.line_number}"
-    withExceptionVar = f".with_exception{ast.line_number}"
-    managerVar = f".with_cm_var{ast.line_number}"
-    sysModuleVar = f".with_sys_var{ast.line_number}"
+    hasNoException = f".with_hit_except{ast.line_number}.{ast.col_offset}"
+    withExceptionVar = f".with_exception{ast.line_number}.{ast.col_offset}"
+    managerVar = f".with_cm_var{ast.line_number}.{ast.col_offset}"
+    sysModuleVar = f".with_sys_var{ast.line_number}.{ast.col_offset}"
 
     # with EXPRESSION as TARGET:
     #     SUITE
