@@ -94,6 +94,9 @@ class ArithmeticTypeWrapper(Wrapper):
 
         return expr.toInt64()
 
+    def convert_float_as(self, context, expr):
+        return expr.toFloat64()
+
     def convert_unary_op(self, context, instance, op):
         if op.matches.USub:
             return context.pushPod(self, instance.nonref_expr.negate())
@@ -716,15 +719,15 @@ class FloatWrapper(ArithmeticTypeWrapper):
             return context.pushPod(
                 float,
                 runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr)
-            ).convert_to_type(self, ConversionLevel.Implicit)
+            )
         if f is floor:
             return context.pushPod(
                 float, runtime_functions.floor_float64.call(expr.toFloat64().nonref_expr)
-            ).convert_to_type(self, ConversionLevel.Implicit)
+            )
         if f is ceil:
             return context.pushPod(
                 float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr)
-            ).convert_to_type(self, ConversionLevel.Implicit)
+            )
 
         return super().convert_builtin(f, context, expr, a1)
 

@@ -309,6 +309,19 @@ class TypedExpression:
 
         return res
 
+    def toFloatAs(self):
+        """Conversion used by math functions, like PyFloat_AsDouble.
+        """
+        res = self.expr_type.convert_float_as(self.context, self)
+
+        if not res:
+            return None
+
+        if res.expr_type.typeRepresentation is not float:
+            raise Exception(f"{self.expr_type}.toFloatAs() returned {res.expr_type}, not float.")
+
+        return res
+
     def refAs(self, i):
         return self.expr_type.refAs(self.context, self, i)
 

@@ -23,6 +23,7 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.native_ast import VoidPtr, UInt64
 import typed_python
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
+from math import trunc, floor, ceil
 
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
@@ -233,6 +234,15 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
         return context.constant(None)
 
+    def convert_builtin(self, f, context, expr, a1=None):
+        if f == ceil:
+            return context.pushPod(float, runtime_functions.pyobj_ceil.call(expr.nonref_expr.cast(VoidPtr)))
+        elif f == floor:
+            return context.pushPod(float, runtime_functions.pyobj_floor.call(expr.nonref_expr.cast(VoidPtr)))
+        elif f == trunc:
+            return context.pushPod(float, runtime_functions.pyobj_trunc.call(expr.nonref_expr.cast(VoidPtr)))
+        return super().convert_builtin(f, context, expr, a1)
+
     def convert_call(self, context, instance, args, kwargs):
         argsAsObjects = []
         for a in args:
@@ -299,6 +309,21 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         return context.pushPod(
             int,
             runtime_functions.pyobj_pynumber_index.call(
+                e.nonref_expr.cast(VoidPtr)
+            )
+        )
+
+    def convert_float_as(self, context, e):
+        """ Converts expr like PyFloat_AsDouble.
+
+        If a floating-point type, converts to float. If not, try __float__.
+        [3.8+: If __float__ is not defined, then try __index__. ]
+        Otherwise, fail.
+        At the moment, this conversion doesn't match any ConversionLevel in conversion_level.py.
+        """
+        return context.pushPod(
+            float,
+            runtime_functions.pyobj_to_float64.call(
                 e.nonref_expr.cast(VoidPtr)
             )
         )

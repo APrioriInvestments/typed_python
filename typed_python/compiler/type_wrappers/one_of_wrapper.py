@@ -456,3 +456,15 @@ class OneOfWrapper(Wrapper):
             ),
             ("oneof", self, "index_cast")
         )
+
+    def convert_float_as(self, context, expr):
+        return context.expressionAsFunctionCall(
+            "oneof_convert_float_as",
+            (expr,),
+            lambda expr: self.unwrap(
+                expr.context,
+                expr,
+                lambda exprUnwrapped: exprUnwrapped.toFloatAs()
+            ),
+            ("oneof", self, "float_as")
+        )
