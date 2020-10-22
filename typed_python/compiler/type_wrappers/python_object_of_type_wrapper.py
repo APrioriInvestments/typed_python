@@ -23,6 +23,7 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.native_ast import VoidPtr, UInt64
 import typed_python
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
+from math import trunc, floor, ceil
 
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
@@ -233,6 +234,15 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
         return context.constant(None)
 
+    def convert_builtin(self, f, context, expr, a1=None):
+        if f == ceil:
+            return context.pushPod(float, runtime_functions.pyobj_ceil.call(expr.nonref_expr.cast(VoidPtr)))
+        elif f == floor:
+            return context.pushPod(float, runtime_functions.pyobj_floor.call(expr.nonref_expr.cast(VoidPtr)))
+        elif f == trunc:
+            return context.pushPod(float, runtime_functions.pyobj_trunc.call(expr.nonref_expr.cast(VoidPtr)))
+        return super().convert_builtin(f, context, expr, a1)
+
     def convert_call(self, context, instance, args, kwargs):
         argsAsObjects = []
         for a in args:
@@ -315,6 +325,25 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             return context.constant(True)
 
         t = target_type.typeRepresentation
+        if conversionLevel == ConversionLevel.Math:
+            if t is float:
+                context.pushEffect(
+                    targetVal.expr.store(
+                        runtime_functions.pyobj_to_float64.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+                return context.constant(True)
+            if t is int:
+                context.pushEffect(
+                    targetVal.expr.store(
+                        runtime_functions.pyobj_to_int64.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+                return context.constant(True)
 
         if not issubclass(t, OneOf):
             return context.pushPod(

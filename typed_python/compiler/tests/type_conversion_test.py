@@ -94,8 +94,8 @@ def makeConverterDict():
         return TriggerConvert(T, 4)(arg)
 
     @Entrypoint
-    def convert5(arg, T):
-        return TriggerConvert(T, 5)(arg)
+    def convert6(arg, T):
+        return TriggerConvert(T, 6)(arg)
 
     return {
         ConversionLevel.Signature: convert0,
@@ -103,7 +103,7 @@ def makeConverterDict():
         ConversionLevel.UpcastContainers: convert2,
         ConversionLevel.Implicit: convert3,
         ConversionLevel.ImplicitContainers: convert4,
-        ConversionLevel.New: convert5,
+        ConversionLevel.New: convert6,
     }
 
 

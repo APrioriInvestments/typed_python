@@ -169,98 +169,95 @@ extern "C" {
     // START math functions
     // parameters are checked before calling these functions
 
-    double np_acos_float64(double d) {
-        return std::acos(d);
+    // In general, for math functions, if the argument is finite, overflow errors are raised as exceptions.
+    // But if the argument is inf, -inf, or nan, the function is calculated without raising an exception,
+    // and the result _may_ be inf, -inf, or nan.
+    // Fun fact: math.atan2(math.inf, math.inf) = .7853...
+    inline void raise_if_inf(double a, double ret) {
+        if (std::isfinite(a) && std::isinf(ret)) {
+            PyEnsureGilAcquired getTheGil;
+            PyErr_Format(PyExc_OverflowError, "math range error");
+            throw PythonExceptionSet();
+        }
     }
 
-    float np_acos_float32(float f) {
-        return std::acos(f);
+    double np_acos_float64(double d) {
+        double ret = std::acos(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     double np_acosh_float64(double d) {
-        return std::acosh(d);
-    }
-
-    float np_acosh_float32(float f) {
-        return std::acosh(f);
+        double ret =  std::acosh(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     double np_asin_float64(double d) {
-        return std::asin(d);
-    }
-
-    float np_asin_float32(float f) {
-        return std::asin(f);
+        double ret = std::asin(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     double np_asinh_float64(double d) {
-        return std::asinh(d);
-    }
-
-    float np_asinh_float32(float f) {
-        return std::asinh(f);
+        double ret = std::asinh(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     double np_atan_float64(double d) {
-        return std::atan(d);
-    }
-
-    float np_atan_float32(float f) {
-        return std::atan(f);
+        double ret = std::atan(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     double np_atan2_float64(double d1, double d2) {
-        return std::atan2(d1, d2);
-    }
-
-    float np_atan2_float32(float f1, float f2) {
-        return std::atan2(f1, f2);
+        double ret = std::atan2(d1, d2);
+        // If one of d1 or d2 is not finite, don't raise exception.
+        // And d1+d2 is not finite if one of d1 or d2 is not finite.
+        raise_if_inf(d1+d2, ret);
+        return ret;
     }
 
     double np_atanh_float64(double d) {
-        return std::atanh(d);
-    }
-
-    float np_atanh_float32(float f) {
-        return std::atanh(f);
+        double ret = std::atanh(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     double np_cosh_float64(double d) {
-        return std::cosh(d);
-    }
-
-    float np_cosh_float32(float f) {
-        return std::cosh(f);
+        double ret = std::cosh(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     double np_erf_float64(double d) {
-        return std::erf(d);
-    }
-
-    float np_erf_float32(float f) {
-        return std::erf(f);
+        double ret = std::erf(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     double np_erfc_float64(double d) {
-        return std::erfc(d);
-    }
-
-    float np_erfc_float32(float f) {
-        return std::erfc(f);
+        double ret = std::erfc(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     double np_expm1_float64(double d) {
-        return std::expm1(d);
-    }
-
-    float np_expm1_float32(float f) {
-        return std::expm1(f);
+        double ret = std::expm1(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     // d = 171.0 will overflow 64-bit float, so could replace this calculation with a table lookup
     // from 0 to 170.
     // This also would avoid some accumulated errors in the multiplication.
     double np_factorial64(double d) {
+        if (d >= 171.0) {
+            PyErr_Format(PyExc_OverflowError, "math range error");
+            throw PythonExceptionSet();
+        }
+
         double ret = 1;
         double d1 = 1.0;
         while (d1 < d) {
@@ -269,22 +266,15 @@ extern "C" {
         return ret;
     }
 
-    // f = 35.0 will overflow 32-bit float, so could replace this calculation with a table lookup
-    // from 0 to 34.
-    // This also would avoid some accumulated errors in the multiplication.
-    float np_factorial32(float f) {
-        float ret = 1;
-        float f1 = 1.0;
-        while (f1 < f) {
-            ret *= ++f1;
-        }
-        return ret;
-    }
-
     // As for all of these, parameter checks have already occurred.
     // n = 21 will overflow 64-bit integer, so could replace this calculation with a table lookup
     // from 0 to 20.
     int64_t np_factorial(int64_t n) {
+        if (n >= 21) {
+            PyErr_Format(PyExc_OverflowError, "math range error");
+            throw PythonExceptionSet();
+        }
+
         int64_t ret = 1;
         int64_t i = 1;
         while (i < n) {
@@ -293,14 +283,8 @@ extern "C" {
         return ret;
     }
 
-    // END math functions
-
     double np_fmod_float64(double d1, double d2) {
         return std::fmod(d1, d2);
-    }
-
-    float np_fmod_float32(float f1, float f2) {
-        return std::fmod(f1, f2);
     }
 
     void np_frexp_float64(double d, instance_ptr ret) {
@@ -318,33 +302,19 @@ extern "C" {
             );
     }
 
-    void np_frexp_float32(float f, instance_ptr ret) {
-        int exp;
-        float man = frexp(f, &exp);
-        static Tuple* tupleT = Tuple::Make({Float32::Make(), Int64::Make()});
-
-        tupleT->constructor(ret,
-            [&](uint8_t* eltPtr, int64_t k) {
-                if (k == 0)
-                    *(float*)eltPtr = man;
-                else
-                    *(int64_t*)eltPtr = (int64_t)exp;
-                }
-            );
-    }
-
     double np_gamma_float64(double d) {
-        return std::tgamma(d);
+        double ret = std::tgamma(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
-    float np_gamma_float32(float f) {
-        return std::tgamma(f);
-    }
-
-    uint64_t np_gcd(uint64_t i1, uint64_t i2) {
+    int64_t np_gcd(int64_t i1, int64_t i2) {
+        if (i1 < 0) i1 = -i1;
+        if (i2 < 0) i2 = -i2;
         if (i1 == 0) {
             return i2;
         }
+
         while (i2 != 0) {
             if (i1 % i2 == 0) {
                 return i2;
@@ -361,33 +331,22 @@ extern "C" {
         return fabs(d1 - d2) <= fmax(rel_tol * m, abs_tol);
     }
 
-    bool np_isclose_float32(float f1, float f2, float rel_tol, float abs_tol) {
-        double m = fmax(fabs(f1), fabs(f2));
-        return fabs(f1 - f2) <= fmax(rel_tol * m, abs_tol);
-    }
-
     double np_ldexp_float64(double d, int i) {
-        return std::ldexp(d, i);
-    }
-
-    float np_ldexp_float32(float f, int i) {
-        return std::ldexp(f, i);
+        double ret = std::ldexp(d, i);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     double np_lgamma_float64(double d) {
-        return std::lgamma(d);
-    }
-
-    float np_lgamma_float32(float f) {
-        return std::lgamma(f);
+        double ret = std::lgamma(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     double np_log1p_float64(double d) {
-        return std::log1p(d);
-    }
-
-    float np_log1p_float32(float f) {
-        return std::log1p(f);
+        double ret = std::log1p(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     void np_modf_float64(double d, instance_ptr ret) {
@@ -400,39 +359,28 @@ extern "C" {
         );
     }
 
-    void np_modf_float32(float f, instance_ptr ret) {
-        float integer;
-        float frac = modff(f, &integer);
-        static Tuple* tupleT = Tuple::Make({Float32::Make(), Float32::Make()});
-
-        tupleT->constructor(ret,
-            [&](uint8_t* eltPtr, int64_t k) { *(float*)eltPtr = k == 0 ? frac : integer; }
-        );
-    }
-
     double np_sinh_float64(double d) {
-        return std::sinh(d);
-    }
-
-    float np_sinh_float32(float f) {
-        return std::sinh(f);
+        double ret = std::sinh(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
     double np_tan_float64(double d) {
-        return std::tan(d);
-    }
-
-    float np_tan_float32(float f) {
-        return std::tan(f);
+        double ret = std::tan(d);
+        if (std::isinf(ret)) {
+            PyErr_Format(PyExc_OverflowError, "math range error");
+            throw PythonExceptionSet();
+        }
+        return ret;
     }
 
     double np_tanh_float64(double d) {
-        return std::tanh(d);
+        double ret = std::tanh(d);
+        raise_if_inf(d, ret);
+        return ret;
     }
 
-    float np_tanh_float32(float f) {
-        return std::tanh(f);
-    }
+    // END math functions
 
     bool nativepython_runtime_string_eq(StringType::layout* lhs, StringType::layout* rhs) {
         if (lhs == rhs) {
@@ -590,43 +538,6 @@ extern "C" {
 
         return outList;
     }
-/*
-    ListOfType::layout* nativepython_runtime_string_split_2(StringType::layout* l) {
-        static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
-
-        ListOfType::layout* outList;
-
-        listOfStringT->constructor((instance_ptr)&outList);
-
-        StringType::split_3(outList, l, -1);
-
-        return outList;
-    }
-
-    ListOfType::layout* nativepython_runtime_string_split_3(StringType::layout* l, StringType::layout* sep) {
-        static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
-
-        ListOfType::layout* outList;
-
-        listOfStringT->constructor((instance_ptr)&outList);
-
-        StringType::split(outList, l, sep, -1);
-
-        return outList;
-    }
-
-    ListOfType::layout* nativepython_runtime_string_split_3max(StringType::layout* l, int64_t max) {
-        static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
-
-        ListOfType::layout* outList;
-
-        listOfStringT->constructor((instance_ptr)&outList);
-
-        StringType::split_3(outList, l, max);
-
-        return outList;
-    }
-    */
 
     ListOfType::layout* nativepython_runtime_string_splitlines(StringType::layout* l, bool keepends) {
         static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
@@ -1178,7 +1089,7 @@ extern "C" {
         throw PythonExceptionSet();
     }
 
-   bool np_match_exception(PyObject* exc) {
+    bool np_match_exception(PyObject* exc) {
         PyEnsureGilAcquired getTheGil;
         return PyErr_ExceptionMatches(exc);
     }
@@ -2024,7 +1935,6 @@ extern "C" {
         return PyLong_AsLong(res);
     }
 
-
     PythonObjectOfType::layout_type* np_pyobj_Add(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
@@ -2391,6 +2301,131 @@ extern "C" {
         return false; // __exit__ returning false means don't suppress exceptions
     }
 
+    double np_pyobj_ceil(PythonObjectOfType::layout_type* obj) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        if (!PyObject_HasAttrString(obj->pyObj, "__ceil__")) {
+            double val = PyFloat_AsDouble(obj->pyObj);
+            if (val == -1.0 && PyErr_Occurred()) {
+                throw PythonExceptionSet();
+            }
+            return ceil(val);
+        }
+
+        PyObjectHolder retObj(PyObject_CallMethod(obj->pyObj, "__ceil__", NULL));
+        double ret;
+
+        // This is an additional condition.  Python does not have this condition (__ceil__ does not have to return a number).
+        if (PyFloat_Check(retObj)) {
+            ret = PyFloat_AsDouble(retObj);
+        }
+        else if (PyLong_Check(retObj)) {
+             ret = (double)PyLong_AsLong(retObj);
+        }
+        else {
+            PyObjectHolder floatObj(PyObject_CallMethod(retObj, "__float__", NULL));
+            if (floatObj) {
+                ret = PyFloat_AsDouble(floatObj);
+            }
+            else {
+                PyErr_SetString(PyExc_TypeError, "__ceil__ returned non-number");
+                throw PythonExceptionSet();
+            }
+        }
+        if (ret == -1.0 && PyErr_Occurred()) {
+            throw PythonExceptionSet();
+        }
+        return ret;
+    }
+
+    double np_pyobj_floor(PythonObjectOfType::layout_type* obj) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        if (!PyObject_HasAttrString(obj->pyObj, "__floor__")) {
+            double val = PyFloat_AsDouble(obj->pyObj);
+            if (val == -1.0 && PyErr_Occurred()) {
+                throw PythonExceptionSet();
+            }
+            return floor(val);
+        }
+
+        PyObjectHolder retObj(PyObject_CallMethod(obj->pyObj, "__floor__", NULL));
+        double ret;
+
+        // This is an additional condition.  Python does not have this condition (__floor__ does not have to return a number).
+        if (PyFloat_Check(retObj)) {
+            ret = PyFloat_AsDouble(retObj);
+        }
+        else if (PyLong_Check(retObj)) {
+            ret = (double)PyLong_AsLong(retObj);
+        }
+        else {
+            PyObjectHolder floatObj(PyObject_CallMethod(retObj, "__float__", NULL));
+            if (floatObj) {
+                ret = PyFloat_AsDouble(floatObj);
+            }
+            else {
+                PyErr_SetString(PyExc_TypeError, "__floor__ returned non-number");
+                throw PythonExceptionSet();
+            }
+        }
+        if (ret == -1.0 && PyErr_Occurred()) {
+            throw PythonExceptionSet();
+        }
+        return ret;
+    }
+
+    double np_pyobj_trunc(PythonObjectOfType::layout_type* obj) {
+        PyEnsureGilAcquired acquireTheGil;
+        if (PyFloat_Check(obj->pyObj)) {
+            double val = PyFloat_AsDouble(obj->pyObj);
+            if (val == -1.0 && PyErr_Occurred()) {
+                throw PythonExceptionSet();
+            }
+            return trunc(val);
+        }
+
+        if (PyLong_Check(obj->pyObj)) {
+            long val = PyLong_AsLong(obj->pyObj);
+            if (val == -1 && PyErr_Occurred()) {
+                throw PythonExceptionSet();
+            }
+            return double(val);
+        }
+
+
+        if (!PyObject_HasAttrString(obj->pyObj, "__trunc__")) {
+            // unlike the others, __trunc__ doesn't devolve to __float__
+            PyErr_Format(PyExc_TypeError, "type %s doesn't define __trunc__ method", Py_TYPE(obj->pyObj)->tp_name);
+            throw PythonExceptionSet();
+        }
+
+        PyObjectHolder retObj(PyObject_CallMethod(obj->pyObj, "__trunc__", NULL));
+        double ret;
+
+        // This is an additional condition.  Python does not have this condition (__trunc__ does not have to return a number).
+        if (PyFloat_Check(retObj)) {
+            ret = PyFloat_AsDouble(retObj);
+        }
+        else if (PyLong_Check(retObj)) {
+             ret = (double)PyLong_AsLong(retObj);
+        }
+        else {
+            PyObjectHolder floatObj(PyObject_CallMethod(retObj, "__float__", NULL));
+            if (floatObj) {
+                ret = PyFloat_AsDouble(floatObj);
+            }
+            else {
+                PyErr_SetString(PyExc_TypeError, "__trunc__ returned non-number");
+                throw PythonExceptionSet();
+            }
+        }
+        if (ret == -1.0 && PyErr_Occurred()) {
+            throw PythonExceptionSet();
+        }
+        return ret;
+    }
+
     int64_t np_str_to_int64(StringType::layout* s) {
         int64_t ret = 0;
         if (StringType::to_int64(s, &ret)) {
@@ -2444,10 +2479,11 @@ extern "C" {
     }
 
     double np_pyobj_to_float64(PythonObjectOfType::layout_type* obj) {
+    // This conversion matches how the python math module converts arguments to float
         PyEnsureGilAcquired getTheGil;
 
         double res = PyFloat_AsDouble(obj->pyObj);
-        if (PyErr_Occurred()) {
+        if (res == -1.0 && PyErr_Occurred()) {
             throw PythonExceptionSet();
         }
         return res;
@@ -2457,7 +2493,7 @@ extern "C" {
         PyEnsureGilAcquired getTheGil;
 
         int64_t res = PyLong_AsLong(obj->pyObj);
-        if (PyErr_Occurred()) {
+        if (res == -1 && PyErr_Occurred()) {
             throw PythonExceptionSet();
         }
         return res;

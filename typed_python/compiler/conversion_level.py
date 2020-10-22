@@ -39,6 +39,7 @@ class ConversionLevel:
             ConversionLevel.UpcastContainers,
             ConversionLevel.Implicit,
             ConversionLevel.ImplicitContainers,
+            ConversionLevel.Math,
             ConversionLevel.New
         ]:
             if level.LEVEL == intLevel:
@@ -128,11 +129,25 @@ class ImplicitContainers(ConversionLevel):
     LEVEL = 4
 
 
+class Math(ConversionLevel):
+    """Just like Implicit, but also allow objects with __float__ or __int__ methods.
+    This should convert float and int the same way the Python math module does,
+    in other words, with the same logic as PyFloat_AsDouble or PyLong_AsLong, which
+    use __float__, or  __int__. [3.8+: also, __float__ falls back to __index__]
+    So this conversion level will not convert str to float, but will convert classes
+    with __float__ to float.
+    Note: some parameters in the Python math module are strictly int, and others are 'index',
+    * This conversion is not appropriate for the strictly int arguments.
+    * For 'index', use .toIndex() instead of this conversion.
+    """
+    LEVEL = 5
+
+
 class New(ConversionLevel):
     """Invoked by an explicit call to a type constructor. Allows the construction of a
     new instance of the type itself. Internal conversions are done as 'ImplicitContainers' calls.
     """
-    LEVEL = 5
+    LEVEL = 6
 
 
 ConversionLevel.Signature = Signature()
@@ -140,4 +155,5 @@ ConversionLevel.Upcast = Upcast()
 ConversionLevel.UpcastContainers = UpcastContainers()
 ConversionLevel.Implicit = Implicit()
 ConversionLevel.ImplicitContainers = ImplicitContainers()
+ConversionLevel.Math = Math()
 ConversionLevel.New = New()

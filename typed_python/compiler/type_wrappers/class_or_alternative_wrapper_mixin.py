@@ -330,8 +330,6 @@ class ClassOrAlternativeWrapperMixin:
         return context.pushException(TypeError, f"__index__ not implemented for {self.typeRepresentation}")
 
     def convert_builtin(self, f, context, expr, a1=None):
-        # TODO: this should go in some common wrapper base class for alternatives and classes, along with
-        # generate method call
         if f is format:
             if self.has_method("__format__"):
                 return self.convert_method_call(
