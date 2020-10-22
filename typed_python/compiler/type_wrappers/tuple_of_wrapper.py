@@ -118,6 +118,7 @@ class PreReservedTupleOrList(CompilableBuiltin):
         self.tupleType = tupleType
         self.tupleTypeWrapper = typeWrapper(tupleType)
         self.underlyingWrapperType = typeWrapper(tupleType.ElementType)
+        self.isTuple = issubclass(tupleType, TupleOf)
 
     def __eq__(self, other):
         return isinstance(other, PreReservedTupleOrList) and other.tupleType == self.tupleType
@@ -131,26 +132,47 @@ class PreReservedTupleOrList(CompilableBuiltin):
             if length is None:
                 return None
 
-            return context.push(
-                self.tupleType,
-                lambda out:
-                    out.expr.store(
-                        runtime_functions.malloc.call(native_ast.const_int_expr(28))
-                            .cast(self.tupleTypeWrapper.getNativeLayoutType())
-                    ) >>
-                    out.expr.load().ElementPtrIntegers(0, 4).store(
-                        runtime_functions.malloc.call(
-                            length.nonref_expr
-                            .mul(native_ast.const_int_expr(self.underlyingWrapperType.getBytecount()))
-                        ).cast(native_ast.UInt8Ptr)
-                    ) >>
-                    out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>
-                    out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1)) >>
-                    out.expr.load().ElementPtrIntegers(0, 2).store(native_ast.const_int32_expr(0)) >>
-                    out.expr.load().ElementPtrIntegers(0, 3).store(length.nonref_expr.cast(native_ast.Int32))
-            )
+            if self.isTuple:
+                out = context.allocateUninitializedSlot(self.tupleTypeWrapper)
+
+                with context.ifelse(length.nonref_expr) as (ifTrue, ifFalse):
+                    with ifFalse:
+                        context.pushEffect(
+                            out.expr.store(out.expr_type.getNativeLayoutType().zero())
+                        )
+                    with ifTrue:
+                        context.pushEffect(
+                            self.initializeEmptyListExpr(out, length)
+                        )
+
+                context.markUninitializedSlotInitialized(out)
+
+                return out
+            else:
+                return context.push(
+                    self.tupleType,
+                    lambda out: self.initializeEmptyListExpr(out, length)
+                )
 
         return super().convert_call(context, instance, args, kwargs)
+
+    def initializeEmptyListExpr(self, out, length):
+        return (
+            out.expr.store(
+                runtime_functions.malloc.call(native_ast.const_int_expr(28))
+                    .cast(self.tupleTypeWrapper.getNativeLayoutType())
+            ) >>
+            out.expr.load().ElementPtrIntegers(0, 4).store(
+                runtime_functions.malloc.call(
+                    length.nonref_expr
+                    .mul(native_ast.const_int_expr(self.underlyingWrapperType.getBytecount()))
+                ).cast(native_ast.UInt8Ptr)
+            ) >>
+            out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>
+            out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1)) >>
+            out.expr.load().ElementPtrIntegers(0, 2).store(native_ast.const_int32_expr(0)) >>
+            out.expr.load().ElementPtrIntegers(0, 3).store(length.nonref_expr.cast(native_ast.Int32))
+        )
 
 
 def initialize_tuple_or_list_from_other(targetPtr, src, converter_class):

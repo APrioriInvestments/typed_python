@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, TupleOf, Compiled
+from typed_python import Function, TupleOf, Compiled, Entrypoint, ListOf
 import typed_python._types as _types
 import unittest
 import time
@@ -211,3 +211,10 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         self.assertEqual(makeT([1, 2, 3, 4]), Compiled(makeT)([1, 2, 3, 4]))
         self.assertEqual(makeT({1: 2}), Compiled(makeT)({1: 2}))
+
+    def test_tuple_of_from_list_of_empty(self):
+        @Entrypoint
+        def makeT(aList: ListOf(int)):
+            return TupleOf(int)(aList)
+
+        assert len(makeT([])) == 0

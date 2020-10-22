@@ -93,18 +93,21 @@ typed_python_hash_type TupleOrListOfType::hash(instance_ptr left) {
 }
 
 bool TupleOrListOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
-    if (!(*(layout**)left) && (*(layout**)right)) {
-        return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
-    }
-    if (!(*(layout**)right) && (*(layout**)left)) {
-        return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
-    }
-    if (!(*(layout**)right) && !(*(layout**)left)) {
-        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
-    }
-
     layout& left_layout = **(layout**)left;
     layout& right_layout = **(layout**)right;
+
+    bool leftEmpty = !(*(layout**)left) || left_layout.count == 0;
+    bool rightEmpty = !(*(layout**)right) || right_layout.count == 0;
+
+    if (leftEmpty && rightEmpty) {
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
+    }
+    if (leftEmpty && !rightEmpty) {
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+    }
+    if (rightEmpty && !leftEmpty) {
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
+    }
 
     if (&left_layout == &right_layout) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
