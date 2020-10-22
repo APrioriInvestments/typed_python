@@ -101,7 +101,7 @@ def ensureThreads():
 
 
 @Entrypoint
-def pmap(lst, f, OutT):
+def pmap(lst, f, OutT, minGranularity=1):
     """Apply 'f' to every element of 'lst' in parallel.
 
     Args:
@@ -113,10 +113,14 @@ def pmap(lst, f, OutT):
             locking and unlocking the queue than you will actually
             doing work. If None, this will pick something that tries to
             avoid creating too many jobs
+        minGranularity - the smallest batch size we'll allow.
+            If this is 1, then each item in the list is a job. If
+            greater than 1, then we will do no fewer than this many
+            jobs per thread dispatch.
     """
     ensureThreads()
 
-    jobGranularity = max(1, len(lst) // (int(os.cpu_count()) * 30))
+    jobGranularity = max(1, len(lst) // (int(os.cpu_count()) * 30), minGranularity)
 
     # make a list of objects but don't initialize any of them.
     # some objects don't have default constructors and we want to
