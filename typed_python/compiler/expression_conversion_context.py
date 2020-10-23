@@ -1313,7 +1313,10 @@ class ExpressionConversionContext:
         )
 
         if clear_exc:
-            nativeExpr = nativeExpr >> runtime_functions.clear_exc_info.call()
+            nativeExpr = nativeExpr >> native_ast.Expression.Branch(
+                cond=self.functionContext.exception_occurred_slot.load(),
+                true=runtime_functions.clear_exc_info.call()
+            )
 
         nativeExpr = nativeExpr >> native_ast.Expression.Throw(
             expr=native_ast.Expression.Constant(
@@ -1337,7 +1340,10 @@ class ExpressionConversionContext:
             )
         )
         if deferred:
-            nativeExpr = nativeExpr >> runtime_functions.clear_exc_info.call()
+            nativeExpr = nativeExpr >> native_ast.Expression.Branch(
+                cond=self.functionContext.exception_occurred_slot.load(),
+                true=runtime_functions.clear_exc_info.call()
+            )
 
         nativeExpr = nativeExpr >> native_ast.Expression.Throw(
             expr=native_ast.Expression.Constant(
