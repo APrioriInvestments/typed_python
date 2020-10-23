@@ -28,6 +28,13 @@ import sys
 import datetime
 import lz4.frame
 import importlib
+import threading
+
+# a lock to guard the calls to importlib below. It we don't have this,
+# then two threads trying to deserialize at the same time can conflict
+# with each other, because one may see the half-imported module from
+# the other.
+_importlibLock = threading.Lock()
 
 
 _badModuleCache = set()
@@ -203,12 +210,12 @@ class SerializationContext:
 
         if isinstance(t, ConcreteTypeFunction):
             name = t._concreteTypeFunction.__module__ + "." + t._concreteTypeFunction.__name__
-            if self.objectFromName(name) is t:
+            if self.objectFromName(name, allowImport=False) is t:
                 return name
             return None
 
         if isinstance(t, dict) and '__name__' in t and isinstance(t['__name__'], str):
-            maybeModule = self.objectFromName('.modules.' + t['__name__'])
+            maybeModule = self.objectFromName('.modules.' + t['__name__'], allowImport=False)
             if maybeModule is not None and t is getattr(maybeModule, '__dict__', None):
                 return ".module_dict." + t['__name__']
 
@@ -223,7 +230,7 @@ class SerializationContext:
                 else:
                     name = '.fun_in_class.' + mname + "." + qualname
 
-                o = self.objectFromName(name)
+                o = self.objectFromName(name, allowImport=False)
 
                 if o is t:
                     return name
@@ -235,11 +242,11 @@ class SerializationContext:
             mname = t.__typed_python_module__
             fname = t.__name__
 
-            if self.objectFromName(mname + "." + fname) is t:
+            if self.objectFromName(mname + "." + fname, allowImport=False) is t:
                 return mname + "." + fname
 
         elif isinstance(t, ModuleType):
-            if self.objectFromName(".modules." + t.__name__) is t:
+            if self.objectFromName(".modules." + t.__name__, allowImport=False) is t:
                 return ".modules." + t.__name__
 
         elif isinstance(t, type):
@@ -247,7 +254,7 @@ class SerializationContext:
 
             if hasattr(t, "__typed_python_module__"):
                 mname = getattr(t, "__typed_python_module__", None)
-                if self.objectFromName(mname + "." + fname) is t:
+                if self.objectFromName(mname + "." + fname, allowImport=False) is t:
                     return mname + "." + fname
 
             if getattr(t, "__typed_python_category__", None) == 'Value':
@@ -255,13 +262,19 @@ class SerializationContext:
 
             if hasattr(t, "__module__"):
                 mname = getattr(t, "__module__", None)
-                if self.objectFromName(mname + "." + fname) is t:
+                if self.objectFromName(mname + "." + fname, allowImport=False) is t:
                     return mname + "." + fname
 
         return None
 
-    def objectFromName(self, name):
-        ''' Return an object for an input name(string), or None if not found. '''
+    def objectFromName(self, name, allowImport=True):
+        """Return an object for an input name(string), or None if not found.
+
+        If allowImport is False, then don't import any new modules. This is used
+        when we are checking if an object is a given named object. If we have
+        a reference to an object, then we clearly don't need to import the module
+        that contains it to see if it has that name.
+        """
         if name in self.nameToObjectOverride:
             return self.nameToObjectOverride[name]
 
@@ -297,10 +310,11 @@ class SerializationContext:
                 if moduleName in sys.modules:
                     module = sys.modules[moduleName]
                 else:
-                    if moduleName in _badModuleCache:
+                    if moduleName in _badModuleCache or not allowImport:
                         return None
 
-                    module = importlib.import_module(moduleName)
+                    with _importlibLock:
+                        module = importlib.import_module(moduleName)
             except ImportError:
                 _badModuleCache.add(moduleName)
                 return None
@@ -327,7 +341,12 @@ class SerializationContext:
 
                 if name[9:] in sys.modules:
                     return sys.modules[name[9:]]
-                return importlib.import_module(name[9:])
+
+                if not allowImport:
+                    return None
+
+                with _importlibLock:
+                    return importlib.import_module(name[9:])
             except ImportError:
                 _badModuleCache.add(name[9:])
                 return None
@@ -346,7 +365,11 @@ class SerializationContext:
             if moduleName in sys.modules:
                 module = sys.modules[moduleName]
             else:
-                module = importlib.import_module(moduleName)
+                if not allowImport:
+                    return None
+
+                with _importlibLock:
+                    module = importlib.import_module(moduleName)
 
             return getattr(module, objName, None)
 
