@@ -1249,6 +1249,11 @@ class FunctionConversionContext(ConversionContextBase):
 
             return True
 
+    @property
+    def exception_occurred_slot(self):
+        exception_occurred_name = ".exc_occurred"
+        return native_ast.Expression.StackSlot(name=exception_occurred_name, type=native_ast.Bool)
+
     def convert_statement_ast(self, ast, variableStates: FunctionStackState, return_to=None, in_loop=False, try_flow=None):
         """Convert a single statement to native_ast.
 
@@ -1407,7 +1412,12 @@ class FunctionConversionContext(ConversionContextBase):
                         try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_RETURN))
                     )
                 self.assignToLocalVariable(".return_value", e, variableStates)
-                subcontext.pushEffect(runtime_functions.clear_exc_info.call())
+                subcontext.pushEffect(
+                    native_ast.Expression.Branch(
+                        cond=self.exception_occurred_slot.load(),
+                        true=runtime_functions.clear_exc_info.call()
+                    )
+                )
 
                 subcontext.pushTerminal(
                     native_ast.Expression.Return(
@@ -1538,11 +1548,10 @@ class FunctionConversionContext(ConversionContextBase):
             # .exception_occurred turns on once any exception occurs
             # .control_flow indicates the control flow instruction that is deferred until after the 'finally' block
             #   0=default, 1=unhandled exception, 2=break, 3=continue, 4=return
-            exception_occurred_name = f".exc_occurred{ast.line_number}.{ast.col_offset}"
             control_flow_name = f".control_flow{ast.line_number}.{ast.col_offset}"
             end_of_try_marker = f"end_of_try{ast.line_number}.{ast.col_offset}"
             end_of_finally_marker = f"end_of_finally{ast.line_number}.{ast.col_offset}"
-            exception_occurred = native_ast.Expression.StackSlot(name=exception_occurred_name, type=native_ast.Bool)
+            exception_occurred = self.exception_occurred_slot
             control_flow = native_ast.Expression.StackSlot(name=control_flow_name, type=native_ast.Int64)
 
             body_context = ExpressionConversionContext(self, variableStates)
@@ -1605,9 +1614,13 @@ class FunctionConversionContext(ConversionContextBase):
                     variableStates.clone(),
                     variableStatesHandler
                 )
+                handler = handler >> native_ast.Expression.Branch(
+                    cond=exception_occurred.load(),
+                    true=runtime_functions.clear_exc_info.call()
+                )
                 working = native_ast.Expression.Branch(
                     cond=cond_context.finalize(cond.nonref_expr),
-                    true=handler_context.finalize(handler >> runtime_functions.clear_exc_info.call()),
+                    true=handler_context.finalize(handler),
                     false=working_context.finalize(working)
                 )
                 working_returns = handler_returns or working_returns
@@ -1698,7 +1711,10 @@ class FunctionConversionContext(ConversionContextBase):
                 )
                 complete = complete >> native_ast.Expression.Branch(
                     cond=control_flow.load().eq(CONTROL_FLOW_BREAK),
-                    true=runtime_functions.clear_exc_info.call() >> break_context.finalize(brk)
+                    true=native_ast.Expression.Branch(
+                        cond=exception_occurred.load(),
+                        true=runtime_functions.clear_exc_info.call()
+                    ) >> break_context.finalize(brk)
                 )
 
                 cont_context = ExpressionConversionContext(self, variableStates)
@@ -1711,7 +1727,10 @@ class FunctionConversionContext(ConversionContextBase):
                 )
                 complete = complete >> native_ast.Expression.Branch(
                     cond=control_flow.load().eq(CONTROL_FLOW_CONTINUE),
-                    true=runtime_functions.clear_exc_info.call() >> cont_context.finalize(cont)
+                    true=native_ast.Expression.Branch(
+                        cond=exception_occurred.load(),
+                        true=runtime_functions.clear_exc_info.call()
+                    ) >> cont_context.finalize(cont)
                 )
 
             raise_context = ExpressionConversionContext(self, variableStates)
@@ -1853,9 +1872,15 @@ class FunctionConversionContext(ConversionContextBase):
             # return, when in fact it does.
             if return_to is not None:
                 if try_flow:
-                    return try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_BREAK)) \
-                        >> runtime_functions.clear_exc_info.call() \
-                        >> native_ast.Expression.Return(blockName=return_to), True
+                    return (
+                        try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_BREAK)) >>
+                        native_ast.Expression.Branch(
+                            cond=self.exception_occurred_slot.load(),
+                            true=runtime_functions.clear_exc_info.call()
+                        ) >>
+                        native_ast.Expression.Return(blockName=return_to),
+                        True
+                    )
                 else:
                     return native_ast.Expression.Return(blockName=return_to), True
             else:
@@ -1867,9 +1892,15 @@ class FunctionConversionContext(ConversionContextBase):
             # return, when in fact it does.
             if return_to is not None:
                 if try_flow:
-                    return try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_CONTINUE)) \
-                        >> runtime_functions.clear_exc_info.call() \
-                        >> native_ast.Expression.Return(blockName=return_to), True
+                    return (
+                        try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_CONTINUE)) >>
+                        native_ast.Expression.Branch(
+                            cond=self.exception_occurred_slot.load(),
+                            true=runtime_functions.clear_exc_info.call()
+                        ) >>
+                        native_ast.Expression.Return(blockName=return_to),
+                        True
+                    )
                 else:
                     return native_ast.Expression.Return(blockName=return_to), True
             else:
