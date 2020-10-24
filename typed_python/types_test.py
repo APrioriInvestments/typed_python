@@ -3255,3 +3255,13 @@ class NativeTypesTests(unittest.TestCase):
                             good = False
 
         self.assertTrue(good)  # see output for specific problems
+
+    def test_list_of_uint8_from_bytes_perf(self):
+        someBytes = b"asdf" * 1024 * 1024
+
+        t0 = time.time()
+        ListOf(UInt8)(someBytes)
+        t1 = time.time()
+
+        # I get .001, but if we use the normal interpreter loop, .2
+        assert t1 - t0 < .02

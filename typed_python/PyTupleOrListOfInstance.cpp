@@ -337,6 +337,19 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
         }
     }
 
+    if (PyBytes_Check(pyRepresentation) && tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catUInt8) {
+        tupT->constructor(tgt);
+
+        size_t sz = PyBytes_GET_SIZE(pyRepresentation);
+
+        tupT->reserve(tgt, sz);
+
+        memcpy(tupT->eltPtr(tgt, 0), PyBytes_AsString(pyRepresentation), sz);
+        tupT->setSizeUnsafe(tgt, sz);
+
+        return;
+    }
+
     PyObjectStealer iterator(PyObject_GetIter(pyRepresentation));
 
     if (iterator) {
