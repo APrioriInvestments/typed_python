@@ -309,14 +309,14 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         for mathFun in [f_factorial]:
             compiled = Entrypoint(mathFun)
 
-            self.assertEqual(compiled.resultTypeFor(int).typeRepresentation, int)
-            self.assertEqual(compiled.resultTypeFor(Int32).typeRepresentation, int)
-            self.assertEqual(compiled.resultTypeFor(UInt8).typeRepresentation, int)
+            self.assertEqual(compiled.resultTypeFor(int).typeRepresentation, float)
+            self.assertEqual(compiled.resultTypeFor(Int32).typeRepresentation, float)
+            self.assertEqual(compiled.resultTypeFor(UInt8).typeRepresentation, float)
 
             for v in range(21):
                 r1 = mathFun(v)
                 r2 = compiled(v)
-                self.assertIsInstance(r2, int)
+                self.assertIsInstance(r2, float)
                 self.assertEqual(r1, r2, (mathFun, v))
 
             with self.assertRaises(ValueError):
@@ -527,6 +527,25 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         self.assertTrue(math.isnan(r2[5]))
         # Note r1 != r2 because nan != nan
         self.assertEqual(r1[0:-1], r2[0:-1])
+
+        def f_calculated_const():
+            return math.log(math.atan(math.exp(math.sin(math.pi))))
+
+        r1 = f_calculated_const()
+        r2 = Entrypoint(f_calculated_const)()
+        # Ensure that any constant propagation optimization does not affect the value.
+        self.assertEqual(r1, r2)
+
+        def f_runtime_error():
+            return math.log(math.log(math.atan(math.exp(math.sin(math.pi)))))
+
+        # Ensure that any constant propagation optimization does not affect runtime errors
+        with self.assertRaises(ValueError):
+            f_runtime_error()
+
+        c_runtime_error = Entrypoint(f_runtime_error)
+        with self.assertRaises(ValueError):
+            c_runtime_error()
 
     def test_math_functions_perf_other(self):
         count = 1000000
@@ -831,8 +850,8 @@ class TestMathFunctionsCompilation(unittest.TestCase):
     def test_math_functions_on_oneof(self):
         T = OneOf(int, str, 1.99)
 
-        def f_sin(t: T) -> float:
-            return math.sin(t)
+        def f_sin(x: T) -> float:
+            return math.sin(x)
 
         compiled = Entrypoint(f_sin)
         cases = ListOf(T)([12, "987", 1.99])
@@ -840,3 +859,19 @@ class TestMathFunctionsCompilation(unittest.TestCase):
             r1 = callOrExceptType(f_sin, v)
             r2 = callOrExceptType(compiled, v)
             self.assertEqual(r1, r2, v)
+
+        T2 = OneOf(int, float, str)
+
+        def f_factorial(x: T2) -> float:
+            return math.factorial(x)
+
+        compiled = Entrypoint(f_factorial)
+        cases = ListOf(T)([12, 50, 50.0, "string"])
+        for v in cases:
+            r1 = callOrExceptType(f_factorial, v)
+            r2 = callOrExceptType(compiled, v)
+            self.assertEqual(r1[0], r2[0], (v, r1, r2))
+            if r1[0] == 'Exception':
+                self.assertEqual(r1[1], r2[1], v)
+            else:
+                self.assertEqual(float(r1[1]), r2[1], v)

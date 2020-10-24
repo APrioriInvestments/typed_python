@@ -264,19 +264,6 @@ class Wrapper:
             "Can't take instance of type '%s' to an integer index" % (str(self),)
         )
 
-    def convert_float_as(self, context, expr):
-        """ Converts expr like PyFloat_AsDouble.
-
-        If a floating-point type, converts to float. If not, try __float__.
-        [3.8+: If __float__ is not defined, then try __index__. ]
-        Otherwise, fail.
-        At the moment, this conversion doesn't match any ConversionLevel in conversion_level.py.
-        """
-        return context.pushException(
-            TypeError,
-            "Can't take instance of type '%s' as float" % (str(self),)
-        )
-
     def convert_builtin(self, f, context, expr, a1=None):
         if f is dir and a1 is None:
             if not expr.isReference:

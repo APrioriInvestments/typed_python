@@ -313,21 +313,6 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             )
         )
 
-    def convert_float_as(self, context, e):
-        """ Converts expr like PyFloat_AsDouble.
-
-        If a floating-point type, converts to float. If not, try __float__.
-        [3.8+: If __float__ is not defined, then try __index__. ]
-        Otherwise, fail.
-        At the moment, this conversion doesn't match any ConversionLevel in conversion_level.py.
-        """
-        return context.pushPod(
-            float,
-            runtime_functions.pyobj_to_float64.call(
-                e.nonref_expr.cast(VoidPtr)
-            )
-        )
-
     def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         target_type = targetVal.expr_type
 
@@ -340,6 +325,25 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             return context.constant(True)
 
         t = target_type.typeRepresentation
+        if conversionLevel == ConversionLevel.Math:
+            if t is float:
+                context.pushEffect(
+                    targetVal.expr.store(
+                        runtime_functions.pyobj_to_float64.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+                return context.constant(True)
+            if t is int:
+                context.pushEffect(
+                    targetVal.expr.store(
+                        runtime_functions.pyobj_to_int64.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+                return context.constant(True)
 
         if not issubclass(t, OneOf):
             return context.pushPod(

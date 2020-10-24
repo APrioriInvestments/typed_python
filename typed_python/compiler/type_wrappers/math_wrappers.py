@@ -15,7 +15,7 @@
 import typed_python.compiler
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
-from typed_python import Float32, Tuple, ListOf
+from typed_python import Float32, ListOf, Tuple, TupleOf, NamedTuple, Dict
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.tuple_wrapper import MasqueradingTupleWrapper
@@ -131,6 +131,63 @@ class MathFunctionWrapper(Wrapper):
     is_empty = False
     is_pass_by_ref = False
 
+    MathImpl = NamedTuple(f=object, args=TupleOf(object), ret=object, check_inf=bool)
+    # f is a runtime_function, or None.
+    #   None means this implementation is a special case.
+    # args is the tuple of argument types, if it's not just (float,), with elements float, int, "index", or "iterable".
+    #   None means arg_types=(float,)
+    # ret is the appropriate type or Wrapper for the return value, if it's not float.
+    #   None means float.
+    #   A tuple is permitted, meaning that a Masqueraded Tuple of those types should be returned.
+    # check_inf=True means we should generate code to raise an error if the inputs were finite but the output was not finite
+    #    This is only needed if the runtime function doesn't do this already, for example, if it is an LLVM intrinsic.
+    fns_3 = Dict(object, MathImpl)({
+        acos: MathImpl(f=runtime_functions.acos64),
+        acosh: MathImpl(f=runtime_functions.acosh64),
+        asin: MathImpl(f=runtime_functions.asin64),
+        asinh: MathImpl(f=runtime_functions.asinh64),
+        atan: MathImpl(f=runtime_functions.atan64),
+        atanh: MathImpl(f=runtime_functions.atanh64),
+        ceil: MathImpl(f=runtime_functions.ceil64),
+        cos: MathImpl(f=runtime_functions.cos64),
+        cosh: MathImpl(f=runtime_functions.cosh64),
+        degrees: MathImpl(f=None),
+        erf: MathImpl(f=runtime_functions.erf64),
+        erfc: MathImpl(f=runtime_functions.erfc64),
+        exp: MathImpl(f=runtime_functions.exp64, check_inf=True),
+        expm1: MathImpl(f=runtime_functions.expm1_64),
+        fabs: MathImpl(f=runtime_functions.fabs64),
+        factorial: MathImpl(f=runtime_functions.factorial64, args=(int,)),
+        floor: MathImpl(f=runtime_functions.floor64),
+        frexp: MathImpl(f=runtime_functions.frexp64, ret=(float, int)),
+        fsum: MathImpl(f=None, args=("iterable",)),  # special case, in this table for completeness
+        gamma: MathImpl(f=runtime_functions.gamma64),
+        isfinite: MathImpl(f=runtime_functions.isfinite_float64, ret=bool),
+        isinf: MathImpl(f=runtime_functions.isinf_float64, ret=bool),
+        isnan: MathImpl(f=runtime_functions.isnan_float64, ret=bool),
+        ldexp: MathImpl(f=None, args=(float, int)),  # special case, in this table for completeness
+        lgamma: MathImpl(f=runtime_functions.lgamma64),
+        log: MathImpl(f=runtime_functions.log64),
+        log1p: MathImpl(f=runtime_functions.log1p64),
+        log2: MathImpl(f=runtime_functions.log2_64),
+        log10: MathImpl(f=runtime_functions.log10_64),
+        modf: MathImpl(f=runtime_functions.modf64, ret=(float, float)),
+        radians: MathImpl(f=None),
+        sin: MathImpl(f=runtime_functions.sin64),
+        sinh: MathImpl(f=runtime_functions.sinh64, check_inf=True),
+        sqrt: MathImpl(f=runtime_functions.sqrt64),
+        tan: MathImpl(f=runtime_functions.tan64),
+        tanh: MathImpl(f=runtime_functions.tanh64),
+        atan2: MathImpl(f=runtime_functions.atan2_64, args=(float, float)),
+        copysign: MathImpl(f=runtime_functions.copysign64, args=(float, float)),
+        fmod: MathImpl(f=runtime_functions.fmod64, args=(float, float)),
+        gcd: MathImpl(f=None, args=(int, int)),  # special case, in this table for completeness
+        hypot: MathImpl(f=None, args=(float, float)),
+        isclose: MathImpl(f=runtime_functions.isclose64, ret=bool),  # special case, in this table for completeness
+        pow: MathImpl(f=runtime_functions.pow64, args=(float, float), check_inf=True),
+        trunc: MathImpl(f=runtime_functions.trunc64),
+    })
+    # SUPPORTED_FUNCTIONS = tuple(fn_3.keys())
     SUPPORTED_FUNCTIONS = (acos, acosh, asin, asinh, atan, atan2, atanh,
                            copysign, cos, cosh, degrees, erf, erfc, exp, expm1, fabs, factorial,
                            fmod, frexp, fsum, hypot, gamma, gcd, isclose, isnan, isfinite, isinf, ldexp, lgamma,
@@ -146,9 +203,9 @@ class MathFunctionWrapper(Wrapper):
 
     @Wrapper.unwrapOneOfAndValue
     def convert_call(self, context, expr, args, kwargs):
-        # map py function to (c++ function, return type, check_inf)
-        # check_inf is set when we need to check for infinite return values and possibly raise an exception
+        # check_inf is set when we need to check for infinite return values and possibly raise an exception.
         # This would be needed when the function is compiled to an llvm intrinsic.
+        # functions with 1 float arg: map py function to (c++ function, return type, check_inf)
         fns_1 = {
             acos: (runtime_functions.acos64, float, False),
             acosh: (runtime_functions.acosh64, float, False),
@@ -184,7 +241,9 @@ class MathFunctionWrapper(Wrapper):
             sqrt: (runtime_functions.sqrt64, float, False),
             tan: (runtime_functions.tan64, float, False),
             tanh: (runtime_functions.tanh64, float, False),
+            trunc: (runtime_functions.trunc64, float, False),
         }
+        # functions with 2 float args: map py function to (c++ function, return type, check_inf)
         fns_2 = {
             atan2: (runtime_functions.atan2_64, float, False),
             copysign: (runtime_functions.copysign64, float, False),
@@ -192,17 +251,38 @@ class MathFunctionWrapper(Wrapper):
             hypot: (None, float, False),
             isclose: (runtime_functions.isclose64, bool, False),
             pow: (runtime_functions.pow64, float, True),
-            trunc: (runtime_functions.trunc64, float, False),
         }
+        # other math functions, with non-float args, handled as special cases:
+        #   ldexp
+        #   gcd
+
+        impl = self.fns_3.get(self.typeRepresentation)
+        impl_args = impl.args if impl.args else (float,)
+        # impl_ret = impl.ret if impl.ret else float
+        # Check number of arguments and kwargs
+        if self.typeRepresentation is not isclose and (impl is None or len(args) < len(impl_args) or len(args) != len(impl_args)):
+            return super().convert_call(context, expr, args, kwargs)
+
+        # Check for constant arguments.
+        if all([a.isConstant for a in args]) and self.typeRepresentation is not isclose:
+            # Don't do this for isclose, since isclose depends on type, not just values.
+            try:
+                return context.constant(self.typeRepresentation(*(a.constantValue for a in args)))
+            except Exception:
+                # For compatibility, exceptions are not optimized, and will be raised at runtime,
+                # rather than during compilation.
+                pass
+
+        # Convert arguments
+
+        # functions with non-float args
         if len(args) == 2 and not kwargs and self.typeRepresentation is ldexp:
-            arg1 = args[0]
-            arg2 = args[1]
-            arg1 = arg1.toFloatAs()
+            arg1 = args[0].convert_to_type(float, ConversionLevel.Math)
             if arg1 is None:
                 return None
-            arg2 = arg2.convert_to_type(int, ConversionLevel.Signature)  # want a real 'int' here
+            arg2 = args[1].convert_to_type(int, ConversionLevel.Signature)  # want a real 'int' here
             if arg2 is None:
-                return context.pushException(TypeError, "Expected an int as second argument to ldexp.")
+                return None
             return context.pushPod(float, runtime_functions.ldexp64.call(arg1.nonref_expr, arg2.nonref_expr))
 
         if len(args) == 2 and not kwargs and self.typeRepresentation is gcd:
@@ -219,21 +299,16 @@ class MathFunctionWrapper(Wrapper):
 
             return context.pushPod(int, runtime_functions.gcd.call(arg1.nonref_expr, arg2.nonref_expr))
 
+        # functions with 2 float args
         if len(args) == 2 and self.typeRepresentation in fns_2 and (not kwargs or self.typeRepresentation is isclose):
             func, outT, check_inf = fns_2[self.typeRepresentation]
 
-            arg1 = args[0]
-            arg2 = args[1]
-            argType1 = arg1.expr_type.typeRepresentation
-            argType2 = arg2.expr_type.typeRepresentation
-            if argType1 is not float:
-                arg1 = arg1.toFloatAs()
-                if arg1 is None:
-                    return None
-            if argType2 is not float:
-                arg2 = arg2.toFloatAs()
-                if arg2 is None:
-                    return None
+            arg1 = args[0].convert_to_type(float, ConversionLevel.Math)
+            if arg1 is None:
+                return None
+            arg2 = args[1].convert_to_type(float, ConversionLevel.Math)
+            if arg2 is None:
+                return None
 
             if self.typeRepresentation is fmod:
                 with context.ifelse(arg2.nonref_expr.eq(0.0)) as (ifTrue, ifFalse):
@@ -296,23 +371,24 @@ class MathFunctionWrapper(Wrapper):
             return ret
 
         # handle integer factorial here
-        if len(args) == 1 and not kwargs and self.typeRepresentation is factorial:
-            arg = args[0]
-            if not arg.expr_type.is_arithmetic:
-                return context.pushException(TypeError, f"must be real number, not {arg.expr_type}")
+        # if len(args) == 1 and not kwargs and self.typeRepresentation is factorial:
+        #     arg = args[0]
+        #     if not arg.expr_type.is_arithmetic:
+        #         return context.pushException(TypeError, f"must be real number, not {arg.expr_type}")
+        #
+        #     argType = arg.expr_type.typeRepresentation
+        #     if argType not in (Float32, float):
+        #         if argType not in (int,):
+        #             arg = arg.convert_to_type(int, ConversionLevel.New)
+        #             if arg is None:
+        #                 return None
+        #         with context.ifelse(arg.nonref_expr.lt(0)) as (ifTrue, ifFalse):
+        #             with ifTrue:
+        #                 context.pushException(ValueError, "factorial() not defined for negative values")
+        #         return context.pushPod(int, runtime_functions.factorial.call(arg.nonref_expr))
+        #     # let Float32 and float args fall through to later section, which will handle float factorials
 
-            argType = arg.expr_type.typeRepresentation
-            if argType not in (Float32, float):
-                if argType not in (int,):
-                    arg = arg.convert_to_type(int, ConversionLevel.New)
-                    if arg is None:
-                        return None
-                with context.ifelse(arg.nonref_expr.lt(0)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        context.pushException(ValueError, "factorial() not defined for negative values")
-                return context.pushPod(int, runtime_functions.factorial.call(arg.nonref_expr))
-            # let Float32 and float args fall through to later section, which will handle float factorials
-
+        # functions with 1 float arg
         if len(args) == 1 and not kwargs and self.typeRepresentation is fsum:
             arg = args[0]
             return context.call_py_function(sumIterable, (arg,), {})
@@ -321,7 +397,7 @@ class MathFunctionWrapper(Wrapper):
         if len(args) == 1 and self.typeRepresentation in fns_1 and not kwargs:
             func, outT, check_inf = fns_1[self.typeRepresentation]
 
-            arg = args[0].toFloatAs()
+            arg = args[0].convert_to_type(float, ConversionLevel.Math)
             if arg is None:
                 return None
 

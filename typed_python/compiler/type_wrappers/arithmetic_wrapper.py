@@ -94,9 +94,6 @@ class ArithmeticTypeWrapper(Wrapper):
 
         return expr.toInt64()
 
-    def convert_float_as(self, context, expr):
-        return expr.toFloat64()
-
     def convert_unary_op(self, context, instance, op):
         if op.matches.USub:
             return context.pushPod(self, instance.nonref_expr.negate())
@@ -774,6 +771,12 @@ class FloatWrapper(ArithmeticTypeWrapper):
             )
 
         if op.matches.Div:
+            if left.isConstant and right.isConstant:
+                # If we divide by 0, for compatibility, we want that to remain a runtime error, not a compile error.
+                try:
+                    return context.constant(left.constantValue / right.constantValue).convert_to_type(self, ConversionLevel.Implicit)
+                except Exception:
+                    pass
             with context.ifelse(right.nonref_expr) as (ifTrue, ifFalse):
                 with ifFalse:
                     context.pushException(ZeroDivisionError, "division by zero")

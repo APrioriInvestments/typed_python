@@ -329,34 +329,6 @@ class ClassOrAlternativeWrapperMixin:
 
         return context.pushException(TypeError, f"__index__ not implemented for {self.typeRepresentation}")
 
-    def convert_float_as(self, context, e):
-        if self.has_method('__float__'):
-            res = self.convert_method_call(context, e, "__float__", (), {})
-            if res is None:
-                return None
-
-            if res.expr_type == typeWrapper(float):
-                return res
-
-            intRes = context.allocateUninitializedSlot(float)
-
-            succeeded = res.convert_to_type_with_target(intRes, ConversionLevel.Signature, mayThrowOnFailure=False)
-
-            with context.ifelse(succeeded.nonref_expr) as (ifTrue, ifFalse):
-                with ifFalse:
-                    context.pushException(TypeError, "__float__ returned non-float")
-
-            return intRes
-
-        indexRes = self.convert_index_cast(context, e)
-        if indexRes is None:
-            return context.pushException(TypeError, f"__float__, __index__ not implemented for {self.typeRepresentation}")
-
-        res = indexRes.toFloat64()
-        if res is None:
-            return None
-        return res
-
     def convert_builtin(self, f, context, expr, a1=None):
         if f is format:
             if self.has_method("__format__"):

@@ -12,6 +12,7 @@ enum class ConversionLevel {
     UpcastContainers,
     Implicit,
     ImplicitContainers,
+    Math,
     New,
 };
 
@@ -31,8 +32,11 @@ inline int conversionLevelToInt(ConversionLevel level) {
     if (level == ConversionLevel::ImplicitContainers) {
         return 4;
     }
-    if (level == ConversionLevel::New) {
+    if (level == ConversionLevel::Math) {
         return 5;
+    }
+    if (level == ConversionLevel::New) {
+        return 6;
     }
 
     throw std::runtime_error("Invalid ConversionLevel");
@@ -53,6 +57,9 @@ inline std::string conversionLevelToString(ConversionLevel level) {
     }
     if (level == ConversionLevel::ImplicitContainers) {
         return "ImplicitContainers";
+    }
+    if (level == ConversionLevel::Math) {
+        return "Math";
     }
     if (level == ConversionLevel::New) {
         return "New";
@@ -78,6 +85,9 @@ inline ConversionLevel intToConversionLevel(int level) {
         return ConversionLevel::ImplicitContainers;
     }
     if (level == 5) {
+        return ConversionLevel::Math;
+    }
+    if (level == 6) {
         return ConversionLevel::New;
     }
 
