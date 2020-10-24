@@ -39,6 +39,7 @@ class ConversionLevel:
             ConversionLevel.UpcastContainers,
             ConversionLevel.Implicit,
             ConversionLevel.ImplicitContainers,
+            ConversionLevel.Math,
             ConversionLevel.New
         ]:
             if level.LEVEL == intLevel:
