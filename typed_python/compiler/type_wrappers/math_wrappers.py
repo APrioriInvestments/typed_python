@@ -19,6 +19,7 @@ from typed_python import Float32, ListOf, Tuple, TupleOf, NamedTuple, Dict
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.tuple_wrapper import MasqueradingTupleWrapper
+import sys
 
 from math import (
     acos,
@@ -85,6 +86,7 @@ def sumIterable(iterable):
     """Full precision summation using multiple floats for intermediate values.
     Code modified from msum() at code.activestate.com/recipes/393090/, which
     is licensed under the PSF License.
+    Processes arguments as python3.6 or 3.7.
     Original comment below.
     """
     # Rounded x+y stored in hi with the round-off stored in lo.  Together
@@ -100,8 +102,57 @@ def sumIterable(iterable):
             try:
                 item = item.__float__()  # does not convert str to float
             except AttributeError:
-                raise TypeError('must be real number, not str')
+                raise TypeError('must be real number')
         x = float(item)  # I know item is a float now, but force compiler to know this too
+
+        i = 0
+        for y in partials:
+            if abs(x) < abs(y):
+                t = x
+                x = y
+                y = t
+            hi = x + y
+            lo = y - (hi - x)
+            if lo:
+                partials[i] = lo
+                i += 1
+            x = hi
+        popindex = len(partials) - 1
+        while popindex >= i:
+            partials.pop()
+            popindex -= 1
+        partials.append(x)
+    ret = 0.0
+    for p in partials:
+        ret += p
+    return ret
+
+
+def sumIterable38(iterable):
+    """Full precision summation using multiple floats for intermediate values.
+    Code modified from msum() at code.activestate.com/recipes/393090/, which
+    is licensed under the PSF License.
+    Processes arguments as python3.8+.
+    Original comment below.
+    """
+    # Rounded x+y stored in hi with the round-off stored in lo.  Together
+    # hi+lo are exactly equal to x+y.  The inner loop applies hi/lo summation
+    # to each partial so that the list of partial sums remains exact.
+    # Depends on IEEE-754 arithmetic guarantees.  See proof of correctness at:
+    # www-2.cs.cmu.edu/afs/cs/project/quake/public/papers/robust-arithmetic.ps
+
+    partials = ListOf(float)()
+    for item in iterable:
+        # float(item) would convert str to float, so __float__ is better
+        if not isinstance(item, float):
+            try:
+                item = item.__float__()  # does not convert str to float
+            except AttributeError:
+                try:
+                    item = item.__index__()
+                except AttributeError:
+                    raise TypeError('must be real number')
+        x = float(item)  # force to float
 
         i = 0
         for y in partials:
@@ -391,6 +442,8 @@ class MathFunctionWrapper(Wrapper):
         # functions with 1 float arg
         if len(args) == 1 and not kwargs and self.typeRepresentation is fsum:
             arg = args[0]
+            if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
+                return context.call_py_function(sumIterable38, (arg,), {})
             return context.call_py_function(sumIterable, (arg,), {})
 
         # math functions with 1 argument

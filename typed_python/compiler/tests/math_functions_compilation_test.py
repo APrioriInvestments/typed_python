@@ -687,7 +687,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                 return 1.23
 
             def __float__(self):
-                return 1.24
+                return 2.34
 
         def f_ceil(t: object):
             return math.ceil(t)

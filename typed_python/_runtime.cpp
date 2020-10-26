@@ -2303,25 +2303,13 @@ extern "C" {
 
     double np_pyobj_ceil(PythonObjectOfType::layout_type* obj) {
         PyEnsureGilAcquired acquireTheGil;
-        if (PyFloat_Check(obj->pyObj)) {
+
+        if (!PyObject_HasAttrString(obj->pyObj, "__ceil__")) {
             double val = PyFloat_AsDouble(obj->pyObj);
             if (val == -1.0 && PyErr_Occurred()) {
                 throw PythonExceptionSet();
             }
             return ceil(val);
-        }
-
-        if (!PyObject_HasAttrString(obj->pyObj, "__ceil__")) {
-            PyObjectHolder floatObj(PyObject_CallMethod(obj->pyObj, "__float__", NULL));
-            if ((PyObject*)floatObj) {
-                double val = PyFloat_AsDouble(floatObj);
-                if (val == -1.0 && PyErr_Occurred()) {
-                    throw PythonExceptionSet();
-                }
-                return ceil(val);
-             }
-             PyErr_Format(PyExc_TypeError, "'%s' object has no attribute __ceil__", Py_TYPE(obj->pyObj)->tp_name);
-             throw PythonExceptionSet();
         }
 
         PyObjectHolder retObj(PyObject_CallMethod(obj->pyObj, "__ceil__", NULL));
@@ -2352,25 +2340,13 @@ extern "C" {
 
     double np_pyobj_floor(PythonObjectOfType::layout_type* obj) {
         PyEnsureGilAcquired acquireTheGil;
-        if (PyFloat_Check(obj->pyObj)) {
+
+        if (!PyObject_HasAttrString(obj->pyObj, "__floor__")) {
             double val = PyFloat_AsDouble(obj->pyObj);
             if (val == -1.0 && PyErr_Occurred()) {
                 throw PythonExceptionSet();
             }
             return floor(val);
-        }
-
-        if (!PyObject_HasAttrString(obj->pyObj, "__floor__")) {
-            PyObjectHolder floatObj(PyObject_CallMethod(obj->pyObj, "__float__", NULL));
-            if ((PyObject*)floatObj) {
-                double val = PyFloat_AsDouble(floatObj);
-                if (val == -1.0 && PyErr_Occurred()) {
-                    throw PythonExceptionSet();
-                }
-                return floor(val);
-             }
-             PyErr_Format(PyExc_TypeError, "'%s' object has no attribute __floor__", Py_TYPE(obj->pyObj)->tp_name);
-             throw PythonExceptionSet();
         }
 
         PyObjectHolder retObj(PyObject_CallMethod(obj->pyObj, "__floor__", NULL));
@@ -2503,6 +2479,7 @@ extern "C" {
     }
 
     double np_pyobj_to_float64(PythonObjectOfType::layout_type* obj) {
+    // This conversion matches how the python math module converts arguments to float
         PyEnsureGilAcquired getTheGil;
 
         double res = PyFloat_AsDouble(obj->pyObj);
