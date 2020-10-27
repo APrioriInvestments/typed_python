@@ -18,7 +18,7 @@ import time
 import numpy
 
 from typed_python import (
-    Float32, UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8, ListOf, TupleOf, OneOf
+    Float32, UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8, ListOf, Tuple, TupleOf, OneOf
 )
 
 from typed_python import Entrypoint
@@ -432,16 +432,9 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                             self.assertIsInstance(r2, bool)
                             self.assertEqual(r1, r2, (mathFun, v1, v2, rel_tol, abs_tol))
 
-                            # don't bother testing Float32 if rel_tol is too small
-                            if rel_tol is not None and rel_tol < 1e-5:
-                                continue
-
-                            # default rel_tol is different for Float32
-                            r3 = mathFun(Float32(v1), Float32(v2), 1e-5 if rel_tol is None else rel_tol, abs_tol)
+                            r3 = mathFun(Float32(v1), Float32(v2), rel_tol, abs_tol)
                             r4 = compiled(Float32(v1), Float32(v2), rel_tol, abs_tol)
                             self.assertIsInstance(r4, bool)
-                            if r3 != r4:
-                                print("mismatch")
                             self.assertEqual(r3, r4, (mathFun, v1, v2, rel_tol, abs_tol))
 
         def f_gcd(x, y):
@@ -768,6 +761,15 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         def f_isclose(t: object):
             return math.isclose(t, t)
 
+        def f_isclose2(t: object):
+            return math.isclose(t, t, rel_tol=t)
+
+        def f_isclose3(t: object):
+            return math.isclose(t, t, abs_tol=t)
+
+        def f_isclose4(t: object):
+            return math.isclose(t, t, rel_tol=t, abs_tol=t)
+
         def f_isfinite(t: object):
             return math.isfinite(t)
 
@@ -827,8 +829,8 @@ class TestMathFunctionsCompilation(unittest.TestCase):
 
         fns = [f_trunc, f_ceil, f_floor, f_acos, f_acosh, f_asin, f_asinh, f_atan, f_atan2, f_atanh, f_copysign,
                f_cos, f_cosh, f_degrees, f_erf, f_erfc, f_exp, f_expm1, f_fabs, f_fmod, f_frexp, f_fsum, f_gamma, f_gcd,
-               f_hypot, f_isclose, f_isfinite, f_isinf, f_isnan, f_ldexp1, f_ldexp2, f_lgamma, f_log, f_log10, f_log1p,
-               f_log2, f_modf, f_pow, f_radians, f_sin, f_sinh, f_sqrt, f_tan, f_tanh]
+               f_hypot, f_isclose, f_isclose2, f_isclose3, f_isclose4, f_isfinite, f_isinf, f_isnan, f_ldexp1, f_ldexp2, f_lgamma,
+               f_log, f_log10, f_log1p, f_log2, f_modf, f_pow, f_radians, f_sin, f_sinh, f_sqrt, f_tan, f_tanh]
         values = [
             0, 0.5, -0.5, 1.0, -1.0, 7, -7, 1e100, -1e100,
             ClassCeil(), ClassFloor(), ClassTrunc(), ClassFloat(), ClassInt(), ClassIndex(), ClassCeilFloat(),
@@ -848,6 +850,10 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                     self.assertEqual(r1, r2, (f, v))
 
     def test_math_functions_on_oneof(self):
+        class ClassIndex:
+            def __index__(self):
+                return 6
+
         T = OneOf(int, str, 1.99)
 
         def f_sin(x: T) -> float:
@@ -866,7 +872,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
             return math.factorial(x)
 
         compiled = Entrypoint(f_factorial)
-        cases = ListOf(T)([12, 50, 50.0, "string"])
+        cases = ListOf(T2)([12, 50, 50.0, "string"])
         for v in cases:
             r1 = callOrExceptType(f_factorial, v)
             r2 = callOrExceptType(compiled, v)
@@ -874,4 +880,22 @@ class TestMathFunctionsCompilation(unittest.TestCase):
             if r1[0] == 'Exception':
                 self.assertEqual(r1[1], r2[1], v)
             else:
+                # Python factorial is an exact integer, but our factorial is a float,
+                # so convert python result to float before comparing.
                 self.assertEqual(float(r1[1]), r2[1], v)
+
+        T3 = OneOf(int, float, str, ClassIndex)
+
+        def f_gcd(x: T3, y: T3) -> int:
+            return math.gcd(x, y)
+
+        compiled = Entrypoint(f_gcd)
+        cases = ListOf(Tuple(T3, T3))([(6, 8), (6.0, 8.0), ("6", "8"), (ClassIndex(), ClassIndex())])
+        for v in cases:
+            r1 = callOrExceptType(f_gcd, *v)
+            r2 = callOrExceptType(compiled, *v)
+            self.assertEqual(r1[0], r2[0], (v, r1, r2))
+            if r1[0] == 'Exception':
+                self.assertEqual(r1[1], r2[1], v)
+            else:
+                self.assertEqual(r1[1], r2[1], v)
