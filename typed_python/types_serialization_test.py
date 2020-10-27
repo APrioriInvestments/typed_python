@@ -2130,3 +2130,13 @@ class TypesSerializationTest(unittest.TestCase):
             # verify the reference to the module object is correct
             aModule2.y = 30
             assert aModule2.f(10) == 40
+
+    def test_serialize_locks(self):
+        l = threading.Lock()
+        x = (l, l)
+
+        sc = SerializationContext()
+
+        x2 = sc.deserialize(sc.serialize(x))
+
+        assert x2[0] is x2[1] and isinstance(x2[0], type(x[0]))

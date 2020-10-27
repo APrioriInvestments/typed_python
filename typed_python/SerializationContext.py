@@ -444,6 +444,12 @@ class SerializationContext:
             # this is an 'unnamed' module
             return (types.ModuleType, (inst.__name__,), inst.__dict__)
 
+        if isinstance(inst, LockType):
+            return (threading.Lock, (), None)
+
+        if isinstance(inst, RLock):
+            return (threading.RLock, (), None)
+
         if isinstance(inst, type):
             # only serialize Class and Alternative objects from type functions.
             # otherwise, we'll end up changing how we serialize things like 'int',
@@ -565,6 +571,9 @@ class SerializationContext:
 
     def setInstanceStateFromRepresentation(self, instance, representation):
         if representation is reconstructTypeFunctionType:
+            return True
+
+        if isinstance(instance, (LockType, RLock)):
             return True
 
         if isinstance(instance, types.ModuleType):
