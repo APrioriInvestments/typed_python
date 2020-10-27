@@ -275,9 +275,10 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
     }
     if (PyModule_Check(o)) {
         throw std::runtime_error(
-            std::string("Cannot serialize module '") + PyModule_GetName(o) + ("' because it's not explicitly named. "
-                "Please ensure that it's imported as a module variable somewhere in your codebase.")
-            );
+            std::string("Cannot serialize module '")
+            + PyModule_GetName(o)
+            + "'. This code should be unreachable."
+        );
     }
 
     b.writeBeginCompound(FieldNumbers::OBJECT_TYPEANDDICT);

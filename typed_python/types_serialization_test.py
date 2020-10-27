@@ -2104,3 +2104,29 @@ class TypesSerializationTest(unittest.TestCase):
         c = SerializationContext().withoutInternalizingTypeGroups()
 
         c.deserialize(c.serialize(SeesItself))
+
+    def test_serialize_anonymous_module(self):
+        with tempfile.TemporaryDirectory() as tf:
+            c = SerializationContext().withFunctionGlobalsAsIs()
+
+            aModule = types.ModuleType("mymodule")
+
+            CONTENT = (
+                "y = 10\n"
+                "def f(x):\n"
+                "    return x + y\n"
+            )
+            fname = os.path.join(tf, "mymodule.py")
+
+            with open(fname, "w") as f:
+                f.write(CONTENT)
+                exec(compile(CONTENT, fname, "exec"), aModule.__dict__)
+
+            assert aModule.f(10) == 20
+
+            aModule2 = c.deserialize(c.serialize(aModule))
+            assert aModule2.f(10) == 20
+
+            # verify the reference to the module object is correct
+            aModule2.y = 30
+            assert aModule2.f(10) == 40

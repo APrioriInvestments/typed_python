@@ -29,6 +29,7 @@ import datetime
 import lz4.frame
 import importlib
 import threading
+import types
 
 # a lock to guard the calls to importlib below. It we don't have this,
 # then two threads trying to deserialize at the same time can conflict
@@ -86,7 +87,8 @@ class SerializationContext:
         encodeLineInformationForCode=True,
         objectToNameOverride=None,
         internalizeTypeGroups=True,
-        serializeFunctionsAsNonAst=False
+        serializeFunctionsAsNonAst=False,
+        serializeFunctionGlobalsAsIs=False
     ):
         super().__init__()
 
@@ -100,6 +102,7 @@ class SerializationContext:
         self.encodeLineInformationForCode = encodeLineInformationForCode
         self.internalizeTypeGroups = internalizeTypeGroups
         self.serializeFunctionsAsNonAst = serializeFunctionsAsNonAst
+        self.serializeFunctionGlobalsAsIs = serializeFunctionGlobalsAsIs
 
     def addNamedObject(self, name, obj):
         self.nameToObjectOverride[name] = obj
@@ -124,6 +127,32 @@ class SerializationContext:
         else:
             return bytes
 
+    def withFunctionGlobalsAsIs(self):
+        """When serializing a function, don't replace its globals dict.
+
+        By default, when we serialize a function we only serialize the globals
+        it depends on. This prevents us from having to carry large parts of a codebase
+        around for no reason, because most use-cases for serialization don't
+        require us to be able to modify the object that the function's original
+        globals were tied to.
+
+        If, however, you want to retain the original structure of the function
+        including its reference to its unnamed parent module, then you can
+        modify the context in this way.
+        """
+        if self.serializeFunctionGlobalsAsIs:
+            return self
+
+        return SerializationContext(
+            nameToObjectOverride=self.nameToObjectOverride,
+            compressionEnabled=self.compressionEnabled,
+            encodeLineInformationForCode=self.encodeLineInformationForCode,
+            objectToNameOverride=self.objectToNameOverride,
+            internalizeTypeGroups=self.internalizeTypeGroups,
+            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst,
+            serializeFunctionGlobalsAsIs=True
+        )
+
     def withoutFunctionsSerializedAsNonAst(self):
         """Just serialize a function's code, not its AST (from source).
 
@@ -138,7 +167,8 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=True
+            serializeFunctionsAsNonAst=True,
+            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
         )
 
     def withoutInternalizingTypeGroups(self):
@@ -156,7 +186,8 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=False,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst
+            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst,
+            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
         )
 
     def withoutLineInfoEncoded(self):
@@ -169,7 +200,8 @@ class SerializationContext:
             encodeLineInformationForCode=False,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst
+            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst,
+            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
         )
 
     def withoutCompression(self):
@@ -182,7 +214,8 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst
+            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst,
+            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
         )
 
     def withCompression(self):
@@ -195,7 +228,8 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst
+            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst,
+            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
         )
 
     def nameForObject(self, t):
@@ -406,6 +440,10 @@ class SerializationContext:
             @param inst: an instance to be serialized
             @return a representation object or None
         '''
+        if isinstance(inst, types.ModuleType) and inst is not sys.modules.get(inst.__name__):
+            # this is an 'unnamed' module
+            return (types.ModuleType, (inst.__name__,), inst.__dict__)
+
         if isinstance(inst, type):
             # only serialize Class and Alternative objects from type functions.
             # otherwise, we'll end up changing how we serialize things like 'int',
@@ -498,7 +536,7 @@ class SerializationContext:
 
             globalsToUse = None
 
-            if self.nameForObject(inst.__globals__) is not None:
+            if self.nameForObject(inst.__globals__) is not None or self.serializeFunctionGlobalsAsIs:
                 globalsToUse = inst.__globals__
             else:
                 globalsToUse = {}
@@ -527,6 +565,14 @@ class SerializationContext:
 
     def setInstanceStateFromRepresentation(self, instance, representation):
         if representation is reconstructTypeFunctionType:
+            return True
+
+        if isinstance(instance, types.ModuleType):
+            # note that we can't simply copy the contents of the dict into
+            # the module dict because functions will have references to the
+            # dict itself as their 'globals', and copying directly would break
+            # that relationship.
+            _types.setModuleDict(instance, representation)
             return True
 
         if isinstance(instance, property):
@@ -578,7 +624,7 @@ class SerializationContext:
             instance.__defaults__ = representation.get('defaults', ())
 
             if 'globals' in representation:
-                instance.__globals__.update(representation['globals'])
+                _types.setFunctionGlobals(instance, representation['globals'])
 
             _types.setFunctionClosure(instance, representation['closure'])
 

@@ -1512,6 +1512,13 @@ typedef struct {
     PyObject *cm_dict;
 } ClassOrStaticmethod;
 
+// a struct to let us access the md_dict of a module object.
+typedef struct {
+    PyObject_HEAD
+    PyObject *md_dict;
+} ModuleObjectDictMember;
+
+
 PyObject *setClassOrStaticmethod(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "setClassOrStaticmethod takes 2 positional arguments");
@@ -1529,6 +1536,32 @@ PyObject *setClassOrStaticmethod(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
+PyObject *setModuleDict(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "setModuleDict takes 2 positional arguments");
+        return NULL;
+    }
+
+    PyObject* moduleObj = PyTuple_GetItem(args, 0);
+    PyObject* dictObj = PyTuple_GetItem(args, 1);
+
+    if (!PyModule_CheckExact(moduleObj)) {
+        PyErr_SetString(PyExc_TypeError, "setModuleDict requires a module object first");
+        return NULL;
+    }
+
+    if (!PyDict_CheckExact(dictObj)) {
+        PyErr_SetString(PyExc_TypeError, "setModuleDict requires a dict object second");
+        return NULL;
+    }
+
+    incref(dictObj);
+    decref(((ModuleObjectDictMember*)moduleObj)->md_dict);
+    ((ModuleObjectDictMember*)moduleObj)->md_dict = dictObj;
+
+    return incref(Py_None);
+}
+
 PyObject *setFunctionClosure(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "setFunctionClosure takes 2 positional arguments");
@@ -1536,6 +1569,30 @@ PyObject *setFunctionClosure(PyObject* nullValue, PyObject* args) {
     }
 
     PyFunction_SetClosure(PyTuple_GetItem(args, 0), PyTuple_GetItem(args, 1));
+
+    return incref(Py_None);
+}
+
+PyObject *setFunctionGlobals(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "setFunctionGlobals takes 2 positional arguments");
+        return NULL;
+    }
+
+    if (!PyFunction_Check(PyTuple_GetItem(args, 0))) {
+        PyErr_SetString(PyExc_TypeError, "setFunctionGlobals takes a function for its first argument");
+        return NULL;
+    }
+
+    if (!PyDict_Check(PyTuple_GetItem(args, 1))) {
+        PyErr_SetString(PyExc_TypeError, "setFunctionGlobals takes a dict for its second argument.");
+        return NULL;
+    }
+
+    incref(PyTuple_GetItem(args, 1));
+
+    decref(((PyFunctionObject*)PyTuple_GetItem(args, 0))->func_globals);
+    ((PyFunctionObject*)PyTuple_GetItem(args, 0))->func_globals = PyTuple_GetItem(args, 1);
 
     return incref(Py_None);
 }
@@ -2519,6 +2576,7 @@ static PyMethodDef module_methods[] = {
     {"getDispatchIndexForType", (PyCFunction)getDispatchIndexForType, METH_VARARGS | METH_KEYWORDS, NULL},
     {"prepareArgumentToBePassedToCompiler", (PyCFunction)prepareArgumentToBePassedToCompiler, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setFunctionClosure", (PyCFunction)setFunctionClosure, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"setFunctionGlobals", (PyCFunction)setFunctionGlobals, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setClassOrStaticmethod", (PyCFunction)setClassOrStaticmethod, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setPropertyGetSetDel", (PyCFunction)setPropertyGetSetDel, METH_VARARGS | METH_KEYWORDS, NULL},
     {"initializeGlobalStatics", (PyCFunction)initializeGlobalStatics, METH_VARARGS | METH_KEYWORDS, NULL},
@@ -2527,6 +2585,7 @@ static PyMethodDef module_methods[] = {
     {"isValidArithmeticUpcast", (PyCFunction)isValidArithmeticUpcast, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isValidArithmeticConversion", (PyCFunction)isValidArithmeticConversion, METH_VARARGS | METH_KEYWORDS, NULL},
     {"gilReleaseThreadLoop", (PyCFunction)gilReleaseThreadLoop, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"setModuleDict", (PyCFunction)setModuleDict, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 
