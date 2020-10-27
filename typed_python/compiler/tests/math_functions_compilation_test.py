@@ -22,9 +22,10 @@ from typed_python import (
 )
 
 from typed_python import Entrypoint
-
-
 import typed_python.compiler
+from typed_python.compiler.type_wrappers.math_wrappers import sumIterable, sumIterable38
+
+
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
@@ -899,3 +900,16 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                 self.assertEqual(r1[1], r2[1], v)
             else:
                 self.assertEqual(r1[1], r2[1], v)
+
+    def test_math_internal_fns(self):
+        self.assertEqual(sumIterable([1, 2, 3]), 6)
+        self.assertEqual(sumIterable([1e100, 1e-100, -1e100]), 1e-100)
+        self.assertLess(sumIterable(x/1e6 for x in range(-1000000, 1000000, 999)), 0)
+        with self.assertRaises(TypeError):
+            sumIterable([1, 2, "3"])
+
+        self.assertEqual(sumIterable38([1, 2, 3]), 6)
+        self.assertEqual(sumIterable38([1e100, 1e-100, -1e100]), 1e-100)
+        self.assertLess(sumIterable38(x/1e6 for x in range(-1000000, 1000000, 999)), 0)
+        with self.assertRaises(TypeError):
+            sumIterable38([1, 2, "3"])
