@@ -29,7 +29,7 @@ from math import (
     atan,
     atan2,
     atanh,
-    ceil,
+    # ceil,
     copysign,
     cos,
     cosh,
@@ -41,7 +41,7 @@ from math import (
     expm1,
     fabs,
     factorial,
-    floor,
+    # floor,
     fmod,
     frexp,
     fsum,
@@ -70,7 +70,7 @@ from math import (
     tan,
     tanh,
     # tau,
-    trunc
+    # trunc
     # added in 3.7:
     # remainder
     # added in 3.8:
@@ -86,7 +86,7 @@ def sumIterable(iterable):
     """Full precision summation using multiple floats for intermediate values.
     Code modified from msum() at code.activestate.com/recipes/393090/, which
     is licensed under the PSF License.
-    Processes arguments as python3.6 or 3.7.
+    Processes arguments as python3.6 or 3.7 math module.
     Original comment below.
     """
     # Rounded x+y stored in hi with the round-off stored in lo.  Together
@@ -132,7 +132,7 @@ def sumIterable38(iterable):
     """Full precision summation using multiple floats for intermediate values.
     Code modified from msum() at code.activestate.com/recipes/393090/, which
     is licensed under the PSF License.
-    Processes arguments as python3.8+.
+    Processes arguments as python3.8+ math module.
     Original comment below.
     """
     # Rounded x+y stored in hi with the round-off stored in lo.  Together
@@ -192,14 +192,14 @@ class MathFunctionWrapper(Wrapper):
     #   A tuple is permitted, meaning that a Masqueraded Tuple of those types should be returned.
     # check_inf=True means we should generate code to raise an error if the inputs were finite but the output was not finite
     #    This is only needed if the runtime function doesn't do this already, for example, if it is an LLVM intrinsic.
-    fns_3 = Dict(object, MathImpl)({
+    math_impls = Dict(object, MathImpl)({
         acos: MathImpl(f=runtime_functions.acos64),
         acosh: MathImpl(f=runtime_functions.acosh64),
         asin: MathImpl(f=runtime_functions.asin64),
         asinh: MathImpl(f=runtime_functions.asinh64),
         atan: MathImpl(f=runtime_functions.atan64),
         atanh: MathImpl(f=runtime_functions.atanh64),
-        ceil: MathImpl(f=runtime_functions.ceil64),
+        # ceil: MathImpl(f=runtime_functions.ceil64),  # see BuiltinWrapper
         cos: MathImpl(f=runtime_functions.cos64),
         cosh: MathImpl(f=runtime_functions.cosh64),
         degrees: MathImpl(f=None),
@@ -208,15 +208,15 @@ class MathFunctionWrapper(Wrapper):
         exp: MathImpl(f=runtime_functions.exp64, check_inf=True),
         expm1: MathImpl(f=runtime_functions.expm1_64),
         fabs: MathImpl(f=runtime_functions.fabs64),
-        factorial: MathImpl(f=runtime_functions.factorial64, args=(int,)),
-        floor: MathImpl(f=runtime_functions.floor64),
+        factorial: MathImpl(f=runtime_functions.factorial64),
+        # floor: MathImpl(f=runtime_functions.floor64),  # see BuiltinWrapper
         frexp: MathImpl(f=runtime_functions.frexp64, ret=(float, int)),
         fsum: MathImpl(f=None, args=("iterable",)),  # special case, in this table for completeness
         gamma: MathImpl(f=runtime_functions.gamma64),
         isfinite: MathImpl(f=runtime_functions.isfinite_float64, ret=bool),
         isinf: MathImpl(f=runtime_functions.isinf_float64, ret=bool),
         isnan: MathImpl(f=runtime_functions.isnan_float64, ret=bool),
-        ldexp: MathImpl(f=None, args=(float, int)),  # special case, in this table for completeness
+        ldexp: MathImpl(f=runtime_functions.ldexp64, args=(float, int)),
         lgamma: MathImpl(f=runtime_functions.lgamma64),
         log: MathImpl(f=runtime_functions.log64),
         log1p: MathImpl(f=runtime_functions.log1p64),
@@ -232,18 +232,14 @@ class MathFunctionWrapper(Wrapper):
         atan2: MathImpl(f=runtime_functions.atan2_64, args=(float, float)),
         copysign: MathImpl(f=runtime_functions.copysign64, args=(float, float)),
         fmod: MathImpl(f=runtime_functions.fmod64, args=(float, float)),
-        gcd: MathImpl(f=None, args=(int, int)),  # special case, in this table for completeness
+        gcd: MathImpl(f=runtime_functions.gcd, args=("index", "index"), ret=int),
         hypot: MathImpl(f=None, args=(float, float)),
         isclose: MathImpl(f=runtime_functions.isclose64, ret=bool),  # special case, in this table for completeness
         pow: MathImpl(f=runtime_functions.pow64, args=(float, float), check_inf=True),
-        trunc: MathImpl(f=runtime_functions.trunc64),
+        # trunc: MathImpl(f=runtime_functions.trunc64),  # see BuiltinWrapper
     })
-    # SUPPORTED_FUNCTIONS = tuple(fn_3.keys())
-    SUPPORTED_FUNCTIONS = (acos, acosh, asin, asinh, atan, atan2, atanh,
-                           copysign, cos, cosh, degrees, erf, erfc, exp, expm1, fabs, factorial,
-                           fmod, frexp, fsum, hypot, gamma, gcd, isclose, isnan, isfinite, isinf, ldexp, lgamma,
-                           log, log2, log10, log1p, modf, pow, radians,
-                           sin, sinh, sqrt, tan, tanh)
+
+    SUPPORTED_FUNCTIONS = tuple(math_impls.keys())
 
     def __init__(self, mathFun):
         assert mathFun in self.SUPPORTED_FUNCTIONS
@@ -254,64 +250,45 @@ class MathFunctionWrapper(Wrapper):
 
     @Wrapper.unwrapOneOfAndValue
     def convert_call(self, context, expr, args, kwargs):
-        # check_inf is set when we need to check for infinite return values and possibly raise an exception.
-        # This would be needed when the function is compiled to an llvm intrinsic.
-        # functions with 1 float arg: map py function to (c++ function, return type, check_inf)
-        fns_1 = {
-            acos: (runtime_functions.acos64, float, False),
-            acosh: (runtime_functions.acosh64, float, False),
-            asin: (runtime_functions.asin64, float, False),
-            asinh: (runtime_functions.asinh64, float, False),
-            atan: (runtime_functions.atan64, float, False),
-            atanh: (runtime_functions.atanh64, float, False),
-            ceil: (runtime_functions.ceil64, float, False),
-            cos: (runtime_functions.cos64, float, False),
-            cosh: (runtime_functions.cosh64, float, False),
-            degrees: (None, float, False),
-            erf: (runtime_functions.erf64, float, False),
-            erfc: (runtime_functions.erfc64, float, False),
-            exp: (runtime_functions.exp64, float, True),
-            expm1: (runtime_functions.expm1_64, float, False),
-            fabs: (runtime_functions.fabs64, float, False),
-            factorial: (runtime_functions.factorial64, float, False),
-            floor: (runtime_functions.floor64, float, False),
-            frexp: (runtime_functions.frexp64, None, False),
-            gamma: (runtime_functions.gamma64, float, False),
-            isfinite: (runtime_functions.isfinite_float64, bool, False),
-            isinf: (runtime_functions.isinf_float64, bool, False),
-            isnan: (runtime_functions.isnan_float64, bool, False),
-            lgamma: (runtime_functions.lgamma64, float, False),
-            log: (runtime_functions.log64, float, False),
-            log1p: (runtime_functions.log1p64, float, False),
-            log2: (runtime_functions.log2_64, float, False),
-            log10: (runtime_functions.log10_64, float, False),
-            modf: (runtime_functions.modf64, float, False),
-            radians: (None, float, False),
-            sin: (runtime_functions.sin64, float, False),
-            sinh: (runtime_functions.sinh64, float, True),
-            sqrt: (runtime_functions.sqrt64, float, False),
-            tan: (runtime_functions.tan64, float, False),
-            tanh: (runtime_functions.tanh64, float, False),
-            trunc: (runtime_functions.trunc64, float, False),
-        }
-        # functions with 2 float args: map py function to (c++ function, return type, check_inf)
-        fns_2 = {
-            atan2: (runtime_functions.atan2_64, float, False),
-            copysign: (runtime_functions.copysign64, float, False),
-            fmod: (runtime_functions.fmod64, float, False),
-            hypot: (None, float, False),
-            isclose: (runtime_functions.isclose64, bool, False),
-            pow: (runtime_functions.pow64, float, True),
-        }
-        # other math functions, with non-float args, handled as special cases:
-        #   ldexp
-        #   gcd
+        # Special cases
+        if self.typeRepresentation is fsum and len(args) == 1 and not kwargs:
+            if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
+                return context.call_py_function(sumIterable38, (args[0],), {})
+            return context.call_py_function(sumIterable, (args[0],), {})
 
-        impl = self.fns_3.get(self.typeRepresentation)
+        if self.typeRepresentation is isclose and 2 <= len(args) <= 4:
+            arg1 = args[0].convert_to_type(float, ConversionLevel.Math)
+            if arg1 is None:
+                return None
+            arg2 = args[1].convert_to_type(float, ConversionLevel.Math)
+            if arg2 is None:
+                return None
+            if "rel_tol" in kwargs:
+                rel_tol = kwargs["rel_tol"].convert_to_type(float, ConversionLevel.Math)
+                if rel_tol is None:
+                    return None
+            else:
+                if args[0].expr_type.typeRepresentation is Float32 and args[1].expr_type.typeRepresentation is Float32:
+                    rel_tol = native_ast.const_float_expr(1e-5)  # with Float32, default needs to be larger
+                else:
+                    rel_tol = native_ast.const_float_expr(1e-9)
+
+            if "abs_tol" in kwargs:
+                abs_tol = kwargs["abs_tol"].convert_to_type(float, ConversionLevel.Math)
+                if abs_tol is None:
+                    return None
+            else:
+                abs_tol = native_ast.const_float_expr(0.0)
+
+            func = runtime_functions.isclose64
+            return context.pushPod(bool, func.call(arg1.nonref_expr, arg2.nonref_expr, rel_tol, abs_tol))
+
+        # Implementation from table
+        impl = self.math_impls.get(self.typeRepresentation)
         impl_args = impl.args if impl.args else (float,)
-        # impl_ret = impl.ret if impl.ret else float
+
         # Check number of arguments and kwargs
-        if self.typeRepresentation is not isclose and (impl is None or len(args) < len(impl_args) or len(args) != len(impl_args)):
+        if len(args) != len(impl_args) or kwargs:
             return super().convert_call(context, expr, args, kwargs)
 
         # Check for constant arguments.
@@ -325,237 +302,140 @@ class MathFunctionWrapper(Wrapper):
                 pass
 
         # Convert arguments
-
-        # functions with non-float args
-        if len(args) == 2 and not kwargs and self.typeRepresentation is ldexp:
-            arg1 = args[0].convert_to_type(float, ConversionLevel.Math)
-            if arg1 is None:
+        converted_args = []
+        for i, a in enumerate(args):
+            arg_type = impl_args[i]
+            if arg_type == float:
+                converted_a = a.convert_to_type(arg_type, ConversionLevel.Math)
+            elif arg_type == int:
+                converted_a = a.convert_to_type(arg_type, ConversionLevel.Signature)
+            elif arg_type == "index":
+                converted_a = a.toIndex()
+            if converted_a is None:
                 return None
-            arg2 = args[1].convert_to_type(int, ConversionLevel.Signature)  # want a real 'int' here
-            if arg2 is None:
-                return None
-            return context.pushPod(float, runtime_functions.ldexp64.call(arg1.nonref_expr, arg2.nonref_expr))
+            converted_args.append(converted_a)
 
-        if len(args) == 2 and not kwargs and self.typeRepresentation is gcd:
-            arg1 = args[0]
-            arg2 = args[1]
+        # convenience variables
+        arg1 = converted_args[0]
+        arg2 = converted_args[1] if len(args) > 1 else None
+        arg = converted_args[0]
 
-            # gcd uses __index__, not __int__, to process integer arguments
-            arg1 = arg1.toIndex()
-            if arg1 is None:
-                return None
-            arg2 = arg2.toIndex()
-            if arg2 is None:
-                return None
+        # Validate arguments
+        if self.typeRepresentation is fmod:
+            with context.ifelse(arg2.nonref_expr.eq(0.0)) as (ifTrue, ifFalse):
+                with ifTrue:
+                    context.pushException(ValueError, "math domain error")
+        if self.typeRepresentation is pow:
+            with context.ifelse(arg1.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
+                with ifTrue:  # arg1 <= 0
+                    with context.ifelse(arg1.nonref_expr.eq(0.0)) as (ifTrue2, ifFalse2):
+                        with ifTrue2:  # arg1 == 0
+                            with context.ifelse(arg2.nonref_expr.lt(0.0)) as (ifTrue3, ifFalse3):
+                                with ifTrue3:  # arg1 == 0, arg2 < 0
+                                    context.pushException(ValueError, "math domain error")
+                        with ifFalse2:  # arg1 < 0
+                            f_isinf = runtime_functions.isinf_float64
+                            with context.ifelse(f_isinf.call(arg1.nonref_expr)) as (ifTrue4, ifFalse4):
+                                with ifFalse4:  # arg1 < 0 and arg1 is finite
+                                    f_floor = runtime_functions.floor64
+                                    with context.ifelse(
+                                        f_floor.call(arg2.nonref_expr).sub(arg2.nonref_expr).neq(0.0)
+                                    ) as (ifTrue5, ifFalse5):
+                                        with ifTrue5:  # arg1 < 0, arg1 is finite, arg2 not an integer
+                                            context.pushException(ValueError, "math domain error")
+        if self.typeRepresentation in (cos, sin, tan):
+            with context.ifelse(runtime_functions.isinf_float64.call(arg.nonref_expr)) as (ifTrue, ifFalse):
+                with ifTrue:
+                    context.pushException(ValueError, "math domain error")
+        elif self.typeRepresentation in (acos, asin):
+            with context.ifelse(arg.nonref_expr.gt(1.0)) as (ifTrue, ifFalse):
+                with ifTrue:
+                    context.pushException(ValueError, "math domain error")
+            with context.ifelse(arg.nonref_expr.lt(-1.0)) as (ifTrue, ifFalse):
+                with ifTrue:
+                    context.pushException(ValueError, "math domain error")
+        elif self.typeRepresentation is acosh:
+            with context.ifelse(arg.nonref_expr.lt(1.0)) as (ifTrue, ifFalse):
+                with ifTrue:
+                    context.pushException(ValueError, "math domain error")
+        elif self.typeRepresentation is atanh:
+            with context.ifelse(arg.nonref_expr.gte(1.0)) as (ifTrue, ifFalse):
+                with ifTrue:
+                    context.pushException(ValueError, "math domain error")
+            with context.ifelse(arg.nonref_expr.lte(-1.0)) as (ifTrue, ifFalse):
+                with ifTrue:
+                    context.pushException(ValueError, "math domain error")
+        elif self.typeRepresentation is factorial:
+            with context.ifelse(arg.nonref_expr.gte(0.0)) as (ifTrue, ifFalse):
+                with ifTrue:  # arg >= 0
+                    f_floor = runtime_functions.floor64
+                    with context.ifelse(f_floor.call(arg.nonref_expr).sub(arg.nonref_expr).neq(0.0)) as (ifTrue2, ifFalse2):
+                        with ifTrue2:  # arg >= 0, arg not an integer
+                            context.pushException(ValueError, "factorial() only accepts integral values")
+                with ifFalse:  # arg < 0
+                    context.pushException(ValueError, "factorial() not defined for negative values")
+        elif self.typeRepresentation is gamma:
+            with context.ifelse(arg.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
+                with ifTrue:  # arg <= 0
+                    with context.ifelse(runtime_functions.isinf_float64.call(arg.nonref_expr)) as (ifTrue2, ifFalse2):
+                        with ifTrue2:  # arg == -inf   Note: inf is ok but not -inf
+                            context.pushException(ValueError, "math domain error")
+                    f_floor = runtime_functions.floor64
+                    with context.ifelse(f_floor.call(arg.nonref_expr).sub(arg.nonref_expr).eq(0.0)) as (ifTrue2, ifFalse2):
+                        with ifTrue2:  # arg <= 0, arg an integer
+                            context.pushException(ValueError, "math domain error")
+        elif self.typeRepresentation is lgamma:
+            with context.ifelse(arg.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
+                with ifTrue:  # arg <= 0
+                    f_floor = runtime_functions.floor64
+                    with context.ifelse(f_floor.call(arg.nonref_expr).sub(arg.nonref_expr).eq(0.0)) as (ifTrue2, ifFalse2):
+                        with ifTrue2:  # arg <= 0, arg an integer
+                            context.pushException(ValueError, "math domain error")
+        elif self.typeRepresentation in (log, log2, log10):
+            with context.ifelse(arg.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
+                with ifTrue:  # arg <= 0
+                    context.pushException(ValueError, "math domain error")
+        elif self.typeRepresentation is log1p:
+            with context.ifelse(arg.nonref_expr.lte(-1.0)) as (ifTrue, ifFalse):
+                with ifTrue:  # arg <= -1
+                    context.pushException(ValueError, "math domain error")
+        elif self.typeRepresentation is sqrt:
+            with context.ifelse(arg.nonref_expr.lt(0.0)) as (ifTrue, ifFalse):
+                with ifTrue:  # arg < 0
+                    context.pushException(ValueError, "math domain error")
 
-            return context.pushPod(int, runtime_functions.gcd.call(arg1.nonref_expr, arg2.nonref_expr))
+        # Special implementation
+        if self.typeRepresentation is hypot:
+            func = runtime_functions.sqrt64
+            return context.pushPod(float, func.call(arg1.nonref_expr.mul(arg1.nonref_expr).add(arg2.nonref_expr.mul(arg2.nonref_expr))))
+        elif self.typeRepresentation is radians:
+            return context.pushPod(float, arg.nonref_expr.mul(native_ast.const_float_expr(pi / 180)))
+        elif self.typeRepresentation is degrees:
+            return context.pushPod(float, arg.nonref_expr.mul(native_ast.const_float_expr(180 / pi)))
 
-        # functions with 2 float args
-        if len(args) == 2 and self.typeRepresentation in fns_2 and (not kwargs or self.typeRepresentation is isclose):
-            func, outT, check_inf = fns_2[self.typeRepresentation]
+        # Implementation as C++ function or LLVM intrinsic
 
-            arg1 = args[0].convert_to_type(float, ConversionLevel.Math)
-            if arg1 is None:
-                return None
-            arg2 = args[1].convert_to_type(float, ConversionLevel.Math)
-            if arg2 is None:
-                return None
+        # Returning a tuple
+        if isinstance(impl.ret, tuple):
+            outT = MasqueradingTupleWrapper(Tuple(*impl.ret))
+            return_tuple = native_ast.Expression.StackSlot(name=".return_tuple", type=outT.layoutType)
+            context.pushEffect(impl.f.call(arg1.nonref_expr, return_tuple.elemPtr(0).cast(native_ast.VoidPtr)))
+            return typed_python.compiler.typed_expression.TypedExpression(context, return_tuple, outT, True)
 
-            if self.typeRepresentation is fmod:
-                with context.ifelse(arg2.nonref_expr.eq(0.0)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        context.pushException(ValueError, "math domain error")
-            elif self.typeRepresentation is hypot:
-                # calculate this one with sqrt
-                func = runtime_functions.sqrt64
-                return context.pushPod(outT, func.call(arg1.nonref_expr.mul(arg1.nonref_expr).add(arg2.nonref_expr.mul(arg2.nonref_expr))))
-            elif self.typeRepresentation is isclose:
-                func = runtime_functions.isclose64
+        # Returning a single value
+        outT = impl.ret if impl.ret else float
+        ret = context.pushPod(outT, impl.f.call(*converted_args))
 
-                if "rel_tol" in kwargs:
-                    rel_tol = kwargs["rel_tol"].convert_to_type(float, ConversionLevel.Implicit)
-                    if rel_tol is None:
-                        return None
-                else:
-                    if args[0].expr_type.typeRepresentation is Float32 and args[1].expr_type.typeRepresentation is Float32:
-                        rel_tol = native_ast.const_float_expr(1e-5)  # with Float32, default needs to be larger
-                    else:
-                        rel_tol = native_ast.const_float_expr(1e-9)
-
-                if "abs_tol" in kwargs:
-                    abs_tol = kwargs["abs_tol"].convert_to_type(float, ConversionLevel.Implicit)
-                    if abs_tol is None:
-                        return None
-                else:
-                    abs_tol = native_ast.const_float_expr(0.0)
-
-                return context.pushPod(bool, func.call(arg1.nonref_expr, arg2.nonref_expr, rel_tol, abs_tol))
-            elif self.typeRepresentation is pow:
-                with context.ifelse(arg1.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
-                    with ifTrue:  # arg1 <= 0
-                        with context.ifelse(arg1.nonref_expr.eq(0.0)) as (ifTrue2, ifFalse2):
-                            with ifTrue2:  # arg1 == 0
-                                with context.ifelse(arg2.nonref_expr.lt(0.0)) as (ifTrue3, ifFalse3):
-                                    with ifTrue3:  # arg1 == 0, arg2 < 0
-                                        context.pushException(ValueError, "math domain error")
-                            with ifFalse2:  # arg1 < 0
-                                with context.ifelse(runtime_functions.isinf_float64.call(arg1.nonref_expr)) as (ifTrue4, ifFalse4):
-                                    with ifFalse4:  # arg1 < 0 and arg1 is finite
-                                        f_floor = runtime_functions.floor64
-                                        with context.ifelse(
-                                                f_floor.call(arg2.nonref_expr).sub(arg2.nonref_expr).neq(0.0)
-                                        ) as (ifTrue5, ifFalse5):
-                                            with ifTrue5:  # arg1 < 0, arg1 is finite, arg2 not an integer
-                                                context.pushException(ValueError, "math domain error")
-
-            ret = context.pushPod(outT, func.call(arg1.nonref_expr, arg2.nonref_expr))
-            if check_inf:
-                f_isinf = runtime_functions.isinf_float64
-                with context.ifelse(f_isinf.call(ret.nonref_expr)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        f_isfinite = runtime_functions.isfinite_float64
-                        with context.ifelse(
-                                f_isfinite.call(arg1.nonref_expr).bitand(f_isfinite.call(arg2.nonref_expr))
-                        ) as (ifTrue2, ifFalse2):
-                            with ifTrue2:
-                                context.pushException(OverflowError, 'math range error')
-            return ret
-
-        # handle integer factorial here
-        # if len(args) == 1 and not kwargs and self.typeRepresentation is factorial:
-        #     arg = args[0]
-        #     if not arg.expr_type.is_arithmetic:
-        #         return context.pushException(TypeError, f"must be real number, not {arg.expr_type}")
-        #
-        #     argType = arg.expr_type.typeRepresentation
-        #     if argType not in (Float32, float):
-        #         if argType not in (int,):
-        #             arg = arg.convert_to_type(int, ConversionLevel.New)
-        #             if arg is None:
-        #                 return None
-        #         with context.ifelse(arg.nonref_expr.lt(0)) as (ifTrue, ifFalse):
-        #             with ifTrue:
-        #                 context.pushException(ValueError, "factorial() not defined for negative values")
-        #         return context.pushPod(int, runtime_functions.factorial.call(arg.nonref_expr))
-        #     # let Float32 and float args fall through to later section, which will handle float factorials
-
-        # functions with 1 float arg
-        if len(args) == 1 and not kwargs and self.typeRepresentation is fsum:
-            arg = args[0]
-            if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
-                return context.call_py_function(sumIterable38, (arg,), {})
-            return context.call_py_function(sumIterable, (arg,), {})
-
-        # math functions with 1 argument
-        if len(args) == 1 and self.typeRepresentation in fns_1 and not kwargs:
-            func, outT, check_inf = fns_1[self.typeRepresentation]
-
-            arg = args[0].convert_to_type(float, ConversionLevel.Math)
-            if arg is None:
-                return None
-
-            # check argument
-            if self.typeRepresentation in (cos, sin, tan):
-                with context.ifelse(runtime_functions.isinf_float64.call(arg.nonref_expr)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        context.pushException(ValueError, "math domain error")
-            elif self.typeRepresentation is acos:
-                with context.ifelse(arg.nonref_expr.gt(1.0)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        context.pushException(ValueError, "math domain error")
-                with context.ifelse(arg.nonref_expr.lt(-1.0)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        context.pushException(ValueError, "math domain error")
-            elif self.typeRepresentation is acosh:
-                with context.ifelse(arg.nonref_expr.lt(1.0)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        context.pushException(ValueError, "math domain error")
-            elif self.typeRepresentation is asin:
-                with context.ifelse(arg.nonref_expr.gt(1.0)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        context.pushException(ValueError, "math domain error")
-                with context.ifelse(arg.nonref_expr.lt(-1.0)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        context.pushException(ValueError, "math domain error")
-            elif self.typeRepresentation is atanh:
-                with context.ifelse(arg.nonref_expr.gte(1.0)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        context.pushException(ValueError, "math domain error")
-                with context.ifelse(arg.nonref_expr.lte(-1.0)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        context.pushException(ValueError, "math domain error")
-            elif self.typeRepresentation is degrees:
-                # calculate this one without c++
-                return context.pushPod(outT, arg.nonref_expr.mul(native_ast.const_float_expr(180 / pi)))
-            elif self.typeRepresentation is factorial:
-                with context.ifelse(arg.nonref_expr.gte(0.0)) as (ifTrue, ifFalse):
-                    with ifTrue:  # arg >= 0
-                        f_floor = runtime_functions.floor64
-                        with context.ifelse(f_floor.call(arg.nonref_expr).sub(arg.nonref_expr).neq(0.0)) as (ifTrue2, ifFalse2):
-                            with ifTrue2:  # arg >= 0, arg not an integer
-                                context.pushException(ValueError, "factorial() only accepts integral values")
-                    with ifFalse:  # arg < 0
-                        context.pushException(ValueError, "factorial() not defined for negative values")
-            elif self.typeRepresentation is frexp:
-                outT = MasqueradingTupleWrapper(Tuple(float, int))
-                return_tuple = native_ast.Expression.StackSlot(name=".return_tuple", type=outT.layoutType)
-                context.pushEffect(func.call(arg.nonref_expr, return_tuple.elemPtr(0).cast(native_ast.VoidPtr)))
-                return typed_python.compiler.typed_expression.TypedExpression(context, return_tuple, outT, True)
-            elif self.typeRepresentation is gamma:
-                with context.ifelse(arg.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
-                    with ifTrue:  # arg <= 0
-                        with context.ifelse(runtime_functions.isinf_float64.call(arg.nonref_expr)) as (ifTrue2, ifFalse2):
-                            with ifTrue2:  # arg == -inf   Note: inf is ok but not -inf
-                                context.pushException(ValueError, "math domain error")
-                        f_floor = runtime_functions.floor64
-                        with context.ifelse(f_floor.call(arg.nonref_expr).sub(arg.nonref_expr).eq(0.0)) as (ifTrue2, ifFalse2):
-                            with ifTrue2:  # arg <= 0, arg an integer
-                                context.pushException(ValueError, "math domain error")
-            elif self.typeRepresentation is lgamma:
-                with context.ifelse(arg.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
-                    with ifTrue:  # arg <= 0
-                        f_floor = runtime_functions.floor64
-                        with context.ifelse(f_floor.call(arg.nonref_expr).sub(arg.nonref_expr).eq(0.0)) as (ifTrue2, ifFalse2):
-                            with ifTrue2:  # arg <= 0, arg an integer
-                                context.pushException(ValueError, "math domain error")
-            elif self.typeRepresentation is log:
-                with context.ifelse(arg.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
-                    with ifTrue:  # arg <= 0
-                        context.pushException(ValueError, "math domain error")
-            elif self.typeRepresentation is log1p:
-                with context.ifelse(arg.nonref_expr.lte(-1.0)) as (ifTrue, ifFalse):
-                    with ifTrue:  # arg <= -1
-                        context.pushException(ValueError, "math domain error")
-            elif self.typeRepresentation is log2:
-                with context.ifelse(arg.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
-                    with ifTrue:  # arg <= 0
-                        context.pushException(ValueError, "math domain error")
-            elif self.typeRepresentation is log10:
-                with context.ifelse(arg.nonref_expr.lte(0.0)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        context.pushException(ValueError, "math domain error")
-            elif self.typeRepresentation is radians:
-                # calculate this one without c++
-                return context.pushPod(outT, arg.nonref_expr.mul(native_ast.const_float_expr(pi / 180)))
-            elif self.typeRepresentation is modf:
-                outT = MasqueradingTupleWrapper(Tuple(float, float))
-                return_tuple = native_ast.Expression.StackSlot(name=".return_tuple", type=outT.layoutType)
-                context.pushEffect(func.call(arg.nonref_expr, return_tuple.elemPtr(0).cast(native_ast.VoidPtr)))
-                return typed_python.compiler.typed_expression.TypedExpression(self, return_tuple, outT, True)
-            elif self.typeRepresentation is sqrt:
-                with context.ifelse(arg.nonref_expr.lt(0.0)) as (ifTrue, ifFalse):
-                    with ifTrue:  # arg < 0
-                        context.pushException(ValueError, "math domain error")
-
-            ret = context.pushPod(outT, func.call(arg.nonref_expr))
-            if check_inf:
-                f_isinf = runtime_functions.isinf_float64
-                with context.ifelse(f_isinf.call(ret.nonref_expr)) as (ifTrue, ifFalse):
-                    with ifTrue:
-                        f_isfinite = runtime_functions.isfinite_float64
-                        with context.ifelse(f_isfinite.call(arg.nonref_expr)) as (ifTrue2, ifFalse2):
-                            with ifTrue2:
-                                context.pushException(OverflowError, 'math range error')
-            return ret
-
-        return super().convert_call(context, expr, args, kwargs)
+        # Check for nonfinite return value with finite arguments passed in
+        if impl.check_inf:
+            f_isinf = runtime_functions.isinf_float64
+            with context.ifelse(f_isinf.call(ret.nonref_expr)) as (ifTrue, ifFalse):
+                with ifTrue:
+                    f_isfinite = runtime_functions.isfinite_float64
+                    with context.ifelse(
+                        f_isfinite.call(arg1.nonref_expr) if len(args) == 1 else
+                        f_isfinite.call(arg1.nonref_expr).bitand(f_isfinite.call(arg2.nonref_expr))
+                    ) as (ifTrue2, ifFalse2):
+                        with ifTrue2:
+                            context.pushException(OverflowError, 'math range error')
+        return ret
