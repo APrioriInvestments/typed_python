@@ -84,7 +84,7 @@ def visitPyAstChildren(node, callback):
             visitPyAstChildren(x, callback)
 
 
-def computeAssignedVariables(astNode):
+def computeAssignedVariables(astNode, includeImports=True):
     """Return a set of variable names that are assigned to by this ast node or children.
 
     Right now we don't handle the 'nonlocal' keyword correctly (or 'global' for that matter).
@@ -93,7 +93,7 @@ def computeAssignedVariables(astNode):
     Args:
         astNode - any python_ast object, or a list/tuple of them, or a primitive.
     """
-    return set(computeVariablesAssignmentCounts(astNode).keys())
+    return set(computeVariablesAssignmentCounts(astNode, includeImports=includeImports).keys())
 
 
 def computeVariablesAssignedOnlyOnce(astNode):
@@ -102,7 +102,7 @@ def computeVariablesAssignedOnlyOnce(astNode):
     return set([varname for varname, count in assignmentCounts.items() if count == 1])
 
 
-def computeVariablesAssignmentCounts(astNode):
+def computeVariablesAssignmentCounts(astNode, includeImports=True):
     """Count how many times each variable is assigned by this astNode in the current expression.
 
     Args:
@@ -115,7 +115,7 @@ def computeVariablesAssignmentCounts(astNode):
     assignmentCounts = collections.defaultdict(int)
 
     def visit(x):
-        if isinstance(x, Alias):
+        if isinstance(x, Alias) and includeImports:
             if x.asname:
                 assignmentCounts[x.asname] += 1
             else:
