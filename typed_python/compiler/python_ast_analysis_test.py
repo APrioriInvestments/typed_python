@@ -133,3 +133,12 @@ class TestPythonAstAnalysis(unittest.TestCase):
                     return z  # noqa
 
         self.freeVarCheck(f, ['z'], ['AClass'])
+
+    def test_import_aliases(self):
+        def f():
+            import a.b  # noqa
+            import e.f as blah  # noqa
+
+        pyast = python_ast.convertFunctionToAlgebraicPyAst(f)
+
+        assert python_ast_analysis.computeAssignedVariables(pyast.body) == {'a', 'blah'}

@@ -116,7 +116,10 @@ def computeVariablesAssignmentCounts(astNode):
 
     def visit(x):
         if isinstance(x, Alias):
-            assignmentCounts[x] += 1
+            if x.asname:
+                assignmentCounts[x.asname] += 1
+            else:
+                assignmentCounts[x.name.split(".")[0]] += 1
 
         if isinstance(x, Expr):
             if x.matches.Name and (x.ctx.matches.Store or x.ctx.matches.Del or x.ctx.matches.AugStore):
