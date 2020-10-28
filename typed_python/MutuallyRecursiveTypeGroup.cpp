@@ -47,10 +47,10 @@ bool isCanonicalName(std::string name) {
         "token", "traceback", "tracemalloc", "trace", "tty", "turtledemo", "turtle", "types",
         "typing", "unittest", "urllib", "uuid", "uu", "venv", "warnings", "wave", "weakref",
         "_weakrefset", "webbrowser", "wsgiref", "xdrlib", "xml", "xmlrpc", "zipapp",
-        "zipfile", "zipimport", "pytz",
+        "zipfile", "zipimport", "pytz", "psutil",
 
         // and some standard ones we might commonly install
-        "numpy", "pandas", "scipy", "pytest", "_pytest", "typed_python", "llvmlite",
+        "numpy", "pandas", "scipy", "pytest", "_pytest", "typed_python", "object_database", "llvmlite",
         "requests", "redis", "websockets", "boto3", "py", "xdist", "pytest_jsonreport",
         "pytest_metadata", "flask", "flaky", "coverage", "pyasn1", "cryptography", "paramiko",
         "six"
@@ -67,6 +67,40 @@ bool isCanonicalName(std::string name) {
 
     return canonicalPythonModuleNames.find(moduleNameRoot) != canonicalPythonModuleNames.end();
 }
+
+// is this a special name in a dict, module, or class that we shouldn't hash?
+// we do want to hash methods like __init__
+bool isSpecialIgnorableName(const std::string& name) {
+    static std::set<string> canonicalMagicMethods({
+        "__abs__", "__add__", "__and__", "__bool__",
+        "__bytes__", "__call__", "__contains__", "__del__",
+        "__delattr__", "__eq__", "__float__", "__floordiv__",
+        "__format__", "__ge__", "__getitem__", "__gt__",
+        "__hash__", "__iadd__", "__iand__", "__ieq__",
+        "__ifloordiv__", "__ige__", "__igt__", "__ile__",
+        "__ilshift__", "__ilt__", "__imatmul__", "__imod__",
+        "__imul__", "__index__", "__ine__", "__init__",
+        "__int__", "__invert__", "__ior__", "__ipow__",
+        "__irshift__", "__isub__", "__itruediv__", "__ixor__",
+        "__le__", "__len__", "__lshift__", "__lt__",
+        "__matmul__", "__mod__", "__mul__", "__ne__",
+        "__neg__", "__not__", "__or__", "__pos__",
+        "__pow__", "__radd__", "__rand__", "__repr__",
+        "__rfloordiv__", "__rlshift__", "__rmatmul__", "__rmod__",
+        "__rmul__", "__ror__", "__round__", "__round__",
+        "__rpow__", "__rrshift__", "__rshift__", "__rsub__",
+        "__rtruediv__", "__rxor__", "__setattr__", "__setitem__",
+        "__str__", "__sub__", "__truediv__", "__xor__",
+    });
+
+    return (
+        name.substr(0, 2) == "__"
+        && name.substr(name.size() - 2) == "__"
+        && canonicalMagicMethods.find(name) == canonicalMagicMethods.end()
+    );
+}
+
+
 
 /*******
     This function defines  generic visitor pattern for looking inside of a Type or a PyObject to see
@@ -93,7 +127,7 @@ void visitCompilerVisibleTypesAndPyobjects(
     const visitor_4& namedVisitor,
     const visitor_5& onErr
 ) {
-    auto visitDict = [&](PyObject* d) {
+    auto visitDict = [&](PyObject* d, bool ignoreSpecialNames=false) {
         if (!d) {
             hashVisit(0);
             return;
@@ -109,7 +143,15 @@ void visitCompilerVisibleTypesAndPyobjects(
         std::map<std::string, PyObject*> names;
         iterate(d, [&](PyObject* o) {
             if (PyUnicode_Check(o)) {
-                names[PyUnicode_AsUTF8(o)] = o;
+                std::string name = PyUnicode_AsUTF8(o);
+
+                // we don't want module members to hash their file paths
+                // or their module loader info, because then they can't be
+                // moved around without violating the cache (and in fact their
+                // hashes are not stable at all)
+                if (!(ignoreSpecialNames && isSpecialIgnorableName(name))) {
+                    names[name] = o;
+                }
             }
         });
 
@@ -284,7 +326,11 @@ void visitCompilerVisibleTypesAndPyobjects(
             std::vector<std::vector<PyObject*> > dotAccesses;
 
             Function::Overload::visitCompilerVisibleGlobals(
-                namedVisitor,
+                [&](std::string name, PyObject* val) {
+                    if (!isSpecialIgnorableName(name)) {
+                        namedVisitor(name, val);
+                    }
+                },
                 (PyCodeObject*)f->func_code,
                 f->func_globals
             );
@@ -301,7 +347,7 @@ void visitCompilerVisibleTypesAndPyobjects(
 
         hashVisit(ShaHash(0));
         if (tp->tp_dict) {
-            visitDict(tp->tp_dict);
+            visitDict(tp->tp_dict, true);
         }
         hashVisit(ShaHash(0));
 
@@ -387,7 +433,7 @@ void visitCompilerVisibleTypesAndPyobjects(
 
             visit((PyObject*)obj.pyobj()->ob_type);
 
-            visitDict(dict);
+            visitDict(dict, true);
             return;
         }
     }
