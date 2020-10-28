@@ -410,3 +410,8 @@ inline PyObject* weakrefModule() {
     static PyObject* module = PyImport_ImportModule("weakref");
     return module;
 }
+
+inline PyObject* osModule() {
+    static PyObject* module = PyImport_ImportModule("os");
+    return module;
+}

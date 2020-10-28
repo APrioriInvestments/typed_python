@@ -580,6 +580,7 @@ PyObject* initializeGlobalStatics(PyObject* nullValue, PyObject* args, PyObject*
     runtimeModule();
     builtinsModule();
     sysModule();
+    osModule();
     weakrefModule();
 
     return incref(Py_None);
@@ -2268,6 +2269,64 @@ PyObject *typesAndObjectsVisibleToCompilerFrom(PyObject* nullValue, PyObject* ar
     });
 }
 
+PyObject *recursiveTypeGroupHash(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "recursiveTypeGroupHash takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    MutuallyRecursiveTypeGroup* group = nullptr;
+
+    return translateExceptionToPyObject([&]() {
+        if (PyType_Check(a1)) {
+            Type* typeArg = PyInstance::extractTypeFrom(a1);
+            if (typeArg) {
+                group = typeArg->getRecursiveTypeGroup();
+            }
+        }
+
+        if (!group) {
+            group = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(a1).first;
+        }
+
+        if (!group) {
+            return incref(Py_None);
+        }
+
+        return PyUnicode_FromString(group->hash().digestAsHexString().c_str());
+    });
+}
+
+PyObject *recursiveTypeGroupDeepRepr(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "recursiveTypeGroupDeepRepr takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    MutuallyRecursiveTypeGroup* group = nullptr;
+
+    return translateExceptionToPyObject([&]() {
+        if (PyType_Check(a1)) {
+            Type* typeArg = PyInstance::extractTypeFrom(a1);
+            if (typeArg) {
+                group = typeArg->getRecursiveTypeGroup();
+            }
+        }
+
+        if (!group) {
+            group = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(a1).first;
+        }
+
+        if (!group) {
+            return incref(Py_None);
+        }
+
+        return PyUnicode_FromString(group->repr(true).c_str());
+    });
+}
+
 PyObject *recursiveTypeGroup(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "recursiveTypeGroup takes 1 positional argument");
@@ -2547,6 +2606,8 @@ static PyMethodDef module_methods[] = {
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
     {"recursiveTypeGroup", (PyCFunction)recursiveTypeGroup, METH_VARARGS, NULL},
+    {"recursiveTypeGroupDeepRepr", (PyCFunction)recursiveTypeGroupDeepRepr, METH_VARARGS, NULL},
+    {"recursiveTypeGroupHash", (PyCFunction)recursiveTypeGroupHash, METH_VARARGS, NULL},
     {"typesAndObjectsVisibleToCompilerFrom", (PyCFunction)typesAndObjectsVisibleToCompilerFrom, METH_VARARGS, NULL},
     {"isRecursive", (PyCFunction)isRecursive, METH_VARARGS, NULL},
     {"referencedTypes", (PyCFunction)referencedTypes, METH_VARARGS, NULL},

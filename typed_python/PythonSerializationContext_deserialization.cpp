@@ -959,7 +959,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                     "Named object " + name + " identifies a group with hash "
                     + group->hash().digestAsHexString() + " which doesn't equal the "
                     + "expected hash of " + groupHash.digestAsHexString() + " that's embedded "
-                    + "in the serialized stream."
+                    + "in the serialized stream.\n\ndeep group repr is:\n" + group->repr(true)
                 );
             }
 

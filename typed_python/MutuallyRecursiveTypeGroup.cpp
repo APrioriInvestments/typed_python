@@ -47,7 +47,7 @@ bool isCanonicalName(std::string name) {
         "token", "traceback", "tracemalloc", "trace", "tty", "turtledemo", "turtle", "types",
         "typing", "unittest", "urllib", "uuid", "uu", "venv", "warnings", "wave", "weakref",
         "_weakrefset", "webbrowser", "wsgiref", "xdrlib", "xml", "xmlrpc", "zipapp",
-        "zipfile", "zipimport",
+        "zipfile", "zipimport", "pytz",
 
         // and some standard ones we might commonly install
         "numpy", "pandas", "scipy", "pytest", "_pytest", "typed_python", "llvmlite",
@@ -150,6 +150,15 @@ void visitCompilerVisibleTypesAndPyobjects(
             }
         });
 
+        return;
+    }
+
+    static PyObject* osModule = ::osModule();
+    static PyObject* environType = PyObject_GetAttrString(osModule, "_Environ");
+
+    if (obj.pyobj()->ob_type == (PyTypeObject*)environType) {
+        // don't ever hash the environment.
+        hashVisit(ShaHash(13));
         return;
     }
 
@@ -368,6 +377,8 @@ void visitCompilerVisibleTypesAndPyobjects(
         return;
     }
 
+    // we do want to visit the internals of arbitrary objects, because
+    // the compiler will attempt to do so as well.
     if (PyObject_HasAttrString(obj.pyobj(), "__dict__")) {
         PyObjectStealer dict(PyObject_GetAttrString(obj.pyobj(), "__dict__"));
 
@@ -469,13 +480,58 @@ int32_t MutuallyRecursiveTypeGroup::indexOfObjectInThisGroup(PyObject* o) {
     return -1;
 }
 
-std::string MutuallyRecursiveTypeGroup::repr() {
+std::string MutuallyRecursiveTypeGroup::repr(bool deep) {
     std::ostringstream s;
-    s << "group with hash " << hash().digestAsHexString() << ":\n";
 
-    for (auto& ixAndObj: mIndexToObject) {
-        s << "  " << ixAndObj.first << " -> " << ixAndObj.second.name() << "\n";
-    }
+    std::set<MutuallyRecursiveTypeGroup*> seen;
+
+    std::function<void (MutuallyRecursiveTypeGroup*, int)> dump = [&](MutuallyRecursiveTypeGroup* group, int level) {
+        seen.insert(group);
+
+        std::string levelPrefix(level, ' ');
+
+        s << levelPrefix << "group with hash " << group->hash().digestAsHexString() << ":\n";
+
+        // sort lexically and then by level, so that
+        // we can tell what's going on when we have a discrepancy
+        std::map<std::string, std::vector<int> > ordered;
+        for (auto& ixAndObj: group->mIndexToObject) {
+            ordered[ixAndObj.second.name()].push_back(ixAndObj.first);
+        }
+
+        for (auto& nameAndIndices: ordered) {
+            for (auto ix: nameAndIndices.second) {
+                TypeOrPyobj obj = group->mIndexToObject.find(ix)->second;
+
+                s << levelPrefix << " " << ix << " -> " << obj.name() << "\n";
+
+                if (deep) {
+                    std::vector<TypeOrPyobj> visible;
+                    visibleFrom(obj, visible);
+
+                    for (auto v: visible) {
+                        MutuallyRecursiveTypeGroup* subgroup;
+                        if (v.typeOrPyobjAsType()) {
+                            subgroup = v.typeOrPyobjAsType()->getRecursiveTypeGroup();
+                        } else {
+                            subgroup = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(
+                                v.typeOrPyobjAsObject()
+                            ).first;
+                        }
+
+                        if (seen.find(subgroup) == seen.end()) {
+                            dump(subgroup, level + 2);
+                        } else {
+                            s << levelPrefix << "  " << "group with hash " << group->hash().digestAsHexString()
+                                << " (dumped already)\n";
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    dump(this, 0);
 
     return s.str();
 }

@@ -49,7 +49,7 @@ public:
         }
     }
 
-    std::string repr();
+    std::string repr(bool deep=false);
 
     static ShaHash pyObjectShaHash(PyObject* h, MutuallyRecursiveTypeGroup* groupHead);
 

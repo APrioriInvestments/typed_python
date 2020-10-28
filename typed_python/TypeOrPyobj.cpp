@@ -63,7 +63,7 @@ std::string TypeOrPyobj::name() {
 
         if (repr) {
             return "<PyObj of type " + std::string(mPyObj->ob_type->tp_name) +
-                " with repr " + std::string(PyUnicode_AsUTF8(repr)).substr(0, 50) + ">";
+                " with repr " + std::string(PyUnicode_AsUTF8(repr)).substr(0, 150) + ">";
             decref(repr);
         }
 
