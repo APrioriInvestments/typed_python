@@ -15,6 +15,7 @@
 import sys
 import os
 import importlib
+from typed_python.test_util import callFunctionInFreshProcess
 import typed_python.compiler.python_ast_util as python_ast_util
 import threading
 import textwrap
@@ -42,10 +43,13 @@ from typed_python import (
     Member, ConstDict, Alternative, serialize, deserialize,
     Dict, Set, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject,
-    Forward, Final, Function, Entrypoint, TypeFunction, PointerTo
+    Forward, Final, Function, Entrypoint, TypeFunction, PointerTo,
 )
 
-from typed_python._types import refcount, isRecursive, identityHash, buildPyFunctionObject, setFunctionClosure
+from typed_python._types import (
+    refcount, isRecursive, identityHash, buildPyFunctionObject,
+    setFunctionClosure, typesAreEquivalent, recursiveTypeGroupDeepRepr
+)
 
 module_level_testfun = dummy_test_module.testfunction
 
@@ -2140,3 +2144,216 @@ class TypesSerializationTest(unittest.TestCase):
         x2 = sc.deserialize(sc.serialize(x))
 
         assert x2[0] is x2[1] and isinstance(x2[0], type(x[0]))
+
+    def test_serialize_methods(self):
+        sc = SerializationContext()
+
+        assert sc.deserialize(sc.serialize(ModuleLevelClass().f))() == "HI!"
+
+    def test_can_deserialize_anonymous_class_methods(self):
+        class Cls:
+            def f(self):
+                return Cls
+
+        assert callFunctionInFreshProcess(Cls().f, ()) is Cls
+
+    def test_can_deserialize_untyped_forward_class_methods(self):
+        Cls = Forward("Cls")
+
+        @Cls.define
+        class Cls:
+            # recall that regular classes ignore their annotations
+            def f(self) -> Cls:
+                return "HI"
+
+        assert callFunctionInFreshProcess(Cls, ()).f() == "HI"
+
+    def test_can_deserialize_forward_class_methods_tp_class(self):
+        Cls = Forward("Cls")
+
+        @Cls.define
+        class Cls(Class):
+            m = Member(str)
+
+            def f(self) -> Cls:
+                return Cls(m='HI')
+
+        assert callFunctionInFreshProcess(Cls, ()).f().m == "HI"
+
+    def test_can_deserialize_forward_class_methods_tp_class_no_self_reference(self):
+        Cls = Forward("Cls")
+
+        @Cls.define
+        class Cls(Class):
+            m = Member(str)
+
+            def f(self) -> str:
+                return "HI"
+
+        assert callFunctionInFreshProcess(Cls, ()).f() == "HI"
+
+    def test_deserialize_regular_class_retains_identity(self):
+        class Cls:
+            # recall that regular classes ignore their annotations
+            def f(self):
+                Cls
+                return "HI"
+
+        Cls2 = type(callFunctionInFreshProcess(Cls, ()))
+
+        assert identityHash(Cls).hex() == identityHash(Cls2).hex()
+
+    @pytest.mark.skip(reason='broken')
+    def test_deserialize_untyped_class_in_forward_retains_identity(self):
+        # this still breaks because we have some inconsistency between how
+        # the MRTG gets created after deserialization when we have a regular
+        # python class in a forward like this.
+        Cls = Forward("Cls")
+
+        @Cls.define
+        class Cls:
+            def f(self) -> Cls:
+                return Cls()
+
+        Cls2 = type(callFunctionInFreshProcess(Cls, ()))
+
+        l = recursiveTypeGroupDeepRepr(Cls).split("\n")
+        r = recursiveTypeGroupDeepRepr(Cls2).split("\n")
+
+        while len(l) < len(r):
+            l.append("")
+
+        while len(r) < len(l):
+            r.append("")
+
+        def pad(x):
+            x = x[:120]
+            x = x + " " * (120 - len(x))
+            return x
+
+        for i in range(len(l)):
+            print(pad(l[i]), "    " if l[i] == r[i] else " != ", pad(r[i]))
+
+        assert identityHash(Cls) == identityHash(Cls2)
+
+    def test_deserialize_tp_class_retains_identity(self):
+        Cls = Forward("Cls")
+
+        @Cls.define
+        class Cls(Class):
+            # recall that regular classes ignore their annotations
+            def f(self) -> Cls:
+                return Cls()
+
+        Cls2 = type(callFunctionInFreshProcess(Cls, ()))
+
+        assert identityHash(Cls) == identityHash(Cls2)
+
+    def test_call_method_dispatch_on_two_versions_of_same_class_with_recursion_defined_in_host(self):
+        Base = Forward("Base")
+
+        @Base.define
+        class Base(Class):
+            def blah(self) -> Base:
+                return self
+
+            def f(self, x) -> int:
+                return x + 1
+
+        class Child(Base, Final):
+            def f(self, x) -> int:
+                return -1
+
+        aChild = Child()
+
+        aChildBytes = SerializationContext().serialize(aChild)
+
+        def deserializeAndCall(someBytes):
+            @Entrypoint
+            def callF(x):
+                return x.f(10)
+
+            aChild = SerializationContext().deserialize(someBytes)
+
+            aChild2 = SerializationContext().deserialize(someBytes)
+
+            assert identityHash(aChild) == identityHash(aChild2)
+
+            if callF(aChild) == callF(aChild2):
+                return "OK"
+            else:
+                return "FAILED"
+
+        assert callFunctionInFreshProcess(deserializeAndCall, (aChildBytes,)) == "OK"
+
+    def test_call_method_dispatch_on_two_versions_of_self_referential_class_produced_differently(self):
+        def deserializeAndCall():
+            Base = Forward("Base")
+
+            @Base.define
+            class Base(Class):
+                def blah(self) -> Base:
+                    return self
+
+                def f(self, x) -> int:
+                    return x + 1
+
+            @Entrypoint
+            def callF(x: Base):
+                return x.f(10)
+
+            class Child(Base, Final):
+                def f(self, x) -> int:
+                    return -1
+
+            return Child(), callF
+
+        child1, callF1 = callFunctionInFreshProcess(deserializeAndCall, ())
+        child2, callF2 = callFunctionInFreshProcess(deserializeAndCall, ())
+
+        assert identityHash(child1) == identityHash(child2)
+        assert identityHash(callF1) == identityHash(callF2)
+
+        assert callF1(child1) == callF2(child2)
+
+    def test_call_method_dispatch_on_two_versions_of_same_class_with_recursion(self):
+        Base = Forward("Base")
+
+        @Base.define
+        class Base(Class):
+            def blah(self) -> Base:
+                return self
+
+            def f(self, x) -> int:
+                return x + 1
+
+        @Entrypoint
+        def callF(x: Base):
+            return x.f(10)
+
+        identityHash(Base)
+
+        def deserializeAndCall():
+            class Child(Base, Final):
+                def f(self, x) -> int:
+                    return -1
+
+            assert isinstance(Child(), Base)
+
+            return SerializationContext().serialize(Child())
+
+        childBytes = callFunctionInFreshProcess(deserializeAndCall, ())
+
+        child1 = SerializationContext().deserialize(childBytes)
+        child2 = SerializationContext().deserialize(childBytes)
+
+        assert type(child1) is type(child2)
+
+        childVersionOfBase = type(child1).BaseClasses[0]
+
+        assert typesAreEquivalent(Base, childVersionOfBase)
+
+        print(type(child1).BaseClasses)
+        assert Base in type(child1).BaseClasses
+
+        assert callF(child1) == callF(child2)

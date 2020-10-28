@@ -21,7 +21,7 @@ from typed_python.python_ast import (
 )
 from typed_python.hash import sha_hash
 from typed_python.type_function import ConcreteTypeFunction, reconstructTypeFunctionType, isTypeFunctionType
-from types import FunctionType, ModuleType, CodeType, BuiltinFunctionType
+from types import FunctionType, ModuleType, CodeType, MethodType, BuiltinFunctionType
 from _thread import LockType, RLock
 import numpy
 import sys
@@ -74,6 +74,7 @@ DEFAULT_NAME_TO_OVERRIDE = {
     ".builtin.builtin_function_or_method": BuiltinFunctionType,
     ".builtin.code_type": CodeType,
     ".builtin.module_type": ModuleType,
+    ".builtin.method_type": MethodType,
     ".builtin.function_type": FunctionType,
 }
 
@@ -488,6 +489,10 @@ class SerializationContext:
         if isinstance(inst, staticmethod):
             return (staticmethod, (None,), inst.__func__)
 
+        if isinstance(inst, MethodType):
+            # create a 'dummy' method which we'll fill out below
+            return (MethodType, (lambda: None, 0), (inst.__self__, inst.__func__))
+
         if isinstance(inst, classmethod):
             return (classmethod, (None,), inst.__func__)
 
@@ -571,6 +576,10 @@ class SerializationContext:
 
     def setInstanceStateFromRepresentation(self, instance, representation):
         if representation is reconstructTypeFunctionType:
+            return True
+
+        if isinstance(instance, types.MethodType):
+            _types.setMethodObjectInternals(instance, representation[0], representation[1])
             return True
 
         if isinstance(instance, (LockType, RLock)):

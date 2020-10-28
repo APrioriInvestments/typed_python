@@ -449,6 +449,7 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
         //           in this group, and we serialize the type as a python object
         //      4 if its an object-and-dict whose type is included
         //           in this group, and we serialize it as an index.
+        //      5 if its a tuple
         b.writeBeginCompound(2);
             for (auto& indexAndObj: group->getIndexToObject()) {
                 int32_t index = indexAndObj.first;
@@ -458,6 +459,7 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                     // it's a type object. write it as a native type and serialize its inner pieces.
                     b.writeUnsignedVarintObject(0, 0);
                     b.writeStringObject(1, indexAndObj.second.typeOrPyobjAsType()->name());
+                    b.writeUnsignedVarintObject(2, indexAndObj.second.typeOrPyobjAsType()->getTypeCategory());
                 } else {
                     //give the plugin a chance to convert the instance to something else
                     PyObjectStealer representation(
@@ -562,7 +564,20 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                         serializePythonObject(objDict, b, index);
                     }
                 } else {
-                    serializeNativeTypeInner(obj.typeOrPyobjAsType(), b, index);
+                    Type* toSerialize = obj.typeOrPyobjAsType();
+                    if (toSerialize->isForward()) {
+                        Forward* f = (Forward*)toSerialize;
+                        if (f->getTarget()) {
+                            // we already indicated that this is a forward,
+                            // so we just want to serialize the type of the inner
+                            // which should be another MRTG reference
+                            serializeNativeType(f->getTarget(), b, index);
+                        } else {
+                            throw std::runtime_error("Can't serialize empty forward " + f->name());
+                        }
+                    } else {
+                        serializeNativeTypeInner(toSerialize, b, index);
+                    }
                 }
             };
 
@@ -643,13 +658,6 @@ void PythonSerializationContext::serializeNativeTypeInner(
             size_t fieldNumber
             ) const {
     b.writeBeginCompound(fieldNumber);
-
-    if (nativeType->getTypeCategory() == Type::TypeCategory::catForward) {
-        if (!((Forward*)nativeType)->getTarget()) {
-            throw std::runtime_error("Can't serialize an undefined forward");
-        }
-        nativeType = ((Forward*)nativeType)->getTarget();
-    }
 
     if (isSimpleType(nativeType)) {
         b.writeUnsignedVarintObject(0, nativeType->getTypeCategory());
@@ -755,7 +763,7 @@ void PythonSerializationContext::serializeNativeTypeInner(
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catHeldClass) {
         serializeNativeType(((HeldClass*)nativeType)->getClassType(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catForward) {
-        throw std::runtime_error("We shouldn't ever get here.");
+        throw std::runtime_error("We shouldn't be serializing forwards directly");
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catClass) {
         Class* cls = (Class*)nativeType;
 

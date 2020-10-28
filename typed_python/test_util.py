@@ -21,7 +21,7 @@ import subprocess
 import sys
 import os
 
-from typed_python import Entrypoint
+from typed_python import Entrypoint, SerializationContext
 
 
 def currentMemUsageMb(residentOnly=True):
@@ -91,6 +91,56 @@ def instantiateFiles(filesToWrite, tf):
                 "from typed_python import *\n"
                 + contents
             )
+
+
+def callFunctionInFreshProcess(func, argTup, compilerCacheDir=None):
+    """Return the value of a function evaluated on some arguments in a subprocess.
+
+    We use this to test the semantics of anonymous functions and classes in a process
+    that didn't create those obects.
+
+    Args:
+        func - the function object to call
+        argTup - a tuple of arguments
+
+    Returns:
+        the result of the expression.
+    """
+    with tempfile.TemporaryDirectory() as tf:
+        env = dict(os.environ)
+
+        if compilerCacheDir:
+            env["TP_COMPILER_CACHE"] = compilerCacheDir
+
+        sc = SerializationContext()
+
+        with open(os.path.join(tf, "input"), "wb") as f:
+            f.write(sc.serialize((func, argTup)))
+
+        try:
+            subprocess.check_output(
+                [
+                    sys.executable,
+                    "-u",
+                    "-c",
+                    "from typed_python import SerializationContext\n"
+                    "sc = SerializationContext()\n"
+                    "with open('input', 'rb') as f:\n"
+                    "    func, argTup = sc.deserialize(f.read())\n"
+                    "with open('output', 'wb') as f:\n"
+                    "    f.write(sc.serialize(func(*argTup)))\n"
+                ],
+                cwd=tf,
+                env=env,
+                stderr=subprocess.PIPE
+            )
+        except subprocess.CalledProcessError as e:
+            raise Exception("Subprocess failed:\n\n" + e.stdout.decode("ASCII") + "\n\nerr=\n" + e.stderr.decode("ASCII"))
+
+        with open(os.path.join(tf, "output"), "rb") as f:
+            result = sc.deserialize(f.read())
+
+        return result
 
 
 def evaluateExprInFreshProcess(filesToWrite, expression, compilerCacheDir=None, printComments=False):

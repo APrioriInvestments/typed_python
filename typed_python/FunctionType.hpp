@@ -791,12 +791,31 @@ public:
         void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
             visitor(mFunctionCode);
 
+            // visit the interior elements of
             if (mFunctionAnnotations) {
-                visitor(mFunctionAnnotations);
+                if (PyDict_CheckExact(mFunctionAnnotations)) {
+                    PyObject *key, *value;
+                    Py_ssize_t pos = 0;
+
+                    while (PyDict_Next(mFunctionAnnotations, &pos, &key, &value)) {
+                        visitor(value);
+                    }
+                } else {
+                    visitor(mFunctionAnnotations);
+                }
             }
 
             if (mFunctionDefaults) {
-                visitor(mFunctionDefaults);
+                if (PyDict_CheckExact(mFunctionDefaults)) {
+                    PyObject *key, *value;
+                    Py_ssize_t pos = 0;
+
+                    while (PyDict_Next(mFunctionDefaults, &pos, &key, &value)) {
+                        visitor(value);
+                    }
+                } else {
+                    visitor(mFunctionDefaults);
+                }
             }
 
             for (auto nameAndGlobal: mFunctionGlobalsInCells) {

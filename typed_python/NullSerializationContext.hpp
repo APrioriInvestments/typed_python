@@ -32,7 +32,7 @@ public:
         throw std::runtime_error("No serialization plugin provided, so we can't serialize arbitrary python objects.");
     }
 
-    virtual Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType, bool insistResolved=false) const {
+    virtual Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType) const {
         throw std::runtime_error("No serialization plugin provided, so we can't serialize arbitrary python objects.");
     }
 

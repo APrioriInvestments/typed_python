@@ -36,6 +36,16 @@ public:
         return mHash;
     }
 
+    void computeHashAndInstall();
+
+    // indicate that when we deserialize 'sourceHash', we are going to get the group
+    // mapped to 'destHash'.
+    static void installSourceToDestHashLookup(ShaHash sourceHash, ShaHash destHash);
+
+    // if 'sourceHash' was marked to go to 'destHash', return 'destHash'. otherwise
+    // return sourceHash.
+    static ShaHash sourceToDestHashLookup(ShaHash sourceHash);
+
     const std::map<int32_t, TypeOrPyobj>& getIndexToObject() const {
         return mIndexToObject;
     }
@@ -74,6 +84,8 @@ public:
     // returns -1 if its not.
     int32_t indexOfObjectInThisGroup(PyObject* o);
 
+    int32_t indexOfObjectInThisGroup(TypeOrPyobj o);
+
     static bool pyObjectGloballyIdentifiable(PyObject* h);
 
     static ShaHash computePyObjectShaHashConstant(PyObject* h);
@@ -107,6 +119,8 @@ private:
     static std::unordered_map<PyObject*, ShaHash> mPythonObjectShaHashes;
 
     static std::map<ShaHash, Type*> mHashToType;
+
+    static std::map<ShaHash, ShaHash> mSourceToDestHashLookup;
 
     static std::map<ShaHash, PyObject*> mHashToObject;
 

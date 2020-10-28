@@ -156,7 +156,7 @@ public:
 
     void deserializeClassMembers(std::vector<std::tuple<std::string, Type*, Instance> >& members, DeserializationBuffer& b, int wireType) const;
 
-    void deserializeClassFunDict(std::map<std::string, Function*>& dict, DeserializationBuffer& b, int wireType) const;
+    void deserializeClassFunDict(std::string className, std::map<std::string, Function*>& dict, DeserializationBuffer& b, int wireType) const;
 
     void deserializeClassClassMemberDict(std::map<std::string, PyObjectHolder>& dict, DeserializationBuffer& b, int wireType) const;
 
@@ -166,7 +166,7 @@ public:
 
     virtual PyObject* deserializePythonObject(DeserializationBuffer& b, size_t wireType) const;
 
-    Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType, bool insistResolved=false) const;
+    Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType) const;
 
     PyObject* deserializeRecursiveObject(DeserializationBuffer& b, size_t wireType) const;
 

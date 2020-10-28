@@ -56,10 +56,18 @@ void PyClassInstance::copyConstructFromPythonInstanceConcrete(Class* eltType, in
 
         Class* childType = (Class*)argType;
 
+        int mroIndex = childType->getHeldClass()->getMroIndex(
+            eltType->getHeldClass()
+        );
+
+        if (mroIndex < 0) {
+            throw std::runtime_error("Invalid MRO index encountered");
+        }
+
         Class::initializeInstance(
             tgt,
             Class::instanceToLayout(argDataPtr),
-            childType->getHeldClass()->getMroIndex(eltType->getHeldClass())
+            mroIndex
         )->refcount++;
 
         return;

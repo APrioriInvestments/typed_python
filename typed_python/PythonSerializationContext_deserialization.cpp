@@ -97,10 +97,7 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
             } else if (fieldNumber == FieldNumbers::NATIVE_INSTANCE) {
                 result = PyInstance::fromInstance(deserializeNativeInstance(b, wireType));
             } else if (fieldNumber == FieldNumbers::NATIVE_TYPE) {
-                Type* nativeType = deserializeNativeType(b, wireType, true);
-                if (nativeType->getTypeCategory() == Type::TypeCategory::catForward) {
-                    throw std::runtime_error("Forward should already be resolved");
-                }
+                Type* nativeType = deserializeNativeType(b, wireType);
                 result = incref((PyObject*)PyInstance::typeObj(nativeType));
             } else if (fieldNumber == FieldNumbers::OBJECT_NAME) {
                 result = deserializePythonObjectFromName(b, wireType, memo);
@@ -257,6 +254,7 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromName(Deserializ
         throw PythonExceptionSet();
     }
     if (result == Py_None){
+        asm("int3");
         throw std::runtime_error("Failed to deserialize Type '" + name + "'");
     }
 
@@ -453,6 +451,7 @@ void PythonSerializationContext::deserializeClassMembers(
 }
 
 void PythonSerializationContext::deserializeClassFunDict(
+    std::string className,
     std::map<std::string, Function*>& dict,
     DeserializationBuffer& b,
     int inWireType
@@ -467,21 +466,29 @@ void PythonSerializationContext::deserializeClassFunDict(
             } else if (fieldNumber2 == 1) {
                 fun = deserializeNativeType(b, wireType2);
             } else {
-                throw std::runtime_error("Corrupt function definition when deserializing class: bad field " + format(fieldNumber2));
+                throw std::runtime_error("Corrupt function definition when deserializing class "
+                    + className
+                    + ": bad field " + format(fieldNumber2));
             }
         });
 
         if (!fun) {
-            throw std::runtime_error("Corrupt function definition when deserializing class: no function");
+            throw std::runtime_error("Corrupt function definition when deserializing class "
+                + className
+                + ": no function");
         }
 
         if (name.size() == 0) {
-            throw std::runtime_error("Corrupt function definition when deserializing class: no name");
+            throw std::runtime_error("Corrupt function definition when deserializing class "
+                + className
+                + ": no name");
         }
 
         if (fun->getTypeCategory() == Type::TypeCategory::catForward && !((Forward*)fun)->getTarget()) {
             throw std::runtime_error(
-                "Corrupt function definition when deserializing class: function is an untargeted forward."
+                "Corrupt function definition when deserializing class "
+                + className + "." + name
+                + ": function is an untargeted forward."
             );
         }
 
@@ -573,6 +580,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
     std::map<int32_t, int32_t> indexOfObjToIndexOfType;
 
     std::map<int32_t, Type*> indicesOfNativeTypes;
+    std::map<int32_t, Type::TypeCategory> indicesOfNativeTypeCategories;
     std::map<int32_t, PyObject*> indicesWrittenAsObjectAndRep;
 
     std::map<int32_t, PyObject*> indicesWithSerializedBodies;
@@ -596,6 +604,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             hasGroupHash = true;
 
             if (mInternalizeTypeGroups) {
+                groupHash = MutuallyRecursiveTypeGroup::sourceToDestHashLookup(groupHash);
                 // check if a group exists with this hash. If so, we'll consume our objects
                 // but we'll just drop them on the floor because we don't really need them.
                 outGroup = MutuallyRecursiveTypeGroup::getGroupFromHash(groupHash);
@@ -611,7 +620,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             }
 
             if (!outGroup) {
-                outGroup = new MutuallyRecursiveTypeGroup(groupHash);
+                outGroup = new MutuallyRecursiveTypeGroup();
 
                 if (memo != -1) {
                     b.addCachedPointer(memo, (void*)outGroup, nullptr);
@@ -646,6 +655,12 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                             indicesOfNativeTypes[indexInGroup] = nullptr;
                         }
                         setSomething = true;
+                    } else
+                    if (fieldInIndex == 2 && kind == 0) {
+                        assertWireTypesEqual(subSubWireType, WireType::VARINT);
+                        indicesOfNativeTypeCategories[indexInGroup] = Type::TypeCategory(
+                            b.readUnsignedVarint()
+                        );
                     } else
                     if (fieldInIndex == 1 && kind == 1) {
                         // this is the now-deprecated field code for sending a named object.
@@ -742,6 +757,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
         } else
         if (fieldNumber == 3) {
             b.consumeCompoundMessage(wireType, [&](size_t indexInGroup, size_t subWireType) {
+
                 if (indexOfObjToIndexOfType.find(indexInGroup) != indexOfObjToIndexOfType.end()) {
                     // this instance doesn't have a body yet because it was an instance of an object defined
                     // within this type group. So we have to provide one.
@@ -871,24 +887,32 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                     }
                 } else
                 if (indicesOfNativeTypes.find(indexInGroup) != indicesOfNativeTypes.end()) {
-                    Type* t = deserializeNativeTypeInner(b, subWireType, actuallyBuildGroup);
+                    if (indicesOfNativeTypeCategories[indexInGroup] == Type::TypeCategory::catForward) {
+                        Type* t = deserializeNativeType(b, subWireType);
+                        if (actuallyBuildGroup) {
+                            ((Forward*)indicesOfNativeTypes[indexInGroup])->define(t);
+                        }
+                    } else {
+                        Type* t = deserializeNativeTypeInner(b, subWireType, actuallyBuildGroup);
 
-                    if (actuallyBuildGroup) {
-                        if (!t) {
-                            throw std::runtime_error("Somehow, deserializeNativeTypeInner didn't return a type.");
-                        }
+                        if (actuallyBuildGroup) {
+                            if (!t) {
+                                throw std::runtime_error("Somehow, deserializeNativeTypeInner didn't return a type.");
+                            }
 
-                        if (!indicesOfNativeTypes[indexInGroup]) {
-                            throw std::runtime_error("indicesOfNativeTypes[indexInGroup] is somehow none");
+                            if (!indicesOfNativeTypes[indexInGroup]) {
+                                throw std::runtime_error("indicesOfNativeTypes[indexInGroup] is somehow none");
+                            }
+                            if (!indicesOfNativeTypes[indexInGroup]->isForward()) {
+                                throw std::runtime_error("indicesOfNativeTypes[indexInGroup] was already resolved");
+                            }
+                            ((Forward*)indicesOfNativeTypes[indexInGroup])->define(t);
+                            indicesOfNativeTypes[indexInGroup] = t;
+
+                            // update the mutually recursive group or we'll end up with
+                            // downstream consumers actually pulling out the forwards
+                            outGroup->setIndexToObject(indexInGroup, t);
                         }
-                        if (!indicesOfNativeTypes[indexInGroup]->isForward()) {
-                            throw std::runtime_error("indicesOfNativeTypes[indexInGroup] was already resolved");
-                        }
-                        ((Forward*)indicesOfNativeTypes[indexInGroup])->define(t);
-                        indicesOfNativeTypes[indexInGroup] = t;
-                        // update the mutually recursive group or we'll end up with
-                        // downstream consumers actually pulling out the forwards
-                        outGroup->setIndexToObject(indexInGroup, t);
                     }
                 } else {
                     throw std::runtime_error("Corrupt MutuallyRecursiveTypeGroup group");
@@ -954,15 +978,6 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                 );
             }
 
-            if (group->hash() != groupHash) {
-                throw std::runtime_error(
-                    "Named object " + name + " identifies a group with hash "
-                    + group->hash().digestAsHexString() + " which doesn't equal the "
-                    + "expected hash of " + groupHash.digestAsHexString() + " that's embedded "
-                    + "in the serialized stream.\n\ndeep group repr is:\n" + group->repr(true)
-                );
-            }
-
             if (!outGroup) {
                 outGroup = group;
                 if (memo != -1) {
@@ -993,10 +1008,16 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
     }
 
     if (actuallyBuildGroup) {
-        for (auto indexAndType: indicesOfNativeTypes) {
-            if (indexAndType.second->getTypeCategory() == Type::TypeCategory::catForward) {
-                throw std::runtime_error("We failed to resolve a forward deserializing " + groupHash.digestAsHexString());
-            }
+        outGroup->computeHashAndInstall();
+
+        if (outGroup->hash() != groupHash) {
+            // make sure that next time we deserialize this group
+            // we get the same one. Just because we have different internal
+            // hashes doesn't mean we should duplicate the types.
+            MutuallyRecursiveTypeGroup::installSourceToDestHashLookup(
+                groupHash,
+                outGroup->hash()
+            );
         }
     }
 
@@ -1056,7 +1077,7 @@ Type* catToSimpleType(Type::TypeCategory category) {
     throw std::runtime_error("Category " + Type::categoryToString(category) + " is not simple");
 }
 
-Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b, size_t inWireType, bool insistResolved) const {
+Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b, size_t inWireType) const {
     PyEnsureGilAcquired acquireTheGil;
 
     MutuallyRecursiveTypeGroup* group = nullptr;
@@ -1174,12 +1195,6 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             Type* target = ((Forward*)nativeType)->getTarget();
             if (target) {
                 nativeType = target;
-            } else
-            if (insistResolved) {
-                // by the time we get back to the object layer, everything should be resolved.
-                // we're supposed to guarantee this by deserializing the native types
-                // first and then deserializing the python objects
-                throw std::runtime_error("Somehow, we deserialized an unresolved forward from name " + name);
             }
         }
 
@@ -1192,13 +1207,17 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
         }
 
         if (!PyType_Check(typeFromRep)) {
-            throw std::runtime_error("We the type representation to produce a type object");
+            throw std::runtime_error(
+                "We expect the type representation to produce a type object but got " +
+                std::string(typeFromRep->ob_type->tp_name)
+            );
         }
 
         Type* nativeType = PyInstance::extractTypeFrom(typeFromRep);
 
         if (!nativeType) {
-            throw std::runtime_error("We the type representation to produce a typed_python Type* object.");
+            // the type representation could be a regular python class
+            return PythonObjectOfType::Make(typeFromRep);
         }
 
         return nativeType;
@@ -1224,15 +1243,6 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             Type* target = ((Forward*)resultType)->getTarget();
             if (target) {
                 resultType = target;
-            } else
-            if (insistResolved) {
-                for (auto ixAndThing: group->getIndexToObject()) {
-                    std::cout << ixAndThing.first << " -> " << ixAndThing.second.name() << "\n";
-                }
-                // by the time we get back to the object layer, everything should be resolved.
-                // we're supposed to guarantee this by deserializing the native types
-                // first and then deserializing the python objects
-                throw std::runtime_error("Somehow, we deserialized an unresolved forward: " + format(indexInGroup));
             }
         }
 
@@ -1380,7 +1390,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
                 } else if (fieldNumber == 3) {
                     deserializeAlternativeMembers(alternativeMembers, b, wireType);
                 } else if (fieldNumber == 4) {
-                    deserializeClassFunDict(classMethods, b, wireType);
+                    deserializeClassFunDict(names.back(), classMethods, b, wireType);
                 }
             } else
             if (category == Type::TypeCategory::catClass) {
@@ -1389,11 +1399,11 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
                 } else if (fieldNumber == 2) {
                     deserializeClassMembers(classMembers, b, wireType);
                 } else if (fieldNumber == 3) {
-                    deserializeClassFunDict(classMethods, b, wireType);
+                    deserializeClassFunDict(names.back(), classMethods, b, wireType);
                 } else if (fieldNumber == 4) {
-                    deserializeClassFunDict(classStatics, b, wireType);
+                    deserializeClassFunDict(names.back(), classStatics, b, wireType);
                 } else if (fieldNumber == 5) {
-                    deserializeClassFunDict(classPropertyFunctions, b, wireType);
+                    deserializeClassFunDict(names.back(), classPropertyFunctions, b, wireType);
                 } else if (fieldNumber == 6) {
                     deserializeClassClassMemberDict(classClassMembers, b, wireType);
                 } else if (fieldNumber == 7) {
@@ -1504,7 +1514,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
         );
     }
     else if (category == Type::TypeCategory::catForward) {
-        throw std::runtime_error("We shouldn't be serializing forwards.");
+        throw std::runtime_error("We shouldn't be deserializing forwards directly.");
     }
     else if (category == Type::TypeCategory::catClass) {
         if (names.size() != 1) {

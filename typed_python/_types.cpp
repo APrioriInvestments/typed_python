@@ -1520,6 +1520,27 @@ typedef struct {
 } ModuleObjectDictMember;
 
 
+PyObject *setMethodObjectInternals(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 3) {
+        PyErr_SetString(PyExc_TypeError, "setMethodObjectInternals takes 3 positional arguments");
+        return NULL;
+    }
+
+    PyMethodObject* method = (PyMethodObject*)PyTuple_GetItem(args, 0);
+    PyObject* self = PyTuple_GetItem(args, 1);
+    PyObject* func = PyTuple_GetItem(args, 2);
+
+    incref(self);
+    incref(func);
+    decref(method->im_func);
+    decref(method->im_self);
+
+    method->im_func = func;
+    method->im_self = self;
+
+    return incref(Py_None);
+}
+
 PyObject *setClassOrStaticmethod(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "setClassOrStaticmethod takes 2 positional arguments");
@@ -2066,6 +2087,31 @@ PyObject *bytecount(PyObject* nullValue, PyObject* args) {
     }
 
     return PyLong_FromLong(t->bytecount());
+}
+
+PyObject *typesAreEquivalent(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "typesAreEquivalent takes 3 positional arguments");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+    PyObjectHolder a2(PyTuple_GetItem(args, 1));
+
+    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t1) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'typesAreEquivalent' must be a type object");
+        return NULL;
+    }
+
+    Type* t2 = PyInstance::unwrapTypeArgToTypePtr(a2);
+
+    if (!t2) {
+        PyErr_SetString(PyExc_TypeError, "second argument to 'typesAreEquivalent' must be a type object");
+        return NULL;
+    }
+
+    return Type::typesEquivalent(t1, t2) ? incref(Py_True) : incref(Py_False);
 }
 
 PyObject *canConstructFrom(PyObject* nullValue, PyObject* args) {
@@ -2625,6 +2671,7 @@ static PyMethodDef module_methods[] = {
     {"createPyCell", (PyCFunction)createPyCell, METH_VARARGS, NULL},
     {"copy", (PyCFunction)copyRefTo, METH_VARARGS, NULL},
     {"refTo", (PyCFunction)refTo, METH_VARARGS, NULL},
+    {"typesAreEquivalent", (PyCFunction)typesAreEquivalent, METH_VARARGS, NULL},
     {"getTypePointer", (PyCFunction)getTypePointer, METH_VARARGS, NULL},
     {"getCodeGlobalDotAccesses", (PyCFunction)getCodeGlobalDotAccesses, METH_VARARGS | METH_KEYWORDS, NULL},
     {"_vtablePointer", (PyCFunction)getVTablePointer, METH_VARARGS, NULL},
@@ -2639,6 +2686,7 @@ static PyMethodDef module_methods[] = {
     {"setFunctionClosure", (PyCFunction)setFunctionClosure, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setFunctionGlobals", (PyCFunction)setFunctionGlobals, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setClassOrStaticmethod", (PyCFunction)setClassOrStaticmethod, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"setMethodObjectInternals", (PyCFunction)setMethodObjectInternals, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setPropertyGetSetDel", (PyCFunction)setPropertyGetSetDel, METH_VARARGS | METH_KEYWORDS, NULL},
     {"initializeGlobalStatics", (PyCFunction)initializeGlobalStatics, METH_VARARGS | METH_KEYWORDS, NULL},
     {"convertObjectToTypeAtLevel", (PyCFunction)convertObjectToTypeAtLevel, METH_VARARGS | METH_KEYWORDS, NULL},

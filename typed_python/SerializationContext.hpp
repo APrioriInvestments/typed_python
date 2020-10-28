@@ -64,7 +64,7 @@ public:
     virtual PyObject* deserializePythonObject(DeserializationBuffer& b, size_t wireType) const = 0;
 
     virtual void serializeNativeType(Type* o, SerializationBuffer& b, size_t fieldNumber) const = 0;
-    virtual Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType, bool insistResolved=false) const = 0;
+    virtual Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType) const = 0;
 
     virtual bool isCompressionEnabled() const = 0;
     virtual std::shared_ptr<ByteBuffer> compress(uint8_t* begin, uint8_t* end) const = 0;

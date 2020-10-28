@@ -195,7 +195,7 @@ public:
     method_call_signature_type dispatchDefinitionForSlot(size_t slotIx) const {
         auto it = mDispatchDefinitions.find(slotIx);
         if (it == mDispatchDefinitions.end()) {
-            throw std::runtime_error("Invalid slot");
+            throw std::runtime_error("Invalid slot " + format(slotIx));
         }
         return it->second;
     }
@@ -249,7 +249,7 @@ public:
     base classes we might masquerade as.
     *****/
 
-    void finalize(ClassDispatchTable* dispatchers, long inInitializationBitByteCount) {
+    void finalize(ClassDispatchTable* dispatchers, long inInitializationBitByteCount, long count) {
         mDispatchTables = dispatchers;
         mInitializationBitByteCount = inInitializationBitByteCount;
     }
@@ -710,7 +710,7 @@ public:
             ancestor->m_implementors.insert(this);
         }
 
-        m_vtable->finalize(&mClassDispatchTables[0], (m_members.size() + 7) / 8);
+        m_vtable->finalize(&mClassDispatchTables[0], (m_members.size() + 7) / 8, mClassDispatchTables.size());
 
         // make sure that, for every interface we can take on, we have slots allocated
         // that the compiler can come along and compile.
@@ -807,11 +807,11 @@ public:
     int64_t getMroIndex(HeldClass* ancestor) const {
         auto it = m_ancestor_to_mro_index.find(ancestor);
 
-        if (it == m_ancestor_to_mro_index.end()) {
-            return -1;
+        if (it != m_ancestor_to_mro_index.end()) {
+            return it->second;
         }
 
-        return it->second;
+        return -1;
     }
 
     ClassDispatchTable* dispatchTableAs(HeldClass* interface) {

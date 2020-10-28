@@ -73,6 +73,10 @@ public:
     }
 
     static layout* initializeInstance(instance_ptr toInit, layout* layoutPtr, uint16_t dispatchIndex) {
+        if (dispatchIndex >= 65535) {
+            asm("int3");
+        }
+
         if (((size_t)layoutPtr) >> 48) {
             throw std::runtime_error("Invalid layout pointer encountered.");
         }
