@@ -177,6 +177,10 @@ public:
         return m_typeCategory == catClass;
     }
 
+    bool isAlternative() const {
+        return m_typeCategory == catAlternative;
+    }
+
     bool isForward() const {
         return m_typeCategory == catForward;
     }

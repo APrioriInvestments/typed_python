@@ -368,3 +368,30 @@ def test_compiler_cache_handles_changed_types():
                 badCt += 1
 
         assert badCt == 1
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_ordering_is_stable_under_code_change():
+    # check that the order of functions in a MutuallyRecursiveTypeGroup is
+    # stable even if we change the code underneath it.
+    moduleText = "\n".join([
+        "def f1(x):",
+        "    return f2(x) + 1",
+        "def f2(x):",
+        "    return f3(x) + 1",
+        "def f3(x):",
+        "    return f1(x) + 1",
+    ])
+
+    names = evaluateExprInFreshProcess(
+        {'x.py': moduleText},
+        '[f.__name__ for f in recursiveTypeGroup(x.f1)]'
+    )
+
+    for _ in range(5):
+        names2 = evaluateExprInFreshProcess(
+            {'x.py': moduleText.replace(" + 1", "+ 2")},
+            '[f.__name__ for f in recursiveTypeGroup(x.f1)]'
+        )
+
+        assert names == names2

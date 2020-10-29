@@ -23,6 +23,11 @@ class Type;
 
 class TypeOrPyobj {
 public:
+    TypeOrPyobj() :
+        mType(nullptr),
+        mPyObj(nullptr)
+    {}
+
     TypeOrPyobj(Type* t) :
         mType(t),
         mPyObj(nullptr)

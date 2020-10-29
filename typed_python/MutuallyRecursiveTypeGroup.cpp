@@ -639,19 +639,82 @@ std::string MutuallyRecursiveTypeGroup::repr(bool deep) {
 // through the compiler, or just through normal type references. We need to
 // pick a 'first' type, which we can do by picking the first type to be defined
 // in the program, and then walk through the group placing them in order..
-
-// static
-void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<TypeOrPyobj>& types) {
-    bool veryVerbose = false;
-
-    MutuallyRecursiveTypeGroup* group = new MutuallyRecursiveTypeGroup();
-
-    if (types.size() == 0) {
-        throw std::runtime_error("Empty compiler recursive group makes no sense.");
-    }
+// returns the root, and a bool that's false normally, true if we
+// were unable to uniquely pick it.
+std::pair<TypeOrPyobj, bool> computeRoot(const std::set<TypeOrPyobj>& types) {
 
     // we need to pick a single type or object to be the 'root' of the group
     // so we can order the hashes properly
+
+    // ideally we'd use a named class, function, or barring that an alternative.
+    // If we use a named type, it ensures that the type layout for an MRTG where some of the types
+    // are named is stable even if the hashes change because we modify the code.
+    std::map<std::string, std::vector<TypeOrPyobj> > namedThings;
+
+    // first see if there are any TP class or function objects
+    for (auto &t: types) {
+        if (t.type() && (t.type()->isClass() || t.type()->isFunction() || t.type()->isAlternative())) {
+            namedThings[t.type()->name()].push_back(t);
+        }
+    }
+
+    // take the first named thing where only one thing has that name
+    for (auto it = namedThings.rbegin(); it != namedThings.rend(); ++it) {
+        if (it->second.size() == 1) {
+            return std::make_pair(it->second[0], false);
+        }
+    }
+
+    namedThings.clear();
+
+    // now python class, function, or type objects
+    for (auto &t: types) {
+        if (t.pyobj()) {
+            if (PyModule_Check(t.pyobj())) {
+                PyObjectStealer name(PyModule_GetNameObject(t.pyobj()));
+                if (!name) {
+                    PyErr_Clear();
+                } else {
+                    if (PyUnicode_Check(name)) {
+                        namedThings[PyUnicode_AsUTF8(name)].push_back(t);
+                    }
+                }
+            } else
+            if (PyType_Check(t.pyobj())) {
+                namedThings[((PyTypeObject*)t.pyobj())->tp_name].push_back(t);
+            } else
+            if (PyFunction_Check(t.pyobj())) {
+                PyObjectStealer moduleName(PyObject_GetAttrString(t.pyobj(), "__module__"));
+                if (!moduleName) {
+                    PyErr_Clear();
+                } else {
+                    PyObjectStealer name(PyObject_GetAttrString(t.pyobj(), "__qualname__"));
+                    if (!name) {
+                        PyErr_Clear();
+                    } else {
+                        if (PyUnicode_Check(moduleName) && PyUnicode_Check(name)) {
+                            namedThings[
+                                std::string(PyUnicode_AsUTF8(moduleName))
+                                + "."
+                                + PyUnicode_AsUTF8(name)
+                            ].push_back(t);
+                        }
+                    }
+                }
+
+            }
+        }
+    }
+
+    // take the first named thing where only one thing has that name
+    for (auto it = namedThings.rbegin(); it != namedThings.rend(); ++it) {
+        if (it->second.size() == 1) {
+            return std::make_pair(it->second[0], false);
+        }
+    }
+
+    // we have nothing named. Fall back to a process that depends on the
+    // hashes.
     std::map<TypeOrPyobj, ShaHash> curHashes;
     std::map<TypeOrPyobj, ShaHash> newHashes;
 
@@ -708,27 +771,33 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
         names[curHashes[t]].push_back(t);
     }
 
-    TypeOrPyobj* root = nullptr;
 
     for (auto& nameAndTypes: names) {
         if (nameAndTypes.second.size() == 1) {
-            root = &nameAndTypes.second[0];
-            break;
+            return std::make_pair(nameAndTypes.second[0], false);
         }
     }
 
-    if (!root) {
-        group->mAnyPyObjectsIncorrectlyOrdered = true;
-        // just pick the first one. It's not stable.
-        for (auto& nameAndTypes: names) {
-            root = &nameAndTypes.second[0];
-            break;
-        }
-
-        if (!root) {
-            throw std::runtime_error("this should never happen");
-        }
+    // just pick the first one. It's not stable.
+    for (auto& nameAndTypes: names) {
+        return std::make_pair(nameAndTypes.second[0], true);
     }
+
+    throw std::runtime_error("this should never happen");
+}
+
+// static
+void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<TypeOrPyobj>& types) {
+    bool veryVerbose = false;
+
+    MutuallyRecursiveTypeGroup* group = new MutuallyRecursiveTypeGroup();
+
+    if (types.size() == 0) {
+        throw std::runtime_error("Empty compiler recursive group makes no sense.");
+    }
+
+    TypeOrPyobj root;
+    std::tie(root, group->mAnyPyObjectsIncorrectlyOrdered) = computeRoot(types);
 
     std::map<TypeOrPyobj, int> ordering;
 
@@ -770,7 +839,7 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
         std::cout << "Finish group with " << types.size() << " items\n";
     }
 
-    visit(*root);
+    visit(root);
 
     if (ordering.size() != types.size()) {
         throw std::runtime_error("Couldn't find all the types: " + format(ordering.size()) + " vs " + format(types.size()));
