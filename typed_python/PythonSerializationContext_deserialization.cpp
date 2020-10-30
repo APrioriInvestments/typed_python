@@ -1381,7 +1381,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
                     types.push_back(deserializeNativeType(b, wireType));
                 }
             } else
-            if (category == Type::TypeCategory::catHeldClass) {
+            if (category == Type::TypeCategory::catClass) {
                 types.push_back(deserializeNativeType(b, wireType));
             } else
             if (category == Type::TypeCategory::catAlternative) {
@@ -1393,7 +1393,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
                     deserializeClassFunDict(names.back(), classMethods, b, wireType);
                 }
             } else
-            if (category == Type::TypeCategory::catClass) {
+            if (category == Type::TypeCategory::catHeldClass) {
                 if (fieldNumber == 1) {
                     names.push_back(b.readStringObject());
                 } else if (fieldNumber == 2) {
@@ -1409,10 +1409,18 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
                 } else if (fieldNumber == 7) {
                     b.consumeCompoundMessage(wireType, [&](int which, size_t wireType2) {
                         Type* t = deserializeNativeType(b, wireType2);
-                        if (!t || t->getTypeCategory() != Type::TypeCategory::catClass) {
-                            throw std::runtime_error("Corrupt class base found.");
+                        if (!t) {
+                            throw std::runtime_error(
+                                "Empty class base found"
+                            );
                         }
-                        classBases.push_back((Class*)t);
+                        if (!t->isHeldClass()) {
+                            throw std::runtime_error(
+                                "Corrupt class base found: got " +
+                                t->name() + " of category " + t->getTypeCategoryString()
+                            );
+                        }
+                        classBases.push_back(((HeldClass*)t)->getClassType());
                     });
                 } else if (fieldNumber == 8) {
                     assertWireTypesEqual(wireType, WireType::VARINT);
@@ -1489,17 +1497,17 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
     // otherwise, construct it from the pieces we were given.
     Type* resultType = nullptr;
 
-    if (category == Type::TypeCategory::catHeldClass) {
+    if (category == Type::TypeCategory::catClass) {
         if (types.size() != 1) {
-            throw std::runtime_error("Corrupt 'HeldClass' encountered: can't have multiple corresponding Class objects.");
+            throw std::runtime_error("Corrupt 'Class' encountered: can't have multiple corresponding HeldClass objects.");
         }
-        if (types[0]->getTypeCategory() != Type::TypeCategory::catClass) {
+        if (types[0]->getTypeCategory() != Type::TypeCategory::catHeldClass) {
             throw std::runtime_error(
-                "Corrupt 'HeldClass' encountered: Class is a " +
-                Type::categoryToString(types[0]->getTypeCategory()) + " not a Class"
+                "Corrupt 'Class' encountered: HeldClass is a " +
+                Type::categoryToString(types[0]->getTypeCategory()) + " not a HeldClass"
             );
         }
-        resultType = ((Class*)types[0])->getHeldClass();
+        resultType = ((HeldClass*)types[0])->getClassType();
     }
     else if (category == Type::TypeCategory::catAlternative) {
         if (names.size() != 2) {
@@ -1516,9 +1524,9 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
     else if (category == Type::TypeCategory::catForward) {
         throw std::runtime_error("We shouldn't be deserializing forwards directly.");
     }
-    else if (category == Type::TypeCategory::catClass) {
+    else if (category == Type::TypeCategory::catHeldClass) {
         if (names.size() != 1) {
-            throw std::runtime_error("Corrupt 'Class' encountered.");
+            throw std::runtime_error("Corrupt 'HeldClass' encountered.");
         }
 
         std::map<std::string, PyObject*> classClassMembersRaw;
@@ -1535,7 +1543,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             classStatics,
             classPropertyFunctions,
             classClassMembersRaw
-        );
+        )->getHeldClass();
     }
     else if (category == Type::TypeCategory::catFunction) {
         if (names.size() != 3) {

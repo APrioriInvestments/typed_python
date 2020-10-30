@@ -177,6 +177,10 @@ public:
         return m_typeCategory == catClass;
     }
 
+    bool isHeldClass() const {
+        return m_typeCategory == catHeldClass;
+    }
+
     bool isAlternative() const {
         return m_typeCategory == catAlternative;
     }

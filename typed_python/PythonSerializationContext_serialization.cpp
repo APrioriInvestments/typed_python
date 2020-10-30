@@ -591,21 +591,49 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                 }
             }
 
-            // then Class objects
+            // then HeldClass objects, ordered with all bases before
+            // their children (so that when we deserialize, any base classes
+            // are no longer forwards)
+            std::map<HeldClass*, int> heldClasses;
             for (auto& indexAndObj: group->getIndexToObject()) {
                 if (
                     indexAndObj.second.typeOrPyobjAsType() &&
-                    indexAndObj.second.typeOrPyobjAsType()->isClass()
+                    indexAndObj.second.typeOrPyobjAsType()->isHeldClass()
                 ) {
-                    writeObjectBody(indexAndObj.first, indexAndObj.second);
+                    heldClasses[(HeldClass*)indexAndObj.second.typeOrPyobjAsType()] = indexAndObj.first;
                 }
             }
+
+            std::set<HeldClass*> alreadyWrittenHeldClass;
+            std::function<void (HeldClass*)> visit = [&](HeldClass* cls) {
+                if (alreadyWrittenHeldClass.find(cls) != alreadyWrittenHeldClass.end()) {
+                    return;
+                }
+
+                alreadyWrittenHeldClass.insert(cls);
+
+                // walk the base class list and ensure all of them are serialized
+                // first
+                for (HeldClass* ancestor: cls->getMro()) {
+                    if (heldClasses.find(ancestor) != heldClasses.end()) {
+                        visit(ancestor);
+                    }
+                }
+
+                // now we can write this object.
+                writeObjectBody(heldClasses[cls], cls);
+            };
+
+            for (auto classAndIndex: heldClasses) {
+                visit(classAndIndex.first);
+            }
+
 
             // everything else
             for (auto& indexAndObj: group->getIndexToObject()) {
                 if (indexAndObj.second.typeOrPyobjAsType()
                         && !indexAndObj.second.typeOrPyobjAsType()->isFunction()
-                        && !indexAndObj.second.typeOrPyobjAsType()->isClass()
+                        && !indexAndObj.second.typeOrPyobjAsType()->isHeldClass()
                     ) {
                     writeObjectBody(indexAndObj.first, indexAndObj.second);
                 }
@@ -760,14 +788,18 @@ void PythonSerializationContext::serializeNativeTypeInner(
         for (auto& overload: ftype->getOverloads()) {
             overload.serialize(*this, b, whichIndex++);
         }
-    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catHeldClass) {
-        serializeNativeType(((HeldClass*)nativeType)->getClassType(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catForward) {
         throw std::runtime_error("We shouldn't be serializing forwards directly");
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catClass) {
-        Class* cls = (Class*)nativeType;
+        serializeNativeType(((Class*)nativeType)->getHeldClass(), b, 1);
+    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catHeldClass) {
+        HeldClass* cls = (HeldClass*)nativeType;
 
-        b.writeStringObject(1, cls->name());
+        // note that we serialize the name of the class (not the held class)
+        // which has 'Held' in the name. Practically speaking, we're serializing
+        // the data necessary to call Class::Make, even though the object we're
+        // serializing is the HeldClass.
+        b.writeStringObject(1, cls->getClassType()->name());
 
         //members
         serializeClassMembers(cls->getOwnMembers(), b, 2);
@@ -783,7 +815,7 @@ void PythonSerializationContext::serializeNativeTypeInner(
         {
             int which = 0;
             for (auto t: cls->getBases()) {
-                serializeNativeType(t->getClassType(), b, which++);
+                serializeNativeType(t, b, which++);
             }
         }
 

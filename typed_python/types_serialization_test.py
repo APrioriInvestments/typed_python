@@ -2313,6 +2313,45 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert identityHash(child1) == identityHash(child2)
         assert identityHash(callF1) == identityHash(callF2)
+        assert type(child1) is type(child2)
+        assert type(callF1) is type(callF2)
+
+        assert callF1(child1) == callF2(child2)
+
+    def test_deserialize_anonymous_recursive_base_and_subclass(self):
+        def deserializeAndCall():
+            Base = Forward("Base")
+            Child = Forward("Child")
+
+            @Base.define
+            class Base(Class):
+                def blah(self) -> Child:
+                    return Child()
+
+                def f(self, x) -> int:
+                    return x + 1
+
+            @Child.define
+            class Child(Base, Final):
+                def f(self, x) -> int:
+                    return -1
+
+            @Entrypoint
+            def callF(x: Child):
+                return x.f(10)
+
+            return Base, callF
+
+        Base1, callF1 = callFunctionInFreshProcess(deserializeAndCall, ())
+        Base2, callF2 = callFunctionInFreshProcess(deserializeAndCall, ())
+
+        assert identityHash(Base1) == identityHash(Base2)
+        assert identityHash(callF1) == identityHash(callF2)
+        assert Base1 is Base2
+        assert type(callF1) is type(callF2)
+
+        child1 = Base1().blah()
+        child2 = Base2().blah()
 
         assert callF1(child1) == callF2(child2)
 
