@@ -279,7 +279,9 @@ void visitCompilerVisibleTypesAndPyobjects(
         hashVisit(co->co_kwonlyargcount);
         hashVisit(co->co_nlocals);
         hashVisit(co->co_stacksize);
-        hashVisit(co->co_flags);
+        // don't serialize the 'co_flags' field because it's not actually stable
+        // and it doesn't contain any semantic information not available elsewhere.
+        // hashVisit(co->co_flags);
         hashVisit(co->co_firstlineno);
         hashVisit(ShaHash::SHA1(PyBytes_AsString(co->co_code), PyBytes_GET_SIZE(co->co_code)));
         visit(co->co_consts);
@@ -289,7 +291,7 @@ void visitCompilerVisibleTypesAndPyobjects(
         visit(co->co_cellvars);
         // we ignore this, because otherwise, we'd have the hash change
         // whenever we instantiate code in a new location
-        // + visit(co->co_filename)
+        // visit(co->co_filename)
         visit(co->co_name);
         visit(co->co_lnotab);
         return;
