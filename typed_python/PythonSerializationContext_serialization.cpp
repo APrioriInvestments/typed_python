@@ -451,19 +451,52 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
         //           in this group, and we serialize it as an index.
         //      5 if its a tuple
         b.writeBeginCompound(2);
-            for (auto& indexAndObj: group->getIndexToObject()) {
-                int32_t index = indexAndObj.first;
+            std::set<int> writtenSoFar;
+
+            // write the 'header' for object in the group indexed by 'index'.
+            // we do this recursively, so that we can ensure we write out the
+            // headers for any base classes of classes in this group that are also
+            // in this group, first. We have to do it this way because
+            // we can't instantiate a class without the base class object being
+            // instantiated as a type first. The 'object representation' of a
+            // type contains its bases as part of the constructor, which can
+            // lead to cycles.
+            std::function<void (int)> writeObjectHeader = [&](int index) {
+                // if we wrote this already, we can exit immediately
+                if (writtenSoFar.find(index) != writtenSoFar.end()) {
+                    return;
+                }
+
+                // mark that we wrote it
+                writtenSoFar.insert(index);
+
+                TypeOrPyobj obj = group->getIndexToObject().find(index)->second;
+
+                // check whether this is a type object and if so, check all the bases
+                if (obj.pyobj() && PyType_Check(obj.pyobj())) {
+                    PyTypeObject* typeObj = (PyTypeObject*)obj.pyobj();
+
+                    if (typeObj->tp_bases) {
+                        iterate(typeObj->tp_bases, [&](PyObject* baseCls) {
+                            int index = group->indexOfObjectInThisGroup(baseCls);
+                            if (index != -1) {
+                                writeObjectHeader(index);
+                            }
+                        });
+                    }
+                }
+
                 b.writeBeginCompound(index);
 
-                if (indexAndObj.second.typeOrPyobjAsType()) {
+                if (obj.typeOrPyobjAsType()) {
                     // it's a type object. write it as a native type and serialize its inner pieces.
                     b.writeUnsignedVarintObject(0, 0);
-                    b.writeStringObject(1, indexAndObj.second.typeOrPyobjAsType()->name());
-                    b.writeUnsignedVarintObject(2, indexAndObj.second.typeOrPyobjAsType()->getTypeCategory());
+                    b.writeStringObject(1, obj.typeOrPyobjAsType()->name());
+                    b.writeUnsignedVarintObject(2, obj.typeOrPyobjAsType()->getTypeCategory());
                 } else {
                     //give the plugin a chance to convert the instance to something else
                     PyObjectStealer representation(
-                        PyObject_CallMethod(mContextObj, "representationFor", "(O)", indexAndObj.second.pyobj())
+                        PyObject_CallMethod(mContextObj, "representationFor", "(O)", obj.pyobj())
                     );
 
                     if (!representation) {
@@ -488,9 +521,9 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
 
                         indicesWrittenAsObjectAndRep[index].set(PyTuple_GetItem(representation, 2));
                     } else
-                    if (PyTuple_Check(indexAndObj.second.pyobj())) {
+                    if (PyTuple_Check(obj.pyobj())) {
                         b.writeUnsignedVarintObject(0, 5);
-                        b.writeUnsignedVarintObject(1, PyTuple_Size(indexAndObj.second.pyobj()));
+                        b.writeUnsignedVarintObject(1, PyTuple_Size(obj.pyobj()));
                         indicesWrittenAsExternalObjectAndDict.insert(index);
                     } else {
                         // we're going to serialize this as a regular python object with
@@ -500,13 +533,13 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                         // and it's either in our group or not.
 
                         int32_t indexInThisGroup = group->indexOfObjectInThisGroup(
-                            (PyObject*)indexAndObj.second.pyobj()->ob_type
+                            (PyObject*)obj.pyobj()->ob_type
                         );
 
                         if (indexInThisGroup == -1) {
                             indicesWrittenAsExternalObjectAndDict.insert(index);
                             b.writeUnsignedVarintObject(0, 3);
-                            serializePythonObject((PyObject*)indexAndObj.second.pyobj()->ob_type, b, 1);
+                            serializePythonObject((PyObject*)obj.pyobj()->ob_type, b, 1);
                         } else {
                             indicesWrittenAsInternalObjectAndDict.insert(index);
                             b.writeUnsignedVarintObject(0, 4);
@@ -516,6 +549,10 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                 }
 
                 b.writeEndCompound();
+            };
+
+            for (auto& indexAndObj: group->getIndexToObject()) {
+                writeObjectHeader(indexAndObj.first);
             }
 
         b.writeEndCompound();

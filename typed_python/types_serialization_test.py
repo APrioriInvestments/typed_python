@@ -2507,3 +2507,20 @@ class TypesSerializationTest(unittest.TestCase):
                 return "concrete2"
 
         assert AnotherChildClass().f() == "concrete2"
+
+    def test_serialize_mutually_recursive_untyped_classes(self):
+        # ensure we can serialize and hash anonymous classes descended from ABC
+        def makeClasses():
+            class BaseClass:
+                @staticmethod
+                def getChild():
+                    return ChildClass()
+
+            class ChildClass(BaseClass):
+                pass
+
+            return (BaseClass, ChildClass, recursiveTypeGroupDeepRepr(BaseClass))
+
+        BaseClass, ChildClass, deepRepr = callFunctionInFreshProcess(makeClasses, ())
+
+        assert type(BaseClass.getChild()) is ChildClass
