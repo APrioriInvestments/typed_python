@@ -15,6 +15,7 @@
 import sys
 import os
 import importlib
+from abc import ABC, abstractmethod, ABCMeta
 from typed_python.test_util import callFunctionInFreshProcess
 import typed_python.compiler.python_ast_util as python_ast_util
 import threading
@@ -2467,3 +2468,42 @@ class TypesSerializationTest(unittest.TestCase):
                 )
 
         assert childBytes == childBytes2
+
+    def test_serialize_abc_subclass(self):
+        # ensure we can serialize and hash anonymous classes descended from ABC
+        def makeClasses():
+            class BaseClass(ABC):
+                @abstractmethod
+                def f(self):
+                    pass
+
+            class ChildClass(BaseClass):
+                def f(self):
+                    return "concrete"
+
+            return (BaseClass, ChildClass, ChildClass())
+
+        BaseClass, ChildClass, childInstance = callFunctionInFreshProcess(makeClasses, ())
+
+        assert type(BaseClass) is ABCMeta
+
+        assert issubclass(ChildClass, BaseClass)
+        assert isinstance(childInstance, ChildClass)
+        assert isinstance(childInstance, BaseClass)
+
+        assert childInstance.f() == "concrete"
+
+        with self.assertRaisesRegex(TypeError, "abstract methods"):
+            BaseClass()
+
+        class ABadChildClass(BaseClass):
+            pass
+
+        with self.assertRaisesRegex(TypeError, "abstract methods"):
+            ABadChildClass()
+
+        class AnotherChildClass(BaseClass):
+            def f(self):
+                return "concrete2"
+
+        assert AnotherChildClass().f() == "concrete2"

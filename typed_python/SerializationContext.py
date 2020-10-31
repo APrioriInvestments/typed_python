@@ -23,6 +23,7 @@ from typed_python.hash import sha_hash
 from typed_python.type_function import ConcreteTypeFunction, reconstructTypeFunctionType, isTypeFunctionType
 from types import FunctionType, ModuleType, CodeType, MethodType, BuiltinFunctionType
 from _thread import LockType, RLock
+import abc
 import numpy
 import sys
 import datetime
@@ -473,6 +474,7 @@ class SerializationContext:
             ):
                 # this is a regular class
                 classMembers = {}
+                typeConstructorNamespace = {}
 
                 for name, memb in inst.__dict__.items():
                     getset_descriptor = type(type.__dict__['__doc__'])
@@ -481,7 +483,11 @@ class SerializationContext:
                     if name != "__dict__" and not isinstance(memb, (wrapper_descriptor, getset_descriptor)):
                         classMembers[name] = memb
 
-                return (type, (inst.__name__, inst.__bases__, {}), classMembers)
+                # filter out weird class members introduced by 'abc'
+                if issubclass(inst, abc.ABC):
+                    classMembers = {k: v for k, v in classMembers.items() if not k.startswith("_abc")}
+
+                return (type(inst), (inst.__name__, inst.__bases__, typeConstructorNamespace), classMembers)
 
         if isinstance(inst, property):
             return (property, (None, None, None), (inst.fget, inst.fset, inst.fdel))
@@ -544,6 +550,9 @@ class SerializationContext:
             representation["defaults"] = inst.__defaults__
             representation["kwdefaults"] = inst.__kwdefaults__
             representation["closure"] = inst.__closure__
+
+            if hasattr(inst, '__isabstractmethod__'):
+                representation['__isabstractmethod__'] = inst.__isabstractmethod__
 
             globalsToUse = None
 
@@ -641,6 +650,9 @@ class SerializationContext:
             instance.__kwdefaults__ = representation.get('kwdefaults', {})
             instance.__defaults__ = representation.get('defaults', ())
 
+            if '__isabstractmethod__' in representation:
+                instance.__isabstractmethod__ = representation['__isabstractmethod__']
+
             if 'globals' in representation:
                 _types.setFunctionGlobals(instance, representation['globals'])
 
@@ -649,6 +661,7 @@ class SerializationContext:
             return True
 
         if isinstance(instance, type):
+            # set class members
             if representation is not None:
                 for k, v in representation.items():
                     setattr(instance, k, v)
