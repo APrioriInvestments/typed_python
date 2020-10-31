@@ -24,7 +24,7 @@ from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBui
 from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
     _types, Compiled, Member, Final, isCompiled, ConstDict,
-    makeNamedTuple, UInt32, Int32, Type
+    makeNamedTuple, UInt32, Int32, Type, identityHash
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
@@ -2733,6 +2733,20 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callFunc(f1, 10.5), "10.5")
         self.assertEqual(callFunc(f2, 10.5), 10)
+
+    def test_reconstructed_code_has_same_identity_hash(self):
+        def call(x):
+            return x
+
+        ast = convertFunctionToAlgebraicPyAst(call)
+
+        assert ast.filename == call.__code__.co_filename
+
+        newCall = evaluateFunctionDefWithLocalsInCells(ast, {'f': str}, {})
+
+        assert newCall.__code__.co_filename == call.__code__.co_filename
+
+        assert identityHash(call.__code__) == identityHash(newCall.__code__)
 
     def test_code_with_nested_listcomp(self):
         def call(x):

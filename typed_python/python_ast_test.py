@@ -64,6 +64,22 @@ class TestPythonAst(unittest.TestCase):
 
         self.reverseParseCheck(f)
 
+    def test_ast_for_function_with_decorator(self):
+        # check that the ast for a function with a decorator doesn't actually
+        # include the decorator, as the decorator isn't part of the function
+        # itself.
+        def identity(x):
+            return x
+
+        @identity
+        def f(x):
+            return x
+
+        pyast = python_ast.convertFunctionToAlgebraicPyAst(f)
+
+        assert pyast.matches.FunctionDef
+        assert not pyast.decorator_list
+
     def test_reverse_parse_classdef(self):
         def f():
             class A:

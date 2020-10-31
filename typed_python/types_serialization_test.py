@@ -2420,3 +2420,50 @@ class TypesSerializationTest(unittest.TestCase):
         assert Base in type(child1).BaseClasses
 
         assert callF(child1) == callF(child2)
+
+    def test_serialization_of_entrypointed_function_stable(self):
+        def returnSerializedForm():
+            s = SerializationContext().withoutCompression()
+
+            @Entrypoint
+            def aFun():
+                return 1
+
+            return s.serialize(aFun)
+
+        childBytes = callFunctionInFreshProcess(returnSerializedForm, ())
+
+        childFun = (
+            SerializationContext()
+            .withoutCompression()
+            .withoutInternalizingTypeGroups()
+            .deserialize(childBytes)
+        )
+
+        childBytes2 = (
+            SerializationContext()
+            .withoutCompression()
+            .withoutInternalizingTypeGroups()
+            .serialize(childFun)
+        )
+
+        if childBytes != childBytes2:
+            decoded1 = decodeSerializedObject(childBytes)
+            decoded2 = decodeSerializedObject(childBytes2)
+
+            decoded1Print = dict(enumerate(pprint.PrettyPrinter(indent=2).pformat(decoded1).split("\n")))
+            decoded2Print = dict(enumerate(pprint.PrettyPrinter(indent=2).pformat(decoded2).split("\n")))
+
+            def pad(x):
+                x = str(x)[:100]
+                x = x + " " * (100 - len(x) )
+                return x
+
+            for k in range(max(len(decoded1Print), len(decoded2Print))):
+                print(
+                    pad(decoded1Print.get(k)),
+                    "    " if decoded1Print.get(k) == decoded2Print.get(k) else " != ",
+                    pad(decoded2Print.get(k))
+                )
+
+        assert childBytes == childBytes2

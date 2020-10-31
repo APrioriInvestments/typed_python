@@ -882,6 +882,30 @@ _originalAstCache = weakref.WeakKeyDictionary()
 _algebraicAstCache = {}
 
 
+def stripDecoratorFromFuncDef(ast):
+    """Strip any decorator_list elements from a Statement.FunctionDef.
+
+    Args:
+        ast - a Statement.FunctionDef or an Expr.Lambda
+
+    Returns:
+        same type as ast but without any decorator_list elements.
+    """
+    if not ast.matches.FunctionDef:
+        return ast
+
+    return Statement.FunctionDef(
+        name=ast.name,
+        args=ast.args,
+        body=ast.body,
+        decorator_list=(),  # strip decorators here
+        returns=ast.returns,
+        line_number=ast.line_number,
+        col_offset=ast.col_offset,
+        filename=ast.filename,
+    )
+
+
 def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
     # we really just care about the code itself
     if isinstance(f, types.FunctionType):
@@ -916,13 +940,19 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
     try:
         algebraicAst = convertPyAstToAlgebraic(pyast, fCode.co_filename, keepLineInformation)
 
+        # strip any decorators from the function def. They are not actually part of the
+        # definition of the code object itself
+        algebraicAst = stripDecoratorFromFuncDef(algebraicAst)
+
         _algebraicAstCache[fCode, keepLineInformation] = algebraicAst
 
         if fCode not in _originalAstCache:
             if keepLineInformation:
                 _originalAstCache[fCode] = algebraicAst
             else:
-                _originalAstCache[fCode] = convertPyAstToAlgebraic(pyast, fCode.co_filename, True)
+                _originalAstCache[fCode] = stripDecoratorFromFuncDef(
+                    convertPyAstToAlgebraic(pyast, fCode.co_filename, True)
+                )
 
         return algebraicAst
     except Exception as e:
@@ -1042,7 +1072,7 @@ def cacheAstForCode(code, pyAst):
                 + funcDefs
             )
 
-    _originalAstCache[code] = pyAst
+    _originalAstCache[code] = stripDecoratorFromFuncDef(pyAst)
 
     assert len(funcDefs) == len(codeConstants), (
         f"Expected {len(funcDefs)} func defs to cover the "
@@ -1107,7 +1137,8 @@ def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals, stripAnnotation
             kwarg=None
         ),
         body=statements,
-        returns=None
+        returns=None,
+        filename=pyAst.filename
     )
 
     func = evaluateFunctionPyAst(pyAstBuilder, globals)
