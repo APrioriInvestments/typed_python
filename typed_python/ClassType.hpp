@@ -74,6 +74,8 @@ public:
 
     static layout* initializeInstance(instance_ptr toInit, layout* layoutPtr, uint16_t dispatchIndex) {
         if (dispatchIndex >= 65535) {
+            std::cerr << "somehow we got a corrupt class object" << std::endl;
+
             asm("int3");
         }
 

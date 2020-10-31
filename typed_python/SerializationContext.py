@@ -31,6 +31,8 @@ import lz4.frame
 import importlib
 import threading
 import types
+import traceback
+import logging
 
 # a lock to guard the calls to importlib below. It we don't have this,
 # then two threads trying to deserialize at the same time can conflict
@@ -351,8 +353,12 @@ class SerializationContext:
 
                     with _importlibLock:
                         module = importlib.import_module(moduleName)
+            except ModuleNotFoundError:
+                _badModuleCache.add(moduleName)
+                return None
             except ImportError:
                 _badModuleCache.add(moduleName)
+                logging.error("Failed to import module %s:\n%s", moduleName, traceback.format_exc())
                 return None
 
             clsObj = getattr(module, classname, None)
@@ -383,8 +389,12 @@ class SerializationContext:
 
                 with _importlibLock:
                     return importlib.import_module(name[9:])
+            except ModuleNotFoundError:
+                _badModuleCache.add(name[9:])
+                return None
             except ImportError:
                 _badModuleCache.add(name[9:])
+                logging.error("Failed to import module %s:\n%s", name[9:], traceback.format_exc())
                 return None
 
         names = name.rsplit(".", 1)
@@ -408,9 +418,12 @@ class SerializationContext:
                     module = importlib.import_module(moduleName)
 
             return getattr(module, objName, None)
-
+        except ModuleNotFoundError:
+            _badModuleCache.add(moduleName)
+            return None
         except ImportError:
             _badModuleCache.add(moduleName)
+            logging.error("Failed to import module %s:\n%s", moduleName, traceback.format_exc())
             return None
 
     def sha_hash(self, o):

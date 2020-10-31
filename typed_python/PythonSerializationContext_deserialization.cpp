@@ -254,7 +254,6 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromName(Deserializ
         throw PythonExceptionSet();
     }
     if (result == Py_None){
-        asm("int3");
         throw std::runtime_error("Failed to deserialize Type '" + name + "'");
     }
 
