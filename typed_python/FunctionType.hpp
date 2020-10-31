@@ -1396,6 +1396,8 @@ public:
             + ShaHash(mRootName)
             + ShaHash(mQualname)
             + ShaHash(mModulename)
+            + ShaHash(mIsNocompile ? 2 : 1)
+            + ShaHash(mIsEntrypoint ? 2 : 1)
             + mClosureType->identityHash(groupHead)
         );
 

@@ -2203,6 +2203,30 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert identityHash(Cls).hex() == identityHash(Cls2).hex()
 
+    def test_identity_of_function_with_annotation_stable(self):
+        def makeFunction():
+            @Entrypoint
+            def f(x: float):
+                return x + 1
+
+            return (f, identityHash(f))
+
+        f, identityHashOfF = callFunctionInFreshProcess(makeFunction, ())
+
+        assert identityHash(f) == identityHashOfF
+
+    def test_identity_of_function_with_default_value_stable(self):
+        def makeFunction():
+            @Entrypoint
+            def f(x=None):
+                return x + 1
+
+            return (f, identityHash(f))
+
+        f, identityHashOfF = callFunctionInFreshProcess(makeFunction, ())
+
+        assert identityHash(f) == identityHashOfF
+
     @pytest.mark.skip(reason='broken')
     def test_deserialize_untyped_class_in_forward_retains_identity(self):
         # this still breaks because we have some inconsistency between how

@@ -16,7 +16,8 @@ from typed_python.test_util import evaluateExprInFreshProcess
 from typed_python import (
     UInt64, UInt32,
     ListOf, TupleOf, Tuple, NamedTuple, Dict, OneOf, Forward, identityHash,
-    Entrypoint, Class, Member, Final, TypeFunction, SerializationContext
+    Entrypoint, Class, Member, Final, TypeFunction, SerializationContext,
+    Function
 )
 
 import typed_python
@@ -520,3 +521,10 @@ def test_dot_accesses():
     dis.dis(f3)
 
     assert getCodeGlobalDotAccesses(f3.__code__) == [['typed_python', 'f']]
+
+
+def test_identity_of_entrypointed_functions():
+    def f():
+        return 0
+
+    assert identityHash(Function(f)) != identityHash(Entrypoint(f))
