@@ -1262,6 +1262,7 @@ class BytesWrapper(RefcountedWrapper):
 
         return super().convert_attribute(context, instance, attr)
 
+    @Wrapper.unwrapOneOfAndValue
     def convert_method_call(self, context, instance, methodname: str, args, kwargs0):
         """Generates code for bytes method calls.
 
@@ -1594,7 +1595,7 @@ class BytesWrapper(RefcountedWrapper):
                 return None
             return context.call_py_function(bytes_zfill, (instance, arg0), {})
 
-        return context.pushException(AttributeError, methodname)
+        return super().convert_method_call(context, instance, methodname, args, kwargs0)
 
     def convert_getitem_unsafe(self, context, expr, item):
         """Generates code for bytes getitem operation, without any argument checks.

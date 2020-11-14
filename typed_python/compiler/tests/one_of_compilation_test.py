@@ -14,8 +14,8 @@
 
 from typed_python import (
     OneOf, TupleOf, Forward, ConstDict, Class, Final, Member,
-    ListOf, Compiled, Entrypoint, NamedTuple, UInt16
-
+    ListOf, Compiled, Entrypoint, NamedTuple, UInt16,
+    typeKnownToCompiler
 )
 from typed_python import Value as ValueType
 import typed_python._types as _types
@@ -618,3 +618,46 @@ class TestOneOfCompilation(unittest.TestCase):
         l = ListOf(int)([1, 2, 3])
         append(l)
         assert len(l) == 4
+
+    def test_split_on_oneof_type(self):
+        @Entrypoint
+        def split(x: Value):
+            return typeKnownToCompiler(x.split)
+
+        assert issubclass(split("HI"), OneOf)
+
+    def test_string_split_on_oneof_with_constant(self):
+        @Entrypoint
+        def split(x: Value):
+            return x.split("HI")
+
+        assert split("AHIB") == ["A", "B"]
+
+        with self.assertRaisesRegex(TypeError, "Can.t call bytes.split"):
+            split(b"AHIB")
+
+    def test_string_split_on_oneof_retains_type(self):
+        @Entrypoint
+        def split(x: Value):
+            res = x.split("HI")
+
+            return typeKnownToCompiler(res)
+
+        assert split("AHIB") == ListOf(str)
+
+    def test_len_of_oneof(self):
+        @Entrypoint
+        def lenOf(x: Value):
+            return len(x)
+
+        assert lenOf("AHIB") == 4
+
+    def test_string_split_on_oneof_retains_type_2(self):
+        @Entrypoint
+        def split(x: Value, y: Value):
+            res = x.split(y)
+
+            return typeKnownToCompiler(res)
+
+        assert split("AHIB", "HI") == list
+        assert split(b"AHIB", b"HI") == list

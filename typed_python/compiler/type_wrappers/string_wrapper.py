@@ -686,6 +686,7 @@ class StringWrapper(RefcountedWrapper):
 
         return super().convert_attribute(context, instance, attr)
 
+    @Wrapper.unwrapOneOfAndValue
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         if methodname not in self._methods:
             return context.pushException(AttributeError, methodname)

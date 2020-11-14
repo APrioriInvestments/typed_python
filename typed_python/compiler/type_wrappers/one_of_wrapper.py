@@ -60,12 +60,18 @@ class OneOfWrapper(Wrapper):
         If there is only one argument, it will not be a one-of. If there are no arguments,
         we return None.
         """
+        if not types:
+            return None
+
+        if all(isinstance(t, Wrapper) for t in types):
+            types = list(set(types))
+            if len(types) == 1:
+                return types[0]
+
         allTypes = set()
         for t in types:
             if isinstance(t, Wrapper):
                 t = t.interpreterTypeRepresentation
-
-            assert not isinstance(t, Wrapper)
 
             if isinstance(t, OneOf):
                 allTypes.update(t.Types)

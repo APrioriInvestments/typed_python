@@ -15,6 +15,7 @@
 import typed_python
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python.compiler.conversion_level import ConversionLevel
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
@@ -43,6 +44,13 @@ class MasqueradeWrapper(Wrapper):
         return instance.changeType(self.typeRepresentation)
 
     def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if (
+            conversionLevel == ConversionLevel.Signature
+            and targetVal.expr_type.typeRepresentation == self.interpreterTypeRepresentation
+        ):
+            targetVal.convert_copy_initialize(instance.convert_masquerade_to_untyped())
+            return context.constant(True)
+
         # Allow the typed form of the object to perform the conversion
         return instance.convert_masquerade_to_typed().convert_to_type_with_target(targetVal, conversionLevel)
 
