@@ -11,12 +11,11 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-from typed_python._types import serialize, deserialize, Type, Alternative, NamedTuple
+from typed_python._types import serialize, deserialize, Type, Alternative, NamedTuple, codeObjectSetName
 from typed_python import _types
 
 from typed_python.python_ast import (
     convertFunctionToAlgebraicPyAst,
-    evaluateFunctionPyAst,
     evaluateFunctionDefWithLocalsInCells
 )
 from typed_python.hash import sha_hash
@@ -44,10 +43,6 @@ _importlibLock = threading.Lock()
 _badModuleCache = set()
 
 
-def createEmptyFunction(ast):
-    return evaluateFunctionPyAst(ast, stripAnnotations=True)
-
-
 def createFunctionWithLocalsAndGlobals(code, globals):
     if globals is None:
         globals = {}
@@ -55,12 +50,46 @@ def createFunctionWithLocalsAndGlobals(code, globals):
 
 
 def astToCodeObject(ast, freevars):
-    return evaluateFunctionDefWithLocalsInCells(
+    # if our function refers to itself, then the mechanism we use in
+    # evaluateFunctionDefWithLocalsInCells will be wrong, because it
+    # basically takes the AST and builds a nested function to build
+    # the regular function. It uses 'freevars' to determine which vars
+    # are going to end up as 'cells', but if the function refers to
+    # itself, then it will end up finding itself as a cell, even if
+    # it would normally find itself as a closure. To rectify this
+    # we just give it a different name, because we don't really care
+    # about the name. It would probably be better to explicitly serialize
+    # code objects, which we could do directly in the c++ layer.
+    if ast.matches.FunctionDef or ast.matches.AsyncFunctionDef:
+        args = {}
+        for argname in ast.ElementType.ElementNames:
+            args[argname] = getattr(ast, argname)
+
+        origName = ast.name
+
+        args['name'] = "__typed_python_ast_to_code_object_builder__"
+
+        ast = type(ast)(**args)
+    else:
+        origName = None
+
+    res = evaluateFunctionDefWithLocalsInCells(
         ast,
         globals={},
         locals={var: None for var in freevars},
         stripAnnotations=True
     ).__code__
+
+    if len(res.co_freevars) != len(freevars):
+        raise Exception(
+            "Somehow, deserializing this code object produced the "
+            "wrong number of free variables (bound in cells)."
+        )
+
+    if origName is not None:
+        codeObjectSetName(res, origName)
+
+    return res
 
 
 def capture(x):

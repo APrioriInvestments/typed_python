@@ -39,6 +39,8 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.native_ast import Expression, NamedCallTarget
 from typed_python.test_util import currentMemUsageMb
 
+from typed_python.SerializationContext import createFunctionWithLocalsAndGlobals
+
 from typed_python import (
     TupleOf, ListOf, OneOf, Tuple, NamedTuple, Class,
     Member, ConstDict, Alternative, serialize, deserialize,
@@ -53,6 +55,12 @@ from typed_python._types import (
 )
 
 module_level_testfun = dummy_test_module.testfunction
+
+
+def moduleLevelRecursiveF(x):
+    if x > 0:
+        return moduleLevelRecursiveF(x - 1) + 1
+    return 0
 
 
 @Entrypoint
@@ -2536,3 +2544,22 @@ class TypesSerializationTest(unittest.TestCase):
         BaseClass, ChildClass, deepRepr = callFunctionInFreshProcess(makeClasses, ())
 
         assert type(BaseClass.getChild()) is ChildClass
+
+    def test_serialize_recursive_function(self):
+        # ensure we can serialize and hash anonymous classes descended from ABC
+        def makeF():
+            gl = {}
+            gl['moduleLevelRecursiveF'] = None
+
+            f = createFunctionWithLocalsAndGlobals(
+                moduleLevelRecursiveF.__code__,
+                gl
+            )
+
+            gl['moduleLevelRecursiveF'] = f
+
+            return f
+
+        f = callFunctionInFreshProcess(makeF, ())
+
+        assert f(10) == 10
