@@ -460,6 +460,14 @@ class TestBytesCompilation(unittest.TestCase):
                     r2 = Entrypoint(f)(v, y)
                     self.assertEqual(r1, r2, (f, v, y))
 
+    def test_bytes_strip_bad_arg(self):
+        @Entrypoint
+        def strip(x, y):
+            return x.strip(y)
+
+        with self.assertRaises(TypeError):
+            strip(b"asdf", 10)
+
     def test_bytes_count(self):
         def f_count(x, sub):
             return x.count(sub)

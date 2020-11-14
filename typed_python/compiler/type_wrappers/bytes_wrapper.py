@@ -1325,7 +1325,7 @@ class BytesWrapper(RefcountedWrapper):
                         ).cast(self.layoutType)
                     )
                 )
-            elif len(args) == 1 and not kwargs:
+            elif len(args) == 1 and not kwargs and args[0].expr_type.typeRepresentation == bytes:
                 return context.push(
                     bytes,
                     lambda ref: ref.expr.store(
