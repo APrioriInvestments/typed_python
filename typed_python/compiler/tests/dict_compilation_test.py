@@ -791,3 +791,15 @@ class TestDictCompilation(unittest.TestCase):
             r2 = c_compare(T(v), v)
             self.assertEqual(r2, True)
             self.assertEqual(r1, r2)
+
+    def test_dict_size_change_during_iteration_raises(self):
+        @Entrypoint
+        def checkIt():
+            aDict = Dict(int, int)()
+            aDict[1] = 2
+
+            for x in aDict:
+                aDict[x+1] = 2
+
+        with self.assertRaisesRegex(RuntimeError, "dictionary size changed"):
+            checkIt()

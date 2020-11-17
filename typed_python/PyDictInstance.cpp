@@ -221,7 +221,7 @@ PyObject* PyDictInstance::dictClear(PyObject* o) {
 }
 
 PyObject* PyDictInstance::tp_iter_concrete() {
-    return createIteratorToSelf(mIteratorFlag);
+    return createIteratorToSelf(mIteratorFlag, type()->size(dataPtr()));
 }
 
 bool PyDictInstance::compare_as_iterator_to_python_concrete(PyObject* other, int pyComparisonOp) {
@@ -253,6 +253,11 @@ PyObject* PyDictInstance::tp_iternext_concrete() {
         while (mIteratorOffset < type()->slotCount(dataPtr()) && !type()->slotPopulated(dataPtr(), mIteratorOffset)) {
             mIteratorOffset++;
         }
+    }
+
+    if (type()->size(dataPtr()) != mContainerSize) {
+        PyErr_Format(PyExc_RuntimeError, "dictionary size changed during iteration");
+        return NULL;
     }
 
     if (mIteratorOffset >= type()->slotCount(dataPtr())) {

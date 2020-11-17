@@ -29,6 +29,11 @@ import typed_python.compiler
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
+def checkDictSizeAndThrowIfChanged(instance, expectedLen):
+    if len(instance) != expectedLen:
+        raise RuntimeError("dictionary size changed during iteration")
+
+
 def dict_update(instance, other):
     for key in other:
         instance[key] = other[key]
@@ -151,6 +156,11 @@ class DictWrapperBase(RefcountedWrapper):
 
     def getNativeLayoutType(self):
         return self.layoutType
+
+    def convert_len_native(self, expr):
+        if isinstance(expr, TypedExpression):
+            expr = expr.nonref_expr
+        return expr.ElementPtrIntegers(0, 8).load().cast(native_ast.Int64)
 
 
 class DictWrapper(DictWrapperBase):
@@ -297,15 +307,18 @@ class DictWrapper(DictWrapperBase):
         if methodname == "__iter__" and not args and not kwargs:
             res = context.push(
                 DictKeysIteratorWrapper(self.dictType),
-                lambda instance:
-                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
-                    # we initialize the dict pointer below, so technically
-                    # if that were to throw, this would leak a bad value.
+                lambda iteratorInstance:
+                iteratorInstance.expr.ElementPtrIntegers(0, 0).store(-1)
+                >> iteratorInstance.expr.ElementPtrIntegers(0, 1).store(
+                    self.convert_len_native(instance)
+                )
+                # we initialize the dict pointer below, so technically
+                # if that were to throw, this would leak a bad value.
             )
 
             context.pushReference(
                 self,
-                res.expr.ElementPtrIntegers(0, 1)
+                res.expr.ElementPtrIntegers(0, 2)
             ).convert_copy_initialize(instance)
 
             return res
@@ -496,11 +509,6 @@ class DictWrapper(DictWrapperBase):
 
         return context.call_py_function(dict_setitem, (expr, key, value), {})
 
-    def convert_len_native(self, expr):
-        if isinstance(expr, TypedExpression):
-            expr = expr.nonref_expr
-        return expr.ElementPtrIntegers(0, 8).load().cast(native_ast.Int64)
-
     def convert_items_reserved_native(self, expr):
         if isinstance(expr, TypedExpression):
             expr = expr.nonref_expr
@@ -604,11 +612,14 @@ class DictMakeIteratorWrapper(DictWrapperBase):
                 self.iteratorType,
                 lambda instance:
                     instance.expr.ElementPtrIntegers(0, 0).store(-1)
+                    >> instance.expr.ElementPtrIntegers(0, 1).store(
+                        self.convert_len_native(expr)
+                    )
             )
 
             context.pushReference(
                 self,
-                res.expr.ElementPtrIntegers(0, 1)
+                res.expr.ElementPtrIntegers(0, 2)
             ).convert_copy_initialize(expr)
 
             return res
@@ -646,12 +657,32 @@ class DictIteratorWrapper(Wrapper):
 
     def getNativeLayoutType(self):
         return native_ast.Type.Struct(
-            element_types=(("pos", native_ast.Int64), ("dict", DictWrapper(self.dictType).getNativeLayoutType())),
+            element_types=(
+                ("pos", native_ast.Int64),
+                ("count", native_ast.Int64),
+                ("dict", DictWrapper(self.dictType).getNativeLayoutType())
+            ),
             name="const_dict_iterator"
         )
 
     def convert_next(self, context, expr):
-        nextSlotIx = context.call_py_function(table_next_slot, (self.refAs(context, expr, 1), self.refAs(context, expr, 0)), {})
+        context.call_py_function(
+            checkDictSizeAndThrowIfChanged,
+            (
+                self.refAs(context, expr, 2),
+                self.refAs(context, expr, 1),
+            ),
+            {}
+        )
+
+        nextSlotIx = context.call_py_function(
+            table_next_slot,
+            (
+                self.refAs(context, expr, 2),
+                self.refAs(context, expr, 0)
+            ),
+            {}
+        )
 
         if nextSlotIx is None:
             return None, None
@@ -677,25 +708,28 @@ class DictIteratorWrapper(Wrapper):
             return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
 
         if which == 1:
+            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 1))
+
+        if which == 2:
             return context.pushReference(
                 self.dictType,
                 expr.expr
-                    .ElementPtrIntegers(0, 1)
+                    .ElementPtrIntegers(0, 2)
                     .cast(DictWrapper(self.dictType).getNativeLayoutType().pointer())
             )
 
     def convert_assign(self, context, expr, other):
         assert expr.isReference
 
-        for i in range(2):
+        for i in range(3):
             self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
 
     def convert_copy_initialize(self, context, expr, other):
-        for i in range(2):
+        for i in range(3):
             self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
 
     def convert_destroy(self, context, expr):
-        self.refAs(context, expr, 1).convert_destroy()
+        self.refAs(context, expr, 2).convert_destroy()
 
 
 class DictKeysIteratorWrapper(DictIteratorWrapper):
@@ -705,7 +739,7 @@ class DictKeysIteratorWrapper(DictIteratorWrapper):
     def iteratedItemForReference(self, context, expr, ixExpr):
         return DictWrapper(self.dictType).convert_method_call(
             context,
-            self.refAs(context, expr, 1),
+            self.refAs(context, expr, 2),
             "getKeyByIndexUnsafe",
             (ixExpr,),
             {}
@@ -719,7 +753,7 @@ class DictItemsIteratorWrapper(DictIteratorWrapper):
     def iteratedItemForReference(self, context, expr, ixExpr):
         return DictWrapper(self.dictType).convert_method_call(
             context,
-            self.refAs(context, expr, 1),
+            self.refAs(context, expr, 2),
             "getItemByIndexUnsafe",
             (ixExpr,),
             {}
@@ -733,7 +767,7 @@ class DictValuesIteratorWrapper(DictIteratorWrapper):
     def iteratedItemForReference(self, context, expr, ixExpr):
         return DictWrapper(self.dictType).convert_method_call(
             context,
-            self.refAs(context, expr, 1),
+            self.refAs(context, expr, 2),
             "getValueByIndexUnsafe",
             (ixExpr,),
             {}

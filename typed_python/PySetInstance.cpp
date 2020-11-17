@@ -1078,7 +1078,7 @@ Py_ssize_t PySetInstance::mp_and_sq_length_concrete() {
 }
 
 PyObject* PySetInstance::tp_iter_concrete() {
-    return createIteratorToSelf(mIteratorFlag);
+    return createIteratorToSelf(mIteratorFlag, type()->size(dataPtr()));
 }
 
 PyObject* PySetInstance::tp_iternext_concrete() {
@@ -1088,6 +1088,11 @@ PyObject* PySetInstance::tp_iternext_concrete() {
                && !type()->slotPopulated(dataPtr(), mIteratorOffset)) {
             mIteratorOffset++;
         }
+    }
+
+    if (type()->size(dataPtr()) != mContainerSize) {
+        PyErr_Format(PyExc_RuntimeError, "set size changed during iteration");
+        return NULL;
     }
 
     if (mIteratorOffset >= type()->slotCount(dataPtr())) {

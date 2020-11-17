@@ -3265,3 +3265,17 @@ class NativeTypesTests(unittest.TestCase):
 
         # I get .001, but if we use the normal interpreter loop, .2
         assert t1 - t0 < .02
+
+    def test_iterate_dict_and_change_size_throws(self):
+        x = Dict(int, int)({1: 2})
+
+        with self.assertRaisesRegex(RuntimeError, "dictionary size changed"):
+            for k in x:
+                x[k + 1] = 2
+
+    def test_iterate_set_and_change_size_throws(self):
+        x = Set(int)([1])
+
+        with self.assertRaisesRegex(RuntimeError, "set size changed"):
+            for k in x:
+                x.add(k + 1)

@@ -32,6 +32,11 @@ from typed_python.compiler.converter_utils import (
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
+def checkSetSizeAndThrowIfChanged(instance, expectedLen):
+    if len(instance) != expectedLen:
+        raise RuntimeError("set size changed during iteration")
+
+
 def initialize_set_from_other_upcast_containers(ptrToOutSet, iterable, mayThrowOnFailure):
     """Initialize a set from an arbitrary iterable object
 
@@ -325,6 +330,11 @@ class SetWrapperBase(RefcountedWrapper):
     def getNativeLayoutType(self):
         return self.layoutType
 
+    def convert_len_native(self, expr):
+        if isinstance(expr, TypedExpression):
+            expr = expr.nonref_expr
+        return expr.ElementPtrIntegers(0, 8).load().cast(native_ast.Int64)
+
 
 class SetWrapper(SetWrapperBase):
     def __init__(self, setType):
@@ -464,15 +474,18 @@ class SetWrapper(SetWrapperBase):
         if methodname == "__iter__" and not args and not kwargs:
             res = context.push(
                 SetKeysIteratorWrapper(self.setType),
-                lambda instance:
-                instance.expr.ElementPtrIntegers(0, 0).store(-1)
+                lambda iteratorInstance:
+                iteratorInstance.expr.ElementPtrIntegers(0, 0).store(-1)
+                >> iteratorInstance.expr.ElementPtrIntegers(0, 1).store(
+                    self.convert_len_native(instance)
+                )
                 # we initialize the set pointer below, so technically
                 # if that were to throw, this would leak a bad value.
             )
 
             context.pushReference(
                 self,
-                res.expr.ElementPtrIntegers(0, 1)
+                res.expr.ElementPtrIntegers(0, 2)
             ).convert_copy_initialize(instance)
 
             return res
@@ -621,11 +634,6 @@ class SetWrapper(SetWrapperBase):
                 return context.pushVoid()
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
-
-    def convert_len_native(self, expr):
-        if isinstance(expr, TypedExpression):
-            expr = expr.nonref_expr
-        return expr.ElementPtrIntegers(0, 8).load().cast(native_ast.Int64)
 
     def convert_items_reserved_native(self, expr):
         if isinstance(expr, TypedExpression):
@@ -821,13 +829,16 @@ class SetMakeIteratorWrapper(SetWrapperBase):
                 # self.iteratorType is inherited from our specialized children
                 # who pick whether we're an iterator over keys, values, items, etc.
                 self.iteratorType,
-                lambda instance:
-                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
+                lambda iteratorInstance:
+                    iteratorInstance.expr.ElementPtrIntegers(0, 0).store(-1)
+                    >> iteratorInstance.expr.ElementPtrIntegers(0, 1).store(
+                        self.convert_len_native(expr)
+                    )
             )
 
             context.pushReference(
                 self,
-                res.expr.ElementPtrIntegers(0, 1)
+                res.expr.ElementPtrIntegers(0, 2)
             ).convert_copy_initialize(expr)
 
             return res
@@ -853,12 +864,32 @@ class SetIteratorWrapper(Wrapper):
 
     def getNativeLayoutType(self):
         return native_ast.Type.Struct(
-            element_types=(("pos", native_ast.Int64), ("set", SetWrapper(self.setType).getNativeLayoutType())),
+            element_types=(
+                ("pos", native_ast.Int64),
+                ("count", native_ast.Int64),
+                ("set", SetWrapper(self.setType).getNativeLayoutType())
+            ),
             name="const_set_iterator"
         )
 
     def convert_next(self, context, expr):
-        nextSlotIx = context.call_py_function(table_next_slot, (self.refAs(context, expr, 1), self.refAs(context, expr, 0)), {})
+        context.call_py_function(
+            checkSetSizeAndThrowIfChanged,
+            (
+                self.refAs(context, expr, 2),
+                self.refAs(context, expr, 1),
+            ),
+            {}
+        )
+
+        nextSlotIx = context.call_py_function(
+            table_next_slot,
+            (
+                self.refAs(context, expr, 2),
+                self.refAs(context, expr, 0)
+            ),
+            {}
+        )
 
         if nextSlotIx is None:
             return None, None
@@ -884,25 +915,28 @@ class SetIteratorWrapper(Wrapper):
             return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
 
         if which == 1:
+            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 1))
+
+        if which == 2:
             return context.pushReference(
                 self.setType,
                 expr.expr
-                    .ElementPtrIntegers(0, 1)
+                    .ElementPtrIntegers(0, 2)
                     .cast(SetWrapper(self.setType).getNativeLayoutType().pointer())
             )
 
     def convert_assign(self, context, expr, other):
         assert expr.isReference
 
-        for i in range(2):
+        for i in range(3):
             self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
 
     def convert_copy_initialize(self, context, expr, other):
-        for i in range(2):
+        for i in range(3):
             self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
 
     def convert_destroy(self, context, expr):
-        self.refAs(context, expr, 1).convert_destroy()
+        self.refAs(context, expr, 2).convert_destroy()
 
 
 class SetKeysIteratorWrapper(SetIteratorWrapper):
@@ -912,7 +946,7 @@ class SetKeysIteratorWrapper(SetIteratorWrapper):
     def iteratedItemForReference(self, context, expr, ixExpr):
         return SetWrapper(self.setType).convert_method_call(
             context,
-            self.refAs(context, expr, 1),
+            self.refAs(context, expr, 2),
             "getKeyByIndexUnsafe",
             (ixExpr,),
             {}

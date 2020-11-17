@@ -71,6 +71,7 @@ public:
     bool mIsMatcher;
     char mIteratorFlag; //0 is keys, 1 is values, 2 is pairs
     int64_t mIteratorOffset; //-1 if we're not an iterator
+    int64_t mContainerSize; //-1 if we're not an iterator
 
     Instance mContainingInstance;
 
@@ -326,7 +327,7 @@ public:
         });
     }
 
-    PyObject* createIteratorToSelf(int32_t iterTypeFlag) {
+    PyObject* createIteratorToSelf(int32_t iterTypeFlag, int64_t containerSize) {
         PyInstance* result = (PyInstance*)initialize(type(), [&](instance_ptr out) {
             type()->copy_constructor(out, dataPtr());
         });
@@ -334,6 +335,7 @@ public:
         result->mIsMatcher = false;
         result->mIteratorOffset = 0;
         result->mIteratorFlag = iterTypeFlag;
+        result->mContainerSize = containerSize;
 
         return (PyObject*)result;
     }

@@ -1139,3 +1139,15 @@ class TestSetCompilation(unittest.TestCase):
                 aT = T()
                 aT.add([1, 2, "3"])
             addIt()
+
+    def test_set_size_change_during_iteration_raises(self):
+        @Entrypoint
+        def checkIt():
+            aSet = Set(int)()
+            aSet.add(1)
+
+            for x in aSet:
+                aSet.add(x+1)
+
+        with self.assertRaisesRegex(RuntimeError, "set size changed"):
+            checkIt()
