@@ -21,8 +21,9 @@ Python ast directly.
 import sys
 import ast
 import typed_python.compiler.python_ast_util as python_ast_util
-import weakref
 import types
+import traceback
+
 from typed_python._types import Forward, Alternative, TupleOf, OneOf
 
 
@@ -853,7 +854,6 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
             try:
                 return converter(**args)
             except Exception:
-                import traceback
                 raise UserWarning(
                     "Failed to construct %s from %s with arguments\n%s\n\n%s" % (
                         converter,
@@ -872,14 +872,6 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
         return [convertPyAstToAlgebraic(x, fname, keepLineInformation) for x in tree]
 
     return tree
-
-
-# a nasty hack to allow us to find the Ast's of functions we have deserialized
-# but for which we never had the source code.
-_originalAstCache = weakref.WeakKeyDictionary()
-
-# a memo for the pyast -> algebraic ast mapping
-_algebraicAstCache = {}
 
 
 def stripDecoratorFromFuncDef(ast):
@@ -906,6 +898,11 @@ def stripDecoratorFromFuncDef(ast):
     )
 
 
+# a map from (code) -> algebraic ast
+_codeToAlgebraicAst = {}
+_codeToAlgebraicAstWithoutLineInfo = {}
+
+
 def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
     # we really just care about the code itself
     if isinstance(f, types.FunctionType):
@@ -917,52 +914,49 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
             "convertFunctionToAlgebraicPyAst requires a function object, or a code object."
         )
 
-    if (fCode, keepLineInformation) in _algebraicAstCache:
-        return _algebraicAstCache[fCode, keepLineInformation]
+    if not keepLineInformation:
+        if fCode in _codeToAlgebraicAstWithoutLineInfo:
+            return _codeToAlgebraicAstWithoutLineInfo[fCode]
 
-    if fCode in _originalAstCache:
-        if keepLineInformation:
-            return _originalAstCache[fCode]
-        else:
-            # we need to strip the line information from the ast and place it
-            # in _algebraicAstCache
-            algebraicAst = _originalAstCache[fCode]
-            pyast = convertAlgebraicToPyAst(algebraicAst)
-            _algebraicAstCache[fCode, False] = convertPyAstToAlgebraic(pyast, "", False)
+        algebraic = convertFunctionToAlgebraicPyAst(f)
 
-            return _algebraicAstCache[fCode, False]
+        _codeToAlgebraicAstWithoutLineInfo[fCode] = convertPyAstToAlgebraic(
+            convertAlgebraicToPyAst(algebraic),
+            "",
+            False
+        )
 
+        return _codeToAlgebraicAstWithoutLineInfo[fCode]
+
+    # check if this is in the cache already
+    if fCode in _codeToAlgebraicAst:
+        return _codeToAlgebraicAst[fCode]
+
+    # it's not. we'll have to build it
     try:
         pyast = python_ast_util.pyAstForCode(fCode)
     except Exception:
-        raise Exception("Failed to get source for function %s" % (fCode.co_name))
+        raise Exception("Failed to get source for function %s:\n%s" % (fCode.co_name, traceback.format_exc()))
 
     try:
-        algebraicAst = convertPyAstToAlgebraic(pyast, fCode.co_filename, keepLineInformation)
+        algebraicAst = convertPyAstToAlgebraic(pyast, fCode.co_filename, True)
 
         # strip any decorators from the function def. They are not actually part of the
         # definition of the code object itself
         algebraicAst = stripDecoratorFromFuncDef(algebraicAst)
 
-        _algebraicAstCache[fCode, keepLineInformation] = algebraicAst
-
-        if fCode not in _originalAstCache:
-            if keepLineInformation:
-                _originalAstCache[fCode] = algebraicAst
-            else:
-                _originalAstCache[fCode] = stripDecoratorFromFuncDef(
-                    convertPyAstToAlgebraic(pyast, fCode.co_filename, True)
-                )
-
-        return algebraicAst
+        cacheAstForCode(fCode, algebraicAst)
     except Exception as e:
         raise Exception(
             "Failed to convert function at %s:%s:\n%s"
             % (fCode.co_filename, fCode.co_firstlineno, repr(e))
         )
 
+    return _codeToAlgebraicAst[fCode]
+
 
 # a memo from pyAst to the 'code' object that we evaluate to def it.
+# this is only relevant for the versions that do have line numbers
 _pyAstToCodeObjectCache = {}
 
 
@@ -1051,6 +1045,8 @@ def evaluateFunctionPyAst(pyAst, globals=None, stripAnnotations=False):
 
 def cacheAstForCode(code, pyAst):
     """Remember that 'code' is equivalent to pyAst, and also for contained code objects."""
+    if code in _codeToAlgebraicAst:
+        return
 
     # we have to import this within the function to break the import cycle
     from typed_python.compiler.python_ast_analysis import extractFunctionDefsInOrder
@@ -1072,7 +1068,7 @@ def cacheAstForCode(code, pyAst):
                 + funcDefs
             )
 
-    _originalAstCache[code] = stripDecoratorFromFuncDef(pyAst)
+    _codeToAlgebraicAst[code] = stripDecoratorFromFuncDef(pyAst)
 
     assert len(funcDefs) == len(codeConstants), (
         f"Expected {len(funcDefs)} func defs to cover the "
@@ -1142,6 +1138,9 @@ def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals, stripAnnotation
     )
 
     func = evaluateFunctionPyAst(pyAstBuilder, globals)
+
     inner = func(*[val for name, val in locals.items()])
+
+    cacheAstForCode(inner.__code__, pyAst)
 
     return inner

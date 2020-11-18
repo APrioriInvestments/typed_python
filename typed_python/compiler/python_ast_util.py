@@ -62,6 +62,12 @@ def pyAstFromText(text):
 
 
 def pyAstForCode(codeObject):
+    """Given a code object that represents a function or lambda, get the ast for its code.
+
+    This returns a python-native ast (from the 'ast' builtin module).
+
+    Don't try to run this on code objects from classes or generators.
+    """
     sourceFile = codeObject.co_filename
     sourceLines = getLines(sourceFile)
     if sourceLines is None:
@@ -74,7 +80,7 @@ def pyAstForCode(codeObject):
 
     if len(defs) == 0:
         raise Exception(
-            f"Error: can't convert {codeObject} back to code because when we"
+            f"Error: can't convert {codeObject} back to a python_ast because when we"
             f" look, there are no defs or lambas at "
             f"{codeObject.co_filename}:{codeObject.co_firstlineno}"
         )
@@ -83,7 +89,7 @@ def pyAstForCode(codeObject):
         return defs[0]
 
     for d in defs:
-        assert isinstance(d, ast.Lambda)
+        assert isinstance(d, ast.Lambda), type(d)
 
     # for each Lambda, convert it to an Expression object, compile it to a code
     # object that evaluates to that lambda, and pull out the constant 'code' object

@@ -26,7 +26,7 @@ __fully_typed_serialization_version__ = 1
 # or look them up in a codebase. Clients that serialize 'object' and 'type'
 # and who want a way to check that they are reading the correct protocol
 # can check this version.
-__untyped_serialization_version__ = 1
+__untyped_serialization_version__ = 2
 
 from typed_python.internals import (
     Member, Final, Function, UndefinedBehaviorException,

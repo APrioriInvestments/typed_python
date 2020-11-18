@@ -746,8 +746,6 @@ class ConversionContextBase:
             for varname in tpFunction.overloads[0].closureVarLookups:
                 assert varname in self.variablesReadByClosures
 
-            python_ast._originalAstCache[untypedFunction.__code__] = ast
-
         # this function object has a totally bogus closure - it will just have 'None'
         # for each variable it references. We'll need to replace the closure variable binding
         # rules and have it extract its closure

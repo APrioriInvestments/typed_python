@@ -1595,30 +1595,6 @@ PyObject *setFunctionClosure(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
-PyObject *codeObjectSetName(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 2) {
-        PyErr_SetString(PyExc_TypeError, "codeObjectSetName takes 2 positional arguments");
-        return NULL;
-    }
-
-    if (!PyCode_Check(PyTuple_GetItem(args, 0))) {
-        PyErr_SetString(PyExc_TypeError, "codeObjectSetName takes a code object for its first argument");
-        return NULL;
-    }
-
-    if (!PyUnicode_Check(PyTuple_GetItem(args, 1))) {
-        PyErr_SetString(PyExc_TypeError, "codeObjectSetName takes a string for its second argument.");
-        return NULL;
-    }
-
-    incref(PyTuple_GetItem(args, 1));
-
-    decref(((PyCodeObject*)PyTuple_GetItem(args, 0))->co_name);
-    ((PyCodeObject*)PyTuple_GetItem(args, 0))->co_name = PyTuple_GetItem(args, 1);
-
-    return incref(Py_None);
-}
-
 PyObject *setFunctionGlobals(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "setFunctionGlobals takes 2 positional arguments");
@@ -2709,7 +2685,6 @@ static PyMethodDef module_methods[] = {
     {"prepareArgumentToBePassedToCompiler", (PyCFunction)prepareArgumentToBePassedToCompiler, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setFunctionClosure", (PyCFunction)setFunctionClosure, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setFunctionGlobals", (PyCFunction)setFunctionGlobals, METH_VARARGS | METH_KEYWORDS, NULL},
-    {"codeObjectSetName", (PyCFunction)codeObjectSetName, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setClassOrStaticmethod", (PyCFunction)setClassOrStaticmethod, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setMethodObjectInternals", (PyCFunction)setMethodObjectInternals, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setPropertyGetSetDel", (PyCFunction)setPropertyGetSetDel, METH_VARARGS | METH_KEYWORDS, NULL},

@@ -1078,7 +1078,7 @@ class TypesSerializationTest(unittest.TestCase):
             lz4.frame
         )
 
-    def test_serialize_lambdas_with_references_in_list_comprehensions(self):
+    def test_serialize_functions_with_references_in_list_comprehensions(self):
         sc = SerializationContext()
 
         # note that it matters that the 'module_level_testfun' is at the module level,
@@ -1089,6 +1089,21 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(f(), "testfunction")
 
         self.assertEqual(sc.deserialize(sc.serialize(f))(), "testfunction")
+
+    def test_serialize_functions_with_nested_list_comprehensions(self):
+        sc = SerializationContext()
+
+        def f():
+            return [[z for z in range(20)] for _ in range(1)]
+
+        self.assertEqual(sc.deserialize(sc.serialize(f))(), f())
+
+    def test_serialize_lambdas_with_nested_list_comprehensions(self):
+        sc = SerializationContext()
+
+        f = lambda: [[z for z in range(20)] for _ in range(1)]
+
+        self.assertEqual(sc.deserialize(sc.serialize(f))(), f())
 
     def test_serialize_large_lists(self):
         x = SerializationContext()
@@ -2563,3 +2578,47 @@ class TypesSerializationTest(unittest.TestCase):
         f = callFunctionInFreshProcess(makeF, ())
 
         assert f(10) == 10
+
+    def test_can_reserialize_deserialized_function_with_no_backing_file(self):
+        # when we serialize an anonymous function on one machine, where we have
+        # a definition for that code, we need to ensure that on another machine,
+        # where we don't have that file, we can still get access to the original
+        # AST. This is because we need the AST itself, not just the code object
+        # and we generate the AST from the original source code.
+
+        # this test builds a function on disk and serializes it in a separate process
+        # we then check that the file no longer exists but that we can still
+        # serialize it.
+        def makeF():
+            with tempfile.TemporaryDirectory() as tempdir:
+                path = os.path.join(tempdir, "asdf.py")
+
+                CONTENTS = (
+                    "def anF(x):\n"
+                    "    if x > 0:\n"
+                    "        return anF(x - 1) + 1\n"
+                    "    return 0\n"
+                )
+
+                with open(path, "w") as f:
+                    f.write(CONTENTS)
+
+                globals = {'__file__': path, '__name__': 'asdf'}
+
+                exec(
+                    compile(CONTENTS, path, "exec"),
+                    globals
+                )
+
+                s = SerializationContext()
+                return s.serialize(globals['anF'])
+
+        serializedF = callFunctionInFreshProcess(makeF, ())
+
+        f = SerializationContext().deserialize(serializedF)
+
+        f2serialized = SerializationContext().serialize(f)
+
+        f2 = SerializationContext().deserialize(f2serialized)
+
+        assert f(10) == f2(10)

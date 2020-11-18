@@ -11,12 +11,12 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-from typed_python._types import serialize, deserialize, Type, Alternative, NamedTuple, codeObjectSetName
+from typed_python._types import serialize, deserialize, Type, Alternative, NamedTuple
 from typed_python import _types
 
 from typed_python.python_ast import (
     convertFunctionToAlgebraicPyAst,
-    evaluateFunctionDefWithLocalsInCells
+    cacheAstForCode
 )
 from typed_python.hash import sha_hash
 from typed_python.type_function import ConcreteTypeFunction, reconstructTypeFunctionType, isTypeFunctionType
@@ -49,47 +49,45 @@ def createFunctionWithLocalsAndGlobals(code, globals):
     return _types.buildPyFunctionObject(code, globals, ())
 
 
-def astToCodeObject(ast, freevars):
-    # if our function refers to itself, then the mechanism we use in
-    # evaluateFunctionDefWithLocalsInCells will be wrong, because it
-    # basically takes the AST and builds a nested function to build
-    # the regular function. It uses 'freevars' to determine which vars
-    # are going to end up as 'cells', but if the function refers to
-    # itself, then it will end up finding itself as a cell, even if
-    # it would normally find itself as a closure. To rectify this
-    # we just give it a different name, because we don't really care
-    # about the name. It would probably be better to explicitly serialize
-    # code objects, which we could do directly in the c++ layer.
-    if ast.matches.FunctionDef or ast.matches.AsyncFunctionDef:
-        args = {}
-        for argname in ast.ElementType.ElementNames:
-            args[argname] = getattr(ast, argname)
+def buildCodeObject(
+    ast,
+    co_argcount,
+    co_kwonlyargcount,
+    co_nlocals,
+    co_stacksize,
+    co_flags,
+    co_code,
+    co_consts,
+    co_names,
+    co_varnames,
+    co_freevars,
+    co_cellvars,
+    co_filename,
+    co_name,
+    co_firstlineno,
+    co_lnotab,
+):
+    codeObj = types.CodeType(
+        co_argcount,
+        co_kwonlyargcount,
+        co_nlocals,
+        co_stacksize,
+        co_flags,
+        co_code,
+        co_consts,
+        co_names,
+        co_varnames,
+        co_filename,
+        co_name,
+        co_firstlineno,
+        co_lnotab,
+        co_freevars,
+        co_cellvars,
+    )
 
-        origName = ast.name
+    cacheAstForCode(codeObj, ast)
 
-        args['name'] = "__typed_python_ast_to_code_object_builder__"
-
-        ast = type(ast)(**args)
-    else:
-        origName = None
-
-    res = evaluateFunctionDefWithLocalsInCells(
-        ast,
-        globals={},
-        locals={var: None for var in freevars},
-        stripAnnotations=True
-    ).__code__
-
-    if len(res.co_freevars) != len(freevars):
-        raise Exception(
-            "Somehow, deserializing this code object produced the "
-            "wrong number of free variables (bound in cells)."
-        )
-
-    if origName is not None:
-        codeObjectSetName(res, origName)
-
-    return res
+    return codeObj
 
 
 def capture(x):
@@ -120,7 +118,6 @@ class SerializationContext:
         encodeLineInformationForCode=True,
         objectToNameOverride=None,
         internalizeTypeGroups=True,
-        serializeFunctionsAsNonAst=False,
         serializeFunctionGlobalsAsIs=False
     ):
         super().__init__()
@@ -134,7 +131,6 @@ class SerializationContext:
         self.compressionEnabled = compressionEnabled
         self.encodeLineInformationForCode = encodeLineInformationForCode
         self.internalizeTypeGroups = internalizeTypeGroups
-        self.serializeFunctionsAsNonAst = serializeFunctionsAsNonAst
         self.serializeFunctionGlobalsAsIs = serializeFunctionGlobalsAsIs
 
     def addNamedObject(self, name, obj):
@@ -182,26 +178,7 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst,
             serializeFunctionGlobalsAsIs=True
-        )
-
-    def withoutFunctionsSerializedAsNonAst(self):
-        """Just serialize a function's code, not its AST (from source).
-
-        this means we can't deserialize it, but is good for hashing.
-        """
-        if self.serializeFunctionsAsNonAst:
-            return self
-
-        return SerializationContext(
-            nameToObjectOverride=self.nameToObjectOverride,
-            compressionEnabled=self.compressionEnabled,
-            encodeLineInformationForCode=self.encodeLineInformationForCode,
-            objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=True,
-            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
         )
 
     def withoutInternalizingTypeGroups(self):
@@ -219,7 +196,6 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=False,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
         )
 
@@ -233,7 +209,6 @@ class SerializationContext:
             encodeLineInformationForCode=False,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
         )
 
@@ -247,7 +222,6 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
         )
 
@@ -261,7 +235,6 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionsAsNonAst=self.serializeFunctionsAsNonAst,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
         )
 
@@ -569,19 +542,33 @@ class SerializationContext:
             return inst.__reduce__() + (None,)
 
         if isinstance(inst, CodeType):
-            if self.serializeFunctionsAsNonAst:
-                # serialize only enough to hash this
-                return (
-                    astToCodeObject,
-                    (inst.co_freevars, inst.co_code, inst.co_names, inst.co_consts, inst.co_varnames,
-                     inst.co_filename if self.encodeLineInformationForCode else None,
-                     inst.co_firstlineno if self.encodeLineInformationForCode else None),
-                    None
-                )
-            else:
-                pyast = convertFunctionToAlgebraicPyAst(inst, keepLineInformation=self.encodeLineInformationForCode)
+            pyast = convertFunctionToAlgebraicPyAst(
+                inst,
+                keepLineInformation=self.encodeLineInformationForCode
+            )
 
-                return (astToCodeObject, (pyast, inst.co_freevars), {})
+            return (
+                buildCodeObject,
+                (
+                    pyast,
+                    inst.co_argcount,
+                    inst.co_kwonlyargcount,
+                    inst.co_nlocals,
+                    inst.co_stacksize,
+                    inst.co_flags,
+                    inst.co_code,
+                    inst.co_consts,
+                    inst.co_names,
+                    inst.co_varnames,
+                    inst.co_freevars,
+                    inst.co_cellvars,
+                    inst.co_filename if self.encodeLineInformationForCode else "",
+                    inst.co_name,
+                    inst.co_firstlineno if self.encodeLineInformationForCode else 0,
+                    inst.co_lnotab
+                ),
+                {}
+            )
 
         if isinstance(inst, FunctionType):
             representation = {}
