@@ -483,9 +483,8 @@ extern "C" {
         return StringType::title(l);
     }
 
-
-    StringType::layout* nativepython_runtime_string_strip(StringType::layout* l, bool fromLeft, bool fromRight) {
-        return StringType::strip(l, fromLeft, fromRight);
+    StringType::layout* nativepython_runtime_string_strip(StringType::layout* l, bool whitespace, StringType::layout* values, bool fromLeft, bool fromRight) {
+        return StringType::strip(l, whitespace, values, fromLeft, fromRight);
     }
 
     int64_t nativepython_runtime_string_find(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {

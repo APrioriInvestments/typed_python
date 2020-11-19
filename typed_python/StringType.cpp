@@ -1057,7 +1057,7 @@ StringType::layout* StringType::getsubstr(layout* l, int64_t start, int64_t stop
 
 // specialized form of the strip left/right algorithm based on the codepoint type.
 template<class elt_type>
-void stripInset(int64_t& ioLeftPos, int64_t& ioRightPos, elt_type* data, bool fromLeft, bool fromRight) {
+void stripInset_whitespace(int64_t& ioLeftPos, int64_t& ioRightPos, elt_type* data, bool fromLeft, bool fromRight) {
     if (fromLeft) {
         while (ioLeftPos < ioRightPos && uprops[data[ioLeftPos]] & Uprops_SPACE) {
             ioLeftPos++;
@@ -1071,7 +1071,7 @@ void stripInset(int64_t& ioLeftPos, int64_t& ioRightPos, elt_type* data, bool fr
     }
 }
 
-StringType::layout* StringType::strip(layout* l, bool fromLeft, bool fromRight) {
+StringType::layout* StringType::strip_whitespace(layout* l, bool fromLeft, bool fromRight) {
     if (!l) {
         return l;
     }
@@ -1082,13 +1082,13 @@ StringType::layout* StringType::strip(layout* l, bool fromLeft, bool fromRight) 
     uint8_t* dataPtr = l->data;
 
     if (l->bytes_per_codepoint == 1) {
-        stripInset(leftPos, rightPos, (uint8_t*)dataPtr, fromLeft, fromRight);
+        stripInset_whitespace(leftPos, rightPos, (uint8_t*)dataPtr, fromLeft, fromRight);
     }
     else if (l->bytes_per_codepoint == 2) {
-        stripInset(leftPos, rightPos, (uint16_t*)dataPtr, fromLeft, fromRight);
+        stripInset_whitespace(leftPos, rightPos, (uint16_t*)dataPtr, fromLeft, fromRight);
     }
     else if (l->bytes_per_codepoint == 4) {
-        stripInset(leftPos, rightPos, (uint32_t*)dataPtr, fromLeft, fromRight);
+        stripInset_whitespace(leftPos, rightPos, (uint32_t*)dataPtr, fromLeft, fromRight);
     }
 
     if (leftPos == rightPos) {
@@ -1103,12 +1103,82 @@ StringType::layout* StringType::strip(layout* l, bool fromLeft, bool fromRight) 
     return getsubstr(l, leftPos, rightPos);
 }
 
-StringType::layout* StringType::lstrip(layout* l) {
-    return strip(l, true, false);
+// specialized form of the strip left/right algorithm based on the codepoint type.
+template<class elt_type>
+void stripInset(int64_t& ioLeftPos, int64_t& ioRightPos, elt_type* data, bool fromLeft, bool fromRight) {
+    if (fromLeft) {
+        while (ioLeftPos < ioRightPos && uprops[data[ioLeftPos]] & Uprops_SPACE) {
+            ioLeftPos++;
+        }
+    }
+
+    if (fromRight) {
+        while (ioLeftPos < ioRightPos && uprops[data[ioRightPos-1]] & Uprops_SPACE) {
+            ioRightPos--;
+        }
+    }
 }
 
-StringType::layout* StringType::rstrip(layout* l) {
-    return strip(l, false, true);
+StringType::layout* StringType::strip(layout* l, bool whiteSpace, layout* values, bool fromLeft, bool fromRight) {
+    if (whiteSpace) {
+        return strip_whitespace(l, fromLeft, fromRight);
+    }
+
+    if (!l || !values || values->pointcount == 0) {
+        if (l) l->refcount++;
+        return l;
+    }
+
+    int64_t leftPos = 0;
+    int64_t rightPos = l->pointcount;
+
+    if (fromLeft) {
+        while (leftPos < rightPos) {
+            uint32_t c = getpoint(l, leftPos);
+            bool found = false;
+            for (int i = 0; i < values->pointcount; i++) {
+                if (c == getpoint(values, i)) {
+                    leftPos++;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) break;  // no matches
+        }
+    }
+    if (fromRight) {
+        while (leftPos < rightPos) {
+            uint32_t c = getpoint(l, rightPos - 1);
+            bool found = false;
+            for (int i = 0; i < values->pointcount; i++) {
+                if (c == getpoint(values, i)) {
+                    rightPos--;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) break;  // no matches
+        }
+    }
+
+    if (leftPos == rightPos) {
+        return nullptr;
+    }
+
+    if (leftPos == 0 && rightPos == l->pointcount) {
+        l->refcount++;
+        return l;
+    }
+
+    return getsubstr(l, leftPos, rightPos);
+}
+
+StringType::layout* StringType::lstrip(layout* l, bool whiteSpace, StringType::layout* values) {
+    return strip(l, whiteSpace, values, true, false);
+}
+
+StringType::layout* StringType::rstrip(layout* l, bool whiteSpace, StringType::layout* values) {
+    return strip(l, whiteSpace, values, false, true);
 }
 
 
