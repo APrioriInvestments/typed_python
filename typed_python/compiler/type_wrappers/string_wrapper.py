@@ -720,12 +720,15 @@ class StringWrapper(RefcountedWrapper):
         if methodname in ['strip', 'lstrip', 'rstrip'] and not kwargs:
             fromLeft = methodname in ['strip', 'lstrip']
             fromRight = methodname in ['strip', 'rstrip']
-            if len(args) == 0 and not kwargs:
+            if len(args) == 0 or (len(args) == 1 and args[0].expr_type.typeRepresentation == str):
+                arg0 = VoidPtr.zero() if len(args) == 0 else args[0].nonref_expr
                 return context.push(
                     str,
                     lambda strRef: strRef.expr.store(
                         runtime_functions.string_strip.call(
                             instance.nonref_expr.cast(VoidPtr),
+                            native_ast.const_bool_expr(len(args) == 0),
+                            arg0.cast(VoidPtr),
                             native_ast.const_bool_expr(fromLeft),
                             native_ast.const_bool_expr(fromRight)
                         ).cast(self.layoutType)

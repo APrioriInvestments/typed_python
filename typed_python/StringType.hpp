@@ -67,11 +67,12 @@ public:
     static layout* swapcase(layout* l);
     static layout* title(layout* l);
 
-    static layout* strip(layout *l, bool fromLeft=true, bool fromRight=true);
+    static layout* strip_whitespace(layout* l, bool fromLeft=true, bool fromRight=true);
+    static layout* strip(layout* l, bool whiteSpace=true, layout* values=nullptr, bool fromLeft=true, bool fromRight=true);
 
-    static layout* lstrip(layout *l);
+    static layout* lstrip(layout *l, bool whiteSpace=true, layout* values=nullptr);
 
-    static layout* rstrip(layout *l);
+    static layout* rstrip(layout *l, bool whiteSpace=true, layout* values=nullptr);
 
     //return the lowest index in the string where substring sub is found within l[start, end]
     static int64_t find(layout* l, layout* sub, int64_t start, int64_t end);

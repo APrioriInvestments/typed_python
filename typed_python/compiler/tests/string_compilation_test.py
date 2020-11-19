@@ -678,6 +678,28 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(s.rstrip(), rstrip(s), s)
             self.assertEqual(s.lstrip(), lstrip(s), s)
 
+        def strip2(s, p):
+            return s.strip(p)
+
+        def lstrip2(s, p):
+            return s.lstrip(p)
+
+        def rstrip2(s, p):
+            return s.rstrip(p)
+
+        chars = 'a\u20ACa\U0001F000a'
+        strings = {c for c in chars} | {chars, ''}
+        cases = {x+y+z for x in strings for y in strings for z in strings}
+
+        for f in [strip2, lstrip2, rstrip2]:
+            with self.assertRaises(TypeError):
+                Entrypoint(f)("asdf", 10)
+            for s in cases:
+                for p in cases:
+                    r1 = f(s, p)
+                    r2 = Entrypoint(f)(s, p)
+                    self.assertEqual(r1, r2, (f, s, p))
+
     @pytest.mark.skip(reason='just for comparing performance when changing implementation')
     def test_string_find_perf(self):
         @Compiled

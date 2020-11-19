@@ -577,6 +577,8 @@ string_strip = externalCallTarget(
     Void.pointer(),
     Void.pointer(),
     Bool,
+    Void.pointer(),
+    Bool,
     Bool
 )
 
