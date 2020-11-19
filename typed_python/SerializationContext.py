@@ -66,9 +66,17 @@ def buildCodeObject(
     co_name,
     co_firstlineno,
     co_lnotab,
+    co_posonlyargcount=0
 ):
+    if sys.version_info.minor < 8 and co_posonlyargcount:
+        raise Exception(
+            "tried to deserialize a code object from a future version "
+            "of python that uses positional-only arguments."
+        )
+
     codeObj = types.CodeType(
         co_argcount,
+        *([] if sys.version_info.minor < 8 else [co_posonlyargcount]),
         co_kwonlyargcount,
         co_nlocals,
         co_stacksize,
@@ -566,6 +574,9 @@ class SerializationContext:
                     inst.co_name,
                     inst.co_firstlineno if self.encodeLineInformationForCode else 0,
                     inst.co_lnotab
+                ) + (
+                    () if sys.version_info.minor < 8 or inst.co_posonlyargcount == 0 else
+                    (inst.co_posonlyargcount,)
                 ),
                 {}
             )
