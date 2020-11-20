@@ -13,8 +13,12 @@
 #   limitations under the License.
 
 import unittest
+import time
+import gc
+import pytest
 
 from typed_python import Entrypoint
+from typed_python.test_util import currentMemUsageMb
 
 
 class TestGeneratorsAndComprehensions(unittest.TestCase):
@@ -27,3 +31,37 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert isinstance(lst, list)
         assert lst == [a + 1 for a in range(10)]
+
+    def executeInLoop(self, f, duration=.25, threshold=1.0):
+        gc.collect()
+        memUsage = currentMemUsageMb()
+
+        t0 = time.time()
+
+        count = 0
+        while time.time() - t0 < duration:
+            f()
+            count += 1
+
+        gc.collect()
+        print("count=", count, "allocated=", currentMemUsageMb() - memUsage)
+        self.assertLess(currentMemUsageMb() - memUsage, threshold)
+
+    @pytest.mark.skipif('sys.platform=="darwin"')
+    def test_listcomp_doesnt_leak(self):
+        @Entrypoint
+        def listComp(x):
+            return [a + 1 for a in range(x)]
+
+        @Entrypoint
+        def sumListComp(x):
+            l = listComp(x)
+            res = 0
+            for val in l:
+                res += val
+            return res
+
+        # burn it in
+        sumListComp(1000000)
+        self.executeInLoop(lambda: sumListComp(1000000), duration=.1, threshold=20.0)
+        self.executeInLoop(lambda: sumListComp(1000000), duration=.25, threshold=1.0)

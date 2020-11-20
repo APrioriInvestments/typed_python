@@ -2152,6 +2152,21 @@ class ListComprehensionConversionContext(FunctionConversionContext):
 
         return [context.finalize(None)]
 
+    def generateDestructors(self, variableStates):
+        destructors = super().generateDestructors(variableStates)
+
+        context = ExpressionConversionContext(self, variableStates)
+        accumulator = self.localVariableExpression(context, ".list_comp_accumulator")
+        accumulator.convert_destroy()
+
+        nativeDestructor = context.finalize(None)
+
+        return destructors + [
+            native_ast.Teardown.Always(
+                expr=nativeDestructor
+            )
+        ]
+
     def processYieldExpression(self, expr):
         """Called with the body of a yield statement so that subclasses can handle.
 
