@@ -114,118 +114,81 @@ realloc = externalCallTarget("realloc", UInt8Ptr, UInt8Ptr, Int64)
 memcpy = externalCallTarget("memcpy", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 memmove = externalCallTarget("memmove", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 
-acos32 = externalCallTarget("np_acos_float32", Float32, Float32)
 acos64 = externalCallTarget("np_acos_float64", Float64, Float64)
 
-acosh32 = externalCallTarget("np_acosh_float32", Float32, Float32)
 acosh64 = externalCallTarget("np_acosh_float64", Float64, Float64)
 
-asin32 = externalCallTarget("np_asin_float32", Float32, Float32)
 asin64 = externalCallTarget("np_asin_float64", Float64, Float64)
 
-asinh32 = externalCallTarget("np_asinh_float32", Float32, Float32)
 asinh64 = externalCallTarget("np_asinh_float64", Float64, Float64)
 
-atan32 = externalCallTarget("np_atan_float32", Float32, Float32)
 atan64 = externalCallTarget("np_atan_float64", Float64, Float64)
 
-atan2_32 = externalCallTarget("np_atan2_float32", Float32, Float32, Float32)
 atan2_64 = externalCallTarget("np_atan2_float64", Float64, Float64, Float64)
 
-atanh32 = externalCallTarget("np_atanh_float32", Float32, Float32)
 atanh64 = externalCallTarget("np_atanh_float64", Float64, Float64)
 
-ceil32 = externalCallTarget("llvm.ceil.f32", Float32, Float32, intrinsic=True)
 ceil64 = externalCallTarget("llvm.ceil.f64", Float64, Float64, intrinsic=True)
 
-copysign32 = externalCallTarget("llvm.copysign.f32", Float32, Float32, Float32, intrinsic=True)
 copysign64 = externalCallTarget("llvm.copysign.f64", Float64, Float64, Float64, intrinsic=True)
 
-cos32 = externalCallTarget("llvm.cos.f32", Float32, Float32, intrinsic=True)
 cos64 = externalCallTarget("llvm.cos.f64", Float64, Float64, intrinsic=True)
 
-cosh32 = externalCallTarget("np_cosh_float32", Float32, Float32)
 cosh64 = externalCallTarget("np_cosh_float64", Float64, Float64)
 
-erf32 = externalCallTarget("np_erf_float32", Float32, Float32)
 erf64 = externalCallTarget("np_erf_float64", Float64, Float64)
 
-erfc32 = externalCallTarget("np_erfc_float32", Float32, Float32)
 erfc64 = externalCallTarget("np_erfc_float64", Float64, Float64)
 
-exp32 = externalCallTarget("llvm.exp.f32", Float32, Float32, intrinsic=True)
 exp64 = externalCallTarget("llvm.exp.f64", Float64, Float64, intrinsic=True)
 
-expm1_32 = externalCallTarget("np_expm1_float32", Float32, Float32)
 expm1_64 = externalCallTarget("np_expm1_float64", Float64, Float64)
 
-fabs32 = externalCallTarget("llvm.fabs.f32", Float32, Float32, intrinsic=True)
 fabs64 = externalCallTarget("llvm.fabs.f64", Float64, Float64, intrinsic=True)
 
 factorial = externalCallTarget("np_factorial", Int64, Int64)
-factorial32 = externalCallTarget("np_factorial32", Float32, Float32)
 factorial64 = externalCallTarget("np_factorial64", Float64, Float64)
 
-floor32 = externalCallTarget("llvm.floor.f32", Float32, Float32, intrinsic=True)
 floor64 = externalCallTarget("llvm.floor.f64", Float64, Float64, intrinsic=True)
 
-fmod32 = externalCallTarget("np_fmod_float32", Float32, Float32, Float32)
 fmod64 = externalCallTarget("np_fmod_float64", Float64, Float64, Float64)
 
-frexp32 = externalCallTarget("np_frexp_float32", Void, Float32, Void.pointer())
 frexp64 = externalCallTarget("np_frexp_float64", Void, Float64, Void.pointer())
 
-gamma32 = externalCallTarget("np_gamma_float32", Float32, Float32)
 gamma64 = externalCallTarget("np_gamma_float64", Float64, Float64)
 
-gcd = externalCallTarget("np_gcd", UInt64, UInt64, UInt64)
+gcd = externalCallTarget("np_gcd", Int64, Int64, Int64)
 
-isclose32 = externalCallTarget("np_isclose_float32", Bool, Float32, Float32, Float32, Float32)
 isclose64 = externalCallTarget("np_isclose_float64", Bool, Float64, Float64, Float64, Float64)
 
-ldexp32 = externalCallTarget("np_ldexp_float32", Float32, Float32, Int64)
 ldexp64 = externalCallTarget("np_ldexp_float64", Float64, Float64, Int64)
 
-lgamma32 = externalCallTarget("np_lgamma_float32", Float32, Float32)
 lgamma64 = externalCallTarget("np_lgamma_float64", Float64, Float64)
 
-log32 = externalCallTarget("llvm.log.f32", Float32, Float32, intrinsic=True)
 log64 = externalCallTarget("llvm.log.f64", Float64, Float64, intrinsic=True)
 
-log1p32 = externalCallTarget("np_log1p_float32", Float32, Float32)
 log1p64 = externalCallTarget("np_log1p_float64", Float64, Float64)
 
-log2_32 = externalCallTarget("llvm.log2.f32", Float32, Float32, intrinsic=True)
 log2_64 = externalCallTarget("llvm.log2.f64", Float64, Float64, intrinsic=True)
 
-log10_32 = externalCallTarget("llvm.log10.f32", Float32, Float32, intrinsic=True)
 log10_64 = externalCallTarget("llvm.log10.f64", Float64, Float64, intrinsic=True)
 
-modf32 = externalCallTarget("np_modf_float32", Void, Float32, Void.pointer())
 modf64 = externalCallTarget("np_modf_float64", Void, Float64, Void.pointer())
 
-pow32 = externalCallTarget("llvm.pow.f32", Float32, Float32, Float32, intrinsic=True)
 pow64 = externalCallTarget("llvm.pow.f64", Float64, Float64, Float64, intrinsic=True)
 
-remainder32 = externalCallTarget("llvm.frem.f32", Float32, Float32, Float32, intrinsic=True)
 remainder64 = externalCallTarget("llvm.frem.f64", Float64, Float64, Float64, intrinsic=True)
 
-sin32 = externalCallTarget("llvm.sin.f32", Float32, Float32, intrinsic=True)
 sin64 = externalCallTarget("llvm.sin.f64", Float64, Float64, intrinsic=True)
 
-sinh32 = externalCallTarget("np_sinh_float32", Float32, Float32)
 sinh64 = externalCallTarget("np_sinh_float64", Float64, Float64)
 
-sqrt32 = externalCallTarget("llvm.sqrt.f32", Float32, Float32, intrinsic=True)
 sqrt64 = externalCallTarget("llvm.sqrt.f64", Float64, Float64, intrinsic=True)
 
-tan32 = externalCallTarget("np_tan_float32", Float32, Float32)
 tan64 = externalCallTarget("np_tan_float64", Float64, Float64)
 
-tanh32 = externalCallTarget("np_tanh_float32", Float32, Float32)
 tanh64 = externalCallTarget("np_tanh_float64", Float64, Float64)
 
-trunc32 = externalCallTarget("llvm.trunc.f32", Float32, Float32, intrinsic=True)
 trunc64 = externalCallTarget("llvm.trunc.f64", Float64, Float64, intrinsic=True)
 
 initialize_exception = externalCallTarget(
@@ -1107,6 +1070,24 @@ pyobj_to_int64 = externalCallTarget(
 
 pyobj_to_float64 = externalCallTarget(
     "np_pyobj_to_float64",
+    Float64,
+    Void.pointer()
+)
+
+pyobj_ceil = externalCallTarget(
+    "np_pyobj_ceil",
+    Float64,
+    Void.pointer()
+)
+
+pyobj_floor = externalCallTarget(
+    "np_pyobj_floor",
+    Float64,
+    Void.pointer()
+)
+
+pyobj_trunc = externalCallTarget(
+    "np_pyobj_trunc",
     Float64,
     Void.pointer()
 )
