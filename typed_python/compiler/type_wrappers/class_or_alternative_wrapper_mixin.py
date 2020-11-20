@@ -329,9 +329,28 @@ class ClassOrAlternativeWrapperMixin:
 
         return context.pushException(TypeError, f"__index__ not implemented for {self.typeRepresentation}")
 
+    def convert_math_float_cast(self, context, e):
+        if self.has_method('__float__'):
+            res = self.convert_method_call(context, e, "__float__", (), {})
+            if res is None:
+                return None
+
+            if res.expr_type == typeWrapper(float):
+                return res
+
+            floatRes = context.allocateUninitializedSlot(float)
+
+            succeeded = res.convert_to_type_with_target(floatRes, ConversionLevel.Signature, mayThrowOnFailure=False)
+
+            with context.ifelse(succeeded.nonref_expr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushException(TypeError, "__float__ returned non-float")
+
+            return floatRes
+
+        return context.pushException(TypeError, f"__float__ not implemented for {self.typeRepresentation}")
+
     def convert_builtin(self, f, context, expr, a1=None):
-        # TODO: this should go in some common wrapper base class for alternatives and classes, along with
-        # generate method call
         if f is format:
             if self.has_method("__format__"):
                 return self.convert_method_call(

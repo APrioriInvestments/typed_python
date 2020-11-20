@@ -309,6 +309,18 @@ class TypedExpression:
 
         return res
 
+    def toFloatMath(self):
+        """Equivalent to __float__"""
+        res = self.expr_type.convert_math_float_cast(self.context, self)
+
+        if not res:
+            return None
+
+        if res.expr_type.typeRepresentation is not float:
+            raise Exception(f"{self.expr_type}.toFloatMath() returned {res.expr_type}, not float.")
+
+        return res
+
     def refAs(self, i):
         return self.expr_type.refAs(self.context, self, i)
 

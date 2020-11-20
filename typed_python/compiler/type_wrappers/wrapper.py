@@ -264,6 +264,12 @@ class Wrapper:
             "Can't take instance of type '%s' to an integer index" % (str(self),)
         )
 
+    def convert_math_float_cast(self, context, expr):
+        return context.pushException(
+            TypeError,
+            "Can't take instance of type '%s' to an float" % (str(self),)
+        )
+
     def convert_builtin(self, f, context, expr, a1=None):
         if f is dir and a1 is None:
             if not expr.isReference:

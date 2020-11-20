@@ -94,6 +94,9 @@ class ArithmeticTypeWrapper(Wrapper):
 
         return expr.toInt64()
 
+    def convert_math_float_cast(self, context, e):
+        return e.toFloat64()
+
     def convert_unary_op(self, context, instance, op):
         if op.matches.USub:
             return context.pushPod(self, instance.nonref_expr.negate())
@@ -716,15 +719,15 @@ class FloatWrapper(ArithmeticTypeWrapper):
             return context.pushPod(
                 float,
                 runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr)
-            ).convert_to_type(self, ConversionLevel.Implicit)
+            )
         if f is floor:
             return context.pushPod(
                 float, runtime_functions.floor_float64.call(expr.toFloat64().nonref_expr)
-            ).convert_to_type(self, ConversionLevel.Implicit)
+            )
         if f is ceil:
             return context.pushPod(
                 float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr)
-            ).convert_to_type(self, ConversionLevel.Implicit)
+            )
 
         return super().convert_builtin(f, context, expr, a1)
 
@@ -771,6 +774,12 @@ class FloatWrapper(ArithmeticTypeWrapper):
             )
 
         if op.matches.Div:
+            if left.isConstant and right.isConstant:
+                # If we divide by 0, for compatibility, we want that to remain a runtime error, not a compile error.
+                try:
+                    return context.constant(left.constantValue / right.constantValue).convert_to_type(self, ConversionLevel.Implicit)
+                except Exception:
+                    pass
             with context.ifelse(right.nonref_expr) as (ifTrue, ifFalse):
                 with ifFalse:
                     context.pushException(ZeroDivisionError, "division by zero")
