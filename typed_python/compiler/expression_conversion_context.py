@@ -399,7 +399,7 @@ class ExpressionConversionContext:
         """
         returnType = self.functionContext.currentReturnType()
 
-        assert returnType == expression.expr_type
+        assert returnType == expression.expr_type, (returnType, expression.expr_type)
 
         if returnType.is_pass_by_ref:
             returnTarget = TypedExpression(
@@ -1940,9 +1940,21 @@ class ExpressionConversionContext:
 
             return aList
 
+        if ast.matches.Yield:
+            raise Exception("Yield should be handled at the statement level")
+
         if ast.matches.Lambda:
             return self.functionContext.localVariableExpression(self, ".closure").changeType(
                 self.functionContext.functionDefToType[ast]
+            )
+
+        if ast.matches.ListComp:
+            generatorFunc = self.functionContext.localVariableExpression(self, ".closure").changeType(
+                self.functionContext.functionDefToType[ast]
+            )
+            return generatorFunc.expr_type.convert_list_comprehension(
+                generatorFunc.context,
+                generatorFunc
             )
 
         if ast.matches.Constant:

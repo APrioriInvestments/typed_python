@@ -21,13 +21,14 @@ from typed_python.compiler.python_ast_analysis import (
     computeFunctionArgVariables,
     computeVariablesAssignedOnlyOnce,
     computeVariablesReadByClosures,
+    countYieldStatements,
     extractFunctionDefs
 )
 from typed_python.internals import makeFunctionType
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
-from typed_python import _types, Type
+from typed_python import _types, Type, ListOf
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.expression_conversion_context import ExpressionConversionContext
 from typed_python.compiler.function_stack_state import FunctionStackState
@@ -52,6 +53,10 @@ _closureCycleMemo = {}
 
 
 class FunctionOutput:
+    pass
+
+
+class FunctionYield:
     pass
 
 
@@ -93,6 +98,8 @@ class ConversionContextBase:
 
         # the list of 'def' statements and 'Lambda' expressions. each one engenders a function type.
         self.functionDefs = []
+        self.generators = []
+        self.comprehensions = []
 
         # all 'def' operations that are assigned exactly once. These defs are special
         # because we just assume that the binding is active without even evaluating the
@@ -137,6 +144,8 @@ class ConversionContextBase:
         self._typesAreUnstable = False
         self._functionOutputTypeKnown = False
         self._native_args = None
+
+        self._curYieldPoint = 0
 
     def alwaysRaises(self):
         return False
@@ -324,11 +333,11 @@ class ConversionContextBase:
 
         self.functionDefToType = {
             fd: Forward(fd.name if fd.matches.FunctionDef else "<lambda>")
-            for fd in self.functionDefs
+            for fd in list(self.functionDefs) + self.generators + self.comprehensions
         }
 
-        # walk over the function defs and actually build them
-        for ast in self.functionDefs:
+        # walk over the function defs and instantiate their forward types
+        for ast in list(self.functionDefs) + self.generators + self.comprehensions:
             untypedFuncType, typedFuncType = self.computeTypeForFunctionDef(ast)
 
             self.functionDefToType[ast] = self.functionDefToType[ast].define(typedFuncType)
@@ -370,10 +379,15 @@ class ConversionContextBase:
 
         _closureCycleMemo[closureKey] = (self.closureType, dict(self.functionDefToType))
 
+    def nextYieldPoint(self):
+        self._curYieldPoint += 1
+        return self._curYieldPoint - 1
+
     def convertToNativeFunction(self):
         self.tempLetVarIx = 0
         self._tempStackVarIx = 0
         self._tempIterVarIx = 0
+        self._curYieldPoint = 0
 
         variableStates = FunctionStackState()
 
@@ -505,6 +519,13 @@ class ConversionContextBase:
             varType.is_pass_by_ref
         )
 
+    def setVariableType(self, varname, new_type):
+        if self._varname_to_type.get(varname) == new_type:
+            return
+
+        self._varname_to_type[varname] = new_type
+        self.markTypesAreUnstable()
+
     def upsizeVariableType(self, varname, new_type):
         if self._varname_to_type.get(varname) is None:
             if new_type is None:
@@ -560,8 +581,20 @@ class ConversionContextBase:
 
         return [context.finalize(None)]
 
+    def functionVariableInitializations(self, variableStates):
+        """Produce any initializer expressions that get run when the function is first called.
+
+        Args:
+            variableStates - the current VariableStates
+        Returns:
+            a list of native_ast expressions
+        """
+        return []
+
     def initializeVariableStates(self, argnames, variableStates):
         to_add = self.closureInitializer(variableStates)
+
+        to_add.extend(self.functionVariableInitializations(variableStates))
 
         # reset this
         self._argumentsWithoutStackslots = set()
@@ -744,7 +777,7 @@ class ConversionContextBase:
             self.closurelessFunctionTypeToDef[type(tpFunction)] = ast
 
             for varname in tpFunction.overloads[0].closureVarLookups:
-                assert varname in self.variablesReadByClosures
+                assert varname in self.variablesReadByClosures, varname
 
         # this function object has a totally bogus closure - it will just have 'None'
         # for each variable it references. We'll need to replace the closure variable binding
@@ -819,11 +852,7 @@ class ExpressionFunctionConversionContext(ConversionContextBase):
 
         if expr is not None:
             if not self._functionOutputTypeKnown:
-                if self._varname_to_type.get(FunctionOutput) is None:
-                    self.markTypesAreUnstable()
-                    self._varname_to_type[FunctionOutput] = expr.expr_type
-                else:
-                    self.upsizeVariableType(FunctionOutput, expr.expr_type)
+                self.upsizeVariableType(FunctionOutput, expr.expr_type)
 
             subcontext.pushReturnValue(expr)
 
@@ -834,11 +863,11 @@ class FunctionConversionContext(ConversionContextBase):
     """Helper function for converting a single python function given some input and output types"""
 
     def __init__(self, converter, name, identity, input_types, output_type, closureVarnames,
-                 globalVars, globalVarsRaw, ast_arg, statements):
+                 globalVars, globalVarsRaw, ast_arg, ast):
         super().__init__(converter, name, identity, input_types, output_type, ast_arg.argumentNames(),
                          closureVarnames, globalVars, globalVarsRaw)
 
-        self._statements = statements
+        self._statements = statements = self.extractStatements(ast)
 
         self.variablesAssigned = computeAssignedVariables(statements)
         self.variablesBound = computeFunctionArgVariables(ast_arg) | set(closureVarnames)
@@ -848,15 +877,26 @@ class FunctionConversionContext(ConversionContextBase):
         # since they get bound in the closure varnames.
         self.variablesReadByClosures = computeVariablesReadByClosures(statements)
 
+        # if this is not zero, then we are a generator
+        self.isGenerator = countYieldStatements(statements) > 0
+
         # the set of variables that have exactly one definition. If these are 'deffed'
         # functions, we don't have to worry about them changing type and so they can be
         # bound to the closure directly (in which case we don't even assign them to slots)
         self.variablesAssignedOnlyOnce = computeVariablesAssignedOnlyOnce(statements)
 
-        functionDefs, assignedLambdas, freeLambdas = extractFunctionDefs(statements)
+        (
+            functionDefs,
+            assignedLambdas,
+            freeLambdas,
+            comprehensions,
+            generators,
+        ) = extractFunctionDefs(statements)
 
         # the list of 'def' statements and 'Lambda' expressions. each one engenders a function type.
         self.functionDefs = functionDefs + freeLambdas
+        self.generators = generators
+        self.comprehensions = comprehensions
 
         # all 'def' operations that are assigned exactly once. These defs are special
         # because we just assume that the binding is active without even evaluating the
@@ -880,6 +920,34 @@ class FunctionConversionContext(ConversionContextBase):
         ])
 
         self._constructInitialVarnameToType()
+
+    def extractStatements(self, pyast):
+        """Given the AST we're converting, extract the statemets we're actually going to convert.
+
+        Args:
+            pyast - the FunctionDef, Lambda, etc. that we're converting
+        Returns:
+            a list of pythnn_ast.Statement objects
+        """
+        if isinstance(pyast, python_ast.Statement.FunctionDef):
+            return pyast.body
+        else:
+            return [python_ast.Statement.Return(
+                value=pyast.body,
+                line_number=pyast.body.line_number,
+                col_offset=pyast.body.col_offset,
+                filename=pyast.body.filename
+            )]
+
+    def processYieldExpression(self, expr):
+        """Called with the body of a yield statement so that subclasses can handle.
+
+        expr is an expression of type self._varname_to_type[FunctionYield].
+
+        We return a native expression handling the result. Flow must return.
+        """
+        # we expect that we would create a 'ListComprehension' class
+        raise Exception("Naked generators are not implemented yet")
 
     def convert_function_body(self, variableStates: FunctionStackState):
         return self.convert_statement_list_ast(self._statements, variableStates, toplevel=True)
@@ -1102,6 +1170,35 @@ class FunctionConversionContext(ConversionContextBase):
         if ast.matches.Expr and ast.value.matches.Str:
             return native_ast.Expression(), True
 
+        if ast.matches.Expr and ast.value.matches.Yield:
+            # for the moment we don't support co-routines, so this is where
+            # yield handling happens
+            subcontext = ExpressionConversionContext(self, variableStates)
+
+            if ast.value.value is None:
+                e = subcontext.constant(None)
+            else:
+                e = subcontext.convert_expression_ast(ast.value.value)
+
+            if e is None:
+                return subcontext.finalize(None, exceptionsTakeFrom=ast), False
+
+            self.upsizeVariableType(FunctionYield, e.expr_type)
+
+            if e.expr_type != self._varname_to_type[FunctionYield]:
+                e = e.convert_to_type(
+                    self._varname_to_type[FunctionYield],
+                    ConversionLevel.ImplicitContainers
+                )
+
+                if e is None:
+                    return subcontext.finalize(None, exceptionsTakeFrom=ast), False
+
+            return (
+                subcontext.finalize(self.processYieldExpression(e), exceptionsTakeFrom=ast),
+                True
+            )
+
         if ast.matches.AugAssign:
             subcontext = ExpressionConversionContext(self, variableStates)
             val_to_store = subcontext.convert_expression_ast(ast.value)
@@ -1143,6 +1240,9 @@ class FunctionConversionContext(ConversionContextBase):
                 return subcontext.finalize(None, exceptionsTakeFrom=ast), True
 
         if ast.matches.Return:
+            if self.isGenerator:
+                raise Exception("Return in compiled generators not supported yet")
+
             subcontext = ExpressionConversionContext(self, variableStates)
 
             if ast.value is None:
@@ -1154,11 +1254,7 @@ class FunctionConversionContext(ConversionContextBase):
                 return subcontext.finalize(None, exceptionsTakeFrom=ast), False
 
             if not self._functionOutputTypeKnown:
-                if self._varname_to_type.get(FunctionOutput) is None:
-                    self.markTypesAreUnstable()
-                    self._varname_to_type[FunctionOutput] = e.expr_type
-                else:
-                    self.upsizeVariableType(FunctionOutput, e.expr_type)
+                self.upsizeVariableType(FunctionOutput, e.expr_type)
 
             if e.expr_type != self._varname_to_type[FunctionOutput]:
                 e = e.convert_to_type(self._varname_to_type[FunctionOutput], ConversionLevel.ImplicitContainers)
@@ -1988,27 +2084,116 @@ class FunctionConversionContext(ConversionContextBase):
             flows_off_end = False
 
         if toplevel and flows_off_end:
-            flows_off_end = False
-            if not self._functionOutputTypeKnown:
-                if self._varname_to_type.get(FunctionOutput) is None:
-                    self._varname_to_type[FunctionOutput] = NoneWrapper()
-                    self.markTypesAreUnstable()
-                else:
-                    self.upsizeVariableType(FunctionOutput, NoneWrapper())
-
             exprAndReturns.append(
-                self.convert_statement_ast(
-                    python_ast.Statement.Return(
-                        value=None, filename="", line_number=0, col_offset=0
-                    ),
-                    variableStates,
-                    return_to=return_to,
-                    try_flow=try_flow
-                )
+                self.handleFlowsOffEnd(variableStates)
             )
+            assert exprAndReturns[-1][1] is False
 
         seq_expr = native_ast.makeSequence(
             [expr for expr, _ in exprAndReturns]
         )
 
-        return seq_expr, flows_off_end
+        return seq_expr, exprAndReturns[-1][1] if exprAndReturns else True
+
+    def handleFlowsOffEnd(self, variableStates: FunctionStackState):
+        """Generate code to handle the case where we exit the function normally.
+
+        Returns:
+            a tuple (native_ast, controlFlowReturns)
+
+        controlFlowReturns must be False.
+        """
+        if not self._functionOutputTypeKnown:
+            self.upsizeVariableType(FunctionOutput, NoneWrapper())
+
+        return self.convert_statement_ast(
+            python_ast.Statement.Return(
+                value=None, filename="", line_number=0, col_offset=0
+            ),
+            variableStates
+        )
+
+
+class ListComprehensionConversionContext(FunctionConversionContext):
+    """Convert a generator function, but instead of generating, build a list.
+
+    We generate an accumulator at the start of the function, replace all yields
+    with an '.append' operation, and then at the end append the list.
+    """
+    def listCompAccumulatorType(self):
+        if FunctionYield in self._varname_to_type:
+            return typeWrapper(ListOf(self._varname_to_type[FunctionYield].typeRepresentation))
+        else:
+            return typeWrapper(ListOf(None))
+
+    def localVariableExpression(self, context: ExpressionConversionContext, name):
+        if name == ".list_comp_accumulator":
+            listCompType = self.listCompAccumulatorType()
+
+            return TypedExpression(
+                context,
+                native_ast.Expression.StackSlot(
+                    name=name,
+                    type=listCompType.getNativeLayoutType()
+                ),
+                listCompType,
+                isReference=True
+            )
+
+        return super().localVariableExpression(context, name)
+
+    def functionVariableInitializations(self, variableStates):
+        context = ExpressionConversionContext(self, variableStates)
+
+        self.localVariableExpression(
+            context,
+            ".list_comp_accumulator"
+        ).convert_default_initialize()
+
+        return [context.finalize(None)]
+
+    def processYieldExpression(self, expr):
+        """Called with the body of a yield statement so that subclasses can handle.
+
+        expr is an expression of type self._varname_to_type[FunctionYield].
+
+        We return a native expression handling the result. Flow must return.
+        """
+        self.localVariableExpression(
+            expr.context,
+            ".list_comp_accumulator"
+        ).convert_method_call(
+            "append", [expr], {}
+        )
+
+    def handleFlowsOffEnd(self, variableStates: FunctionStackState):
+        """Generate code to handle the case where we exit the function normally.
+
+        Returns:
+            a tuple (native_ast, controlFlowReturns)
+
+        controlFlowReturns must be False.
+        """
+        assert not self._functionOutputTypeKnown
+        listCompType = self.listCompAccumulatorType()
+
+        subcontext = ExpressionConversionContext(self, variableStates)
+
+        from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import (
+            TypedListMasqueradingAsList
+        )
+
+        resExpr = (
+            self.localVariableExpression(subcontext, ".list_comp_accumulator")
+            .changeType(
+                TypedListMasqueradingAsList(
+                    listCompType.typeRepresentation
+                )
+            )
+        )
+
+        self.setVariableType(FunctionOutput, resExpr.expr_type)
+
+        subcontext.pushReturnValue(resExpr)
+
+        return subcontext.finalize(None, exceptionsTakeFrom=None), False

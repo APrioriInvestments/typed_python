@@ -1082,8 +1082,6 @@ def cacheAstForCode(code, pyAst):
 
 
 def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals, stripAnnotations=False):
-    assert isinstance(pyAst, (Statement.FunctionDef, Statement.AsyncFunctionDef, Expr.Lambda))
-
     # make a new FunctionDef that defines a function
     # def f(l1, l2, ...):  #l1 ... lN in locals
     #   def pyAst():
@@ -1122,8 +1120,46 @@ def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals, stripAnnotation
             ),
             Statement.Return(value=Expr.Name(id=pyAst.name, ctx=ExprContext.Load()))
         ]
-    else:
+    elif pyAst.matches.GeneratorExp or pyAst.matches.ListComp or pyAst.matches.SetComp or pyAst.matches.DictComp:
+        # generators and list comprehensions always become functions that yield
+        # the elements of the comprehension
+        if pyAst.matches.DictComp:
+            bodyExpr = Expr.Tuple(elts=(pyAst.key, pyAst.value), ctx=ExprContext.Load())
+        else:
+            bodyExpr = pyAst.elt
+
+        body = Statement.Expr(value=Expr.Yield(value=bodyExpr))
+
+        for comprehension in pyAst.generators:
+            for ifExpr in comprehension.ifs:
+                body = Statement.If(
+                    test=ifExpr,
+                    body=[body],
+                    orelse=[]
+                )
+
+            body = Statement.For(
+                target=comprehension.target,
+                iter=comprehension.iter,
+                body=[body]
+            )
+
+        statements = [
+            Statement.FunctionDef(
+                name="__typed_python_generator_builder__",
+                args=Arguments.Item(
+                    vararg=None,
+                    kwarg=None
+                ),
+                body=[body],
+                returns=None
+            ),
+            Statement.Return(value=Expr.Name(id="__typed_python_generator_builder__", ctx=ExprContext.Load()))
+        ]
+    elif pyAst.matches.Lambda:
         statements = [Statement.Return(value=pyAst)]
+    else:
+        raise Exception(f"Can't build a python AST out of {type(pyAst)}")
 
     pyAstBuilder = Statement.FunctionDef(
         name="__typed_python_func_builder__",

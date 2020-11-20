@@ -74,7 +74,18 @@ class GetCompiledTypes(RuntimeEventVisitor):
     def __init__(self):
         self.types = {}
 
-    def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variableTypes):
+    def onNewFunction(
+        self,
+        funcName,
+        funcCode,
+        funcGlobals,
+        closureVars,
+        inputTypes,
+        outputType,
+        yieldType,
+        variableTypes,
+        conversionType
+    ):
         self.types[funcName] = makeNamedTuple(
             inputTypes=inputTypes,
             outputType=outputType,
@@ -1300,7 +1311,18 @@ class TestCompilationStructures(unittest.TestCase):
 
     def test_method_not_returning_returns_none(self):
         class NoPythonObjectTypes(RuntimeEventVisitor):
-            def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variableTypes):
+            def onNewFunction(
+                self,
+                funcName,
+                funcCode,
+                funcGlobals,
+                closureVars,
+                inputTypes,
+                outputType,
+                yieldType,
+                variableTypes,
+                conversionType
+            ):
                 assert issubclass(outputType.typeRepresentation, Type)
 
         class C(Class, Final):

@@ -24,7 +24,6 @@ from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrappe
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.native_ast import VoidPtr
 
-
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
@@ -183,6 +182,65 @@ class PythonTypedFunctionWrapper(Wrapper):
         )
 
         return result.convert_to_type(returnType, ConversionLevel.Implicit)
+
+    def convert_list_comprehension(self, context, instance):
+        """We are a generator. Convert a "list comprehension".
+
+        This means we take our code and execute it directly, replacing all 'yield' statements
+        with an append to an intermediate list, and then returning the final list comprehension
+        at the end.
+        """
+        # we should have exactly one overload that takes no arguments and has no return type
+        assert len(self.typeRepresentation.overloads) == 1
+        overload = self.typeRepresentation.overloads[0]
+        assert not overload.args
+        assert overload.returnType is None
+
+        # build the actual functions
+        argsToPass = context.buildFunctionArguments(
+            overload,
+            [],
+            {}
+        )
+
+        closureType = self.typeRepresentation.ClosureType
+
+        # import this wrapper. Note that we have to import it here to break the import cycles.
+        # there's definitely a better way to organize this code.
+        from typed_python.compiler.function_conversion_context import ListComprehensionConversionContext
+
+        singleConvertedOverload = context.functionContext.converter.convert(
+            overload.name,
+            overload.functionCode,
+            overload.realizedGlobals,
+            overload.functionGlobals,
+            list(overload.funcGlobalsInCells),
+            list(overload.closureVarLookups),
+            [typeWrapper(self.closurePathToCellType(path, closureType)) for path in overload.closureVarLookups.values()],
+            None,
+            conversionType=ListComprehensionConversionContext
+        )
+
+        if not singleConvertedOverload:
+            # it's still doing type inference
+            context.pushException(
+                TypeError,
+                "Can't build the list comprehension converter."
+            )
+            return
+
+        closureTuple = instance.changeType(self.closureWrapper)
+        closureArgs = [self.closurePathToCellValue(path, closureTuple) for path in overload.closureVarLookups.values()]
+
+        # check if any closureArgs are None, which means that converting them threw an exception.
+        for a in closureArgs:
+            if a is None:
+                return
+
+        return context.call_typed_call_target(
+            singleConvertedOverload,
+            closureArgs + argsToPass
+        )
 
     def convert_call(self, context, left, args, kwargs):
         if left is None:

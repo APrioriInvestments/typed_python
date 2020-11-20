@@ -168,7 +168,13 @@ def computeVariablesReadByClosures(astNode):
             assertValidStatement(x)
 
         if isinstance(x, Expr):
-            if x.matches.Lambda:
+            if (
+                x.matches.Lambda
+                or x.matches.ListComp
+                or x.matches.SetComp
+                or x.matches.DictComp
+                or x.matches.GeneratorExp
+            ):
                 closureVars.update(computeReadVariables(x))
                 return False
 
@@ -206,6 +212,34 @@ def extractFunctionDefsInOrder(astNode):
     return res
 
 
+def countYieldStatements(astNode):
+    res = [0]
+
+    def visit(x):
+        if isinstance(x, Statement):
+            if x.matches.FunctionDef or x.matches.ClassDef or x.matches.AsyncFunctionDef:
+                return False
+
+        if isinstance(x, Expr):
+            if (
+                x.matches.Lambda
+                or x.matches.ListComp
+                or x.matches.SetComp
+                or x.matches.DictComp
+                or x.matches.GeneratorExp
+            ):
+                return False
+
+            if x.matches.Yield:
+                res[0] += 1
+
+        return True
+
+    visitPyAstChildren(astNode, visit)
+
+    return res[0]
+
+
 def extractFunctionDefs(astNode):
     """Find all the direct 'def' operations that could produce closure elements.
 
@@ -215,6 +249,8 @@ def extractFunctionDefs(astNode):
     functionDefs = []
     assignedLambdas = []
     freeLambdas = []
+    comprehensions = []
+    generators = []
 
     def visit(x):
         if isinstance(x, Statement):
@@ -240,11 +276,29 @@ def extractFunctionDefs(astNode):
                 freeLambdas.append(x)
                 return False
 
+            if (
+                x.matches.ListComp
+                or x.matches.SetComp
+                or x.matches.DictComp
+            ):
+                comprehensions.append(x)
+                return False
+
+            if x.matches.GeneratorExp:
+                generators.append(x)
+                return False
+
         return True
 
     visitPyAstChildren(astNode, visit)
 
-    return functionDefs, assignedLambdas, freeLambdas
+    return (
+        functionDefs,
+        assignedLambdas,
+        freeLambdas,
+        comprehensions,
+        generators
+    )
 
 
 def computeFunctionArgVariables(args: Arguments):

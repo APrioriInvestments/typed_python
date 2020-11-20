@@ -302,7 +302,18 @@ class TypeFunctionTest(unittest.TestCase):
             Clients should subclass this and pass it to 'addEventVisitor' in the runtime
             to find out about events like function typing assignments.
             """
-            def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variableTypes):
+            def onNewFunction(
+                self,
+                funcName,
+                funcCode,
+                funcGlobals,
+                closureVars,
+                inputTypes,
+                outputType,
+                yieldType,
+                variableTypes,
+                conversionType
+            ):
                 if funcName == "do":
                     self.variableTypes = variableTypes
 

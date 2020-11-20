@@ -27,7 +27,7 @@ from typed_python.compiler.directed_graph import DirectedGraph
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
-from typed_python.compiler.function_conversion_context import FunctionConversionContext, FunctionOutput
+from typed_python.compiler.function_conversion_context import FunctionConversionContext, FunctionOutput, FunctionYield
 from typed_python.compiler.native_function_conversion_context import NativeFunctionConversionContext
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from typed_python.compiler.typed_call_target import TypedCallTarget
@@ -215,20 +215,23 @@ class PythonToNativeConverter:
 
         return prefix + name + "." + identityHash
 
-    def createConversionContext(self, identity, funcName, funcCode, funcGlobals, funcGlobalsRaw, closureVars, input_types, output_type):
+    def createConversionContext(
+        self,
+        identity,
+        funcName,
+        funcCode,
+        funcGlobals,
+        funcGlobalsRaw,
+        closureVars,
+        input_types,
+        output_type,
+        conversionType
+    ):
+        ConverterType = conversionType or FunctionConversionContext
+
         pyast = self._code_to_ast(funcCode)
 
-        if isinstance(pyast, python_ast.Statement.FunctionDef):
-            body = pyast.body
-        else:
-            body = [python_ast.Statement.Return(
-                value=pyast.body,
-                line_number=pyast.body.line_number,
-                col_offset=pyast.body.col_offset,
-                filename=pyast.body.filename
-            )]
-
-        return FunctionConversionContext(
+        return ConverterType(
             self,
             funcName,
             identity,
@@ -238,7 +241,7 @@ class PythonToNativeConverter:
             funcGlobals,
             funcGlobalsRaw,
             pyast.args,
-            body,
+            pyast,
         )
 
     def defineLinkName(self, identity, linkName):
@@ -704,6 +707,7 @@ class PythonToNativeConverter:
         input_types,
         output_type,
         assertIsRoot=False,
+        conversionType=None
     ):
         """Convert a single pure python function using args of 'input_types'.
 
@@ -725,6 +729,8 @@ class PythonToNativeConverter:
                 If not None, then we will produce this type or throw an exception.
             assertIsRoot - if True, then assert that no other functions are using
                 the converter right now.
+            conversionType - if None, this is a normal function conversion. Otherwise,
+                this must be a subclass of FunctionConversionContext
         """
         assert isinstance(funcName, str)
         assert isinstance(funcCode, types.CodeType)
@@ -739,7 +745,8 @@ class PythonToNativeConverter:
                 funcName,
                 input_types,
                 output_type,
-                closureVars
+                closureVars,
+                conversionType
             )) +
             self.hashGlobals(funcGlobals, funcCode, funcGlobalsFromCells)
         )
@@ -754,7 +761,7 @@ class PythonToNativeConverter:
 
         if identity not in self._identifier_to_pyfunc:
             self._identifier_to_pyfunc[identity] = (
-                funcName, funcCode, funcGlobals, closureVars, input_types, output_type
+                funcName, funcCode, funcGlobals, closureVars, input_types, output_type, conversionType
             )
 
         isRoot = len(self._inflight_function_conversions) == 0
@@ -779,7 +786,8 @@ class PythonToNativeConverter:
                 funcGlobalsRaw,
                 closureVars,
                 input_types,
-                output_type
+                output_type,
+                conversionType
             )
 
             self._inflight_function_conversions[identity] = functionConverter
@@ -820,7 +828,7 @@ class PythonToNativeConverter:
             if identifier in self._identifier_to_pyfunc:
                 for v in self._visitors:
 
-                    funcName, funcCode, funcGlobals, closureVars, input_types, output_type = (
+                    funcName, funcCode, funcGlobals, closureVars, input_types, output_type, conversionType = (
                         self._identifier_to_pyfunc[identifier]
                     )
 
@@ -832,7 +840,9 @@ class PythonToNativeConverter:
                             closureVars,
                             input_types,
                             functionConverter._varname_to_type.get(FunctionOutput),
-                            {k: v.typeRepresentation for k, v in functionConverter._varname_to_type.items() if isinstance(k, str)}
+                            functionConverter._varname_to_type.get(FunctionYield),
+                            {k: v.typeRepresentation for k, v in functionConverter._varname_to_type.items() if isinstance(k, str)},
+                            conversionType
                         )
                     except Exception:
                         logging.exception("event handler %s threw an unexpected exception", v.onNewFunction)

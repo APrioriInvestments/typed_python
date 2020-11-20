@@ -406,8 +406,19 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         out = {}
 
         class Visitor(RuntimeEventVisitor):
-            def onNewFunction(self, funcName, funcCode, funcGlobals, closureVars, inputTypes, outputType, variables):
-                out[funcName] = (inputTypes, outputType, variables)
+            def onNewFunction(
+                self,
+                funcName,
+                funcCode,
+                funcGlobals,
+                closureVars,
+                inputTypes,
+                outputType,
+                yieldType,
+                variableTypes,
+                conversionType
+            ):
+                out[funcName] = (inputTypes, outputType, variableTypes)
 
         @Entrypoint
         def f(x):
