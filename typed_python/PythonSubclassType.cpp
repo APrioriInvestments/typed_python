@@ -32,9 +32,7 @@ bool PythonSubclass::isBinaryCompatibleWithConcrete(Type* other) {
 
 // static
 PythonSubclass* PythonSubclass::Make(Type* base, PyTypeObject* pyType) {
-    static std::mutex guard;
-
-    std::lock_guard<std::mutex> lock(guard);
+    PyEnsureGilAcquired getTheGil;
 
     static std::map<PyTypeObject*, PythonSubclass*> m;
 

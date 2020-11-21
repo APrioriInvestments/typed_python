@@ -174,9 +174,7 @@ OneOfType* OneOfType::Make(const std::vector<Type*>& types, OneOfType* knownType
 
     visit(types);
 
-    static std::mutex guard;
-
-    std::lock_guard<std::mutex> lock(guard);
+    PyEnsureGilAcquired getTheGil;
 
     typedef const std::vector<Type*> keytype;
 

@@ -124,9 +124,6 @@ private:
 
     static std::map<ShaHash, PyObject*> mHashToObject;
 
-    // a guard for mHashToType, which can be accessed by multiple threads in the serializer
-    static std::recursive_mutex mHashToTypeMutex;
-
     void computeHash();
 
     ShaHash mHash;

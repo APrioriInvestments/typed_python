@@ -158,9 +158,7 @@ bool TupleOrListOfType::cmp(instance_ptr left, instance_ptr right, int pyCompari
 
 // static
 TupleOfType* TupleOfType::Make(Type* elt, TupleOfType* knownType) {
-    static std::mutex guard;
-
-    std::lock_guard<std::mutex> lock(guard);
+    PyEnsureGilAcquired getTheGil;
 
     static std::map<Type*, TupleOfType*> m;
 
@@ -179,9 +177,7 @@ TupleOfType* TupleOfType::Make(Type* elt, TupleOfType* knownType) {
 
 // static
 ListOfType* ListOfType::Make(Type* elt, ListOfType* knownType) {
-    static std::mutex guard;
-
-    std::lock_guard<std::mutex> lock(guard);
+    PyEnsureGilAcquired getTheGil;
 
     static std::map<Type*, ListOfType*> m;
 

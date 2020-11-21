@@ -43,13 +43,11 @@ public:
 
 
     static RefTo* Make(Type* elt, RefTo* knownType = nullptr) {
-        static std::mutex guard;
+        PyEnsureGilAcquired getTheGil;
 
         if (elt->getTypeCategory() != Type::TypeCategory::catHeldClass) {
             throw std::runtime_error("RefTo only valid on HeldClass types");
         }
-
-        std::lock_guard<std::mutex> lock(guard);
 
         static std::map<Type*, RefTo*> m;
 

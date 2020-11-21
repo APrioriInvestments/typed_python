@@ -175,9 +175,7 @@ public:
     }
 
     static TypedCellType* Make(Type* t, TypedCellType* knownType = nullptr) {
-        static std::mutex guard;
-
-        std::lock_guard<std::mutex> lock(guard);
+        PyEnsureGilAcquired getTheGil;
 
         typedef Type* keytype;
 

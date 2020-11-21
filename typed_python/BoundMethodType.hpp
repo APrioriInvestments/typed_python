@@ -73,9 +73,7 @@ public:
     }
 
     static BoundMethod* Make(Type* c, std::string funcName, BoundMethod* knownType=nullptr) {
-        static std::mutex guard;
-
-        std::lock_guard<std::mutex> lock(guard);
+        PyEnsureGilAcquired getTheGil;
 
         typedef std::pair<Type*, std::string> keytype;
 

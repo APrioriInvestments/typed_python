@@ -4,9 +4,7 @@
 #include <map>
 
 SetType* SetType::Make(Type* eltype, SetType* knownType) {
-    static std::mutex guard;
-
-    std::lock_guard<std::mutex> lg(guard);
+    PyEnsureGilAcquired getTheGil;
 
     static std::map<Type*, SetType*> m;
 

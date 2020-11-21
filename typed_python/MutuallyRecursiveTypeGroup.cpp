@@ -445,7 +445,7 @@ void visitCompilerVisibleTypesAndPyobjects(
 }
 
 ShaHash MutuallyRecursiveTypeGroup::sourceToDestHashLookup(ShaHash sourceHash) {
-    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+    PyEnsureGilAcquired getTheGil;
 
     auto it = mSourceToDestHashLookup.find(sourceHash);
     if (it != mSourceToDestHashLookup.end()) {
@@ -456,7 +456,7 @@ ShaHash MutuallyRecursiveTypeGroup::sourceToDestHashLookup(ShaHash sourceHash) {
 }
 
 void MutuallyRecursiveTypeGroup::installSourceToDestHashLookup(ShaHash sourceHash, ShaHash destHash) {
-    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+    PyEnsureGilAcquired getTheGil;
 
     mSourceToDestHashLookup[sourceHash] = destHash;
 }
@@ -468,7 +468,7 @@ void MutuallyRecursiveTypeGroup::computeHashAndInstall() {
 
     computeHash();
 
-    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+    PyEnsureGilAcquired getTheGil;
 
     if (mHashToGroup.find(mHash) == mHashToGroup.end()) {
         mHashToGroup[mHash] = this;
@@ -479,7 +479,7 @@ MutuallyRecursiveTypeGroup::MutuallyRecursiveTypeGroup(ShaHash hash) :
     mAnyPyObjectsIncorrectlyOrdered(false),
     mHash(hash)
 {
-    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+    PyEnsureGilAcquired getTheGil;
 
     if (mHashToGroup.find(mHash) == mHashToGroup.end()) {
         mHashToGroup[mHash] = this;
@@ -533,7 +533,7 @@ std::string MutuallyRecursiveTypeGroup::pyObjectSortName(PyObject* o) {
 }
 
 int32_t MutuallyRecursiveTypeGroup::indexOfObjectInThisGroup(TypeOrPyobj o) {
-    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+    PyEnsureGilAcquired getTheGil;
 
     if (o.typeOrPyobjAsType()) {
         if (o.typeOrPyobjAsType()->getRecursiveTypeGroup() == this) {
@@ -552,7 +552,7 @@ int32_t MutuallyRecursiveTypeGroup::indexOfObjectInThisGroup(TypeOrPyobj o) {
 }
 
 int32_t MutuallyRecursiveTypeGroup::indexOfObjectInThisGroup(PyObject* o) {
-    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+    PyEnsureGilAcquired getTheGil;
 
     auto it = mPythonObjectTypeGroups.find(o);
     if (it != mPythonObjectTypeGroups.end()) {
@@ -875,7 +875,7 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
 
 
 MutuallyRecursiveTypeGroup* MutuallyRecursiveTypeGroup::getGroupFromHash(ShaHash hash) {
-    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+    PyEnsureGilAcquired getTheGil;
 
     auto it = mHashToGroup.find(hash);
     if (it == mHashToGroup.end()) {
@@ -916,7 +916,7 @@ void MutuallyRecursiveTypeGroup::computeHash() {
 
     mHash = wholeGroupHash;
 
-    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+    PyEnsureGilAcquired getTheGil;
 
     if (mHashToGroup.find(mHash) == mHashToGroup.end()) {
         mHashToGroup[mHash] = this;
@@ -1567,7 +1567,7 @@ void MutuallyRecursiveTypeGroup::installTypeHash(Type* t) {
     // now fill out 'mHashToType' so that the deserializer can look types up by hash.
     // this will call back into the 'hash' function for this group, but we filled it out
     // already, so that should be OK.
-    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+    PyEnsureGilAcquired getTheGil;
 
     if (!t->identityHash().isPoison()) {
         auto it = mHashToType.find(t->identityHash());
@@ -1596,7 +1596,7 @@ PyObject* MutuallyRecursiveTypeGroup::lookupObject(const ShaHash& hash) {
 
 //static
 Type* MutuallyRecursiveTypeGroup::lookupType(const ShaHash& hash) {
-    std::lock_guard<std::recursive_mutex> lock(mHashToTypeMutex);
+    PyEnsureGilAcquired getTheGil;
 
     auto it = mHashToType.find(hash);
 
@@ -1612,9 +1612,6 @@ std::unordered_map<PyObject*, ShaHash> MutuallyRecursiveTypeGroup::mPythonObject
 
 //static
 std::unordered_map<PyObject*, std::pair<MutuallyRecursiveTypeGroup*, int> > MutuallyRecursiveTypeGroup::mPythonObjectTypeGroups;
-
-//static
-std::recursive_mutex MutuallyRecursiveTypeGroup::mHashToTypeMutex;
 
 //static
 std::map<ShaHash, Type*> MutuallyRecursiveTypeGroup::mHashToType;

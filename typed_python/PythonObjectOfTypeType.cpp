@@ -63,9 +63,7 @@ bool PythonObjectOfType::cmp(instance_ptr left, instance_ptr right, int pyCompar
 
 // static
 PythonObjectOfType* PythonObjectOfType::Make(PyTypeObject* pyType, PyObject* givenType) {
-    static std::mutex guard;
-
-    std::lock_guard<std::mutex> lock(guard);
+    PyEnsureGilAcquired getTheGil;
 
     typedef std::pair<PyTypeObject*, PyObject*> keytype;
 

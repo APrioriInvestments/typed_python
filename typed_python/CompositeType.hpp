@@ -197,9 +197,7 @@ public:
 protected:
     template<class subtype>
     static subtype* MakeSubtype(const std::vector<Type*>& types, const std::vector<std::string>& names, subtype* knownType = nullptr) {
-        static std::mutex guard;
-
-        std::lock_guard<std::mutex> lock(guard);
+        PyEnsureGilAcquired getTheGil;
 
         typedef std::pair<const std::vector<Type*>, const std::vector<std::string> > keytype;
 

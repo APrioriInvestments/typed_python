@@ -1409,9 +1409,7 @@ public:
     }
 
     static Function* Make(std::string inName, std::string qualname, std::string moduleName, const std::vector<Overload>& overloads, Type* closureType, bool isEntrypoint, bool isNocompile) {
-        static std::mutex guard;
-
-        std::lock_guard<std::mutex> lock(guard);
+        PyEnsureGilAcquired getTheGil;
 
         typedef std::tuple<const std::string, const std::string, const std::string, const std::vector<Overload>, Type*, bool, bool> keytype;
 

@@ -62,9 +62,7 @@ public:
     }
 
     static PointerTo* Make(Type* elt, PointerTo* knownType = nullptr) {
-        static std::mutex guard;
-
-        std::lock_guard<std::mutex> lock(guard);
+        PyEnsureGilAcquired getTheGil;
 
         static std::map<Type*, PointerTo*> m;
 

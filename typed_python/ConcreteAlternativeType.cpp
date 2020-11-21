@@ -79,9 +79,7 @@ void ConcreteAlternative::constructor(instance_ptr self) {
 
 // static
 ConcreteAlternative* ConcreteAlternative::Make(Alternative* alt, int64_t which, ConcreteAlternative* knownType) {
-    static std::mutex guard;
-
-    std::lock_guard<std::mutex> lock(guard);
+    PyEnsureGilAcquired getTheGil;
 
     typedef std::pair<Alternative*, int64_t> keytype;
 

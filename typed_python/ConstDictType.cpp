@@ -55,9 +55,7 @@ bool ConstDictType::isBinaryCompatibleWithConcrete(Type* other) {
 
 // static
 ConstDictType* ConstDictType::Make(Type* key, Type* value, ConstDictType* knownType) {
-    static std::mutex guard;
-
-    std::lock_guard<std::mutex> lock(guard);
+    PyEnsureGilAcquired getTheGil;
 
     static std::map<std::pair<Type*, Type*>, ConstDictType*> m;
 

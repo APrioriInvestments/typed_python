@@ -94,9 +94,7 @@ public:
     }
 
     static Type* Make(Instance i) {
-        static std::mutex guard;
-
-        std::lock_guard<std::mutex> lock(guard);
+        PyEnsureGilAcquired getTheGil;
 
         static std::map<Instance, Value*> m;
 
