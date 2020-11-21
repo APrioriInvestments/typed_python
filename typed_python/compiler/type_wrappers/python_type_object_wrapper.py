@@ -13,11 +13,12 @@
 #   limitations under the License.
 
 import typed_python.compiler
-from typed_python import Type
+from typed_python import Type, TupleOf
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
+from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
@@ -36,6 +37,21 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
     def convert_call_on_container_expression(self, context, inst, argExpr):
         if issubclass(self.typeRepresentation.Value, CompilableBuiltin):
             return self.typeRepresentation.Value.convert_type_call_on_container_expression(context, inst, argExpr)
+
+        if self.typeRepresentation.Value in (tuple, list) and (argExpr.matches.ListComp or argExpr.matches.GeneratorExp):
+            compResult = context.convert_generator_as_list_comprehension(argExpr)
+
+            if compResult is None:
+                return compResult
+
+            if self.typeRepresentation.Value is list:
+                return compResult
+            else:
+                return compResult.changeType(
+                    TypedTupleMasqueradingAsTuple(
+                        TupleOf(compResult.expr_type.typeRepresentation.ElementType)
+                    )
+                )
 
         return typeWrapper(self.typeRepresentation.Value).convert_type_call_on_container_expression(context, inst, argExpr)
 

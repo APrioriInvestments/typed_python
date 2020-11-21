@@ -16,9 +16,16 @@ import unittest
 import time
 import gc
 import pytest
+from flaky import flaky
 
-from typed_python import Entrypoint, ListOf
+from typed_python import Entrypoint, ListOf, TupleOf
 from typed_python.test_util import currentMemUsageMb
+
+
+def timeIt(f):
+    t0 = time.time()
+    f()
+    return time.time() - t0
 
 
 class TestGeneratorsAndComprehensions(unittest.TestCase):
@@ -42,50 +49,106 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert isinstance(lst, ListOf(int))
         assert lst == [a + 1 for a in range(10)]
 
+    @flaky(max_runs=3, min_passes=1)
     def test_list_from_listcomp_perf(self):
+        def sum(iterable):
+            res = 0
+            for s in iterable:
+                res += s
+            return res
+
         @Entrypoint
         def listCompSumConverted(x):
-            aLst = ListOf(int)([a + 1 for a in range(x)])
-            res = 0
-            for a in aLst:
-                res += a
-            return res
+            return sum(ListOf(int)([a + 1 for a in range(x)]))
+
+        @Entrypoint
+        def listCompSumGenerator(x):
+            return sum(ListOf(int)(a + 1 for a in range(x)))
+
+        @Entrypoint
+        def tupleCompSumConverted(x):
+            return sum(TupleOf(int)([a + 1 for a in range(x)]))
+
+        @Entrypoint
+        def tupleCompSumGenerator(x):
+            return sum(TupleOf(int)(a + 1 for a in range(x)))
 
         @Entrypoint
         def listCompSumMasquerade(x):
-            aLst = [a + 1 for a in range(x)]
-            res = 0
-            for a in aLst:
-                res += a
-            return res
+            return sum([a + 1 for a in range(x)])
 
         def listCompSumUntyped(x):
-            aLst = [a + 1 for a in range(x)]
-            res = 0
-            for a in aLst:
-                res += a
-            return res
+            return sum([a + 1 for a in range(x)])
 
         listCompSumConverted(1000)
+        listCompSumGenerator(1000)
+        tupleCompSumConverted(1000)
+        tupleCompSumGenerator(1000)
         listCompSumMasquerade(1000)
 
-        t0 = time.time()
-        listCompSumConverted(1000000)
-        convertedTime = time.time() - t0
+        compiledTimes = [
+            timeIt(lambda: listCompSumConverted(1000000)),
+            timeIt(lambda: listCompSumGenerator(1000000)),
+            timeIt(lambda: tupleCompSumConverted(1000000)),
+            timeIt(lambda: tupleCompSumGenerator(1000000)),
+            timeIt(lambda: listCompSumMasquerade(1000000)),
+        ]
+        untypedTime = timeIt(lambda: listCompSumUntyped(1000000))
 
-        t0 = time.time()
-        listCompSumMasquerade(1000000)
-        masqueradeTime = time.time() - t0
+        print(compiledTimes)
 
-        t0 = time.time()
-        listCompSumUntyped(1000000)
-        untypedTime = time.time() - t0
+        avgCompiledTime = sum(compiledTimes) / len(compiledTimes)
 
         # they should be about the same
-        assert .75 <= convertedTime / masqueradeTime <= 1.25
+        for timeElapsed in compiledTimes:
+            assert .75 <= timeElapsed / avgCompiledTime <= 1.25
 
         # but python is much slower. I get about 30 x.
-        assert untypedTime / convertedTime > 10
+        assert untypedTime / avgCompiledTime > 10
+
+    @flaky(max_runs=3, min_passes=1)
+    def test_untyped_tuple_from_listcomp_perf(self):
+        def sum(iterable):
+            res = 0
+            for s in iterable:
+                res += s
+            return res
+
+        @Entrypoint
+        def tupleCompSumConverted(x):
+            return sum(tuple([a + 1 for a in range(x)]))
+
+        @Entrypoint
+        def tupleCompSumConvertedGenerator(x):
+            return sum(tuple(a + 1 for a in range(x)))
+
+        @Entrypoint
+        def listCompSumConvertedGenerator(x):
+            return sum(list(a + 1 for a in range(x)))
+
+        def listCompSumUntyped(x):
+            return sum(tuple(a + 1 for a in range(x)))
+
+        tupleCompSumConverted(1000)
+        tupleCompSumConvertedGenerator(1000)
+        listCompSumConvertedGenerator(1000)
+
+        tupleCompiled = timeIt(lambda: tupleCompSumConverted(10000000))
+        tupleCompiledGenerator = timeIt(lambda: tupleCompSumConvertedGenerator(10000000))
+        listCompiledGenerator = timeIt(lambda: listCompSumConvertedGenerator(10000000))
+        untypedTime = timeIt(lambda: listCompSumUntyped(10000000))
+
+        print("tupleCompiled = ", tupleCompiled)
+        print("tupleCompiledGenerator = ", tupleCompiledGenerator)
+        print("listCompiledGenerator = ", listCompiledGenerator)
+        print("untypedTime = ", untypedTime)
+
+        # they should be about the same
+        assert .75 <= tupleCompiled / tupleCompiledGenerator <= 1.25
+        assert .75 <= listCompiledGenerator / tupleCompiledGenerator <= 1.25
+
+        # but python is much slower. I get about 30 x.
+        assert untypedTime / listCompiledGenerator > 10
 
     def executeInLoop(self, f, duration=.25, threshold=1.0):
         gc.collect()
