@@ -14,7 +14,7 @@
 
 import pkg_resources
 import setuptools
-
+import sys
 from distutils.command.build_ext import build_ext
 from distutils.extension import Extension
 
@@ -28,21 +28,28 @@ class TypedPythonBuildExtension(build_ext):
         build_ext.run(self)
 
 
-extra_compile_args = [
-    '-O2',
-    '-fstack-protector-strong',
-    '-Wformat',
-    '-Wdate-time',
-    '-Werror=format-security',
-    '-std=c++14',
-    '-Wno-sign-compare',
-    '-Wno-narrowing',
-    '-Wno-sign-compare',
-    '-Wno-terminate',
-    '-Wno-reorder',
-    '-Wno-bool-compare',
-    '-Wno-cpp'
-]
+if sys.platform == 'win32':
+    extra_compile_args = [
+        '/O2',
+        '/std:c++latest',
+    ]
+else:
+    extra_compile_args = [
+        '-O2',
+        '-fstack-protector-strong',
+        '-Wformat',
+        '-Wdate-time',
+        '-Werror=format-security',
+        '-std=c++14',
+        '-Wno-sign-compare',
+        '-Wno-narrowing',
+        '-Wno-sign-compare',
+        '-Wno-terminate',
+        '-Wno-reorder',
+        '-Wno-bool-compare',
+        '-Wno-cpp'
+    ]
+
 
 ext_modules = [
     Extension(

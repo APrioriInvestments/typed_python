@@ -14,7 +14,8 @@
 ******************************************************************************/
 
 #include "PyGilState.hpp"
-
+#include <chrono>
+#include <thread>
 
 class ReleaseableThreadState;
 
@@ -68,7 +69,7 @@ public:
             std::cerr << "somehow another thread got the threadstate in ReleaseableThreadState" << std::endl;
 
             // this is a fatal error
-            asm("int3");
+            abort();
         }
 
         // release the GIL. we're not holding it but it should be OK to release it from
@@ -90,7 +91,7 @@ public:
                     std::cerr << "somehow we are not yet released, and yet not also waiting." << std::endl;
 
                     // this is a fatal error
-                    asm("int3");
+                    abort();
                 }
 
                 waitingPyThreadState = nullptr;
@@ -162,7 +163,7 @@ void PyEnsureGilReleased::gilReleaseThreadLoop() {
     }
 
     while (true) {
-        usleep(500);
+        std::this_thread::sleep_for(std::chrono::microseconds(500));
 
         {
             std::lock_guard<std::mutex> lock(*gilReleaseMutex);

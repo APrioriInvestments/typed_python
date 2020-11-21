@@ -202,7 +202,7 @@ typed_python_hash_type Class::hash(instance_ptr left) {
 }
 
 void Class::constructor(instance_ptr self, bool allowEmpty) {
-    if (!m_is_default_constructible and !allowEmpty) {
+    if (!m_is_default_constructible && !allowEmpty) {
         throw std::runtime_error(m_name + " is not default-constructible");
     }
 

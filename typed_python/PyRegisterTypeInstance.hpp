@@ -197,14 +197,14 @@ inline int64_t pyLshift(int64_t l, int64_t r) {
         PyErr_Format(PyExc_ValueError, "negative shift count");
         throw PythonExceptionSet();
     }
-    if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
+    if ((l == 0 && r > std::numeric_limits<int64_t>::max()) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
         PyErr_Format(PyExc_ValueError, "shift count too large");
         throw PythonExceptionSet();
     }
     return (l >= 0) ? l << r : -((-l) << r);
 }
 inline uint64_t pyLshift(uint64_t l, uint64_t r) {
-    if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
+    if ((l == 0 && r > std::numeric_limits<int64_t>::max()) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
         PyErr_Format(PyExc_ValueError, "shift count too large");
         throw PythonExceptionSet();
     }
@@ -226,7 +226,7 @@ inline int64_t pyLshift(double l, double r) {
 }
 
 inline uint64_t pyRshift(uint64_t l, uint64_t r) {
-    if (r > SSIZE_MAX) {
+    if (r > std::numeric_limits<int64_t>::max()) {
         PyErr_Format(PyExc_ValueError, "shift count too large");
         throw PythonExceptionSet();
     }
@@ -241,7 +241,7 @@ inline int64_t pyRshift(int64_t l, int64_t r) {
         PyErr_Format(PyExc_ValueError, "negative shift count");
         throw PythonExceptionSet();
     }
-    if (r > SSIZE_MAX) {
+    if (r > std::numeric_limits<int64_t>::max()) {
         PyErr_Format(PyExc_ValueError, "shift count too large");
         throw PythonExceptionSet();
     }

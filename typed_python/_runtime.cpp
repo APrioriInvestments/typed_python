@@ -1427,7 +1427,7 @@ extern "C" {
     }
 
     double nativepython_runtime_mod_float64_float64(double l, double r) {
-        if (std::isnan(r) or std::isnan(l)) {
+        if (std::isnan(r) || std::isnan(l)) {
             return NAN;
         }
 
@@ -1498,7 +1498,7 @@ extern "C" {
             return 0;
         }
 
-        if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
+        if ((l == 0 && r > std::numeric_limits<int64_t>::max()) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
             PyEnsureGilAcquired acquireTheGil;
             PyErr_Format(PyExc_OverflowError, "shift count too large");
             throw PythonExceptionSet();
@@ -1509,7 +1509,7 @@ extern "C" {
 
     // should match corresponding function in PyRegisterTypeInstance.hpp
     uint64_t nativepython_runtime_lshift_uint64_uint64(uint64_t l, uint64_t r) {
-        if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
+        if ((l == 0 && r > std::numeric_limits<int64_t>::max()) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
             PyEnsureGilAcquired acquireTheGil;
             PyErr_Format(PyExc_OverflowError, "shift count too large");
             throw PythonExceptionSet();
@@ -1519,7 +1519,7 @@ extern "C" {
 
     // should match corresponding function in PyRegisterTypeInstance.hpp
     uint64_t nativepython_runtime_rshift_uint64_uint64(uint64_t l, uint64_t r) {
-        if (r > SSIZE_MAX) {
+        if (r > std::numeric_limits<int64_t>::max()) {
             PyEnsureGilAcquired acquireTheGil;
             PyErr_Format(PyExc_OverflowError, "shift count too large");
             throw PythonExceptionSet();
@@ -1538,7 +1538,7 @@ extern "C" {
             PyErr_Format(PyExc_ValueError, "negative shift count");
             throw PythonExceptionSet();
         }
-        if (r > SSIZE_MAX) {
+        if (r > std::numeric_limits<int64_t>::max()) {
             PyEnsureGilAcquired acquireTheGil;
             PyErr_Format(PyExc_OverflowError, "shift count too large");
             throw PythonExceptionSet();

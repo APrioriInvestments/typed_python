@@ -310,12 +310,14 @@ void Type::forwardTypesAreResolved() {
         visitReferencedTypes([&](Type* t) { if (!t->m_is_simple) isSimple = false; });
 
         if (!isSimple) {
-            std::function<void (Type*)> markNotSimple([&](Type* t) {
+            std::function<void (Type*)> markNotSimple;
+
+            markNotSimple = [&](Type* t) {
                 if (t->m_is_simple) {
                     t->m_is_simple = false;
                     markNotSimple(t);
                 }
-            });
+            };
 
             markNotSimple(this);
         }

@@ -986,7 +986,9 @@ PyObject* PyInstance::getInternalModuleMember(const char* name) {
 PyTypeObject* PyInstance::allTypesBaseType() {
     auto allocateBaseType = [&]() {
         PyTypeObject* result = new PyTypeObject {
-            PyVarObject_HEAD_INIT(NULL, 0)              // TYPE (c.f., Type Objects)
+            .ob_base = {
+                PyObject_HEAD_INIT(NULL) 0
+            },
             .tp_name = "typed_python._types.Type",          // const char*
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
@@ -1067,7 +1069,9 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
         PyDict_SetItemString(classDict, "__typed_python_module__", PyUnicode_FromString("typed_python._types"));
 
         types[category] = new NativeTypeCategoryWrapper { {
-            PyVarObject_HEAD_INIT(NULL, 0)              // TYPE (c.f., Type Objects)
+            .ob_base = {
+                PyObject_HEAD_INIT(NULL) 0
+            },
             .tp_name = (new std::string("typed_python._types." + Type::categoryToString(category)))->c_str(),          // const char*
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
@@ -1178,7 +1182,9 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
     Type::TypeCategory cat = inType->getTypeCategory();
 
     types[inType] = new NativeTypeWrapper { {
-            PyVarObject_HEAD_INIT(NULL, 0)              // TYPE (c.f., Type Objects)
+            .ob_base = {
+                PyObject_HEAD_INIT(NULL) 0
+            },
             .tp_name = (new std::string(inType->name()))->c_str(),          // const char*
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t

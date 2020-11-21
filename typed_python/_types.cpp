@@ -140,7 +140,7 @@ PyObject *MakeConstDictType(PyObject* nullValue, PyObject* args) {
     for (long k = 0; k < PyTuple_Size(args); k++) {
         PyObjectHolder item(PyTuple_GetItem(args,k));
         types.push_back(PyInstance::unwrapTypeArgToTypePtr(item));
-        if (not types.back()) {
+        if (!types.back()) {
             return NULL;
         }
     }
@@ -177,7 +177,7 @@ PyObject *MakeDictType(PyObject* nullValue, PyObject* args) {
     for (long k = 0; k < PyTuple_Size(args); k++) {
         PyObjectHolder item(PyTuple_GetItem(args,k));
         types.push_back(PyInstance::unwrapTypeArgToTypePtr(item));
-        if (not types.back()) {
+        if (!types.back()) {
             return NULL;
         }
     }
@@ -244,7 +244,7 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
                     )
                 );
 
-            if (not namesAndTypes.back().second) {
+            if (!namesAndTypes.back().second) {
                 return NULL;
             }
         }
@@ -3052,14 +3052,14 @@ static PyMethodDef module_methods[] = {
 
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
-    .m_name = "_types",
-    .m_doc = NULL,
-    .m_size = 0,
-    .m_methods = module_methods,
-    .m_slots = NULL,
-    .m_traverse = NULL,
-    .m_clear = NULL,
-    .m_free = NULL
+    "_types",            /* m_name */
+    NULL,                /* m_doc */
+    0,                   /* m_size */
+    module_methods,      /* m_methods */
+    NULL,                /* m_reload */
+    NULL,                /* m_traverse */
+    NULL,                /* m_clear */
+    NULL,                /* m_free */
 };
 
 void updateTypeRepForType(Type* type, PyTypeObject* pyType) {
