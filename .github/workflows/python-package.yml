@@ -1,0 +1,55 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Python package
+
+on: push
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: [3.6, 3.7, 3.8]
+        exclude:
+          - os: macos-latest
+            python-version: 3.6
+          - os: macos-latest
+            python-version: 3.8
+          - os: windows-latest
+            python-version: 3.6
+          - os: windows-latest
+            python-version: 3.8
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest pipenv safety flaky
+        pip install -e .
+    - name: Test with pytest
+      env:
+        TRAVIS_CI: 1
+      run: |
+        pytest
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.6
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8==3.7.9 pipenv safety
+    - name: Check pipenv and lint
+      run: |
+        (pipenv lock --requirements | safety check --stdin) || (sleep 60; pipenv lock --requirements | safety check --stdin) || (sleep 60; pipenv lock --requirements | safety check --stdin)
+        make lint
