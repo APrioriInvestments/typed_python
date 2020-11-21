@@ -17,7 +17,7 @@ import time
 import gc
 import pytest
 
-from typed_python import Entrypoint
+from typed_python import Entrypoint, ListOf
 from typed_python.test_util import currentMemUsageMb
 
 
@@ -31,6 +31,61 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert isinstance(lst, list)
         assert lst == [a + 1 for a in range(10)]
+
+    def test_list_from_listcomp(self):
+        @Entrypoint
+        def listComp(x):
+            return ListOf(int)([a + 1 for a in range(x)])
+
+        lst = listComp(10)
+
+        assert isinstance(lst, ListOf(int))
+        assert lst == [a + 1 for a in range(10)]
+
+    def test_list_from_listcomp_perf(self):
+        @Entrypoint
+        def listCompSumConverted(x):
+            aLst = ListOf(int)([a + 1 for a in range(x)])
+            res = 0
+            for a in aLst:
+                res += a
+            return res
+
+        @Entrypoint
+        def listCompSumMasquerade(x):
+            aLst = [a + 1 for a in range(x)]
+            res = 0
+            for a in aLst:
+                res += a
+            return res
+
+        def listCompSumUntyped(x):
+            aLst = [a + 1 for a in range(x)]
+            res = 0
+            for a in aLst:
+                res += a
+            return res
+
+        listCompSumConverted(1000)
+        listCompSumMasquerade(1000)
+
+        t0 = time.time()
+        listCompSumConverted(1000000)
+        convertedTime = time.time() - t0
+
+        t0 = time.time()
+        listCompSumMasquerade(1000000)
+        masqueradeTime = time.time() - t0
+
+        t0 = time.time()
+        listCompSumUntyped(1000000)
+        untypedTime = time.time() - t0
+
+        # they should be about the same
+        assert .75 <= convertedTime / masqueradeTime <= 1.25
+
+        # but python is much slower. I get about 30 x.
+        assert untypedTime / convertedTime > 10
 
     def executeInLoop(self, f, duration=.25, threshold=1.0):
         gc.collect()

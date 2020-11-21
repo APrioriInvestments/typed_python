@@ -529,45 +529,52 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         return res
 
     def convert_type_call_on_container_expression(self, context, typeInst, argExpr):
-        if not (argExpr.matches.Tuple or argExpr.matches.List or argExpr.matches.Set):
-            return super().convert_type_call_on_container_expression(context, typeInst, argExpr)
+        if argExpr.matches.Tuple or argExpr.matches.List:
+            # we're calling TupleOf(T) or ListOf(T) with an expression like [1, 2, 3, ...]
 
-        # we're calling TupleOf(T) or ListOf(T) with an expression like [1, 2, 3, ...]
-
-        # first allocate something of the right size
-        aTup = PreReservedTupleOrList(self.typeRepresentation).convert_call(
-            context,
-            None,
-            (context.constant(len(argExpr.elts)),),
-            {}
-        )
-
-        # for each expression, push it onto the front and then update the
-        # size. We have to do it this way so that if we throw an exception
-        # in the middle of constructing the tuple, we teardown the intermediate
-        # tuple the right way.
-        for i in range(len(argExpr.elts)):
-            val = context.convert_expression_ast(argExpr.elts[i])
-            if val is None:
-                return None
-
-            val = val.convert_to_type(self.typeRepresentation.ElementType, ConversionLevel.Implicit)
-            if val is None:
-                return None
-
-            aTup.convert_method_call(
-                "_initializeItemUnsafe",
-                (context.constant(i), val),
+            # first allocate something of the right size
+            aTup = PreReservedTupleOrList(self.typeRepresentation).convert_call(
+                context,
+                None,
+                (context.constant(len(argExpr.elts)),),
                 {}
             )
 
-            aTup.convert_method_call(
-                "setSizeUnsafe",
-                (context.constant(i + 1),),
-                {}
-            )
+            # for each expression, push it onto the front and then update the
+            # size. We have to do it this way so that if we throw an exception
+            # in the middle of constructing the tuple, we teardown the intermediate
+            # tuple the right way.
+            for i in range(len(argExpr.elts)):
+                val = context.convert_expression_ast(argExpr.elts[i])
+                if val is None:
+                    return None
 
-        return aTup
+                val = val.convert_to_type(self.typeRepresentation.ElementType, ConversionLevel.Implicit)
+                if val is None:
+                    return None
+
+                aTup.convert_method_call(
+                    "_initializeItemUnsafe",
+                    (context.constant(i), val),
+                    {}
+                )
+
+                aTup.convert_method_call(
+                    "setSizeUnsafe",
+                    (context.constant(i + 1),),
+                    {}
+                )
+
+            return aTup
+
+        if argExpr.matches.ListComp or argExpr.matches.GeneratorExp:
+            # simply build this as a listcomp and remove the masquerade
+            res = context.convert_generator_as_list_comprehension(argExpr)
+            if res is None:
+                return res
+            return res.changeType(self)
+
+        return super().convert_type_call_on_container_expression(context, typeInst, argExpr)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:

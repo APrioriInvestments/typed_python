@@ -1949,15 +1949,18 @@ class ExpressionConversionContext:
             )
 
         if ast.matches.ListComp:
-            generatorFunc = self.functionContext.localVariableExpression(self, ".closure").changeType(
-                self.functionContext.functionDefToType[ast]
-            )
-            return generatorFunc.expr_type.convert_list_comprehension(
-                generatorFunc.context,
-                generatorFunc
-            )
+            return self.convert_generator_as_list_comprehension(ast)
 
         if ast.matches.Constant:
             return self.constant(ast.value, allowArbitrary=True)
 
         raise ConversionException("can't handle python expression type %s" % ast.Name)
+
+    def convert_generator_as_list_comprehension(self, ast):
+        generatorFunc = self.functionContext.localVariableExpression(self, ".closure").changeType(
+            self.functionContext.functionDefToType[ast]
+        )
+        return generatorFunc.expr_type.convert_list_comprehension(
+            generatorFunc.context,
+            generatorFunc
+        )
