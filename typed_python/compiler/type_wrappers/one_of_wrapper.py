@@ -86,6 +86,9 @@ class OneOfWrapper(Wrapper):
 
         return typeWrapper(OneOf(*sorted(allTypes, key=str)))
 
+    def convert_which_native(self, expr):
+        return expr.ElementPtrIntegers(0, 0).load()
+
     def unwrap(self, context, expr, generator):
         """Call 'generator' on 'expr' cast down to each subtype and combine the results.
         """
@@ -93,7 +96,7 @@ class OneOfWrapper(Wrapper):
         exprs = []
         typesSeen = set()
 
-        with context.switch(expr.expr.ElementPtrIntegers(0, 0).load(),
+        with context.switch(self.convert_which_native(expr.expr),
                             range(len(self.typeRepresentation.Types)),
                             False) as indicesAndContexts:
             for i, subcontext in indicesAndContexts:

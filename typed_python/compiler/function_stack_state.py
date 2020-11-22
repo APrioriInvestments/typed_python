@@ -67,6 +67,19 @@ class FunctionStackState:
     def clone(self):
         return FunctionStackState(dict(self._types), set(self._maybeUninitialized))
 
+    def becomeMergeOf(self, manyStates):
+        assert len(manyStates)
+
+        if len(manyStates) == 1:
+            self._types = dict(manyStates[0]._types)
+            self._maybeUninitialized = set(manyStates[0]._maybeUninitialized)
+            return
+
+        self.becomeMerge(manyStates[0], manyStates[1])
+
+        for i in range(2, len(manyStates)):
+            self.mergeWithSelf(manyStates[i])
+
     def becomeMerge(self, left, right):
         """Become the result of two control flow paths merging.
 

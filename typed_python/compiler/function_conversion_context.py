@@ -1581,107 +1581,58 @@ class FunctionConversionContext(ConversionContextBase):
             return (complete, ((body_returns and orelse_returns) or working_returns) and final_returns)
 
         if ast.matches.For:
-            iterator_setup_context = ExpressionConversionContext(self, variableStates)
+            context = ExpressionConversionContext(self, variableStates)
 
-            to_iterate = iterator_setup_context.convert_expression_ast(ast.iter)
+            to_iterate = context.convert_expression_ast(ast.iter)
             if to_iterate is None:
-                return iterator_setup_context.finalize(None, exceptionsTakeFrom=ast), False
+                return context.finalize(None, exceptionsTakeFrom=ast), False
 
-            iteration_expressions = to_iterate.get_iteration_expressions()
+            if issubclass(to_iterate.expr_type.typeRepresentation, OneOf):
+                # split the code on the different possible 'oneof' values
+                if not to_iterate.isReference:
+                    to_iterate = context.pushMove(to_iterate)
 
-            # we allow types to explicitly break themselves down into a fixed set of
-            # expressions to unroll, so that we can retain typing information.
-            if iteration_expressions is not None:
-                for subexpr in iteration_expressions:
-                    self.convert_assignment(ast.target, None, subexpr)
+                subExprs = []
+                anyFlowsReturn = False
+                subVariableStates = []
 
-                    thisOne, thisOneReturns = self.convert_statement_list_ast(
-                        ast.body, variableStates, return_to=return_to, in_loop=True, try_flow=try_flow
+                for ix in range(len(to_iterate.expr_type.typeRepresentation.Types)):
+                    subVS = variableStates.clone()
+                    subcontext = ExpressionConversionContext(self, subVS)
+
+                    expr, flowReturns = self.convert_iteration_expression(
+                        to_iterate.refAs(ix).changeContext(subcontext),
+                        ast,
+                        "." + str(ix),
+                        in_loop,
+                        return_to,
+                        try_flow
                     )
 
-                    # if we hit 'continue', just come to the end of this expression
-                    thisOne = thisOne.withReturnTargetName("loop_continue")
+                    subExprs.append(expr)
+                    if flowReturns:
+                        anyFlowsReturn = True
 
-                    iterator_setup_context.pushEffect(thisOne)
+                    subVariableStates.append(subVS)
 
-                    if not thisOneReturns:
-                        return iterator_setup_context.finalize(None, exceptionsTakeFrom=ast).withReturnTargetName("loop_break"), False
+                switchExpr = subExprs[-1]
+                for ix in reversed(range(len(subExprs) - 1)):
+                    switchExpr = native_ast.Expression.Branch(
+                        cond=to_iterate.expr_type
+                        .convert_which_native(to_iterate.expr)
+                        .cast(native_ast.Int64).eq(native_ast.const_int_expr(ix)),
+                        true=subExprs[ix],
+                        false=switchExpr
+                    )
 
-                thisOne, thisOneReturns = self.convert_statement_list_ast(
-                    ast.orelse, variableStates, return_to=return_to, in_loop=in_loop, try_flow=try_flow
-                )
+                variableStates.becomeMergeOf(subVariableStates)
 
-                iterator_setup_context.pushEffect(thisOne)
-
-                wholeLoopExpr = iterator_setup_context.finalize(None, exceptionsTakeFrom=ast)
-
-                wholeLoopExpr = wholeLoopExpr.withReturnTargetName("loop_break")
-
-                return wholeLoopExpr, thisOneReturns
+                return context.finalize(
+                    switchExpr,
+                    exceptionsTakeFrom=ast
+                ), anyFlowsReturn
             else:
-                # create a variable to hold the iterator, and instantiate it there
-                iter_varname = ".iter." + str(ast.line_number)
-
-                iterator_object = to_iterate.convert_method_call("__iter__", (), {})
-                if iterator_object is None:
-                    return iterator_setup_context.finalize(None, exceptionsTakeFrom=ast), False
-
-                self.assignToLocalVariable(iter_varname, iterator_object, variableStates)
-
-                while True:
-                    # track the initial variable states
-                    initVariableStates = variableStates.clone()
-
-                    cond_context = ExpressionConversionContext(self, variableStates)
-
-                    iter_obj = cond_context.namedVariableLookup(iter_varname)
-                    if iter_obj is None:
-                        return (
-                            iterator_setup_context.finalize(None, exceptionsTakeFrom=ast)
-                            >> cond_context.finalize(None, exceptionsTakeFrom=ast),
-                            False
-                        )
-
-                    next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
-                    if next_ptr is None:
-                        return (
-                            iterator_setup_context.finalize(None, exceptionsTakeFrom=ast)
-                            >> cond_context.finalize(None, exceptionsTakeFrom=ast),
-                            False
-                        )
-
-                    with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
-                        with if_true:
-                            self.convert_assignment(ast.target, None, next_ptr)
-
-                    variableStatesTrue = variableStates.clone()
-                    variableStatesFalse = variableStates.clone()
-
-                    true, true_returns = self.convert_statement_list_ast(
-                        ast.body, variableStatesTrue, in_loop=True, return_to=return_to, try_flow=try_flow
-                    )
-                    false, false_returns = self.convert_statement_list_ast(
-                        ast.orelse, variableStatesFalse, in_loop=True, return_to=return_to, try_flow=try_flow
-                    )
-
-                    variableStates.becomeMerge(
-                        variableStatesTrue if true_returns else None,
-                        variableStatesFalse if false_returns else None
-                    )
-
-                    variableStates.mergeWithSelf(initVariableStates)
-
-                    if variableStates == initVariableStates:
-                        # if nothing changed, the loop is stable.
-                        return (
-                            iterator_setup_context.finalize(None, exceptionsTakeFrom=ast) >>
-                            native_ast.Expression.While(
-                                cond=cond_context.finalize(is_populated, exceptionsTakeFrom=ast),
-                                while_true=true.withReturnTargetName("loop_continue"),
-                                orelse=false
-                            ).withReturnTargetName("loop_break"),
-                            true_returns or false_returns
-                        )
+                return self.convert_iteration_expression(to_iterate, ast, "", in_loop, return_to, try_flow)
 
         if ast.matches.Raise:
             expr_context = ExpressionConversionContext(self, variableStates)
@@ -2034,6 +1985,107 @@ class FunctionConversionContext(ConversionContextBase):
             return context.finalize(None, exceptionsTakeFrom=ast), True
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast.Name)
+
+    def convert_iteration_expression(self, to_iterate, ast, variableSuffix, in_loop, return_to, try_flow):
+        """Convert the 'For' statement in 'ast', where to_iterate is the iterable."""
+        context = to_iterate.context
+        variableStates = context.variableStates
+
+        iteration_expressions = to_iterate.get_iteration_expressions()
+
+        # we allow types to explicitly break themselves down into a fixed set of
+        # expressions to unroll, so that we can retain typing information.
+        if iteration_expressions is not None:
+            for subexpr in iteration_expressions:
+                self.convert_assignment(ast.target, None, subexpr)
+
+                thisOne, thisOneReturns = self.convert_statement_list_ast(
+                    ast.body, variableStates, return_to=return_to, in_loop=True, try_flow=try_flow
+                )
+
+                # if we hit 'continue', just come to the end of this expression
+                thisOne = thisOne.withReturnTargetName("loop_continue")
+
+                context.pushEffect(thisOne)
+
+                if not thisOneReturns:
+                    return context.finalize(None, exceptionsTakeFrom=ast).withReturnTargetName("loop_break"), False
+
+            thisOne, thisOneReturns = self.convert_statement_list_ast(
+                ast.orelse, variableStates, return_to=return_to, in_loop=in_loop, try_flow=try_flow
+            )
+
+            context.pushEffect(thisOne)
+
+            wholeLoopExpr = context.finalize(None, exceptionsTakeFrom=ast)
+
+            wholeLoopExpr = wholeLoopExpr.withReturnTargetName("loop_break")
+
+            return wholeLoopExpr, thisOneReturns
+        else:
+            # create a variable to hold the iterator, and instantiate it there
+            iter_varname = ".iter." + str(ast.line_number) + variableSuffix
+
+            iterator_object = to_iterate.convert_method_call("__iter__", (), {})
+            if iterator_object is None:
+                return context.finalize(None, exceptionsTakeFrom=ast), False
+
+            self.assignToLocalVariable(iter_varname, iterator_object, variableStates)
+
+            while True:
+                # track the initial variable states
+                initVariableStates = variableStates.clone()
+
+                cond_context = ExpressionConversionContext(self, variableStates)
+
+                iter_obj = cond_context.namedVariableLookup(iter_varname)
+                if iter_obj is None:
+                    return (
+                        context.finalize(None, exceptionsTakeFrom=ast)
+                        >> cond_context.finalize(None, exceptionsTakeFrom=ast),
+                        False
+                    )
+
+                next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
+                if next_ptr is None:
+                    return (
+                        context.finalize(None, exceptionsTakeFrom=ast)
+                        >> cond_context.finalize(None, exceptionsTakeFrom=ast),
+                        False
+                    )
+
+                with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
+                    with if_true:
+                        self.convert_assignment(ast.target, None, next_ptr)
+
+                variableStatesTrue = variableStates.clone()
+                variableStatesFalse = variableStates.clone()
+
+                true, true_returns = self.convert_statement_list_ast(
+                    ast.body, variableStatesTrue, in_loop=True, return_to=return_to, try_flow=try_flow
+                )
+                false, false_returns = self.convert_statement_list_ast(
+                    ast.orelse, variableStatesFalse, in_loop=True, return_to=return_to, try_flow=try_flow
+                )
+
+                variableStates.becomeMerge(
+                    variableStatesTrue if true_returns else None,
+                    variableStatesFalse if false_returns else None
+                )
+
+                variableStates.mergeWithSelf(initVariableStates)
+
+                if variableStates == initVariableStates:
+                    # if nothing changed, the loop is stable.
+                    return (
+                        context.finalize(None, exceptionsTakeFrom=ast) >>
+                        native_ast.Expression.While(
+                            cond=cond_context.finalize(is_populated, exceptionsTakeFrom=ast),
+                            while_true=true.withReturnTargetName("loop_continue"),
+                            orelse=false
+                        ).withReturnTargetName("loop_break"),
+                        true_returns or false_returns
+                    )
 
     def convert_statement_list_ast(
             self, statements, variableStates: FunctionStackState, toplevel=False, return_to=None, in_loop=False, try_flow=None

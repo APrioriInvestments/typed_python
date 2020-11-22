@@ -24,7 +24,7 @@ from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBui
 from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
     _types, Compiled, Member, Final, isCompiled, ConstDict,
-    makeNamedTuple, UInt32, Int32, Type, identityHash
+    makeNamedTuple, UInt32, Int32, Type, identityHash, typeKnownToCompiler
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
@@ -480,7 +480,7 @@ class TestCompilationStructures(unittest.TestCase):
         t2 = time.time()
 
         print("Range is %.2f slower than nonrange." % ((t2-t1)/(t1-t0)))  # I get 1.00
-        self.assertLess((t1-t0), (t2 - t1) * 1.1)
+        self.assertLess((t1-t0), (t2 - t1) * 1.2)
 
     def test_read_invalid_variables(self):
         @Compiled
@@ -3203,3 +3203,42 @@ class TestCompilationStructures(unittest.TestCase):
             return res
 
         assert iterate() == 6
+
+    def test_iterate_oneof(self):
+        @Entrypoint
+        def iterate(x: OneOf(ListOf(int), ListOf(float))):
+            res = 0
+            for val in x:
+                res += val
+            return res
+
+        assert iterate(ListOf(int)([1, 2, 3])) == 6
+
+        assert iterate.resultTypeFor(ListOf(int)).typeRepresentation == OneOf(int, float)
+
+    def test_iterate_oneof_segregates_variables(self):
+        @Entrypoint
+        def iterate(x: OneOf(ListOf(int), ListOf(str))):
+            for val in x:
+                # depending on the branch we're in, we should know that 'val'
+                # is either an int or a string
+                return typeKnownToCompiler(val)
+
+            return None
+
+        assert iterate(ListOf(int)([1, 2])) is int
+        assert iterate(ListOf(str)(["2"])) is str
+
+    def test_iterate_oneof_variable_types_join(self):
+        @Entrypoint
+        def iterate(x: OneOf(ListOf(int), ListOf(str))):
+            res = None
+            for val in x:
+                # depending on the branch we're in, we should know that 'val'
+                # is either an int or a string
+                res = val
+
+            return typeKnownToCompiler(res)
+
+        assert iterate(ListOf(int)([1, 2])) is OneOf(int, None, str)
+        assert iterate(ListOf(str)(["2"])) is OneOf(int, None, str)
