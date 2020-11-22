@@ -474,6 +474,28 @@ def isCompiled():
     return False
 
 
+def checkOneOfType(x):
+    """Instruct compiler to fork based on the type of 'x'.
+
+    If variable 'x' is a OneOf type, and you write
+
+        checkOneOfType(x)
+
+    Then the compiler will generate code that forks based on the type of
+    'x' and compiles the remainder of the current sequence of statements
+    based on that type.
+
+    This can make code involving 'OneOf' substantially faster by lifting
+    the check of the type of 'x' to the top of a block of statements,
+    but at the cost of producing larger code.
+
+    Note: Placing several 'checkOneOfType' calls in a row can produce
+    absurdly large code, since we fork on all the possible combined types
+    of OneOf.
+    """
+    return x
+
+
 def typeKnownToCompiler(x):
     """Returns the type object that the compiler knows for 'x'
 

@@ -28,7 +28,9 @@ def removeTypeFrom(type, toRemove):
 class FunctionStackState:
     """Model what's known about a set of variables at a particular point in a program.
 
-    Each variable may be one of a set of types, or 'Uninitialized'
+    Each variable may be one of a set of types, or 'Uninitialized'.
+
+    These are actual Type objects, not wrappers.
     """
     def __init__(self, types=None, maybeUninitialized=None):
         self._types = types or dict()

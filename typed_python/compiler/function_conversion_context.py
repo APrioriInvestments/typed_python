@@ -24,7 +24,7 @@ from typed_python.compiler.python_ast_analysis import (
     countYieldStatements,
     extractFunctionDefs
 )
-from typed_python.internals import makeFunctionType
+from typed_python.internals import makeFunctionType, checkOneOfType
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
@@ -1587,7 +1587,10 @@ class FunctionConversionContext(ConversionContextBase):
             if to_iterate is None:
                 return context.finalize(None, exceptionsTakeFrom=ast), False
 
-            if issubclass(to_iterate.expr_type.typeRepresentation, OneOf):
+            if (
+                isinstance(to_iterate.expr_type.typeRepresentation, type)
+                and issubclass(to_iterate.expr_type.typeRepresentation, OneOf)
+            ):
                 # split the code on the different possible 'oneof' values
                 if not to_iterate.isReference:
                     to_iterate = context.pushMove(to_iterate)
@@ -2087,6 +2090,97 @@ class FunctionConversionContext(ConversionContextBase):
                         true_returns or false_returns
                     )
 
+    def checkIfStatementIsSplitOnOneOf(self, statement, variableStates):
+        """Check if 'statement' is 'checkOneOfType(x)' for some variable 'x'
+
+        If so, return the name of the variable 'x'. Otherwise return None.
+        """
+        if not statement.matches.Expr:
+            return None
+
+        expr = statement.value
+
+        if not expr.matches.Call or len(expr.args) != 1 or expr.keywords:
+            return None
+
+        if expr.args[0].matches.Starred:
+            return None
+
+        if not expr.args[0].matches.Name or not expr.func.matches.Name:
+            return None
+
+        c = ExpressionConversionContext(self, variableStates)
+        callRes = c.convert_expression_ast(expr.func)
+
+        if callRes is None:
+            return None
+
+        if callRes.expr_type.typeRepresentation is not checkOneOfType:
+            return None
+
+        varname = expr.args[0].id
+
+        curType = variableStates.currentType(varname)
+
+        if curType is None or not issubclass(curType, OneOf):
+            return None
+
+        return varname
+
+    def splitOnOneOfAndConvertStatementList(
+        self,
+        varToSplitOn,
+        statements,
+        variableStates,
+        toplevel,
+        return_to,
+        in_loop,
+        try_flow
+    ):
+        subExprs = []
+        anyFlowsReturn = False
+        subVariableStates = []
+
+        varType = variableStates.currentType(varToSplitOn)
+        assert issubclass(varType, OneOf)
+
+        for ix in range(len(varType.Types)):
+            subVS = variableStates.clone()
+
+            subVS.restrictTypeFor(varToSplitOn, varType.Types[ix], True)
+
+            expr, flowReturns = self.convert_statement_list_ast(
+                statements,
+                subVS,
+                False,
+                return_to,
+                in_loop,
+                try_flow
+            )
+
+            subExprs.append(expr)
+            if flowReturns:
+                anyFlowsReturn = True
+
+            subVariableStates.append(subVS)
+
+        context = ExpressionConversionContext(self, variableStates)
+        toSplit = context.namedVariableLookup(varToSplitOn)
+
+        switchExpr = subExprs[-1]
+        for ix in reversed(range(len(subExprs) - 1)):
+            switchExpr = native_ast.Expression.Branch(
+                cond=toSplit.expr_type
+                .convert_which_native(toSplit.expr)
+                .cast(native_ast.Int64).eq(native_ast.const_int_expr(ix)),
+                true=subExprs[ix],
+                false=switchExpr
+            )
+
+        variableStates.becomeMergeOf(subVariableStates)
+
+        return context.finalize(switchExpr), anyFlowsReturn
+
     def convert_statement_list_ast(
             self, statements, variableStates: FunctionStackState, toplevel=False, return_to=None, in_loop=False, try_flow=None
     ):
@@ -2108,22 +2202,40 @@ class FunctionConversionContext(ConversionContextBase):
             whether control flow returns to the invoking native code.
         """
         exprAndReturns = []
-        for s in statements:
-            res = self.convert_statement_ast(
-                s, variableStates, return_to=return_to, in_loop=in_loop, try_flow=try_flow
-            )
 
-            if not isinstance(res, tuple) or len(res) != 2:
-                raise Exception(
-                    f"convert_statement_ast is supposed to return a pair. It returned {res}. "
-                    f"Statement type is {type(s)}"
+        for statementIx in range(len(statements)):
+            s = statements[statementIx]
+
+            varToSplitOn = self.checkIfStatementIsSplitOnOneOf(s, variableStates)
+
+            if varToSplitOn is not None:
+                expr, controlFlowReturns = self.splitOnOneOfAndConvertStatementList(
+                    varToSplitOn,
+                    statements[statementIx+1:],
+                    variableStates,
+                    toplevel,
+                    return_to,
+                    in_loop,
+                    try_flow
                 )
-            expr, controlFlowReturns = res
-
-            exprAndReturns.append((expr, controlFlowReturns))
-
-            if not controlFlowReturns:
+                exprAndReturns.append((expr, controlFlowReturns))
                 break
+            else:
+                res = self.convert_statement_ast(
+                    s, variableStates, return_to=return_to, in_loop=in_loop, try_flow=try_flow
+                )
+
+                if not isinstance(res, tuple) or len(res) != 2:
+                    raise Exception(
+                        f"convert_statement_ast is supposed to return a pair. It returned {res}. "
+                        f"Statement type is {type(s)}"
+                    )
+                expr, controlFlowReturns = res
+
+                exprAndReturns.append((expr, controlFlowReturns))
+
+                if not controlFlowReturns:
+                    break
 
         if not exprAndReturns or exprAndReturns[-1][1]:
             flows_off_end = True

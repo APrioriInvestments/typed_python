@@ -24,7 +24,7 @@ from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBui
 from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
     _types, Compiled, Member, Final, isCompiled, ConstDict,
-    makeNamedTuple, UInt32, Int32, Type, identityHash, typeKnownToCompiler
+    makeNamedTuple, UInt32, Int32, Type, identityHash, typeKnownToCompiler, checkOneOfType
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
@@ -3242,3 +3242,79 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert iterate(ListOf(int)([1, 2])) is OneOf(int, None, str)
         assert iterate(ListOf(str)(["2"])) is OneOf(int, None, str)
+
+    def test_check_isinstance_on_oneof(self):
+        @Entrypoint
+        def doIt(var: OneOf(int, float)):
+            if isinstance(var, int):
+                return typeKnownToCompiler(var)
+            else:
+                return typeKnownToCompiler(var)
+
+        assert doIt(1.0) is float
+        assert doIt(1) is int
+
+    def test_check_one_of_type(self):
+        @Entrypoint
+        def doIt(var: OneOf(int, float)):
+            checkOneOfType(var)
+            print(var)
+            return typeKnownToCompiler(var)
+
+        assert doIt(1.0) is float
+        assert doIt(1) is int
+
+    @flaky(max_runs=3, min_passes=1)
+    def test_check_one_of_type_perf_difference(self):
+        @Entrypoint
+        def accumulate(var: OneOf(int, float), times: int):
+            res = var
+            for t in range(times - 1):
+                res += var
+            return res
+
+        @Entrypoint
+        def accumulateWithCheck(var: OneOf(int, float), times: int):
+            # instruct the compiler to check what kind of variable this is
+            checkOneOfType(var)
+
+            res = var
+            for t in range(times - 1):
+                res += var
+            return res
+
+        accumulate(1, 100)
+        accumulateWithCheck(1, 100)
+
+        t0 = time.time()
+        accumulate(1, 100000)
+        t1 = time.time()
+        accumulateWithCheck(1, 100000)
+        t2 = time.time()
+
+        checkTime = t2 - t1
+        normalTime = t1 - t0
+
+        speedup = normalTime / checkTime
+        print("integer speedup is", speedup)
+
+        # it should be really big because the compiler can replace
+        # the sum with n*(n-1)/2
+        assert speedup > 100
+
+        accumulate(1.0, 100)
+        accumulateWithCheck(1.0, 100)
+
+        t0 = time.time()
+        accumulate(1.0, 100000)
+        t1 = time.time()
+        accumulateWithCheck(1.0, 100000)
+        t2 = time.time()
+
+        checkTime = t2 - t1
+        normalTime = t1 - t0
+
+        speedup = normalTime / checkTime
+        # i get about 10x, 5 on the github test boxes
+        print("float speedup is", speedup)
+        assert speedup > 2.5

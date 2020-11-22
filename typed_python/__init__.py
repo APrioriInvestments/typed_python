@@ -33,6 +33,7 @@ from typed_python.internals import (
     makeNamedTuple, DisableCompiledCode, isCompiled, Held,
     typeKnownToCompiler,
     localVariableTypesKnownToCompiler,
+    checkOneOfType
 )
 from typed_python._types import bytecount, refcount
 from typed_python.module import Module
