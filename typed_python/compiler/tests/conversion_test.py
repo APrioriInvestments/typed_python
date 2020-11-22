@@ -3180,3 +3180,26 @@ class TestCompilationStructures(unittest.TestCase):
             return x
 
         assert toList([1, 2]) == toListC([1, 2]) == ListOf(int)([1, 2])
+
+    def test_iterate_with_multiple_variable_targets(self):
+        @Entrypoint
+        def iterate(iterable):
+            res = 0
+            for x, y in iterable:
+                res += y
+            return res
+
+        assert iterate(ListOf(ListOf(int))([[1, 2], [3, 4]])) == 6
+
+        with self.assertRaisesRegex(Exception, "not enough values to unpack"):
+            iterate(ListOf(ListOf(int))([[1, 2], [3]]))
+
+    def test_iterate_constant_expression_multiple(self):
+        @Entrypoint
+        def iterate():
+            res = 0
+            for x, y in ((1, 2), (3, 4)):
+                res += y
+            return res
+
+        assert iterate() == 6

@@ -1581,11 +1581,6 @@ class FunctionConversionContext(ConversionContextBase):
             return (complete, ((body_returns and orelse_returns) or working_returns) and final_returns)
 
         if ast.matches.For:
-            if not ast.target.matches.Name:
-                raise NotImplementedError("Can't handle multi-variable loop expressions")
-
-            target_var_name = ast.target.id
-
             iterator_setup_context = ExpressionConversionContext(self, variableStates)
 
             to_iterate = iterator_setup_context.convert_expression_ast(ast.iter)
@@ -1598,7 +1593,7 @@ class FunctionConversionContext(ConversionContextBase):
             # expressions to unroll, so that we can retain typing information.
             if iteration_expressions is not None:
                 for subexpr in iteration_expressions:
-                    self.assignToLocalVariable(target_var_name, subexpr, variableStates)
+                    self.convert_assignment(ast.target, None, subexpr)
 
                     thisOne, thisOneReturns = self.convert_statement_list_ast(
                         ast.body, variableStates, return_to=return_to, in_loop=True, try_flow=try_flow
@@ -1625,7 +1620,7 @@ class FunctionConversionContext(ConversionContextBase):
                 return wholeLoopExpr, thisOneReturns
             else:
                 # create a variable to hold the iterator, and instantiate it there
-                iter_varname = target_var_name + ".iter." + str(ast.line_number)
+                iter_varname = ".iter." + str(ast.line_number)
 
                 iterator_object = to_iterate.convert_method_call("__iter__", (), {})
                 if iterator_object is None:
@@ -1657,7 +1652,7 @@ class FunctionConversionContext(ConversionContextBase):
 
                     with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
                         with if_true:
-                            self.assignToLocalVariable(target_var_name, next_ptr, variableStates)
+                            self.convert_assignment(ast.target, None, next_ptr)
 
                     variableStatesTrue = variableStates.clone()
                     variableStatesFalse = variableStates.clone()
