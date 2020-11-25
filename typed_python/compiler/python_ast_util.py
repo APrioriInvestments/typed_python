@@ -14,6 +14,7 @@
 
 import ast
 import os
+import linecache
 
 _pathExistsOnDiskCache = {}
 _linesCache = {}
@@ -47,8 +48,11 @@ def getLines(path):
         with open(path, "r") as f:
             _linesCache[path] = f.readlines()
         return _linesCache[path]
-    else:
-        return None
+
+    if path[:1] == '<' and path[-1:] == '>':
+        return linecache.getlines(path)
+
+    return None
 
 
 def clearAllCaches():
