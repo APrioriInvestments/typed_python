@@ -768,23 +768,37 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             return native_ast.nullExpr
 
     def convert_type_call(self, context, typeInst, args, kwargs):
-        if kwargs:
-            raise NotImplementedError("can't kwargs-initialize a class yet")
+        # pack the named arguments onto the back of the call, and pass
+        # a tuple of None|string representing the names
+        argNames = (None,) * len(args) + tuple(kwargs)
+        args = tuple(args) + tuple(kwargs.values())
 
         return context.push(
             self,
             lambda new_class:
                 context.converter.defineNativeFunction(
                     'construct(' + self.typeRepresentation.__name__ + ")("
-                    + ",".join([a.expr_type.typeRepresentation.__name__ for a in args]) + ")",
-                    ('util', self, 'construct', tuple([a.expr_type for a in args])),
+                    + ",".join([
+                        (argNames[i] + '=' if argNames[i] is not None else "") +
+                        args[i].expr_type.typeRepresentation.__name__
+                        for i in range(len(args))
+                    ]) + ")",
+                    ('util', self, 'construct', tuple([a.expr_type for a in args]), argNames),
                     [a.expr_type for a in args],
                     self,
-                    self.generateConstructor
+                    lambda context, out, *args: self.generateConstructor(context, out, argNames, *args)
                 ).call(new_class, *args)
         )
 
-    def generateConstructor(self, context, out, *args):
+    def generateConstructor(self, context, out, argNames, *args):
+        """Generate native code to initialize a Class object from a set of args/kwargs.
+
+        Args:
+            context - the NativeFunctionConversionContext governing this conversion
+            out - a TypedExpression pointing to an uninitialized Class instance.
+            argNames - a tuple of (None|str) with the names of the args as they were passed.
+            *args - Typed expressions representing each argument passed to us.
+        """
         context.pushEffect(
             out.expr.store(
                 runtime_functions.malloc.call(
@@ -820,16 +834,34 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                     context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_default_initialize()
                 context.pushEffect(self.setIsInitializedExpr(out, i))
 
+        # break our args back out to unnamed and named arguments
+        unnamedArgs = []
+        namedArgs = {}
+
+        for argIx in range(len(args)):
+            if argNames[argIx] is not None:
+                namedArgs[argNames[argIx]] = args[argIx]
+            else:
+                unnamedArgs.append(args[argIx])
+
         if '__init__' in self.typeRepresentation.MemberFunctions:
             initFuncType = typeWrapper(self.typeRepresentation.MemberFunctions['__init__'])
-            initFuncType.convert_call(context, context.push(initFuncType, lambda expr: None), (out,) + args, {})
+            initFuncType.convert_call(
+                context,
+                context.push(initFuncType, lambda expr: None),
+                (out,) + tuple(unnamedArgs),
+                namedArgs
+            )
         else:
-            if len(args):
+            if len(unnamedArgs):
                 context.pushException(
                     TypeError,
                     "Can't construct a " + self.typeRepresentation.__qualname__ +
                     " with positional arguments because it doesn't have an __init__"
                 )
+
+            for name, arg in namedArgs.items():
+                self.convert_set_attribute(context, out, name, arg)
 
     def convert_comparison(self, context, left, op, right):
         if op.matches.Eq:

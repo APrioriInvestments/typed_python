@@ -2044,3 +2044,40 @@ class TestClassCompilationCompilation(unittest.TestCase):
             c.x = x
 
         assignX(C(), [ListOf(int)([1, 2, 3])])
+
+    def test_kwarg_initialize_class(self):
+        @Entrypoint
+        def makeAClass(x, y, z):
+            return AClass(x=x, z=z, y=y)
+
+        assert makeAClass(1, 2, (3, 4)).z == TupleOf(int)((3, 4))
+
+    def test_class_assign_invalid_member(self):
+        @Entrypoint
+        def assignInvalid(c):
+            c.invalidMember = 10
+
+        with self.assertRaisesRegex(AttributeError, "no attribute 'invalidMember'"):
+            assignInvalid(AClass())
+
+    def test_kwarg_initialize_class_invalid_arg(self):
+        def makeAClass(x, y, z):
+            return AClass(x=x, invalidMember=z, y=y)
+
+        with self.assertRaisesRegex(AttributeError, "has no attribute 'invalidMember'"):
+            makeAClass(1, 2, (3, 4))
+
+        with self.assertRaisesRegex(AttributeError, "has no attribute 'invalidMember'"):
+            Entrypoint(makeAClass)(1, 2, (3, 4))
+
+    def test_kwarg_initialize_method(self):
+        def initializeAClass(**kwargs):
+            return AClassWithInit(**kwargs)
+
+        def checkEqual(l, r):
+            assert l.x == r.x
+            assert l.y == r.y
+
+        checkEqual(Entrypoint(initializeAClass)(), initializeAClass())
+        checkEqual(Entrypoint(initializeAClass)(x=1), initializeAClass(x=1))
+        checkEqual(Entrypoint(initializeAClass)(x=1, y=2), initializeAClass(x=1, y=2))
