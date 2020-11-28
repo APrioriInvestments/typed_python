@@ -38,6 +38,8 @@ from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
 from typed_python import OneOf, Function, Tuple, Forward, Class
 
+from typed_python.python_ast import evaluateFunctionDefWithLocalsInCells
+
 # Constants for control flow instructions
 CONTROL_FLOW_DEFAULT = 0
 CONTROL_FLOW_EXCEPTION = 1
@@ -145,7 +147,10 @@ class ConversionContextBase:
         self._functionOutputTypeKnown = False
         self._native_args = None
 
-        self._curYieldPoint = 0
+    @property
+    def isGenerator(self):
+        """Override to true if the function should produce a Generator object."""
+        return False
 
     def alwaysRaises(self):
         return False
@@ -379,36 +384,34 @@ class ConversionContextBase:
 
         _closureCycleMemo[closureKey] = (self.closureType, dict(self.functionDefToType))
 
-    def nextYieldPoint(self):
-        self._curYieldPoint += 1
-        return self._curYieldPoint - 1
-
     def convertToNativeFunction(self):
         self.tempLetVarIx = 0
         self._tempStackVarIx = 0
         self._tempIterVarIx = 0
-        self._curYieldPoint = 0
 
         variableStates = FunctionStackState()
 
         self.buildClosureTypes()
 
         initializer_expr = self.initializeVariableStates(self._argnames, variableStates)
-
         body_native_expr, controlFlowReturns = self.convert_function_body(variableStates)
-
-        # destroy our variables if they are in scope
-        destructors = self.generateDestructors(variableStates)
-
         assert not controlFlowReturns
 
-        body_native_expr = initializer_expr >> body_native_expr
+        if self.isGenerator:
+            # discard the native expression and generate code to produce the closure
+            # object instead
+            body_native_expr = self.convert_build_generator()
+        else:
+            # destroy our variables if they are in scope
+            destructors = self.generateDestructors(variableStates)
 
-        if destructors:
-            body_native_expr = native_ast.Expression.Finally(
-                teardowns=destructors,
-                expr=body_native_expr
-            )
+            body_native_expr = initializer_expr >> body_native_expr
+
+            if destructors:
+                body_native_expr = native_ast.Expression.Finally(
+                    teardowns=destructors,
+                    expr=body_native_expr
+                )
 
         return_type = self._varname_to_type.get(FunctionOutput, None)
 
@@ -443,6 +446,224 @@ class ConversionContextBase:
                 ),
                 return_type
             )
+
+    def createGeneratorFun(self):
+        """Modify our function code to be the '__next__' of a class defining the generator.
+
+        Basically, 'yield' gets turned to 'return', variable accesses become 'self.', and
+        we introduce some extra code to route ourselves to the correct place in the code
+        based on the last 'yield' statement.
+        """
+        def accessVar(varname):
+            return python_ast.Expr.Attribute(
+                value=python_ast.Expr.Name(id="self", ctx=python_ast.ExprContext.Load()),
+                attr=varname,
+                ctx=python_ast.ExprContext.Load()
+            )
+
+        def setVar(varname, val):
+            return python_ast.Statement.Assign(
+                targets=(
+                    python_ast.Expr.Attribute(
+                        value=python_ast.Expr.Name(id="self", ctx=python_ast.ExprContext.Load()),
+                        attr=varname,
+                        ctx=python_ast.ExprContext.Store()
+                    ),
+                ),
+                value=val,
+            )
+
+        def const(val):
+            if isinstance(val, int):
+                return python_ast.Expr.Num(n=python_ast.NumericConstant.Int(value=val))
+            if isinstance(val, str):
+                return python_ast.Expr.Str(s=val)
+            raise Exception("Don't know how to encode constant of type " + str(type(val)))
+
+        def compare(l, r, opcode):
+            return python_ast.Expr.Compare(
+                left=l,
+                ops=(getattr(python_ast.ComparisonOp, opcode)(),),
+                comparators=(r,)
+            )
+
+        def branch(cond, l, r):
+            return python_ast.Statement.If(test=cond, body=l, orelse=r)
+
+        def genPrint(*exprs):
+            return python_ast.Statement.Expr(
+                value=python_ast.Expr.Call(
+                    func=python_ast.Expr.Name(id='print'),
+                    args=exprs
+                )
+            )
+
+        yieldsSeen = [0]
+
+        def changeStatement(s):
+            yieldsInside = countYieldStatements(s)
+            yieldUpperBound = yieldsSeen[0] + yieldsInside
+
+            yield branch(
+                # if the target slot is lessthan or equal to the number of yields we'll have
+                # _after_ we exit this code, then we need to go in
+                compare(accessVar("..slot"), const(yieldUpperBound), "Lt"),
+                list(changeStatementInner(s)),
+                []
+            )
+
+        def changeStatementInner(s):
+            if s.matches.Expr:
+                # yield genPrint(const("At line " + str(s.line_number) + " with "), accessVar("..slot"))
+
+                if s.value.matches.Yield:
+                    yield branch(
+                        compare(accessVar("..slot"), const(yieldsSeen[0]), "Eq"),
+                        [setVar("..slot", const(-1))],
+                        [
+                            setVar("..slot", const(yieldsSeen[0])),
+                            python_ast.Statement.Return(
+                                value=s.value.value
+                            )
+                        ]
+                    )
+                    yieldsSeen[0] += 1
+                else:
+                    yield s
+
+                return
+
+            if s.matches.FunctionDef:
+                raise Exception("Not implemented")
+            if s.matches.ClassDef:
+                raise Exception("Not implemented")
+            if s.matches.Return:
+                raise Exception("Not implemented")
+            if s.matches.Delete:
+                raise Exception("Not implemented")
+            if s.matches.Assign:
+                raise Exception("Not implemented")
+            if s.matches.AugAssign:
+                raise Exception("Not implemented")
+            if s.matches.Print:
+                raise Exception("Not implemented")
+            if s.matches.For:
+                raise Exception("Not implemented")
+            if s.matches.While:
+                raise Exception("Not implemented")
+            if s.matches.If:
+                raise Exception("Not implemented")
+            if s.matches.With:
+                raise Exception("Not implemented")
+            if s.matches.Raise:
+                raise Exception("Not implemented")
+            if s.matches.Try:
+                raise Exception("Not implemented")
+            if s.matches.Assert:
+                raise Exception("Not implemented")
+            if s.matches.Import:
+                raise Exception("Not implemented")
+            if s.matches.ImportFrom:
+                raise Exception("Not implemented")
+            if s.matches.Global:
+                raise Exception("Not implemented")
+            if s.matches.Pass:
+                raise Exception("Not implemented")
+            if s.matches.Break:
+                raise Exception("Not implemented")
+            if s.matches.Continue:
+                raise Exception("Not implemented")
+            if s.matches.AsyncFunctionDef:
+                raise Exception("Not implemented")
+            if s.matches.AnnAssign:
+                raise Exception("Not implemented")
+            if s.matches.AsyncWith:
+                raise Exception("Not implemented")
+            if s.matches.AsyncFor:
+                raise Exception("Not implemented")
+            if s.matches.NonLocal:
+                raise Exception("Not implemented")
+
+            raise Exception("Unknown statement: " + str(type(s)))
+
+        return python_ast.Statement.FunctionDef(
+            name="__next__",
+            args=python_ast.Arguments.Item(
+                args=[python_ast.Arg.Item(arg="self", annotation=None)],
+                vararg=None,
+                kwarg=None
+            ),
+            body=[subst for s in self._statements for subst in changeStatement(s)],
+            returns=None,
+            filename=""
+        )
+
+    def convert_build_generator(self):
+        """Generate code that returns a 'generator' object."""
+        generatorMembers = [("..slot", int, None)]
+
+        for k, v in self._varname_to_type.items():
+            if isinstance(k, str):
+                generatorMembers.append(("." + k, v.typeRepresentation, None))
+
+        generatorFun = evaluateFunctionDefWithLocalsInCells(
+            self.createGeneratorFun(),
+            {},
+            {}
+        )
+
+        memberFunctions = {
+            '__next__':
+            makeFunctionType(
+                '__next__',
+                generatorFun,
+                classname=self.name + ".generator",
+                assumeClosuresGlobal=True
+            )
+        }
+
+        generatorType = typeWrapper(
+            _types.Class(
+                self.name + ".generator",
+                (),
+                True,
+                tuple(generatorMembers),
+                tuple(memberFunctions.items()),
+                (),
+                (),
+                ()
+            )
+        )
+
+        self._varname_to_type[FunctionOutput] = generatorType
+
+        assert generatorType.is_pass_by_ref
+
+        variableStates = FunctionStackState()
+        context = ExpressionConversionContext(self, variableStates)
+
+        args = {}
+
+        for argByName in self._argnames:
+            args["." + argByName] = self.externalScopeVarExpr(context, argByName)
+
+        args["..slot"] = context.constant(-1)
+
+        output = generatorType.convert_type_call(context, None, [], args)
+
+        assert output is not None
+
+        returnSlot = TypedExpression(
+            context,
+            native_ast.Expression.Variable(
+                name=".return",
+            ),
+            generatorType,
+            isReference=True
+        )
+
+        returnSlot.convert_copy_initialize(output)
+        return context.finalize(native_ast.Expression.Return())
 
     def _constructInitialVarnameToType(self):
         input_types = self._input_types
@@ -878,7 +1099,7 @@ class FunctionConversionContext(ConversionContextBase):
         self.variablesReadByClosures = computeVariablesReadByClosures(statements)
 
         # if this is not zero, then we are a generator
-        self.isGenerator = countYieldStatements(statements) > 0
+        self._bodyHasYieldStatements = countYieldStatements(statements) > 0
 
         # the set of variables that have exactly one definition. If these are 'deffed'
         # functions, we don't have to worry about them changing type and so they can be
@@ -921,6 +1142,10 @@ class FunctionConversionContext(ConversionContextBase):
 
         self._constructInitialVarnameToType()
 
+    @property
+    def isGenerator(self):
+        return self._bodyHasYieldStatements > 0
+
     def extractStatements(self, pyast):
         """Given the AST we're converting, extract the statemets we're actually going to convert.
 
@@ -946,8 +1171,12 @@ class FunctionConversionContext(ConversionContextBase):
 
         We return a native expression handling the result. Flow must return.
         """
-        # we expect that we would create a 'ListComprehension' class
-        raise Exception("Naked generators are not implemented yet")
+
+        # in the base class, we just drop this on the floor - we still generate
+        # code for the function, but just to figure out what 'FunctionYield' will
+        # be. Then at the end of function generation we discard the actual code and
+        # produce the actual generator object
+        pass
 
     def convert_function_body(self, variableStates: FunctionStackState):
         return self.convert_statement_list_ast(self._statements, variableStates, toplevel=True)
@@ -1240,9 +1469,6 @@ class FunctionConversionContext(ConversionContextBase):
                 return subcontext.finalize(None, exceptionsTakeFrom=ast), True
 
         if ast.matches.Return:
-            if self.isGenerator:
-                raise Exception("Return in compiled generators not supported yet")
-
             subcontext = ExpressionConversionContext(self, variableStates)
 
             if ast.value is None:
@@ -1252,6 +1478,10 @@ class FunctionConversionContext(ConversionContextBase):
 
             if e is None:
                 return subcontext.finalize(None, exceptionsTakeFrom=ast), False
+
+            if self.isGenerator:
+                subcontext.pushException(StopIteration, e)
+                return subcontext.finalize(None), False
 
             if not self._functionOutputTypeKnown:
                 self.upsizeVariableType(FunctionOutput, e.expr_type)
@@ -2262,6 +2492,9 @@ class FunctionConversionContext(ConversionContextBase):
 
         controlFlowReturns must be False.
         """
+        if self.isGenerator:
+            return native_ast.Expression.Return(arg=None, blockName=None), False
+
         if not self._functionOutputTypeKnown:
             self.upsizeVariableType(FunctionOutput, NoneWrapper())
 
@@ -2279,6 +2512,10 @@ class ListComprehensionConversionContext(FunctionConversionContext):
     We generate an accumulator at the start of the function, replace all yields
     with an '.append' operation, and then at the end append the list.
     """
+    @property
+    def isGenerator(self):
+        return False
+
     def listCompAccumulatorType(self):
         if FunctionYield in self._varname_to_type:
             return typeWrapper(ListOf(self._varname_to_type[FunctionYield].typeRepresentation))

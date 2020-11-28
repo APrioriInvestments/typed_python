@@ -183,3 +183,14 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         sumListComp(1000000)
         self.executeInLoop(lambda: sumListComp(1000000), duration=.1, threshold=20.0)
         self.executeInLoop(lambda: sumListComp(1000000), duration=.25, threshold=1.0)
+
+    def test_call_generator(self):
+        @Entrypoint
+        def generateInts(ct):
+            yield 1
+            yield 2
+
+        generator = generateInts(100)
+
+        assert generator.__next__() == 1
+        assert generator.__next__() == 2
