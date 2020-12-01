@@ -60,10 +60,10 @@ install: install-dependencies install-pre-commit
 
 
 .PHONY: install-dependencies
+.ONESHELL:
 install-dependencies: $(VIRTUAL_ENV)
-	. $(VIRTUAL_ENV)/bin/activate; \
-		pip install pipenv==2018.11.26; \
-		pipenv install --dev --deploy;
+	. $(VIRTUAL_ENV)/bin/activate
+	pipenv install --dev --deploy
 
 
 .PHONY: install-pre-commit
@@ -118,8 +118,12 @@ clean:
 	echo "export COVERAGE_PROCESS_START=$(PWD)/tox.ini" >> $@
 	echo "export PYTHONPATH=$(PWD)" >> $@
 
+.ONESHELL:
 $(VIRTUAL_ENV): $(PYTHON) .env
 	$(PYTHON) -m venv $(VIRTUAL_ENV)
+	. $(VIRTUAL_ENV)/bin/activate
+	pip install pipenv==2018.11.26
+	pip install wheel
 
 $(TP_BUILD_PATH)/all.o: $(TP_SRC_PATH)/*.hpp $(TP_SRC_PATH)/*.cpp
 	$(CC) $(CPP_FLAGS) -c $(TP_SRC_PATH)/all.cpp $ -o $@

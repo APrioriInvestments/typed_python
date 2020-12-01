@@ -10,6 +10,7 @@ flake8 = "*"
 pytest = "*"
 pre-commit = "*"
 flaky = "*"
+pytest-cov = "*"
 
 [packages]
 sortedcontainers = "*"
