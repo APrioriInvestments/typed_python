@@ -206,3 +206,17 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts(1)) == [1, 2, 4]
         assert list(generateInts(-1)) == [1, 3, 4]
+
+    def test_call_generator_with_loop(self):
+        @Entrypoint
+        def generateInts(ct):
+            x = 0
+            while x < ct:
+                yield x
+                x = x + 1
+            else:
+                yield -1
+            yield -2
+
+        assert list(generateInts(10)) == list(range(10)) + [-1, -2]
+        assert list(generateInts(0)) == list(range(0)) + [-1, -2]

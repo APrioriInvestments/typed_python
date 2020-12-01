@@ -38,12 +38,12 @@ from typed_python.compiler.python_ast_analysis import (
 )
 
 
-def accessVar(varname):
+def accessVar(varname, context=None):
     """Generate a 'self.(varname)' python expression"""
     return python_ast.Expr.Attribute(
         value=python_ast.Expr.Name(id="self", ctx=python_ast.ExprContext.Load()),
         attr=varname,
-        ctx=python_ast.ExprContext.Load()
+        ctx=python_ast.ExprContext.Load() if context is None else context
     )
 
 
@@ -94,9 +94,11 @@ def boolOp(opcode, *values):
     )
 
 
-def branch(cond, l, r):
+def branch(cond, l, r, isWhile=False):
     """Generate an If python statement"""
-    return python_ast.Statement.If(test=cond, body=l, orelse=r)
+    Statement = python_ast.Statement
+
+    return (Statement.If if not isWhile else Statement.While)(test=cond, body=l, orelse=r)
 
 
 def genPrint(*exprs):
@@ -127,26 +129,13 @@ class GeneratorCodegen:
     def __init__(self):
         self.yieldsSeen = 0
 
-    def changeStatement(self, s):
-        yieldsInside = countYieldStatements(s)
-
-        yieldUpperBound = self.yieldsSeen + yieldsInside
-
-        yield branch(
-            # if the target slot is lessthan or equal to the number of yields we'll have
-            # _after_ we exit this code, then we need to go in
-            compare(accessVar("..slot"), const(yieldUpperBound), "Lt"),
-            list(self.changeStatementInner(s)),
-            []
-        )
-
     def changeExpr(self, expr: python_ast.Expr):
         """Change any expressions we're accessing to 'self' expressions."""
         return self._changeExpr(expr)
 
     def _changeExpr(self, expr):
         if expr.matches.Name:
-            return accessVar("." + expr.id)
+            return accessVar("." + expr.id, expr.ctx)
 
         args = {}
 
@@ -162,6 +151,22 @@ class GeneratorCodegen:
                 args[name] = getattr(expr, name)
 
         return type(expr)(**args)
+
+    def changeStatement(self, s):
+        yieldsInside = countYieldStatements(s)
+
+        yieldUpperBound = self.yieldsSeen + yieldsInside
+
+        yield branch(
+            # if the target slot is lessthan or equal to the number of yields we'll have
+            # _after_ we exit this code, then we need to go in
+            compare(accessVar("..slot"), const(yieldUpperBound), "Lt"),
+            # if there are no internal yields, then we don't need to do anything
+            # but this external check, which guarantees we skip over the statement
+            # if we're searching ahead for the next expression
+            list(self.changeStatementInner(s)),
+            []
+        )
 
     def changeStatementInner(self, s):
         if s.matches.Expr:
@@ -182,33 +187,35 @@ class GeneratorCodegen:
 
             return
 
-        if s.matches.If:
+        if s.matches.Assign:
+            yield python_ast.Statement.Assign(
+                targets=(self.changeExpr(x) for x in s.targets),
+                value=self.changeExpr(s.value)
+            )
+
+            return
+
+        if s.matches.If or s.matches.While:
             # if the slot is -1, we're just running. But if the
             # slot is between [self.yieldsSeen, self.yieldsSeen + yieldsLeft) we want
             # to go directly to the 'left' branch without executing the condition,
             # and if greater, then we go to the right without executing the condition
             yieldsSeen = self.yieldsSeen
             yieldsLeft = countYieldStatements(s.body)
-            yieldsRight = countYieldStatements(s.orelse)
 
             yield branch(
-                checkSlotBetween(-1, yieldsSeen + yieldsLeft + yieldsRight - 1),
-                [
-                    branch(
-                        boolOp(
-                            "Or",
-                            checkSlotBetween(yieldsSeen, yieldsSeen + yieldsLeft - 1),
-                            boolOp(
-                                "And",
-                                checkSlotBetween(-1, -1),
-                                self.changeExpr(s.test)
-                            )
-                        ),
-                        self.changeStatementSequence(s.body),
-                        self.changeStatementSequence(s.orelse),
+                boolOp(
+                    "Or",
+                    checkSlotBetween(yieldsSeen, yieldsSeen + yieldsLeft - 1),
+                    boolOp(
+                        "And",
+                        checkSlotBetween(-1, -1),
+                        self.changeExpr(s.test)
                     )
-                ],
-                []
+                ),
+                self.changeStatementSequence(s.body),
+                self.changeStatementSequence(s.orelse),
+                isWhile=s.matches.While
             )
 
             return
@@ -220,8 +227,6 @@ class GeneratorCodegen:
         if s.matches.Return:
             raise Exception("Not implemented")
         if s.matches.Delete:
-            raise Exception("Not implemented")
-        if s.matches.Assign:
             raise Exception("Not implemented")
         if s.matches.AugAssign:
             raise Exception("Not implemented")
