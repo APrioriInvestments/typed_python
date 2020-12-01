@@ -220,3 +220,29 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts(10)) == list(range(10)) + [-1, -2]
         assert list(generateInts(0)) == list(range(0)) + [-1, -2]
+
+    def test_call_generator_with_closure_var(self):
+        xInClosure = 100
+
+        @Entrypoint
+        def generateInts(ct):
+            yield 1
+            yield xInClosure
+            yield ct
+            yield 2
+
+        assert list(generateInts(10)) == [1, 100, 10, 2]
+
+    def test_call_generator_with_closure_var_cant_assign(self):
+        xInClosure = 100
+
+        @Entrypoint
+        def generateInts(ct):
+            yield 1
+            yield xInClosure
+            xInClosure = xInClosure + 1  # noqa
+            yield ct
+            yield 2
+
+        with self.assertRaises(UnboundLocalError):
+            assert list(generateInts(10)) == [1, 100, 10, 2]

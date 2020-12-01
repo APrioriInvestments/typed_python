@@ -454,7 +454,9 @@ class ConversionContextBase:
         we introduce some extra code to route ourselves to the correct place in the code
         based on the last 'yield' statement.
         """
-        return GeneratorCodegen().convertStatementsToFunctionDef(self._statements)
+        return GeneratorCodegen(
+            set(self._varname_to_type)
+        ).convertStatementsToFunctionDef(self._statements)
 
     def convert_build_generator(self):
         """Generate code that returns a 'generator' object."""

@@ -126,7 +126,8 @@ def checkSlotBetween(low, high):
 
 
 class GeneratorCodegen:
-    def __init__(self):
+    def __init__(self, localVars):
+        self.localVars = localVars
         self.yieldsSeen = 0
 
     def changeExpr(self, expr: python_ast.Expr):
@@ -135,7 +136,9 @@ class GeneratorCodegen:
 
     def _changeExpr(self, expr):
         if expr.matches.Name:
-            return accessVar("." + expr.id, expr.ctx)
+            if expr.id in self.localVars:
+                return accessVar("." + expr.id, expr.ctx)
+            return expr
 
         args = {}
 
