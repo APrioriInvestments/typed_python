@@ -7,7 +7,6 @@ verify_ssl = true
 autopep8 = "*"
 beautifulsoup4 = "*"
 flake8 = "*"
-coverage = "*"
 pytest = "*"
 pre-commit = "*"
 flaky = "*"
