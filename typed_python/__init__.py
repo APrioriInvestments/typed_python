@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-__version__ = "0.1.1"
+__version__ = "0.1.2a1"
 
 # incremented every time the way we serialize a fully-typed
 # TP object changes. Consumers who only serialize fully-typed
