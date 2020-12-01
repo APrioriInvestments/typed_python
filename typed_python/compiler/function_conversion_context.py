@@ -14,7 +14,7 @@
 
 import typed_python.python_ast as python_ast
 import sys
-
+from typed_python.compiler.generator_codegen import GeneratorCodegen
 from typed_python.compiler.python_ast_analysis import (
     computeAssignedVariables,
     computeReadVariables,
@@ -454,149 +454,7 @@ class ConversionContextBase:
         we introduce some extra code to route ourselves to the correct place in the code
         based on the last 'yield' statement.
         """
-        def accessVar(varname):
-            return python_ast.Expr.Attribute(
-                value=python_ast.Expr.Name(id="self", ctx=python_ast.ExprContext.Load()),
-                attr=varname,
-                ctx=python_ast.ExprContext.Load()
-            )
-
-        def setVar(varname, val):
-            return python_ast.Statement.Assign(
-                targets=(
-                    python_ast.Expr.Attribute(
-                        value=python_ast.Expr.Name(id="self", ctx=python_ast.ExprContext.Load()),
-                        attr=varname,
-                        ctx=python_ast.ExprContext.Store()
-                    ),
-                ),
-                value=val,
-            )
-
-        def const(val):
-            if isinstance(val, int):
-                return python_ast.Expr.Num(n=python_ast.NumericConstant.Int(value=val))
-            if isinstance(val, str):
-                return python_ast.Expr.Str(s=val)
-            raise Exception("Don't know how to encode constant of type " + str(type(val)))
-
-        def compare(l, r, opcode):
-            return python_ast.Expr.Compare(
-                left=l,
-                ops=(getattr(python_ast.ComparisonOp, opcode)(),),
-                comparators=(r,)
-            )
-
-        def branch(cond, l, r):
-            return python_ast.Statement.If(test=cond, body=l, orelse=r)
-
-        def genPrint(*exprs):
-            return python_ast.Statement.Expr(
-                value=python_ast.Expr.Call(
-                    func=python_ast.Expr.Name(id='print'),
-                    args=exprs
-                )
-            )
-
-        yieldsSeen = [0]
-
-        def changeStatement(s):
-            yieldsInside = countYieldStatements(s)
-            yieldUpperBound = yieldsSeen[0] + yieldsInside
-
-            yield branch(
-                # if the target slot is lessthan or equal to the number of yields we'll have
-                # _after_ we exit this code, then we need to go in
-                compare(accessVar("..slot"), const(yieldUpperBound), "Lt"),
-                list(changeStatementInner(s)),
-                []
-            )
-
-        def changeStatementInner(s):
-            if s.matches.Expr:
-                # yield genPrint(const("At line " + str(s.line_number) + " with "), accessVar("..slot"))
-
-                if s.value.matches.Yield:
-                    yield branch(
-                        compare(accessVar("..slot"), const(yieldsSeen[0]), "Eq"),
-                        [setVar("..slot", const(-1))],
-                        [
-                            setVar("..slot", const(yieldsSeen[0])),
-                            python_ast.Statement.Return(
-                                value=s.value.value
-                            )
-                        ]
-                    )
-                    yieldsSeen[0] += 1
-                else:
-                    yield s
-
-                return
-
-            if s.matches.FunctionDef:
-                raise Exception("Not implemented")
-            if s.matches.ClassDef:
-                raise Exception("Not implemented")
-            if s.matches.Return:
-                raise Exception("Not implemented")
-            if s.matches.Delete:
-                raise Exception("Not implemented")
-            if s.matches.Assign:
-                raise Exception("Not implemented")
-            if s.matches.AugAssign:
-                raise Exception("Not implemented")
-            if s.matches.Print:
-                raise Exception("Not implemented")
-            if s.matches.For:
-                raise Exception("Not implemented")
-            if s.matches.While:
-                raise Exception("Not implemented")
-            if s.matches.If:
-                raise Exception("Not implemented")
-            if s.matches.With:
-                raise Exception("Not implemented")
-            if s.matches.Raise:
-                raise Exception("Not implemented")
-            if s.matches.Try:
-                raise Exception("Not implemented")
-            if s.matches.Assert:
-                raise Exception("Not implemented")
-            if s.matches.Import:
-                raise Exception("Not implemented")
-            if s.matches.ImportFrom:
-                raise Exception("Not implemented")
-            if s.matches.Global:
-                raise Exception("Not implemented")
-            if s.matches.Pass:
-                raise Exception("Not implemented")
-            if s.matches.Break:
-                raise Exception("Not implemented")
-            if s.matches.Continue:
-                raise Exception("Not implemented")
-            if s.matches.AsyncFunctionDef:
-                raise Exception("Not implemented")
-            if s.matches.AnnAssign:
-                raise Exception("Not implemented")
-            if s.matches.AsyncWith:
-                raise Exception("Not implemented")
-            if s.matches.AsyncFor:
-                raise Exception("Not implemented")
-            if s.matches.NonLocal:
-                raise Exception("Not implemented")
-
-            raise Exception("Unknown statement: " + str(type(s)))
-
-        return python_ast.Statement.FunctionDef(
-            name="__next__",
-            args=python_ast.Arguments.Item(
-                args=[python_ast.Arg.Item(arg="self", annotation=None)],
-                vararg=None,
-                kwarg=None
-            ),
-            body=[subst for s in self._statements for subst in changeStatement(s)],
-            returns=None,
-            filename=""
-        )
+        return GeneratorCodegen().convertStatementsToFunctionDef(self._statements)
 
     def convert_build_generator(self):
         """Generate code that returns a 'generator' object."""
@@ -617,6 +475,13 @@ class ConversionContextBase:
             makeFunctionType(
                 '__next__',
                 generatorFun,
+                classname=self.name + ".generator",
+                assumeClosuresGlobal=True
+            ),
+            '__iter__':
+            makeFunctionType(
+                '__iter__',
+                lambda self: self,
                 classname=self.name + ".generator",
                 assumeClosuresGlobal=True
             )

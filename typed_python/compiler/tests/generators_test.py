@@ -190,7 +190,19 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
             yield 1
             yield 2
 
-        generator = generateInts(100)
+        assert list(generateInts(100)) == [1, 2]
 
-        assert generator.__next__() == 1
-        assert generator.__next__() == 2
+    def test_call_generator_with_branch(self):
+        @Entrypoint
+        def generateInts(ct):
+            yield 1
+
+            if ct > 0:
+                yield 2
+            else:
+                yield 3
+
+            yield 4
+
+        assert list(generateInts(1)) == [1, 2, 4]
+        assert list(generateInts(-1)) == [1, 3, 4]
