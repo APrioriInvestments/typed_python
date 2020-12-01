@@ -324,6 +324,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Can't convert"):
             f((1, 2, 3))
 
+    @flaky(max_runs=3, min_passes=1)
     def test_perf_of_mutually_recursive_untyped_functions(self):
         def q(x):
             return x-1
