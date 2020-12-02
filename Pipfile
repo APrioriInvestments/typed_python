@@ -20,6 +20,3 @@ numpy = "*"
 psutil = "*"
 pytz = "*"
 typed_python = {editable = true,path = "."}
-
-[requires]
-python_version = "3.6"
