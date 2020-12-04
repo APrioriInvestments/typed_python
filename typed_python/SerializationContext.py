@@ -612,7 +612,12 @@ class SerializationContext:
 
                 walkCodeObject(inst.__code__)
 
-                representation['globals'] = {k: v for k, v in inst.__globals__.items() if k in all_names}
+                # build the set of names that are actually used.
+                # clients are allowed to put references to submodules (e.g. "lxml.etree")
+                # indicating that if we use 'lxml' we also need to import 'lxml.etree'
+                representation['globals'] = {
+                    k: v for k, v in inst.__globals__.items() if k.split(".")[0] in all_names
+                }
 
             args = (
                 inst.__code__,

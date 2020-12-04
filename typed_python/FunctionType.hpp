@@ -1053,21 +1053,39 @@ public:
             std::set<PyObject*> allNames;
             extractNamesFromCode((PyCodeObject*)mFunctionCode, allNames);
 
+            std::set<std::string> allNamesString;
+
             for (auto name: allNames) {
                 if (PyUnicode_Check(name)) {
-                    // don't include globals that are covered by our closure since we can't see them
-                    // anyways.
-                    std::string nameStr(PyUnicode_AsUTF8(name));
-                    if (mClosureBindings.find(nameStr) == mClosureBindings.end()) {
-                        int res = PyDict_Contains(mFunctionGlobals, name);
-                        if (res == -1) {
-                            throw PythonExceptionSet();
-                        }
+                    std::string nameStr = PyUnicode_AsUTF8(name);
 
-                        if (res) {
-                            if (PyDict_SetItem(result, name, PyDict_GetItem(mFunctionGlobals, name))) {
-                                throw PythonExceptionSet();
-                            }
+                    if (mClosureBindings.find(nameStr) == mClosureBindings.end()) {
+                        allNamesString.insert(nameStr);
+                    }
+                }
+            }
+
+            // iterate mFunctionGlobals, keeping any where the name is in allNames
+            // note we split on '.' and take the first part so that if a module
+            // like lxml.etree is included, and we use 'lxml', we'll take the reference
+            // to etree as well. This ensures that submodules in anonymously serialized
+            // code can get pulled along.
+            PyObject *key, *value;
+            Py_ssize_t pos = 0;
+
+            while (PyDict_Next(mFunctionGlobals, &pos, &key, &value)) {
+                if (PyUnicode_Check(key)) {
+                    std::string globalName = PyUnicode_AsUTF8(key);
+                    std::string shortGlobalName = globalName;
+
+                    size_t indexOfDot = shortGlobalName.find('.');
+                    if (indexOfDot != std::string::npos) {
+                        shortGlobalName = shortGlobalName.substr(0, indexOfDot);
+                    }
+
+                    if (allNamesString.find(shortGlobalName) != allNamesString.end()) {
+                        if (PyDict_SetItem(result, key, value)) {
+                            throw PythonExceptionSet();
                         }
                     }
                 }

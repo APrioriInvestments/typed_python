@@ -402,8 +402,9 @@ class FunctionOverload:
         if self._realizedGlobals is None:
             res = {}
 
-            for name in sorted(self.extractGlobalNamesFromCode(self.functionCode)):
-                if name in self.functionGlobals:
+            globalNames = set(self.extractGlobalNamesFromCode(self.functionCode))
+            for name in self.functionGlobals:
+                if name.split(".")[0] in globalNames:
                     res[name] = self.functionGlobals[name]
 
             for varname, cell in self.funcGlobalsInCells.items():
