@@ -18,7 +18,7 @@ import gc
 import pytest
 from flaky import flaky
 
-from typed_python import Entrypoint, ListOf, TupleOf
+from typed_python import Entrypoint, ListOf, TupleOf, Class, Member, Final
 from typed_python.test_util import currentMemUsageMb
 
 
@@ -233,6 +233,79 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts(10)) == [1, 100, 10, 2]
 
+    def test_call_generator_with_arg_assign(self):
+        @Entrypoint
+        def generateInts(ct):
+            yield ct
+            ct = 2
+            yield ct
+
+        assert list(generateInts(10)) == [10, 2]
+
+    def test_call_generator_with_aug_assign(self):
+        @Entrypoint
+        def generateInts(ct):
+            yield ct
+            ct += 1
+            yield ct
+            ct += 2
+            yield ct
+            ct += 3
+            yield ct
+
+        assert list(generateInts(0)) == [0, 1, 3, 6]
+
+    def test_call_generator_with_ann_assign(self):
+        @Entrypoint
+        def generateInts(ct):
+            yield ct
+            ct: int = 1
+            yield ct
+
+        assert list(generateInts(0)) == [0, 1]
+
+    def test_call_generator_with_pass(self):
+        @Entrypoint
+        def generateInts(ct):
+            if ct > 10:
+                pass
+
+            yield ct
+
+        assert list(generateInts(100)) == [100]
+
+    def test_call_generator_with_continue(self):
+        @Entrypoint
+        def generateInts(ct):
+            x = 0
+
+            while x < ct:
+                yield x
+                x = x + 1
+
+                if x % 2 == 0:
+                    continue
+
+                yield x
+
+        assert list(generateInts(5)) == [0, 1, 1, 2, 3, 3, 4, 5]
+
+    def test_call_generator_with_break(self):
+        @Entrypoint
+        def generateInts(ct):
+            x = 0
+
+            while x < ct:
+                yield x
+                x = x + 1
+
+                if x % 2 == 0:
+                    break
+
+                yield x
+
+        assert list(generateInts(5)) == [0, 1, 1]
+
     def test_call_generator_with_closure_var_cant_assign(self):
         xInClosure = 100
 
@@ -246,3 +319,222 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         with self.assertRaises(UnboundLocalError):
             assert list(generateInts(10)) == [1, 100, 10, 2]
+
+    def test_call_generator_with_assert(self):
+        @Entrypoint
+        def generateInts(ct):
+            y = ct
+
+            assert y > 10
+            yield y
+            y -= 10
+            yield y
+
+        assert list(generateInts(15)) == [15, 5]
+
+    def test_call_generator_with_try_finally(self):
+        @Entrypoint
+        def generateInts():
+            try:
+                yield 1
+
+                yield 2
+            finally:
+                yield 3
+
+                yield 4
+
+            yield 5
+
+        assert list(generateInts()) == [1, 2, 3, 4, 5]
+
+    def test_call_generator_with_try(self):
+        @Entrypoint
+        def generateInts():
+            hasCaught = False
+
+            try:
+                yield 1
+
+                yield 2
+
+                raise Exception("catch me")
+
+                yield 300
+            except Exception:
+                assert not hasCaught
+                hasCaught = True
+                yield 3
+                assert hasCaught
+                yield 4
+            finally:
+                yield 5
+
+            yield 6
+
+        assert list(generateInts()) == [1, 2, 3, 4, 5, 6]
+
+    def test_generator_produces_stop_iteration_when_done(self):
+        @Entrypoint
+        def generateInts():
+            yield 1
+
+            yield 2
+
+        g = generateInts()
+
+        assert g.__next__() == 1
+        assert g.__next__() == 2
+
+        with pytest.raises(StopIteration):
+            g.__next__()
+
+        with pytest.raises(StopIteration):
+            g.__next__()
+
+        with pytest.raises(StopIteration):
+            g.__next__()
+
+    def test_raise_in_generator_stops_iteration(self):
+        @Entrypoint
+        def generateInts():
+            yield 1
+
+            yield 2
+
+            raise Exception("catch me")
+
+        g = generateInts()
+
+        assert g.__next__() == 1
+        assert g.__next__() == 2
+
+        with pytest.raises(Exception, match="catch me"):
+            g.__next__()
+
+        with pytest.raises(StopIteration):
+            g.__next__()
+
+        with pytest.raises(StopIteration):
+            g.__next__()
+
+    @pytest.mark.skip(reason='not implemented yet')
+    def test_reraise_in_generator_after_yield(self):
+        @Entrypoint
+        def generateInts():
+            try:
+                yield 1
+
+                yield 2
+
+                raise Exception("catch me")
+            except Exception:
+                yield 3
+
+                raise
+
+        g = generateInts()
+
+        assert g.__next__() == 1
+        assert g.__next__() == 2
+        assert g.__next__() == 3
+
+        with pytest.raises(Exception, match="catch me"):
+            g.__next__()
+
+    def test_return_in_generator(self):
+        @Entrypoint
+        def generateInts():
+            yield 1
+
+            return 20
+
+        g = generateInts()
+
+        assert g.__next__() == 1
+
+        try:
+            g.__next__()
+        except StopIteration as i:
+            assert i.args == (20,)
+
+        try:
+            g.__next__()
+        except StopIteration as i:
+            assert i.args == ()
+
+    def test_argless_return_in_generator(self):
+        @Entrypoint
+        def generateInts():
+            yield 1
+
+            return
+
+        g = generateInts()
+
+        assert g.__next__() == 1
+
+        try:
+            g.__next__()
+        except StopIteration as i:
+            assert i.args == ()
+
+        try:
+            g.__next__()
+        except StopIteration as i:
+            assert i.args == ()
+
+    def test_with_in_generator(self):
+        class ContextManager(Class, Final):
+            entered = Member(int)
+
+            def __init__(self):
+                self.entered = 0
+
+            def __enter__(self):
+                self.entered += 1
+
+            def __exit__(self, a, b, c):
+                self.entered -= 1
+
+        cm = ContextManager()
+
+        @Entrypoint
+        def generateInts(x):
+            yield 1
+
+            with x:
+                yield 2
+
+                with x:
+                    yield 3
+
+                    yield 4
+
+                yield 5
+
+            yield 6
+
+        g = generateInts(cm)
+
+        print(type(g).MemberNames)
+
+        assert cm.entered == 0
+
+        assert g.__next__() == 1
+        assert cm.entered == 0
+
+        assert g.__next__() == 2
+        assert cm.entered == 1
+
+        assert g.__next__() == 3
+        assert cm.entered == 2
+
+        assert g.__next__() == 4
+        assert cm.entered == 2
+
+        assert g.__next__() == 5
+        assert cm.entered == 1
+
+        assert g.__next__() == 6
+        assert cm.entered == 0

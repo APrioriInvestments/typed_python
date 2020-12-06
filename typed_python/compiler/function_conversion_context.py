@@ -13,8 +13,9 @@
 #   limitations under the License.
 
 import typed_python.python_ast as python_ast
-import sys
+import importlib
 from typed_python.compiler.generator_codegen import GeneratorCodegen
+from typed_python.compiler.withblock_codegen import expandWithBlockIntoTryCatch
 from typed_python.compiler.python_ast_analysis import (
     computeAssignedVariables,
     computeReadVariables,
@@ -512,7 +513,17 @@ class ConversionContextBase:
         args = {}
 
         for argByName in self._argnames:
-            args["." + argByName] = self.externalScopeVarExpr(context, argByName)
+            varType = self._varname_to_type[argByName]
+
+            initializer = TypedExpression(
+                context,
+                native_ast.Expression.Variable(name=argByName),
+                varType,
+                varType.is_pass_by_ref
+            )
+
+            if initializer is not None:
+                args["." + argByName] = initializer
 
         args["..slot"] = context.constant(-1)
 
@@ -1306,6 +1317,22 @@ class FunctionConversionContext(ConversionContextBase):
 
             return subcontext.finalize(None, exceptionsTakeFrom=ast), succeeds
 
+        if ast.matches.AnnAssign:
+            subcontext = ExpressionConversionContext(self, variableStates)
+
+            if ast.value is None:
+                # this is a no-op
+                return subcontext.finalize(None), True
+
+            val_to_store = subcontext.convert_expression_ast(ast.value)
+
+            if val_to_store is None:
+                return subcontext.finalize(None, exceptionsTakeFrom=ast), False
+
+            succeeds = self.convert_assignment(ast.target, None, val_to_store)
+
+            return subcontext.finalize(None, exceptionsTakeFrom=ast), succeeds
+
         if ast.matches.Assign:
             if (
                 len(ast.targets) == 1
@@ -1771,239 +1798,7 @@ class FunctionConversionContext(ConversionContextBase):
             return exprs, True
 
         if ast.matches.With:
-            if len(ast.items) > 1:
-                # we can break 'with a, b:' down to
-                # with a: with b:
-                # and proceed recursively
-                newBlock = python_ast.Statement.With(
-                    items=[ast.items[0]],
-                    body=[
-                        python_ast.Statement.With(
-                            items=ast.items[1:],
-                            body=ast.body,
-                            line_number=ast.line_number,
-                            col_offset=ast.col_offset,
-                            filename=ast.filename,
-                        )
-                    ],
-                    line_number=ast.line_number,
-                    col_offset=ast.col_offset,
-                    filename=ast.filename,
-                )
-
-                return self.convert_statement_list_ast(
-                    [newBlock],
-                    variableStates,
-                    return_to=return_to,
-                    try_flow=try_flow,
-                    in_loop=in_loop
-                )
-
-            # directly expand the context manager code in terms of python primitives
-            hasNoException = f".with_hit_except{ast.line_number}"
-            withExceptionVar = f".with_exception{ast.line_number}"
-            managerVar = f".with_cm_var{ast.line_number}"
-
-            # with EXPRESSION as TARGET:
-            #     SUITE
-            #
-            # is semantically equivalent to:
-            #
-            # manager = (EXPRESSION)
-            # value = enter(manager)
-            # hit_except = False
-            #
-            # try:
-            #     TARGET = value
-            #     SUITE
-            # except:
-            #     hit_except = True
-            #     if not exit(manager, *sys.exc_info()):
-            #         raise
-            # finally:
-            #     if not hit_except:
-            #         exit(manager, None, None, None)
-            #             assert len(ast.items) == 1
-            def makeStatement(ast, kind, **kwargs):
-                """Helper function to make a Statement of type 'kind'
-
-                Takes line/col from 'ast' and args from 'kwargs'
-                """
-                return getattr(python_ast.Statement, kind)(
-                    line_number=ast.line_number,
-                    col_offset=ast.col_offset,
-                    filename=ast.filename,
-                    **kwargs
-                )
-
-            def makeExpr(ast, kind, **kwargs):
-                """Helper function to make an Expression of type 'kind'
-
-                Takes line/col from 'ast' and args from 'kwargs'
-                """
-                return getattr(python_ast.Expr, kind)(
-                    line_number=ast.line_number,
-                    col_offset=ast.col_offset,
-                    filename=ast.filename,
-                    **kwargs
-                )
-
-            def makeStoreName(ast, name):
-                """Make a 'Store' context name lookup Expression."""
-                return makeExpr(ast, 'Name', id=name, ctx=python_ast.ExprContext.Store())
-
-            def makeLoadName(ast, name):
-                """Make a 'Load' context name lookup Expression."""
-                return makeExpr(ast, 'Name', id=name, ctx=python_ast.ExprContext.Load())
-
-            def makeCallAttribute(x, attributeName, *args):
-                """Make getattr(x, attributeName)(*args) expression"""
-                return makeExpr(
-                    x,
-                    "Call",
-                    func=makeExpr(x, 'Attribute', value=x, attr=attributeName, ctx=python_ast.ExprContext.Load()),
-                    args=args
-                )
-
-            def makeGetItem(x, index):
-                """Make an x[index] expression"""
-                return makeExpr(
-                    x,
-                    "Subscript",
-                    value=x,
-                    slice=python_ast.Slice.Index(
-                        value=makeExpr(ast, 'Num', n=python_ast.NumericConstant.Int(value=index))
-                    ),
-                    ctx=python_ast.ExprContext.Load()
-                )
-
-            def makeNone():
-                """Make an expression for 'None'"""
-                return makeExpr(ast, 'Num', n=python_ast.NumericConstant.None_())
-
-            statements = [
-                # hasNoException = True
-                makeStatement(
-                    ast,
-                    'Assign',
-                    targets=[
-                        makeStoreName(ast, hasNoException)
-                    ],
-                    value=makeExpr(ast, 'Num', n=python_ast.NumericConstant.Boolean(value=True))
-                ),
-                # managerVar = CONTEXT_MANAGER_EXPRESSION
-                makeStatement(
-                    ast,
-                    'Assign',
-                    targets=[
-                        makeStoreName(ast, managerVar)
-                    ],
-                    value=ast.items[0].context_expr
-                ),
-            ]
-
-            if ast.items[0].optional_vars is not None:
-                statements.append(
-                    # CM_VAR_NAME = managerVar.__enter__()
-                    makeStatement(
-                        ast,
-                        'Assign',
-                        targets=[
-                            ast.items[0].optional_vars
-                        ],
-                        value=makeCallAttribute(
-                            makeLoadName(ast.items[0].optional_vars, managerVar),
-                            "__enter__"
-                        )
-                    )
-                )
-            else:
-                statements.append(
-                    makeStatement(
-                        ast,
-                        'Expr',
-                        value=makeCallAttribute(
-                            makeLoadName(ast, managerVar),
-                            "__enter__"
-                        )
-                    )
-                )
-
-            statements.append(
-                makeStatement(
-                    ast,
-                    'Try',
-                    body=list(ast.body),
-                    handlers=[
-                        python_ast.ExceptionHandler.Item(
-                            type=None,
-                            name=None,
-                            body=[
-                                # hasNoException = False
-                                makeStatement(
-                                    ast,
-                                    'Assign',
-                                    targets=[
-                                        makeStoreName(ast, hasNoException)
-                                    ],
-                                    value=makeExpr(ast, 'Num', n=python_ast.NumericConstant.Boolean(value=False))
-                                ),
-                                # withExceptionVar = sys.exc_info()
-                                makeStatement(
-                                    ast,
-                                    'Assign',
-                                    targets=[
-                                        makeStoreName(ast, withExceptionVar)
-                                    ],
-                                    value=makeCallAttribute(
-                                        makeExpr(ast, 'Constant', value=sys),
-                                        "exc_info"
-                                    )
-                                ),
-                                # if not manager.__exit__(withExceptionVar[0], ...):
-                                #    raise
-                                makeStatement(
-                                    ast,
-                                    'If',
-                                    test=makeCallAttribute(
-                                        makeLoadName(ast, managerVar),
-                                        "__exit__",
-                                        makeGetItem(makeLoadName(ast, withExceptionVar), 0),
-                                        makeGetItem(makeLoadName(ast, withExceptionVar), 1),
-                                        makeGetItem(makeLoadName(ast, withExceptionVar), 2),
-                                    ),
-                                    orelse=[
-                                        makeStatement(ast, 'Raise', exc=None, cause=None)
-                                    ]
-                                )
-                            ],
-                        )
-                    ],
-                    finalbody=[
-                        # if hasNoException:
-                        makeStatement(
-                            ast,
-                            'If',
-                            test=makeLoadName(ast, hasNoException),
-                            body=[
-                                # manager.__exit__(None, None, None)
-                                makeStatement(
-                                    ast,
-                                    'Expr',
-                                    value=makeCallAttribute(
-                                        makeLoadName(ast, managerVar),
-                                        "__exit__",
-                                        makeNone(),
-                                        makeNone(),
-                                        makeNone(),
-                                    )
-                                )
-                            ],
-                            orelse=[]
-                        )
-                    ]
-                )
-            )
+            statements = expandWithBlockIntoTryCatch(ast)
 
             return self.convert_statement_list_ast(
                 statements,
@@ -2012,6 +1807,26 @@ class FunctionConversionContext(ConversionContextBase):
                 try_flow=try_flow,
                 in_loop=in_loop
             )
+
+        if ast.matches.Import:
+            # TODO: correctly model the side-effectfulness of imports
+            context = ExpressionConversionContext(self, variableStates)
+
+            for alias in ast.names:
+                if alias.asname is None and len(alias.name.split(".")) > 1:
+                    module = importlib.import_module(alias.name.split("."))[0]
+                    target = alias.name.split(".")
+                else:
+                    module = importlib.import_module(alias.name)
+                    target = alias.asname
+
+                self.assignToLocalVariable(
+                    target,
+                    context.constant(module),
+                    variableStates
+                )
+
+            return context.finalize(None, exceptionsTakeFrom=ast), True
 
         if ast.matches.Break:
             # for the moment, we have to pretend as if the 'break' did return control flow,
@@ -2083,6 +1898,14 @@ class FunctionConversionContext(ConversionContextBase):
             self.assignToLocalVariable(ast.name, res, variableStates)
 
             return context.finalize(None, exceptionsTakeFrom=ast), True
+
+        # if ast.matches.ImportFrom:
+        # if ast.matches.ClassDef:
+        # if ast.matches.Global:
+        # if ast.matches.AsyncFunctionDef:
+        # if ast.matches.AsyncWith:
+        # if ast.matches.AsyncFor:
+        # if ast.matches.NonLocal:
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast.Name)
 

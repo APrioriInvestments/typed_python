@@ -340,7 +340,7 @@ class ExpressionConversionContext:
                 )
             )
 
-        if isinstance(x, type):
+        if isinstance(x, (type, types.ModuleType)):
             return pythonObjectRepresentation(self, x)
 
         if allowArbitrary:

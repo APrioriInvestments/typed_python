@@ -231,7 +231,6 @@ Statement = Statement.define(Alternative(
         "annotation": Expr,
         'simple': int,
         "value": OneOf(Expr, None),
-        "op": BinaryOp,
         'line_number': int,
         'col_offset': int,
         'filename': str
@@ -808,6 +807,11 @@ def convertAlgebraicToPyAst_(pyAst):
         if pyAst.n.matches.Unknown:
             raise Exception(f"Unknown constant: {pyAst.filename}:{pyAst.line_number}")
         return ast.Num(n=pyAst.n.value)
+
+    if type(pyAst) is Expr.Constant:
+        return reverseConverters[type(pyAst)](
+            **{k: getattr(pyAst, k) for k in type(pyAst).ElementType.ElementNames if k not in ['line_number', 'col_offset']}
+        )
 
     if type(pyAst) in reverseConverters:
         return reverseConverters[type(pyAst)](**convertAlgebraicArgs(pyAst, *type(pyAst).ElementType.ElementNames))

@@ -3319,3 +3319,11 @@ class TestCompilationStructures(unittest.TestCase):
         # i get about 10x, 5 on the github test boxes
         print("float speedup is", speedup)
         assert speedup > 2.5
+
+    def test_compile_annotated_assignment(self):
+        def f():
+            x: int = 20
+            x: int
+            return x
+
+        assert f() == Entrypoint(f)()

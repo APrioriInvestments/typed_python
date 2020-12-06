@@ -31,6 +31,18 @@ class ModuleWrapper(Wrapper):
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
+    def convert_default_initialize(self, context, target):
+        pass
+
+    def convert_assign(self, context, target, toStore):
+        pass
+
+    def convert_copy_initialize(self, context, target, toStore):
+        pass
+
+    def convert_destroy(self, context, instance):
+        pass
+
     def convert_attribute(self, context, instance, attribute):
         if not hasattr(self.typeRepresentation.Value, attribute):
             return context.pushException(
