@@ -971,6 +971,7 @@ class TestStringCompilation(unittest.TestCase):
 
         self.assertEqual(callit(f), str(callOrExcept))
 
+    @flaky.flaky(max_runs=3, min_passes=1)
     def test_compare_strings_to_constant(self):
         @Entrypoint
         def countEqualTo(z):
