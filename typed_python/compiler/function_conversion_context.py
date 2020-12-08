@@ -30,6 +30,7 @@ from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 from typed_python import _types, Type, ListOf
+from typed_python.generator import Generator
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.expression_conversion_context import ExpressionConversionContext
 from typed_python.compiler.function_stack_state import FunctionStackState
@@ -473,27 +474,39 @@ class ConversionContextBase:
             {}
         )
 
+        T = self._varname_to_type[FunctionYield].typeRepresentation
+
+        generatorBaseclass = Generator(T)
+
+        generatorSubclass = Forward(self.name + ".generator")
+
+        def __iter__(self) -> generatorBaseclass:
+            return self
+
         memberFunctions = {
             '__next__':
             makeFunctionType(
                 '__next__',
                 generatorFun,
                 classname=self.name + ".generator",
-                assumeClosuresGlobal=True
+                assumeClosuresGlobal=True,
+                returnTypeOverride=T
             ),
             '__iter__':
             makeFunctionType(
                 '__iter__',
-                lambda self: self,
+                __iter__,
                 classname=self.name + ".generator",
                 assumeClosuresGlobal=True
             )
         }
 
-        generatorType = typeWrapper(
+        generatorSubclass = generatorSubclass.define(
             _types.Class(
                 self.name + ".generator",
-                (),
+                (
+                    Generator(self._varname_to_type[FunctionYield].typeRepresentation),
+                ),
                 True,
                 tuple(generatorMembers),
                 tuple(memberFunctions.items()),
@@ -502,6 +515,8 @@ class ConversionContextBase:
                 ()
             )
         )
+
+        generatorType = typeWrapper(generatorSubclass)
 
         self._varname_to_type[FunctionOutput] = generatorType
 

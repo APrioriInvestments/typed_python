@@ -66,6 +66,8 @@ PyCell = _types.PyCell()
 
 from typed_python.compiler.runtime import Entrypoint, Compiled, NotCompiled, Runtime  # noqa
 
+from typed_python.generator import Generator  # noqa
+
 # this has to come at the end to break import cyclic
 from typed_python.lib.map import map  # noqa
 from typed_python.lib.pmap import pmap  # noqa
