@@ -5,8 +5,9 @@ repos:
 #     rev: 19.3b0
 #     hooks:
 #     -   id: black
+
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.3.0
+    rev: v3.3.0
     hooks:
     -   id: trailing-whitespace
     -   id: end-of-file-fixer
@@ -14,4 +15,8 @@ repos:
     -   id: check-toml
     -   id: check-json
     -   id: check-added-large-files
+
+-   repo: https://gitlab.com/pycqa/flake8
+    rev: 3.8.4
+    hooks:
     -   id: flake8

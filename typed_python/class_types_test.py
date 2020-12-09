@@ -384,19 +384,19 @@ class NativeClassTypesTests(unittest.TestCase):
                 return float
 
             @staticmethod  # noqa: F811
-            def f(a):
+            def f(a):  # noqa: F811
                 return "any"
 
             @staticmethod  # noqa: F811
-            def f(*args: int):
+            def f(*args: int):  # noqa: F811
                 return "int list"
 
             @staticmethod  # noqa: F811
-            def f(*args: str):
+            def f(*args: str):  # noqa: F811
                 return "string list"
 
             @staticmethod  # noqa: F811
-            def f(**kwargs: TupleOf(int)):
+            def f(**kwargs: TupleOf(int)):  # noqa: F811
                 return "named tuple of ints"
 
         for thing in [C(), C]:

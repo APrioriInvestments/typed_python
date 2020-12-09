@@ -37,7 +37,7 @@ def checkFormat(constructor):
         raise MacroFormatError("The source text list returned by your macro shouldn't be empty")
     elif not sourceText[-1][:7] == "return ":
         raise MacroFormatError(
-            f"The last line in the source text returned by your macro should be equal to "
+            "The last line in the source text returned by your macro should be equal to "
             + "'return ' + X for some valid variable name X, not {sourceText[-1]}"
         )
     for i, line in enumerate(sourceText):

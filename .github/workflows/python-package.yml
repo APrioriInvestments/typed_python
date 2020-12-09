@@ -73,12 +73,12 @@ jobs:
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
-        python-version: 3.6
+        python-version: 3.8
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8==3.7.9 pipenv safety
+        pip install flake8==3.8.4 pipenv safety
 
     - name: Flake8, Black, & Safety Checks
       run: |
