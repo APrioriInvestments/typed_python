@@ -63,6 +63,19 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
         assert instance.isReference
         return instance.changeType(self.refToType, isReferenceOverride=False)
 
+    def convert_attribute_pointerTo(self, context, pointerInstance, attribute):
+        refToSelf = TypedExpression(
+            pointerInstance.context,
+            pointerInstance.nonref_expr,
+            self,
+            True
+        )
+
+        if attribute in self.nameToIndex:
+            return self.memberRef(refToSelf, self.nameToIndex[attribute]).asPointer()
+
+        return super().convert_attribute(context, pointerInstance, attribute)
+
     def _can_convert_to_type(self, otherType, explicit):
         return False
 

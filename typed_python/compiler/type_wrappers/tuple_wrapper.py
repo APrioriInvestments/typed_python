@@ -204,6 +204,9 @@ class TupleWrapper(Wrapper):
             val = (val * context.constant(Int32(1000003))) ^ subHash
         return val
 
+    def hasMethod(self, methodName):
+        return False
+
     @property
     def is_pod(self):
         return self._is_pod
@@ -311,6 +314,9 @@ class TupleWrapper(Wrapper):
                 self.refAs(context, expr, i).convert_destroy()
 
     def get_iteration_expressions(self, context, expr):
+        if self.has_intiter() or self.hasMethod("__iter__"):
+            return None
+
         return [self.refAs(context, expr, i) for i in range(len(self.subTypeWrappers))]
 
     def convert_type_call(self, context, typeInst, args, kwargs):
@@ -483,6 +489,33 @@ class NamedTupleWrapper(TupleWrapper):
         self.namesToIndices = {n: i for i, n in enumerate(t.ElementNames)}
         self.namesToTypes = {n: t.ElementTypes[i] for i, n in enumerate(t.ElementNames)}
 
+    def has_intiter(self):
+        """Does this type support the 'intiter' format?"""
+        if not self.isSubclassOfNamedTuple:
+            return False
+
+        return self.hasMethod('__typed_python_int_iter_size__')
+
+    def hasMethod(self, methodName):
+        method = getattr(self.typeRepresentation, methodName, None)
+
+        if isinstance(method, (types.FunctionType, typed_python._types.Function)):
+            return True
+
+        return False
+
+    def convert_intiter_size(self, context, instance):
+        """If this type supports intiter, compute the size of the iterator.
+
+        This function will return a TypedExpression(int) or None if it set an exception."""
+        return self.convert_method_call(context, instance, "__typed_python_int_iter_size__", [], {})
+
+    def convert_intiter_value(self, context, instance, valueInstance):
+        """If this type supports intiter, compute the value of the iterator.
+
+        This function will return a TypedExpression, or None if it set an exception."""
+        return self.convert_method_call(context, instance, "__typed_python_int_iter_value__", [], {})
+
     def convert_attribute(self, context, instance, attribute):
         if attribute in ["replacing"]:
             return instance.changeType(BoundMethodWrapper.Make(self, attribute))
@@ -516,6 +549,26 @@ class NamedTupleWrapper(TupleWrapper):
             AttributeError,
             "'%s' object has no attribute '%s'" % (str(self.typeRepresentation), attribute)
         )
+
+    def convert_fastnext(self, context, instance):
+        if self.isSubclassOfNamedTuple:
+            return self.convert_method_call(context, instance, "__fastnext__", [], {})
+
+        return super().convert_fastnext()
+
+    def convert_pointerTo(self, context, instance):
+        if not instance.isReference:
+            instance = context.pushMove(instance)
+
+        return instance.asPointer()
+
+    def convert_attribute_pointerTo(self, context, pointerInstance, attribute):
+        if attribute in self.namesToIndices:
+            return self.refAs(
+                context,
+                pointerInstance.asReference(),
+                self.namesToIndices[attribute],
+            ).asPointer()
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0:

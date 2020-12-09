@@ -30,7 +30,7 @@ from typed_python.compiler.type_wrappers.python_free_object_wrapper import Pytho
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from typed_python.compiler.type_wrappers.value_wrapper import ValueWrapper
 from typed_python.compiler.type_wrappers.tuple_of_wrapper import TupleOfWrapper
-from typed_python.compiler.type_wrappers.pointer_to_wrapper import PointerToWrapper
+from typed_python.compiler.type_wrappers.pointer_to_wrapper import PointerToWrapper, PointerToObjectWrapper
 from typed_python.compiler.type_wrappers.ref_to_wrapper import RefToWrapper
 from typed_python.compiler.type_wrappers.list_of_wrapper import ListOfWrapper
 from typed_python.compiler.type_wrappers.isinstance_wrapper import IsinstanceWrapper
@@ -46,7 +46,7 @@ from typed_python.compiler.type_wrappers.alternative_wrapper import makeAlternat
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.len_wrapper import LenWrapper
 from typed_python.compiler.type_wrappers.hash_wrapper import HashWrapper
-from typed_python.compiler.type_wrappers.range_wrapper import _RangeWrapper
+from typed_python.compiler.type_wrappers.range_wrapper import range as compilableRange
 from typed_python.compiler.type_wrappers.print_wrapper import PrintWrapper
 from typed_python.compiler.type_wrappers.compiler_introspection_wrappers import (
     IsCompiledWrapper,
@@ -71,7 +71,8 @@ from typed_python import (
     UInt8, Float32, makeNamedTuple,
     ListOf, isCompiled,
     typeKnownToCompiler,
-    localVariableTypesKnownToCompiler
+    localVariableTypesKnownToCompiler,
+    pointerTo
 )
 
 # the type of bound C methods on types.
@@ -239,7 +240,7 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
         return TypedExpression(context, native_ast.nullExpr, ReprWrapper(), False)
 
     if f is range:
-        return TypedExpression(context, native_ast.nullExpr, _RangeWrapper, False)
+        return pythonObjectRepresentation(context, compilableRange, owningGlobalScopeAndName)
 
     if f is bytes.maketrans:
         return TypedExpression(context, native_ast.nullExpr, BytesMaketransWrapper(), False)
@@ -255,6 +256,9 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
 
     if f is print:
         return TypedExpression(context, native_ast.nullExpr, PrintWrapper(), False)
+
+    if f is pointerTo:
+        return TypedExpression(context, native_ast.nullExpr, PointerToObjectWrapper(), False)
 
     if f is isCompiled:
         return TypedExpression(context, native_ast.nullExpr, IsCompiledWrapper(), False)

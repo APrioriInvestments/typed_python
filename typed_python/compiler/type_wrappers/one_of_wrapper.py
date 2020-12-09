@@ -28,6 +28,9 @@ class OneOfWrapper(Wrapper):
     is_pass_by_ref = True
     can_unwrap = True
 
+    # is this wrapping a OneOf object
+    is_oneof_wrapper = True
+
     def __init__(self, t):
         assert hasattr(t, '__typed_python_category__')
         super().__init__(t)
@@ -283,6 +286,14 @@ class OneOfWrapper(Wrapper):
             temp = context.pushMove(expr)
             expr.convert_copy_initialize(other)
             temp.convert_destroy()
+
+    def refAsType(self, context, expr, subtype):
+        """Unwrap this assuming that it is _definitely_ 'subtype' which must be a TP type."""
+        for ix in range(len(self.typeRepresentation.Types)):
+            if self.typeRepresentation.Types[ix] == subtype:
+                return self.refAs(context, expr, ix)
+
+        raise Exception(f"type {subtype} is not one of the options in {self}")
 
     def refAs(self, context, expr, which):
         assert expr.expr_type == self

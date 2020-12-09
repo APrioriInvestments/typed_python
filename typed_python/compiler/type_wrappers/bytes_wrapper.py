@@ -22,6 +22,7 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import TypedListMasqueradingAsList
 
 from typed_python import UInt8, Int32, ListOf, Tuple, TupleOf, Dict, Set, ConstDict
+from typed_python import Class, Final, Member, pointerTo, PointerTo
 from typed_python.type_promotion import isInteger
 
 import typed_python.compiler.native_ast as native_ast
@@ -1245,6 +1246,13 @@ class BytesWrapper(RefcountedWrapper):
                 '__iter__', 'center', 'ljust', 'rjust', 'expandtabs', 'splitlines', 'zfill'] \
         + list(_bool_methods) + list(_bytes_methods) + list(_find_methods)
 
+    def convert_default_initialize(self, context, target):
+        context.pushEffect(
+            target.expr.store(
+                self.layoutType.zero()
+            )
+        )
+
     def convert_attribute(self, context, instance, attr: str):
         """Generates code for bytes attribute operation.
 
@@ -1261,6 +1269,22 @@ class BytesWrapper(RefcountedWrapper):
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
+
+    def has_intiter(self):
+        """Does this type support the 'intiter' format?"""
+        return True
+
+    def convert_intiter_size(self, context, instance):
+        """If this type supports intiter, compute the size of the iterator.
+
+        This function will return a TypedExpression(int) or None if it set an exception."""
+        return self.convert_len(context, instance)
+
+    def convert_intiter_value(self, context, instance, valueInstance):
+        """If this type supports intiter, compute the value of the iterator.
+
+        This function will return a TypedExpression, or None if it set an exception."""
+        return self.convert_getitem(context, instance, valueInstance)
 
     @Wrapper.unwrapOneOfAndValue
     def convert_method_call(self, context, instance, methodname: str, args, kwargs0):
@@ -1281,22 +1305,16 @@ class BytesWrapper(RefcountedWrapper):
             TypedExpression of return value of method call.
         """
         if methodname not in self._methods:
-            return context.pushException(AttributeError, methodname)
+            return super().convert_method_call(context, instance, methodname, args, kwargs0)
 
         kwargs = kwargs0.copy()
         if methodname == '__iter__' and not args and not kwargs:
-            res = context.push(
-                _BytesIteratorWrapper,
-                lambda instance:
-                instance.expr.ElementPtrIntegers(0, 0).store(-1)
+            return typeWrapper(BytesIterator).convert_type_call(
+                context,
+                None,
+                [],
+                dict(pos=context.constant(-1), bytesObj=instance)
             )
-
-            context.pushReference(
-                self,
-                res.expr.ElementPtrIntegers(0, 1)
-            ).convert_copy_initialize(instance)
-
-            return res
 
         if methodname in self._bool_methods and not args and not kwargs:
             return context.call_py_function(self._bool_methods[methodname], (instance,), {})
@@ -1779,124 +1797,19 @@ class BytesWrapper(RefcountedWrapper):
             return None
 
 
-class BytesIteratorWrapper(Wrapper):
-    """Code-generation wrapper for bytes iterator.
+class BytesIterator(Class, Final):
+    pos = Member(int)
+    bytesObj = Member(bytes)
+    value = Member(int)
 
-    Code generated here, when compiled, is intended to behave the same as iterating BytesType in the interpreter.
+    def __fastnext__(self):
+        self.pos = self.pos + 1
 
-    In all comments below, read 'bytes' as 'instance of BytesType'.
-    """
-    is_pod = False
-    is_empty = False
-    is_pass_by_ref = True
-
-    def __init__(self):
-        super().__init__((bytes, "iterator"))
-
-    def getNativeLayoutType(self):
-        """Returns layout of bytes iterator.
-        """
-        return native_ast.Type.Struct(
-            element_types=(("pos", native_ast.Int64), ("bytes", typeWrapper(bytes).getNativeLayoutType())),
-            name="bytes_iterator"
-        )
-
-    def convert_next(self, context, inst):
-        """Generates code for inst.__next__() where inst is a bytes iterator instance.
-
-        Args:
-            context: ExpressionConversionContext
-            inst: bytes (BytesType) iterator instance
-
-        Returns:
-            TypedExpression of next element in iteration.
-        """
-        context.pushEffect(
-            inst.expr.ElementPtrIntegers(0, 0).store(
-                inst.expr.ElementPtrIntegers(0, 0).load().add(1)
-            )
-        )
-        self_len = self.refAs(context, inst, 1).convert_len()
-        canContinue = context.pushPod(
-            bool,
-            inst.expr.ElementPtrIntegers(0, 0).load().lt(self_len.nonref_expr)
-        )
-
-        nextIx = context.pushReference(int, inst.expr.ElementPtrIntegers(0, 0))
-        return self.iteratedItemForReference(context, inst, nextIx), canContinue
-
-    def refAs(self, context, expr, which: int):
-        """Generates code to access an internal field of the bytes (BytesType) iterator.
-
-        Args:
-            context: ExpressionConversionContext
-            expr: bytes (BytesType) iterator instance
-            which: int giving index of which field to access
-
-        Returns:
-            TypedExpression that is a reference to this field.
-        """
-        assert expr.expr_type == self
-
-        if which == 0:
-            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
-
-        if which == 1:
-            return context.pushReference(
-                bytes,
-                expr.expr
-                    .ElementPtrIntegers(0, 1)
-                    .cast(typeWrapper(bytes).getNativeLayoutType().pointer())
-            )
-
-    def iteratedItemForReference(self, context, expr, ixExpr):
-        """Generates code to access an iteration element by reference
-
-        Args:
-            context: ExpressionConversionContext
-            expr: bytes (BytesType) iterator instance
-            ixExpr: TypedExpression giving index of which element to access
-
-        Returns:
-            TypedExpression that is a reference to this element.
-        """
-        return typeWrapper(bytes).convert_getitem_unsafe(
-            context,
-            self.refAs(context, expr, 1),
-            ixExpr
-        ).heldToRef()
-
-    def convert_assign(self, context, expr, other):
-        """Generates code to assign a bytes (BytesType) iterator to another.
-
-        Args:
-            context: ExpressionConversionContext
-            expr: bytes (BytesType) iterator instance to be assigned to
-            other: bytes (BytesType) iterator instance to be assigned
-        """
-        assert expr.isReference
-
-        for i in range(2):
-            self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
-
-    def convert_copy_initialize(self, context, expr, other):
-        """Generates code to initialize a bytes (BytesType) iterator by copying from another.
-
-        Args:
-            context: ExpressionConversionContext
-            expr: bytes (BytesType) iterator instance to be initialized
-            other: bytes (BytesType) iterator instance to be copied
-        """
-        for i in range(2):
-            self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
-
-    def convert_destroy(self, context, expr):
-        """Generates code to destroy a bytes (BytesType) iterator.
-        """
-        self.refAs(context, expr, 1).convert_destroy()
-
-
-_BytesIteratorWrapper = BytesIteratorWrapper()
+        if self.pos < len(self.bytesObj):
+            self.value = self.bytesObj[self.pos]
+            return pointerTo(self).value
+        else:
+            return PointerTo(int)()
 
 
 class BytesMaketransWrapper(Wrapper):

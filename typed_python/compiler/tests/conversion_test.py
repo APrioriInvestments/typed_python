@@ -24,7 +24,7 @@ from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBui
 from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
     _types, Compiled, Member, Final, isCompiled, ConstDict,
-    makeNamedTuple, UInt32, Int32, Type, identityHash, typeKnownToCompiler, checkOneOfType
+    makeNamedTuple, UInt32, Int32, Type, identityHash, typeKnownToCompiler, checkOneOfType,
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
@@ -629,8 +629,8 @@ class TestCompilationStructures(unittest.TestCase):
         ratio = callsDeeply / callsShallowly
 
         # inlining should work across invocations, regardless of order
-        self.assertLessEqual(.9, ratio)
-        self.assertLessEqual(ratio, 1.1)
+        self.assertLessEqual(.8, ratio)
+        self.assertLessEqual(ratio, 1.2)
         print(f"Deeper call tree code was {ratio} times slow.")
 
     def test_exception_handling_preserves_refcount(self):
@@ -3380,15 +3380,16 @@ class TestCompilationStructures(unittest.TestCase):
             res = var
             for t in range(times - 1):
                 res += var
+
             return res
 
         accumulate(1, 100)
         accumulateWithCheck(1, 100)
 
         t0 = time.time()
-        accumulate(1, 100000)
+        accumulate(1, 1000000)
         t1 = time.time()
-        accumulateWithCheck(1, 100000)
+        accumulateWithCheck(1, 1000000)
         t2 = time.time()
 
         checkTime = t2 - t1
@@ -3398,16 +3399,16 @@ class TestCompilationStructures(unittest.TestCase):
         print("integer speedup is", speedup)
 
         # it should be really big because the compiler can replace
-        # the sum with n*(n-1)/2
+        # the sum with n*(n-1)/2, so it's basically constant time.
         assert speedup > 100
 
         accumulate(1.0, 100)
         accumulateWithCheck(1.0, 100)
 
         t0 = time.time()
-        accumulate(1.0, 100000)
+        accumulate(1.0, 1000000)
         t1 = time.time()
-        accumulateWithCheck(1.0, 100000)
+        accumulateWithCheck(1.0, 1000000)
         t2 = time.time()
 
         checkTime = t2 - t1

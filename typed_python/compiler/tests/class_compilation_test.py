@@ -19,7 +19,7 @@ import unittest
 from flaky import flaky
 from typed_python import (
     Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, UInt64, Int16,
-    Float32, Final, makeNamedTuple, Compiled, Function, Held, Value
+    Float32, Final, makeNamedTuple, Compiled, Function, Held, Value, pointerTo
 )
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime, CountCompilationsVisitor
@@ -284,7 +284,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         speedup = uncompiled_time / compiled_time
 
-        self.assertGreater(speedup, 20)
+        self.assertGreater(speedup, 15)
         self.assertEqual(compiled_res, uncompiled_res)
 
         print("speedup is ", speedup)  # I get about 75
@@ -2082,3 +2082,15 @@ class TestClassCompilationCompilation(unittest.TestCase):
         checkEqual(Entrypoint(initializeAClass)(), initializeAClass())
         checkEqual(Entrypoint(initializeAClass)(x=1), initializeAClass(x=1))
         checkEqual(Entrypoint(initializeAClass)(x=1, y=2), initializeAClass(x=1, y=2))
+
+    def test_pointer_to_member(self):
+        class C(Class, Final):
+            x = Member(int)
+
+        @Entrypoint
+        def f(c):
+            return pointerTo(c).x
+
+        c = C()
+
+        assert f(c) == pointerTo(c).x

@@ -14,7 +14,6 @@
 
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python.compiler.converter_utils import (
@@ -22,10 +21,11 @@ from typed_python.compiler.converter_utils import (
     InitializeRefAsImplicitContainers,
     InitializeRefAsUpcastContainers
 )
+from typed_python.type_function import TypeFunction
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.typed_expression import TypedExpression
 
-from typed_python import Int32, TupleOf, ListOf, Tuple, NamedTuple
+from typed_python import Int32, TupleOf, ListOf, Tuple, NamedTuple, Class, Final, Member, pointerTo, PointerTo
 
 from typed_python.compiler.type_wrappers.util import min
 
@@ -321,8 +321,24 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
         return super().convert_type_method_call(context, typeInst, methodname, args, kwargs)
 
+    def has_intiter(self):
+        """Does this type support the 'intiter' format?"""
+        return True
+
+    def convert_intiter_size(self, context, instance):
+        """If this type supports intiter, compute the size of the iterator.
+
+        This function will return a TypedExpression(int) or None if it set an exception."""
+        return self.convert_len(context, instance)
+
+    def convert_intiter_value(self, context, instance, valueInstance):
+        """If this type supports intiter, compute the value of the iterator.
+
+        This function will return a TypedExpression, or None if it set an exception."""
+        return self.convert_getitem(context, instance, valueInstance)
+
     def convert_attribute(self, context, expr, attr):
-        if attr in ("_getItemUnsafe", "_initializeItemUnsafe", "setSizeUnsafe", 'toBytes'):
+        if attr in ("_getItemUnsafe", "_initializeItemUnsafe", "setSizeUnsafe", 'toBytes', '__iter__', 'pointerUnsafe'):
             return expr.changeType(BoundMethodWrapper.Make(self, attr))
 
         if attr == '_hash_cache':
@@ -445,18 +461,25 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             return context.pushVoid()
 
         if methodname == "__iter__" and not args and not kwargs:
-            res = context.push(
-                TupleOrListOfIteratorWrapper(self.typeRepresentation),
-                lambda instance:
-                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
+            return typeWrapper(TupleOrListOfIterator(self.typeRepresentation)).convert_type_call(
+                context,
+                None,
+                [],
+                dict(pos=context.constant(-1), tup=instance)
             )
 
-            context.pushReference(
-                self,
-                res.expr.ElementPtrIntegers(0, 1)
-            ).convert_copy_initialize(instance)
+        if methodname == "pointerUnsafe":
+            if len(args) == 1:
+                count = args[0].toInt64()
+                if count is None:
+                    return
 
-            return res
+                return context.pushPod(
+                    PointerTo(self.typeRepresentation.ElementType),
+                    instance.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
+                        self.underlyingWrapperType.getNativeLayoutType().pointer()
+                    ).elemPtr(count.nonref_expr)
+                )
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
@@ -605,69 +628,23 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
 
-class TupleOrListOfIteratorWrapper(Wrapper):
-    is_pod = False
-    is_empty = False
-    is_pass_by_ref = True
+@TypeFunction
+def TupleOrListOfIterator(T):
+    class TupleOrListOfIterator(Class, Final):
+        pos = Member(int)
+        tup = Member(T)
 
-    def __init__(self, tupType):
-        self.tupType = tupType
-        super().__init__((tupType, "iterator"))
+        def __fastnext__(self):
+            posPtr = pointerTo(self).pos
+            tupPtr = pointerTo(self).tup
 
-    def getNativeLayoutType(self):
-        return native_ast.Type.Struct(
-            element_types=(("pos", native_ast.Int64), ("tup", typeWrapper(self.tupType).getNativeLayoutType())),
-            name="tuple_or_list_iterator"
-        )
+            posPtr.set(posPtr.get() + 1)
 
-    def convert_next(self, context, expr):
-        context.pushEffect(
-            expr.expr.ElementPtrIntegers(0, 0).store(
-                expr.expr.ElementPtrIntegers(0, 0).load().add(1)
-            )
-        )
-        self_len = self.refAs(context, expr, 1).convert_len()
-        canContinue = context.pushPod(
-            bool,
-            expr.expr.ElementPtrIntegers(0, 0).load().lt(self_len.nonref_expr)
-        )
-
-        nextIx = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
-        return self.iteratedItemForReference(context, expr, nextIx), canContinue
-
-    def refAs(self, context, expr, which):
-        assert expr.expr_type == self
-
-        if which == 0:
-            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
-
-        if which == 1:
-            return context.pushReference(
-                self.tupType,
-                expr.expr
-                    .ElementPtrIntegers(0, 1)
-                    .cast(typeWrapper(self.tupType).getNativeLayoutType().pointer())
-            )
-
-    def iteratedItemForReference(self, context, expr, ixExpr):
-        return typeWrapper(self.tupType).convert_getitem_unsafe(
-            context,
-            self.refAs(context, expr, 1),
-            ixExpr
-        ).heldToRef()
-
-    def convert_assign(self, context, expr, other):
-        assert expr.isReference
-
-        for i in range(2):
-            self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
-
-    def convert_copy_initialize(self, context, expr, other):
-        for i in range(2):
-            self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
-
-    def convert_destroy(self, context, expr):
-        self.refAs(context, expr, 1).convert_destroy()
+            if posPtr.get() < len(tupPtr.get()):
+                return tupPtr.get().pointerUnsafe(posPtr.get())
+            else:
+                return PointerTo(T.ElementType)()
+    return TupleOrListOfIterator
 
 
 class TupleOfWrapper(TupleOrListOfWrapper):

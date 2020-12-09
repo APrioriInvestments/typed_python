@@ -43,12 +43,37 @@ import typed_python.python_ast as python_ast
 from typed_python.compiler.python_ast_analysis import (
     countYieldStatements,
 )
+from typed_python.compiler.codegen_helpers import (
+    const,
+    compare,
+    boolOp,
+    branch,
+    makeCallExpr,
+    attr,
+    assign,
+    readVar,
+    raiseStopIteration
+)
+
+
+def returnNullPtr():
+    return python_ast.Statement.Return(
+        value=python_ast.Expr.Call(
+            func=readVar(".PointerType"),
+            args=()
+        )
+    )
 
 
 def accessVar(varname, context=None):
     """Generate a 'self.(varname)' python expression"""
+    if varname == "..slot":
+        return makeCallExpr(
+            attr(readVar(".slotPtr"), "get")
+        )
+
     return python_ast.Expr.Attribute(
-        value=python_ast.Expr.Name(id="self", ctx=python_ast.ExprContext.Load()),
+        value=python_ast.Expr.Name(id="__typed_python_generator_self__", ctx=python_ast.ExprContext.Load()),
         attr=varname,
         ctx=python_ast.ExprContext.Load() if context is None else context
     )
@@ -59,74 +84,12 @@ def setVar(varname, val):
     return python_ast.Statement.Assign(
         targets=(
             python_ast.Expr.Attribute(
-                value=python_ast.Expr.Name(id="self", ctx=python_ast.ExprContext.Load()),
+                value=python_ast.Expr.Name(id="__typed_python_generator_self__", ctx=python_ast.ExprContext.Load()),
                 attr=varname,
                 ctx=python_ast.ExprContext.Store()
             ),
         ),
         value=val,
-    )
-
-
-def const(val):
-    """Generate a python expression representing the constant 'val'"""
-    if val is None:
-        return python_ast.Expr.Num(n=python_ast.NumericConstant.None_())
-    if isinstance(val, bool):
-        return python_ast.Expr.Num(n=python_ast.NumericConstant.Boolean(value=val))
-    if isinstance(val, int):
-        return python_ast.Expr.Num(n=python_ast.NumericConstant.Int(value=val))
-    if isinstance(val, str):
-        return python_ast.Expr.Str(s=val)
-    raise Exception("Don't know how to encode constant of type " + str(type(val)))
-
-
-def compare(l, r, opcode):
-    """Generate a pyexpression comparing python expressions l and r"""
-    return python_ast.Expr.Compare(
-        left=l,
-        ops=(getattr(python_ast.ComparisonOp, opcode)(),),
-        comparators=(r,)
-    )
-
-
-def boolOp(opcode, *values):
-    """Generate 'or' or 'and' python expression.
-
-    Args:
-        opcode - one of 'And' or 'Or'
-        values - python expressions to bool on
-    """
-    return python_ast.Expr.BoolOp(
-        op=getattr(python_ast.BooleanOp, opcode)(),
-        values=values,
-    )
-
-
-def branch(cond, l, r, isWhile=False):
-    """Generate an If python statement"""
-    Statement = python_ast.Statement
-
-    return (Statement.If if not isWhile else Statement.While)(test=cond, body=l, orelse=r)
-
-
-def genPrint(*exprs):
-    """Generate a statement that prints all of 'exprs' (for debugging)"""
-    return python_ast.Statement.Expr(
-        value=python_ast.Expr.Call(
-            func=python_ast.Expr.Name(id='print'),
-            args=exprs
-        )
-    )
-
-
-def raiseStopIteration(*args):
-    return python_ast.Statement.Raise(
-        exc=python_ast.Expr.Call(
-            func=python_ast.Expr.Name(id='StopIteration'),
-            args=tuple(args)
-        ),
-        cause=None
     )
 
 
@@ -198,8 +161,12 @@ class GeneratorCodegen:
                     [setVar("..slot", const(-1))],
                     [
                         setVar("..slot", const(self.yieldsSeen)),
+                        setVar("..value", self.changeExpr(s.value.value)),
                         python_ast.Statement.Return(
-                            value=self.changeExpr(s.value.value)
+                            value=attr(
+                                makeCallExpr(readVar(".pointerTo"), readVar("__typed_python_generator_self__")),
+                                "..value"
+                            )
                         )
                     ]
                 )
@@ -388,8 +355,11 @@ class GeneratorCodegen:
 
         if s.matches.Return:
             if s.value is None:
-                yield raiseStopIteration()
+                yield returnNullPtr()
             else:
+                # this is a strange pathway that bypasses the normal
+                # yield pathway
+                yield setVar("..slot", const(-2))
                 yield raiseStopIteration(
                     self.changeExpr(s.value)
                 )
@@ -416,11 +386,12 @@ class GeneratorCodegen:
             )
             return
 
+        if s.matches.For:
+            assert False, "this should already have been rewritten"
+
         if s.matches.FunctionDef:
             raise Exception("Not implemented")
         if s.matches.ClassDef:
-            raise Exception("Not implemented")
-        if s.matches.For:
             raise Exception("Not implemented")
 
         if s.matches.Global:
@@ -441,22 +412,32 @@ class GeneratorCodegen:
 
     def convertStatementsToFunctionDef(self, statements):
         return python_ast.Statement.FunctionDef(
-            name="__next__",
+            name="__fastnext__",
             args=python_ast.Arguments.Item(
-                args=[python_ast.Arg.Item(arg="self", annotation=None)],
+                args=[python_ast.Arg.Item(arg="__typed_python_generator_self__", annotation=None)],
                 vararg=None,
                 kwarg=None
             ),
             body=[
                 python_ast.Statement.Try(
                     body=[
+                        assign(
+                            ".slotPtr",
+                            attr(
+                                makeCallExpr(
+                                    readVar(".pointerTo"),
+                                    readVar("__typed_python_generator_self__")
+                                ),
+                                "..slot"
+                            )
+                        ),
                         branch(
                             checkSlotBetween(-2, -2),
-                            [raiseStopIteration()],
+                            [returnNullPtr()],
                             []
                         )
                     ] + self.changeStatementSequence(statements) + [
-                        raiseStopIteration()
+                        returnNullPtr()
                     ],
                     finalbody=[
                         # if we exit during 'normal' execution (slot == -1)

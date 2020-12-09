@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Tuple, Compiled, Entrypoint, Class, Member, Final
+from typed_python import ListOf, Tuple, Compiled, Entrypoint, Class, Member, Final, NamedTuple, PointerTo, Set
 import typed_python._types as _types
 import unittest
 
@@ -172,3 +172,32 @@ class TestPointerToCompilation(unittest.TestCase):
         p.initialize()
 
         assert aList[0] == ""
+
+    def test_pointer_to_named_tuple(self):
+        NT = NamedTuple(x=int, y=float)
+        Lst = ListOf(NT)
+
+        lst = Lst([NT(x=10, y=20)])
+
+        @Entrypoint
+        def ptrToX(p):
+            return p.x
+
+        assert type(ptrToX(lst.pointerUnsafe(0))) == PointerTo(int)
+        assert type(lst.pointerUnsafe(0).x) == PointerTo(int)
+
+        assert lst.pointerUnsafe(0).x.get() == 10
+        assert ptrToX(lst.pointerUnsafe(0)).get() == 10
+
+    def test_type_of_element_of_pointer_to_set(self):
+        P = PointerTo(Set(int))
+
+        assert P.ElementType is Set(int)
+        assert P().ElementType is Set(int)
+
+        @Entrypoint
+        def check():
+            assert P.ElementType is Set(int), P.ElementType
+            assert P().ElementType is Set(int), P().ElementType
+
+        check()

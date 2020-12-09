@@ -73,6 +73,9 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
     is_empty = False
     is_pass_by_ref = True
 
+    # is this wrapping a Class object
+    is_class_wrapper = True
+
     BYTES_BEFORE_INIT_BITS = 16  # the refcount and vtable are both 8 byte integers.
     CAN_BE_NULL = False
 
@@ -107,6 +110,20 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             )
         ).load()
 
+    def convert_pointerTo(self, context, instance):
+        PtrT = PointerTo(self.typeRepresentation.HeldClass)
+
+        return TypedExpression(
+            context,
+            (
+                self.get_layout_pointer(instance.nonref_expr)
+                .ElementPtrIntegers(0, 2)
+                .cast(typeWrapper(PtrT).getNativeLayoutType())
+            ),
+            PtrT,
+            False
+        )
+
     def _can_convert_to_type(self, otherType, conversionLevel):
         if isinstance(otherType, ClassWrapper):
             if otherType.typeRepresentation in self.typeRepresentation.MRO:
@@ -118,6 +135,9 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
     def _can_convert_from_type(self, otherType, conversionLevel):
         return False
+
+    def convert_fastnext(self, context, instance):
+        return self.convert_method_call(context, instance, "__fastnext__", [], {})
 
     def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         otherType = targetVal.expr_type
@@ -141,9 +161,30 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
+    def has_intiter(self):
+        """Does this type support the 'intiter' format?"""
+        return "__typed_python_int_iter_size__" in self.typeRepresentation.MemberFunctions
+
+    def convert_intiter_size(self, context, instance):
+        """If this type supports intiter, compute the size of the iterator.
+
+        This function will return a TypedExpression(int) or None if it set an exception."""
+        return self.convert_method_call(context, instance, "__typed_python_int_iter_size__", [], {})
+
+    def convert_intiter_value(self, context, instance, valueInstance):
+        """If this type supports intiter, compute the value of the iterator.
+
+        This function will return a TypedExpression, or None if it set an exception."""
+        return self.convert_method_call(context, instance, "__typed_python_int_iter_value__", [], {})
+
     def get_layout_pointer(self, nonref_expr):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.
         # so whenever we interact with the pointer we need to chop off the top 16 bits
+
+        # TODO: seems like this should be legal?
+        # if self.typeRepresentation.IsFinal:
+        #    return nonref_expr.cast(self.layoutType)
+
         return (
             nonref_expr
             .cast(native_ast.UInt64)

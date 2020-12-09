@@ -290,6 +290,23 @@ PyObject* PyPointerToInstance::tp_getattr_concrete(PyObject* pyAttrName, const c
         }
     }
 
+    if (type()->getEltType()->isNamedTuple()) {
+        NamedTuple* nt = (NamedTuple*)type()->getEltType();
+
+        auto it = nt->getNameToIndex().find(attrName);
+
+        if (it != nt->getNameToIndex().end()) {
+            int index = it->second;
+
+            Type* memberType = nt->getTypes()[index];
+            size_t offset = nt->getOffsets()[index];
+
+            instance_ptr ptr = *(instance_ptr*)dataPtr() + offset;
+
+            return PyInstance::extractPythonObject((instance_ptr)&ptr, PointerTo::Make(memberType));
+        }
+    }
+
     return PyInstance::tp_getattr_concrete(pyAttrName, attrName);
 }
 

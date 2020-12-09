@@ -275,7 +275,6 @@ class ClassOrAlternativeWrapperMixin:
 
         if targetVal.expr_type.typeRepresentation is str:
             if self.has_method("__str__"):
-                context.logDiagnostic("CALL IT! ", str(mayThrowOnFailure))
                 return context.call_py_function(
                     initialize_str_from_method_call,
                     (targetVal.asPointer(), instance, context.constant(mayThrowOnFailure)),

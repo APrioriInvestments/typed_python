@@ -63,6 +63,105 @@ TypeIgnore = TypeIgnore.define(Alternative(
     Item={'lineno': int, 'tag': str}
 ))
 
+
+def statementStrLines(self):
+    if self.matches.FunctionDef:
+        yield f"def {self.name}(...):"
+        for s in self.body:
+            for line in statementStrLines(s):
+                yield "    " + line
+        return
+
+    elif self.matches.Expr:
+        yield str(self.value)
+
+    elif self.matches.If:
+        yield f"if {self.test}:"
+        for s in self.body:
+            for line in statementStrLines(s):
+                yield "    " + line
+        if self.orelse:
+            yield "else:"
+            for s in self.orelse:
+                for line in statementStrLines(s):
+                    yield "    " + line
+
+    elif self.matches.While:
+        yield f"while {self.test}:"
+        for s in self.body:
+            for line in statementStrLines(s):
+                yield "    " + line
+        if self.orelse:
+            yield "else:"
+            for s in self.orelse:
+                for line in statementStrLines(s):
+                    yield "    " + line
+
+    elif self.matches.Try:
+        yield "try:"
+        for s in self.body:
+            for line in statementStrLines(s):
+                yield "    " + line
+        for eh in self.handlers:
+            yield f"except {eh.type}" + (f" as {eh.name}")
+            for s in eh.body:
+                for line in statementStrLines(s):
+                    yield "    " + line
+        if self.orelse:
+            yield "else:"
+            for s in self.orelse:
+                for line in statementStrLines(s):
+                    yield "    " + line
+        if self.finalbody:
+            yield "finally:"
+            for s in self.finalbody:
+                for line in statementStrLines(s):
+                    yield "    " + line
+
+    elif self.matches.With:
+        yield f"with {self.items}:"
+        for s in self.body:
+            for line in statementStrLines(s):
+                yield "    " + line
+
+    elif self.matches.Assign:
+        yield f"{', '.join(str(x) for x in self.targets)} = {self.value}"
+
+    elif self.matches.AugAssign:
+        yield f"{self.target} {self.op}= {self.value}"
+
+    elif self.matches.Raise:
+        res = "raise"
+        if self.exc is not None:
+            res += " " + str(self.exc)
+
+        if self.cause is not None:
+            res += " from " + str(self.cause)
+
+        yield res
+
+    elif self.matches.Break:
+        yield "break"
+
+    elif self.matches.Continue:
+        yield "continue"
+
+    elif self.matches.Pass:
+        yield "pass"
+
+    elif self.matches.Return:
+        if self.value is not None:
+            yield f"return {self.value}"
+        else:
+            yield "return"
+    else:
+        yield str(type(self)) + "..."
+
+
+def StatementStr(self):
+    return "\n".join(list(statementStrLines(self)))
+
+
 Statement = Statement.define(Alternative(
     "Statement",
     FunctionDef={
@@ -256,8 +355,106 @@ Statement = Statement.define(Alternative(
         'line_number': int,
         'col_offset': int,
         'filename': str
-    }
+    },
+    __str__=StatementStr
 ))
+
+
+def ExpressionStr(self):
+    if self.matches.Num:
+        return str(self.n)
+
+    if self.matches.Call:
+        return (
+            f"({self.func})(" +
+            ", ".join([str(x) for x in self.args] + [f"{kwd.args}={kwd.value}" for kwd in self.keywords])
+            + ")"
+        )
+
+    if self.matches.Str:
+        return repr(self.s)
+
+    if self.matches.Compare:
+        res = str(self.left)
+        for i in range(len(self.ops)):
+            if self.ops[i].matches.Eq:
+                sep = "=="
+            if self.ops[i].matches.NotEq:
+                sep = "!="
+            if self.ops[i].matches.Lt:
+                sep = "<"
+            if self.ops[i].matches.LtE:
+                sep = "<="
+            if self.ops[i].matches.Gt:
+                sep = ">"
+            if self.ops[i].matches.GtE:
+                sep = ">="
+            if self.ops[i].matches.Is:
+                sep = "is"
+            if self.ops[i].matches.IsNot:
+                sep = "is not"
+            if self.ops[i].matches.In:
+                sep = "in"
+            if self.ops[i].matches.NotIn:
+                sep = "not in"
+
+            res += f" {sep} {self.comparators[i]}"
+        return res
+
+    if self.matches.BoolOp:
+        sep = " and " if self.op.matches.And else " or "
+        return sep.join([f"({x})" for x in self.values])
+
+    if self.matches.BinOp:
+        if self.op.matches.Add:
+            sep = "+"
+        if self.op.matches.Sub:
+            sep = "-"
+        if self.op.matches.Mult:
+            sep = "*"
+        if self.op.matches.Div:
+            sep = "/"
+        if self.op.matches.Mod:
+            sep = "%"
+        if self.op.matches.Pow:
+            sep = "**"
+        if self.op.matches.LShift:
+            sep = "<<"
+        if self.op.matches.RShift:
+            sep = ">>"
+        if self.op.matches.BitOr:
+            sep = "|"
+        if self.op.matches.BitXor:
+            sep = "^"
+        if self.op.matches.BitAnd:
+            sep = "&"
+        if self.op.matches.FloorDiv:
+            sep = "//"
+        if self.op.matches.MatMult:
+            sep = "@"
+
+        return f"({self.left}) {sep} ({self.right})"
+
+    if self.matches.UnaryOp:
+        if self.op.matches.Invert:
+            sep = "~"
+        if self.op.matches.Not:
+            sep = "not "
+        if self.op.matches.UAdd:
+            sep = "+"
+        if self.op.matches.USub:
+            sep = "-"
+
+        return f"{sep} ({self.operand})"
+
+    if self.matches.Attribute:
+        return f"({self.value}).{self.attr}"
+
+    if self.matches.Name:
+        return self.id
+
+    return str(type(self))
+
 
 Expr = Expr.define(Alternative(
     "Expr",
@@ -456,7 +653,8 @@ Expr = Expr.define(Alternative(
         'line_number': int,
         'col_offset': int,
         'filename': str
-    }
+    },
+    __str__=ExpressionStr
 ))
 
 NumericConstant = NumericConstant.define(Alternative(
@@ -467,7 +665,14 @@ NumericConstant = NumericConstant.define(Alternative(
     None_={},
     Float={"value": float},
     Complex={"real": float, "imag": float},
-    Unknown={}
+    Unknown={},
+    __str__=lambda self: (
+        str(self.value) if (
+            self.matches.Int or self.matches.Long
+            or self.matches.Boolean or self.matches.Float
+        ) else "None" if self.matches.None_ else
+        f"{self.real} + {self.imag}j" if self.matches.Complex else "Unknown"
+    )
 ))
 
 ExprContext = ExprContext.define(Alternative(

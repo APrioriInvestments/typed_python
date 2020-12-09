@@ -872,7 +872,7 @@ class SetIteratorWrapper(Wrapper):
             name="const_set_iterator"
         )
 
-    def convert_next(self, context, expr):
+    def convert_fastnext(self, context, expr):
         context.call_py_function(
             checkSetSizeAndThrowIfChanged,
             (
@@ -892,7 +892,7 @@ class SetIteratorWrapper(Wrapper):
         )
 
         if nextSlotIx is None:
-            return None, None
+            return None
 
         context.pushEffect(
             expr.expr.ElementPtrIntegers(0, 0).store(
@@ -906,7 +906,7 @@ class SetIteratorWrapper(Wrapper):
 
         nextIx = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
 
-        return self.iteratedItemForReference(context, expr, nextIx), canContinue
+        return self.iteratedItemForReference(context, expr, nextIx).asPointerIf(canContinue)
 
     def refAs(self, context, expr, which):
         assert expr.expr_type == self

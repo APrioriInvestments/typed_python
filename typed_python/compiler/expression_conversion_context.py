@@ -747,7 +747,7 @@ class ExpressionConversionContext:
         if self.teardowns:
             expr = native_ast.Expression.Finally(expr=expr, teardowns=self.teardowns)
 
-        if exceptionsTakeFrom and expr.couldThrow():
+        if exceptionsTakeFrom and expr.couldThrow() and exceptionsTakeFrom.filename:
             expr = native_ast.Expression.ExceptionPropagator(
                 expr=expr,
                 varname=self.functionContext.allocateLetVarname(),
@@ -1374,8 +1374,13 @@ class ExpressionConversionContext:
 
     def recastVariableAsRestrictedType(self, expr, varType):
         if varType is not None and varType != expr.expr_type.typeRepresentation:
-            if getattr(expr.expr_type.typeRepresentation, "__typed_python_category__", None) == "OneOf":
-                return expr.convert_to_type(varType, ConversionLevel.Signature)
+            if expr.expr_type.is_oneof_wrapper:
+                # if it's a concrete type, then it must be one of our subtypes
+                if isinstance(varType, type) and not issubclass(varType, OneOf):
+                    return expr.expr_type.refAsType(expr.context, expr, varType)
+                else:
+                    # it's possible that it's a subset of the oneof types
+                    return expr.convert_to_type(varType, ConversionLevel.Signature)
 
             if getattr(expr.expr_type.typeRepresentation, "__typed_python_category__", None) == "Alternative" and \
                     getattr(varType, "__typed_python_category__", None) == "ConcreteAlternative":

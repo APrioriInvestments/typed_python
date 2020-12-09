@@ -70,6 +70,12 @@ class Wrapper:
     # if this is true, then we must also have a 'getCompileTimeConstant' method
     is_compile_time_constant = False
 
+    # is this wrapping a Class object
+    is_class_wrapper = False
+
+    # is this wrapping a OneOf object
+    is_oneof_wrapper = False
+
     def __repr__(self):
         return "Wrapper(%s)" % str(self)
 
@@ -84,6 +90,15 @@ class Wrapper:
 
     def __init__(self, typeRepresentation):
         super().__init__()
+
+        # if not (
+        #     isinstance(typeRepresentation, type)
+        # ):
+        #     raise Exception(
+        #         "Compiler Wrapper objects must always wrap a "
+        #         f"type. You gave us {typeRepresentation} "
+        #         f"whose type is {type(typeRepresentation)}"
+        #     )
 
         # this is the representation of this type _in the compiler_
         self.typeRepresentation = typeRepresentation
@@ -135,17 +150,51 @@ class Wrapper:
 
         raise NotImplementedError(self)
 
-    def convert_next(self, context, expr):
-        """Return a pair of typed_expressions (next_value, continue_iteration) for the result of __next__.
+    def has_intiter(self):
+        """Does this type support the 'intiter' format?"""
+        return False
 
-        If continue_iteration is False, then next_value will be ignored. It should be a reference.
+    def convert_intiter_size(self, context, instance):
+        """If this type supports intiter, compute the size of the iterator.
+
+        This function will return a TypedExpression(int) or None if it set an exception."""
+        raise NotImplementedError()
+
+    def convert_intiter_value(self, context, instance, valueInstance):
+        """If this type supports intiter, compute the value of the iterator.
+
+        This function will return a TypedExpression, or NOne if it set an exception."""
+        raise NotImplementedError()
+
+    def convert_fastnext(self, context, expr):
+        """Return a PointerTo _value_ expression with the result of __next__.
+
+        If the pointer is null, then you are indicating that iteration stopped and
+        there is no viable result.
         """
         context.pushException(
             AttributeError,
             "%s object cannot be iterated" % self
         )
 
-        return None, None
+        return None
+
+    def convert_pointerTo(self, context, instance):
+        """Generate code for 'pointerTo(self)'"""
+        return context.pushException(TypeError, "Can't call pointerTo with args of type (%s)" % (
+            str(self.typeRepresentation),
+        ))
+
+    def convert_attribute_pointerTo(self, context, pointerInstance, attribute):
+        """Implement getattr(PointerTo(self), attribute)"""
+
+        # allow the generic implementation to take over
+        return Wrapper.convert_attribute(
+            pointerInstance.expr_type,
+            context,
+            pointerInstance,
+            attribute
+        )
 
     def convert_attribute(self, context, instance, attribute):
         """Produce code to access 'attribute' on an object represented by TypedExpression 'instance'."""
@@ -154,6 +203,13 @@ class Wrapper:
                 context,
                 self.typeRepresentation
             ).convert_attribute(attribute)
+
+        if self.has_intiter() and attribute in (
+            "__typed_python_int_iter_size__", "__typed_python_int_iter_value__"
+        ):
+            from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
+
+            return instance.changeType(BoundMethodWrapper.Make(self, attribute))
 
         return context.pushException(
             AttributeError,
@@ -624,7 +680,6 @@ class Wrapper:
         Used so that things like ListOf(T).toBytes can provide compiler-friendly
         implementations.
         """
-        print(typeInst.expr_type, type(typeInst.expr_type))
         return typeInst.expr_type.convert_method_call(
             context,
             typeInst,
@@ -636,6 +691,15 @@ class Wrapper:
         )
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if methodname == "__fastnext__" and not args and not kwargs:
+            return self.convert_fastnext(context, instance)
+
+        if methodname == "__typed_python_int_iter_size__" and self.has_intiter() and not args and not kwargs:
+            return self.convert_intiter_size(context, instance)
+
+        if methodname == "__typed_python_int_iter_value__" and self.has_intiter() and len(args) == 1 and not kwargs:
+            return self.convert_intiter_value(context, instance, args[0])
+
         return context.pushException(
             TypeError,
             "Can't call %s.%s with args of type (%s)" % (

@@ -101,7 +101,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         # they should be about the same
         for timeElapsed in compiledTimes:
-            assert .75 <= timeElapsed / avgCompiledTime <= 1.25
+            assert .66 <= timeElapsed / avgCompiledTime <= 1.33
 
         # but python is much slower. I get about 30 x.
         assert untypedTime / avgCompiledTime > 10
@@ -317,7 +317,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
             yield ct
             yield 2
 
-        with self.assertRaises(UnboundLocalError):
+        with self.assertRaises(NameError):
             assert list(generateInts(10)) == [1, 100, 10, 2]
 
     def test_call_generator_with_assert(self):
@@ -538,3 +538,114 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert g.__next__() == 6
         assert cm.entered == 0
+
+    def test_for_in_generator(self):
+        @Entrypoint
+        def generateInts(x):
+            yield -1
+
+            for val in range(x):
+                yield val
+            else:
+                yield -2
+
+            yield -3
+
+        g = generateInts(5)
+
+        assert g.__next__() == -1
+        assert g.__next__() == 0
+        assert g.__next__() == 1
+        assert g.__next__() == 2
+        assert g.__next__() == 3
+        assert g.__next__() == 4
+        assert g.__next__() == -2
+        assert g.__next__() == -3
+
+        with self.assertRaises(StopIteration):
+            assert g.__next__() == -3
+
+    def test_for_in_generator_over_various_builtin_types(self):
+        @Entrypoint
+        def generate(l):
+            for val in l:
+                yield val
+
+        for toIterate in [
+            ListOf(int)([1, 2, 3]),
+            TupleOf(int)([1, 2, 3]),
+            "hi",
+            b"someBytes"
+        ]:
+            assert list(generate(toIterate)) == list(toIterate)
+
+    def test_can_iterate_class(self):
+        class C(Class, Final):
+            x = Member(int)
+
+            def __iter__(self):
+                for val in range(self.x):
+                    yield val * 2
+
+        @Entrypoint
+        def iterate(l):
+            res = None
+            for val in l:
+                if res is None:
+                    res = ListOf(type(val))()
+                res.append(val)
+            return res
+
+        c = C(x=4)
+
+        print(list(c))
+
+    def test_can_iterate_class_perf(self):
+        class C(Class, Final):
+            x = Member(int)
+
+            def __iter__(self):
+                val = 0
+                while val < self.x:
+                    yield val * 2
+                    val += 1
+
+        @Entrypoint
+        def add(l):
+            res = 0
+
+            for val in l:
+                res += val
+
+            return res
+
+        add(C(x=4))
+
+        CT = 10 * 1000000
+
+        t0 = time.time()
+        add(C(x=CT))
+        elapsedTyped = time.time() - t0
+
+        def untypedGenerator(x):
+            val = 0
+            while val < x:
+                yield val * 2
+                val += 1
+
+        def addUntyped(iterable):
+            res = 0
+            for val in iterable:
+                res += val
+            return res
+
+        t0 = time.time()
+        addUntyped(untypedGenerator(CT))
+        elapsedUntyped = time.time() - t0
+
+        print(elapsedUntyped, f" to iterate {CT//1000000}mm typed")
+        print(elapsedTyped, f" to iterate {CT//1000000}mm untyped")
+        print("speedup is ", elapsedUntyped / elapsedTyped)
+
+        # I get about 12.
+        assert elapsedUntyped / elapsedTyped > 4

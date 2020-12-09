@@ -14,6 +14,7 @@
 
 import typed_python.python_ast as python_ast
 import importlib
+from typed_python.compiler.for_loop_codegen import rewriteForLoops, rewriteIntiterForLoop
 from typed_python.compiler.generator_codegen import GeneratorCodegen
 from typed_python.compiler.withblock_codegen import expandWithBlockIntoTryCatch
 from typed_python.compiler.python_ast_analysis import (
@@ -29,7 +30,7 @@ from typed_python.internals import makeFunctionType, checkOneOfType
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
-from typed_python import _types, Type, ListOf
+from typed_python import _types, Type, ListOf, PointerTo, pointerTo
 from typed_python.generator import Generator
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.expression_conversion_context import ExpressionConversionContext
@@ -497,23 +498,37 @@ class ConversionContextBase:
         """
         return GeneratorCodegen(
             set(self._varname_to_type)
-        ).convertStatementsToFunctionDef(self._statements)
+        ).convertStatementsToFunctionDef(
+            rewriteForLoops(self._statements)
+            if self.isGenerator else self.statements
+        )
 
     def convert_build_generator(self):
         """Generate code that returns a 'generator' object."""
-        generatorMembers = [("..slot", int, None)]
+        if FunctionYield not in self._varname_to_type:
+            context = ExpressionConversionContext(self, FunctionStackState())
+            context.pushException("TypeInference not complete yet")
+            return context.finalize(None)
+
+        # if we have a FunctionYield, we have a type for our generator
+        T = self._varname_to_type[FunctionYield].typeRepresentation
+
+        generatorMembers = [
+            ("..slot", int, None),
+            ("..value", T, None)
+        ]
 
         for k, v in self._varname_to_type.items():
             if isinstance(k, str):
                 generatorMembers.append(("." + k, v.typeRepresentation, None))
 
-        generatorFun = evaluateFunctionDefWithLocalsInCells(
-            self.createGeneratorFun(),
-            {},
-            {}
-        )
+        smts = self.createGeneratorFun()
 
-        T = self._varname_to_type[FunctionYield].typeRepresentation
+        generatorFun = evaluateFunctionDefWithLocalsInCells(
+            smts,
+            {},
+            {".PointerType": PointerTo(T), ".pointerTo": pointerTo}
+        )
 
         generatorBaseclass = Generator(T)
 
@@ -523,29 +538,27 @@ class ConversionContextBase:
             return self
 
         memberFunctions = {
-            '__next__':
+            '__fastnext__':
             makeFunctionType(
-                '__next__',
+                '__fastnext__',
                 generatorFun,
                 classname=self.name + ".generator",
                 assumeClosuresGlobal=True,
-                returnTypeOverride=T
-            ),
+                returnTypeOverride=PointerTo(T)
+            ).typeWithEntrypoint(True),
             '__iter__':
             makeFunctionType(
                 '__iter__',
                 __iter__,
                 classname=self.name + ".generator",
-                assumeClosuresGlobal=True
-            )
+                assumeClosuresGlobal=True,
+            ).typeWithEntrypoint(True)
         }
 
         generatorSubclass = generatorSubclass.define(
             _types.Class(
                 self.name + ".generator",
-                (
-                    Generator(self._varname_to_type[FunctionYield].typeRepresentation),
-                ),
+                (generatorBaseclass,),
                 True,
                 tuple(generatorMembers),
                 tuple(memberFunctions.items()),
@@ -1112,7 +1125,8 @@ class FunctionConversionContext(ConversionContextBase):
 
     def convert_function_body(self, variableStates: FunctionStackState):
         return self.convert_statement_list_ast(
-            self._statements,
+            rewriteForLoops(self._statements) if
+            self.isGenerator else self._statements,
             variableStates,
             ControlFlowBlocks(),
             toplevel=True
@@ -1267,13 +1281,18 @@ class FunctionConversionContext(ConversionContextBase):
             tempVarnames = []
 
             for targetIndex in range(len(targets) + 1):
-                next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
+                next_ptr = iter_obj.convert_fastnext()
+
                 if next_ptr is not None:
-                    with subcontext.ifelse(is_populated.nonref_expr) as (if_true, if_false):
+                    with subcontext.ifelse(next_ptr.nonref_expr) as (if_true, if_false):
                         if targetIndex < len(targets):
                             with if_true:
                                 tempVarnames.append(f".anonyous_iter{targets[0].line_number}.{targetIndex}")
-                                self.assignToLocalVariable(tempVarnames[-1], next_ptr, variableStates)
+                                self.assignToLocalVariable(
+                                    tempVarnames[-1],
+                                    next_ptr.asReference(),
+                                    variableStates
+                                )
 
                             with if_false:
                                 subcontext.pushException(
@@ -1283,6 +1302,8 @@ class FunctionConversionContext(ConversionContextBase):
                         else:
                             with if_true:
                                 subcontext.pushException(ValueError, f"too many values to unpack (expected {len(targets)})")
+                else:
+                    return False
 
             for targetIndex in range(len(targets)):
                 self.convert_assignment(
@@ -2033,72 +2054,93 @@ class FunctionConversionContext(ConversionContextBase):
             wholeLoopExpr = wholeLoopExpr.withReturnTargetName("loop_break")
 
             return wholeLoopExpr, thisOneReturns
-        else:
-            # create a variable to hold the iterator, and instantiate it there
-            iter_varname = ".iter." + str(ast.line_number) + variableSuffix
 
-            iterator_object = to_iterate.convert_method_call("__iter__", (), {})
-            if iterator_object is None:
-                return context.finalize(None, exceptionsTakeFrom=ast), False
+        if to_iterate.expr_type.has_intiter():
+            # execute the 'intiter' fastpath for iterators. Classes where iteration
+            # is simply enumerating a list of values indexed by an integer can
+            # be replaced with a simple loop, which downstream compilation steps
+            # can see through better. Eventually, we'd like to be able to pull apart
+            # everything we're doing with classes for optimization purposes,
+            # but at the moment, this is more expedient.
+            iter_varname = ".iterate_over." + str(ast.line_number) + variableSuffix
 
-            self.assignToLocalVariable(iter_varname, iterator_object, variableStates)
+            self.assignToLocalVariable(iter_varname, to_iterate, variableStates)
 
-            while True:
-                # track the initial variable states
-                initVariableStates = variableStates.clone()
+            inner, innerReturns = self.convert_statement_list_ast(
+                list(rewriteIntiterForLoop(iter_varname, ast.target, ast.body, ast.orelse)),
+                variableStates,
+                controlFlowBlocks
+            )
 
-                cond_context = ExpressionConversionContext(self, variableStates)
+            return context.finalize(
+                inner, exceptionsTakeFrom=ast
+            ), innerReturns
 
-                iter_obj = cond_context.namedVariableLookup(iter_varname)
-                if iter_obj is None:
-                    return (
-                        context.finalize(None, exceptionsTakeFrom=ast)
-                        >> cond_context.finalize(None, exceptionsTakeFrom=ast),
-                        False
-                    )
+        # create a variable to hold the iterator, and instantiate it there
+        iter_varname = ".iter." + str(ast.line_number) + variableSuffix
 
-                next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
-                if next_ptr is None:
-                    return (
-                        context.finalize(None, exceptionsTakeFrom=ast)
-                        >> cond_context.finalize(None, exceptionsTakeFrom=ast),
-                        False
-                    )
+        iterator_object = to_iterate.convert_method_call("__iter__", (), {})
+        if iterator_object is None:
+            return context.finalize(None, exceptionsTakeFrom=ast), False
 
-                with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
-                    with if_true:
-                        self.convert_assignment(ast.target, None, next_ptr)
+        self.assignToLocalVariable(iter_varname, iterator_object, variableStates)
 
-                variableStatesTrue = variableStates.clone()
-                variableStatesFalse = variableStates.clone()
+        while True:
+            # track the initial variable states
+            initVariableStates = variableStates.clone()
 
-                true, true_returns = self.convert_statement_list_ast(
-                    ast.body, variableStatesTrue,
-                    controlFlowBlocks.pushLoop()
-                )
-                false, false_returns = self.convert_statement_list_ast(
-                    ast.orelse, variableStatesFalse,
-                    controlFlowBlocks.pushLoop()
+            cond_context = ExpressionConversionContext(self, variableStates)
+
+            iter_obj = cond_context.namedVariableLookup(iter_varname)
+            if iter_obj is None:
+                return (
+                    context.finalize(None, exceptionsTakeFrom=ast)
+                    >> cond_context.finalize(None, exceptionsTakeFrom=ast),
+                    False
                 )
 
-                variableStates.becomeMerge(
-                    variableStatesTrue if true_returns else None,
-                    variableStatesFalse if false_returns else None
+            next_ptr = iter_obj.convert_fastnext()
+            if next_ptr is None:
+                return (
+                    context.finalize(None, exceptionsTakeFrom=ast)
+                    >> cond_context.finalize(None, exceptionsTakeFrom=ast),
+                    False
                 )
 
-                variableStates.mergeWithSelf(initVariableStates)
+            with cond_context.ifelse(next_ptr.nonref_expr) as (if_true, if_false):
+                with if_true:
+                    self.convert_assignment(ast.target, None, next_ptr.asReference())
 
-                if variableStates == initVariableStates:
-                    # if nothing changed, the loop is stable.
-                    return (
-                        context.finalize(None, exceptionsTakeFrom=ast) >>
-                        native_ast.Expression.While(
-                            cond=cond_context.finalize(is_populated, exceptionsTakeFrom=ast),
-                            while_true=true.withReturnTargetName("loop_continue"),
-                            orelse=false
-                        ).withReturnTargetName("loop_break"),
-                        true_returns or false_returns
-                    )
+            variableStatesTrue = variableStates.clone()
+            variableStatesFalse = variableStates.clone()
+
+            true, true_returns = self.convert_statement_list_ast(
+                ast.body, variableStatesTrue,
+                controlFlowBlocks.pushLoop()
+            )
+            false, false_returns = self.convert_statement_list_ast(
+                ast.orelse, variableStatesFalse,
+                controlFlowBlocks.pushLoop()
+            )
+
+            variableStates.becomeMerge(
+                variableStatesTrue if true_returns else None,
+                variableStatesFalse if false_returns else None
+            )
+
+            variableStates.mergeWithSelf(initVariableStates)
+
+            if variableStates == initVariableStates:
+                # if nothing changed, the loop is stable.
+                return (
+                    context.finalize(None, exceptionsTakeFrom=ast) >>
+                    native_ast.Expression.While(
+                        cond=cond_context.finalize(next_ptr.nonref_expr, exceptionsTakeFrom=ast),
+                        while_true=true.withReturnTargetName("loop_continue"),
+                        orelse=false
+                    ).withReturnTargetName("loop_break"),
+                    true_returns or false_returns
+                )
 
     def checkIfStatementIsSplitOnOneOf(self, statement, variableStates):
         """Check if 'statement' is 'checkOneOfType(x)' for some variable 'x'

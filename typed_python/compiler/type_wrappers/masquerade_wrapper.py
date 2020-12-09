@@ -86,8 +86,8 @@ class MasqueradeWrapper(Wrapper):
     def convert_default_initialize(self, context, target):
         raise Exception("This should never be called")
 
-    def convert_next(self, context, instance):
-        return instance.convert_masquerade_to_untyped().convert_next()
+    def convert_fastnext(self, context, instance):
+        return instance.convert_masquerade_to_untyped().convert_fastnext()
 
     def convert_attribute(self, context, instance, attribute):
         return instance.convert_masquerade_to_typed().convert_attribute(attribute)

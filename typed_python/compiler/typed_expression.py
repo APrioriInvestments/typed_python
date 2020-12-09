@@ -70,6 +70,50 @@ class TypedExpression:
             False
         )
 
+    def asPointerIf(self, ifExpr):
+        """Return 'self' as a PointerTo(T) which is null if ifExpr is False.
+
+        Args:
+            self - a reference to a T
+            ifExpr - a TypedExpression to something which can be compared to zero.
+
+        Returns:
+            a TypedExpression(PointerTo(T)) which is _not_ a reference.
+        """
+        assert self.isReference
+
+        return TypedExpression(
+            self.context,
+            native_ast.Expression.Branch(
+                cond=ifExpr.nonref_expr,
+                true=self.expr,
+                false=self.expr_type.getNativeLayoutType().pointer().zero()
+            ),
+            typeWrapper(PointerTo(self.expr_type.typeRepresentation)),
+            False,
+            None
+        )
+
+    def asReference(self):
+        """Change from being a value 'PointerTo(T)' to being a reference of type 'T'"""
+        if self.isReference:
+            self = TypedExpression(
+                self.context,
+                self.nonref_expr,
+                self.expr_type,
+                False
+            )
+
+        assert (
+            isinstance(self.expr_type.typeRepresentation, type)
+            and issubclass(self.expr_type.typeRepresentation, PointerTo)
+        )
+
+        return self.changeType(
+            typeWrapper(self.expr_type.typeRepresentation.ElementType),
+            True
+        )
+
     def refToHeld(self):
         if getattr(self.expr_type.typeRepresentation, "__typed_python_category__", None) == "RefTo":
             return TypedExpression(
@@ -282,8 +326,14 @@ class TypedExpression:
     def convert_masquerade_to_typed(self):
         return self.expr_type.convert_masquerade_to_typed(self.context, self)
 
-    def convert_next(self):
-        return self.expr_type.convert_next(self.context, self)
+    def convert_fastnext(self):
+        """Call '__fastnext__' on the object.
+
+        Returns:
+            a PointerTo the result, which will be None if iteration is
+            stopped.
+        """
+        return self.expr_type.convert_fastnext(self.context, self)
 
     def toFloat64(self):
         return self.convert_to_type(float, ConversionLevel.New)
