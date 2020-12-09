@@ -325,6 +325,8 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertTrue(.8 <= ratio <= 1.2, ratio)
 
+    @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.skipif('sys.platform=="darwin"')
     def test_nocompile_works(self):
         thisWouldNotBeVisible = set()
 
