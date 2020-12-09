@@ -12,13 +12,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import time
+import typed_python._types as _types
+import unittest
+
+from flaky import flaky
 from typed_python import (
     Tuple, NamedTuple, Class, Member, ListOf, Compiled,
     Final, Forward, OneOf
 )
-import time
-import typed_python._types as _types
-import unittest
 from typed_python import Entrypoint, makeNamedTuple, Function
 
 
@@ -335,6 +337,7 @@ class TestTupleCompilation(unittest.TestCase):
 
         assert getAProperty(X(a=12)) == 112
 
+    @flaky(max_runs=3, min_passes=1)
     def test_subclass_of_named_tuple_compilation_perf(self):
         NT = NamedTuple(a=float, b=str)
 

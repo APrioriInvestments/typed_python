@@ -347,6 +347,7 @@ class TestSetCompilation(unittest.TestCase):
         self.assertEqual(temp_set, set())
         self.assertEqual(original_set, new_set)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_set_perf(self):
         def set_copy_discard(s: Set(int), count: int):
             for i in range(2, count):

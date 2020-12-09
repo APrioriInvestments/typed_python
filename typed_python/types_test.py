@@ -1508,6 +1508,7 @@ class NativeTypesTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 print(a + v)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_alternatives_perf(self):
         alt = Alternative(
             "Alt",
@@ -3256,6 +3257,7 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertTrue(good)  # see output for specific problems
 
+    @flaky(max_runs=3, min_passes=1)
     def test_list_of_uint8_from_bytes_perf(self):
         someBytes = b"asdf" * 1024 * 1024
 

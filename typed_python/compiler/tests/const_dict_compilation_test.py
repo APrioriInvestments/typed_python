@@ -12,11 +12,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ConstDict, TupleOf, ListOf, Tuple, Compiled
-import typed_python._types as _types
-from typed_python import Entrypoint
-import unittest
 import time
+import typed_python._types as _types
+import unittest
+
+from flaky import flaky
+from typed_python import ConstDict, TupleOf, ListOf, Tuple, Compiled
+from typed_python import Entrypoint
 
 
 dictTypes = [
@@ -158,6 +160,7 @@ class TestConstDictCompilation(unittest.TestCase):
         self.assertTrue(compiledContains({k*2: k*2 for k in range(10)}, 4))
         self.assertFalse(compiledContains({k*2: k*2 for k in range(10)}, 5))
 
+    @flaky(max_runs=3, min_passes=1)
     def test_const_dict_loops_perf(self):
         def loop(x: ConstDict(int, int)):
             res = 0

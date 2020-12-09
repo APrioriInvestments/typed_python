@@ -15,6 +15,7 @@
 import unittest
 import time
 
+from flaky import flaky
 from typed_python import Tuple, NamedTuple, Entrypoint, makeNamedTuple, ListOf, Function, OneOf
 from typed_python import map
 
@@ -43,6 +44,7 @@ class TestMap(unittest.TestCase):
         self.assertEqual(type(map(f, aNamedTup)), NamedTuple(x=int, y=float))
         self.assertEqual(type(compiledMap(f, aNamedTup)), NamedTuple(x=int, y=float))
 
+    @flaky(max_runs=3, min_passes=1)
     def test_map_perf(self):
         @Function
         def addOne(x):

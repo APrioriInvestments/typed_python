@@ -12,13 +12,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Function, TupleOf, OneOf, Compiled, Entrypoint
-from typed_python import UInt8, UInt16, UInt32, Class, Final, Member
-import typed_python._types as _types
-import unittest
-import time
 import numpy
 import psutil
+import time
+import typed_python._types as _types
+import unittest
+
+from flaky import flaky
+from typed_python import ListOf, Function, TupleOf, OneOf, Compiled, Entrypoint
+from typed_python import UInt8, UInt16, UInt32, Class, Final, Member
 
 
 class TestListOfCompilation(unittest.TestCase):
@@ -327,6 +329,7 @@ class TestListOfCompilation(unittest.TestCase):
 
         self.assertEqual(f(), [10.0, None, 10.0, None])
 
+    @flaky(max_runs=3, min_passes=1)
     def test_lists_add_perf(self):
         T = ListOf(int)
 

@@ -15,6 +15,7 @@
 import unittest
 import time
 
+from flaky import flaky
 from typed_python import Tuple, NamedTuple, Entrypoint
 
 from typed_python import reduce
@@ -38,6 +39,7 @@ class TestReduce(unittest.TestCase):
         self.assertEqual(reduce(f, aNamedTup), 3.5)
         self.assertEqual(compiledReduce(f, aNamedTup), 3.5)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_reduce_perf(self):
         def doit(tup, times):
             res = 0.0

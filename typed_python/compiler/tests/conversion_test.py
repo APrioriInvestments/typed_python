@@ -2473,6 +2473,7 @@ class TestCompilationStructures(unittest.TestCase):
                                         self.assertEqual(r1, r2, (a, b, c, d))
                                         self.assertEqual(t1, t2, (a, b, c, d))
 
+    @flaky(max_runs=3, min_passes=1)
     def test_context_manager_perf(self):
 
         class ConMan1():

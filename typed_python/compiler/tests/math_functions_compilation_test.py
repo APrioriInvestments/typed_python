@@ -17,6 +17,7 @@ import math
 import time
 import numpy
 
+from flaky import flaky
 from typed_python import (
     Float32, UInt64, UInt32, UInt16, UInt8, Int32, Int16, Int8, ListOf, TupleOf
 )
@@ -66,6 +67,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
             for val in values:
                 self.assertEqual(compiled(val), funToTest(val), val)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_math_functions_perf(self):
         def checkMany(x: float, i: int):
             count = 0
@@ -521,6 +523,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         # Note r1 != r2 because nan != nan
         self.assertEqual(r1[0:-1], r2[0:-1])
 
+    @flaky(max_runs=3, min_passes=1)
     def test_math_functions_perf_other(self):
         count = 1000000
         element = lambda i: -5.0 + i / (count / 10.0)

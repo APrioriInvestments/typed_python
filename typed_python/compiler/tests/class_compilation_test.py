@@ -238,6 +238,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(g(c), c.g())
         self.assertEqual(g(c2), c2.g())
 
+    @flaky(max_runs=3, min_passes=1)
     def test_call_method_dispatch_perf(self):
         @Compiled
         def addCaller(c: AClass, count: int):

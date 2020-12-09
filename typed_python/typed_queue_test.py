@@ -16,6 +16,8 @@ import unittest
 import threading
 import time
 import queue
+
+from flaky import flaky
 from typed_python.typed_queue import TypedQueue
 from typed_python import ListOf, Entrypoint, Tuple
 from typed_python._types import refcount
@@ -70,6 +72,7 @@ class TypedQueueTests(unittest.TestCase):
 
         thread1.join()
 
+    @flaky(max_runs=3, min_passes=1)
     def test_queue_perf(self):
         untypedQueue1 = queue.Queue()
         untypedQueue2 = queue.Queue()

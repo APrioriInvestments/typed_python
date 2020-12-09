@@ -325,6 +325,7 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertEqual(x, {2: 3})
 
+    @flaky(max_runs=3, min_passes=1)
     def test_dict_read_write_perf(self):
         def dict_setmany(d, count, passes):
             for _ in range(passes):
@@ -470,6 +471,7 @@ class TestDictCompilation(unittest.TestCase):
         self.assertEqual(_types.refcount(aTup), 2)
         self.assertEqual(_types.refcount(aTup3), 2)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_dict_hash_perf_compiled(self):
         @Entrypoint
         def f(dictToLookupIn, items, passes):

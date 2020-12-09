@@ -99,6 +99,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         # I get about .5 seconds on my laptop
         self.assertTrue(time.time() - t0 < 5.0, time.time() - t0)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_specialized_entrypoint_perf_difference(self):
         compiledAdd = Entrypoint(add)
 

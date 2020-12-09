@@ -12,14 +12,17 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Tuple
-import typed_python.lib.sorting as sorting
-import unittest
 import numpy
 import time
+import typed_python.lib.sorting as sorting
+import unittest
+
+from flaky import flaky
+from typed_python import ListOf, Tuple
 
 
 class TestSorting(unittest.TestCase):
+    @flaky(max_runs=3, min_passes=1)
     def test_perf_not_quadratic(self):
         length = 100000
 
@@ -70,6 +73,7 @@ class TestSorting(unittest.TestCase):
 
         self.assertEqual(ListOf(int)(sorted(x)), sorting.sorted(x))
 
+    @flaky(max_runs=3, min_passes=1)
     def test_sort_perf_simple(self):
         x = ListOf(float)(numpy.random.uniform(size=1000000))
 
@@ -86,6 +90,7 @@ class TestSorting(unittest.TestCase):
         # I get about 3
         self.assertGreater(speedup, 1.5)
 
+    @flaky(max_runs=3, min_passes=1)
     def test_sort_perf_tuples(self):
         x = ListOf(Tuple(float, float))()
 

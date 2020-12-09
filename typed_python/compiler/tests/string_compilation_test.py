@@ -12,6 +12,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import pytest
+import unittest
+import time
+
+from flaky import flaky
 from typed_python import _types, ListOf, TupleOf, Dict, ConstDict, Compiled, Entrypoint, OneOf
 from typed_python.compiler.type_wrappers.string_wrapper import strJoinIterable, \
     strStartswith, strRangeStartswith, strStartswithTuple, strRangeStartswithTuple, \
@@ -19,10 +24,6 @@ from typed_python.compiler.type_wrappers.string_wrapper import strJoinIterable, 
     strReplace, strPartition, strRpartition, strCenter, strRjust, strLjust, strExpandtabs, strZfill
 from typed_python.test_util import currentMemUsageMb, compilerPerformanceComparison
 from typed_python.compiler.runtime import PrintNewFunctionVisitor
-import pytest
-import unittest
-import time
-import flaky
 
 
 someStrings = [
@@ -697,7 +698,7 @@ class TestStringCompilation(unittest.TestCase):
         print(f"total time {t1-t0}")
         self.assertTrue(False)
 
-    @flaky.flaky(max_runs=3, min_passes=1)
+    @flaky(max_runs=3, min_passes=1)
     def test_string_strip_perf(self):
         bigS = " " * 1000000
         littleS = " "
@@ -791,7 +792,7 @@ class TestStringCompilation(unittest.TestCase):
         endusage = currentMemUsageMb()
         self.assertLess(endusage, startusage + 1)
 
-    @flaky.flaky(max_runs=3, min_passes=1)
+    @flaky(max_runs=3, min_passes=1)
     def test_string_split_perf(self):
         def splitAndCount(s: str, sep: str, times: int):
             res = 0
@@ -971,7 +972,7 @@ class TestStringCompilation(unittest.TestCase):
 
         self.assertEqual(callit(f), str(callOrExcept))
 
-    @flaky.flaky(max_runs=3, min_passes=1)
+    @flaky(max_runs=3, min_passes=1)
     def test_compare_strings_to_constant(self):
         @Entrypoint
         def countEqualTo(z):

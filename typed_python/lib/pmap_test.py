@@ -16,6 +16,7 @@ import pytest
 import os
 import traceback
 
+from flaky import flaky
 from typed_python.lib.pmap import pmap
 from typed_python.typed_queue import TypedQueue
 from typed_python import ListOf, Entrypoint, Class, Member, Final, Tuple
@@ -46,6 +47,7 @@ def test_pmap_correct():
     assert pmap(ListOf(int)([1, 2, 3]), addOne, int) == [2, 3, 4]
 
 
+@flaky(max_runs=3, min_passes=1)
 def test_pmap_perf():
     # disable this test on travis, as extra cores aren't guaranteed.
     if os.environ.get('TRAVIS_CI', None) is not None:

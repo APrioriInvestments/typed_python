@@ -12,6 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import time
+import unittest
+
+from flaky import flaky
 from typed_python import Compiled, Entrypoint, ListOf, TupleOf, Dict, ConstDict
 from typed_python.compiler.type_wrappers.bytes_wrapper import bytesJoinIterable, \
     bytes_isalnum, bytes_isalpha, \
@@ -22,10 +26,6 @@ from typed_python.compiler.type_wrappers.bytes_wrapper import bytesJoinIterable,
     bytes_partition, bytes_rpartition, bytes_center, bytes_ljust, bytes_rjust, bytes_expandtabs, \
     bytes_zfill
 from typed_python.test_util import compilerPerformanceComparison
-import flaky
-
-import unittest
-import time
 
 
 someBytes = [
@@ -106,8 +106,11 @@ class TestBytesCompilation(unittest.TestCase):
 
         for s in someBytes:
             for i in range(-20, 20):
-                self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
+                self.assertEqual(
+                    callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i)
+                )
 
+    @flaky(max_runs=3, min_passes=1)
     def test_bytes_perf(self):
         def bytesAdd(x: bytes):
             i = 0
@@ -281,7 +284,7 @@ class TestBytesCompilation(unittest.TestCase):
         with self.assertRaises(ValueError):
             compiledRsplit(b'abc', b'')
 
-    @flaky.flaky(max_runs=3, min_passes=1)
+    @flaky(max_runs=3, min_passes=1)
     def test_bytes_split_perf(self):
         def splitAndCount(s: bytes, sep: bytes, times: int):
             res = 0
