@@ -122,7 +122,8 @@ clean:
 $(VIRTUAL_ENV): $(PYTHON) .env
 	$(PYTHON) -m venv $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate
-	pip install pipenv==2018.11.26
+	pip install -U pip
+	pip install pipenv==2020.11.15
 	pip install wheel
 
 $(TP_BUILD_PATH)/all.o: $(TP_SRC_PATH)/*.hpp $(TP_SRC_PATH)/*.cpp
