@@ -360,7 +360,7 @@ class FunctionOverloadArg:
 
 
 class FunctionOverload:
-    def __init__(self, functionTypeObject, index, code, funcGlobals, funcGlobalsInCells, closureVarLookups, returnType):
+    def __init__(self, functionTypeObject, index, code, funcGlobalsInCells, closureVarLookups, returnType):
         """Initialize a FunctionOverload.
 
         Args:
@@ -379,11 +379,14 @@ class FunctionOverload:
         self.index = index
         self.closureVarLookups = closureVarLookups
         self.functionCode = code
-        self.functionGlobals = funcGlobals
         self.funcGlobalsInCells = funcGlobalsInCells
         self.returnType = returnType
         self._realizedGlobals = None
         self.args = ()
+
+    @property
+    def functionGlobals(self):
+        return self.functionTypeObject.extractOverloadGlobals(self.index)
 
     @staticmethod
     def extractGlobalNamesFromCode(codeObj):

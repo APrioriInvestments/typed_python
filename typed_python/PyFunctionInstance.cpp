@@ -527,7 +527,6 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
         PyDict_SetItemString(pyOverloadInstDict, "index", (PyObject*)pyIndex);
         PyDict_SetItemString(pyOverloadInstDict, "closureVarLookups", (PyObject*)pyClosureVarsDict);
         PyDict_SetItemString(pyOverloadInstDict, "functionCode", (PyObject*)overload.getFunctionCode());
-        PyDict_SetItemString(pyOverloadInstDict, "functionGlobals", (PyObject*)overload.getFunctionGlobals());
         PyDict_SetItemString(pyOverloadInstDict, "funcGlobalsInCells", (PyObject*)pyGlobalCellDict);
         PyDict_SetItemString(pyOverloadInstDict, "returnType", overload.getReturnType() ? (PyObject*)typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None);
         PyDict_SetItemString(pyOverloadInstDict, "_realizedGlobals", Py_None);
@@ -675,6 +674,35 @@ PyObject* PyFunctionInstance::extractPyFun(PyObject* funcObj, PyObject* args, Py
             fType->getClosureType(),
             ((PyInstance*)funcObj)->dataPtr()
         );
+    });
+}
+
+/* static */
+PyObject* PyFunctionInstance::extractOverloadGlobals(PyObject* cls, PyObject* args, PyObject* kwargs) {
+    Type* selfType = PyInstance::unwrapTypeArgToTypePtr(cls);
+
+    if (!selfType || selfType->getTypeCategory() != Type::TypeCategory::catFunction) {
+        PyErr_Format(PyExc_TypeError, "Expected class to be a Function");
+        return nullptr;
+    }
+
+    Function* fType = (Function*)selfType;
+
+    static const char *kwlist[] = {"overloadIx", NULL};
+
+    long overloadIx;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "l", (char**)kwlist, &overloadIx)) {
+        return nullptr;
+    }
+
+    if (overloadIx < 0 || overloadIx >= fType->getOverloads().size()) {
+        PyErr_SetString(PyExc_IndexError, "Overload index out of bounds");
+        return nullptr;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        return incref(fType->getOverloads()[overloadIx].getFunctionGlobals());
     });
 }
 
@@ -840,12 +868,13 @@ PyObject* PyFunctionInstance::resultTypeFor(PyObject* funcObj, PyObject* args, P
 
 /* static */
 PyMethodDef* PyFunctionInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef[9] {
+    return new PyMethodDef[10] {
         {"overload", (PyCFunction)PyFunctionInstance::overload, METH_VARARGS | METH_KEYWORDS, NULL},
         {"withEntrypoint", (PyCFunction)PyFunctionInstance::withEntrypoint, METH_VARARGS | METH_KEYWORDS, NULL},
         {"withNocompile", (PyCFunction)PyFunctionInstance::withNocompile, METH_VARARGS | METH_KEYWORDS, NULL},
         {"resultTypeFor", (PyCFunction)PyFunctionInstance::resultTypeFor, METH_VARARGS | METH_KEYWORDS, NULL},
         {"extractPyFun", (PyCFunction)PyFunctionInstance::extractPyFun, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"extractOverloadGlobals", (PyCFunction)PyFunctionInstance::extractOverloadGlobals, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {"getClosure", (PyCFunction)PyFunctionInstance::getClosure, METH_VARARGS | METH_KEYWORDS, NULL},
         {"withClosureType", (PyCFunction)PyFunctionInstance::withClosureType, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {"withOverloadVariableBindings", (PyCFunction)PyFunctionInstance::withOverloadVariableBindings, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},

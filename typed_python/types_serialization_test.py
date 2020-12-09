@@ -2622,3 +2622,36 @@ class TypesSerializationTest(unittest.TestCase):
         f2 = SerializationContext().deserialize(f2serialized)
 
         assert f(10) == f2(10)
+
+    def test_globals_of_entrypointed_functions_serialized_externally(self):
+        def makeC():
+            with tempfile.TemporaryDirectory() as tempdir:
+                path = os.path.join(tempdir, "asdf.py")
+
+                CONTENTS = (
+                    "from typed_python import Entrypoint, ListOf, Class, Final\n"
+                    "class C(Class, Final):\n"
+                    "    @staticmethod\n"
+                    "    @Entrypoint\n"
+                    "    def anF():\n"
+                    "        return C\n"
+                )
+
+                with open(path, "w") as f:
+                    f.write(CONTENTS)
+
+                globals = {'__file__': path}
+
+                exec(
+                    compile(CONTENTS, path, "exec"),
+                    globals
+                )
+
+                s = SerializationContext()
+                return s.serialize(globals['C'])
+
+        serializedC = callFunctionInFreshProcess(makeC, ())
+
+        C = SerializationContext().deserialize(serializedC)
+
+        assert C.anF() is C

@@ -90,6 +90,8 @@ public:
 
     static PyObject* extractPyFun(PyObject* funcObj, PyObject* args, PyObject* kwargs);
 
+    static PyObject* extractOverloadGlobals(PyObject* funcObj, PyObject* args, PyObject* kwargs);
+
     static PyObject* withEntrypoint(PyObject* funcObj, PyObject* args, PyObject* kwargs);
 
     static PyObject* withNocompile(PyObject* funcObj, PyObject* args, PyObject* kwargs);
