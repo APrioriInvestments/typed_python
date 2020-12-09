@@ -28,6 +28,9 @@ class OneOfWrapper(Wrapper):
     is_pass_by_ref = True
     can_unwrap = True
 
+    # is this wrapping a OneOf object
+    is_oneof_wrapper = True
+
     def __init__(self, t):
         assert hasattr(t, '__typed_python_category__')
         super().__init__(t)

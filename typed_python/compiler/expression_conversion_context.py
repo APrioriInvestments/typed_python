@@ -747,7 +747,7 @@ class ExpressionConversionContext:
         if self.teardowns:
             expr = native_ast.Expression.Finally(expr=expr, teardowns=self.teardowns)
 
-        if exceptionsTakeFrom and expr.couldThrow():
+        if exceptionsTakeFrom and expr.couldThrow() and exceptionsTakeFrom.filename:
             expr = native_ast.Expression.ExceptionPropagator(
                 expr=expr,
                 varname=self.functionContext.allocateLetVarname(),

@@ -13,166 +13,54 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python import Class, Final, Member, PointerTo, NamedTuple
+from typed_python import pointerTo
 import typed_python.compiler.native_ast as native_ast
 
 
-class RangeWrapper(Wrapper):
-    is_pod = True
-    is_empty = False
-    is_pass_by_ref = False
+class Range(Class, Final, __name__='range'):
+    start = Member(int)
+    stop = Member(int)
+    step = Member(int)
 
-    def __init__(self):
-        super().__init__((range, "type"))
+    def __repr__(self):
+        if self.step == 1:
+            return f"range({self.start}, {self.stop})"
 
-    def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return f"range({self.start}, {self.stop}, {self.step})"
 
-    def convert_call(self, context, expr, args, kwargs):
-        if len(args) == 1 and not kwargs:
-            arg = args[0].toIndex()
-            if not arg:
-                return None
-            return context.push(
-                _RangeInstanceWrapper,
-                lambda newInstance:
-                    newInstance.expr.ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(-1))
-                    >> newInstance.expr.ElementPtrIntegers(0, 1).store(arg.nonref_expr)
-                    >> newInstance.expr.ElementPtrIntegers(0, 2).store(native_ast.const_int_expr(1))
-            )
+    def __init__(self, stop):
+        self.start = 0
+        self.stop = stop
+        self.step = 1
 
-        if len(args) == 2 and not kwargs:
-            arg0 = args[0].toIndex()
-            if not arg0:
-                return None
+    def __init__(self, start, stop):
+        self.start = start
+        self.stop = stop
+        self.step = 1
 
-            arg1 = args[1].toIndex()
-            if not arg1:
-                return None
+    def __init__(self, start, stop, step):
+        self.start = start
+        self.stop = stop
+        self.step = step
 
-            return context.push(
-                _RangeInstanceWrapper,
-                lambda newInstance:
-                    newInstance.expr.ElementPtrIntegers(0, 0).store(arg0.nonref_expr.sub(1))
-                    >> newInstance.expr.ElementPtrIntegers(0, 1).store(arg1.nonref_expr)
-                    >> newInstance.expr.ElementPtrIntegers(0, 2).store(native_ast.const_int_expr(1))
-            )
-
-        if len(args) == 3 and not kwargs:
-            arg0 = args[0].toIndex()
-            if not arg0:
-                return None
-
-            arg1 = args[1].toIndex()
-            if not arg1:
-                return None
-
-            arg2 = args[2].toIndex()
-            if not arg2:
-                return None
-
-            with context.ifelse(arg2.nonref_expr) as (ifTrue, ifFalse):
-                with ifFalse:
-                    context.pushException(ValueError, "range() arg 3 must not be zero")
-
-            return context.push(
-                _RangeInstanceWrapper,
-                lambda newInstance:
-                    newInstance.expr.ElementPtrIntegers(0, 0).store(arg0.nonref_expr.sub(arg2.nonref_expr))
-                    >> newInstance.expr.ElementPtrIntegers(0, 1).store(arg1.nonref_expr)
-                    >> newInstance.expr.ElementPtrIntegers(0, 2).store(arg2.nonref_expr)
-            )
-
-        return super().convert_call(context, expr, args, kwargs)
-
-    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
-        if conversionLevel.isNewOrHigher() and targetVal.expr_type.typeRepresentation is str:
-            targetVal.convert_copy_initialize(
-                context.constant(str(self.typeRepresentation[0]))
-            )
-            return context.constant(True)
-
-        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
+    def __iter__(self):
+        return RangeIterator(start=self.start - self.step, stop=self.stop, step=self.step)
 
 
-class RangeInstanceWrapper(Wrapper):
-    is_pod = True
-    is_empty = False
-    is_pass_by_ref = False
+class RangeIterator(NamedTuple(start=int, stop=int, step=int)):
+    def __fastnext__(self) -> PointerTo(int):
+        startPtr = pointerTo(self).start
+        stopPtr = pointerTo(self).stop
+        stepPtr = pointerTo(self).step
 
-    def __init__(self):
-        super().__init__((range, "instance"))
+        startPtr.set(startPtr.get() + stepPtr.get())
 
-    def getNativeLayoutType(self):
-        return native_ast.Type.Struct(
-            element_types=(
-                ('start', native_ast.Int64),
-                ('stop', native_ast.Int64),
-                ('step', native_ast.Int64)
-            )
-        )
+        if stepPtr.get() > 0:
+            if startPtr.get() < stopPtr.get():
+                return startPtr
+        else:
+            if startPtr.get() > stopPtr.get():
+                return startPtr
 
-    def convert_method_call(self, context, expr, methodname, args, kwargs):
-        if methodname == "__iter__" and not args and not kwargs:
-            return context.push(
-                _RangeIteratorWrapper,
-                lambda instance:
-                    instance.expr.store(expr.nonref_expr)
-            )
-        return super().convert_method_call(context, expr, methodname, args, kwargs)
-
-
-class RangeIteratorWrapper(Wrapper):
-    is_pod = True
-    is_empty = False
-    is_pass_by_ref = True
-
-    def __init__(self):
-        super().__init__((range, "iterator"))
-
-    def getNativeLayoutType(self):
-        return native_ast.Type.Struct(
-            element_types=(("start", native_ast.Int64), ("stop", native_ast.Int64), ("step", native_ast.Int64)),
-            name="range_storage"
-        )
-
-    def convert_next(self, context, expr):
-        context.pushEffect(
-            expr.expr.ElementPtrIntegers(0, 0).store(
-                expr.expr.ElementPtrIntegers(0, 0).load().add(
-                    expr.expr.ElementPtrIntegers(0, 2).load()
-                )
-            )
-        )
-        canContinue = context.allocateUninitializedSlot(bool)
-
-        with context.ifelse(expr.expr.ElementPtrIntegers(0, 2).load().gt(native_ast.const_int_expr(0))) as (ifTrue, ifFalse):
-            with ifTrue:
-                context.pushEffect(
-                    canContinue.expr.store(
-                        expr.expr.ElementPtrIntegers(0, 0).load().lt(
-                            expr.expr.ElementPtrIntegers(0, 1).load()
-                        )
-                    )
-                )
-            with ifFalse:
-                context.pushEffect(
-                    canContinue.expr.store(
-                        expr.expr.ElementPtrIntegers(0, 0).load().gt(
-                            expr.expr.ElementPtrIntegers(0, 1).load()
-                        )
-                    )
-                )
-
-        context.markUninitializedSlotInitialized(canContinue)
-
-        nextExpr = context.pushReference(
-            int,
-            expr.expr.ElementPtrIntegers(0, 0)
-        )
-
-        return nextExpr, canContinue
-
-
-_RangeWrapper = RangeWrapper()
-_RangeInstanceWrapper = RangeInstanceWrapper()
-_RangeIteratorWrapper = RangeIteratorWrapper()
+        return PointerTo(int)()

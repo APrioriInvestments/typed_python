@@ -15,7 +15,7 @@
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
 from typed_python import (
-    _types, Int32, Tuple, NamedTuple, Function, Dict, Set, ConstDict, ListOf, TupleOf
+    _types, Int32, Tuple, NamedTuple, Function, Dict, Set, ConstDict, ListOf, TupleOf, PointerTo
 )
 import typed_python._types
 from typed_python.compiler.conversion_level import ConversionLevel
@@ -533,6 +533,28 @@ class NamedTupleWrapper(TupleWrapper):
             AttributeError,
             "'%s' object has no attribute '%s'" % (str(self.typeRepresentation), attribute)
         )
+
+    def convert_fastnext(self, context, instance):
+        if self.isSubclassOfNamedTuple:
+            return self.convert_method_call(context, instance, "__fastnext__", [], {})
+
+        return super().convert_fastnext()
+
+    def convert_pointerTo(self, context, instance):
+        PtrT = PointerTo(self.typeRepresentation)
+
+        if not instance.isReference:
+            instance = context.pushMove(instance)
+
+        return instance.asPointer()
+
+    def convert_attribute_pointerTo(self, context, pointerInstance, attribute):
+        if attribute in self.namesToIndices:
+            return self.refAs(
+                context,
+                pointerInstance.asReference(),
+                self.namesToIndices[attribute],
+            ).asPointer()
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0:

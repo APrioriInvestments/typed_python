@@ -12,11 +12,19 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Compiled, Entrypoint
+from typed_python import ListOf, Compiled, Entrypoint, localVariableTypesKnownToCompiler
+import time
 import unittest
 
 
 class TestRangeCompilation(unittest.TestCase):
+    def test_construct_range(self):
+        @Entrypoint
+        def buildRange(x: int):
+            return range(x).stop
+
+        assert buildRange(10) == 10
+
     def test_sum_with_range(self):
         @Compiled
         def sumWithRange(x: int):
@@ -106,3 +114,29 @@ class TestRangeCompilation(unittest.TestCase):
             (10, -10, -500),
         ]:
             assert fCompiled(*args) == f(*args)
+
+    def test_range_perf(self):
+        @Entrypoint
+        def sumRangeAsInts(x):
+            res = 0
+            for y in range(x):
+                res += y
+            return res
+
+        @Entrypoint
+        def sumRangeAsFloats(x):
+            res = 0.0
+            for y in range(x):
+                res += y
+            return res
+
+        sumRangeAsInts(10)
+        sumRangeAsFloats(10)
+
+        t0 = time.time()
+        sumRangeAsInts(1000000000)
+        t1 = time.time()
+        sumRangeAsFloats(1000000000)
+        t2 = time.time()
+
+        print(t2 - t1, t1 - t0)

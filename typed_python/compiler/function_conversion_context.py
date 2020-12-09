@@ -14,6 +14,7 @@
 
 import typed_python.python_ast as python_ast
 import importlib
+from typed_python.compiler.for_loop_codegen import rewriteForLoops
 from typed_python.compiler.generator_codegen import GeneratorCodegen
 from typed_python.compiler.withblock_codegen import expandWithBlockIntoTryCatch
 from typed_python.compiler.python_ast_analysis import (
@@ -29,7 +30,7 @@ from typed_python.internals import makeFunctionType, checkOneOfType
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
-from typed_python import _types, Type, ListOf
+from typed_python import _types, Type, ListOf, PointerTo, pointerTo
 from typed_python.generator import Generator
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.expression_conversion_context import ExpressionConversionContext
@@ -497,23 +498,37 @@ class ConversionContextBase:
         """
         return GeneratorCodegen(
             set(self._varname_to_type)
-        ).convertStatementsToFunctionDef(self._statements)
+        ).convertStatementsToFunctionDef(
+            rewriteForLoops(self._statements)
+            if self.isGenerator else self.statements
+        )
 
     def convert_build_generator(self):
         """Generate code that returns a 'generator' object."""
-        generatorMembers = [("..slot", int, None)]
+        if FunctionYield not in self._varname_to_type:
+            context = ExpressionConversionContext(self, FunctionStackState())
+            context.pushException("TypeInference not complete yet")
+            return context.finalize(None)
+
+        # if we have a FunctionYield, we have a type for our generator
+        T = self._varname_to_type[FunctionYield].typeRepresentation
+
+        generatorMembers = [
+            ("..slot", int, None),
+            ("..value", T, None)
+        ]
 
         for k, v in self._varname_to_type.items():
             if isinstance(k, str):
                 generatorMembers.append(("." + k, v.typeRepresentation, None))
 
-        generatorFun = evaluateFunctionDefWithLocalsInCells(
-            self.createGeneratorFun(),
-            {},
-            {}
-        )
+        smts = self.createGeneratorFun()
 
-        T = self._varname_to_type[FunctionYield].typeRepresentation
+        generatorFun = evaluateFunctionDefWithLocalsInCells(
+            smts,
+            {},
+            {".PointerType": PointerTo(T), ".pointerTo": pointerTo}
+        )
 
         generatorBaseclass = Generator(T)
 
@@ -523,29 +538,27 @@ class ConversionContextBase:
             return self
 
         memberFunctions = {
-            '__next__':
+            '__fastnext__':
             makeFunctionType(
-                '__next__',
+                '__fastnext__',
                 generatorFun,
                 classname=self.name + ".generator",
                 assumeClosuresGlobal=True,
-                returnTypeOverride=T
-            ),
+                returnTypeOverride=PointerTo(T)
+            ).typeWithEntrypoint(True),
             '__iter__':
             makeFunctionType(
                 '__iter__',
                 __iter__,
                 classname=self.name + ".generator",
-                assumeClosuresGlobal=True
-            )
+                assumeClosuresGlobal=True,
+            ).typeWithEntrypoint(True)
         }
 
         generatorSubclass = generatorSubclass.define(
             _types.Class(
                 self.name + ".generator",
-                (
-                    Generator(self._varname_to_type[FunctionYield].typeRepresentation),
-                ),
+                (generatorBaseclass,),
                 True,
                 tuple(generatorMembers),
                 tuple(memberFunctions.items()),
@@ -1112,7 +1125,8 @@ class FunctionConversionContext(ConversionContextBase):
 
     def convert_function_body(self, variableStates: FunctionStackState):
         return self.convert_statement_list_ast(
-            self._statements,
+            rewriteForLoops(self._statements) if
+            self.isGenerator else self._statements,
             variableStates,
             ControlFlowBlocks(),
             toplevel=True
@@ -1267,13 +1281,18 @@ class FunctionConversionContext(ConversionContextBase):
             tempVarnames = []
 
             for targetIndex in range(len(targets) + 1):
-                next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
+                next_ptr = iter_obj.convert_fastnext()
+
                 if next_ptr is not None:
-                    with subcontext.ifelse(is_populated.nonref_expr) as (if_true, if_false):
+                    with subcontext.ifelse(next_ptr.nonref_expr) as (if_true, if_false):
                         if targetIndex < len(targets):
                             with if_true:
                                 tempVarnames.append(f".anonyous_iter{targets[0].line_number}.{targetIndex}")
-                                self.assignToLocalVariable(tempVarnames[-1], next_ptr, variableStates)
+                                self.assignToLocalVariable(
+                                    tempVarnames[-1],
+                                    next_ptr.asReference(),
+                                    variableStates
+                                )
 
                             with if_false:
                                 subcontext.pushException(
@@ -2057,7 +2076,7 @@ class FunctionConversionContext(ConversionContextBase):
                         False
                     )
 
-                next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
+                next_ptr = iter_obj.convert_fastnext()
                 if next_ptr is None:
                     return (
                         context.finalize(None, exceptionsTakeFrom=ast)
@@ -2065,9 +2084,9 @@ class FunctionConversionContext(ConversionContextBase):
                         False
                     )
 
-                with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
+                with cond_context.ifelse(next_ptr.nonref_expr) as (if_true, if_false):
                     with if_true:
-                        self.convert_assignment(ast.target, None, next_ptr)
+                        self.convert_assignment(ast.target, None, next_ptr.asReference())
 
                 variableStatesTrue = variableStates.clone()
                 variableStatesFalse = variableStates.clone()
@@ -2093,7 +2112,7 @@ class FunctionConversionContext(ConversionContextBase):
                     return (
                         context.finalize(None, exceptionsTakeFrom=ast) >>
                         native_ast.Expression.While(
-                            cond=cond_context.finalize(is_populated, exceptionsTakeFrom=ast),
+                            cond=cond_context.finalize(next_ptr.nonref_expr, exceptionsTakeFrom=ast),
                             while_true=true.withReturnTargetName("loop_continue"),
                             orelse=false
                         ).withReturnTargetName("loop_break"),

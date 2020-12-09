@@ -42,6 +42,8 @@ public:
 
     PyObject* pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErrRep);
 
+    static PyObject* pointerUnsafe(PyObject* o, PyObject* args);
+
     static PyObject* toArray(PyObject* o, PyObject* args);
 
     static PyObject* toBytes(PyObject* o, PyObject* args);
@@ -76,8 +78,6 @@ public:
     static PyObject* listPop(PyObject* o, PyObject* args);
 
     static PyObject* listSetSizeUnsafe(PyObject* o, PyObject* args);
-
-    static PyObject* listPointerUnsafe(PyObject* o, PyObject* args);
 
     static PyObject* listTranspose(PyObject* o, PyObject* args);
 

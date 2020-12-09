@@ -68,7 +68,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
         context.pushException(TypeError, "Can't default-initialize %s" % self.typeRepresentation.__qualname__)
 
-    def convert_next(self, context, expr):
+    def convert_fastnext(self, context, expr):
         nextRes = context.push(
             object,
             lambda objPtr: objPtr.expr.store(
@@ -86,7 +86,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             with ifFalse:
                 self.convert_default_initialize(context, nextRes, forceToNone=True)
 
-        return nextRes, canContinue
+        return nextRes.asPointerIf(canContinue)
 
     def convert_attribute(self, context, instance, attr):
         if self.typeRepresentation in (_thread.LockType, _thread.RLock) and attr in ('acquire', 'release', "__enter__", "__exit__"):

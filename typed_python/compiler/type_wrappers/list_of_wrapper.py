@@ -18,7 +18,7 @@ from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethod
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import PointerTo, ListOf
+from typed_python import ListOf
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -138,7 +138,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
     def convert_attribute(self, context, instance, attr):
         if attr in ("copy", "resize", "reserve", "reserved", "extend", "append",
-                    "clear", "pop", "setSizeUnsafe", "pointerUnsafe"):
+                    "clear", "pop", "setSizeUnsafe"):
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -174,19 +174,6 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         self.underlyingWrapperType,
                         native.call(instance, count)
                     )
-
-        if methodname == "pointerUnsafe":
-            if len(args) == 1:
-                count = args[0].toInt64()
-                if count is None:
-                    return
-
-                return context.pushPod(
-                    PointerTo(self.typeRepresentation.ElementType),
-                    instance.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
-                        self.underlyingWrapperType.getNativeLayoutType().pointer()
-                    ).elemPtr(count.nonref_expr)
-                )
 
         if methodname == "resize":
             if len(args) == 1:

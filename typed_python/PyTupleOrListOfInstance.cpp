@@ -639,11 +639,39 @@ const char* TUPLE_FROM_BYTES_DOCSTRING =
     "NamedTuple."
 ;
 
+PyDoc_STRVAR(tuplePointerUnsafe_doc,
+    "tup.pointerUnsafe(i) -> pointer to element i of tup\n"
+    "\n"
+    "If tup if of type TupleOf(T), the return value is of type PointerTo(T).\n"
+    "This is intended for compiled code, where pointerUnsafe is expected to be\n"
+    "faster than the usual bounds-checked indexed access to an instance of\n"
+    "TupleOf(T).\n"
+    "In C++ terms, tup.pointerUnsafe(i) is &tup[i].\n"
+
+);
+PyObject* PyTupleOrListOfInstance::pointerUnsafe(PyObject* o, PyObject* args) {
+    PyTupleOrListOfInstance* self_w = (PyTupleOrListOfInstance*)o;
+
+    if (PyTuple_Size(args) != 1 || !PyLong_Check(PyTuple_GetItem(args, 0))) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.pointerUnsafe takes one integer argument");
+        return NULL;
+    }
+
+    int64_t ix = PyLong_AsLongLong(PyTuple_GetItem(args,0));
+
+    void* ptr = (void*)self_w->type()->eltPtr(self_w->dataPtr(), ix);
+
+    return extractPythonObject((instance_ptr)&ptr, PointerTo::Make(self_w->type()->getEltType()));
+}
+
+
+
 PyMethodDef* PyTupleOfInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef [6] {
         {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, TupleOf_toArray_doc},
         {"toBytes", (PyCFunction)PyTupleOrListOfInstance::toBytes, METH_VARARGS, TUPLE_TO_BYTES_DOCSTRING},
         {"fromBytes", (PyCFunction)PyTupleOrListOfInstance::fromBytes, METH_VARARGS | METH_KEYWORDS | METH_CLASS, TUPLE_FROM_BYTES_DOCSTRING},
+        {"pointerUnsafe", (PyCFunction)PyTupleOrListOfInstance::pointerUnsafe, METH_VARARGS, tuplePointerUnsafe_doc},
         {NULL, NULL}
     };
 }
@@ -657,21 +685,7 @@ PyDoc_STRVAR(listPointerUnsafe_doc,
     "faster than the usual bounds-checked indexed access to an instance of\n"
     "ListOf(T).\n"
     "In C++ terms, lst.pointerUnsafe(i) is &lst[i].\n"
-    );
-PyObject* PyListOfInstance::listPointerUnsafe(PyObject* o, PyObject* args) {
-    PyListOfInstance* self_w = (PyListOfInstance*)o;
-
-    if (PyTuple_Size(args) != 1 || !PyLong_Check(PyTuple_GetItem(args, 0))) {
-        PyErr_SetString(PyExc_TypeError, "ListOf.pointerUnsafe takes one integer argument");
-        return NULL;
-    }
-
-    int64_t ix = PyLong_AsLongLong(PyTuple_GetItem(args,0));
-
-    void* ptr = (void*)self_w->type()->eltPtr(self_w->dataPtr(), ix);
-
-    return extractPythonObject((instance_ptr)&ptr, PointerTo::Make(self_w->type()->getEltType()));
-}
+);
 
 // static
 PyDoc_STRVAR(listAppend_doc,
@@ -1119,7 +1133,7 @@ PyMethodDef* PyListOfInstance::typeMethodsConcrete(Type* t) {
         {"resize", (PyCFunction)PyListOfInstance::listResize, METH_VARARGS, listResize_doc},
         {"pop", (PyCFunction)PyListOfInstance::listPop, METH_VARARGS, listPop_doc},
         {"setSizeUnsafe", (PyCFunction)PyListOfInstance::listSetSizeUnsafe, METH_VARARGS, listSetSizeUnsafe_doc},
-        {"pointerUnsafe", (PyCFunction)PyListOfInstance::listPointerUnsafe, METH_VARARGS, listPointerUnsafe_doc},
+        {"pointerUnsafe", (PyCFunction)PyTupleOrListOfInstance::pointerUnsafe, METH_VARARGS, listPointerUnsafe_doc},
         {"transpose", (PyCFunction)PyListOfInstance::listTranspose, METH_VARARGS, listTranspose_doc},
         {NULL, NULL}
     };

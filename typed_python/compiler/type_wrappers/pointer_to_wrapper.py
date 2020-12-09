@@ -17,12 +17,31 @@ from typed_python.compiler.type_wrappers.python_type_object_wrapper import Pytho
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.conversion_level import ConversionLevel
 
-from typed_python import PointerTo
+from typed_python import PointerTo, pointerTo
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+class PointerToObjectWrapper(Wrapper):
+    is_pod = True
+    is_empty = False
+    is_pass_by_ref = False
+
+    def __init__(self):
+        super().__init__(pointerTo)
+
+    def getNativeLayoutType(self):
+        return native_ast.Type.Void()
+
+    @Wrapper.unwrapOneOfAndValue
+    def convert_call(self, context, expr, args, kwargs):
+        if len(args) != 1 or kwargs:
+            return super().convert_call(context, expr, args, kwargs)
+
+        return args[0].expr_type.convert_pointerTo(context, args[0])
 
 
 class PointerToWrapper(Wrapper):
@@ -112,7 +131,11 @@ class PointerToWrapper(Wrapper):
         if attr in ("set", "get", "initialize", "cast", "destroy"):
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
-        return super().convert_attribute(context, instance, attr)
+        return typeWrapper(self.typeRepresentation.ElementType).convert_attribute_pointerTo(
+            context,
+            instance,
+            attr
+        )
 
     def convert_getitem(self, context, instance, key):
         addedValue = instance + key

@@ -629,8 +629,8 @@ class TestCompilationStructures(unittest.TestCase):
         ratio = callsDeeply / callsShallowly
 
         # inlining should work across invocations, regardless of order
-        self.assertLessEqual(.9, ratio)
-        self.assertLessEqual(ratio, 1.1)
+        self.assertLessEqual(.8, ratio)
+        self.assertLessEqual(ratio, 1.2)
         print(f"Deeper call tree code was {ratio} times slow.")
 
     def test_exception_handling_preserves_refcount(self):
