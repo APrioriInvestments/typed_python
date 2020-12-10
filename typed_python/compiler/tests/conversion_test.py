@@ -821,6 +821,91 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(testBreak(10), Entrypoint(testBreak)(10))
 
+    def test_converting_break_in_while_with_try_outside_of_loop(self):
+        def testBreak():
+            res = 0
+
+            try:
+                while True:
+                    res += 1
+                    break
+                res += 10
+            finally:
+                res += 100
+
+            return res
+
+        self.assertEqual(testBreak(), Entrypoint(testBreak)())
+
+    def test_converting_break_in_while_with_try_inside_of_loop(self):
+        def testBreak():
+            res = 0
+
+            while True:
+                try:
+                    res += 1
+                    break
+                finally:
+                    res += 10
+
+            res += 100
+
+            return res
+
+        self.assertEqual(testBreak(), Entrypoint(testBreak)())
+
+    def test_converting_break_through_nested_try_finally(self):
+        def testBreak():
+            res = 0
+
+            try:
+                while True:
+                    try:
+                        try:
+                            res += 1
+                            break
+                        finally:
+                            res += 10
+                    finally:
+                        res += 100
+            finally:
+                res += 1000
+
+            res += 10000
+
+            return res
+
+        self.assertEqual(testBreak(), Entrypoint(testBreak)())
+
+    def test_converting_continue_through_multiple_nested_try_finally(self):
+        def testBreak():
+            res = 0
+
+            try:
+                while True:
+                    if res > 0:
+                        break
+
+                    try:
+                        try:
+                            res += 1
+                            continue
+                        finally:
+                            res += 10
+                    finally:
+                        res += 100
+
+                    # never gets here
+                    assert False
+            finally:
+                res += 1000
+
+            res += 10000
+
+            return res
+
+        self.assertEqual(testBreak(), Entrypoint(testBreak)())
+
     def test_converting_continue_in_while(self):
         def testContinue(x):
             res = 0

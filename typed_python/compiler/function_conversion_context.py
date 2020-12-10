@@ -64,6 +64,45 @@ class FunctionYield:
     pass
 
 
+class ControlFlowBlocks:
+    """Models info about where control flow should go.
+
+    When we're generating code within a try/catch or a while loop we need
+    to know where break/continue/return statements should go. This class
+    models how codegen handles those cases.
+
+    return_to - label to return to. Only set within a 'try' statement.
+        If None, return normally.
+    try_flow - variable containing deferred control flow instruction.  Specifically, what
+        control flow should be followed after the 'finally' block.
+        Only set within a 'try' statement.
+        0=default, 1=unhandled exception, 2=break, 3=continue, 4=return
+    in_loop - would a break/continue directly hit a surrounding while or for loop?
+    """
+
+    def __init__(self, return_to=None, try_flow=None, in_loop=False, in_loop_ever=False):
+        self.return_to = return_to
+        self.try_flow = try_flow
+        self.in_loop = in_loop
+        self.in_loop_ever = in_loop_ever
+
+    def pushTryCatch(self, return_to, try_flow):
+        return ControlFlowBlocks(
+            return_to=return_to,
+            try_flow=try_flow,
+            in_loop=False,
+            in_loop_ever=self.in_loop_ever
+        )
+
+    def pushLoop(self):
+        return ControlFlowBlocks(
+            return_to=self.return_to,
+            try_flow=self.try_flow,
+            in_loop=True,
+            in_loop_ever=True,
+        )
+
+
 class ConversionContextBase:
     """Helper function for converting a single python function given some input and output types"""
 
@@ -1072,7 +1111,12 @@ class FunctionConversionContext(ConversionContextBase):
         pass
 
     def convert_function_body(self, variableStates: FunctionStackState):
-        return self.convert_statement_list_ast(self._statements, variableStates, toplevel=True)
+        return self.convert_statement_list_ast(
+            self._statements,
+            variableStates,
+            ControlFlowBlocks(),
+            toplevel=True
+        )
 
     def convert_delete(self, expression, variableStates):
         """Convert the target of a 'del' statement.
@@ -1254,7 +1298,7 @@ class FunctionConversionContext(ConversionContextBase):
         exception_occurred_name = ".exc_occurred"
         return native_ast.Expression.StackSlot(name=exception_occurred_name, type=native_ast.Bool)
 
-    def convert_statement_ast(self, ast, variableStates: FunctionStackState, return_to=None, in_loop=False, try_flow=None):
+    def convert_statement_ast(self, ast, variableStates: FunctionStackState, controlFlowBlocks):
         """Convert a single statement to native_ast.
 
         Args:
@@ -1262,13 +1306,7 @@ class FunctionConversionContext(ConversionContextBase):
             variableStates - a description of what's known about the types of our variables.
                 This data structure will be _modified_ by the calling code to include what's
                 known about the types of values when control flow leaves this statement.
-            return_to - label to return to. Only set within a 'try' statement.
-                If None, return normally.
-            try_flow - variable containing deferred control flow instruction.  Specifically, what
-                control flow should be followed after the 'finally' block.
-                Only set within a 'try' statement.
-                0=default, 1=unhandled exception, 2=break, 3=continue, 4=return
-            in_loop - are we within a 'for' or 'while' statement?
+            controlFlowBlocks - info about where control flow should return next
         Returns:
             a pair (native_ast.Expression, flowReturns) giving an expression representing the
             statement in native code, and a boolean indicating whether control flow might
@@ -1277,7 +1315,7 @@ class FunctionConversionContext(ConversionContextBase):
         """
 
         try:
-            return self._convert_statement_ast(ast, variableStates, return_to=return_to, in_loop=in_loop, try_flow=try_flow)
+            return self._convert_statement_ast(ast, variableStates, controlFlowBlocks)
         except Exception as e:
             types = {
                 varname: self._varname_to_type.get(varname)
@@ -1291,7 +1329,7 @@ class FunctionConversionContext(ConversionContextBase):
                 e.args = (newMessage,)
             raise
 
-    def _convert_statement_ast(self, ast, variableStates: FunctionStackState, return_to=None, in_loop=False, try_flow=None):
+    def _convert_statement_ast(self, ast, variableStates: FunctionStackState, controlFlowBlocks):
         """same as 'convert_statement_ast'."""
 
         if ast.matches.Expr and ast.value.matches.Str:
@@ -1406,10 +1444,10 @@ class FunctionConversionContext(ConversionContextBase):
             if e is None:
                 return subcontext.finalize(None, exceptionsTakeFrom=ast), False
 
-            if return_to is not None:
-                if try_flow:
+            if controlFlowBlocks.return_to is not None:
+                if controlFlowBlocks.try_flow:
                     subcontext.pushEffect(
-                        try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_RETURN))
+                        controlFlowBlocks.try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_RETURN))
                     )
                 self.assignToLocalVariable(".return_value", e, variableStates)
                 subcontext.pushEffect(
@@ -1422,7 +1460,7 @@ class FunctionConversionContext(ConversionContextBase):
                 subcontext.pushTerminal(
                     native_ast.Expression.Return(
                         arg=None,
-                        blockName=return_to
+                        blockName=controlFlowBlocks.return_to
                     )
                 )
 
@@ -1452,8 +1490,11 @@ class FunctionConversionContext(ConversionContextBase):
             if cond.expr.matches.Constant:
                 truth_val = cond.expr.val.truth_value()
 
-                branch, flow_returns = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse, variableStates,
-                                                                       return_to=return_to, try_flow=try_flow)
+                branch, flow_returns = self.convert_statement_list_ast(
+                    ast.body if truth_val else ast.orelse,
+                    variableStates,
+                    controlFlowBlocks
+                )
 
                 return cond_context.finalize(None, exceptionsTakeFrom=ast) >> branch, flow_returns
 
@@ -1463,8 +1504,8 @@ class FunctionConversionContext(ConversionContextBase):
             self.restrictByCondition(variableStatesTrue, ast.test, result=True)
             self.restrictByCondition(variableStatesFalse, ast.test, result=False)
 
-            true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue, return_to=return_to, try_flow=try_flow)
-            false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse, return_to=return_to, try_flow=try_flow)
+            true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue, controlFlowBlocks)
+            false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse, controlFlowBlocks)
 
             variableStates.becomeMerge(
                 variableStatesTrue if true_returns else None,
@@ -1501,7 +1542,7 @@ class FunctionConversionContext(ConversionContextBase):
 
                     if not truth_value:
                         branch, flow_returns = self.convert_statement_list_ast(
-                            ast.orelse, variableStates, return_to=return_to, try_flow=try_flow
+                            ast.orelse, variableStates, controlFlowBlocks
                         )
                         return cond_context.finalize(None, exceptionsTakeFrom=ast) >> branch, flow_returns
                     else:
@@ -1516,7 +1557,7 @@ class FunctionConversionContext(ConversionContextBase):
                 self.restrictByCondition(variableStatesFalse, ast.test, result=False)
 
                 true, true_returns = self.convert_statement_list_ast(
-                    ast.body, variableStatesTrue, return_to=return_to, in_loop=True, try_flow=try_flow
+                    ast.body, variableStatesTrue, controlFlowBlocks.pushLoop()
                 )
 
                 if isWhileTrue:
@@ -1524,7 +1565,7 @@ class FunctionConversionContext(ConversionContextBase):
                         isWhileTrue = False
 
                 false, false_returns = self.convert_statement_list_ast(
-                    ast.orelse, variableStatesFalse, return_to=return_to, try_flow=try_flow
+                    ast.orelse, variableStatesFalse, controlFlowBlocks
                 )
 
                 variableStates.becomeMerge(
@@ -1556,7 +1597,9 @@ class FunctionConversionContext(ConversionContextBase):
 
             body_context = ExpressionConversionContext(self, variableStates)
             body, body_returns = self.convert_statement_list_ast(
-                ast.body, variableStates, in_loop=in_loop, return_to=end_of_try_marker, try_flow=control_flow
+                ast.body,
+                variableStates,
+                controlFlowBlocks.pushTryCatch(end_of_try_marker, control_flow)
             )
             body_context.pushEffect(body)
 
@@ -1593,7 +1636,10 @@ class FunctionConversionContext(ConversionContextBase):
                     self.assignToLocalVariable(h_name, handler_context.fetchExceptionObject(exc_type), variableStatesHandler)
 
                 handler, handler_returns = self.convert_statement_list_ast(
-                    h.body, variableStatesHandler, in_loop=in_loop, return_to=end_of_try_marker, try_flow=control_flow
+                    h.body, variableStatesHandler,
+                    controlFlowBlocks.pushTryCatch(
+                        end_of_try_marker, control_flow
+                    )
                 )
 
                 if h.name is not None:
@@ -1630,7 +1676,8 @@ class FunctionConversionContext(ConversionContextBase):
             orelse_context = ExpressionConversionContext(self, variableStates)
             if len(ast.orelse) > 0:
                 orelse, orelse_returns = self.convert_statement_list_ast(
-                    ast.orelse, variableStates, in_loop=in_loop, return_to=end_of_try_marker, try_flow=control_flow
+                    ast.orelse, variableStates,
+                    controlFlowBlocks.pushTryCatch(end_of_try_marker, control_flow)
                 )
                 orelse_context.pushEffect(orelse)
             else:
@@ -1639,7 +1686,8 @@ class FunctionConversionContext(ConversionContextBase):
             final_context = ExpressionConversionContext(self, variableStates)
             if ast.finalbody is not None:
                 final, final_returns = self.convert_statement_list_ast(
-                    ast.finalbody, variableStates, in_loop=in_loop, return_to=end_of_finally_marker, try_flow=control_flow
+                    ast.finalbody, variableStates,
+                    controlFlowBlocks.pushTryCatch(end_of_finally_marker, control_flow)
                 )
                 final = final.withReturnTargetName(end_of_finally_marker)
                 final_returns = True
@@ -1683,12 +1731,10 @@ class FunctionConversionContext(ConversionContextBase):
                 return_context = ExpressionConversionContext(self, variableStates)
                 rtn, _ = self.convert_statement_ast(
                     python_ast.Statement.Return(
-                        value=python_ast.Expr.Name(id=".return_value"), filename="", line_number=0, col_offset=0
+                        value=python_ast.Expr.Name(id=".return_value")
                     ),
                     variableStates,
-                    in_loop=in_loop,
-                    return_to=return_to,
-                    try_flow=try_flow
+                    controlFlowBlocks
                 )
 
                 complete = complete >> native_ast.Expression.Branch(
@@ -1700,14 +1746,12 @@ class FunctionConversionContext(ConversionContextBase):
                     >> return_context.finalize(rtn)
                 )
 
-            if in_loop:
+            if controlFlowBlocks.in_loop_ever:
                 break_context = ExpressionConversionContext(self, variableStates)
                 brk, _ = self.convert_statement_ast(
-                    python_ast.Statement.Break(filename="", line_number=0, col_offset=0),
+                    python_ast.Statement.Break(),
                     variableStates,
-                    in_loop=in_loop,
-                    return_to=return_to,
-                    try_flow=try_flow
+                    controlFlowBlocks
                 )
                 complete = complete >> native_ast.Expression.Branch(
                     cond=control_flow.load().eq(CONTROL_FLOW_BREAK),
@@ -1719,11 +1763,9 @@ class FunctionConversionContext(ConversionContextBase):
 
                 cont_context = ExpressionConversionContext(self, variableStates)
                 cont, _ = self.convert_statement_ast(
-                    python_ast.Statement.Continue(filename="", line_number=0, col_offset=0),
+                    python_ast.Statement.Continue(),
                     variableStates,
-                    in_loop=in_loop,
-                    return_to=return_to,
-                    try_flow=try_flow
+                    controlFlowBlocks
                 )
                 complete = complete >> native_ast.Expression.Branch(
                     cond=control_flow.load().eq(CONTROL_FLOW_CONTINUE),
@@ -1769,9 +1811,7 @@ class FunctionConversionContext(ConversionContextBase):
                         to_iterate.refAs(ix).changeContext(subcontext),
                         ast,
                         "." + str(ix),
-                        in_loop,
-                        return_to,
-                        try_flow
+                        controlFlowBlocks
                     )
 
                     subExprs.append(expr)
@@ -1797,7 +1837,7 @@ class FunctionConversionContext(ConversionContextBase):
                     exceptionsTakeFrom=ast
                 ), anyFlowsReturn
             else:
-                return self.convert_iteration_expression(to_iterate, ast, "", in_loop, return_to, try_flow)
+                return self.convert_iteration_expression(to_iterate, ast, "", controlFlowBlocks)
 
         if ast.matches.Raise:
             expr_context = ExpressionConversionContext(self, variableStates)
@@ -1841,9 +1881,7 @@ class FunctionConversionContext(ConversionContextBase):
             return self.convert_statement_list_ast(
                 statements,
                 variableStates,
-                return_to=return_to,
-                try_flow=try_flow,
-                in_loop=in_loop
+                controlFlowBlocks
             )
 
         if ast.matches.Import:
@@ -1867,44 +1905,42 @@ class FunctionConversionContext(ConversionContextBase):
             return context.finalize(None, exceptionsTakeFrom=ast), True
 
         if ast.matches.Break:
-            # for the moment, we have to pretend as if the 'break' did return control flow,
-            # or else a while loop that always ends in break/continue will look like it doesn't
-            # return, when in fact it does.
-            if return_to is not None:
-                if try_flow:
-                    return (
-                        try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_BREAK)) >>
-                        native_ast.Expression.Branch(
-                            cond=self.exception_occurred_slot.load(),
-                            true=runtime_functions.clear_exc_info.call()
-                        ) >>
-                        native_ast.Expression.Return(blockName=return_to),
-                        True
-                    )
-                else:
-                    return native_ast.Expression.Return(blockName=return_to), True
-            else:
+            if controlFlowBlocks.in_loop:
                 return native_ast.Expression.Return(blockName="loop_break"), True
 
-        if ast.matches.Continue:
-            # for the moment, we have to pretend as if the 'continue' did return control flow,
-            # or else a while loop that always ends in break/continue will look like it doesn't
-            # return, when in fact it does.
-            if return_to is not None:
-                if try_flow:
-                    return (
-                        try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_CONTINUE)) >>
-                        native_ast.Expression.Branch(
-                            cond=self.exception_occurred_slot.load(),
-                            true=runtime_functions.clear_exc_info.call()
-                        ) >>
-                        native_ast.Expression.Return(blockName=return_to),
-                        True
-                    )
-                else:
-                    return native_ast.Expression.Return(blockName=return_to), True
+            assert controlFlowBlocks.return_to is not None
+
+            if controlFlowBlocks.try_flow:
+                return (
+                    controlFlowBlocks.try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_BREAK)) >>
+                    native_ast.Expression.Branch(
+                        cond=self.exception_occurred_slot.load(),
+                        true=runtime_functions.clear_exc_info.call()
+                    ) >>
+                    native_ast.Expression.Return(blockName=controlFlowBlocks.return_to),
+                    True
+                )
             else:
+                return native_ast.Expression.Return(blockName=controlFlowBlocks.return_to), True
+
+        if ast.matches.Continue:
+            if controlFlowBlocks.in_loop:
                 return native_ast.Expression.Return(blockName="loop_continue"), True
+
+            assert controlFlowBlocks.return_to is not None
+
+            if controlFlowBlocks.try_flow:
+                return (
+                    controlFlowBlocks.try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_CONTINUE)) >>
+                    native_ast.Expression.Branch(
+                        cond=self.exception_occurred_slot.load(),
+                        true=runtime_functions.clear_exc_info.call()
+                    ) >>
+                    native_ast.Expression.Return(blockName=controlFlowBlocks.return_to),
+                    True
+                )
+            else:
+                return native_ast.Expression.Return(blockName=controlFlowBlocks.return_to), True
 
         if ast.matches.Assert:
             expr_context = ExpressionConversionContext(self, variableStates)
@@ -1959,7 +1995,7 @@ class FunctionConversionContext(ConversionContextBase):
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast.Name)
 
-    def convert_iteration_expression(self, to_iterate, ast, variableSuffix, in_loop, return_to, try_flow):
+    def convert_iteration_expression(self, to_iterate, ast, variableSuffix, controlFlowBlocks):
         """Convert the 'For' statement in 'ast', where to_iterate is the iterable."""
         context = to_iterate.context
         variableStates = context.variableStates
@@ -1973,7 +2009,8 @@ class FunctionConversionContext(ConversionContextBase):
                 self.convert_assignment(ast.target, None, subexpr)
 
                 thisOne, thisOneReturns = self.convert_statement_list_ast(
-                    ast.body, variableStates, return_to=return_to, in_loop=True, try_flow=try_flow
+                    ast.body, variableStates,
+                    controlFlowBlocks.pushLoop()
                 )
 
                 # if we hit 'continue', just come to the end of this expression
@@ -1985,7 +2022,8 @@ class FunctionConversionContext(ConversionContextBase):
                     return context.finalize(None, exceptionsTakeFrom=ast).withReturnTargetName("loop_break"), False
 
             thisOne, thisOneReturns = self.convert_statement_list_ast(
-                ast.orelse, variableStates, return_to=return_to, in_loop=in_loop, try_flow=try_flow
+                ast.orelse, variableStates,
+                controlFlowBlocks,
             )
 
             context.pushEffect(thisOne)
@@ -2035,10 +2073,12 @@ class FunctionConversionContext(ConversionContextBase):
                 variableStatesFalse = variableStates.clone()
 
                 true, true_returns = self.convert_statement_list_ast(
-                    ast.body, variableStatesTrue, in_loop=True, return_to=return_to, try_flow=try_flow
+                    ast.body, variableStatesTrue,
+                    controlFlowBlocks.pushLoop()
                 )
                 false, false_returns = self.convert_statement_list_ast(
-                    ast.orelse, variableStatesFalse, in_loop=True, return_to=return_to, try_flow=try_flow
+                    ast.orelse, variableStatesFalse,
+                    controlFlowBlocks.pushLoop()
                 )
 
                 variableStates.becomeMerge(
@@ -2103,9 +2143,7 @@ class FunctionConversionContext(ConversionContextBase):
         statements,
         variableStates,
         toplevel,
-        return_to,
-        in_loop,
-        try_flow
+        controlFlowBlocks
     ):
         subExprs = []
         anyFlowsReturn = False
@@ -2122,10 +2160,7 @@ class FunctionConversionContext(ConversionContextBase):
             expr, flowReturns = self.convert_statement_list_ast(
                 statements,
                 subVS,
-                False,
-                return_to,
-                in_loop,
-                try_flow
+                controlFlowBlocks
             )
 
             subExprs.append(expr)
@@ -2152,7 +2187,8 @@ class FunctionConversionContext(ConversionContextBase):
         return context.finalize(switchExpr), anyFlowsReturn
 
     def convert_statement_list_ast(
-            self, statements, variableStates: FunctionStackState, toplevel=False, return_to=None, in_loop=False, try_flow=None
+            self, statements, variableStates: FunctionStackState, controlFlowBlocks,
+            *, toplevel=False
     ):
         """Convert a sequence of statements to a native expression.
 
@@ -2164,8 +2200,7 @@ class FunctionConversionContext(ConversionContextBase):
             variableStates - a FunctionStackState object,
             toplevel - is this at the root of a function, so that flowing off the end should
                 produce a Return expression?
-            return_to - if any of these statements alter control flow (return, break, continue), this is the name of the
-                finally block that we should return to first
+            controlFlowBLocks - where control flow should return to
 
         Returns:
             a tuple (expr: native_ast.Expression, controlFlowReturns: bool) giving the result, and
@@ -2184,15 +2219,13 @@ class FunctionConversionContext(ConversionContextBase):
                     statements[statementIx+1:],
                     variableStates,
                     toplevel,
-                    return_to,
-                    in_loop,
-                    try_flow
+                    controlFlowBlocks
                 )
                 exprAndReturns.append((expr, controlFlowReturns))
                 break
             else:
                 res = self.convert_statement_ast(
-                    s, variableStates, return_to=return_to, in_loop=in_loop, try_flow=try_flow
+                    s, variableStates, controlFlowBlocks
                 )
 
                 if not isinstance(res, tuple) or len(res) != 2:
@@ -2242,7 +2275,8 @@ class FunctionConversionContext(ConversionContextBase):
             python_ast.Statement.Return(
                 value=None, filename="", line_number=0, col_offset=0
             ),
-            variableStates
+            variableStates,
+            ControlFlowBlocks()
         )
 
 
