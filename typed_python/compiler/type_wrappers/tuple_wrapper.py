@@ -180,6 +180,8 @@ class TupleWrapper(Wrapper):
         super().__init__(t)
         bytecount = _types.bytecount(t)
 
+        self.isWellAligned = all(_types.bytecount(eltT) == 8 for eltT in t.ElementTypes)
+
         self.subTypeWrappers = tuple(typeWrapper(sub_t) for sub_t in t.ElementTypes)
         self.unionType = OneOfWrapper.mergeTypes(t.ElementTypes)
         if self.unionType is not None:
@@ -190,7 +192,16 @@ class TupleWrapper(Wrapper):
         for i in range(len(self.subTypeWrappers)-1):
             self.byteOffsets.append(self.byteOffsets[-1] + _types.bytecount(t.ElementTypes[i]))
 
-        self.layoutType = native_ast.Type.Array(element_type=native_ast.UInt8, count=bytecount)
+        if self.isWellAligned:
+            self.layoutType = native_ast.Type.Struct(
+                element_types=[
+                    (f"field_{i}", self.subTypeWrappers[i].getNativeLayoutType())
+                    for i in range(len(self.subTypeWrappers))
+                ],
+                name=t.__qualname__ + "Layout"
+            )
+        else:
+            self.layoutType = native_ast.Type.Array(element_type=native_ast.UInt8, count=bytecount)
 
         self._is_pod = all(typeWrapper(possibility).is_pod for possibility in self.subTypeWrappers)
         self.is_default_constructible = _types.is_default_constructible(t)
@@ -229,12 +240,18 @@ class TupleWrapper(Wrapper):
         if not expr.isReference:
             expr = context.pushMove(expr)
 
-        return context.pushReference(
-            self.subTypeWrappers[which],
-            expr.expr.cast(native_ast.UInt8Ptr)
-                .ElementPtrIntegers(self.byteOffsets[which])
-                .cast(self.subTypeWrappers[which].getNativeLayoutType().pointer())
-        )
+        if self.isWellAligned:
+            return context.pushReference(
+                self.subTypeWrappers[which],
+                expr.expr.ElementPtrIntegers(0, which)
+            )
+        else:
+            return context.pushReference(
+                self.subTypeWrappers[which],
+                expr.expr.cast(native_ast.UInt8Ptr)
+                    .ElementPtrIntegers(self.byteOffsets[which])
+                    .cast(self.subTypeWrappers[which].getNativeLayoutType().pointer())
+            )
 
     def convert_len(self, context, instance):
         return context.constant(len(self.subTypeWrappers))
