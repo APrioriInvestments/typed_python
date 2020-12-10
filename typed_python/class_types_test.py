@@ -1626,3 +1626,15 @@ class NativeClassTypesTests(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "Cannot construct the value None from an instance of bool"):
             c[10] = 20
+
+    def test_cant_create_held_classes_in_interpreter(self):
+        class C(Class, Final):
+            x = Member(int)
+
+        H = Held(C)
+
+        with self.assertRaises(Exception):
+            H()
+
+        with self.assertRaises(Exception):
+            H(x=1)

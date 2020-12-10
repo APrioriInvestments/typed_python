@@ -220,7 +220,7 @@ void PyInstance::constructFromPythonArguments(uint8_t* data, Type* t, PyObject* 
 
 void PyInstance::constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, PyObject* args, PyObject* kwargs) {
     if ((kwargs == NULL || PyDict_Size(kwargs) == 0) && (args == NULL || PyTuple_Size(args) == 0)) {
-        if (t->is_default_constructible()) {
+        if (t->is_default_constructible() && !t->isHeldClass()) {
             t->constructor(data);
             return;
         }
