@@ -265,3 +265,11 @@ class TestPythonAst(unittest.TestCase):
         aLambda2 = python_ast.evaluateFunctionPyAst(pyast, globals={'x': 10})
 
         self.assertEqual(aLambda(11), aLambda2(11))
+
+    def test_converting_lambda_with_double_star_dicts(self):
+        def f():
+            x = {1: 2}
+            y = {**x}
+            return y
+
+        self.assertEqual(self.reverseParseCheck(f)(), f())

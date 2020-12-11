@@ -299,7 +299,7 @@ Expr = Expr.define(Alternative(
         'filename': str
     },
     Dict={
-        "keys": TupleOf(Expr),
+        "keys": TupleOf(OneOf(None, Expr)),
         "values": TupleOf(Expr),
         'line_number': int,
         'col_offset': int,
