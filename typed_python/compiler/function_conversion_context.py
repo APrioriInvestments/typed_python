@@ -497,7 +497,8 @@ class ConversionContextBase:
         based on the last 'yield' statement.
         """
         return GeneratorCodegen(
-            set(self._varname_to_type)
+            set(self._varname_to_type),
+            self._statements[0].line_number
         ).convertStatementsToFunctionDef(
             rewriteForLoops(self._statements)
             if self.isGenerator else self.statements
@@ -1075,6 +1076,7 @@ class FunctionConversionContext(ConversionContextBase):
         for name, lambdaFunc in assignedLambdas:
             if name in self.variablesAssignedOnlyOnce:
                 self.functionDefsAssignedOnce[name] = lambdaFunc
+            self.functionDefs.append(lambdaFunc)
 
         # the current _type_ that we're using for this def,
         self.functionDefToType = {}

@@ -19,7 +19,7 @@ from flaky import flaky
 
 from typed_python import (
     Class, Final, Function, NamedTuple, bytecount, ListOf, TypedCell, Forward,
-    PyCell, Tuple, TupleOf, NotCompiled, TypeFunction, Member
+    PyCell, Tuple, TupleOf, NotCompiled, TypeFunction, Member, typeKnownToCompiler,
 )
 
 from typed_python.compiler.runtime import RuntimeEventVisitor, Entrypoint
@@ -985,3 +985,45 @@ class TestCompilingClosures(unittest.TestCase):
 
         # check that we are actually using a TypedCell
         assert issubclass(r.MemberTypes[0].ClosureType, TypedCell)
+
+    def test_can_use_assigned_lambdas_in_compiled_code(self):
+        @Entrypoint
+        def callIt(x):
+            f = lambda x: x * 2
+
+            return f(1)
+
+        assert callIt(10) == 2
+
+    def test_can_use_reassigned_assigned_lambdas_in_compiled_code(self):
+        @Entrypoint
+        def callIt(x):
+            if x % 2 == 0:
+                f = lambda x: x * 2
+            else:
+                f = lambda x: x * 3
+
+            return f(x) + f(1)
+
+        assert callIt(10) == 22
+        assert callIt(11) == 36
+
+    def test_captured_closure_values_have_good_types(self):
+        aList = ListOf(int)([1, 2, 3])
+
+        @Entrypoint
+        def callIt():
+            return typeKnownToCompiler(aList)
+
+        assert callIt() == ListOf(int)
+
+    def test_captured_closure_values_in_class_methods_have_good_types(self):
+        aList = ListOf(int)([1, 2, 3])
+
+        class Cls(Class, Final):
+            @staticmethod
+            @Entrypoint
+            def callIt():
+                return typeKnownToCompiler(aList)
+
+        assert Cls.callIt() == ListOf(int)

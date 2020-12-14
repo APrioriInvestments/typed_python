@@ -40,8 +40,9 @@ with '0' meaning the first yield statement, '1' meaning the second, etc.
 from typed_python import TupleOf
 from typed_python.compiler.withblock_codegen import expandWithBlockIntoTryCatch
 import typed_python.python_ast as python_ast
+
 from typed_python.compiler.python_ast_analysis import (
-    countYieldStatements,
+    countYieldStatements, computeFunctionArgVariables, computeAssignedVariables
 )
 from typed_python.compiler.codegen_helpers import (
     const,
@@ -56,84 +57,136 @@ from typed_python.compiler.codegen_helpers import (
 )
 
 
-def returnNullPtr():
-    return python_ast.Statement.Return(
-        value=python_ast.Expr.Call(
-            func=readVar(".PointerType"),
-            args=()
-        )
-    )
-
-
-def accessVar(varname, context=None):
-    """Generate a 'self.(varname)' python expression"""
-    if varname == "..slot":
-        return makeCallExpr(
-            attr(readVar(".slotPtr"), "get")
-        )
-
-    return python_ast.Expr.Attribute(
-        value=python_ast.Expr.Name(id="__typed_python_generator_self__", ctx=python_ast.ExprContext.Load()),
-        attr=varname,
-        ctx=python_ast.ExprContext.Load() if context is None else context
-    )
-
-
-def setVar(varname, val):
-    """Generate a 'self.(varname) = val' python expression"""
-    return python_ast.Statement.Assign(
-        targets=(
-            python_ast.Expr.Attribute(
-                value=python_ast.Expr.Name(id="__typed_python_generator_self__", ctx=python_ast.ExprContext.Load()),
-                attr=varname,
-                ctx=python_ast.ExprContext.Store()
-            ),
-        ),
-        value=val,
-    )
-
-
-def checkSlotBetween(low, high):
-    if low > high:
-        return const(False)
-
-    if low == high:
-        return compare(const(low), accessVar("..slot"), "Eq")
-
-    return boolOp(
-        "And",
-        compare(const(low), accessVar("..slot"), "LtE"),
-        compare(const(high), accessVar("..slot"), "GtE")
-    )
-
-
 class GeneratorCodegen:
-    def __init__(self, localVars):
+    def __init__(self, localVars, generatorLineNumber):
         self.localVars = localVars
         self.yieldsSeen = 0
+        self.generatorLineNumber = generatorLineNumber
+        self.selfName = f"__typed_python_generator_self_{self.generatorLineNumber}__"
 
-    def changeExpr(self, expr: python_ast.Expr):
-        """Change any expressions we're accessing to 'self' expressions."""
-        return self._changeExpr(expr)
+    def returnNullPtr(self):
+        return python_ast.Statement.Return(
+            value=python_ast.Expr.Call(
+                func=readVar(".PointerType"),
+                args=()
+            )
+        )
 
-    def _changeExpr(self, expr):
-        if expr.matches.Name:
-            if expr.id in self.localVars:
-                return accessVar("." + expr.id, expr.ctx)
+    def accessVar(self, varname, context=None):
+        """Generate a 'self.(varname)' python expression"""
+        if varname == "..slot":
+            return makeCallExpr(
+                attr(readVar(".slotPtr"), "get")
+            )
+
+        return python_ast.Expr.Attribute(
+            value=python_ast.Expr.Name(id=self.selfName, ctx=python_ast.ExprContext.Load()),
+            attr=varname,
+            ctx=python_ast.ExprContext.Load() if context is None else context
+        )
+
+    def setVar(self, varname, val):
+        """Generate a 'self.(varname) = val' python expression"""
+        return python_ast.Statement.Assign(
+            targets=(
+                python_ast.Expr.Attribute(
+                    value=python_ast.Expr.Name(id=self.selfName, ctx=python_ast.ExprContext.Load()),
+                    attr=varname,
+                    ctx=python_ast.ExprContext.Store()
+                ),
+            ),
+            value=val,
+        )
+
+    def checkSlotBetween(self, low, high):
+        if low > high:
+            return const(False)
+
+        if low == high:
+            return compare(const(low), self.accessVar("..slot"), "Eq")
+
+        return boolOp(
+            "And",
+            compare(const(low), self.accessVar("..slot"), "LtE"),
+            compare(const(high), self.accessVar("..slot"), "GtE")
+        )
+
+    def _changeInteriorObject(self, expr, varsToNotRebind=()):
+        """Walk over (and return mapped versions of) "interior" ast objects.
+
+        Generally, this means anything that's not part of the main function body
+        including statements of interior closures, etc. In all of these cases,
+        we're simply trying to re-map any accesses of variables, while being
+        careful to track which variables are being bound within function bodies.
+        """
+        if isinstance(expr, (int, float, bool, str)) or expr is None:
             return expr
 
+        if expr.matches.Name:
+            if expr.id in self.localVars and expr.id not in varsToNotRebind:
+                return self.accessVar("." + expr.id, expr.ctx)
+            return expr
+
+        if expr.matches.GeneratorExp:
+            raise Exception("Not implemented yet")
+
+        if expr.matches.ListComp:
+            raise Exception("Not implemented yet")
+
+        if expr.matches.DictComp:
+            raise Exception("Not implemented yet")
+
+        if expr.matches.SetComp:
+            raise Exception("Not implemented yet")
+
+        if expr.matches.Lambda:
+            # so any variable in here that's bound by the function
+            # is local to that function. any other variable should
+            # be accessing '__typed_python_generator_self__'
+            boundVars = computeFunctionArgVariables(expr.args)
+
+            return python_ast.Expr.Lambda(
+                args=self._changeInteriorObject(expr.args, varsToNotRebind),
+                body=self._changeInteriorObject(expr.body, set(varsToNotRebind) | set(boundVars)),
+                line_number=expr.line_number,
+                col_offset=expr.col_offset,
+                filename=expr.filename,
+            )
+
+        if expr.matches.FunctionDef:
+            boundVars = set(computeFunctionArgVariables(expr.args)) | set(
+                computeAssignedVariables(expr.body)
+            )
+
+            return python_ast.Statement.FunctionDef(
+                name=expr.name,
+                args=self._changeInteriorObject(expr.args),
+                body=[self._changeInteriorObject(s, set(varsToNotRebind) | set(boundVars)) for s in expr.body],
+                decorator_list=[self._changeInteriorObject(d) for d in expr.decorator_list],
+                returns=self._changeInteriorObject(expr.returns) if expr.returns is not None else None,
+                line_number=expr.line_number,
+                col_offset=expr.col_offset,
+                filename=expr.filename,
+            )
+
+        # a generic expression walker
         args = {}
 
         for ix in range(len(expr.ElementType.ElementNames)):
-            argT = expr.ElementType.ElementTypes[ix]
             name = expr.ElementType.ElementNames[ix]
+            val = getattr(expr, name)
+            argT = type(val)
 
-            if argT is python_ast.Expr:
-                args[name] = self._changeExpr(getattr(expr, name))
-            elif argT is TupleOf(python_ast.Expr):
-                args[name] = [self._changeExpr(subE) for subE in getattr(expr, name)]
+            if issubclass(argT, (python_ast.Expr, python_ast.Arg, python_ast.Arguments, python_ast.Statement)):
+                args[name] = self._changeInteriorObject(val, varsToNotRebind)
+            elif argT in (
+                TupleOf(python_ast.Expr),
+                TupleOf(python_ast.Arg),
+                TupleOf(python_ast.Statement)
+            ):
+                args[name] = [self._changeInteriorObject(subE, varsToNotRebind) for subE in val]
             else:
-                args[name] = getattr(expr, name)
+                args[name] = val
 
         return type(expr)(**args)
 
@@ -145,7 +198,7 @@ class GeneratorCodegen:
         yield branch(
             # if the target slot is lessthan or equal to the number of yields we'll have
             # _after_ we exit this code, then we need to go in
-            compare(accessVar("..slot"), const(yieldUpperBound), "Lt"),
+            compare(self.accessVar("..slot"), const(yieldUpperBound), "Lt"),
             # if there are no internal yields, then we don't need to do anything
             # but this external check, which guarantees we skip over the statement
             # if we're searching ahead for the next expression
@@ -157,14 +210,14 @@ class GeneratorCodegen:
         if s.matches.Expr:
             if s.value.matches.Yield:
                 yield branch(
-                    compare(accessVar("..slot"), const(self.yieldsSeen), "Eq"),
-                    [setVar("..slot", const(-1))],
+                    compare(self.accessVar("..slot"), const(self.yieldsSeen), "Eq"),
+                    [self.setVar("..slot", const(-1))],
                     [
-                        setVar("..slot", const(self.yieldsSeen)),
-                        setVar("..value", self.changeExpr(s.value.value)),
+                        self.setVar("..slot", const(self.yieldsSeen)),
+                        self.setVar("..value", self._changeInteriorObject(s.value.value)),
                         python_ast.Statement.Return(
                             value=attr(
-                                makeCallExpr(readVar(".pointerTo"), readVar("__typed_python_generator_self__")),
+                                makeCallExpr(readVar(".pointerTo"), readVar(self.selfName)),
                                 "..value"
                             )
                         )
@@ -172,32 +225,41 @@ class GeneratorCodegen:
                 )
                 self.yieldsSeen += 1
             else:
-                yield self.changeExpr(s)
+                yield self._changeInteriorObject(s)
 
             return
 
         if s.matches.Assign:
             yield python_ast.Statement.Assign(
-                targets=(self.changeExpr(x) for x in s.targets),
-                value=self.changeExpr(s.value)
+                targets=(self._changeInteriorObject(x) for x in s.targets),
+                value=self._changeInteriorObject(s.value),
+                line_number=s.line_number,
+                col_offset=s.col_offset,
+                filename=s.filename
             )
 
             return
 
         if s.matches.AugAssign:
             yield python_ast.Statement.AugAssign(
-                target=self.changeExpr(s.target),
+                target=self._changeInteriorObject(s.target),
                 op=s.op,
-                value=self.changeExpr(s.value)
+                value=self._changeInteriorObject(s.value),
+                line_number=s.line_number,
+                col_offset=s.col_offset,
+                filename=s.filename
             )
 
             return
 
         if s.matches.AnnAssign:
             yield python_ast.Statement.AnnAssign(
-                target=self.changeExpr(s.target),
+                target=self._changeInteriorObject(s.target),
                 annotation=const(0),
-                value=self.changeExpr(s.value) if s.value is not None else None
+                value=self._changeInteriorObject(s.value) if s.value is not None else None,
+                line_number=s.line_number,
+                col_offset=s.col_offset,
+                filename=s.filename
             )
 
             return
@@ -213,11 +275,11 @@ class GeneratorCodegen:
             yield branch(
                 boolOp(
                     "Or",
-                    checkSlotBetween(yieldsSeen, yieldsSeen + yieldsLeft - 1),
+                    self.checkSlotBetween(yieldsSeen, yieldsSeen + yieldsLeft - 1),
                     boolOp(
                         "And",
-                        checkSlotBetween(-1, -1),
-                        self.changeExpr(s.test)
+                        self.checkSlotBetween(-1, -1),
+                        self._changeInteriorObject(s.test)
                     )
                 ),
                 self.changeStatementSequence(s.body),
@@ -228,32 +290,50 @@ class GeneratorCodegen:
             return
 
         if s.matches.Pass:
-            yield python_ast.Statement.Pass()
+            yield python_ast.Statement.Pass(
+                line_number=s.line_number,
+                col_offset=s.col_offset,
+                filename=s.filename
+            )
 
             return
 
         if s.matches.Break:
-            yield python_ast.Statement.Break()
+            yield python_ast.Statement.Break(
+                line_number=s.line_number,
+                col_offset=s.col_offset,
+                filename=s.filename
+            )
 
             return
 
         if s.matches.Continue:
-            yield python_ast.Statement.Continue()
+            yield python_ast.Statement.Continue(
+                line_number=s.line_number,
+                col_offset=s.col_offset,
+                filename=s.filename
+            )
 
             return
 
         if s.matches.Assert:
             yield python_ast.Statement.Assert(
-                test=self.changeExpr(s.test),
-                msg=None if s.msg is None else self.changeExpr(s.msg)
+                test=self._changeInteriorObject(s.test),
+                msg=None if s.msg is None else self._changeInteriorObject(s.msg),
+                line_number=s.line_number,
+                col_offset=s.col_offset,
+                filename=s.filename,
             )
 
             return
 
         if s.matches.Raise:
             yield python_ast.Statement.Raise(
-                exc=self.changeExpr(s.exc) if s.exc is not None else None,
-                cause=self.changeExpr(s.cause) if s.cause is not None else None,
+                exc=self._changeInteriorObject(s.exc) if s.exc is not None else None,
+                cause=self._changeInteriorObject(s.cause) if s.cause is not None else None,
+                line_number=s.line_number,
+                col_offset=s.col_offset,
+                filename=s.filename,
             )
 
             return
@@ -307,7 +387,7 @@ class GeneratorCodegen:
 
                     cleanupMatchers.append(
                         branch(
-                            checkSlotBetween(
+                            self.checkSlotBetween(
                                 yieldsAtThisCleanupHandlerStart,
                                 yieldsAtThisCleanupHandlerStart + thisEHYields - 1,
                             ),
@@ -322,14 +402,14 @@ class GeneratorCodegen:
             self.yieldsSeen = yieldsSeen
 
             yield branch(
-                checkSlotBetween(-1, yieldsSeen + yieldsBody - 1),
+                self.checkSlotBetween(-1, yieldsSeen + yieldsBody - 1),
                 # we're inside the body of the try block.
                 [
                     python_ast.Statement.Try(
                         body=self.changeStatementSequence(s.body),
                         handlers=[
                             python_ast.ExceptionHandler.Item(
-                                type=self.changeExpr(eh.type) if eh.type is not None else None,
+                                type=self._changeInteriorObject(eh.type) if eh.type is not None else None,
                                 name=eh.name,
                                 body=self.changeStatementSequence(eh.body)
                             ) for eh in s.handlers
@@ -341,7 +421,7 @@ class GeneratorCodegen:
                             # set to something other than -1, then we are paused
                             # and returning a value and shouldn't run.
                             branch(
-                                checkSlotBetween(-1, -1),
+                                self.checkSlotBetween(-1, -1),
                                 self.changeStatementSequence(s.finalbody),
                                 [],
                             )
@@ -355,13 +435,13 @@ class GeneratorCodegen:
 
         if s.matches.Return:
             if s.value is None:
-                yield returnNullPtr()
+                yield self.returnNullPtr()
             else:
                 # this is a strange pathway that bypasses the normal
                 # yield pathway
-                yield setVar("..slot", const(-2))
+                yield self.setVar("..slot", const(-2))
                 yield raiseStopIteration(
-                    self.changeExpr(s.value)
+                    self._changeInteriorObject(s.value)
                 )
 
             return
@@ -382,7 +462,10 @@ class GeneratorCodegen:
 
         if s.matches.Delete:
             yield python_ast.Statement.Delete(
-                targets=[self.changeExpr(e) for e in s.targets]
+                targets=[self._changeInteriorObject(e) for e in s.targets],
+                line_number=s.line_number,
+                col_offset=s.col_offset,
+                filename=s.filename,
             )
             return
 
@@ -390,10 +473,27 @@ class GeneratorCodegen:
             assert False, "this should already have been rewritten"
 
         if s.matches.FunctionDef:
-            raise Exception("Not implemented")
+            yield python_ast.Statement.FunctionDef(
+                name=s.name,
+                args=self._changeInteriorObject(s.args),
+                body=[
+                    self._changeInteriorObject(
+                        stmt,
+                        set(computeFunctionArgVariables(s.args)) |
+                        set(computeAssignedVariables(s.body))
+                    ) for stmt in s.body
+                ],
+                decorator_list=[self._changeInteriorObject(expr) for expr in s.decorator_list],
+                returns=self._changeInteriorObject(s.returns),
+                line_number=s.line_number,
+                col_offset=s.col_offset,
+                filename=s.filename,
+            )
+
+            return
+
         if s.matches.ClassDef:
             raise Exception("Not implemented")
-
         if s.matches.Global:
             raise Exception("Not implemented")
         if s.matches.AsyncFunctionDef:
@@ -414,7 +514,7 @@ class GeneratorCodegen:
         return python_ast.Statement.FunctionDef(
             name="__fastnext__",
             args=python_ast.Arguments.Item(
-                args=[python_ast.Arg.Item(arg="__typed_python_generator_self__", annotation=None)],
+                args=[python_ast.Arg.Item(arg=self.selfName, annotation=None)],
                 vararg=None,
                 kwarg=None
             ),
@@ -426,26 +526,26 @@ class GeneratorCodegen:
                             attr(
                                 makeCallExpr(
                                     readVar(".pointerTo"),
-                                    readVar("__typed_python_generator_self__")
+                                    readVar(self.selfName)
                                 ),
                                 "..slot"
                             )
                         ),
                         branch(
-                            checkSlotBetween(-2, -2),
-                            [returnNullPtr()],
+                            self.checkSlotBetween(-2, -2),
+                            [self.returnNullPtr()],
                             []
                         )
                     ] + self.changeStatementSequence(statements) + [
-                        returnNullPtr()
+                        self.returnNullPtr()
                     ],
                     finalbody=[
                         # if we exit during 'normal' execution (slot == -1)
                         # then we are unwinding an exception and we should never
                         # resume
                         branch(
-                            checkSlotBetween(-1, -1),
-                            [setVar("..slot", const(-2))],
+                            self.checkSlotBetween(-1, -1),
+                            [self.setVar("..slot", const(-2))],
                             []
                         )
                     ]

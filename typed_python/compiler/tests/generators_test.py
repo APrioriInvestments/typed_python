@@ -643,9 +643,101 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         addUntyped(untypedGenerator(CT))
         elapsedUntyped = time.time() - t0
 
-        print(elapsedUntyped, f" to iterate {CT//1000000}mm typed")
-        print(elapsedTyped, f" to iterate {CT//1000000}mm untyped")
+        print(elapsedUntyped, f" to iterate {CT//1000000}mm untyped")
+        print(elapsedTyped, f" to iterate {CT//1000000}mm typed")
         print("speedup is ", elapsedUntyped / elapsedTyped)
 
         # I get about 12.
         assert elapsedUntyped / elapsedTyped > 4
+
+    def test_can_use_lambdas_in_generators(self):
+        @Entrypoint
+        def iterate(x):
+            f = lambda y: y * 2
+
+            yield f(1)
+            yield f(x)
+
+        assert list(iterate(10)) == [2, 20]
+
+    def test_can_use_lambdas_in_generators_with_renamed_variables(self):
+        @Entrypoint
+        def iterate(x):
+            f = lambda x: x * 2
+
+            yield f(1)
+            yield f(x)
+
+        assert list(iterate(10)) == [2, 20]
+
+    def test_can_make_closures_in_generator(self):
+        @Entrypoint
+        def iterate(x):
+            def f(y):
+                return y * 2
+
+            yield f(1)
+            yield f(x)
+
+        assert list(iterate(10)) == [2, 20]
+
+    def test_generator_interior_closures_masked_correctly(self):
+        @Entrypoint
+        def iterate(x):
+            def f(y):
+                x = y
+                return x * 2
+
+            yield f(1)
+            yield f(x)
+
+        assert list(iterate(10)) == [2, 20]
+
+    def test_generator_interior_closures_capture(self):
+        @Entrypoint
+        def iterate(x):
+            def f(y):
+                return y + x
+
+            yield f(1)
+
+        assert list(iterate(10)) == [11]
+
+    def test_generator_doubly_interior_closures_masked_correctly(self):
+        @Entrypoint
+        def iterate(x):
+            def f(y):
+                def g():
+                    x = y
+                    return x * 2
+                return g()
+
+            yield f(1)
+            yield f(x)
+
+        assert list(iterate(10)) == [2, 20]
+
+    def test_generator_in_generator(self):
+        @Entrypoint
+        def iterate(x):
+            def f(y):
+                yield y + 2
+                yield y + 4
+
+            for val in f(1):
+                yield val
+
+            for val in f(x):
+                yield val
+
+        assert list(iterate(10)) == [3, 5, 12, 14]
+
+    def test_generator_in_generator_reading_parent(self):
+        @Entrypoint
+        def iterate(x):
+            def f(y):
+                yield y + x
+
+            yield f(1).__iter__().__next__()
+
+        assert list(iterate(10)) == [11]

@@ -450,6 +450,12 @@ def ExpressionStr(self):
     if self.matches.Attribute:
         return f"({self.value}).{self.attr}"
 
+    if self.matches.Yield:
+        if self.value is None:
+            return "yield"
+        else:
+            return f"yield {self.value}"
+
     if self.matches.Name:
         return self.id
 
