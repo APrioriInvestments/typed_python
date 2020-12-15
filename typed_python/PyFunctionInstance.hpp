@@ -94,6 +94,8 @@ public:
 
     static PyObject* typeWithEntrypoint(PyObject* cls, PyObject* args, PyObject* kwargs);
 
+    static PyObject* typeWithNocompile(PyObject* cls, PyObject* args, PyObject* kwargs);
+
     static PyObject* withEntrypoint(PyObject* funcObj, PyObject* args, PyObject* kwargs);
 
     static PyObject* withNocompile(PyObject* funcObj, PyObject* args, PyObject* kwargs);

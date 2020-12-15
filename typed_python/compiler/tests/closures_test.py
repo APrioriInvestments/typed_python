@@ -20,6 +20,7 @@ from flaky import flaky
 from typed_python import (
     Class, Final, Function, NamedTuple, bytecount, ListOf, TypedCell, Forward,
     PyCell, Tuple, TupleOf, NotCompiled, TypeFunction, Member, typeKnownToCompiler,
+    isCompiled
 )
 
 from typed_python.compiler.runtime import RuntimeEventVisitor, Entrypoint
@@ -1027,3 +1028,58 @@ class TestCompilingClosures(unittest.TestCase):
                 return typeKnownToCompiler(aList)
 
         assert Cls.callIt() == ListOf(int)
+
+    def test_closure_lambdas_obey_not_compiled(self):
+        @NotCompiled
+        def g():
+            assert not isCompiled()
+
+        @Entrypoint
+        def f():
+            return g()
+
+        f()
+
+    def test_passed_lambdas_obey_not_compiled(self):
+        @NotCompiled
+        def g():
+            assert not isCompiled()
+
+        @Entrypoint
+        def f(g):
+            return g()
+
+        f(g)
+
+    def test_interior_lambdas_obey_not_compiled(self):
+        @Entrypoint
+        def f():
+            @NotCompiled
+            def g():
+                assert not isCompiled()
+
+            return g()
+
+        f()
+
+    def test_compiled_defs_obey_not_compiled(self):
+        @Entrypoint
+        def makeNocompile():
+            @NotCompiled
+            def g():
+                pass
+
+            return g
+
+        assert makeNocompile().isNocompile
+
+    def test_compiled_defs_obey_entrypoint(self):
+        @Entrypoint
+        def makeEntrypoint():
+            @Entrypoint
+            def g():
+                pass
+
+            return g
+
+        assert makeEntrypoint().isEntrypoint

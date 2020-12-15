@@ -286,6 +286,24 @@ class ConversionContextBase:
     def computeTypeForFunctionDef(self, ast):
         untypedFuncType = self.functionDefToClosurelessFunction(ast)
 
+        if hasattr(ast, 'decorator_list'):
+            for decorator in ast.decorator_list:
+                ctx = ExpressionConversionContext(self, FunctionStackState())
+                decoratorEval = ctx.convert_expression_ast(decorator)
+                if decoratorEval is None:
+                    raise Exception(
+                        "Decorators other than NotCompiled or Entrypoint not supported yet"
+                    )
+
+                if decoratorEval.expr_type.typeRepresentation is typed_python.NotCompiled:
+                    untypedFuncType = untypedFuncType.typeWithNocompile(True)
+                elif decoratorEval.expr_type.typeRepresentation is typed_python.Entrypoint:
+                    untypedFuncType = untypedFuncType.typeWithEntrypoint(True)
+                else:
+                    raise Exception(
+                        "Decorators other than NotCompiled or Entrypoint not supported yet"
+                    )
+
         typedFuncType = untypedFuncType.withClosureType(self.closureType)
         typedFuncType = typedFuncType.withOverloadVariableBindings(
             0,

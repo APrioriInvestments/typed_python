@@ -741,6 +741,27 @@ PyObject* PyFunctionInstance::typeWithEntrypoint(PyObject* cls, PyObject* args, 
 }
 
 /* static */
+PyObject* PyFunctionInstance::typeWithNocompile(PyObject* cls, PyObject* args, PyObject* kwargs) {
+    Type* selfType = PyInstance::unwrapTypeArgToTypePtr(cls);
+
+    if (!selfType || selfType->getTypeCategory() != Type::TypeCategory::catFunction) {
+        PyErr_Format(PyExc_TypeError, "Expected class to be a Function");
+        return nullptr;
+    }
+
+    static const char *kwlist[] = {"isNocompile", NULL};
+    int isWithNocompile;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "p", (char**)kwlist, &isWithNocompile)) {
+        return nullptr;
+    }
+
+    return PyInstance::typePtrToPyTypeRepresentation(
+        ((Function*)selfType)->withNocompile(isWithNocompile)
+    );
+}
+
+/* static */
 PyObject* PyFunctionInstance::withEntrypoint(PyObject* funcObj, PyObject* args, PyObject* kwargs) {
     static const char *kwlist[] = {"isEntrypoint", NULL};
     int isWithEntrypoint;
@@ -889,11 +910,12 @@ PyObject* PyFunctionInstance::resultTypeFor(PyObject* funcObj, PyObject* args, P
 
 /* static */
 PyMethodDef* PyFunctionInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef[11] {
+    return new PyMethodDef[12] {
         {"overload", (PyCFunction)PyFunctionInstance::overload, METH_VARARGS | METH_KEYWORDS, NULL},
         {"withEntrypoint", (PyCFunction)PyFunctionInstance::withEntrypoint, METH_VARARGS | METH_KEYWORDS, NULL},
         {"typeWithEntrypoint", (PyCFunction)PyFunctionInstance::typeWithEntrypoint, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {"withNocompile", (PyCFunction)PyFunctionInstance::withNocompile, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"typeWithNocompile", (PyCFunction)PyFunctionInstance::typeWithNocompile, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {"resultTypeFor", (PyCFunction)PyFunctionInstance::resultTypeFor, METH_VARARGS | METH_KEYWORDS, NULL},
         {"extractPyFun", (PyCFunction)PyFunctionInstance::extractPyFun, METH_VARARGS | METH_KEYWORDS, NULL},
         {"extractOverloadGlobals", (PyCFunction)PyFunctionInstance::extractOverloadGlobals, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
