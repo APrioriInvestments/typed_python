@@ -101,7 +101,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         # they should be about the same
         for timeElapsed in compiledTimes:
-            assert .66 <= timeElapsed / avgCompiledTime <= 1.33
+            assert .5 <= timeElapsed / avgCompiledTime <= 2.0
 
         # but python is much slower. I get about 30 x.
         assert untypedTime / avgCompiledTime > 10
