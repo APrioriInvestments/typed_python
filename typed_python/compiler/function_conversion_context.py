@@ -1933,6 +1933,9 @@ class FunctionConversionContext(ConversionContextBase):
                 if alias.asname is None and len(alias.name.split(".")) > 1:
                     module = importlib.import_module(alias.name.split("."))[0]
                     target = alias.name.split(".")
+                elif alias.asname is None:
+                    module = importlib.import_module(alias.name)
+                    target = alias.name
                 else:
                     module = importlib.import_module(alias.name)
                     target = alias.asname

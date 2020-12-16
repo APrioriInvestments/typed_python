@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import time
+import sys
 import traceback
 import threading
 import unittest
@@ -3579,3 +3580,12 @@ class TestCompilationStructures(unittest.TestCase):
                                         print(t2)
                                     self.assertEqual(r1, r2, (a, b, c, d, e, f, g))
                                     self.assertEqual(t1, t2, (a, b, c, d, e, f, g))
+
+    def test_import_module(self):
+        @Entrypoint
+        def importSomething():
+            import sys
+
+            return sys
+
+        assert importSomething() is sys
