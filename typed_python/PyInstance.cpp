@@ -30,6 +30,7 @@
 #include "PyClassInstance.hpp"
 #include "PyHeldClassInstance.hpp"
 #include "PyBoundMethodInstance.hpp"
+#include "PyAlternativeMatcherInstance.hpp"
 #include "PyAlternativeInstance.hpp"
 #include "PyFunctionInstance.hpp"
 #include "PyStringInstance.hpp"
@@ -330,6 +331,7 @@ PyObject* PyInstance::tp_new_type(PyTypeObject *subtype, PyObject *args, PyObjec
     if (catToProduce == Type::TypeCategory::catNone ) { return MakeNoneType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catValue ) { return MakeValueType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catBoundMethod ) { return MakeBoundMethodType(nullptr, args); }
+    if (catToProduce == Type::TypeCategory::catAlternativeMatcher ) { return MakeAlternativeMatcherType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catFunction ) { return MakeFunctionType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catClass ) { return MakeClassType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catAlternative ) { return MakeAlternativeType(nullptr, args, kwds); }
@@ -354,7 +356,6 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
 
             try {
                 self->mIteratorOffset = -1;
-                self->mIsMatcher = false;
 
                 self->initialize([&](instance_ptr data) {
                     constructFromPythonArguments(data, eltType, args, kwds);
@@ -1565,6 +1566,7 @@ PyObject* PyInstance::categoryToPyString(Type::TypeCategory cat) {
     if (cat == Type::TypeCategory::catConcreteAlternative) { static PyObject* res = PyUnicode_FromString("ConcreteAlternative"); return res; }
     if (cat == Type::TypeCategory::catPythonSubclass) { static PyObject* res = PyUnicode_FromString("PythonSubclass"); return res; }
     if (cat == Type::TypeCategory::catBoundMethod) { static PyObject* res = PyUnicode_FromString("BoundMethod"); return res; }
+    if (cat == Type::TypeCategory::catAlternativeMatcher) { static PyObject* res = PyUnicode_FromString("AlternativeMatcher"); return res; }
     if (cat == Type::TypeCategory::catClass) { static PyObject* res = PyUnicode_FromString("Class"); return res; }
     if (cat == Type::TypeCategory::catHeldClass) { static PyObject* res = PyUnicode_FromString("HeldClass"); return res; }
     if (cat == Type::TypeCategory::catFunction) { static PyObject* res = PyUnicode_FromString("Function"); return res; }

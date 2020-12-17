@@ -39,7 +39,6 @@ PyObject* PyConstDictInstance::constDictItems(PyObject *o) {
 
         self->mIteratorOffset = 0;
         self->mIteratorFlag = 2;
-        self->mIsMatcher = false;
 
         self->initialize([&](instance_ptr data) {
             self_type->copy_constructor(data, w->dataPtr());
@@ -71,7 +70,6 @@ PyObject* PyConstDictInstance::constDictKeys(PyObject *o) {
 
         self->mIteratorOffset = 0;
         self->mIteratorFlag = 0;
-        self->mIsMatcher = false;
 
         self->initialize([&](instance_ptr data) {
             self_type->copy_constructor(data, w->dataPtr());
@@ -102,7 +100,6 @@ PyObject* PyConstDictInstance::constDictValues(PyObject *o) {
 
         self->mIteratorOffset = 0;
         self->mIteratorFlag = 1;
-        self->mIsMatcher = false;
 
         self->initialize([&](instance_ptr data) {
             self_type->copy_constructor(data, w->dataPtr());
@@ -186,7 +183,6 @@ PyObject* PyConstDictInstance::tp_iter_concrete() {
 
     output->mIteratorOffset = 0;
     output->mIteratorFlag = mIteratorFlag;
-    output->mIsMatcher = false;
 
     return (PyObject*)output;
 }

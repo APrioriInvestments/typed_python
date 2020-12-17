@@ -131,20 +131,9 @@ void PyAlternativeInstance::copyConstructFromPythonInstanceConcrete(Alternative*
 
 
 PyObject* PyAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
-    if (mIsMatcher) {
-        if (type()->subtypes()[type()->which(dataPtr())].first == attrName) {
-            return incref(Py_True);
-        }
-        return incref(Py_False);
-    }
-
     if (strcmp(attrName,"matches") == 0) {
-        PyInstance* self = duplicate();
-
-        self->mIteratorOffset = -1;
-        self->mIsMatcher = true;
-
-        return (PyObject*)self;
+        // concrete alternative should handle this
+        throw std::runtime_error("PyAlternativeInstance should not be receiving 'matches' inquiries.");
     }
 
     //see if its a method
@@ -196,20 +185,12 @@ PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrNam
         }
     }
 
-    if (mIsMatcher) {
-        if (type()->getAlternative()->subtypes()[type()->getAlternative()->which(dataPtr())].first == attrName) {
-            return incref(Py_True);
-        }
-        return incref(Py_False);
-    }
-
     if (strcmp(attrName, "matches") == 0) {
-        PyInstance* self = duplicate();
+        Type* matcherType = AlternativeMatcher::Make(type());
 
-        self->mIteratorOffset = -1;
-        self->mIsMatcher = true;
-
-        return (PyObject*)self;
+        return PyInstance::initializePythonRepresentation(matcherType, [&](instance_ptr data) {
+            matcherType->copy_constructor(data, dataPtr());
+        });
     }
 
     //see if its a method

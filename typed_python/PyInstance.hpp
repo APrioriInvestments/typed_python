@@ -43,6 +43,7 @@ class PyRefToInstance;
 class PyCompositeTypeInstance;
 class PyTupleInstance;
 class PyNamedTupleInstance;
+class PyAlternativeMatcherInstance;
 class PyAlternativeInstance;
 class PyConcreteAlternativeInstance;
 class PyStringInstance;
@@ -68,7 +69,6 @@ public:
     PyObject_HEAD
 
     bool mIsInitialized;
-    bool mIsMatcher;
     char mIteratorFlag; //0 is keys, 1 is values, 2 is pairs
     int64_t mIteratorOffset; //-1 if we're not an iterator
     int64_t mContainerSize; //-1 if we're not an iterator
@@ -124,6 +124,8 @@ public:
                 return f(*(PyAlternativeInstance*)obj);
             case Type::TypeCategory::catConcreteAlternative:
                 return f(*(PyConcreteAlternativeInstance*)obj);
+            case Type::TypeCategory::catAlternativeMatcher:
+                return f(*(PyAlternativeMatcherInstance*)obj);
             case Type::TypeCategory::catPythonSubclass:
                 return f(*(PyPythonSubclassInstance*)obj);
             case Type::TypeCategory::catPythonObjectOfType:
@@ -215,6 +217,8 @@ public:
                 return f((PyHeldClassInstance*)nullptr);
             case Type::TypeCategory::catFunction:
                 return f((PyFunctionInstance*)nullptr);
+            case Type::TypeCategory::catAlternativeMatcher:
+                return f((PyAlternativeMatcherInstance*)nullptr);
             case Type::TypeCategory::catBoundMethod:
                 return f((PyBoundMethodInstance*)nullptr);
             case Type::TypeCategory::catNone:
@@ -295,7 +299,6 @@ public:
             (PyInstance*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
 
         self->mIteratorOffset = -1;
-        self->mIsMatcher = false;
 
         try {
             self->initialize(f, eltType);
@@ -332,7 +335,6 @@ public:
             type()->copy_constructor(out, dataPtr());
         });
 
-        result->mIsMatcher = false;
         result->mIteratorOffset = 0;
         result->mIteratorFlag = iterTypeFlag;
         result->mContainerSize = containerSize;

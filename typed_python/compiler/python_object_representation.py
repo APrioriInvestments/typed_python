@@ -43,6 +43,7 @@ from typed_python.compiler.type_wrappers.set_wrapper import SetWrapper
 from typed_python.compiler.type_wrappers.tuple_wrapper import TupleWrapper, NamedTupleWrapper
 from typed_python.compiler.type_wrappers.slice_type_object_wrapper import SliceWrapper
 from typed_python.compiler.type_wrappers.alternative_wrapper import makeAlternativeWrapper
+from typed_python.compiler.type_wrappers.alternative_wrapper import AlternativeMatcherWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.len_wrapper import LenWrapper
 from typed_python.compiler.type_wrappers.hash_wrapper import HashWrapper
@@ -185,6 +186,9 @@ def _typedPythonTypeToTypeWrapper(t):
 
     if t.__typed_python_category__ == "BoundMethod":
         return BoundMethodWrapper(t)
+
+    if t.__typed_python_category__ == "AlternativeMatcher":
+        return AlternativeMatcherWrapper(t)
 
     if t.__typed_python_category__ == "TupleOf":
         return TupleOfWrapper(t)

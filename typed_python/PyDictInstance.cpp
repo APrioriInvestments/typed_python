@@ -34,7 +34,6 @@ PyObject* PyDictInstance::dictItems(PyObject *o) {
 
     result->mIteratorOffset = 0;
     result->mIteratorFlag = 2;
-    result->mIsMatcher = false;
 
     return (PyObject*)result;
 }
@@ -53,7 +52,6 @@ PyObject* PyDictInstance::dictKeys(PyObject *o) {
 
     result->mIteratorOffset = 0;
     result->mIteratorFlag = 0;
-    result->mIsMatcher = false;
 
     return (PyObject*)result;
 }
@@ -72,7 +70,6 @@ PyObject* PyDictInstance::dictValues(PyObject *o) {
 
     result->mIteratorOffset = 0;
     result->mIteratorFlag = 1;
-    result->mIsMatcher = false;
 
     return (PyObject*)result;
 }

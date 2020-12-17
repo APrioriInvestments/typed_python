@@ -12,8 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Int16, UInt64, Float32, Alternative, Forward, \
-    Dict, ConstDict, ListOf, Compiled
+from typed_python import (
+    TypeFunction, Int16, UInt64, Float32, Alternative, Forward,
+    Dict, ConstDict, ListOf, Compiled, OneOf
+)
 import typed_python._types as _types
 from typed_python import Entrypoint
 import unittest
@@ -1643,3 +1645,23 @@ class TestAlternativeCompilation(unittest.TestCase):
                 r0 = fn(v)
                 r1 = c_fn(v)
                 self.assertEqual(r0, r1)
+
+    def test_matches_on_alternative(self):
+        A = Alternative("A", X=dict(x=int))
+
+        @Entrypoint
+        def checkMatchesX(x):
+            return x.matches.X
+
+        assert checkMatchesX(A.X())
+
+    def test_matches_on_oneof_alternative(self):
+        A = Alternative("A", X=dict(x=int))
+        B = Alternative("B", Y=dict(y=int))
+
+        @Entrypoint
+        def checkMatchesX(x: OneOf(A, B, int)):
+            return x.matches.X
+
+        assert checkMatchesX(A.X())
+        assert not checkMatchesX(B.Y())

@@ -1111,6 +1111,15 @@ class NativeTypesTests(unittest.TestCase):
         for k in aDict:
             self.assertEqual(aDict[str(k)], str(int(k)+1))
 
+    def test_alternative_matcher_type(self):
+        A = Alternative("A", X=dict(x=int))
+
+        assert type(A.X().matches).__name__ == "AlternativeMatcher(X)"
+        assert type(A.X().matches).__typed_python_category__ == "AlternativeMatcher"
+        assert type(A.X().matches).Alternative is A
+        assert A.X().matches.X
+        assert not A.X().matches.NotX
+
     def test_alternative_bytecounts(self):
         alt = Alternative(
             "Empty",
@@ -3265,8 +3274,10 @@ class NativeTypesTests(unittest.TestCase):
         ListOf(UInt8)(someBytes)
         t1 = time.time()
 
+        elapsed = (t1 - t0)
+
         # I get .001, but if we use the normal interpreter loop, .2
-        assert t1 - t0 < .02
+        assert elapsed < .02
 
     def test_iterate_dict_and_change_size_throws(self):
         x = Dict(int, int)({1: 2})

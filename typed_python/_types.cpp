@@ -764,7 +764,31 @@ PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    Type* resType = BoundMethod::Make((Class*)t0, PyUnicode_AsUTF8(a1));
+    Type* resType = BoundMethod::Make(t0, PyUnicode_AsUTF8(a1));
+
+    return incref((PyObject*)PyInstance::typeObj(resType));
+}
+
+PyObject *MakeAlternativeMatcherType(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "AlternativeMatcher takes one argument");
+        return NULL;
+    }
+
+    PyObjectHolder a0(PyTuple_GetItem(args,0));
+
+    Type* t0 = PyInstance::unwrapTypeArgToTypePtr(a0);
+
+    if (!t0->isAlternative() && !t0->isConcreteAlternative()) {
+        PyErr_SetString(
+            PyExc_TypeError,
+            "Expected first argument to be an alternative or concrete alternative"
+        );
+
+        return NULL;
+    }
+
+    Type* resType = AlternativeMatcher::Make((Alternative*)t0);
 
     return incref((PyObject*)PyInstance::typeObj(resType));
 }
@@ -2754,6 +2778,7 @@ PyInit__types(void)
     PyModule_AddObject(module, "Class", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catClass)));
     PyModule_AddObject(module, "Function", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catFunction)));
     PyModule_AddObject(module, "BoundMethod", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catBoundMethod)));
+    PyModule_AddObject(module, "AlternativeMatcher", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catAlternativeMatcher)));
     PyModule_AddObject(module, "EmbeddedMessage", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catEmbeddedMessage)));
     PyModule_AddObject(module, "TypedCell", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catTypedCell)));
     PyModule_AddObject(module, "PyCell", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPyCell)));

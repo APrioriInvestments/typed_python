@@ -1373,10 +1373,18 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             if (category == -1) {
                 throw std::runtime_error("Corrupt native type found.");
             }
-            if (category == Type::TypeCategory::catForward || category == Type::TypeCategory::catBoundMethod) {
+            if (category == Type::TypeCategory::catForward
+                    || category == Type::TypeCategory::catBoundMethod
+            ) {
                 if (fieldNumber == 1) {
                     names.push_back(b.readStringObject());
                 } else if (fieldNumber == 2) {
+                    types.push_back(deserializeNativeType(b, wireType));
+                }
+            } else
+            if (category == Type::TypeCategory::catAlternativeMatcher
+            ) {
+                if (fieldNumber == 1) {
                     types.push_back(deserializeNativeType(b, wireType));
                 }
             } else
@@ -1645,6 +1653,12 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             throw std::runtime_error("Invalid native type: BoundMethod needs exactly 1 name.");
         }
         resultType = ::BoundMethod::Make(types[0], names[0]);
+    }
+    else if (category == Type::TypeCategory::catAlternativeMatcher) {
+        if (types.size() != 1) {
+            throw std::runtime_error("Invalid native type: AternativeMatcher needs exactly 1 type.");
+        }
+        resultType = ::AlternativeMatcher::Make(types[0]);
     }
     else if (category == Type::TypeCategory::catRefTo) {
         if (types.size() != 1) {

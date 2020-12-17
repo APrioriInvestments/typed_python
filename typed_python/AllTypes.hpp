@@ -43,6 +43,7 @@
 #include "HeldClassType.hpp"
 #include "ClassType.hpp"
 #include "BoundMethodType.hpp"
+#include "AlternativeMatcherType.hpp"
 #include "EmbeddedMessageType.hpp"
 #include "SetType.hpp"
 #include "PyCellType.hpp"

@@ -780,6 +780,8 @@ void PythonSerializationContext::serializeNativeTypeInner(
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catBoundMethod) {
         b.writeStringObject(1, ((BoundMethod*)nativeType)->getFuncName());
         serializeNativeType(((BoundMethod*)nativeType)->getFirstArgType(), b, 2);
+    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catAlternativeMatcher) {
+        serializeNativeType(((AlternativeMatcher*)nativeType)->getAlternative(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catListOf) {
         serializeNativeType(((ListOfType*)nativeType)->getEltType(), b, 2);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catTypedCell) {

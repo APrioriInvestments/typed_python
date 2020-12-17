@@ -66,6 +66,7 @@ class DictType;
 class ConstDictType;
 class Alternative;
 class ConcreteAlternative;
+class AlternativeMatcher;
 class PythonSubclass;
 class PythonObjectOfType;
 class Class;
@@ -126,6 +127,7 @@ public:
         catPythonSubclass = 25, //subclass of a typed_python type
         catPythonObjectOfType = 26, //a python object that matches 'isinstance' on a particular type
         catBoundMethod = 27,
+        catAlternativeMatcher = 37,
         catClass = 28,
         catHeldClass = 29,
         catFunction = 30,
@@ -183,6 +185,10 @@ public:
 
     bool isAlternative() const {
         return m_typeCategory == catAlternative;
+    }
+
+    bool isConcreteAlternative() const {
+        return m_typeCategory == catConcreteAlternative;
     }
 
     bool isForward() const {
@@ -354,6 +360,7 @@ public:
         if (category == Type::TypeCategory::catConcreteAlternative) { return "ConcreteAlternative"; }
         if (category == Type::TypeCategory::catPythonSubclass) { return "PythonSubclass"; }
         if (category == Type::TypeCategory::catBoundMethod) { return "BoundMethod"; }
+        if (category == Type::TypeCategory::catAlternativeMatcher) { return "AlternativeMatcher"; }
         if (category == Type::TypeCategory::catClass) { return "Class"; }
         if (category == Type::TypeCategory::catHeldClass) { return "HeldClass"; }
         if (category == Type::TypeCategory::catFunction) { return "Function"; }
@@ -435,6 +442,8 @@ public:
                 return f(*(Function*)this);
             case catBoundMethod:
                 return f(*(BoundMethod*)this);
+            case catAlternativeMatcher:
+                return f(*(AlternativeMatcher*)this);
             case catForward:
                 return f(*(Forward*)this);
             case catEmbeddedMessage:

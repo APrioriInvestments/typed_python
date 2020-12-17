@@ -212,7 +212,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
 
         self.alternativeType = t
         self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
-        self.matcherType = AlternativeMatchingWrapper(self.typeRepresentation)
+        self.matcherType = typeWrapper(_types.AlternativeMatcher(self.typeRepresentation))
         self._alternatives = None
 
     @property
@@ -329,6 +329,7 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
         self.alternativeType = t.Alternative
         self.indexInParent = t.Index
         self.underlyingLayout = typeWrapper(t.ElementType)  # a NamedTuple
+        self.matcherType = typeWrapper(_types.AlternativeMatcher(self.typeRepresentation))
         self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
 
     def getNativeLayoutType(self):
@@ -426,6 +427,9 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
         self.refToInner(context, out).convert_initialize_from_args(*args)
 
     def convert_attribute(self, context, instance, attribute, nocheck=False):
+        if attribute == 'matches':
+            return instance.changeType(self.matcherType)
+
         if attribute in self.typeRepresentation.__typed_python_methods__:
             methodType = BoundMethodWrapper(
                 _types.BoundMethod(self.typeRepresentation, attribute)
@@ -439,8 +443,49 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
         return context.constant(typename == self.typeRepresentation.Name)
 
 
-class AlternativeMatchingWrapper(Wrapper):
+class AlternativeMatcherWrapper(Wrapper):
+    def __init__(self, t):
+        super().__init__(t)
+
+    def __str__(self):
+        return f"AlternativeMatcherWrapper({self.typeRepresentation})"
+
+    @property
+    def is_pod(self):
+        return typeWrapper(self.typeRepresentation.Alternative).is_pod
+
+    @property
+    def is_pass_by_ref(self):
+        return typeWrapper(self.typeRepresentation.Alternative).is_pass_by_ref
+
+    @property
+    def is_empty(self):
+        return typeWrapper(self.typeRepresentation.Alternative).is_empty
+
+    def getNativeLayoutType(self):
+        return typeWrapper(self.typeRepresentation.Alternative).getNativeLayoutType()
+
+    def convert_assign(self, context, target, toStore):
+        return typeWrapper(self.typeRepresentation.Alternative).convert_assign(
+            context,
+            target.changeType(typeWrapper(self.typeRepresentation.Alternative)),
+            toStore.changeType(typeWrapper(self.typeRepresentation.Alternative))
+        )
+
+    def convert_copy_initialize(self, context, target, toStore):
+        return typeWrapper(self.typeRepresentation.Alternative).convert_copy_initialize(
+            context,
+            target.changeType(typeWrapper(self.typeRepresentation.Alternative)),
+            toStore.changeType(typeWrapper(self.typeRepresentation.Alternative))
+        )
+
+    def convert_destroy(self, context, instance):
+        return typeWrapper(self.typeRepresentation.Alternative).convert_destroy(
+            context,
+            instance.changeType(typeWrapper(self.typeRepresentation.Alternative))
+        )
+
     def convert_attribute(self, context, instance, attribute):
-        altType = typeWrapper(self.typeRepresentation)
+        altType = typeWrapper(self.typeRepresentation.Alternative)
 
         return altType.convert_check_matches(context, instance.changeType(altType), attribute)

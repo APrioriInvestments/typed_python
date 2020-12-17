@@ -47,6 +47,7 @@ PyObject *MakeTypedCellType(PyObject* nullValue, PyObject* args);
 PyObject *MakeNoneType(PyObject* nullValue, PyObject* args);
 PyObject *MakeValueType(PyObject* nullValue, PyObject* args);
 PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args);
+PyObject *MakeAlternativeMatcherType(PyObject* nullValue, PyObject* args);
 PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args);
 PyObject *MakeClassType(PyObject* nullValue, PyObject* args);
 PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwargs);

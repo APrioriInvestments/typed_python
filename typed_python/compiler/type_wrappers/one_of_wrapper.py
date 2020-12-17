@@ -417,7 +417,7 @@ class OneOfWrapper(Wrapper):
                 # get a pointer to the uninitialized target as if it were the 'ix'th type
                 typedTarget = self.refAs(context, targetVal, ix)
 
-                if typedTarget.expr_type == convertFrom.expr_type:
+                if typedTarget.expr_type.typeRepresentation == convertFrom.expr_type.typeRepresentation:
                     typedTarget.convert_copy_initialize(convertFrom)
 
                     context.pushEffect(
@@ -463,6 +463,14 @@ class OneOfWrapper(Wrapper):
                                     context.pushEffect(
                                         native_ast.Expression.Return(arg=native_ast.const_bool_expr(True))
                                     )
+
+        if self._can_convert_from_type(convertFrom.expr_type, conversionLevel) is True:
+            context.pushException(
+                TypeError,
+                f"We are supposed to always be able to convert "
+                f"to {self} from {convertFrom.expr_type} at {conversionLevel} "
+                f"but somehow we didn't."
+            )
 
         # at the end, we didn't convert
         context.pushEffect(

@@ -196,7 +196,6 @@ PyObject* PySetInstance::setCopy(PyObject* o, PyObject* args) {
     }
     new_inst->mIteratorOffset = -1;
     new_inst->mIteratorFlag = 0;
-    new_inst->mIsMatcher = false;
 
     try {
         copy_elements((PyObject*)new_inst, (PyObject*)(PySetInstance*)o);
@@ -218,7 +217,6 @@ PyObject* PySetInstance::set_intersection(PyObject* o, PyObject* other) {
     }
     new_inst->mIteratorOffset = -1;
     new_inst->mIteratorFlag = 0;
-    new_inst->mIsMatcher = false;
 
     PySetInstance* self_w = (PySetInstance*)o;
     Type* src_type = extractTypeFrom(Py_TYPE(other));
@@ -327,7 +325,6 @@ PyObject* PySetInstance::set_difference(PyObject* o, PyObject* other) {
         }
         new_inst->mIteratorOffset = -1;
         new_inst->mIteratorFlag = 0;
-        new_inst->mIsMatcher = false;
 
         try {
             PySetInstance* other_w = (PySetInstance*)other;
@@ -481,7 +478,6 @@ PyObject* PySetInstance::set_symmetric_difference(PyObject* o, PyObject* other) 
         }
         new_inst->mIteratorOffset = -1;
         new_inst->mIteratorFlag = 0;
-        new_inst->mIsMatcher = false;
 
         try {
             PySetInstance* other_w = (PySetInstance*)other;
@@ -586,7 +582,6 @@ PyObject* PySetInstance::set_union(PyObject* o, PyObject* other) {
 
     new_inst->mIteratorOffset = -1;
     new_inst->mIteratorFlag = 0;
-    new_inst->mIsMatcher = false;
 
     try {
         // copy lhs to new set
@@ -785,7 +780,6 @@ PyObject* PySetInstance::setUnion(PyObject* o, PyObject* args) {
     }
     new_inst->mIteratorOffset = -1;
     new_inst->mIteratorFlag = 0;
-    new_inst->mIsMatcher = false;
 
     try {
         // copy lhs to new set
@@ -964,7 +958,6 @@ PyObject* PySetInstance::setUpdate(PyObject* o, PyObject* args) {
     PySetInstance* self_w = (PySetInstance*)o;
     self_w->mIteratorOffset = -1;
     self_w->mIteratorFlag = 0;
-    self_w->mIsMatcher = false;
 
     try {
         // copy rhs arg items to new set
