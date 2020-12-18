@@ -61,3 +61,6 @@ class TypedTupleMasqueradingAsTuple(MasqueradeWrapper):
             [instance.convert_masquerade_to_typed()],
             {}
         ).changeType(tuple)
+
+    def refAs(self, context, instance, which):
+        return self.convert_masquerade_to_typed(context, instance).refAs(which)

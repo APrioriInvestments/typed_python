@@ -271,8 +271,13 @@ public:
         size_t index = 0;
 
         for (auto pathAndType: mCellTypes) {
-            types.push_back(pathAndType.second);
-            mClosureIndices[pathAndType.first] = index++;
+            if (pathAndType.second) {
+                types.push_back(pathAndType.second);
+                mClosureIndices[pathAndType.first] = index++;
+            } else {
+                // this variable is not assigned.
+                types.push_back(NoneType::Make());
+            }
         }
 
         Tuple* closureTuple = Tuple::Make(types);
@@ -369,29 +374,33 @@ public:
 
             PyObject* cellContents = PyCell_GET(cell);
 
-            if (mObjectPaths.find(cellContents) == mObjectPaths.end()) {
-                throw std::runtime_error("Failed to find a record of this function cell even though we walked it already");
-            }
-
-            Path contentsPath = mObjectPaths[cellContents];
-
-            if (mResolvedFunctionTypes.find(contentsPath) != mResolvedFunctionTypes.end()) {
-                bindings[closureVarName] = ClosureVariableBinding() + ClosureVariableBindingStep(
-                    (Function*)mResolvedFunctionTypes.find(contentsPath)->second
-                );
+            if (!cellContents) {
+                // this cell is empty, and so we just don't bind it at all
             } else {
-                // this is a function
-                ClosureVariableBinding binding;
-                if (mClosureIsCell) {
-                    binding = binding + ClosureVariableBindingStep::AccessCell();
+                if (mObjectPaths.find(cellContents) == mObjectPaths.end()) {
+                    throw std::runtime_error("Failed to find a record of this function cell even though we walked it already");
                 }
 
-                auto it = mClosureIndices.find(contentsPath);
-                if (it == mClosureIndices.end()) {
-                    throw std::runtime_error("Path " + contentsPath.toString() + " isn't in the closure indices");
-                }
+                Path contentsPath = mObjectPaths[cellContents];
 
-                bindings[closureVarName] = binding + ClosureVariableBindingStep(it->second);
+                if (mResolvedFunctionTypes.find(contentsPath) != mResolvedFunctionTypes.end()) {
+                    bindings[closureVarName] = ClosureVariableBinding() + ClosureVariableBindingStep(
+                        (Function*)mResolvedFunctionTypes.find(contentsPath)->second
+                    );
+                } else {
+                    // this is a function
+                    ClosureVariableBinding binding;
+                    if (mClosureIsCell) {
+                        binding = binding + ClosureVariableBindingStep::AccessCell();
+                    }
+
+                    auto it = mClosureIndices.find(contentsPath);
+                    if (it == mClosureIndices.end()) {
+                        throw std::runtime_error("Path " + contentsPath.toString() + " isn't in the closure indices");
+                    }
+
+                    bindings[closureVarName] = binding + ClosureVariableBindingStep(it->second);
+                }
             }
         }
 

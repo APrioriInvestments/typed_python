@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 import unittest
-from typed_python import TupleOf, ConstDict, Function
+from typed_python import TupleOf, ConstDict, Function, Entrypoint
 
 
 class NativeFunctionTypesTests(unittest.TestCase):
@@ -57,3 +57,40 @@ class NativeFunctionTypesTests(unittest.TestCase):
         self.assertEqual([a.defaultValue for a in o.args], [None, (30,), (None,), None, None])
         self.assertEqual([a.isStarArg for a in o.args], [False, False, False, True, False])
         self.assertEqual([a.isKwarg for a in o.args], [False, False, False, False, True])
+
+    def test_instantiate_function_type_with_untyped_closure(self):
+        x = 10
+
+        @Function
+        def f():
+            return x
+
+        with self.assertRaises(NameError):
+            # the default constructor for the function should produce
+            # an empty cell, which throws a name error
+            type(f)()()
+
+    def test_instantiate_function_type_with_entrypointed_closure(self):
+        x = 10
+
+        @Entrypoint
+        def f():
+            return x
+
+        fInst = type(f)()
+
+        with self.assertRaises(NameError):
+            fInst()
+
+    def test_instantiate_function_type_with_typed_closure(self):
+        @Entrypoint
+        def makeF(x):
+            def f():
+                return x
+            return type(f)
+
+        fType = makeF(10)
+        closure = fType.ClosureType()
+        closure.x = 20
+
+        assert fType(closure)() == 20

@@ -142,6 +142,10 @@ def makeFunctionType(name, f, classname=None, ignoreAnnotations=False, assumeClo
                     # reapply the entrypoint flag
                     res = type(res().withEntrypoint(True))
 
+                if f.isNocompile:
+                    # reapply the entrypoint flag
+                    res = type(res().withNocompile(True))
+
                 return res
 
         return type(f)

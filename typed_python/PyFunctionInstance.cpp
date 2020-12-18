@@ -1114,6 +1114,12 @@ void PyFunctionInstance::copyConstructFromPythonInstanceConcrete(Function* type,
         throw std::runtime_error("Can't convert to " + type->name() + " with " + format(conversionLevelToInt(level)));
     }
 
+    // see if we have just been handed the closure.
+    if (pyRepresentation->ob_type == PyInstance::typeObj(type->getClosureType())) {
+        type->getClosureType()->copy_constructor(tgt, ((PyInstance*)pyRepresentation)->dataPtr());
+        return;
+    }
+
     if (!pyValCouldBeOfTypeConcrete(type, pyRepresentation, level)) {
         throw std::runtime_error("Can't convert to " + type->name() + " pyrep");
     }
