@@ -30,7 +30,7 @@ from typed_python.internals import makeFunctionType, checkOneOfType
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
-from typed_python import _types, Type, ListOf, PointerTo, pointerTo
+from typed_python import _types, Type, ListOf, PointerTo, pointerTo, Set, Dict
 from typed_python.generator import Generator
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.expression_conversion_context import ExpressionConversionContext
@@ -2345,7 +2345,7 @@ class FunctionConversionContext(ConversionContextBase):
         )
 
 
-class ListComprehensionConversionContext(FunctionConversionContext):
+class ComprehensionConversionContextBase(FunctionConversionContext):
     """Convert a generator function, but instead of generating, build a list.
 
     We generate an accumulator at the start of the function, replace all yields
@@ -2355,15 +2355,12 @@ class ListComprehensionConversionContext(FunctionConversionContext):
     def isGenerator(self):
         return False
 
-    def listCompAccumulatorType(self):
-        if FunctionYield in self._varname_to_type:
-            return typeWrapper(ListOf(self._varname_to_type[FunctionYield].typeRepresentation))
-        else:
-            return typeWrapper(ListOf(None))
+    def comprehensionAccumulatorType(self):
+        raise Exception("SubclassesOverride")
 
     def localVariableExpression(self, context: ExpressionConversionContext, name):
-        if name == ".list_comp_accumulator":
-            listCompType = self.listCompAccumulatorType()
+        if name == ".comprehension_accumulator":
+            listCompType = self.comprehensionAccumulatorType()
 
             return TypedExpression(
                 context,
@@ -2382,7 +2379,7 @@ class ListComprehensionConversionContext(FunctionConversionContext):
 
         self.localVariableExpression(
             context,
-            ".list_comp_accumulator"
+            ".comprehension_accumulator"
         ).convert_default_initialize()
 
         return [context.finalize(None)]
@@ -2391,7 +2388,7 @@ class ListComprehensionConversionContext(FunctionConversionContext):
         destructors = super().generateDestructors(variableStates)
 
         context = ExpressionConversionContext(self, variableStates)
-        accumulator = self.localVariableExpression(context, ".list_comp_accumulator")
+        accumulator = self.localVariableExpression(context, ".comprehension_accumulator")
         accumulator.convert_destroy()
 
         nativeDestructor = context.finalize(None)
@@ -2409,12 +2406,7 @@ class ListComprehensionConversionContext(FunctionConversionContext):
 
         We return a native expression handling the result. Flow must return.
         """
-        self.localVariableExpression(
-            expr.context,
-            ".list_comp_accumulator"
-        ).convert_method_call(
-            "append", [expr], {}
-        )
+        raise Exception("Subclasses Implement")
 
     def handleFlowsOffEnd(self, variableStates: FunctionStackState):
         """Generate code to handle the case where we exit the function normally.
@@ -2425,21 +2417,12 @@ class ListComprehensionConversionContext(FunctionConversionContext):
         controlFlowReturns must be False.
         """
         assert not self._functionOutputTypeKnown
-        listCompType = self.listCompAccumulatorType()
 
         subcontext = ExpressionConversionContext(self, variableStates)
 
-        from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import (
-            TypedListMasqueradingAsList
-        )
-
         resExpr = (
-            self.localVariableExpression(subcontext, ".list_comp_accumulator")
-            .changeType(
-                TypedListMasqueradingAsList(
-                    listCompType.typeRepresentation
-                )
-            )
+            self.localVariableExpression(subcontext, ".comprehension_accumulator")
+            .changeType(self.getMasqueradeType())
         )
 
         self.setVariableType(FunctionOutput, resExpr.expr_type)
@@ -2447,3 +2430,127 @@ class ListComprehensionConversionContext(FunctionConversionContext):
         subcontext.pushReturnValue(resExpr)
 
         return subcontext.finalize(None, exceptionsTakeFrom=None), False
+
+
+class ListComprehensionConversionContext(ComprehensionConversionContextBase):
+    """Convert a generator function, but instead of generating, build a list.
+
+    We generate an accumulator at the start of the function, replace all yields
+    with an '.append' operation, and then at the end append the list.
+    """
+    def comprehensionAccumulatorType(self):
+        if FunctionYield in self._varname_to_type:
+            return typeWrapper(ListOf(self._varname_to_type[FunctionYield].typeRepresentation))
+        else:
+            return typeWrapper(ListOf(None))
+
+    def processYieldExpression(self, expr):
+        """Called with the body of a yield statement so that subclasses can handle.
+
+        expr is an expression of type self._varname_to_type[FunctionYield].
+
+        We return a native expression handling the result. Flow must return.
+        """
+        self.localVariableExpression(
+            expr.context,
+            ".comprehension_accumulator"
+        ).convert_method_call(
+            "append", [expr], {}
+        )
+
+    def getMasqueradeType(self):
+        from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import (
+            TypedListMasqueradingAsList
+        )
+
+        return TypedListMasqueradingAsList(
+            self.comprehensionAccumulatorType().typeRepresentation
+        )
+
+
+class SetComprehensionConversionContext(ComprehensionConversionContextBase):
+    """Convert a generator function, but instead of generating, build a set.
+
+    We generate an accumulator at the start of the function, replace all yields
+    with an '.append' operation, and then at the end append the list.
+    """
+    def comprehensionAccumulatorType(self):
+        if FunctionYield in self._varname_to_type:
+            return typeWrapper(Set(self._varname_to_type[FunctionYield].typeRepresentation))
+        else:
+            return typeWrapper(Set(None))
+
+    def processYieldExpression(self, expr):
+        """Called with the body of a yield statement so that subclasses can handle.
+
+        expr is an expression of type self._varname_to_type[FunctionYield].
+
+        We return a native expression handling the result. Flow must return.
+        """
+        self.localVariableExpression(
+            expr.context,
+            ".comprehension_accumulator"
+        ).convert_method_call(
+            "add", [expr], {}
+        )
+
+    def getMasqueradeType(self):
+        from typed_python.compiler.type_wrappers.typed_set_masquerading_as_set_wrapper import (
+            TypedSetMasqueradingAsSet
+        )
+
+        return TypedSetMasqueradingAsSet(
+            self.comprehensionAccumulatorType().typeRepresentation
+        )
+
+
+class DictComprehensionConversionContext(ComprehensionConversionContextBase):
+    """Convert a generator function, but instead of generating, build a dict.
+
+    We generate an accumulator at the start of the function, replace all yields
+    (which must be pairs) with an assignment operation, and then at the end append the list.
+    """
+    def comprehensionAccumulatorType(self):
+        if FunctionYield in self._varname_to_type:
+            # the tuple wrapper will already jam together the various types
+            # into a single output tuple because there is only one 'yield' statement
+            from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper \
+                import TypedTupleMasqueradingAsTuple
+
+            T = self._varname_to_type[FunctionYield]
+
+            assert isinstance(T, TypedTupleMasqueradingAsTuple)
+            assert len(T.typeRepresentation.ElementTypes) == 2
+
+            return typeWrapper(
+                Dict(
+                    T.typeRepresentation.ElementTypes[0],
+                    T.typeRepresentation.ElementTypes[1]
+                )
+            )
+        else:
+            return typeWrapper(Dict(None, None))
+
+    def processYieldExpression(self, expr):
+        """Called with the body of a yield statement so that subclasses can handle.
+
+        expr is an expression of type self._varname_to_type[FunctionYield].
+
+        We return a native expression handling the result. Flow must return.
+        """
+        self.localVariableExpression(
+            expr.context,
+            ".comprehension_accumulator"
+        ).convert_setitem(
+            expr.convert_getitem(expr.context.constant(0)),
+            expr.convert_getitem(expr.context.constant(1))
+        )
+
+    def getMasqueradeType(self):
+        from typed_python.compiler.type_wrappers.typed_dict_masquerading_as_dict_wrapper import (
+            TypedDictMasqueradingAsDict
+        )
+
+        return TypedDictMasqueradingAsDict(
+            self.comprehensionAccumulatorType().typeRepresentation
+        )

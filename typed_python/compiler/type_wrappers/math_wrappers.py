@@ -18,7 +18,7 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python import ListOf, Tuple, TupleOf, NamedTuple, Dict
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python.compiler.type_wrappers.tuple_wrapper import MasqueradingTupleWrapper
+from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 import sys
 
 from math import (
@@ -426,8 +426,8 @@ class MathFunctionWrapper(Wrapper):
 
             # ... returning a tuple.
             if isinstance(outT, tuple):
-                outT = MasqueradingTupleWrapper(Tuple(*impl.ret))
-                return_tuple = native_ast.Expression.StackSlot(name=".return_tuple", type=outT.layoutType)
+                outT = TypedTupleMasqueradingAsTuple(Tuple(*impl.ret))
+                return_tuple = native_ast.Expression.StackSlot(name=".return_tuple", type=outT.getNativeLayoutType())
                 context.pushEffect(impl.f.call(arg1, return_tuple.elemPtr(0).cast(native_ast.VoidPtr)))
                 return typed_python.compiler.typed_expression.TypedExpression(context, return_tuple, outT, True)
 

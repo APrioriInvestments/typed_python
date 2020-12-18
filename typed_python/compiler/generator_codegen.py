@@ -42,7 +42,8 @@ from typed_python.compiler.withblock_codegen import expandWithBlockIntoTryCatch
 import typed_python.python_ast as python_ast
 
 from typed_python.compiler.python_ast_analysis import (
-    countYieldStatements, computeFunctionArgVariables, computeAssignedVariables
+    countYieldStatements, computeFunctionArgVariables, computeAssignedVariables,
+    computeReadVariables
 )
 from typed_python.compiler.codegen_helpers import (
     const,
@@ -127,17 +128,48 @@ class GeneratorCodegen:
                 return self.accessVar("." + expr.id, expr.ctx)
             return expr
 
-        if expr.matches.GeneratorExp:
-            raise Exception("Not implemented yet")
+        if (
+            expr.matches.GeneratorExp or
+            expr.matches.ListComp or
+            expr.matches.SetComp or
+            expr.matches.DictComp
+        ):
+            generators = []
+            boundVars = set()
+            for g in expr.generators:
+                postBoundVars = boundVars | set(computeReadVariables(g.target))
 
-        if expr.matches.ListComp:
-            raise Exception("Not implemented yet")
+                generators.append(
+                    python_ast.Comprehension.Item(
+                        target=g.target,
+                        iter=self._changeInteriorObject(g.iter, set(varsToNotRebind) | boundVars),
+                        ifs=[
+                            self._changeInteriorObject(x, set(varsToNotRebind) | postBoundVars)
+                            for x in g.ifs
+                        ],
+                        is_async=g.is_async
+                    )
+                )
 
-        if expr.matches.DictComp:
-            raise Exception("Not implemented yet")
+                boundVars = postBoundVars
 
-        if expr.matches.SetComp:
-            raise Exception("Not implemented yet")
+            if expr.matches.DictComp:
+                return type(expr)(
+                    key=self._changeInteriorObject(expr.key, set(varsToNotRebind) | boundVars),
+                    value=self._changeInteriorObject(expr.value, set(varsToNotRebind) | boundVars),
+                    generators=generators,
+                    line_number=expr.line_number,
+                    col_offset=expr.col_offset,
+                    filename=expr.filename
+                )
+            else:
+                return type(expr)(
+                    elt=self._changeInteriorObject(expr.elt, set(varsToNotRebind) | boundVars),
+                    generators=generators,
+                    line_number=expr.line_number,
+                    col_offset=expr.col_offset,
+                    filename=expr.filename
+                )
 
         if expr.matches.Lambda:
             # so any variable in here that's bound by the function

@@ -57,4 +57,7 @@ class TypedTupleMasqueradingAsTuple(MasqueradeWrapper):
         return actualRes
 
     def convert_masquerade_to_untyped(self, context, instance):
-        return context.constant(tuple).convert_call([instance], {}).changeType(tuple)
+        return context.constant(tuple).convert_call(
+            [instance.convert_masquerade_to_typed()],
+            {}
+        ).changeType(tuple)

@@ -190,6 +190,33 @@ class PythonTypedFunctionWrapper(Wrapper):
         with an append to an intermediate list, and then returning the final list comprehension
         at the end.
         """
+        from typed_python.compiler.function_conversion_context import ListComprehensionConversionContext
+
+        return self.convert_comprehension(context, instance, ListComprehensionConversionContext)
+
+    def convert_set_comprehension(self, context, instance):
+        """We are a generator. Convert a "set comprehension".
+
+        This means we take our code and execute it directly, replacing all 'yield' statements
+        with an append to an intermediate set, and then returning the final set comprehension
+        at the end.
+        """
+        from typed_python.compiler.function_conversion_context import SetComprehensionConversionContext
+
+        return self.convert_comprehension(context, instance, SetComprehensionConversionContext)
+
+    def convert_dict_comprehension(self, context, instance):
+        """We are a generator. Convert a "dict comprehension".
+
+        This means we take our code and execute it directly, replacing all 'yield' statements
+        with an append to an intermediate dict, and then returning the final dict comprehension
+        at the end.
+        """
+        from typed_python.compiler.function_conversion_context import DictComprehensionConversionContext
+
+        return self.convert_comprehension(context, instance, DictComprehensionConversionContext)
+
+    def convert_comprehension(self, context, instance, ConvertionContextType):
         # we should have exactly one overload that takes no arguments and has no return type
         assert len(self.typeRepresentation.overloads) == 1
         overload = self.typeRepresentation.overloads[0]
@@ -207,7 +234,6 @@ class PythonTypedFunctionWrapper(Wrapper):
 
         # import this wrapper. Note that we have to import it here to break the import cycles.
         # there's definitely a better way to organize this code.
-        from typed_python.compiler.function_conversion_context import ListComprehensionConversionContext
 
         singleConvertedOverload = context.functionContext.converter.convert(
             overload.name,
@@ -218,7 +244,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             list(overload.closureVarLookups),
             [typeWrapper(self.closurePathToCellType(path, closureType)) for path in overload.closureVarLookups.values()],
             None,
-            conversionType=ListComprehensionConversionContext
+            conversionType=ConvertionContextType
         )
 
         if not singleConvertedOverload:

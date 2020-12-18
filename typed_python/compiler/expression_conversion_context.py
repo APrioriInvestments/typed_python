@@ -1962,6 +1962,17 @@ class ExpressionConversionContext:
         if ast.matches.ListComp:
             return self.convert_generator_as_list_comprehension(ast)
 
+        if ast.matches.SetComp:
+            return self.convert_generator_as_set_comprehension(ast)
+
+        if ast.matches.DictComp:
+            return self.convert_generator_as_dict_comprehension(ast)
+
+        if ast.matches.GeneratorExp:
+            return self.functionContext.localVariableExpression(self, ".closure").changeType(
+                self.functionContext.functionDefToType[ast]
+            ).convert_call([], {})
+
         if ast.matches.Constant:
             return self.constant(ast.value, allowArbitrary=True)
 
@@ -1972,6 +1983,24 @@ class ExpressionConversionContext:
             self.functionContext.functionDefToType[ast]
         )
         return generatorFunc.expr_type.convert_list_comprehension(
+            generatorFunc.context,
+            generatorFunc
+        )
+
+    def convert_generator_as_set_comprehension(self, ast):
+        generatorFunc = self.functionContext.localVariableExpression(self, ".closure").changeType(
+            self.functionContext.functionDefToType[ast]
+        )
+        return generatorFunc.expr_type.convert_set_comprehension(
+            generatorFunc.context,
+            generatorFunc
+        )
+
+    def convert_generator_as_dict_comprehension(self, ast):
+        generatorFunc = self.functionContext.localVariableExpression(self, ".closure").changeType(
+            self.functionContext.functionDefToType[ast]
+        )
+        return generatorFunc.expr_type.convert_dict_comprehension(
             generatorFunc.context,
             generatorFunc
         )

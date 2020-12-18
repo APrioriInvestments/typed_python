@@ -18,7 +18,7 @@ import gc
 import pytest
 from flaky import flaky
 
-from typed_python import Entrypoint, ListOf, TupleOf, Class, Member, Final
+from typed_python import Entrypoint, ListOf, TupleOf, Class, Member, Final, Generator
 from typed_python.test_util import currentMemUsageMb
 
 
@@ -39,6 +39,47 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert isinstance(lst, list)
         assert lst == [a + 1 for a in range(10)]
 
+    def test_set_comprehension(self):
+        @Entrypoint
+        def setComp(x):
+            return {a + 1 for a in range(x)}
+
+        st = setComp(10)
+
+        assert isinstance(st, set)
+        assert st == {a + 1 for a in range(10)}
+
+    def test_tuple_comprehension(self):
+        @Entrypoint
+        def tupComp(x):
+            return tuple(a + 1 for a in range(x))
+
+        tup = tupComp(10)
+
+        assert isinstance(tup, tuple)
+        assert tup == tuple(a + 1 for a in range(10))
+
+    def test_dict_comprehension(self):
+        @Entrypoint
+        def dictComp(x):
+            return {k: k + 1 for k in range(10)}
+
+        d = dictComp(10)
+
+        assert isinstance(d, dict)
+        assert d == {a: a + 1 for a in range(10)}
+
+    def test_dict_comprehension_multiple_types(self):
+        def dictComp(x):
+            return {k if (k%3) else "Boo": k + 1 if (k % 2) else "hi" for k in range(10)}
+
+        dictCompCompiled = Entrypoint(dictComp)
+
+        d = dictCompCompiled(10)
+        assert isinstance(d, dict)
+
+        assert d == dictComp(10)
+
     def test_list_from_listcomp(self):
         @Entrypoint
         def listComp(x):
@@ -48,6 +89,17 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert isinstance(lst, ListOf(int))
         assert lst == [a + 1 for a in range(10)]
+
+    def test_generator_exp_is_generator(self):
+        @Entrypoint
+        def generatorComp(x):
+            return (a + 1 for a in range(x))
+
+        g = generatorComp(10)
+
+        assert isinstance(g, Generator(int))
+
+        assert list(g) == [x + 1 for x in range(10)]
 
     @flaky(max_runs=3, min_passes=1)
     def test_list_from_listcomp_perf(self):
@@ -517,8 +569,6 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         g = generateInts(cm)
 
-        print(type(g).MemberNames)
-
         assert cm.entered == 0
 
         assert g.__next__() == 1
@@ -741,3 +791,44 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
             yield f(1).__iter__().__next__()
 
         assert list(iterate(10)) == [11]
+
+    def test_list_comp_in_generator(self):
+        @Entrypoint
+        def iterate(x):
+            yield [z for z in range(x)]
+
+        assert list(iterate(10)) == [list(range(10))]
+
+    def test_set_comp_in_generator(self):
+        @Entrypoint
+        def iterate(x):
+            yield {z for z in range(x)}
+
+        assert list(iterate(10)) == [set(range(10))]
+
+    def test_tuple_comp_in_generator(self):
+        @Entrypoint
+        def iterate(x):
+            yield tuple(z for z in range(x))
+
+        assert list(iterate(10)) == [tuple(range(10))]
+
+    def test_dict_comp_in_generator(self):
+        @Entrypoint
+        def iterate(x):
+            yield {z: z + 1 for z in range(x)}
+
+        assert list(iterate(10)) == [{z: z + 1 for z in range(10)}]
+
+    @pytest.mark.skip("not implemented yet")
+    def test_list_comp_masking(self):
+        # check that the masking behavior of nested variables in list comps is right
+        # technically, each successive listcomp is its own scope
+        # which we do not obey yet.
+
+        @Entrypoint
+        def iterate(x):
+            return [x+1 for x in range(x) for x in range(x - 3)]
+
+        x = 10
+        assert iterate(10) == [x+1 for x in range(x) for x in range(x - 3)]

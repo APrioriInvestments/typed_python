@@ -24,4 +24,7 @@ class TypedListMasqueradingAsList(MasqueradeWrapper):
         return list
 
     def convert_masquerade_to_untyped(self, context, instance):
-        return context.constant(list).convert_call([instance], {}).changeType(list)
+        return context.constant(list).convert_call(
+            [instance.convert_masquerade_to_typed()],
+            {}
+        ).changeType(list)

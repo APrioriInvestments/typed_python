@@ -904,3 +904,10 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         t1.join()
         t2.join()
         print(time.time() - t0, " to do 2mm in two threads")
+
+    def test_slice_object(self):
+        @Entrypoint
+        def sliceIt(x: object) -> str:
+            return x[:1024]
+
+        assert sliceIt("hi") == "hi"
