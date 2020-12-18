@@ -187,6 +187,7 @@ class ConversionContextBase:
 
         self._typesAreUnstable = False
         self._functionOutputTypeKnown = False
+        self._functionYieldTypeKnown = False
         self._native_args = None
 
     @property
@@ -660,6 +661,11 @@ class ConversionContextBase:
             self._varname_to_type[FunctionOutput] = typeWrapper(self._output_type)
 
         self._functionOutputTypeKnown = FunctionOutput in self._varname_to_type
+
+        if self.isGenerator and self._functionOutputTypeKnown:
+            if hasattr(self._output_type, 'IteratorType'):
+                self._varname_to_type[FunctionYield] = typeWrapper(self._output_type.IteratorType)
+                self._functionYieldTypeKnown = True
 
     def typesAreUnstable(self):
         return self._typesAreUnstable
@@ -1389,7 +1395,8 @@ class FunctionConversionContext(ConversionContextBase):
             if e is None:
                 return subcontext.finalize(None, exceptionsTakeFrom=ast), False
 
-            self.upsizeVariableType(FunctionYield, e.expr_type)
+            if not self._functionYieldTypeKnown:
+                self.upsizeVariableType(FunctionYield, e.expr_type)
 
             if e.expr_type != self._varname_to_type[FunctionYield]:
                 e = e.convert_to_type(

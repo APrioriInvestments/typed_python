@@ -7,6 +7,8 @@ def Generator(T):
     from typed_python import Entrypoint
 
     class Generator_(Class, __name__=f"Generator({T})"):
+        IteratorType = T
+
         @Entrypoint
         def __iter__(self) -> Generator(T):
             return self

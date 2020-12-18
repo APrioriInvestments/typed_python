@@ -18,7 +18,7 @@ import gc
 import pytest
 from flaky import flaky
 
-from typed_python import Entrypoint, ListOf, TupleOf, Class, Member, Final, Generator
+from typed_python import Entrypoint, ListOf, TupleOf, Class, Member, Final, Generator, OneOf
 from typed_python.test_util import currentMemUsageMb
 
 
@@ -832,3 +832,10 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         x = 10
         assert iterate(10) == [x+1 for x in range(x) for x in range(x - 3)]
+
+    def test_type_annotations_on_generator(self):
+        @Entrypoint
+        def iterate(x) -> Generator(OneOf(None, int)):
+            yield 1
+
+        assert isinstance(iterate(10), Generator(OneOf(None, int)))
