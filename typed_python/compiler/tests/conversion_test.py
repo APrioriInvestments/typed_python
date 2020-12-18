@@ -3589,3 +3589,37 @@ class TestCompilationStructures(unittest.TestCase):
             return sys
 
         assert importSomething() is sys
+
+    def test_class_as_context_manager(self):
+        class SimpleCM1():
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                return False
+
+        class SimpleCM2(Class, Final):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                return True
+
+        class SimpleCM3(Class, Final):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                return False
+
+        def testCM(cm):
+            try:
+                with cm:
+                    raise ZeroDivisionError()
+            except Exception:
+                return 1
+            return 0
+
+        assert testCM(SimpleCM1()) == 1
+        assert testCM(SimpleCM2()) == 0
+        assert testCM(SimpleCM3()) == 1
