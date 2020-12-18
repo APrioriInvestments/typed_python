@@ -2094,3 +2094,22 @@ class TestClassCompilationCompilation(unittest.TestCase):
         c = C()
 
         assert f(c) == pointerTo(c).x
+
+    def test_type_of_subclass(self):
+        class Base(Class):
+            pass
+
+        class Child(Base, Final):
+            pass
+
+        @Entrypoint
+        def f(c: Base):
+            return type(c)
+
+        @Entrypoint
+        def fKnowsChild(c: Child):
+            return type(c)
+
+        assert f(Base()) is Base
+        assert f(Child()) is Child
+        assert fKnowsChild(Child()) is Child

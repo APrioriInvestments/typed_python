@@ -105,6 +105,16 @@ extern "C" {
         }
     }
 
+    Type* np_classTypeAsPointer(VTable* vtable) {
+        return vtable->mType->getClassType();
+    }
+
+    PythonObjectOfType::layout_type* np_convertTypePtrToTypeObj(Type* p) {
+        PyEnsureGilAcquired getTheGil;
+
+        return  PythonObjectOfType::createLayout((PyObject*)PyInstance::typeObj(p));
+    }
+
     void np_compileClassDestructor(VTable* vtable) {
         PyEnsureGilAcquired getTheGil;
 

@@ -15,6 +15,7 @@
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
+from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 import types
 
@@ -357,10 +358,14 @@ class ExpressionConversionContext:
 
     def pushPod(self, type, expression):
         """stash an expression that generates POD passed as a value"""
-        type = typeWrapper(type)
+        if not isinstance(type, Wrapper):
+            type = typeWrapper(type)
 
-        assert type.is_pod
-        assert not type.is_pass_by_ref
+        if not type.is_pod:
+            raise Exception(f"Type {type} is not pod. {type.is_pod}")
+
+        if type.is_pass_by_ref:
+            raise Exception(f"Type {type} is pass_by_ref")
 
         varname = self.functionContext.allocateLetVarname()
 

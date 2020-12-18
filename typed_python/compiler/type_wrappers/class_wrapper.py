@@ -23,7 +23,9 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
     ClassOrAlternativeWrapperMixin
 )
-
+from typed_python.compiler.type_wrappers.voidptr_masquerading_as_tp_type import (
+    VoidPtrMasqueradingAsTPType
+)
 from typed_python import _types, PointerTo, Int32, Tuple, NamedTuple, bytecount
 
 import typed_python.compiler.native_ast as native_ast
@@ -926,5 +928,22 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             runtime_functions.hash_class.call(
                 layoutPtr.cast(native_ast.VoidPtr),
                 context.getTypePointer(expr.expr_type.typeRepresentation)
+            )
+        )
+
+    def convert_typeof(self, context, instance):
+        if self.typeRepresentation.IsFinal:
+            return context.constant(self.typeRepresentation)
+
+        vtablePtr = (
+            self.get_layout_pointer(instance.nonref_expr)
+            .ElementPtrIntegers(0, 1)
+            .load()
+        )
+
+        return context.pushPod(
+            VoidPtrMasqueradingAsTPType(),
+            runtime_functions.classTypeAsPointer.call(
+                vtablePtr.cast(native_ast.VoidPtr)
             )
         )

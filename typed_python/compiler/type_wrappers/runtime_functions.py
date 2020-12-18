@@ -104,6 +104,8 @@ pyOpToUnaryCallTarget = {
 
 throwNullPtr = externalCallTarget("np_throwNullPtr", Void)
 
+convertTypePtrToTypeObj = externalCallTarget("np_convertTypePtrToTypeObj", Void.pointer(), Void.pointer())
+classTypeAsPointer = externalCallTarget("np_classTypeAsPointer", Void.pointer(), Void.pointer())
 compileClassDispatch = externalCallTarget("np_compileClassDispatch", Void, Void.pointer(), Int64)
 compileClassDestructor = externalCallTarget("np_compileClassDestructor", Void, Void.pointer())
 

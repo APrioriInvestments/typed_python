@@ -26,6 +26,10 @@ class MasqueradeWrapper(Wrapper):
     By default all operations force us to convert to the interpreter form and then
     try it there. Subclasses should override if they have a better idea.
     """
+
+    # by default, use the 'typed' form to perform all operations.
+    DEFAULT_IS_TYPED = True
+
     def __str__(self):
         return f"Masquerade({self.typeRepresentation} as {self.interpreterTypeRepresentation})"
 
@@ -55,7 +59,7 @@ class MasqueradeWrapper(Wrapper):
             return context.constant(True)
 
         # Allow the typed form of the object to perform the conversion
-        return instance.convert_masquerade_to_typed().convert_to_type_with_target(targetVal, conversionLevel)
+        return self.convert_masquerade_to_default(context, instance).convert_to_type_with_target(targetVal, conversionLevel)
 
     def get_iteration_expressions(self, context, instance):
         return instance.convert_masquerade_to_typed().get_iteration_expressions()
@@ -89,80 +93,97 @@ class MasqueradeWrapper(Wrapper):
     def convert_default_initialize(self, context, target):
         raise Exception("This should never be called")
 
+    def convert_masquerade_to_default(self, context, instance):
+        """Convert the masquerade to whatever type should handle most operations.
+
+        Subclasses can override this based on whether the default behavior of the
+        masquerade is to use the interpter form or the typed form.
+
+        The typed form is the default.
+        """
+        if self.DEFAULT_IS_TYPED:
+            return self.convert_masquerade_to_typed(context, instance)
+        else:
+            return self.convert_masquerade_to_untyped(context, instance)
+
     def convert_fastnext(self, context, instance):
-        return instance.convert_masquerade_to_untyped().convert_fastnext()
+        return self.convert_masquerade_to_default(context, instance).convert_fastnext()
 
     def convert_attribute(self, context, instance, attribute):
-        return instance.convert_masquerade_to_typed().convert_attribute(attribute)
+        return self.convert_masquerade_to_default(context, instance).convert_attribute(attribute)
 
     def convert_set_attribute(self, context, instance, attribute, value):
-        return instance.convert_masquerade_to_typed().convert_set_attribute(attribute, value)
+        return self.convert_masquerade_to_default(context, instance).convert_set_attribute(attribute, value)
 
     def convert_delitem(self, context, instance, item):
-        return instance.convert_masquerade_to_typed().convert_delitem(item)
+        return self.convert_masquerade_to_default(context, instance).convert_delitem(item)
 
     def convert_getitem(self, context, instance, item):
-        return instance.convert_masquerade_to_typed().convert_getitem(item)
+        return self.convert_masquerade_to_default(context, instance).convert_getitem(item)
 
     def convert_getslice(self, context, instance, lower, upper, step):
-        return instance.convert_masquerade_to_typed().convert_getslice(lower, upper, step)
+        return self.convert_masquerade_to_default(context, instance).convert_getslice(lower, upper, step)
 
     def convert_setitem(self, context, instance, index, value):
-        return instance.convert_masquerade_to_typed().convert_setitem(index, value)
+        return self.convert_masquerade_to_default(context, instance).convert_setitem(index, value)
 
     def convert_call(self, context, instance, args, kwargs):
-        return instance.convert_masquerade_to_untyped().convert_call(args, kwargs)
+        return self.convert_masquerade_to_default(context, instance).convert_call(args, kwargs)
 
     def convert_len(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_len()
+        return self.convert_masquerade_to_default(context, instance).convert_len()
 
     def convert_hash(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_hash()
+        return self.convert_masquerade_to_default(context, instance).convert_hash()
 
     def convert_abs(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_abs()
+        return self.convert_masquerade_to_default(context, instance).convert_abs()
 
     def convert_builtin(self, f, context, instance, a1=None):
-        return instance.convert_masquerade_to_typed().convert_builtin(f, a1)
+        return self.convert_masquerade_to_default(context, instance).convert_builtin(f, a1)
 
     def convert_repr(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_repr()
+        return self.convert_masquerade_to_default(context, instance).convert_repr()
 
     def convert_unary_op(self, context, instance, op):
-        return instance.convert_masquerade_to_typed().convert_unary_op(op)
+        return self.convert_masquerade_to_default(context, instance).convert_unary_op(op)
 
     def _can_convert_to_type(self, otherType, conversionLevel):
-        return typeWrapper(self.typeRepresentation)._can_convert_to_type(otherType, conversionLevel)
+        return typeWrapper(
+            self.typeRepresentation if self.DEFAULT_IS_TYPED else self.interpreterTypeRepresentation
+        )._can_convert_to_type(otherType, conversionLevel)
 
     def _can_convert_from_type(self, otherType, conversionLevel):
-        return typeWrapper(self.typeRepresentation)._can_convert_from_type(otherType, conversionLevel)
+        return typeWrapper(
+            self.typeRepresentation if self.DEFAULT_IS_TYPED else self.interpreterTypeRepresentation
+        )._can_convert_from_type(otherType, conversionLevel)
 
     def convert_to_self_with_target(self, context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure=False):
         assert False, "this should never be called"
 
     def convert_bin_op(self, context, l, op, r, inplace):
-        return l.convert_masquerade_to_untyped().convert_bin_op(op, r, inplace)
+        return self.convert_masquerade_to_default(context, l).convert_bin_op(op, r, inplace)
 
     def convert_bin_op_reverse(self, context, r, op, l, inplace):
-        return r.convert_masquerade_to_untyped().convert_bin_op_reverse(op, l, inplace)
+        return self.convert_masquerade_to_default(context, r).convert_bin_op_reverse(op, l, inplace)
 
     def convert_format(self, context, instance, formatSpecOrNone=None):
-        return instance.convert_masquerade_to_untyped().convert_format(formatSpecOrNone)
+        return self.convert_masquerade_to_default(context, instance).convert_format(formatSpecOrNone)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         assert False, "this should never be called"
 
     def convert_call_on_container_expression(self, context, inst, argExpr):
-        return inst.convert_masquerade_to_untyped().convert_call_on_container_expression(argExpr)
+        return self.convert_masquerade_to_default(context, inst).convert_call_on_container_expression(argExpr)
 
     def convert_type_call_on_container_expression(self, context, typeInst, argExpr):
         assert False, "this should never be called"
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        return instance.convert_masquerade_to_typed().convert_method_call(methodname, args, kwargs)
+        return self.convert_masquerade_to_default(context, instance).convert_method_call(methodname, args, kwargs)
 
     def convert_context_manager_enter(self, context, instance):
-        return instance.convert_masquerade_to_typed().convert_context_manager_enter()
+        return self.convert_masquerade_to_default(context, instance).convert_context_manager_enter()
 
     def convert_context_manager_exit(self, context, instance, args):
-        return instance.convert_masquerade_to_typed().convert_context_manager_exit(args)
+        return self.convert_masquerade_to_default(context, instance).convert_context_manager_exit(args)
