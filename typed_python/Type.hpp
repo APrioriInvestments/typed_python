@@ -483,6 +483,7 @@ public:
     }
 
     //this checks _strict_ subclass. X is not a subclass of itself.
+    //note we are NOT holding the GIL.
     bool isSubclassOf(Type* otherType) {
         if (Type::typesEquivalent(otherType, this)) {
             return false;
@@ -752,6 +753,8 @@ public:
 
         // if we've never initialized our hash
         if (mIdentityHash == ShaHash()) {
+            PyEnsureGilAcquired getTheGil;
+
             ShaHash groupHash = getRecursiveTypeGroup()->hash();
 
             mIdentityHash = (

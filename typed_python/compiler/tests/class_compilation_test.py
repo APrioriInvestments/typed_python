@@ -2113,3 +2113,33 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert f(Base()) is Base
         assert f(Child()) is Child
         assert fKnowsChild(Child()) is Child
+
+    def test_isinstance_on_subclass(self):
+        class Base(Class):
+            pass
+
+        class Child(Base, Final):
+            pass
+
+        @Entrypoint
+        def isinstanceCompiled(c: Base):
+            return issubclass(type(c), Child)
+
+        assert not isinstanceCompiled(Base())
+        assert isinstanceCompiled(Child())
+
+    def test_isinstance_on_two_subclasses(self):
+        class Base(Class):
+            pass
+
+        class Child(Base, Final):
+            pass
+
+        @Entrypoint
+        def isinstanceCompiled(l: Base, r: Base):
+            return issubclass(type(l), type(r))
+
+        assert isinstanceCompiled(Base(), Base())
+        assert isinstanceCompiled(Child(), Base())
+        assert isinstanceCompiled(Child(), Child())
+        assert not isinstanceCompiled(Base(), Child())

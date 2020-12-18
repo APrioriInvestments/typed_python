@@ -323,6 +323,9 @@ class TypedExpression:
     def get_iteration_expressions(self):
         return self.expr_type.get_iteration_expressions(self.context, self)
 
+    def convert_issubclass(self, instance, isSuclassCall):
+        return self.expr_type.convert_issubclass(self.context, self, instance, isSuclassCall)
+
     def convert_masquerade_to_untyped(self):
         return self.expr_type.convert_masquerade_to_untyped(self.context, self)
 

@@ -944,3 +944,27 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             return type(print)
 
         assert typeOf() is type(print)
+
+    def test_isinstance_on_objects(self):
+        @Entrypoint
+        def isinstanceC(o: object, t: object):
+            return isinstance(o, t)
+
+        assert isinstanceC(10, int)
+        assert not isinstanceC(10, str)
+
+    def test_isinstance_on_objects_with_known_type(self):
+        @Entrypoint
+        def isinstanceC(o: object, t):
+            return isinstance(o, t)
+
+        assert isinstanceC(10, int)
+        assert not isinstanceC(10, str)
+
+    def test_isinstance_on_objects_with_known_type_and_value(self):
+        @Entrypoint
+        def isinstanceC(o, t):
+            return isinstance(o, t)
+
+        assert isinstanceC(10, int)
+        assert not isinstanceC(10, str)

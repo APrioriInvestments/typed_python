@@ -94,3 +94,23 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
         )
 
         return pythonObjectRepresentation(context, type)
+
+    def convert_issubclass(self, context, typeInstance, instance, isSubclassCall):
+        if isinstance(instance.expr_type, PythonTypeObjectWrapper):
+            return context.constant(
+                issubclass(
+                    instance.expr_type.typeRepresentation.Value,
+                    typeInstance.expr_type.typeRepresentation.Value
+                )
+            )
+
+        if instance.expr_type.can_convert_to_type(typeWrapper(type), ConversionLevel.Signature) is False:
+            return context.pushException(
+                TypeError,
+                'issubclass() arg 1 must be a class'
+            )
+
+        return typeInstance.convert_to_type(object, ConversionLevel.Signature).convert_issubclass(
+            instance,
+            isSubclassCall
+        )

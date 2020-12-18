@@ -437,3 +437,14 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
                 ).cast(self.getNativeLayoutType())
             )
         )
+
+    def convert_issubclass(self, context, typeInstance, instance, isSubclassCall):
+        instance = instance.convert_to_type(object, ConversionLevel.Signature)
+
+        return context.pushPod(
+            bool,
+            runtime_functions.pyobj_issubclass.call(
+                instance.nonref_expr.cast(VoidPtr),
+                typeInstance.nonref_expr.cast(VoidPtr),
+            )
+        )

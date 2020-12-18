@@ -34,6 +34,7 @@ from typed_python.compiler.type_wrappers.pointer_to_wrapper import PointerToWrap
 from typed_python.compiler.type_wrappers.ref_to_wrapper import RefToWrapper
 from typed_python.compiler.type_wrappers.list_of_wrapper import ListOfWrapper
 from typed_python.compiler.type_wrappers.isinstance_wrapper import IsinstanceWrapper
+from typed_python.compiler.type_wrappers.issubclass_wrapper import IssubclassWrapper
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
 from typed_python.compiler.type_wrappers.held_class_wrapper import HeldClassWrapper
@@ -254,6 +255,9 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
 
     if f is isinstance:
         return TypedExpression(context, native_ast.nullExpr, IsinstanceWrapper(), False)
+
+    if f is issubclass:
+        return TypedExpression(context, native_ast.nullExpr, IssubclassWrapper(), False)
 
     if f is bytecount:
         return TypedExpression(context, native_ast.nullExpr, BytecountWrapper(), False)

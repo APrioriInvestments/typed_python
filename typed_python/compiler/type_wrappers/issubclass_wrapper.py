@@ -16,13 +16,13 @@ from typed_python.compiler import native_ast
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
 
-class IsinstanceWrapper(Wrapper):
+class IssubclassWrapper(Wrapper):
     is_pod = True
     is_empty = False
     is_pass_by_ref = False
 
     def __init__(self):
-        super().__init__(isinstance)
+        super().__init__(issubclass)
 
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
@@ -30,6 +30,6 @@ class IsinstanceWrapper(Wrapper):
     @Wrapper.unwrapOneOfAndValue
     def convert_call(self, context, expr, args, kwargs):
         if len(args) == 2 and not kwargs:
-            return args[1].expr_type.convert_issubclass(context, args[1], args[0].convert_typeof(), False)
+            return args[1].expr_type.convert_issubclass(context, args[1], args[0], True)
 
         return super().convert_call(context, expr, args, kwargs)

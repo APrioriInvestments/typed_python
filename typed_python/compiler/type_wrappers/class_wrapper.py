@@ -942,7 +942,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         )
 
         return context.pushPod(
-            VoidPtrMasqueradingAsTPType(),
+            VoidPtrMasqueradingAsTPType(self.typeRepresentation),
             runtime_functions.classTypeAsPointer.call(
                 vtablePtr.cast(native_ast.VoidPtr)
             )

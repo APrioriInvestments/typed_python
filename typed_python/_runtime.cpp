@@ -109,6 +109,13 @@ extern "C" {
         return vtable->mType->getClassType();
     }
 
+    bool np_typePtrIsSubclass(Type* derived, Type* super) {
+        if (Type::typesEquivalent(derived, super)) {
+            return true;
+        }
+        return derived->isSubclassOf(super);
+    }
+
     PythonObjectOfType::layout_type* np_convertTypePtrToTypeObj(Type* p) {
         PyEnsureGilAcquired getTheGil;
 
@@ -2122,6 +2129,18 @@ extern "C" {
         }
 
         return PythonObjectOfType::stealToCreateLayout(res);
+    }
+
+    bool np_pyobj_issubclass(PythonObjectOfType::layout_type* subclass, PythonObjectOfType::layout_type* superclass, int comparisonOp) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        int res = PyObject_IsSubclass(subclass->pyObj, superclass->pyObj);
+
+        if (res == -1) {
+            throw PythonExceptionSet();
+        }
+
+        return res;
     }
 
     PythonObjectOfType::layout_type* np_pyobj_EQ(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {

@@ -104,6 +104,7 @@ pyOpToUnaryCallTarget = {
 
 throwNullPtr = externalCallTarget("np_throwNullPtr", Void)
 
+typePtrIsSubclass = externalCallTarget("np_typePtrIsSubclass", Bool, Void.pointer(), Void.pointer())
 convertTypePtrToTypeObj = externalCallTarget("np_convertTypePtrToTypeObj", Void.pointer(), Void.pointer())
 classTypeAsPointer = externalCallTarget("np_classTypeAsPointer", Void.pointer(), Void.pointer())
 compileClassDispatch = externalCallTarget("np_compileClassDispatch", Void, Void.pointer(), Int64)
@@ -255,6 +256,13 @@ builtin_pyobj_by_name = externalCallTarget(
     "np_builtin_pyobj_by_name",
     Void.pointer(),
     UInt8.pointer()
+)
+
+pyobj_issubclass = externalCallTarget(
+    "np_pyobj_issubclass",
+    Bool,
+    Void.pointer(),
+    Void.pointer()
 )
 
 pyobj_typeof = externalCallTarget(
