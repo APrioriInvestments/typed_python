@@ -420,3 +420,20 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             return self.convert_method_call(context, instance, "release", (), {})
 
         return super().convert_context_manager_exit(context, instance, args)
+
+    def convert_typeof(self, context, instance):
+        pythonObjectRepresentation = (
+            typed_python.compiler.python_object_representation.pythonObjectRepresentation
+        )
+
+        if self.typeRepresentation is type:
+            return pythonObjectRepresentation(context, type)
+
+        return context.push(
+            object,
+            lambda targetSlot: targetSlot.expr.store(
+                runtime_functions.pyobj_typeof.call(
+                    instance.nonref_expr.cast(VoidPtr)
+                ).cast(self.getNativeLayoutType())
+            )
+        )

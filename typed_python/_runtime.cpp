@@ -1934,6 +1934,18 @@ extern "C" {
         return PyLong_AsLong(res);
     }
 
+    PythonObjectOfType::layout_type* np_pyobj_typeof(PythonObjectOfType::layout_type* lhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = incref((PyObject*)lhs->pyObj->ob_type);
+
+        if (!res) {
+            throw PythonExceptionSet();
+        }
+
+        return PythonObjectOfType::stealToCreateLayout(res);
+    }
+
     PythonObjectOfType::layout_type* np_pyobj_Add(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 

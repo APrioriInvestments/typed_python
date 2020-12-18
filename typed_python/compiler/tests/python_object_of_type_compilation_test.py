@@ -30,6 +30,10 @@ from typed_python._types import refcount
 from typed_python import Entrypoint
 
 
+def globalFun():
+    pass
+
+
 class HoldsAnA:
     def __init__(self, a):
         self.a = a
@@ -911,3 +915,32 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             return x[:1024]
 
         assert sliceIt("hi") == "hi"
+
+    def test_type_of_object_in_compiled_code_accurate(self):
+        @Entrypoint
+        def typeOf(x: object):
+            return type(x)
+
+        assert typeOf(10) is int
+        assert typeOf(object) is type
+
+    def test_type_of_module_in_compiled_code_accurate(self):
+        @Entrypoint
+        def typeOf():
+            return type(threading)
+
+        assert typeOf() is type(threading)
+
+    def test_type_of_global_fun_in_compiled_code_accurate(self):
+        @Entrypoint
+        def typeOf():
+            return type(globalFun)
+
+        assert typeOf() is type(globalFun)
+
+    def test_type_of_print_in_compiled_code_accurate(self):
+        @Entrypoint
+        def typeOf():
+            return type(print)
+
+        assert typeOf() is type(print)

@@ -57,3 +57,9 @@ class ModuleWrapper(Wrapper):
             context,
             getattr(self.typeRepresentation.Value, attribute),
         )
+
+    def convert_typeof(self, context, instance):
+        return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+            context,
+            type(self.typeRepresentation.Value)
+        )

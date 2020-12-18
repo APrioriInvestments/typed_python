@@ -286,6 +286,21 @@ class Wrapper:
     def convert_default_initialize(self, context, target):
         raise NotImplementedError(type(self))
 
+    def convert_typeof(self, context, instance):
+        pythonObjectRepresentation = (
+            typed_python.compiler.python_object_representation.pythonObjectRepresentation
+        )
+
+        if isinstance(instance.expr_type.interpreterTypeRepresentation, type):
+            T = instance.expr_type.interpreterTypeRepresentation
+        else:
+            # some of our wrappers hold actual python instances as their typeRepresentation
+            # we should eventually force them to override this method, or store the
+            # typeRepresentation in some other form
+            T = type(instance.expr_type.interpreterTypeRepresentation)
+
+        return pythonObjectRepresentation(context, T)
+
     def convert_masquerade_to_untyped(self, context, instance):
         """If we are masquerading as an untyped type, convert us to that type."""
         return instance

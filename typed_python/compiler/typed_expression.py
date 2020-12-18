@@ -182,6 +182,9 @@ class TypedExpression:
 
         return self.context.pushReference(self.expr_type, self.expr)
 
+    def convert_typeof(self):
+        return self.expr_type.convert_typeof(self.context, self)
+
     def convert_incref(self):
         return self.expr_type.convert_incref(self.context, self)
 

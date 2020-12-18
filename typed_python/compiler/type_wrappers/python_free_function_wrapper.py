@@ -44,3 +44,6 @@ class PythonFreeFunctionWrapper(Wrapper):
 
     def convert_repr(self, context, instance):
         return context.constant(repr(self.typeRepresentation))
+
+    def convert_typeof(self, context, instance):
+        return context.constant(type(self.typeRepresentation))

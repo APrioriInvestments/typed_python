@@ -70,24 +70,10 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
     @Wrapper.unwrapOneOfAndValue
     def convert_call(self, context, left, args, kwargs):
         if self.typeRepresentation.Value is type:
-            # make sure we don't have any masquerades in here
             if len(args) != 1 or kwargs:
                 return super().convert_call(context, left, args, kwargs)
 
-            argtype = args[0].expr_type
-
-            if isinstance(argtype, PythonTypeObjectWrapper):
-                res = typed_python.compiler.python_object_representation.pythonObjectRepresentation(
-                    context,
-                    type
-                )
-            else:
-                res = typed_python.compiler.python_object_representation.pythonObjectRepresentation(
-                    context,
-                    argtype.interpreterTypeRepresentation
-                )
-
-            return res
+            return args[0].convert_typeof()
 
         if len(args) == 1 and not kwargs:
             if self.typeRepresentation.Value in (bool, int, float, str, bytes):
@@ -101,3 +87,10 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
             return self.typeRepresentation.Value.convert_type_call(context, left, args, kwargs)
 
         return typeWrapper(self.typeRepresentation.Value).convert_type_call(context, left, args, kwargs)
+
+    def convert_typeof(self, context, instance):
+        pythonObjectRepresentation = (
+            typed_python.compiler.python_object_representation.pythonObjectRepresentation
+        )
+
+        return pythonObjectRepresentation(context, type)

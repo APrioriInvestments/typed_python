@@ -255,6 +255,12 @@ builtin_pyobj_by_name = externalCallTarget(
     UInt8.pointer()
 )
 
+pyobj_typeof = externalCallTarget(
+    "np_pyobj_typeof",
+    Void.pointer(),
+    Void.pointer()
+)
+
 pyobj_pynumber_index = externalCallTarget(
     "np_pyobj_pynumber_index",
     Int64,
