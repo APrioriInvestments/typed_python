@@ -109,6 +109,9 @@ convertTypePtrToTypeObj = externalCallTarget("np_convertTypePtrToTypeObj", Void.
 classTypeAsPointer = externalCallTarget("np_classTypeAsPointer", Void.pointer(), Void.pointer())
 compileClassDispatch = externalCallTarget("np_compileClassDispatch", Void, Void.pointer(), Int64)
 compileClassDestructor = externalCallTarget("np_compileClassDestructor", Void, Void.pointer())
+classObjectDowncast = externalCallTarget(
+    "np_classObjectDowncast", Bool, Void.pointer(), Void.pointer(), Void.pointer()
+)
 
 free = externalCallTarget("free", Void, UInt8Ptr)
 malloc = externalCallTarget("malloc", UInt8Ptr, Int64)

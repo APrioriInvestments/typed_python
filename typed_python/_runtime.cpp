@@ -122,6 +122,26 @@ extern "C" {
         return  PythonObjectOfType::createLayout((PyObject*)PyInstance::typeObj(p));
     }
 
+    // downcast the class instance pointer (classPtr) to targetType and write the downcast version
+    // into 'outClassPtr' with an incref if possible, otherwise return false.
+    bool np_classObjectDowncast(void* classPtr, void** outClassPtr, Class* targetType) {
+        Class::layout* layout = Class::instanceToLayout((instance_ptr)&classPtr);
+        Class* actualClass = Class::actualTypeForLayout((instance_ptr)&classPtr);
+
+        int mroIndex = actualClass->getHeldClass()->getMroIndex(targetType->getHeldClass());
+
+        if (mroIndex < 0) {
+            // 'actualClass' doesn't have 'targetType' as a base class, so we can't
+            // masquerade as it
+            return false;
+        }
+
+        Class::initializeInstance((instance_ptr)outClassPtr, layout, mroIndex);
+        layout->refcount += 1;
+
+        return true;
+    }
+
     void np_compileClassDestructor(VTable* vtable) {
         PyEnsureGilAcquired getTheGil;
 

@@ -2143,3 +2143,109 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert isinstanceCompiled(Child(), Base())
         assert isinstanceCompiled(Child(), Child())
         assert not isinstanceCompiled(Base(), Child())
+
+    def test_downcast_in_compiled_code(self):
+        class Base(Class):
+            pass
+
+        class Child(Base, Final):
+            pass
+
+        @Entrypoint
+        def f(x: Child):
+            pass
+
+        @Entrypoint
+        def g(x: Base):
+            return f(x)
+
+        g(Child())
+
+        with self.assertRaises(TypeError):
+            g(Base())
+
+    def test_downcast_in_compiled_code_adjacent(self):
+        class Base(Class):
+            def baseFun(self) -> int:
+                return 0
+
+        class Base1(Base):
+            def baseFun(self) -> int:
+                return 1
+
+        class Base2(Base):
+            def baseFun(self) -> int:
+                return 2
+
+        class Child(Base1, Base2, Final):
+            def baseFun(self) -> int:
+                return 3
+
+        @Entrypoint
+        def callAsChild(x: Child):
+            return x.baseFun()
+
+        @Entrypoint
+        def callAsBase1(x: Base1):
+            return x.baseFun()
+
+        @Entrypoint
+        def callAsBase2(x: Base2):
+            return x.baseFun()
+
+        @Entrypoint
+        def callAsBase(x: Base):
+            return x.baseFun()
+
+        @Entrypoint
+        def callFromBase(f, x: Base):
+            return f(x)
+
+        # if we insist on converting to 'Child', only Child should work
+        assert callFromBase(callAsChild, Child()) == 3
+
+        with self.assertRaises(TypeError):
+            assert callFromBase(callAsChild, Base())
+
+        with self.assertRaises(TypeError):
+            assert callFromBase(callAsChild, Base1())
+
+        with self.assertRaises(TypeError):
+            assert callFromBase(callAsChild, Base2())
+
+        # if we insist on converting to 'Base1', only Child and Base1 should work
+        assert callFromBase(callAsBase1, Child()) == 3
+        assert callFromBase(callAsBase1, Base1()) == 1
+
+        with self.assertRaises(TypeError):
+            assert callFromBase(callAsBase1, Base())
+
+        with self.assertRaises(TypeError):
+            assert callFromBase(callAsBase1, Base2())
+
+        # if we insist on converting to 'Base2', only Child and Base2 should work
+        assert callFromBase(callAsBase2, Child()) == 3
+        assert callFromBase(callAsBase2, Base2()) == 2
+
+        with self.assertRaises(TypeError):
+            assert callFromBase(callAsBase2, Base())
+
+        with self.assertRaises(TypeError):
+            assert callFromBase(callAsBase2, Base1())
+
+        # if we insist on converting to 'Base', everything works
+        assert callFromBase(callAsBase, Child()) == 3
+        assert callFromBase(callAsBase, Base1()) == 1
+        assert callFromBase(callAsBase, Base2()) == 2
+        assert callFromBase(callAsBase, Base()) == 0
+
+        @Entrypoint
+        def callFromBase1(f, x: Base1):
+            return f(x)
+
+        assert callFromBase1(callAsBase, Base1()) == 1
+        assert callFromBase1(callAsBase1, Base1()) == 1
+
+        # if we know it as Base1, but it's a Child, we should be able
+        # to cross call it
+        assert callFromBase1(callAsBase2, Child()) == 3

@@ -132,6 +132,10 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                 return True
             elif self.typeRepresentation in otherType.typeRepresentation.MRO:
                 return "Maybe"
+            elif not (self.typeRepresentation.IsFinal and otherType.typeRepresentation.IsFinal):
+                # if both of the types are final, then it's not possible that we have
+                # a subclass inheriting from both floating around
+                return "Maybe"
 
         return super()._can_convert_to_type(otherType, conversionLevel)
 
@@ -158,8 +162,14 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
                 return context.constant(True)
 
-            elif self.typeRepresentation in otherType.typeRepresentation.MRO:
-                raise Exception("Downcast in compiled code not implemented yet")
+            return context.pushPod(
+                bool,
+                runtime_functions.classObjectDowncast.call(
+                    instance.nonref_expr.cast(native_ast.VoidPtr),
+                    targetVal.expr.cast(native_ast.VoidPtr),
+                    context.getTypePointer(targetVal.expr_type.typeRepresentation)
+                )
+            )
 
         return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
