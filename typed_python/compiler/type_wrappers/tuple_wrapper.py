@@ -371,27 +371,64 @@ class TupleWrapper(Wrapper):
         # the tuple is now initialized
         return uninitializedTuple
 
+    def _indicesInOtherTypeToRead(self, otherType):
+        """Determine which field in another type we should read from when initializing 'self'.
+
+        Args:
+            otherType - another Tuple or NamedTuple wrapper.
+
+        Returns:
+            None if we can't initialize ourself from an instance of otherType, or
+                a list of integers giving the index in 'otherType' to initialize
+                each of our own slots, or None if we are supposed to default initialze.
+        """
+        if (
+            issubclass(self.typeRepresentation, NamedTuple)
+            and issubclass(otherType.typeRepresentation, NamedTuple)
+        ):
+            slots = [None for _ in self.typeRepresentation.ElementTypes]
+
+            for ix, name in enumerate(otherType.typeRepresentation.ElementNames):
+                if name in self.namesToIndices:
+                    slots[self.namesToIndices[name]] = ix
+                else:
+                    return None
+
+            for ix in range(len(slots)):
+                if slots[ix] is None and not _types.is_default_constructible(self.typeRepresentation.ElementTypes[ix]):
+                    return None
+
+            return slots
+
+        if len(otherType.typeRepresentation.ElementTypes) != len(self.typeRepresentation.ElementTypes):
+            return None
+
+        return list(range(len(otherType.typeRepresentation.ElementTypes)))
+
     def _can_convert_from_type(self, sourceType, conversionLevel):
         if issubclass(sourceType.typeRepresentation, (NamedTuple, Tuple)):
             if conversionLevel < ConversionLevel.Upcast:
                 return False
 
-            if len(sourceType.typeRepresentation.ElementTypes) != len(self.typeRepresentation.ElementTypes):
+            slots = self._indicesInOtherTypeToRead(sourceType)
+
+            if slots is None:
                 return False
 
             someNotTrue = False
 
-            for i in range(len(self.typeRepresentation.ElementTypes)):
-                canConvert = typeWrapper(sourceType.typeRepresentation.ElementTypes[i]).can_convert_to_type(
-                    typeWrapper(self.typeRepresentation.ElementTypes[i]),
-                    conversionLevel
-                )
+            for destIx, sourceIx in enumerate(slots):
+                if sourceIx is not None:
+                    canConvert = typeWrapper(sourceType.typeRepresentation.ElementTypes[sourceIx]).can_convert_to_type(
+                        typeWrapper(self.typeRepresentation.ElementTypes[destIx]),
+                        conversionLevel
+                    )
 
-                if canConvert is False:
-                    return False
+                    if canConvert is False:
+                        return False
 
-                if canConvert is not True:
-                    someNotTrue = True
+                    if canConvert is not True:
+                        someNotTrue = True
 
             if someNotTrue:
                 return "Maybe"
@@ -405,9 +442,19 @@ class TupleWrapper(Wrapper):
     def convert_to_self_with_target(self, context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure=False):
         if issubclass(sourceVal.expr_type.typeRepresentation, (NamedTuple, Tuple)):
             if self._can_convert_from_type(sourceVal.expr_type, conversionLevel) is True:
+                slots = self._indicesInOtherTypeToRead(sourceVal.expr_type)
+
                 # this is the simple case
-                for i in range(len(self.typeRepresentation.ElementTypes)):
-                    sourceVal.refAs(i).convert_to_type_with_target(targetVal.refAs(i), conversionLevel, mayThrowOnFailure)
+                for destIx, sourceIx in enumerate(slots):
+                    if sourceIx is not None:
+                        sourceVal.refAs(sourceIx).convert_to_type_with_target(
+                            targetVal.refAs(destIx),
+                            conversionLevel,
+                            mayThrowOnFailure
+                        )
+                    else:
+                        targetVal.refAs(destIx).convert_default_initialize()
+
                 return context.constant(True)
             else:
                 native = context.converter.defineNativeFunction(
@@ -433,28 +480,35 @@ class TupleWrapper(Wrapper):
 
     def generateConvertOtherTupToSelf(self, context, _, targetVal, sourceVal, conversionLevel):
         convertedValues = []
-        sourceT = sourceVal.expr_type.typeRepresentation
         destT = targetVal.expr_type.typeRepresentation
 
-        for i in range(len(sourceT.ElementTypes)):
-            val = context.allocateUninitializedSlot(destT.ElementTypes[i])
+        slots = self._indicesInOtherTypeToRead(sourceVal.expr_type)
 
-            res = sourceVal.refAs(i).convert_to_type_with_target(val, conversionLevel)
+        for destIx, sourceIx in enumerate(slots):
+            if sourceIx is not None:
+                val = context.allocateUninitializedSlot(destT.ElementTypes[destIx])
 
-            convertedValues.append(val)
+                res = sourceVal.refAs(sourceIx).convert_to_type_with_target(val, conversionLevel)
 
-            with context.ifelse(res.nonref_expr) as (ifTrue, ifFalse):
-                with ifTrue:
-                    context.markUninitializedSlotInitialized(val)
+                convertedValues.append(val)
 
-                with ifFalse:
-                    context.pushEffect(
-                        native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
-                    )
+                with context.ifelse(res.nonref_expr) as (ifTrue, ifFalse):
+                    with ifTrue:
+                        context.markUninitializedSlotInitialized(val)
+
+                    with ifFalse:
+                        context.pushEffect(
+                            native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
+                        )
+            else:
+                convertedValues.append(None)
 
         # if we're here, we can simply copy the values over to the other tuple
-        for i in range(len(sourceT.ElementTypes)):
-            targetVal.refAs(i).convert_copy_initialize(convertedValues[i])
+        for i in range(len(convertedValues)):
+            if convertedValues[i] is not None:
+                targetVal.refAs(i).convert_copy_initialize(convertedValues[i])
+            else:
+                targetVal.refAs(i).convert_default_initialize()
 
         context.pushEffect(
             native_ast.Expression.Return(arg=native_ast.const_bool_expr(True))
@@ -581,10 +635,10 @@ class NamedTupleWrapper(TupleWrapper):
 
             for name, argType in self.namesToTypes.items():
                 if name not in kwargs:
-                    if _types.is_default_constructible(name):
+                    if _types.is_default_constructible(argType):
                         needsDefaultInitializer.add(name)
                     else:
-                        context.pushException(TypeError, f"Can't default initialize member {name} of {self}")
+                        context.pushException(TypeError, f"Can't default initialize member '{name}' of {self}")
                         return
 
             uninitializedNamedTuple = context.allocateUninitializedSlot(self)

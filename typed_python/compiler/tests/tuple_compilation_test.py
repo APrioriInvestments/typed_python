@@ -406,3 +406,56 @@ class TestTupleCompilation(unittest.TestCase):
         self.assertIs(sliceAtMinusOne.resultTypeFor(type(tup)).interpreterTypeRepresentation, B)
 
         self.assertIs(Function(lambda tup: sliceAt(tup, -2)).resultTypeFor(type(tup)).interpreterTypeRepresentation, OneOf(A, B))
+
+    def test_construct_named_tuple_with_other_named_tuple(self):
+        # we should be matching the names up correctly
+        T1 = NamedTuple(x=int, y=str)
+        T2 = NamedTuple(y=str, x=int)
+        T3 = NamedTuple(z=float, y=str, x=int)
+
+        @Entrypoint
+        def firstCheck():
+            assert T1(T2(T1(x=10, y='hello'))) == T1(x=10, y='hello')
+
+            # we can construct a bigger tuple from a smaller one
+            assert T3(T2(x=10, y='hello')).y == 'hello'
+
+        firstCheck()
+
+        @Entrypoint
+        def secondCheck():
+            T2(T3(x=10, y='hello'))
+
+        # but not in reverse
+        with self.assertRaises(TypeError):
+            secondCheck()
+
+    def test_construct_named_tuple_with_incorrect_number_of_arguments(self):
+        # we should be matching the names up correctly
+        NT = NamedTuple(z=float, y=str, x=int)
+
+        @Entrypoint
+        def checkIt():
+            return NT(z=10, x=20)
+
+        assert checkIt().y == ""
+
+    def test_cant_construct_named_tuple_with_non_default_initializable(self):
+        # we should be matching the names up correctly
+        C = Forward("C")
+
+        @C.define
+        class C(Class):
+            def __init__(self):
+                pass
+
+        assert not _types.is_default_constructible(C)
+
+        NT = NamedTuple(x=float, c=C)
+
+        @Entrypoint
+        def checkIt():
+            return NT(x=10)
+
+        with self.assertRaisesRegex(TypeError, "Can't default initialize member 'c'"):
+            checkIt()

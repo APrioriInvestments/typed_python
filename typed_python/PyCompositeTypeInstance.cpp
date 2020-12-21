@@ -77,6 +77,66 @@ void PyCompositeTypeInstance::copyConstructFromPythonInstanceConcrete(CompositeT
         }
     }
 
+    std::pair<Type*, instance_ptr> typeAndPtrOfArg = extractTypeAndPtrFrom(pyRepresentation);
+
+    if (eltType->isNamedTuple() && typeAndPtrOfArg.first && typeAndPtrOfArg.first->isNamedTuple()) {
+        NamedTuple* targetType = (NamedTuple*)eltType;
+        NamedTuple* argType = (NamedTuple*)typeAndPtrOfArg.first;
+
+        for (long k = 0; k < argType->getNames().size(); k++) {
+            if (targetType->indexOfName(argType->getNames()[k]) == -1) {
+                throw std::runtime_error(
+                    "Can't convert a "
+                    + argType->name()
+                    + " to "
+                    + targetType->name()
+                    + " because the target doesn't have a member named "
+                    + argType->getNames()[k]
+                );
+            }
+        }
+
+        for (long k = 0; k < targetType->getNames().size(); k++) {
+            if (argType->indexOfName(targetType->getNames()[k]) == -1) {
+                if (!targetType->getTypes()[k]->is_default_constructible()) {
+                    throw std::runtime_error(
+                        "Can't convert a "
+                        + argType->name()
+                        + " to "
+                        + targetType->name()
+                        + " because the type for field '"
+                        + targetType->getNames()[k]
+                        + "' is not default-constructible."
+                    );
+                }
+            }
+        }
+
+        eltType->constructor(tgt,
+            [&](uint8_t* eltPtr, int64_t k) {
+                int otherIx = argType->indexOfName(eltType->getNames()[k]);
+
+                if (otherIx == -1) {
+                    //default constructor
+                    eltType->getTypes()[k]->constructor(eltPtr);
+                } else {
+                    PyObjectStealer item(PyObject_GetAttrString(pyRepresentation, eltType->getNames()[k].c_str()));
+
+                    PyInstance::copyConstructFromPythonInstance(
+                        eltType->getTypes()[k],
+                        eltPtr,
+                        item,
+                        childConversionLevel
+                    );
+                }
+
+                return true;
+            }
+        );
+
+        return;
+    }
+
     int containerSize = PyObject_Length(pyRepresentation);
     if (containerSize == -1) {
         PyErr_Clear();

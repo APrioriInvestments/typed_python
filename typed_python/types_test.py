@@ -3292,3 +3292,18 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "set size changed"):
             for k in x:
                 x.add(k + 1)
+
+    def test_construct_named_tuple_with_other_named_tuple(self):
+        # we should be matching the names up correctly
+        T1 = NamedTuple(x=int, y=str)
+        T2 = NamedTuple(y=str, x=int)
+        T3 = NamedTuple(z=float, y=str, x=int)
+
+        assert T1(T2(T1(x=10, y='hello'))) == T1(x=10, y='hello')
+
+        # we can construct a bigger tuple from a smaller one
+        assert T3(T2(x=10, y='hello')).y == 'hello'
+
+        # but not in reverse
+        with self.assertRaises(TypeError):
+            T2(T3(x=10, y='hello'))
