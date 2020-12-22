@@ -3623,3 +3623,29 @@ class TestCompilationStructures(unittest.TestCase):
         assert testCM(SimpleCM1()) == 1
         assert testCM(SimpleCM2()) == 0
         assert testCM(SimpleCM3()) == 1
+
+    def test_access_oneof_variable(self):
+        @Entrypoint
+        def f(x) -> object:
+            return "aString"
+
+        @Entrypoint
+        def loop1():
+            val = "aString"
+            val = f(0)
+
+            for i in range(20):
+                val = f(i)
+                print(val)
+
+        @Entrypoint
+        def loop2():
+            val = f(0)
+            val = "aString"
+
+            for i in range(20):
+                val = f(i)
+                print(val)
+
+        loop1()
+        loop2()

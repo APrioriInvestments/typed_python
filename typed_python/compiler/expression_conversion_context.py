@@ -1381,11 +1381,15 @@ class ExpressionConversionContext:
         if varType is not None and varType != expr.expr_type.typeRepresentation:
             if expr.expr_type.is_oneof_wrapper:
                 # if it's a concrete type, then it must be one of our subtypes
-                if isinstance(varType, type) and not issubclass(varType, OneOf):
-                    return expr.expr_type.refAsType(expr.context, expr, varType)
-                else:
-                    # it's possible that it's a subset of the oneof types
-                    return expr.convert_to_type(varType, ConversionLevel.Signature)
+                if varType in expr.expr_type.typeRepresentation.Types:
+                    # this is only true if we know for certain that exactly one of these
+                    # types can be cast to varType and that's it
+                    index = expr.expr_type.unambiguousTypeIndexFor(varType)
+                    if index is not None:
+                        return expr.refAs(index)
+
+                # it's possible that it's a subset of the oneof types
+                return expr.convert_to_type(varType, ConversionLevel.Signature)
 
             if getattr(expr.expr_type.typeRepresentation, "__typed_python_category__", None) == "Alternative" and \
                     getattr(varType, "__typed_python_category__", None) == "ConcreteAlternative":

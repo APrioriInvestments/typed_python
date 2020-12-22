@@ -287,13 +287,26 @@ class OneOfWrapper(Wrapper):
             expr.convert_copy_initialize(other)
             temp.convert_destroy()
 
-    def refAsType(self, context, expr, subtype):
-        """Unwrap this assuming that it is _definitely_ 'subtype' which must be a TP type."""
-        for ix in range(len(self.typeRepresentation.Types)):
-            if self.typeRepresentation.Types[ix] == subtype:
-                return self.refAs(context, expr, ix)
+    def unambiguousTypeIndexFor(self, subtype):
+        """Given a TP type 'subtype', is there one and only one of our types it could be?
 
-        raise Exception(f"type {subtype} is not one of the options in {self}")
+        Returns None if we can't pick one, or the index if we can.
+        """
+        isDefinitely = []
+        for index, eltType in enumerate(self.typeRepresentation.Types):
+            canConvert = typeWrapper(eltType).can_convert_to_type(
+                typeWrapper(subtype), ConversionLevel.Signature
+            )
+
+            if canConvert is True:
+                isDefinitely.append(index)
+            elif canConvert == "Maybe":
+                return None
+
+        if len(isDefinitely) == 1:
+            return isDefinitely[0]
+
+        return None
 
     def refAs(self, context, expr, which):
         assert expr.expr_type == self
