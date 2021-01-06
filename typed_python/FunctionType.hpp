@@ -1501,6 +1501,11 @@ public:
         return mClosureType->cmp(left, right, pyComparisonOp, suppressExceptions);
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        // we explicitly don't count functions
+        return 0;
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         mClosureType->deserialize(self, buffer, wireType);

@@ -308,6 +308,26 @@ void ConstDictType::subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr r
     incKvPairCount(output, written);
 }
 
+instance_ptr ConstDictType::kdPairPtrKey(instance_ptr self, int64_t i) {
+    if (!(*(layout**)self)) {
+        return self;
+    }
+
+    layout& record = **(layout**)self;
+
+    return record.data + m_bytes_per_key_subtree_pair * i;
+}
+
+instance_ptr ConstDictType::kdPairPtrDict(instance_ptr self, int64_t i) {
+    if (!(*(layout**)self)) {
+        return self;
+    }
+
+    layout& record = **(layout**)self;
+
+    return record.data + m_bytes_per_key_subtree_pair * i + m_bytes_per_key;
+}
+
 instance_ptr ConstDictType::kvPairPtrKey(instance_ptr self, int64_t i) {
     if (!(*(layout**)self)) {
         return self;

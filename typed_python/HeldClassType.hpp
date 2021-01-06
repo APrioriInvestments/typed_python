@@ -472,6 +472,16 @@ public:
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        size_t res = 0;
+
+        for (long k = 0; k < m_members.size(); k++) {
+            res += std::get<1>(m_members[k])->deepBytecount(eltPtr(instance, k), alreadyVisited);
+        }
+
+        return res;
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         for (long k = 0; k < m_members.size();k++) {

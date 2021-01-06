@@ -83,6 +83,16 @@ public:
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        size_t res = 0;
+
+        for (long k = 0; k < getTypes().size(); k++) {
+            res += getTypes()[k]->deepBytecount(eltPtr(instance, k), alreadyVisited);
+        }
+
+        return res;
+    }
+
     /*******
 
         deserialize a named tuple using field codes.

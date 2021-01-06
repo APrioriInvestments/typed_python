@@ -125,6 +125,22 @@ public:
 
     static StringType* Make() { static StringType* res = new StringType(); return res; }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        layout* l = *(layout**)instance;
+
+        if (!l) {
+            return 0;
+        }
+
+        if (alreadyVisited.find((void*)l) != alreadyVisited.end()) {
+            return 0;
+        }
+
+        alreadyVisited.insert((void*)l);
+
+        return l->pointcount * l->bytes_per_codepoint + sizeof(layout);
+    }
+
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         if (bytes_per_codepoint(self) == 1) {

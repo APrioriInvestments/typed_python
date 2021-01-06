@@ -86,6 +86,22 @@ public:
         return mHeldType->hash(getLayoutPtr(left)->data);
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        layout* l = *(layout**)instance;
+
+        if (!l) {
+            return 0;
+        }
+
+        if (alreadyVisited.find((void*)l) != alreadyVisited.end()) {
+            return 0;
+        }
+
+        alreadyVisited.insert((void*)l);
+
+        return mHeldType->deepBytecount(l->data, alreadyVisited);
+    }
+
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         throw std::runtime_error("Cells are not serializable.");

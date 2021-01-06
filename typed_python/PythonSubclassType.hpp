@@ -99,6 +99,10 @@ public:
         m_base->serialize(self, buffer, fieldNumber);
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        return m_base->deepBytecount(instance, alreadyVisited);
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         m_base->deserialize(self, buffer, wireType);

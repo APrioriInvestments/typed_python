@@ -67,6 +67,10 @@ public:
         mInstance.type()->repr(mInstance.data(), stream, isStr);
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        return 0;
+    }
+
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         buffer.writeEmpty(fieldNumber);

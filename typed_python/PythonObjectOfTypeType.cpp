@@ -37,6 +37,75 @@ void PythonObjectOfType::repr(instance_ptr self, ReprAccumulator& stream, bool i
     stream << PyUnicode_AsUTF8(o);
 }
 
+size_t PythonObjectOfType::deepBytecountForPyObj(PyObject* o, std::unordered_set<void*>& alreadyVisited) {
+    PyEnsureGilAcquired getTheGil;
+
+    if (alreadyVisited.find((void*)o) != alreadyVisited.end()) {
+        return 0;
+    }
+
+    alreadyVisited.insert((void*)o);
+
+    if (PyType_Check(o)) {
+        return sizeof(PyTypeObject);
+    }
+
+    if (Type* t = PyInstance::extractTypeFrom(o->ob_type)) {
+        PyEnsureGilReleased releaseTheGil;
+
+        return t->bytecount() + t->deepBytecount(((PyInstance*)o)->dataPtr(), alreadyVisited) + sizeof(PyInstance);
+    }
+
+    if (PyDict_Check(o)) {
+        size_t res = 0;
+
+        PyObject *key, *value;
+        Py_ssize_t pos = 0;
+
+        while (PyDict_Next(o, &pos, &key, &value)) {
+            res += deepBytecountForPyObj(key, alreadyVisited);
+            res += deepBytecountForPyObj(value, alreadyVisited);
+        }
+
+        return res;
+    }
+
+    if (PyList_Check(o)) {
+        size_t res = 0;
+        for (long k = 0; k < PyList_Size(o); k++) {
+            res += deepBytecountForPyObj(PyList_GetItem(o, k), alreadyVisited);
+        }
+        return res;
+    }
+
+    if (PyTuple_Check(o)) {
+        size_t res = 0;
+        for (long k = 0; k < PyTuple_Size(o); k++) {
+            res += deepBytecountForPyObj(PyTuple_GetItem(o, k), alreadyVisited);
+        }
+        return res;
+    }
+
+    if (PySet_Check(o)) {
+        size_t res = 0;
+
+        iterate(o, [&](PyObject* o2) { res += deepBytecountForPyObj(o2, alreadyVisited); });
+
+        return res;
+    }
+
+    if (PyObject_HasAttrString(o, "__dict__")) {
+        PyObjectStealer dict(PyObject_GetAttrString(o, "__dict__"));
+
+        if (dict) {
+            return sizeof(PyObject) + deepBytecountForPyObj(dict, alreadyVisited);
+        }
+    }
+
+    return sizeof(PyObject);
+}
+
+
 bool PythonObjectOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     PyEnsureGilAcquired acquireTheGil;
 

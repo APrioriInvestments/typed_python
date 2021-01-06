@@ -32,6 +32,10 @@ public:
     }
 
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        return m_alternative->deepBytecount(instance, alreadyVisited);
+    }
+
     void _updateTypeMemosAfterForwardResolution() {
         ConcreteAlternative::Make(m_alternative, m_which, this);
     }

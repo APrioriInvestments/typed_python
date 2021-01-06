@@ -92,6 +92,11 @@ public:
         throw std::runtime_error("Can't serialize References");
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        // we don't walk into refs just like we don't walk into pointers
+        return 0;
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         throw std::runtime_error("Can't deserialize References");

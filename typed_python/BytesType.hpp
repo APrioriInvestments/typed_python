@@ -48,6 +48,22 @@ public:
         buffer.write_bytes(eltPtr(self, 0), count(self));
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        layout* l = *(layout**)instance;
+
+        if (!l) {
+            return 0;
+        }
+
+        if (alreadyVisited.find((void*)l) != alreadyVisited.end()) {
+            return 0;
+        }
+
+        alreadyVisited.insert((void*)l);
+
+        return l->bytecount + sizeof(layout);
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         if (wireType != WireType::BYTES) {

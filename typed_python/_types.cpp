@@ -23,6 +23,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <unordered_set>
 
 #include "AllTypes.hpp"
 #include "NullSerializationContext.hpp"
@@ -1421,6 +1422,36 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
     return NULL;
 }
 
+PyObject *deepBytecount(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "deepBytecount takes 1 argument");
+        return NULL;
+    }
+
+    PyObject* arg = PyTuple_GetItem(args, 0);
+
+    Type* actualType = PyInstance::extractTypeFrom(arg->ob_type);
+
+    size_t sz;
+    std::unordered_set<void*> seen;
+
+    return translateExceptionToPyObject([&]() {
+        if (!actualType) {
+            Instance i = Instance::createAndInitialize(PythonObjectOfType::AnyPyObject(), [&](instance_ptr p) {
+                PyInstance::copyConstructFromPythonInstance(PythonObjectOfType::AnyPyObject(), p, arg, ConversionLevel::New);
+            });
+
+            sz = PythonObjectOfType::AnyPyObject()->deepBytecount(i.data(), seen);
+        } else {
+            PyEnsureGilReleased releaseTheGil;
+
+            sz = actualType->deepBytecount(((PyInstance*)arg)->dataPtr(), seen);
+        }
+
+        return PyLong_FromLong(sz);
+    });
+}
+
 /**
     Serializes an object instance and returns a pointer to a PyBytes object
 
@@ -2660,6 +2691,7 @@ PyObject* gilReleaseThreadLoop(PyObject* null, PyObject* args, PyObject* kwargs)
 
 static PyMethodDef module_methods[] = {
     {"TypeFor", (PyCFunction)MakeTypeFor, METH_VARARGS, NULL},
+    {"deepBytecount", (PyCFunction)deepBytecount, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
     {"decodeSerializedObject", (PyCFunction)decodeSerializedObject, METH_VARARGS, NULL},

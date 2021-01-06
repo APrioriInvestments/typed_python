@@ -176,6 +176,20 @@ public:
         buffer.getContext().serializePythonObject(p, buffer, fieldNumber);
     }
 
+    static size_t deepBytecountForPyObj(PyObject* o, std::unordered_set<void*>& alreadyVisited);
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        layout_type* layoutPtr = *(layout_type**)instance;
+
+        if (alreadyVisited.find((void*)layoutPtr) != alreadyVisited.end()) {
+            return 0;
+        }
+
+        alreadyVisited.insert((void*)layoutPtr);
+
+        return sizeof(layout_type) + deepBytecountForPyObj(layoutPtr->pyObj, alreadyVisited);
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
          initializeHandleAt(self);

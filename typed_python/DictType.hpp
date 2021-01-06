@@ -113,6 +113,41 @@ public:
         }
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        hash_table_layout& l = **(hash_table_layout**)instance;
+
+        if (alreadyVisited.find((void*)&l) != alreadyVisited.end()) {
+            return 0;
+        }
+
+        alreadyVisited.insert((void*)&l);
+
+        size_t res = sizeof(hash_table_layout);
+        // count 'items_populated' and 'items'
+        res += l.items_reserved * (m_bytes_per_key_value_pair + 1);
+
+        // count the hashtable
+        res += sizeof(int32_t) * 2 * l.hash_table_size;
+
+        if (!m_key->isPOD()) {
+            for (long k = 0; k < l.items_reserved; k++) {
+                if (l.items_populated[k]) {
+                    res += m_key->deepBytecount(l.items + k * m_bytes_per_key_value_pair, alreadyVisited);
+                }
+            }
+        }
+
+        if (!m_value->isPOD()) {
+            for (long k = 0; k < l.items_reserved; k++) {
+                if (l.items_populated[k]) {
+                    res += m_value->deepBytecount(l.items + k * m_bytes_per_key_value_pair + m_bytes_per_key, alreadyVisited);
+                }
+            }
+        }
+
+        return res;
+    }
+
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         hash_table_layout& l = **(hash_table_layout**)self;

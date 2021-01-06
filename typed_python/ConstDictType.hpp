@@ -125,6 +125,35 @@ public:
         buffer.writeEndCompound();
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        layout* l = *(layout**)instance;
+
+        if (alreadyVisited.find((void*)l) != alreadyVisited.end()) {
+            return 0;
+        }
+
+        alreadyVisited.insert((void*)l);
+
+        size_t res = sizeof(layout)
+            + l->subpointers * m_bytes_per_key_subtree_pair
+            + l->count * m_bytes_per_key_value_pair
+            ;
+
+        if (l->subpointers) {
+            for (long k = 0; k < l->subpointers; k++) {
+                res += m_key->deepBytecount(kdPairPtrKey(instance, k), alreadyVisited);
+                res += deepBytecount(kdPairPtrDict(instance, k), alreadyVisited);
+            }
+        } else {
+            for (long k = 0; k < l->count; k++) {
+                res += m_key->deepBytecount(kvPairPtrKey(instance, k), alreadyVisited);
+                res += m_value->deepBytecount(kvPairPtrValue(instance, k), alreadyVisited);
+            }
+        }
+
+        return res;
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         int32_t ct = -1;
@@ -174,6 +203,10 @@ public:
     }
 
     void subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr rhs, instance_ptr output);
+
+    instance_ptr kdPairPtrKey(instance_ptr self, int64_t i);
+
+    instance_ptr kdPairPtrDict(instance_ptr self, int64_t i);
 
     instance_ptr kvPairPtrKey(instance_ptr self, int64_t i);
 

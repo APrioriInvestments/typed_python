@@ -92,6 +92,10 @@ public:
         return m_alternative->hash(left);
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        return m_alternative->deepBytecountConcrete(instance, alreadyVisited);
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         m_alternative->deserialize(self, buffer, wireType);

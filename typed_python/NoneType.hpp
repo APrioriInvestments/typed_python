@@ -65,6 +65,10 @@ public:
         return res;
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        return 0;
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         assertWireTypesEqual(wireType, WireType::EMPTY);

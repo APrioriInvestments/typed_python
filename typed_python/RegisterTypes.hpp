@@ -257,6 +257,10 @@ public:
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         buffer.writeRegisterType(fieldNumber, *(T*)self);
     }
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        return 0;
+    }
 };
 
 

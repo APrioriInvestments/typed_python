@@ -98,6 +98,10 @@ public:
         return m_first_arg->hash(left);
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        return m_first_arg->deepBytecount(instance, alreadyVisited);
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         m_first_arg->deserialize(self, buffer, wireType);

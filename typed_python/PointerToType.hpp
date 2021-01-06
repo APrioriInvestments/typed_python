@@ -112,6 +112,11 @@ public:
         throw std::runtime_error("Can't serialize populated Pointers");
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        // we don't follow pointers since we can't be sure they reference valid data.
+        return 0;
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         buffer.readUnsignedVarint();

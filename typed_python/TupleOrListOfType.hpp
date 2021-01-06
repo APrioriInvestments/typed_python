@@ -72,6 +72,32 @@ public:
         });
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        layout_ptr& self_layout = *(layout_ptr*)instance;
+
+        if (!self_layout) {
+            return 0;
+        }
+
+        if (alreadyVisited.find((void*)self_layout) != alreadyVisited.end()) {
+            return 0;
+        }
+
+        alreadyVisited.insert((void*)self_layout);
+
+        size_t res = sizeof(layout) + self_layout->reserved * getEltType()->bytecount();
+
+        if (!getEltType()->isPOD()) {
+            int32_t ct = count(instance);
+
+            for (long k = 0; k < ct; k++) {
+                res += m_element_type->deepBytecount(eltPtr(instance, k), alreadyVisited);
+            }
+        }
+
+        return res;
+    }
+
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
 
     typed_python_hash_type hash(instance_ptr left);

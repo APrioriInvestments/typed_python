@@ -21,6 +21,7 @@
 #include <vector>
 #include <algorithm>
 #include <functional>
+#include <unordered_set>
 #include <mutex>
 #include <set>
 #include <map>
@@ -303,6 +304,24 @@ public:
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions = false);
 
     typed_python_hash_type hash(instance_ptr left);
+
+    // compute the allocated bytecount of an object, including python objects (but not walking
+    // into types, modules, or functions). Don't include storage for 'instance' itself - just storage
+    // that's allocated on the heap by this object.
+    size_t deepBytecount(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        assertForwardsResolvedSufficientlyToInstantiate();
+
+        return this->check([&](auto& subtype) {
+            return subtype.deepBytecountConcrete(instance, alreadyVisited);
+        });
+    }
+
+    size_t deepBytecountConcrete(
+        instance_ptr instance,
+        std::unordered_set<void*>& alreadyVisited
+    ) {
+        throw std::runtime_error("Not implemented for " + name());
+    }
 
     template<class buf_t>
     void serialize(instance_ptr left, buf_t& buffer, size_t fieldNumber) {

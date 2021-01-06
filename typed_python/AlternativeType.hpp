@@ -158,6 +158,21 @@ public:
         m_subtypes[which(self)].second->serialize(eltPtr(self), buffer, which(self));
     }
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        if (m_all_alternatives_empty) {
+            return 0;
+        }
+
+        instance_ptr* p = *(instance_ptr**)instance;
+
+        if (alreadyVisited.find(p) != alreadyVisited.end()) {
+            return 0;
+        }
+
+        alreadyVisited.insert(p);
+        return m_subtypes[which(instance)].second->deepBytecount(eltPtr(instance), alreadyVisited);
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         if (wireType != WireType::SINGLE) {

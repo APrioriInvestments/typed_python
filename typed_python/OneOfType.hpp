@@ -77,6 +77,16 @@ public:
 
     std::string computeName() const;
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        if (isPOD()) {
+            return 0;
+        }
+
+        int fieldNumber = *(uint8_t*)instance;
+
+        return m_types[fieldNumber]->deepBytecount(instance + 1, alreadyVisited);
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         bool hitOne = false;

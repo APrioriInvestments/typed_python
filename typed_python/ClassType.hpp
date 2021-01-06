@@ -186,6 +186,18 @@ public:
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
     static bool cmpStatic(Class* T, instance_ptr left, instance_ptr right, int64_t pyComparisonOp);
 
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+        layout* p = *(layout**)instance;
+
+        if (alreadyVisited.find((void*)p) != alreadyVisited.end()) {
+            return 0;
+        }
+
+        alreadyVisited.insert((void*)p);
+
+        return m_heldClass->deepBytecount(p->data, alreadyVisited) + sizeof(layout) + m_heldClass->bytecount();
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t inWireType, bool asIfFinal=false) {
         if (isFinal() || asIfFinal) {
