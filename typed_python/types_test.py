@@ -3307,3 +3307,122 @@ class NativeTypesTests(unittest.TestCase):
         # but not in reverse
         with self.assertRaises(TypeError):
             T2(T3(x=10, y='hello'))
+
+    def test_dict_update_refcounts(self):
+        d = Dict(TupleOf(int), TupleOf(int))()
+        k = TupleOf(int)([1])
+        v = TupleOf(int)([1, 2])
+
+        n = NamedTuple(k=TupleOf(int), v=TupleOf(int))(k=k, v=v)
+
+        assert _types.refcount(k) == 2
+        assert _types.refcount(v) == 2
+
+        d.update({n.k: n.v})
+
+        assert _types.refcount(k) == 3
+        assert _types.refcount(v) == 3
+
+        d.clear()
+
+        assert _types.refcount(k) == 2
+        assert _types.refcount(v) == 2
+
+        d[k] = v
+        assert _types.refcount(k) == 3
+        assert _types.refcount(v) == 3
+
+        d.pop(k)
+        assert _types.refcount(k) == 2
+        assert _types.refcount(v) == 2
+
+        d[k] = v
+        assert _types.refcount(k) == 3
+        assert _types.refcount(v) == 3
+
+        del d[k]
+        assert _types.refcount(k) == 2
+        assert _types.refcount(v) == 2
+
+        d[k] = v
+        assert _types.refcount(k) == 3
+        assert _types.refcount(v) == 3
+
+        d = None
+        assert _types.refcount(k) == 2
+        assert _types.refcount(v) == 2
+
+        n = None
+        assert _types.refcount(k) == 1
+        assert _types.refcount(v) == 1
+
+    def test_dict_from_const_dict_refcounts(self):
+        D = Dict(TupleOf(int), TupleOf(int))
+        CD = ConstDict(TupleOf(int), TupleOf(int))
+        k1 = TupleOf(int)([1])
+        k2 = TupleOf(int)([1])
+
+        assert _types.refcount(k1) == 1
+        assert _types.refcount(k2) == 1
+
+        cd = CD({k1: k2})
+
+        assert _types.refcount(k1) == 2
+        assert _types.refcount(k2) == 2
+
+        d = D(cd)
+        assert _types.refcount(k1) == 3
+        assert _types.refcount(k2) == 3
+
+        cd = None
+        assert _types.refcount(k1) == 2
+        assert _types.refcount(k2) == 2
+
+        d = None  # noqa
+        assert _types.refcount(k1) == 1
+        assert _types.refcount(k2) == 1
+
+    def test_set_refcounts_tupleof_int(self):
+        s = Set(TupleOf(int))()
+
+        k1 = TupleOf(int)([1])
+        k2 = TupleOf(int)([2])
+
+        s.add(k1)
+        assert _types.refcount(k1) == 2
+        s.discard(k1)
+        assert _types.refcount(k1) == 1
+
+        s.update([k1, k2])
+        s.discard(k1)
+        s.discard(k2)
+
+        assert _types.refcount(k1) == 1
+
+    def test_const_dict_from_dict_refcounts(self):
+        CD = ConstDict(TupleOf(int), TupleOf(int))
+
+        k1 = TupleOf(int)([1])
+        k2 = TupleOf(int)([2])
+
+        d = Dict(TupleOf(int), TupleOf(int))()
+        d[k1] = k2
+
+        assert _types.refcount(k1) == 2
+        assert _types.refcount(k2) == 2
+        assert _types.refcount(d) == 1
+        cd2 = CD(d)
+
+        assert _types.refcount(k1) == 3
+        assert _types.refcount(k2) == 3
+        assert _types.refcount(d) == 1
+
+        cd2 = None  # noqa
+
+        assert _types.refcount(k1) == 2
+        assert _types.refcount(k2) == 2
+
+        d = None
+
+        assert _types.refcount(k1) == 1
+        assert _types.refcount(k2) == 1

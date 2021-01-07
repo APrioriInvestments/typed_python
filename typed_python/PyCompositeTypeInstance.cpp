@@ -349,6 +349,7 @@ void PyNamedTupleInstance::constructFromPythonArgumentsConcreteWithLevel(
                 const std::string& name = namedTupleT->getNames()[k];
                 Type* t = namedTupleT->getTypes()[k];
 
+                // note that 'PyDict_GetItemString' returns a borrowed reference
                 PyObject* o = PyDict_GetItemString(kwargs, name.c_str());
                 if (o) {
                     try {
@@ -511,6 +512,7 @@ PyObject* PyNamedTupleInstance::replacing(PyObject* o, PyObject* args, PyObject*
             std::string itemName = tupType->getNames()[index];
 
             // value passed in kwargs
+            // note that 'value' is a borrowed reference
             PyObject* value = PyDict_GetItemString(kwargs, itemName.c_str());
 
             if (value != NULL) {

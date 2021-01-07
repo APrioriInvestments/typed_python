@@ -23,7 +23,8 @@ ConstDictType* PyConstDictInstance::type() {
 // static
 PyDoc_STRVAR(constDictItems_doc,
     "D.items() -> an iterable containing D's items."
-    );
+);
+
 PyObject* PyConstDictInstance::constDictItems(PyObject *o) {
     if (((PyInstance*)o)->mIteratorOffset != -1) {
         PyErr_SetString(PyExc_TypeError, "ConstDict iterators don't support 'items'");
@@ -44,7 +45,6 @@ PyObject* PyConstDictInstance::constDictItems(PyObject *o) {
             self_type->copy_constructor(data, w->dataPtr());
         });
 
-
         return (PyObject*)self;
     }
 
@@ -55,7 +55,7 @@ PyObject* PyConstDictInstance::constDictItems(PyObject *o) {
 // static
 PyDoc_STRVAR(constDictKeys_doc,
     "D.keys() -> an iterable containing D's keys."
-    );
+);
 PyObject* PyConstDictInstance::constDictKeys(PyObject *o) {
     if (((PyInstance*)o)->mIteratorOffset != -1) {
         PyErr_SetString(PyExc_TypeError, "ConstDict iterators don't support 'keys'");
@@ -542,7 +542,7 @@ void PyConstDictInstance::copyConstructFromPythonInstanceConcrete(ConstDictType*
         return;
     }
 
-    PyObject *iterator = PyObject_GetIter(pyRepresentation);
+    PyObjectStealer iterator(PyObject_GetIter(pyRepresentation));
 
     if (!iterator) {
         throw PythonExceptionSet();

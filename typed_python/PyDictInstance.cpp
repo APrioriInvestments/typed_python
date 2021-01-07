@@ -120,7 +120,7 @@ PyObject* PyDictInstance::dictUpdate(PyObject* o, PyObject* args) {
     } else {
         return translateExceptionToPyObject([&]() {
             iterate(item, [&](PyObject* key) {
-                PyObjectHolder value(PyObject_GetItem(item, key));
+                PyObjectStealer value(PyObject_GetItem(item, key));
                 if (!value) {
                     throw PythonExceptionSet();
                 }
@@ -427,7 +427,6 @@ int PyDictInstance::mp_ass_subscript_concrete_typed(instance_ptr key, instance_p
 int PyDictInstance::mp_ass_subscript_concrete_keytyped(PyObject* pyKey, instance_ptr key, PyObject* value) {
     if (!value) {
         if (type()->deleteKey(dataPtr(), key)) {
-
             return 0;
         }
 
@@ -554,7 +553,7 @@ void PyDictInstance::copyConstructFromPythonInstanceConcrete(DictType* dictType,
 
         try {
             iterate(pyRepresentation, [&](PyObject* key) {
-                PyObjectHolder value(PyObject_GetItem(pyRepresentation, key));
+                PyObjectStealer value(PyObject_GetItem(pyRepresentation, key));
                 if (!value) {
                     throw PythonExceptionSet();
                 }
