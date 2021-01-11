@@ -128,6 +128,10 @@ public:
     size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
         layout* l = *(layout**)instance;
 
+        if (!l) {
+            return 0;
+        }
+
         if (alreadyVisited.find((void*)l) != alreadyVisited.end()) {
             return 0;
         }

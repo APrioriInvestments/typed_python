@@ -71,3 +71,7 @@ def test_deep_bytecount_sees_into_Dict_objects():
 
 def test_deep_bytecount_sees_into_ConstDict_objects():
     assert deepBytecount(ConstDict(int, ListOf(int))({1: ListOf(int)(range(1000))}))
+
+
+def test_deep_bytecount_of_empty_constDict():
+    assert deepBytecount(ConstDict(int, int)()) == 0
