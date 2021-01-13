@@ -66,3 +66,6 @@ compile the entire group all at once.
 #include "Sha1.cpp"
 #include "MutuallyRecursiveTypeGroup.cpp"
 #include "TypeOrPyobj.cpp"
+#include "Memory.cpp"
+#include "PySlab.cpp"
+#include "Slab.cpp"

@@ -31,7 +31,7 @@ StringType::layout* StringType::upgradeCodePoints(layout* lhs, int32_t newBytesP
 
     int64_t new_byteCount = sizeof(layout) + lhs->pointcount * newBytesPerCodepoint;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = newBytesPerCodepoint;
@@ -88,7 +88,7 @@ StringType::layout* StringType::concatenate(layout* lhs, layout* rhs) {
     //they're the same
     int64_t new_byteCount = sizeof(layout) + (rhs->pointcount + lhs->pointcount) * lhs->bytes_per_codepoint;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = lhs->bytes_per_codepoint;
@@ -107,7 +107,7 @@ inline StringType::layout* unicode_generic(pyunicode_fn& operation, T* data, Str
 {
     int32_t allocated_points = l->pointcount;
     int64_t new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
-    StringType::layout* new_layout = (StringType::layout*)malloc(new_byteCount);
+    StringType::layout* new_layout = (StringType::layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
@@ -123,8 +123,13 @@ inline StringType::layout* unicode_generic(pyunicode_fn& operation, T* data, Str
             if (new_pointcount > allocated_points) {
                 allocated_points += increment;
                 increment = (increment * 3) / 2;
+                size_t priorBytecount = new_byteCount;
                 new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
-                new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+                new_layout = (StringType::layout*)tp_realloc(
+                    new_layout,
+                    priorBytecount,
+                    new_byteCount
+                );
             }
         }
         for (int j = 0; j < n; j++) {
@@ -133,8 +138,9 @@ inline StringType::layout* unicode_generic(pyunicode_fn& operation, T* data, Str
     }
     if (allocated_points > new_pointcount) {
         allocated_points = new_pointcount;
+        size_t priorBytecount = new_byteCount;
         new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
-        new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+        new_layout = (StringType::layout*)tp_realloc(new_layout, priorBytecount, new_byteCount);
     }
     new_layout->pointcount = new_pointcount;
     return new_layout;
@@ -196,7 +202,7 @@ inline StringType::layout* capitalize_generic(T* data, StringType::layout* l)
 {
     int32_t allocated_points = l->pointcount;
     int64_t new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
-    StringType::layout* new_layout = (StringType::layout*)malloc(new_byteCount);
+    StringType::layout* new_layout = (StringType::layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
@@ -214,8 +220,9 @@ inline StringType::layout* capitalize_generic(T* data, StringType::layout* l)
             if (new_pointcount > allocated_points) {
                 allocated_points += increment;
                 increment = (increment * 3) / 2;
+                size_t priorBytecount = new_byteCount;
                 new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
-                new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+                new_layout = (StringType::layout*)tp_realloc(new_layout, priorBytecount, new_byteCount);
             }
         }
         for (int j = 0; j < n; j++) {
@@ -224,8 +231,9 @@ inline StringType::layout* capitalize_generic(T* data, StringType::layout* l)
     }
     if (allocated_points > new_pointcount) {
         allocated_points = new_pointcount;
+        size_t priorBytecount = new_byteCount;
         new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
-        new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+        new_layout = (StringType::layout*)tp_realloc(new_layout, priorBytecount, new_byteCount);
     }
     new_layout->pointcount = new_pointcount;
     return new_layout;
@@ -266,7 +274,7 @@ inline StringType::layout* swapcase_generic(T* data, StringType::layout* l)
 {
     int32_t allocated_points = l->pointcount;
     int64_t new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
-    StringType::layout* new_layout = (StringType::layout*)malloc(new_byteCount);
+    StringType::layout* new_layout = (StringType::layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
@@ -290,8 +298,9 @@ inline StringType::layout* swapcase_generic(T* data, StringType::layout* l)
             if (new_pointcount > allocated_points) {
                 allocated_points += increment;
                 increment = (increment * 3) / 2;
+                size_t priorBytecount = new_byteCount;
                 new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
-                new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+                new_layout = (StringType::layout*)tp_realloc(new_layout, priorBytecount, new_byteCount);
             }
         }
         for (int j = 0; j < n; j++) {
@@ -300,8 +309,9 @@ inline StringType::layout* swapcase_generic(T* data, StringType::layout* l)
     }
     if (allocated_points > new_pointcount) {
         allocated_points = new_pointcount;
+        size_t origBytecount = new_byteCount;
         new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
-        new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+        new_layout = (StringType::layout*)tp_realloc(new_layout, origBytecount, new_byteCount);
     }
     new_layout->pointcount = new_pointcount;
     return new_layout;
@@ -352,7 +362,7 @@ inline StringType::layout* title_generic(T* data, StringType::layout* l)
 {
     int32_t allocated_points = l->pointcount;
     int64_t new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
-    StringType::layout* new_layout = (StringType::layout*)malloc(new_byteCount);
+    StringType::layout* new_layout = (StringType::layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
@@ -392,8 +402,9 @@ inline StringType::layout* title_generic(T* data, StringType::layout* l)
             if (new_pointcount > allocated_points) {
                 allocated_points += increment;
                 increment = (increment * 3) / 2;
+                size_t priorBytecount = new_byteCount;
                 new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
-                new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+                new_layout = (StringType::layout*)tp_realloc(new_layout, priorBytecount, new_byteCount);
             }
         }
         for (int j = 0; j < n; j++) {
@@ -402,8 +413,9 @@ inline StringType::layout* title_generic(T* data, StringType::layout* l)
     }
     if (allocated_points > new_pointcount) {
         allocated_points = new_pointcount;
+        size_t origBytecount = new_byteCount;
         new_byteCount = sizeof(StringType::layout) + allocated_points * l->bytes_per_codepoint;
-        new_layout = (StringType::layout*)realloc(new_layout, new_byteCount);
+        new_layout = (StringType::layout*)tp_realloc(new_layout, origBytecount, new_byteCount);
     }
     new_layout->pointcount = new_pointcount;
     return new_layout;
@@ -938,7 +950,7 @@ StringType::layout* StringType::singleFromCodepoint(int64_t codePoint) {
 
     int64_t new_byteCount = sizeof(layout) + bytesPerCodepoint;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = bytesPerCodepoint;
@@ -997,7 +1009,7 @@ StringType::layout* StringType::getitem(layout* lhs, int64_t offset) {
 
     int64_t new_byteCount = sizeof(layout) + 1 * lhs->bytes_per_codepoint;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = lhs->bytes_per_codepoint;
@@ -1044,7 +1056,7 @@ StringType::layout* StringType::getsubstr(layout* l, int64_t start, int64_t stop
     size_t datasize = datalength * l->bytes_per_codepoint;
     int64_t new_byteCount = sizeof(layout) + datasize;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
@@ -1291,7 +1303,7 @@ StringType::layout* StringType::createFromUtf8(const char* utfEncodedString, int
 
     int64_t new_byteCount = sizeof(layout) + length * bytes_per_codepoint;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = bytes_per_codepoint;
@@ -1491,7 +1503,7 @@ void StringType::constructor(instance_ptr self, int64_t bytes_per_codepoint, int
         return;
     }
 
-    (*(layout**)self) = (layout*)malloc(sizeof(layout) + count * bytes_per_codepoint);
+    (*(layout**)self) = (layout*)tp_malloc(sizeof(layout) + count * bytes_per_codepoint);
 
     (*(layout**)self)->bytes_per_codepoint = bytes_per_codepoint;
     (*(layout**)self)->pointcount = count;
@@ -1602,7 +1614,7 @@ void StringType::destroyStatic(instance_ptr self) {
     }
 
     if ((*(layout**)self)->refcount.fetch_sub(1) == 1) {
-        free((*(layout**)self));
+        tp_free((*(layout**)self));
     }
 }
 
@@ -1686,7 +1698,7 @@ void StringType::join(StringType::layout **outString, StringType::layout *separa
     }
 
     // add all the parts together
-    *outString = (layout *) malloc(sizeof(layout) + resultCodepoints * maxCodePoint);
+    *outString = (layout *) tp_malloc(sizeof(layout) + resultCodepoints * maxCodePoint);
     (*outString)->bytes_per_codepoint = maxCodePoint;
     (*outString)->hash_cache = -1;
     (*outString)->refcount = 1;
@@ -1924,7 +1936,7 @@ StringType::layout* StringType::mult(layout* lhs, int64_t rhs) {
     int64_t new_length = lhs->pointcount * rhs;
     int64_t new_byteCount = sizeof(layout) + new_length * lhs->bytes_per_codepoint;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytes_per_codepoint = lhs->bytes_per_codepoint;

@@ -37,7 +37,10 @@ class ConstDictType : public Type {
         uint8_t data[];
     };
 
+    typedef layout* layout_ptr;
+
 public:
+
     ConstDictType(Type* key, Type* value) :
             Type(TypeCategory::catConstDict),
             m_key(key),
@@ -125,7 +128,77 @@ public:
         buffer.writeEndCompound();
     }
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        layout_ptr& destRecordPtr = *(layout**)dest;
+        layout_ptr& srcRecordPtr = *(layout**)src;
+
+        if (!srcRecordPtr) {
+            destRecordPtr = srcRecordPtr;
+            return;
+        }
+
+        auto it = alreadyAllocated.find((instance_ptr)srcRecordPtr);
+        if (it == alreadyAllocated.end()) {
+            int bytecount;
+            if (srcRecordPtr->subpointers) {
+                bytecount = sizeof(layout) + srcRecordPtr->subpointers * m_bytes_per_key_subtree_pair;
+            } else {
+                bytecount = sizeof(layout) + srcRecordPtr->count * m_bytes_per_key_value_pair;
+            }
+
+            destRecordPtr = (layout_ptr)slab->allocate(bytecount, this);
+
+            destRecordPtr->count = srcRecordPtr->count;
+            destRecordPtr->subpointers = srcRecordPtr->subpointers;
+            destRecordPtr->refcount = 0;
+            destRecordPtr->hash_cache = srcRecordPtr->hash_cache;
+
+            if (srcRecordPtr->subpointers) {
+                for (long k = 0; k < srcRecordPtr->subpointers; k++) {
+                    m_key->deepcopy(
+                        kdPairPtrKey(dest, k),
+                        kdPairPtrKey(src, k),
+                        alreadyAllocated,
+                        slab
+                    );
+                    this->deepcopy(
+                        kdPairPtrDict(dest, k),
+                        kdPairPtrDict(src, k),
+                        alreadyAllocated,
+                        slab
+                    );
+                }
+            } else {
+                for (long k = 0; k < srcRecordPtr->count; k++) {
+                    m_key->deepcopy(
+                        kvPairPtrKey(dest, k),
+                        kvPairPtrKey(src, k),
+                        alreadyAllocated,
+                        slab
+                    );
+                    m_value->deepcopy(
+                        kvPairPtrValue(dest, k),
+                        kvPairPtrValue(src, k),
+                        alreadyAllocated,
+                        slab
+                    );
+                }
+            }
+
+            alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
+        } else {
+            destRecordPtr = (layout_ptr)it->second;
+        }
+
+        destRecordPtr->refcount++;
+    }
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         layout* l = *(layout**)instance;
 
         if (!l) {
@@ -138,20 +211,27 @@ public:
 
         alreadyVisited.insert((void*)l);
 
-        size_t res = sizeof(layout)
+
+        if (outSlabs && Slab::slabForAlloc(l)) {
+            outSlabs->insert(Slab::slabForAlloc(l));
+            return 0;
+        }
+
+        size_t res = bytesRequiredForAllocation(
+            sizeof(layout)
             + l->subpointers * m_bytes_per_key_subtree_pair
             + l->count * m_bytes_per_key_value_pair
-            ;
+            );
 
         if (l->subpointers) {
             for (long k = 0; k < l->subpointers; k++) {
-                res += m_key->deepBytecount(kdPairPtrKey(instance, k), alreadyVisited);
-                res += deepBytecount(kdPairPtrDict(instance, k), alreadyVisited);
+                res += m_key->deepBytecount(kdPairPtrKey(instance, k), alreadyVisited, outSlabs);
+                res += deepBytecount(kdPairPtrDict(instance, k), alreadyVisited, outSlabs);
             }
         } else {
             for (long k = 0; k < l->count; k++) {
-                res += m_key->deepBytecount(kvPairPtrKey(instance, k), alreadyVisited);
-                res += m_value->deepBytecount(kvPairPtrValue(instance, k), alreadyVisited);
+                res += m_key->deepBytecount(kvPairPtrKey(instance, k), alreadyVisited, outSlabs);
+                res += m_value->deepBytecount(kvPairPtrValue(instance, k), alreadyVisited, outSlabs);
             }
         }
 

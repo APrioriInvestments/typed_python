@@ -65,12 +65,12 @@ public:
     Instance(Type* t, const initializer_type& initFun) : mLayout(nullptr) {
         t->assertForwardsResolvedSufficientlyToInstantiate();
 
-        layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
+        layout* l = (layout*)tp_malloc(sizeof(layout) + t->bytecount());
 
         try {
             initFun(l->data);
         } catch(...) {
-            free(l);
+            tp_free(l);
             throw;
         }
 

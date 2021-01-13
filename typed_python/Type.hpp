@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "Memory.hpp"
 #include <Python.h>
 #include <string>
 #include <vector>
@@ -36,6 +37,7 @@
 #include "TypeOrPyobj.hpp"
 #include "util.hpp"
 #include "MutuallyRecursiveTypeGroup.hpp"
+#include "Slab.hpp"
 
 class SerializationBuffer;
 class DeserializationBuffer;
@@ -144,6 +146,14 @@ public:
         return m_typeCategory == catTuple;
     }
 
+    bool isString() const {
+        return m_typeCategory == catString;
+    }
+
+    bool isBytes() const {
+        return m_typeCategory == catBytes;
+    }
+
     bool isListOf() const {
         return m_typeCategory == catListOf;
     }
@@ -160,6 +170,10 @@ public:
         return m_typeCategory == catDict;
     }
 
+    bool isSet() const {
+        return m_typeCategory == catSet;
+    }
+
     bool isConstDict() const {
         return m_typeCategory == catConstDict;
     }
@@ -174,6 +188,10 @@ public:
 
     bool isFunction() const {
         return m_typeCategory == catFunction;
+    }
+
+    bool isPythonObjectOfType() const {
+        return m_typeCategory == catPythonObjectOfType;
     }
 
     bool isClass() const {
@@ -309,22 +327,52 @@ public:
 
     typed_python_hash_type hash(instance_ptr left);
 
+    // deepcopy 'src' into a Slab at 'dest'. Memory must be allocated with 'alloc'
+    // and any refcounts must be explicitly noted with 'markRefcount'
+    void deepcopy(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        this->check([&](auto& subtype) {
+            subtype.deepcopyConcrete(dest, src, alreadyAllocated, slab);
+        });
+    }
+
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        throw std::runtime_error(
+            "deepcopyConcrete not implemented for " + name() +
+            " of category " + categoryToString(getTypeCategory())
+        );
+    }
+
     // compute the allocated bytecount of an object, including python objects (but not walking
     // into types, modules, or functions). Don't include storage for 'instance' itself - just storage
-    // that's allocated on the heap by this object.
-    size_t deepBytecount(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+    // that's allocated on the heap by this object. If 'outSlabs' is not the nullpointer, then if we
+    // hit an allocation that's mapped to a slab, just mark the slab and return.
+    size_t deepBytecount(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         assertForwardsResolvedSufficientlyToInstantiate();
 
         return this->check([&](auto& subtype) {
-            return subtype.deepBytecountConcrete(instance, alreadyVisited);
+            return subtype.deepBytecountConcrete(instance, alreadyVisited, outSlabs);
         });
     }
 
     size_t deepBytecountConcrete(
         instance_ptr instance,
-        std::unordered_set<void*>& alreadyVisited
+        std::unordered_set<void*>& alreadyVisited,
+        std::set<Slab*>* outSlabs
     ) {
-        throw std::runtime_error("Not implemented for " + name());
+        throw std::runtime_error(
+            "deepBytecountConcrete not implemented for " + name() +
+            " of category " + categoryToString(getTypeCategory())
+        );
     }
 
     template<class buf_t>

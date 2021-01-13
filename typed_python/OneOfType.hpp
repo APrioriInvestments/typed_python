@@ -77,14 +77,24 @@ public:
 
     std::string computeName() const;
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        uint8_t which = *(uint8_t*)dest = *(uint8_t*)src;
+        m_types[which]->deepcopy(dest+1, src+1, alreadyAllocated, slab);
+    }
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         if (isPOD()) {
             return 0;
         }
 
         int fieldNumber = *(uint8_t*)instance;
 
-        return m_types[fieldNumber]->deepBytecount(instance + 1, alreadyVisited);
+        return m_types[fieldNumber]->deepBytecount(instance + 1, alreadyVisited, outSlabs);
     }
 
     template<class buf_t>

@@ -113,10 +113,10 @@ classObjectDowncast = externalCallTarget(
     "np_classObjectDowncast", Bool, Void.pointer(), Void.pointer(), Void.pointer()
 )
 
-free = externalCallTarget("free", Void, UInt8Ptr)
-malloc = externalCallTarget("malloc", UInt8Ptr, Int64)
+free = externalCallTarget("tp_free", Void, UInt8Ptr)
+malloc = externalCallTarget("tp_malloc", UInt8Ptr, Int64)
 
-realloc = externalCallTarget("realloc", UInt8Ptr, UInt8Ptr, Int64)
+realloc = externalCallTarget("tp_realloc", UInt8Ptr, UInt8Ptr, Int64, Int64)
 memcpy = externalCallTarget("memcpy", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 memmove = externalCallTarget("memmove", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 

@@ -339,7 +339,7 @@ void BytesType::join(BytesType::layout **out, BytesType::layout *separator, List
     }
 
     // add all the parts together
-    *out = (layout*)malloc(sizeof(layout) + total_bytes);
+    *out = (layout*)tp_malloc(sizeof(layout) + total_bytes);
     (*out)->hash_cache = -1;
     (*out)->refcount = 1;
     (*out)->bytecount = total_bytes;
@@ -379,7 +379,7 @@ BytesType::layout* BytesType::concatenate(layout* lhs, layout* rhs) {
         return rhs;
     }
 
-    layout* new_layout = (layout*)malloc(sizeof(layout) + rhs->bytecount + lhs->bytecount);
+    layout* new_layout = (layout*)tp_malloc(sizeof(layout) + rhs->bytecount + lhs->bytecount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = lhs->bytecount + rhs->bytecount;
@@ -391,7 +391,7 @@ BytesType::layout* BytesType::concatenate(layout* lhs, layout* rhs) {
 }
 
 BytesType::layout* BytesType::createFromPtr(const char* data, int64_t length) {
-    layout* new_layout = (layout*)malloc(sizeof(layout) + length);
+    layout* new_layout = (layout*)tp_malloc(sizeof(layout) + length);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = length;
@@ -406,7 +406,7 @@ void BytesType::constructor(instance_ptr self, int64_t count, const char* data) 
         *(layout**)self = nullptr;
         return;
     }
-    (*(layout**)self) = (layout*)malloc(sizeof(layout) + count);
+    (*(layout**)self) = (layout*)tp_malloc(sizeof(layout) + count);
 
     (*(layout**)self)->bytecount = count;
     (*(layout**)self)->refcount = 1;
@@ -444,7 +444,7 @@ void BytesType::destroyStatic(instance_ptr self) {
     }
 
     if ((*(layout**)self)->refcount.fetch_sub(1) == 1) {
-        free((*(layout**)self));
+        tp_free((*(layout**)self));
     }
 }
 
@@ -708,7 +708,7 @@ BytesType::layout* BytesType::lower(layout *l) {
     }
 
     int64_t new_byteCount = sizeof(layout) + l->bytecount;
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = l->bytecount;
@@ -725,7 +725,7 @@ BytesType::layout* BytesType::upper(layout *l) {
     }
 
     int64_t new_byteCount = sizeof(layout) + l->bytecount;
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = l->bytecount;
@@ -742,7 +742,7 @@ BytesType::layout* BytesType::capitalize(layout *l) {
     }
 
     int64_t new_byteCount = sizeof(layout) + l->bytecount;
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = l->bytecount;
@@ -763,7 +763,7 @@ BytesType::layout* BytesType::swapcase(layout *l) {
     }
 
     int64_t new_byteCount = sizeof(layout) + l->bytecount;
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = l->bytecount;
@@ -786,7 +786,7 @@ BytesType::layout* BytesType::title(layout *l) {
     }
 
     int64_t new_byteCount = sizeof(layout) + l->bytecount;
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = l->bytecount;
@@ -856,7 +856,7 @@ BytesType::layout* BytesType::strip(layout* l, bool whiteSpace, layout* values, 
     }
 
     size_t datalength = rightPos - leftPos;
-    layout* new_layout = (layout*)malloc(sizeof(layout) + datalength);
+    layout* new_layout = (layout*)tp_malloc(sizeof(layout) + datalength);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = datalength;
@@ -875,7 +875,7 @@ BytesType::layout* BytesType::mult(layout* lhs, int64_t rhs) {
     int64_t new_length = lhs->bytecount * rhs;
     int64_t new_byteCount = sizeof(layout) + new_length;
 
-    layout* new_layout = (layout*)malloc(new_byteCount);
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = new_length;
@@ -900,7 +900,7 @@ BytesType::layout* BytesType::replace(layout* l, layout* old, layout* repl, int6
     if (!l) {
         if (old || !repl || count >= 0)
             return 0;
-        layout *new_layout = (layout*)malloc(sizeof(layout) + repl->bytecount);
+        layout *new_layout = (layout*)tp_malloc(sizeof(layout) + repl->bytecount);
         new_layout->refcount = 1;
         new_layout->hash_cache = -1;
         new_layout->bytecount = repl->bytecount;
@@ -914,7 +914,7 @@ BytesType::layout* BytesType::replace(layout* l, layout* old, layout* repl, int6
     size_t max_matches = old_len ? l->bytecount / old_len : l->bytecount + 1;
     size_t max_increase = repl_len > old_len ? max_matches * (repl_len - old_len) : 0;
     size_t new_layout_size = sizeof(layout) + l->bytecount + max_increase;
-    layout* new_layout = (layout*)malloc(new_layout_size);
+    layout* new_layout = (layout*)tp_malloc(new_layout_size);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = l->bytecount;
@@ -950,7 +950,11 @@ BytesType::layout* BytesType::replace(layout* l, layout* old, layout* repl, int6
     if (src < end_src) memcpy(dst, src, end_src - src);
 
     if (sizeof(layout) + new_layout->bytecount < new_layout_size) {
-        new_layout = (layout*)realloc(new_layout, sizeof(layout) + new_layout->bytecount);
+        new_layout = (layout*)tp_realloc(
+            new_layout,
+            new_layout_size,
+            sizeof(layout) + new_layout->bytecount
+        );
     }
     return new_layout;
 }
@@ -963,7 +967,7 @@ BytesType::layout* BytesType::translate(layout* l, layout* table, layout* to_del
         throw std::invalid_argument("translation table must be 256 characters long");
     }
 
-    layout *new_layout = (layout*)malloc(sizeof(layout) + l->bytecount);
+    layout *new_layout = (layout*)tp_malloc(sizeof(layout) + l->bytecount);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
 
@@ -988,7 +992,11 @@ BytesType::layout* BytesType::translate(layout* l, layout* table, layout* to_del
 
     // might have shrunk
     if (new_layout->bytecount < l->bytecount) {
-        new_layout = (layout*)realloc(new_layout, sizeof(layout) + new_layout->bytecount);
+        new_layout = (layout*)tp_realloc(
+            new_layout,
+            sizeof(layout) + l->bytecount,
+            sizeof(layout) + new_layout->bytecount
+        );
     }
     return new_layout;
 }
@@ -996,7 +1004,7 @@ BytesType::layout* BytesType::translate(layout* l, layout* table, layout* to_del
 // assumes len(from) == len(to) checked before calling
 BytesType::layout* BytesType::maketrans(layout* from, layout* to) {
     const int table_size = 256;
-    layout* new_layout = (layout*)malloc(sizeof(layout) + table_size);
+    layout* new_layout = (layout*)tp_malloc(sizeof(layout) + table_size);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
     new_layout->bytecount = table_size;

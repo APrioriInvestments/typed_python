@@ -47,7 +47,8 @@ from typed_python._types import (
     PointerTo, RefTo, Dict, validateSerializedObject, validateSerializedObjectStream, decodeSerializedObject,
     getOrSetTypeResolver, Set, Class, Type, BoundMethod,
     TypedCell, pointerTo, refTo, copy, identityHash,
-    deepBytecount
+    deepBytecount, deepcopy, deepcopyContiguous, totalBytesAllocatedInSlabs,
+    deepBytecountAndSlabs
 )
 import typed_python._types as _types
 import threading

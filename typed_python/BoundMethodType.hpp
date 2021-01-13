@@ -98,8 +98,17 @@ public:
         return m_first_arg->hash(left);
     }
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
-        return m_first_arg->deepBytecount(instance, alreadyVisited);
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
+        return m_first_arg->deepBytecount(instance, alreadyVisited, outSlabs);
+    }
+
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        m_first_arg->deepcopy(dest, src, alreadyAllocated, slab);
     }
 
     template<class buf_t>

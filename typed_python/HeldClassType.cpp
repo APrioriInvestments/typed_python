@@ -247,7 +247,7 @@ BoundMethod* HeldClass::getMemberFunctionMethodType(const char* attr, bool forHe
 }
 
 void ClassDispatchTable::allocateUpcastDispatchTables() {
-    mUpcastDispatches = (uint16_t*)malloc(sizeof(uint16_t) * mInterfaceClass->getMro().size());
+    mUpcastDispatches = (uint16_t*)tp_malloc(sizeof(uint16_t) * mInterfaceClass->getMro().size());
 
     for (long castToIx = 0; castToIx < mInterfaceClass->getMro().size(); castToIx++) {
         int mroIndex = mImplementingClass->getMroIndex(mInterfaceClass->getMro()[castToIx]);

@@ -86,6 +86,8 @@ public:
         uint8_t data[];
     };
 
+    typedef layout* layout_ptr;
+
     Alternative(std::string name,
                 std::string moduleName,
                 const std::vector<std::pair<std::string, NamedTuple*> >& subtypes,
@@ -158,7 +160,7 @@ public:
         m_subtypes[which(self)].second->serialize(eltPtr(self), buffer, which(self));
     }
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         if (m_all_alternatives_empty) {
             return 0;
         }
@@ -170,7 +172,55 @@ public:
         }
 
         alreadyVisited.insert(p);
-        return m_subtypes[which(instance)].second->deepBytecount(eltPtr(instance), alreadyVisited);
+
+        if (outSlabs && Slab::slabForAlloc(p)) {
+            outSlabs->insert(Slab::slabForAlloc(p));
+            return 0;
+        }
+
+        return
+            bytesRequiredForAllocation(m_subtypes[which(instance)].second->bytecount() + sizeof(layout)) +
+            m_subtypes[which(instance)].second->deepBytecount(eltPtr(instance), alreadyVisited, outSlabs);
+    }
+
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        if (m_all_alternatives_empty) {
+            return;
+        }
+
+        layout_ptr& destRecordPtr = *(layout**)dest;
+        layout_ptr& srcRecordPtr = *(layout**)src;
+
+        size_t typeIx = srcRecordPtr->which;
+
+        auto it = alreadyAllocated.find((instance_ptr)srcRecordPtr);
+
+        if (it == alreadyAllocated.end()) {
+            destRecordPtr = (layout*)slab->allocate(
+                sizeof(layout) + m_subtypes[typeIx].second->bytecount(),
+                this
+            );
+            destRecordPtr->refcount = 0;
+            destRecordPtr->which = srcRecordPtr->which;
+
+            m_subtypes[typeIx].second->deepcopy(
+                destRecordPtr->data,
+                srcRecordPtr->data,
+                alreadyAllocated,
+                slab
+            );
+
+            alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
+        } else {
+            destRecordPtr = (layout_ptr)it->second;
+        }
+
+        destRecordPtr->refcount++;
     }
 
     template<class buf_t>
@@ -193,7 +243,7 @@ public:
             return;
         }
 
-        *(layout**)self = (layout*)malloc(
+        *(layout**)self = (layout*)tp_malloc(
             sizeof(layout) +
             m_subtypes[which].second->bytecount()
             );

@@ -99,8 +99,17 @@ public:
         m_base->serialize(self, buffer, fieldNumber);
     }
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
-        return m_base->deepBytecount(instance, alreadyVisited);
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        m_base->deepcopy(dest, src, alreadyAllocated, slab);
+    }
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
+        return m_base->deepBytecount(instance, alreadyVisited, outSlabs);
     }
 
     template<class buf_t>

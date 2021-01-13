@@ -90,7 +90,44 @@ public:
         return mHeldType->hash(getLayoutPtr(left)->data);
     }
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        layout_ptr& destLayout = *(layout**)dest;
+        layout_ptr& srcLayout = *(layout**)src;
+
+        if (!srcLayout) {
+            destLayout = srcLayout;
+            return;
+        }
+
+        auto it = alreadyAllocated.find((instance_ptr)srcLayout);
+        if (it == alreadyAllocated.end()) {
+            destLayout = (layout_ptr)slab->allocate(sizeof(layout) + mHeldType->bytecount(), this);
+            destLayout->refcount = 0;
+            destLayout->initialized = srcLayout->initialized;
+
+            if (destLayout->initialized) {
+                mHeldType->deepcopy(
+                    destLayout->data,
+                    srcLayout->data,
+                    alreadyAllocated,
+                    slab
+                );
+            }
+
+            alreadyAllocated[(instance_ptr)srcLayout] = (instance_ptr)destLayout;
+        } else {
+            destLayout = (layout_ptr)it->second;
+        }
+
+        destLayout->refcount++;
+    }
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         layout* l = *(layout**)instance;
 
         if (!l) {
@@ -103,7 +140,12 @@ public:
 
         alreadyVisited.insert((void*)l);
 
-        return mHeldType->deepBytecount(l->data, alreadyVisited);
+        if (outSlabs && Slab::slabForAlloc(l)) {
+            outSlabs->insert(Slab::slabForAlloc(l));
+            return 0;
+        }
+
+        return mHeldType->deepBytecount(l->data, alreadyVisited, outSlabs);
     }
 
     template<class buf_t>
@@ -136,7 +178,7 @@ public:
     }
 
     void initializeHandleAt(instance_ptr data) {
-        getLayoutPtr(data) = (layout*)malloc(sizeof(layout) + mHeldType->bytecount());
+        getLayoutPtr(data) = (layout*)tp_malloc(sizeof(layout) + mHeldType->bytecount());
         getLayoutPtr(data)->refcount = 1;
         getLayoutPtr(data)->initialized = false;
     }
@@ -152,7 +194,7 @@ public:
             if (getLayoutPtr(self)->initialized) {
                 mHeldType->destroy(getLayoutPtr(self)->data);
             }
-            free(getLayoutPtr(self));
+            tp_free(getLayoutPtr(self));
         }
     }
 

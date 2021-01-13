@@ -345,7 +345,7 @@ instance_ptr DictType::insertKey(instance_ptr self, instance_ptr key) const {
 void DictType::constructor(instance_ptr self) {
     assertForwardsResolvedSufficientlyToInstantiate();
 
-    (*(hash_table_layout**)self) = (hash_table_layout*)malloc(sizeof(hash_table_layout));
+    (*(hash_table_layout**)self) = (hash_table_layout*)tp_malloc(sizeof(hash_table_layout));
 
     hash_table_layout& record = **(hash_table_layout**)self;
 
@@ -365,11 +365,11 @@ void DictType::destroy(instance_ptr self) {
             }
         }
 
-        free(record.items);
-        free(record.items_populated);
-        free(record.hash_table_slots);
-        free(record.hash_table_hashes);
-        free(&record);
+        tp_free(record.items);
+        tp_free(record.items_populated);
+        tp_free(record.hash_table_slots);
+        tp_free(record.hash_table_hashes);
+        tp_free(&record);
     }
 }
 

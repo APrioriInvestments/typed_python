@@ -729,7 +729,7 @@ PyObject* PyListOfInstance::listAppendDirect(PyObject* o, PyObject* value) {
     } catch(std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
-    }catch(PythonExceptionSet& e) {
+    } catch(PythonExceptionSet& e) {
         return NULL;
     }
 }

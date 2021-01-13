@@ -85,7 +85,34 @@ class SetType : public Type {
         }
     }
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        hash_table_layout_ptr& destRecordPtr = *(hash_table_layout**)dest;
+        hash_table_layout_ptr& srcRecordPtr = *(hash_table_layout**)src;
+
+        auto it = alreadyAllocated.find((instance_ptr)srcRecordPtr);
+
+        if (it == alreadyAllocated.end()) {
+            destRecordPtr = srcRecordPtr->deepcopy(
+                alreadyAllocated,
+                slab,
+                this,
+                m_key_type,
+                nullptr
+            );
+
+            alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
+        } else {
+            destRecordPtr = (hash_table_layout_ptr)alreadyAllocated[(instance_ptr)srcRecordPtr];
+            destRecordPtr->refcount++;
+        }
+    }
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         hash_table_layout& l = **(hash_table_layout**)instance;
 
         if (alreadyVisited.find((void*)&l) != alreadyVisited.end()) {
@@ -94,17 +121,23 @@ class SetType : public Type {
 
         alreadyVisited.insert((void*)&l);
 
-        size_t res = sizeof(hash_table_layout);
+        if (outSlabs && Slab::slabForAlloc(&l)) {
+            outSlabs->insert(Slab::slabForAlloc(&l));
+            return 0;
+        }
+
+        size_t res = bytesRequiredForAllocation(sizeof(hash_table_layout));
         // count 'items_populated' and 'items'
-        res += l.items_reserved * (m_bytes_per_el + 1);
+        res += bytesRequiredForAllocation(l.items_reserved * m_bytes_per_el);
+        res += bytesRequiredForAllocation(l.items_reserved);
 
         // count the hashtable
-        res += sizeof(int32_t) * 2 * l.hash_table_size;
+        res += bytesRequiredForAllocation(sizeof(int32_t) * l.hash_table_size) * 2;
 
         if (!m_key_type->isPOD()) {
             for (long k = 0; k < l.items_reserved; k++) {
                 if (l.items_populated[k]) {
-                    res += m_key_type->deepBytecount(l.items + k * m_bytes_per_el, alreadyVisited);
+                    res += m_key_type->deepBytecount(l.items + k * m_bytes_per_el, alreadyVisited, outSlabs);
                 }
             }
         }

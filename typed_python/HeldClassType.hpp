@@ -102,7 +102,7 @@ public:
         mFuncPtrsUsed = baseAsBase->mFuncPtrsUsed;
         mFuncPtrsAllocated = baseAsBase->mFuncPtrsAllocated;
 
-        mFuncPtrs = (untyped_function_ptr*)malloc(sizeof(untyped_function_ptr) * mFuncPtrsAllocated);
+        mFuncPtrs = (untyped_function_ptr*)tp_malloc(sizeof(untyped_function_ptr) * mFuncPtrsAllocated);
 
         for (long k = 0; k < mFuncPtrsUsed; k++) {
             mFuncPtrs[k] = nullptr;
@@ -132,7 +132,7 @@ public:
         // compiled code doesn't have to do that.
         if (mFuncPtrsUsed >= mFuncPtrsAllocated) {
             mFuncPtrsAllocated = (mFuncPtrsAllocated + 1) * 2;
-            untyped_function_ptr* newTable = (untyped_function_ptr*)malloc(sizeof(untyped_function_ptr) * mFuncPtrsAllocated);
+            untyped_function_ptr* newTable = (untyped_function_ptr*)tp_malloc(sizeof(untyped_function_ptr) * mFuncPtrsAllocated);
             for (long k = 0; k < mFuncPtrsUsed; k++) {
                 newTable[k] = mFuncPtrs[k];
             }
@@ -472,11 +472,30 @@ public:
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        for (int64_t k = 0; k < m_members.size(); k++) {
+            if (checkInitializationFlag(src, k)) {
+                std::get<1>(m_members[k])->deepcopy(
+                    eltPtr(dest, k),
+                    eltPtr(src, k),
+                    alreadyAllocated,
+                    slab
+                );
+                setInitializationFlag(dest, k);
+            }
+        }
+    }
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         size_t res = 0;
 
         for (long k = 0; k < m_members.size(); k++) {
-            res += std::get<1>(m_members[k])->deepBytecount(eltPtr(instance, k), alreadyVisited);
+            res += std::get<1>(m_members[k])->deepBytecount(eltPtr(instance, k), alreadyVisited, outSlabs);
         }
 
         return res;

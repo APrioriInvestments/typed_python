@@ -24,7 +24,7 @@ def test_deep_bytecount_listof():
 
     for sz in [10, 100, 1000, 10000]:
         l.resize(sz)
-        assert sz * 8 <= deepBytecount(l) <= 8 * sz + 50
+        assert sz * 8 <= deepBytecount(l) <= 8 * sz + 112
 
 
 def test_deep_bytecount_listof_aliasing():
@@ -36,7 +36,7 @@ def test_deep_bytecount_listof_aliasing():
 
     l.resize(1000)
 
-    assert 1000 * 8 <= deepBytecount(x) <= 1000 * 8 + 50
+    assert 1000 * 8 <= deepBytecount(x) <= 1000 * 8 + 112
 
 
 def test_deep_bytecount_sees_into_basic_python_objects():

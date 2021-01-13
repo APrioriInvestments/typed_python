@@ -43,7 +43,7 @@ public:
         PyEnsureGilAcquired acquireTheGil;
 
         if (m_buffer) {
-            free(m_buffer);
+            ::free(m_buffer);
         }
 
         for (auto& typeAndList: m_pointersNeedingDecref) {

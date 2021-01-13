@@ -34,6 +34,7 @@
 #include "DeserializationBuffer.hpp"
 #include "PythonSerializationContext.hpp"
 #include "UnicodeProps.hpp"
+#include "PySlab.hpp"
 #include "_types.hpp"
 
 PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
@@ -1410,6 +1411,186 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
     return PyLong_FromLong(outRefcount);
 }
 
+PyDoc_STRVAR(
+    totalBytesAllocatedInSlabs_doc,
+    "totalBytesAllocatedInSlabs() -> int\n\n"
+    "returns the total number of bytes currently allocated in living Slab objects.\n"
+);
+
+PyObject* totalBytesAllocatedInSlabs(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 0) {
+        PyErr_SetString(PyExc_TypeError, "totalBytesAllocatedInSlabs takes 0 argument");
+        return NULL;
+    }
+
+    return PyLong_FromLong(Slab::totalBytesAllocatedInSlabs());
+}
+
+PyDoc_STRVAR(deepcopy_doc,
+    "deepcopy(o)\n\n"
+    "Make a 'deep copy' of the object graph starting at 'o'. The deepcopier\n"
+    "looks inside of standard python objects with '__dict__', tuples, sets,\n"
+    "dicts, lists, and typed_python instances.  It shallow copies functions,\n"
+    "types, modules, and anything without a standard __dict__."
+);
+
+PyObject* deepcopy(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "deepcopy takes 1 argument");
+        return NULL;
+    }
+
+    PyObject* arg = PyTuple_GetItem(args, 0);
+
+    // this is the 'free store' slab
+    Slab* slab = new Slab(true, 0);
+
+    std::map<instance_ptr, instance_ptr> alreadyCopied;
+
+    try {
+        PyObject* res = PythonObjectOfType::deepcopyPyObject(arg, alreadyCopied, slab);
+        slab->decref();
+        return res;
+    } catch(PythonExceptionSet& e) {
+        slab->decref();
+        return NULL;
+    } catch(std::exception& e) {
+        slab->decref();
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    }
+}
+
+PyDoc_STRVAR(deepcopyContiguous_doc,
+    "deepcopyContiguous(o, trackInternalTypes=False)\n\n"
+    "Make a 'deep copy' of the object graph starting at 'o', placing the new\n"
+    "objects in a 'Slab', which is a contiguously allocated block of memory.\n"
+    "The deepcopier looks inside of standard python objects with '__dict__',\n"
+    "tuples, sets, dicts, lists, and typed_python instances.  It shallow copies\n"
+    "functions, types, modules, and anything without a standard __dict__.\n\n"
+    "If 'trackInternalTypes' is True, the the resulting Slab object tracks\n"
+    "details on the types of the objects allocated inside of it for diagnostic\n"
+    "purposes. See typed_python.Slab for details."
+);
+
+PyObject* deepcopyContiguous(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {"arg", "trackInternalTypes", NULL};
+
+    PyObject* arg;
+    int trackInternalTypes = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|p", (char**)kwlist, &arg, &trackInternalTypes)) {
+        return NULL;
+    }
+
+    std::unordered_set<void*> visited;
+    size_t bytecount = PythonObjectOfType::deepBytecountForPyObj(arg, visited, nullptr);
+
+    // add some space to deal with the front python object we may need
+    bytecount += 128;
+
+    Slab* slab = new Slab(false, bytecount);
+
+    if (trackInternalTypes) {
+        slab->enableTrackAllocTypes();
+    }
+
+    std::map<instance_ptr, instance_ptr> alreadyCopied;
+
+    try {
+        PyObject* res = PythonObjectOfType::deepcopyPyObject(arg, alreadyCopied, slab);
+        slab->decref();
+        return res;
+    } catch(PythonExceptionSet& e) {
+        slab->decref();
+        return NULL;
+    } catch(std::exception& e) {
+        slab->decref();
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    }
+}
+
+
+PyDoc_STRVAR(
+    getAllSlabs_doc,
+    "getAllSlabs() -> [Slab]\n\n"
+    "returns a list of Slab objects for all currently alive Slabs.\n\n"
+    "Note that this could segfault if a slab gets deleted right as you call\n"
+    "this function, so this should be used only for diagnostic purposes."
+);
+
+PyObject *getAllSlabs(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 0) {
+        PyErr_SetString(PyExc_TypeError, "getAllSlabs takes 0 arguments");
+        return NULL;
+    }
+
+    std::lock_guard<std::mutex> guard(Slab::aliveSlabsMutex());
+
+    PyObjectStealer pySlabList(PyList_New(0));
+
+    for (auto slabPtr: Slab::aliveSlabs()) {
+        PyObjectStealer pySlabPtr(PySlab::newPySlab(slabPtr));
+        PyList_Append(pySlabList, pySlabPtr);
+    }
+
+    return incref(pySlabList);
+}
+
+
+PyDoc_STRVAR(
+    deepBytecountAndSlabs_doc,
+    "deepBytecountAndSlabs(o) -> (int, Slab)\n\n"
+    "Returns the bytecount of all non-slab allocations reachable from 'o',\n"
+    "as well as a list of all the Slab objects reachable from 'o'.\n\n"
+    "Use this to determine how many bytes in your graph are not in slabs\n"
+    "or to check if you can reach the same Slab from multiple places.\n"
+);
+PyObject *deepBytecountAndSlabs(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "deepBytecountAndSlabs takes 1 argument");
+        return NULL;
+    }
+
+    PyObject* arg = PyTuple_GetItem(args, 0);
+
+    std::set<Slab*> slabs;
+    std::unordered_set<void*> seen;
+    Type* actualType = PyInstance::extractTypeFrom(arg->ob_type);
+
+    return translateExceptionToPyObject([&]() {
+        size_t sz;
+
+        if (!actualType) {
+            sz = PythonObjectOfType::deepBytecountForPyObj(arg, seen, &slabs);
+        } else {
+            PyEnsureGilReleased releaseTheGil;
+
+            sz = actualType->deepBytecount(((PyInstance*)arg)->dataPtr(), seen, &slabs);
+        }
+
+        PyObjectStealer szAsLong(PyLong_FromLong(sz));
+        PyObjectStealer pySlabList(PyList_New(0));
+
+        for (auto slabPtr: slabs) {
+            PyObjectStealer pySlabPtr(PySlab::newPySlab(slabPtr));
+            PyList_Append(pySlabList, pySlabPtr);
+        }
+
+        return PyTuple_Pack(2, (PyObject*)szAsLong, (PyObject*)pySlabList);
+    });
+}
+
+PyDoc_STRVAR(
+    deepBytecount_doc,
+    "deepBytecount(o) -> int\n\n"
+    "Determine how many bytes of data would be required to represent 'o'\n"
+    "and all the objects beneath it. We use the same rules for reachablility\n"
+    "as we do for 'deepcopy' and 'deepcopyContiguous'. This predicts\n"
+    "the size of the resulting Slab if you call deepcopyContiguous(o)."
+);
+
 PyObject *deepBytecount(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "deepBytecount takes 1 argument");
@@ -1418,22 +1599,19 @@ PyObject *deepBytecount(PyObject* nullValue, PyObject* args) {
 
     PyObject* arg = PyTuple_GetItem(args, 0);
 
-    Type* actualType = PyInstance::extractTypeFrom(arg->ob_type);
-
-    size_t sz;
     std::unordered_set<void*> seen;
 
-    return translateExceptionToPyObject([&]() {
-        if (!actualType) {
-            Instance i = Instance::createAndInitialize(PythonObjectOfType::AnyPyObject(), [&](instance_ptr p) {
-                PyInstance::copyConstructFromPythonInstance(PythonObjectOfType::AnyPyObject(), p, arg, ConversionLevel::New);
-            });
+    Type* actualType = PyInstance::extractTypeFrom(arg->ob_type);
 
-            sz = PythonObjectOfType::AnyPyObject()->deepBytecount(i.data(), seen);
+    return translateExceptionToPyObject([&]() {
+        size_t sz;
+
+        if (!actualType) {
+            sz = PythonObjectOfType::deepBytecountForPyObj(arg, seen, nullptr);
         } else {
             PyEnsureGilReleased releaseTheGil;
 
-            sz = actualType->deepBytecount(((PyInstance*)arg)->dataPtr(), seen);
+            sz = actualType->deepBytecount(((PyInstance*)arg)->dataPtr(), seen, nullptr);
         }
 
         return PyLong_FromLong(sz);
@@ -2679,7 +2857,12 @@ PyObject* gilReleaseThreadLoop(PyObject* null, PyObject* args, PyObject* kwargs)
 
 static PyMethodDef module_methods[] = {
     {"TypeFor", (PyCFunction)MakeTypeFor, METH_VARARGS, NULL},
-    {"deepBytecount", (PyCFunction)deepBytecount, METH_VARARGS, NULL},
+    {"deepBytecount", (PyCFunction)deepBytecount, METH_VARARGS, deepBytecount_doc},
+    {"deepBytecountAndSlabs", (PyCFunction)deepBytecountAndSlabs, METH_VARARGS, deepBytecountAndSlabs_doc},
+    {"getAllSlabs", (PyCFunction)getAllSlabs, METH_VARARGS, getAllSlabs_doc},
+    {"totalBytesAllocatedInSlabs", (PyCFunction)totalBytesAllocatedInSlabs, METH_VARARGS, totalBytesAllocatedInSlabs_doc},
+    {"deepcopy", (PyCFunction)deepcopy, METH_VARARGS, deepcopy_doc},
+    {"deepcopyContiguous", (PyCFunction)deepcopyContiguous, METH_VARARGS | METH_KEYWORDS, deepcopyContiguous_doc},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
     {"decodeSerializedObject", (PyCFunction)decodeSerializedObject, METH_VARARGS, NULL},
@@ -2811,6 +2994,12 @@ PyInit__types(void)
     // initialize a couple of global references to things in typed_python.internals
     PythonObjectOfType::AnyPyObject();
     PythonObjectOfType::AnyPyType();
+
+    if (PyType_Ready(&PyType_Slab) < 0) {
+        return NULL;
+    }
+
+    PyModule_AddObject(module, "Slab", (PyObject*)incref(&PyType_Slab));
 
     return module;
 }

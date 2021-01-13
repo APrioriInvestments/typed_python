@@ -34,6 +34,8 @@ public:
         }
     };
 
+    typedef layout* layout_ptr;
+
     StringType() : Type(TypeCategory::catString)
     {
         m_name = "str";
@@ -125,7 +127,41 @@ public:
 
     static StringType* Make() { static StringType* res = new StringType(); return res; }
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        layout_ptr& destLayout = *(layout**)dest;
+        layout_ptr& srcLayout = *(layout**)src;
+
+        if (!srcLayout) {
+            destLayout = srcLayout;
+            return;
+        }
+
+        auto it = alreadyAllocated.find((instance_ptr)srcLayout);
+        if (it == alreadyAllocated.end()) {
+            int64_t new_byteCount = srcLayout->pointcount * srcLayout->bytes_per_codepoint;
+
+            destLayout = (layout_ptr)slab->allocate(sizeof(layout) + new_byteCount, this);
+            destLayout->refcount = 0;
+            destLayout->hash_cache = srcLayout->hash_cache;
+            destLayout->pointcount = srcLayout->pointcount;
+            destLayout->bytes_per_codepoint = srcLayout->bytes_per_codepoint;
+
+            memcpy(destLayout->data, srcLayout->data, new_byteCount);
+
+            alreadyAllocated[(instance_ptr)srcLayout] = (instance_ptr)destLayout;
+        } else {
+            destLayout = (layout_ptr)it->second;
+        }
+
+        destLayout->refcount++;
+    }
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         layout* l = *(layout**)instance;
 
         if (!l) {
@@ -138,7 +174,12 @@ public:
 
         alreadyVisited.insert((void*)l);
 
-        return l->pointcount * l->bytes_per_codepoint + sizeof(layout);
+        if (outSlabs && Slab::slabForAlloc(l)) {
+            outSlabs->insert(Slab::slabForAlloc(l));
+            return 0;
+        }
+
+        return bytesRequiredForAllocation(l->pointcount * l->bytes_per_codepoint + sizeof(layout));
     }
 
     template<class buf_t>

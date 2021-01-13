@@ -31,6 +31,8 @@ public:
         PyObject* pyObj;
     };
 
+    typedef layout_type* layout_ptr;
+
     // return a new layout with a refcount of 1, but steal the reference
     // to the python object.
     static layout_type* stealToCreateLayout(PyObject* p) {
@@ -40,7 +42,7 @@ public:
     // return a new layout with a refcount of 1, increffing the argument
     // before placing it in the layout.
     static layout_type* createLayout(PyObject* p, bool alsoIncref = true) {
-        layout_type* res = (layout_type*)malloc(sizeof(layout_type));
+        layout_type* res = (layout_type*)tp_malloc(sizeof(layout_type));
 
         if (alsoIncref) {
             incref(p);
@@ -52,8 +54,8 @@ public:
         return res;
     }
 
-    void initializeHandleAt(instance_ptr ptr, int refcount=1) {
-        ((layout_type**)ptr)[0] = (layout_type*)malloc(sizeof(layout_type));
+    void initializeHandleAt(instance_ptr ptr) {
+        ((layout_type**)ptr)[0] = (layout_type*)tp_malloc(sizeof(layout_type));
         ((layout_type**)ptr)[0]->pyObj = NULL;
         ((layout_type**)ptr)[0]->refcount = 1;
     }
@@ -75,7 +77,7 @@ public:
         if (p->refcount == 0) {
             PyEnsureGilAcquired getTheGil;
             decref(p->pyObj);
-            free(p);
+            tp_free(p);
         }
     }
 
@@ -85,7 +87,7 @@ public:
         if (getHandlePtr(self)->refcount == 0) {
             PyEnsureGilAcquired getTheGil;
             decref(getPyObj(self));
-            free(*(layout_type**)self);
+            tp_free(*(layout_type**)self);
         }
     }
 
@@ -180,9 +182,22 @@ public:
         buffer.getContext().serializePythonObject(p, buffer, fieldNumber);
     }
 
-    static size_t deepBytecountForPyObj(PyObject* o, std::unordered_set<void*>& alreadyVisited);
+    static size_t deepBytecountForPyObj(PyObject* o, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs);
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+    static PyObject* deepcopyPyObject(
+        PyObject* o,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    );
+
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    );
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         layout_type* layoutPtr = *(layout_type**)instance;
 
         if (alreadyVisited.find((void*)layoutPtr) != alreadyVisited.end()) {
@@ -191,7 +206,12 @@ public:
 
         alreadyVisited.insert((void*)layoutPtr);
 
-        return sizeof(layout_type) + deepBytecountForPyObj(layoutPtr->pyObj, alreadyVisited);
+        if (outSlabs && Slab::slabForAlloc(layoutPtr)) {
+            outSlabs->insert(Slab::slabForAlloc(layoutPtr));
+            return 0;
+        }
+
+        return bytesRequiredForAllocation(sizeof(layout_type)) + deepBytecountForPyObj(layoutPtr->pyObj, alreadyVisited, outSlabs);
     }
 
     template<class buf_t>

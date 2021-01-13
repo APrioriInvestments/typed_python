@@ -72,7 +72,54 @@ public:
         });
     }
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        layout_ptr& destLayout = *(layout**)dest;
+        layout_ptr& srcLayout = *(layout**)src;
+
+        if (!srcLayout) {
+            destLayout = srcLayout;
+            return;
+        }
+
+        auto it = alreadyAllocated.find((instance_ptr)srcLayout);
+        if (it == alreadyAllocated.end()) {
+            destLayout = (layout_ptr)slab->allocate(sizeof(layout), this);
+            destLayout->hash_cache = srcLayout->hash_cache;
+            destLayout->refcount = 0;
+            destLayout->reserved = srcLayout->count;
+            destLayout->count = srcLayout->count;
+
+            destLayout->data = (instance_ptr)slab->allocate(getEltType()->bytecount() * srcLayout->count, nullptr);
+
+            if (destLayout->count) {
+                if (getEltType()->isPOD()) {
+                    memcpy(destLayout->data, srcLayout->data, getEltType()->bytecount() * srcLayout->count);
+                } else {
+                    for (long k = 0; k < srcLayout->count; k++) {
+                        m_element_type->deepcopy(
+                            destLayout->data + k * m_element_type->bytecount(),
+                            srcLayout->data + k * m_element_type->bytecount(),
+                            alreadyAllocated,
+                            slab
+                        );
+                    }
+                }
+            }
+
+            alreadyAllocated[(instance_ptr)srcLayout] = (instance_ptr)destLayout;
+        } else {
+            destLayout = (layout_ptr)it->second;
+        }
+
+        destLayout->refcount++;
+    }
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         layout_ptr& self_layout = *(layout_ptr*)instance;
 
         if (!self_layout) {
@@ -85,13 +132,21 @@ public:
 
         alreadyVisited.insert((void*)self_layout);
 
-        size_t res = sizeof(layout) + self_layout->reserved * getEltType()->bytecount();
+        if (outSlabs && Slab::slabForAlloc(self_layout)) {
+            outSlabs->insert(Slab::slabForAlloc(self_layout));
+            return 0;
+        }
+
+        size_t res = (
+            bytesRequiredForAllocation(sizeof(layout)) +
+            bytesRequiredForAllocation(self_layout->reserved * getEltType()->bytecount())
+        );
 
         if (!getEltType()->isPOD()) {
             int32_t ct = count(instance);
 
             for (long k = 0; k < ct; k++) {
-                res += m_element_type->deepBytecount(eltPtr(instance, k), alreadyVisited);
+                res += m_element_type->deepBytecount(eltPtr(instance, k), alreadyVisited, outSlabs);
             }
         }
 
@@ -136,13 +191,13 @@ public:
             return;
         }
 
-        self = (layout*)malloc(sizeof(layout));
+        self = (layout*)tp_malloc(sizeof(layout));
 
         self->count = count;
         self->refcount = 1;
         self->reserved = std::max<int32_t>(1, count);
         self->hash_cache = -1;
-        self->data = (uint8_t*)malloc(getEltType()->bytecount() * self->reserved);
+        self->data = (uint8_t*)tp_malloc(getEltType()->bytecount() * self->reserved);
 
         for (int64_t k = 0; k < count; k++) {
             try {
@@ -151,8 +206,8 @@ public:
                 for (long k2 = k-1; k2 >= 0; k2--) {
                     m_element_type->destroy(eltPtr(self,k2));
                 }
-                free(self->data);
-                free(self);
+                tp_free(self->data);
+                tp_free(self);
                 throw;
             }
         }
@@ -163,21 +218,21 @@ public:
     void constructorUnbounded(instance_ptr selfPtr, const sub_constructor& allocator) {
         layout_ptr& self = *(layout_ptr*)selfPtr;
 
-        self = (layout*)malloc(sizeof(layout));
+        self = (layout*)tp_malloc(sizeof(layout));
 
         self->count = 0;
         self->refcount = 1;
         self->reserved = 1;
         self->hash_cache = -1;
-        self->data = (uint8_t*)malloc(getEltType()->bytecount() * self->reserved);
+        self->data = (uint8_t*)tp_malloc(getEltType()->bytecount() * self->reserved);
 
         while(true) {
             try {
                 if (!allocator(eltPtr(self, self->count), self->count)) {
                     if (m_is_tuple && self->count == 0) {
                         //tuples need to be the nullptr
-                        free(self->data);
-                        free(self);
+                        tp_free(self->data);
+                        tp_free(self);
                         self = nullptr;
                     }
                     return;
@@ -191,8 +246,8 @@ public:
                 for (long k2 = (long)self->count-1; k2 >= 0; k2--) {
                     m_element_type->destroy(eltPtr(self,k2));
                 }
-                free(self->data);
-                free(self);
+                tp_free(self->data);
+                tp_free(self);
                 throw;
             }
         }

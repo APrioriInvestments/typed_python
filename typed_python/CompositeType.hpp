@@ -83,11 +83,27 @@ public:
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        for (long k = (long)m_types.size() - 1; k >= 0; k--) {
+            m_types[k]->deepcopy(
+                dest + m_byte_offsets[k],
+                src + m_byte_offsets[k],
+                alreadyAllocated,
+                slab
+            );
+        }
+    }
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         size_t res = 0;
 
         for (long k = 0; k < getTypes().size(); k++) {
-            res += getTypes()[k]->deepBytecount(eltPtr(instance, k), alreadyVisited);
+            res += getTypes()[k]->deepBytecount(eltPtr(instance, k), alreadyVisited, outSlabs);
         }
 
         return res;

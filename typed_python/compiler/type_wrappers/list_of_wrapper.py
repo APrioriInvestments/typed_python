@@ -406,6 +406,11 @@ class ListOfWrapper(TupleOrListOfWrapper):
             listInst.nonref_expr.ElementPtrIntegers(0, 4).store(
                 runtime_functions.realloc.call(
                     listInst.nonref_expr.ElementPtrIntegers(0, 4).load(),
+                    # original bytecount
+                    listInst.nonref_expr.ElementPtrIntegers(0, 3).load().cast(native_ast.Int64).mul(
+                        self.underlyingWrapperType.getBytecount()
+                    ),
+                    # new bytecount
                     countInst.nonref_expr.mul(self.underlyingWrapperType.getBytecount())
                 )
             )

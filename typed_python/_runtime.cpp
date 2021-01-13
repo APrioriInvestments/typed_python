@@ -852,7 +852,7 @@ extern "C" {
         int64_t max_ret_bytes_per_codepoint = l ? (l->bytes_per_codepoint < 4 ? l->bytes_per_codepoint + 1 : 4) : 0;
         int64_t max_ret_size = l ? l->pointcount * max_ret_bytes_per_codepoint : 0;
 
-        BytesType::layout* out = (BytesType::layout*)malloc(sizeof(BytesType::layout) + max_ret_size);
+        BytesType::layout* out = (BytesType::layout*)tp_malloc(sizeof(BytesType::layout) + max_ret_size);
         out->refcount = 1;
         out->hash_cache = -1;
         out->bytecount = 0;
@@ -892,7 +892,11 @@ extern "C" {
 
         out->bytecount = cur;
         if (out->bytecount < max_ret_size) {
-            out = (BytesType::layout*)realloc(out, sizeof(BytesType::layout) + out->bytecount);
+            out = (BytesType::layout*)tp_realloc(
+                out,
+                sizeof(BytesType::layout) + max_ret_size,
+                sizeof(BytesType::layout) + out->bytecount
+            );
         }
 
         return out;
@@ -1790,7 +1794,7 @@ extern "C" {
     hash_table_layout* nativepython_tableCreate() {
         hash_table_layout* result;
 
-        result = (hash_table_layout*)malloc(sizeof(hash_table_layout));
+        result = (hash_table_layout*)tp_malloc(sizeof(hash_table_layout));
 
         new (result) hash_table_layout();
 

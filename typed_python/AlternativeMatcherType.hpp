@@ -92,8 +92,17 @@ public:
         return m_alternative->hash(left);
     }
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
-        return m_alternative->deepBytecountConcrete(instance, alreadyVisited);
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
+        return m_alternative->deepBytecount(instance, alreadyVisited, outSlabs);
+    }
+
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        m_alternative->deepcopy(dest, src, alreadyAllocated, slab);
     }
 
     template<class buf_t>

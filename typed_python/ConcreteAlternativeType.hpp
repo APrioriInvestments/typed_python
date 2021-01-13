@@ -31,9 +31,17 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        return m_alternative->deepcopy(dest, src, alreadyAllocated, slab);
+    }
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
-        return m_alternative->deepBytecount(instance, alreadyVisited);
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
+        return m_alternative->deepBytecount(instance, alreadyVisited, outSlabs);
     }
 
     void _updateTypeMemosAfterForwardResolution() {
@@ -95,7 +103,7 @@ public:
             *(uint8_t*)self = m_which;
             s(self);
         } else {
-            *(layout**)self = (layout*)malloc(
+            *(layout**)self = (layout*)tp_malloc(
                 sizeof(layout) +
                 elementType()->bytecount()
                 );
@@ -106,7 +114,7 @@ public:
             try {
                 s(record.data);
             } catch(...) {
-                free(*(layout**)self);
+                tp_free(*(layout**)self);
                 throw;
             }
         }

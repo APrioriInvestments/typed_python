@@ -43,6 +43,8 @@ public:
         unsigned char data[];
     };
 
+    typedef layout* layout_ptr;
+
     Class(std::string name, HeldClass* inClass) :
             Type(catClass),
             m_heldClass(inClass)
@@ -188,7 +190,51 @@ public:
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
     static bool cmpStatic(Class* T, instance_ptr left, instance_ptr right, int64_t pyComparisonOp);
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        //layout_ptr& destRecordPtr = *(layout**)dest;
+        layout_ptr srcRecordPtr = instanceToLayout(src);
+
+        auto it = alreadyAllocated.find((instance_ptr)srcRecordPtr);
+
+        if (it == alreadyAllocated.end()) {
+            // we could have a pointer to a subclass of 'this', in which case
+            // the layout could be larger and have more fields than
+            // mHeldClass would indicate.
+            HeldClass* actualHeldClassType = srcRecordPtr->vtable->mType;
+
+            layout_ptr destRecordPtr = (layout_ptr)slab->allocate(
+                sizeof(layout) + actualHeldClassType->bytecount(),
+                this
+            );
+
+            destRecordPtr->refcount = 0;
+            destRecordPtr->vtable = srcRecordPtr->vtable;
+
+            actualHeldClassType->deepcopy(
+                destRecordPtr->data,
+                srcRecordPtr->data,
+                alreadyAllocated,
+                slab
+            );
+
+            alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
+        }
+
+        ((layout_ptr)alreadyAllocated[(instance_ptr)srcRecordPtr])->refcount++;
+
+        initializeInstance(
+            dest,
+            (layout_ptr)alreadyAllocated[(instance_ptr)srcRecordPtr],
+            instanceToDispatchTableIndex(src)
+        );
+    }
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         layout* p = *(layout**)instance;
 
         if (alreadyVisited.find((void*)p) != alreadyVisited.end()) {
@@ -197,7 +243,13 @@ public:
 
         alreadyVisited.insert((void*)p);
 
-        return m_heldClass->deepBytecount(p->data, alreadyVisited) + sizeof(layout) + m_heldClass->bytecount();
+        if (outSlabs && Slab::slabForAlloc(p)) {
+            outSlabs->insert(Slab::slabForAlloc(p));
+            return 0;
+        }
+
+        return m_heldClass->deepBytecount(p->data, alreadyVisited, outSlabs) +
+            bytesRequiredForAllocation(sizeof(layout) + m_heldClass->bytecount());
     }
 
     template<class buf_t>
@@ -225,7 +277,7 @@ public:
 
                     initializeInstance(
                         self,
-                        (layout*)malloc(
+                        (layout*)tp_malloc(
                             sizeof(layout) + m_heldClass->bytecount()
                         ),
                         0
@@ -327,7 +379,7 @@ public:
     // 'initializer(instance_ptr memberData, int memberIx)' for each member
     template<class sub_constructor>
     void constructor(instance_ptr self, const sub_constructor& initializer) const {
-        initializeInstance(self, (layout*)malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
+        initializeInstance(self, (layout*)tp_malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
 
         layout& l = *instanceToLayout(self);
         l.refcount = 1;
@@ -336,7 +388,7 @@ public:
         try {
             m_heldClass->constructor(l.data, initializer);
         } catch (...) {
-            free(instanceToLayout(self));
+            tp_free(instanceToLayout(self));
         }
     }
 
@@ -344,7 +396,7 @@ public:
     // 'initializer(instance_ptr data)'
     template<class sub_constructor>
     void constructorInitializingHeld(instance_ptr self, const sub_constructor& initializer) const {
-        initializeInstance(self, (layout*)malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
+        initializeInstance(self, (layout*)tp_malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
 
         layout& l = *instanceToLayout(self);
         l.refcount = 1;
@@ -353,7 +405,7 @@ public:
         try {
             initializer(l.data);
         } catch (...) {
-            free(instanceToLayout(self));
+            tp_free(instanceToLayout(self));
         }
     }
 

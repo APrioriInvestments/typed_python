@@ -206,7 +206,7 @@ void Class::constructor(instance_ptr self, bool allowEmpty) {
         throw std::runtime_error(m_name + " is not default-constructible");
     }
 
-    initializeInstance(self, (layout*)malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
+    initializeInstance(self, (layout*)tp_malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
 
     layout& l = *instanceToLayout(self);
     l.refcount = 1;
@@ -224,7 +224,7 @@ void Class::destroy(instance_ptr self) {
 
     if (l.refcount.fetch_sub(1) == 1) {
         l.vtable->mType->destroy(l.data);
-        free(instanceToLayout(self));
+        tp_free(instanceToLayout(self));
     }
 }
 
@@ -244,6 +244,6 @@ void Class::assign(instance_ptr self, instance_ptr other) {
 
     if (old->refcount.fetch_sub(1) == 1) {
         old->vtable->mType->destroy(old->data);
-        free(old);
+        tp_free(old);
     }
 }

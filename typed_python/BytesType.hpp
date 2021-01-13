@@ -29,6 +29,8 @@ public:
         uint8_t data[];
     };
 
+    typedef layout* layout_ptr;
+
     BytesType() : Type(TypeCategory::catBytes)
     {
         m_name = "bytes";
@@ -48,7 +50,37 @@ public:
         buffer.write_bytes(eltPtr(self, 0), count(self));
     }
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited) {
+    void deepcopyConcrete(
+        instance_ptr dest,
+        instance_ptr src,
+        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        Slab* slab
+    ) {
+        layout_ptr& destLayout = *(layout**)dest;
+        layout_ptr& srcLayout = *(layout**)src;
+
+        if (!srcLayout) {
+            destLayout = srcLayout;
+            return;
+        }
+
+        auto it = alreadyAllocated.find((instance_ptr)srcLayout);
+        if (it == alreadyAllocated.end()) {
+            destLayout = (layout_ptr)slab->allocate(sizeof(layout) + srcLayout->bytecount, this);
+            destLayout->refcount = 0;
+            destLayout->hash_cache = srcLayout->hash_cache;
+            destLayout->bytecount = srcLayout->bytecount;
+            memcpy(destLayout->data, srcLayout->data, srcLayout->bytecount);
+
+            alreadyAllocated[(instance_ptr)srcLayout] = (instance_ptr)destLayout;
+        } else {
+            destLayout = (layout_ptr)it->second;
+        }
+
+        destLayout->refcount++;
+    }
+
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         layout* l = *(layout**)instance;
 
         if (!l) {
@@ -61,7 +93,13 @@ public:
 
         alreadyVisited.insert((void*)l);
 
-        return l->bytecount + sizeof(layout);
+        if (outSlabs && Slab::slabForAlloc(l)) {
+            outSlabs->insert(Slab::slabForAlloc(l));
+            return 0;
+        }
+
+
+        return bytesRequiredForAllocation(l->bytecount + sizeof(layout));
     }
 
     template<class buf_t>
