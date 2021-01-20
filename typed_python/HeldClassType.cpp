@@ -120,6 +120,14 @@ RefTo* HeldClass::getRefToType() {
     return m_refToType;
 }
 
+void HeldClass::delAttribute(instance_ptr self, int memberIndex) const {
+    Type* member_t = std::get<1>(m_members[memberIndex]);
+    if (checkInitializationFlag(self, memberIndex)) {
+        member_t->destroy(eltPtr(self, memberIndex));
+        clearInitializationFlag(self, memberIndex);
+    }
+}
+
 void HeldClass::setAttribute(instance_ptr self, int memberIndex, instance_ptr other) const {
     Type* member_t = std::get<1>(m_members[memberIndex]);
     if (checkInitializationFlag(self, memberIndex)) {

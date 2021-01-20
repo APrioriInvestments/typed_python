@@ -531,6 +531,8 @@ public:
         }
     }
 
+    void delAttribute(instance_ptr self, int memberIndex) const;
+
     void setAttribute(instance_ptr self, int memberIndex, instance_ptr other) const;
 
     //don't default construct classes

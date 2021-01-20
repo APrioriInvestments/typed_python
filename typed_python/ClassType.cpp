@@ -46,6 +46,11 @@ void Class::setAttribute(instance_ptr self, int64_t ix, instance_ptr elt) const 
     m_heldClass->setAttribute(l.data, ix, elt);
 }
 
+void Class::delAttribute(instance_ptr self, int64_t ix) const {
+    layout& l = *instanceToLayout(self);
+    m_heldClass->delAttribute(l.data, ix);
+}
+
 bool Class::checkInitializationFlag(instance_ptr self, int64_t ix) const {
     layout& l = *instanceToLayout(self);
     return m_heldClass->checkInitializationFlag(l.data, ix);

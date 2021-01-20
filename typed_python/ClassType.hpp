@@ -177,6 +177,8 @@ public:
 
     void setAttribute(instance_ptr self, int64_t ix, instance_ptr elt) const;
 
+    void delAttribute(instance_ptr self, int64_t ix) const;
+
     bool checkInitializationFlag(instance_ptr self, int64_t ix) const;
 
     ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {

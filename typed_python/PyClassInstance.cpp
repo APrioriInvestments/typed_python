@@ -126,6 +126,20 @@ int PyClassInstance::classInstanceSetAttributeFromPyObject(Class* cls, instance_
         return -1;
     }
 
+    if (!attrVal) {
+        if (!cls->checkInitializationFlag(data, i)) {
+            PyErr_Format(
+                PyExc_AttributeError,
+                "Attribute '%S' is not initialized",
+                attrName
+            );
+            return -1;
+        }
+
+        cls->delAttribute(data, i);
+        return 0;
+    }
+
     Type* eltType = cls->getMemberType(i);
 
     Type* attrType = extractTypeFrom(attrVal->ob_type);

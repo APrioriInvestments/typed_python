@@ -1638,3 +1638,22 @@ class NativeClassTypesTests(unittest.TestCase):
 
         with self.assertRaises(Exception):
             H(x=1)
+
+    def test_class_delattr(self):
+        class C(Class, Final):
+            x = Member(str)
+
+        c = C(x="hi")
+
+        assert c.x == "hi"
+
+        del c.x
+
+        with self.assertRaises(AttributeError):
+            c.x
+
+        assert not hasattr(c, 'x')
+
+        c.x = "bye"
+
+        assert c.x == "bye"
