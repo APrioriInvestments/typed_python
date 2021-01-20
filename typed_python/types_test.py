@@ -179,10 +179,10 @@ class RandomValueProducer:
 
 class NativeTypesTests(unittest.TestCase):
     def test_refcount_bug_with_simple_string(self):
-        with self.assertRaisesRegex(TypeError, "^first argument to refcount '111' not a permitted Type$"):
+        with self.assertRaisesRegex(TypeError, "first argument to refcount '111' not a permitted Type"):
             _types.refcount(111)
 
-        with self.assertRaisesRegex(TypeError, "^first argument to refcount 'aa' not a permitted Type$"):
+        with self.assertRaisesRegex(TypeError, "first argument to refcount 'aa' not a permitted Type"):
             _types.refcount('aa')
 
     def check_expected_performance(self, elapsed, expected=1.0):
