@@ -1351,75 +1351,63 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
 
     Type* actualType = PyInstance::extractTypeFrom(a1->ob_type);
+    instance_ptr data = ((PyInstance*)(PyObject*)a1)->dataPtr();
 
     if (!actualType || (
-            actualType->getTypeCategory() != Type::TypeCategory::catTupleOf &&
-            actualType->getTypeCategory() != Type::TypeCategory::catListOf &&
-            actualType->getTypeCategory() != Type::TypeCategory::catClass &&
-            actualType->getTypeCategory() != Type::TypeCategory::catConstDict &&
-            actualType->getTypeCategory() != Type::TypeCategory::catDict &&
-            actualType->getTypeCategory() != Type::TypeCategory::catSet &&
-            actualType->getTypeCategory() != Type::TypeCategory::catAlternative &&
-            actualType->getTypeCategory() != Type::TypeCategory::catConcreteAlternative
+            !actualType->isTupleOf() &&
+            !actualType->isListOf() &&
+            !actualType->isClass() &&
+            !actualType->isConstDict() &&
+            !actualType->isDict() &&
+            !actualType->isSet() &&
+            !actualType->isAlternative() &&
+            !actualType->isConcreteAlternative() &&
+            !actualType->isPythonObjectOfType() &&
+            !actualType->isTypedCell()
             )) {
         PyErr_Format(
             PyExc_TypeError,
-            "first argument to refcount '%S' not a permitted Type",
-            (PyObject*)a1
+            "first argument to refcount '%S' not a permitted Type: %S",
+            (PyObject*)a1,
+            (PyObject*)a1->ob_type
             );
         return NULL;
     }
 
-    if (actualType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-        return PyLong_FromLong(
-            ((::TupleOfType*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
-            );
+    int64_t outRefcount = 0;
+
+    if (actualType->isTupleOf()) {
+        outRefcount = ((::TupleOfType*)actualType)->refcount(data);
+    }
+    else if (actualType->isListOf()) {
+        outRefcount = ((::ListOfType*)actualType)->refcount(data);
+    }
+    else if (actualType->isClass()) {
+        outRefcount = ((::Class*)actualType)->refcount(data);
+    }
+    else if (actualType->isConstDict()) {
+        outRefcount = ((::ConstDictType*)actualType)->refcount(data);
+    }
+    else if (actualType->isSet()) {
+        outRefcount = ((::SetType*)actualType)->refcount(data);
+    }
+    else if (actualType->isDict()) {
+        outRefcount = ((::DictType*)actualType)->refcount(data);
+    }
+    else if (actualType->isAlternative()) {
+        outRefcount = ((::Alternative*)actualType)->refcount(data);
+    }
+    else if (actualType->isConcreteAlternative()) {
+        outRefcount = ((::ConcreteAlternative*)actualType)->refcount(data);
+    }
+    else if (actualType->isPythonObjectOfType()) {
+        outRefcount = ((::PythonObjectOfType*)actualType)->refcount(data);
+    }
+    else if (actualType->isTypedCell()) {
+        outRefcount = ((::TypedCellType*)actualType)->refcount(data);
     }
 
-    if (actualType->getTypeCategory() == Type::TypeCategory::catListOf) {
-        return PyLong_FromLong(
-            ((::ListOfType*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
-            );
-    }
-
-    if (actualType->getTypeCategory() == Type::TypeCategory::catClass) {
-        return PyLong_FromLong(
-            ((::Class*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
-            );
-    }
-
-    if (actualType->getTypeCategory() == Type::TypeCategory::catConstDict) {
-        return PyLong_FromLong(
-            ((::ConstDictType*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
-            );
-    }
-    if (actualType->getTypeCategory() == Type::TypeCategory::catSet) {
-        return PyLong_FromLong(
-            ((::SetType*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
-            );
-    }
-    if (actualType->getTypeCategory() == Type::TypeCategory::catDict) {
-        return PyLong_FromLong(
-            ((::DictType*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
-            );
-    }
-    if (actualType->getTypeCategory() == Type::TypeCategory::catAlternative) {
-        return PyLong_FromLong(
-            ((::Alternative*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
-            );
-    }
-    if (actualType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
-        return PyLong_FromLong(
-            ((::ConcreteAlternative*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
-            );
-    }
-
-
-    PyErr_Format(
-        PyExc_TypeError,
-        "this code should be unreachable"
-        );
-    return NULL;
+    return PyLong_FromLong(outRefcount);
 }
 
 PyObject *deepBytecount(PyObject* nullValue, PyObject* args) {

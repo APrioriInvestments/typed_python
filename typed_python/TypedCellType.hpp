@@ -74,11 +74,15 @@ public:
         return nameChanged;
     }
 
+    int64_t refcount(instance_ptr self) const {
+        return getLayoutPtr(self)->refcount;
+    }
+
     void _updateTypeMemosAfterForwardResolution() {
         TypedCellType::Make(mHeldType, this);
     }
 
-    layout_ptr& getLayoutPtr(instance_ptr self) {
+    layout_ptr& getLayoutPtr(instance_ptr self) const {
         return *(layout**)self;
     }
 

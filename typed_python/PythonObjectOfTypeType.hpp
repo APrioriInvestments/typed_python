@@ -170,6 +170,10 @@ public:
         return false;
     }
 
+    int64_t refcount(instance_ptr self) const {
+        return getHandlePtr(self)->refcount;
+    }
+
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         PyObject* p = getPyObj(self);

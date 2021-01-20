@@ -91,6 +91,8 @@ def workExecutor():
         else:
             return
 
+        Job = None
+
 
 @NotCompiled
 def ensureThreads():

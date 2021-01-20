@@ -19,7 +19,7 @@ import traceback
 from flaky import flaky
 from typed_python.lib.pmap import pmap
 from typed_python.typed_queue import TypedQueue
-from typed_python import ListOf, Entrypoint, Class, Member, Final, Tuple
+from typed_python import ListOf, Entrypoint, Class, Member, Final, Tuple, refcount, NotCompiled
 import time
 
 
@@ -171,3 +171,65 @@ def test_recursive_pmap():
     pmap(ListOf(Tuple(int, int))([(0, 3)]), doIt, None)
 
     assert len(tq) == 1111
+
+
+def test_pmap_arg_refcounts():
+    def f(x) -> int:
+        return 0
+
+    args = ListOf(ListOf(int))()
+    lst = ListOf(int)()
+    args.append(lst)
+
+    pmap(args, f, int)
+    args.clear()
+
+    assert refcount(lst) == 1
+
+
+def test_pmap_value_refcounts():
+    def f(x) -> ListOf(int):
+        return ListOf(int)()
+
+    args = ListOf(int)([1])
+    result = pmap(args, f, ListOf(int))
+
+    lst = result[0]
+    result.clear()
+
+    assert refcount(lst) == 1
+
+
+def test_pmap_func_refcounts():
+    x = ListOf(int)()
+
+    @NotCompiled
+    def f(y) -> int:
+        x
+        return 0
+
+    @Entrypoint
+    def returnIt(x):
+        return x
+
+    f = returnIt(f)
+
+    closure = f.getClosure()
+    assert refcount(closure) == 2
+
+    assert refcount(x) == 2
+
+    args = ListOf(int)(range(1000000))
+    pmap(args, f, int)
+
+    assert refcount(x) == 2
+    assert refcount(closure) == 2
+
+    f = None
+
+    assert refcount(closure) == 1
+    assert refcount(x) == 2
+
+    closure = None
+
+    assert refcount(x) == 1

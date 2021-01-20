@@ -26,6 +26,7 @@ from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
     _types, Compiled, Member, Final, isCompiled, ConstDict,
     makeNamedTuple, UInt32, Int32, Type, identityHash, typeKnownToCompiler, checkOneOfType,
+    refcount
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
@@ -3649,3 +3650,33 @@ class TestCompilationStructures(unittest.TestCase):
 
         loop1()
         loop2()
+
+    def test_notcompiled_lambda_closure_refcounts(self):
+        x = ListOf(int)()
+
+        @NotCompiled
+        def f() -> int:
+            x
+            return 0
+
+        @Entrypoint
+        def returnIt(x):
+            return x
+
+        f = returnIt(f)
+
+        closure = f.getClosure()
+        assert refcount(closure) == 2
+
+        for _ in range(100):
+            f()
+
+        assert refcount(x) == 2
+
+        f = None
+
+        assert refcount(closure) == 1
+        assert refcount(x) == 2
+
+        closure = None
+        assert refcount(x) == 1

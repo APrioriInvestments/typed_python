@@ -159,14 +159,14 @@ PyObject* Function::Overload::buildFunctionObj(Type* closureType, instance_ptr c
                     PyObjectHolder newCellContents;
 
                     if (bindingValue.type()->getTypeCategory() == Type::TypeCategory::catTypedCell) {
-                        newCellContents.set(
+                        newCellContents.steal(
                             PyInstance::extractPythonObject(
                                 ((TypedCellType*)bindingValue.type())->get(bindingValue.data()),
                                 ((TypedCellType*)bindingValue.type())->getHeldType()
                             )
                         );
                     } else {
-                        newCellContents.set(
+                        newCellContents.steal(
                             PyInstance::fromInstance(bindingValue)
                         );
                     }

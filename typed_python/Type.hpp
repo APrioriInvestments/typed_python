@@ -192,6 +192,10 @@ public:
         return m_typeCategory == catConcreteAlternative;
     }
 
+    bool isTypedCell() const {
+        return m_typeCategory == catTypedCell;
+    }
+
     bool isForward() const {
         return m_typeCategory == catForward;
     }
