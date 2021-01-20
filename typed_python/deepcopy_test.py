@@ -15,7 +15,7 @@
 from typed_python import (
     TupleOf, ListOf, Dict, Class, Member, NamedTuple, ConstDict, Tuple, Set,
     Alternative, Forward, OneOf, deepcopy, deepcopyContiguous, totalBytesAllocatedInSlabs,
-    deepBytecountAndSlabs, refcount
+    deepBytecountAndSlabs, refcount, totalBytesAllocatedOnFreeStore
 )
 from typed_python.test_util import currentMemUsageMb
 import time
@@ -354,3 +354,27 @@ def test_deepcopy_class_with_dual_references():
     c2 = deepcopy(c)
 
     assert refcount(c2.x) == 3
+
+
+def test_bytes_on_free_store_basic():
+    bytecount0 = totalBytesAllocatedOnFreeStore()
+
+    x = ListOf(int)(range(1000))
+
+    bytecount1 = totalBytesAllocatedOnFreeStore()
+
+    x.resize(2000)
+
+    bytecount2 = totalBytesAllocatedOnFreeStore()
+
+    x.resize(500)
+    x.reserve(500)
+
+    bytecount3 = totalBytesAllocatedOnFreeStore()
+
+    x = None
+
+    assert bytecount1 > bytecount0
+    assert bytecount2 > bytecount1
+    assert bytecount1 > bytecount3 > bytecount0
+    assert bytecount0 == totalBytesAllocatedOnFreeStore()

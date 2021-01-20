@@ -1426,6 +1426,21 @@ PyObject* totalBytesAllocatedInSlabs(PyObject* nullValue, PyObject* args) {
     return PyLong_FromLong(Slab::totalBytesAllocatedInSlabs());
 }
 
+PyDoc_STRVAR(
+    totalBytesAllocatedOnFreeStore_doc,
+    "totalBytesAllocatedOnFreeStore() -> int\n\n"
+    "returns the total number of bytes allocated by typed_python objects not in slabs.\n"
+);
+
+PyObject* totalBytesAllocatedOnFreeStore(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 0) {
+        PyErr_SetString(PyExc_TypeError, "totalBytesAllocatedOnFreeStore takes 0 argument");
+        return NULL;
+    }
+
+    return PyLong_FromLong(tpBytesAllocatedOnFreeStore());
+}
+
 PyDoc_STRVAR(deepcopy_doc,
     "deepcopy(o)\n\n"
     "Make a 'deep copy' of the object graph starting at 'o'. The deepcopier\n"
@@ -2860,6 +2875,7 @@ static PyMethodDef module_methods[] = {
     {"deepBytecount", (PyCFunction)deepBytecount, METH_VARARGS, deepBytecount_doc},
     {"deepBytecountAndSlabs", (PyCFunction)deepBytecountAndSlabs, METH_VARARGS, deepBytecountAndSlabs_doc},
     {"getAllSlabs", (PyCFunction)getAllSlabs, METH_VARARGS, getAllSlabs_doc},
+    {"totalBytesAllocatedOnFreeStore", (PyCFunction)totalBytesAllocatedOnFreeStore, METH_VARARGS, totalBytesAllocatedOnFreeStore_doc},
     {"totalBytesAllocatedInSlabs", (PyCFunction)totalBytesAllocatedInSlabs, METH_VARARGS, totalBytesAllocatedInSlabs_doc},
     {"deepcopy", (PyCFunction)deepcopy, METH_VARARGS, deepcopy_doc},
     {"deepcopyContiguous", (PyCFunction)deepcopyContiguous, METH_VARARGS | METH_KEYWORDS, deepcopyContiguous_doc},

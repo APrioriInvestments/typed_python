@@ -33,6 +33,7 @@ to a Slab object which we decref when the allocation is released.
 ***************/
 
 #include <cstddef>
+#include <atomic>
 
 extern "C" {
 
@@ -42,9 +43,14 @@ void tp_free(void* ptr);
 
 }
 
+inline std::atomic<size_t>& tpBytesAllocatedOnFreeStore() {
+   static std::atomic<size_t> allocatedCount;
+   return allocatedCount;
+}
+
 // how many bytes are required to back an allocation of size 's'
 // accounts for alignment and extra pointers.
-size_t bytesRequiredForAllocation(size_t s) {
+inline size_t bytesRequiredForAllocation(size_t s) {
    if (s % sizeof(std::max_align_t)) {
       s += sizeof(std::max_align_t) - (s % sizeof(std::max_align_t));
    }

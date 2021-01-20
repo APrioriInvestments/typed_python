@@ -48,7 +48,8 @@ from typed_python._types import (
     getOrSetTypeResolver, Set, Class, Type, BoundMethod,
     TypedCell, pointerTo, refTo, copy, identityHash,
     deepBytecount, deepcopy, deepcopyContiguous, totalBytesAllocatedInSlabs,
-    deepBytecountAndSlabs
+    deepBytecountAndSlabs, Slab,
+    totalBytesAllocatedOnFreeStore
 )
 import typed_python._types as _types
 import threading

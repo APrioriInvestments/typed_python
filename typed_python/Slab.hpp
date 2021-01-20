@@ -98,8 +98,13 @@ public:
         if (!ptr) {
             return nullptr;
         }
+        unsigned char* p = (unsigned char*)ptr - sizeof(std::max_align_t);
 
-        return *(Slab**)((unsigned char*)ptr - sizeof(std::max_align_t));
+        if (*(int64_t*)p < 0) {
+            return nullptr;
+        }
+
+        return *(Slab**)(p);
     }
 
     ~Slab() {
