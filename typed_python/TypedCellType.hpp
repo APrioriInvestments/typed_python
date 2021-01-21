@@ -145,7 +145,9 @@ public:
             return 0;
         }
 
-        return mHeldType->deepBytecount(l->data, alreadyVisited, outSlabs);
+        return bytesRequiredForAllocation(
+            mHeldType->deepBytecount(l->data, alreadyVisited, outSlabs) + sizeof(layout)
+        );
     }
 
     template<class buf_t>

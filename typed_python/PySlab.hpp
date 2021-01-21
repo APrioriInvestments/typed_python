@@ -50,6 +50,10 @@ public:
     static PyObject* allocRefcount(PySlab* self, PyObject* args, PyObject* kwargs);
 
     static PyObject* allocType(PySlab* self, PyObject* args, PyObject* kwargs);
+
+    static PyObject* getTag(PySlab* self, PyObject* args, PyObject* kwargs);
+
+    static PyObject* setTag(PySlab* self, PyObject* args, PyObject* kwargs);
 };
 
 extern PyTypeObject PyType_Slab;

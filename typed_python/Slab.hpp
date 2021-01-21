@@ -62,7 +62,8 @@ public:
         mAllocationPoint(nullptr),
         mIsFreeStore(isFreeStoreSlab),
         mRefcount(1),
-        mTrackAllocTypes(false)
+        mTrackAllocTypes(false),
+        mTag(nullptr)
     {
         if (!mIsFreeStore) {
             if (slabSize > 1024 * 128 && HAVE_MMAP) {
@@ -117,6 +118,11 @@ public:
                 }
             }
             totalBytesAllocatedInSlabs().fetch_sub(mSlabBytecount);
+        }
+
+        if (mTag) {
+            PyEnsureGilAcquired getTheGil;
+            ::decref(mTag);
         }
     }
 
@@ -243,6 +249,18 @@ public:
         return res;
     }
 
+    void setTag(PyObject* tag) {
+        if (mTag) {
+            ::decref(mTag);
+        }
+
+        mTag = ::incref(tag);
+    }
+
+    PyObject* getTag() {
+        return mTag;
+    }
+
 private:
     // how many bytes we allocated
     size_t mSlabBytecount;
@@ -265,4 +283,5 @@ private:
     std::vector<void*> mAllocs;
     std::set<void*> mAliveAllocs;
 
+    PyObject* mTag;
 };

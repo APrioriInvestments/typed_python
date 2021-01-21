@@ -1489,12 +1489,13 @@ PyDoc_STRVAR(deepcopyContiguous_doc,
 );
 
 PyObject* deepcopyContiguous(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
-    static const char *kwlist[] = {"arg", "trackInternalTypes", NULL};
+    static const char *kwlist[] = {"arg", "trackInternalTypes", "tag", NULL};
 
     PyObject* arg;
+    PyObject* tag = nullptr;
     int trackInternalTypes = 0;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|p", (char**)kwlist, &arg, &trackInternalTypes)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|pO", (char**)kwlist, &arg, &trackInternalTypes, &tag)) {
         return NULL;
     }
 
@@ -1505,6 +1506,10 @@ PyObject* deepcopyContiguous(PyObject* nullValue, PyObject* args, PyObject* kwar
     bytecount += 128;
 
     Slab* slab = new Slab(false, bytecount);
+
+    if (tag) {
+        slab->setTag(tag);
+    }
 
     if (trackInternalTypes) {
         slab->enableTrackAllocTypes();

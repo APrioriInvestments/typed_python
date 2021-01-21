@@ -99,9 +99,32 @@ PyMethodDef PySlabInstance_methods[] = {
     {"allocType", (PyCFunction)PySlab::allocType, METH_VARARGS | METH_KEYWORDS, PySlab_allocType_doc},
     {"allocRefcount", (PyCFunction)PySlab::allocRefcount, METH_VARARGS | METH_KEYWORDS, PySlab_allocRefcount_doc},
     {"slabPtr", (PyCFunction)PySlab::slabPtr, METH_VARARGS | METH_KEYWORDS, PySlab_slabPtr_doc},
+    {"getTag", (PyCFunction)PySlab::getTag, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"setTag", (PyCFunction)PySlab::setTag, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL}  /* Sentinel */
 };
 
+PyObject* PySlab::getTag(PySlab* self, PyObject* args, PyObject* kwargs) {
+    PyObject* o = self->mSlab->getTag();
+    if (!o) {
+        return incref(Py_None);
+    }
+    return incref(o);
+}
+
+PyObject* PySlab::setTag(PySlab* self, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {"tag", NULL};
+
+    PyObject* tag;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist), &tag) {
+        return NULL;
+    }
+
+    self->mSlab->setTag(tag);
+
+    return incref(Py_None);
+}
 
 PyObject* PySlab::slabPtr(PySlab* self, PyObject* args, PyObject* kwargs)
 {

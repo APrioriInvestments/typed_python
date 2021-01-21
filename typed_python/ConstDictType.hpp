@@ -211,7 +211,6 @@ public:
 
         alreadyVisited.insert((void*)l);
 
-
         if (outSlabs && Slab::slabForAlloc(l)) {
             outSlabs->insert(Slab::slabForAlloc(l));
             return 0;

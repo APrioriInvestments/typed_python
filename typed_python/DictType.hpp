@@ -159,7 +159,7 @@ public:
         res += bytesRequiredForAllocation(l.items_reserved * m_bytes_per_key_value_pair);
 
         // count the hashtable
-        res += bytesRequiredForAllocation(sizeof(int32_t) * 2 * l.hash_table_size);
+        res += bytesRequiredForAllocation(sizeof(int32_t) * l.hash_table_size) * 2;
 
         if (!m_key->isPOD()) {
             for (long k = 0; k < l.items_reserved; k++) {
