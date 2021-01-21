@@ -332,7 +332,7 @@ public:
     void deepcopy(
         instance_ptr dest,
         instance_ptr src,
-        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
         Slab* slab
     ) {
         this->check([&](auto& subtype) {
@@ -343,7 +343,7 @@ public:
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
         Slab* slab
     ) {
         throw std::runtime_error(

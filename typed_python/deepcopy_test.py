@@ -378,3 +378,26 @@ def test_bytes_on_free_store_basic():
     assert bytecount2 > bytecount1
     assert bytecount1 > bytecount3 > bytecount0
     assert bytecount0 == totalBytesAllocatedOnFreeStore()
+
+
+def test_deepcopy_perf():
+    x = ListOf(str)()
+
+    for ix in range(1000000):
+        x.append(str(ix))
+
+    from typed_python import SerializationContext
+
+    t0 = time.time()
+    deepcopyContiguous(x, trackInternalTypes=True)
+    t1 = time.time()
+    deepcopy(x)
+    t2 = time.time()
+
+    sc = SerializationContext()
+    sc.deserialize(sc.serialize(x))
+    t3 = time.time()
+
+    print("serialization", t3 - t2)
+    print("deepcopy", t2 - t1)
+    print("deepcopyContiguous", t1 - t0)

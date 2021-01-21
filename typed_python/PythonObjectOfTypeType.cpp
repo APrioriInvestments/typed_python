@@ -40,7 +40,7 @@ void PythonObjectOfType::repr(instance_ptr self, ReprAccumulator& stream, bool i
 // should return a reference to the object with an incref
 PyObject* PythonObjectOfType::deepcopyPyObject(
     PyObject* o,
-    std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+    std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
     Slab* slab
 ) {
     PyEnsureGilAcquired getTheGil;
@@ -160,7 +160,7 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
 void PythonObjectOfType::deepcopyConcrete(
     instance_ptr dest,
     instance_ptr src,
-    std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+    std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
     Slab* slab
 ) {
     layout_ptr& destPtr = *(layout_ptr*)dest;

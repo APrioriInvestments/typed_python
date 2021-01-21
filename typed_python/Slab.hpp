@@ -278,10 +278,10 @@ private:
     bool mTrackAllocTypes;
 
     std::mutex mAllocMutex;
-    std::map<void*, Type*> mAllocTypes;
-    std::map<void*, int> mAllocOrdering;
+    std::unordered_map<void*, Type*> mAllocTypes;
+    std::unordered_map<void*, int> mAllocOrdering;
     std::vector<void*> mAllocs;
-    std::set<void*> mAliveAllocs;
+    std::unordered_set<void*> mAliveAllocs;
 
     PyObject* mTag;
 };

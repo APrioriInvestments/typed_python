@@ -411,7 +411,7 @@ class hash_table_layout {
     }
 
     hash_table_layout* deepcopy(
-        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
         Slab* slab,
         Type* dictOrSetType,
         Type* keyType,

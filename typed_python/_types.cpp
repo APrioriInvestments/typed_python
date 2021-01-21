@@ -1460,7 +1460,7 @@ PyObject* deepcopy(PyObject* nullValue, PyObject* args) {
     // this is the 'free store' slab
     Slab* slab = new Slab(true, 0);
 
-    std::map<instance_ptr, instance_ptr> alreadyCopied;
+    std::unordered_map<instance_ptr, instance_ptr> alreadyCopied;
 
     try {
         PyObject* res = PythonObjectOfType::deepcopyPyObject(arg, alreadyCopied, slab);
@@ -1515,7 +1515,7 @@ PyObject* deepcopyContiguous(PyObject* nullValue, PyObject* args, PyObject* kwar
         slab->enableTrackAllocTypes();
     }
 
-    std::map<instance_ptr, instance_ptr> alreadyCopied;
+    std::unordered_map<instance_ptr, instance_ptr> alreadyCopied;
 
     try {
         PyObject* res = PythonObjectOfType::deepcopyPyObject(arg, alreadyCopied, slab);

@@ -88,7 +88,7 @@ class SetType : public Type {
 void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::map<instance_ptr, instance_ptr>& alreadyAllocated,
+        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
         Slab* slab
     ) {
         hash_table_layout_ptr& destRecordPtr = *(hash_table_layout**)dest;
