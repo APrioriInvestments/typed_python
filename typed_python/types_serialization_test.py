@@ -57,6 +57,10 @@ from typed_python._types import (
 module_level_testfun = dummy_test_module.testfunction
 
 
+def moduleLevelFunctionUsedByExactlyOneSerializationTest():
+    return "please don't touch me"
+
+
 def moduleLevelRecursiveF(x):
     if x > 0:
         return moduleLevelRecursiveF(x - 1) + 1
@@ -2655,3 +2659,14 @@ class TypesSerializationTest(unittest.TestCase):
         C = SerializationContext().deserialize(serializedC)
 
         assert C.anF() is C
+
+    def test_serialization_independent_of_whether_function_is_hashed(self):
+        s = SerializationContext().withoutLineInfoEncoded().withoutCompression()
+
+        s1 = s.serialize(moduleLevelFunctionUsedByExactlyOneSerializationTest)
+
+        identityHash(moduleLevelFunctionUsedByExactlyOneSerializationTest)
+
+        s2 = s.serialize(moduleLevelFunctionUsedByExactlyOneSerializationTest)
+
+        assert s1 == s2
