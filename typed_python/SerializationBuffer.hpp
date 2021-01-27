@@ -360,6 +360,20 @@ public:
         m_types_being_serialized.erase(nativeType);
     }
 
+    int getGroupCounter(MutuallyRecursiveTypeGroup* group) {
+        auto it = m_group_counter.find(group);
+
+        if (it != m_group_counter.end()) {
+            return it->second;
+        }
+
+        int ix = m_group_counter.size();
+
+        m_group_counter[group] = ix;
+
+        return ix;
+    }
+
 private:
     const SerializationContext& m_context;
 
@@ -377,6 +391,8 @@ private:
     std::vector<PyObject*> m_pyObjectsNeedingDecref;
 
     std::set<Type*> m_types_being_serialized;
+
+    std::unordered_map<MutuallyRecursiveTypeGroup*, int> m_group_counter;
 };
 
 class MarkTypeBeingSerialized {

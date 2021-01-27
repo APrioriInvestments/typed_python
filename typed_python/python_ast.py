@@ -361,13 +361,27 @@ Statement = Statement.define(Alternative(
 
 
 def ExpressionStr(self):
+    if self.matches.ListComp:
+        res = "[" + str(self.elt)
+        for gen in self.generators:
+            res += " for " + str(gen.target) + " in " + str(gen.iter)
+            for ifS in gen.ifs:
+                res += " if " + str(ifS)
+        return res + "]"
+
+    if self.matches.Lambda:
+        return "(lambda ...: " + str(self.body) + ")"
+
+    if self.matches.Subscript:
+        return str(self.value) + "[" + str(self.slice) + "]"
+
     if self.matches.Num:
         return str(self.n)
 
     if self.matches.Call:
         return (
             f"({self.func})(" +
-            ", ".join([str(x) for x in self.args] + [f"{kwd.args}={kwd.value}" for kwd in self.keywords])
+            ", ".join([str(x) for x in self.args] + [f"{kwd.arg}={kwd.value}" for kwd in self.keywords])
             + ")"
         )
 
@@ -700,7 +714,13 @@ Slice = Slice.define(Alternative(
         "step": OneOf(Expr, None)
     },
     ExtSlice={"dims": TupleOf(Slice)},
-    Index={"value": Expr}
+    Index={"value": Expr},
+    __str__=lambda self: (
+        "..." if self.matches.Ellipsis else
+        f"{self.lower}:{self.upper}:{self.step}" if self.matches.Slice else
+        ",".join(str(x) for x in self.dims) if self.matches.ExtSlice else
+        str(self.value) if self.matches.Index else ""
+    )
 ))
 
 BooleanOp = BooleanOp.define(Alternative(
@@ -1258,6 +1278,48 @@ def evaluateFunctionPyAst(pyAst, globals=None, stripAnnotations=False):
     return res
 
 
+def replaceFirstComprehensionArg(pyAst):
+    """Replace the first expression in a comprehension with a '.0' varlookup.
+
+    In general, when you write an expression like [x for x in EXPR] inside
+    of a python function, you get an inner code object that represents the body
+    of the list comprehension in the co_consts. This code object gets used to
+    execute the inner stackframe of the list comprehension.
+
+    That code object does not contain 'EXPR' - it assumes it gets passed that
+    as a variable called '.0'. As a result, we need to make sure we don't embed
+    that information in the code object itself.
+    """
+    def stripComprehension(c: Comprehension):
+        return Comprehension.Item(
+            target=c.target,
+            iter=Expr.Name(id=".0"),
+            ifs=c.ifs,
+            is_async=c.is_async
+        )
+
+    if pyAst.matches.ListComp or pyAst.matches.SetComp or pyAst.matches.GeneratorExp:
+        return type(pyAst)(
+            elt=pyAst.elt,
+            generators=[stripComprehension(pyAst.generators[0])] + list(pyAst.generators[1:]),
+            line_number=pyAst.line_number,
+            col_offset=pyAst.col_offset,
+            filename=pyAst.filename,
+        )
+
+    if pyAst.matches.DictComp:
+        return type(pyAst)(
+            key=pyAst.key,
+            value=pyAst.value,
+            generators=[stripComprehension(pyAst.generators[0])] + list(pyAst.generators[1:]),
+            line_number=pyAst.line_number,
+            col_offset=pyAst.col_offset,
+            filename=pyAst.filename,
+        )
+
+    return pyAst
+
+
 def cacheAstForCode(code, pyAst):
     """Remember that 'code' is equivalent to pyAst, and also for contained code objects."""
     if code in _codeToAlgebraicAst:
@@ -1283,7 +1345,9 @@ def cacheAstForCode(code, pyAst):
                 + funcDefs
             )
 
-    _codeToAlgebraicAst[code] = stripDecoratorFromFuncDef(pyAst)
+    _codeToAlgebraicAst[code] = replaceFirstComprehensionArg(
+        stripDecoratorFromFuncDef(pyAst)
+    )
 
     assert len(funcDefs) == len(codeConstants), (
         f"Expected {len(funcDefs)} func defs to cover the "

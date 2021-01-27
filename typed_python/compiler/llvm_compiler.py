@@ -73,6 +73,8 @@ def create_execution_engine():
     pmb.opt_level = 3
     pmb.size_level = 0
     pmb.inlining_threshold = 1
+    pmb.loop_vectorize = True
+    pmb.slp_vectorize = True
 
     pass_manager = llvm.create_module_pass_manager()
     pmb.populate(pass_manager)

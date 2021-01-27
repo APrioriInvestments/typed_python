@@ -191,7 +191,7 @@ class ClassOrAlternativeWrapperMixin:
     def convert_len(self, context, expr):
         if self.has_method("__len__"):
             return self.convert_method_call(context, expr, "__len__", (), {})
-        return super().convert_len(self, context, expr)
+        return super().convert_len(context, expr)
 
     def convert_abs(self, context, expr):
         return self.convert_method_call(context, expr, "__abs__", (), {})

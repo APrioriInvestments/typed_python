@@ -117,7 +117,8 @@ public:
 
     PythonSerializationContext(PyObject* typeSetObj) :
             mContextObj(typeSetObj),
-            mCompressionEnabled(false)
+            mCompressionEnabled(false),
+            mSerializeHashSequence(false)
     {
         setFlags();
     }
@@ -126,6 +127,12 @@ public:
 
     bool isCompressionEnabled() const {
         return mCompressionEnabled;
+    }
+
+    // should we serialize an integer in the order of the
+    // hash sequence rather than the hash itself?
+    bool shouldSerializeHashSequence() const {
+        return mSerializeHashSequence;
     }
 
     std::shared_ptr<ByteBuffer> compress(uint8_t* begin, uint8_t* end) const;
@@ -220,4 +227,6 @@ private:
     bool mCompressionEnabled;
 
     bool mInternalizeTypeGroups;
+
+    bool mSerializeHashSequence;
 };

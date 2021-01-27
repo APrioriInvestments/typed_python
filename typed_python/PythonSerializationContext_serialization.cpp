@@ -422,7 +422,11 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
         }
 
         // group hash
-        b.writeStringObject(1, group->hash().digestAsString());
+        if (shouldSerializeHashSequence()) {
+            b.writeUnsignedVarintObject(1, b.getGroupCounter(group));
+        } else {
+            b.writeStringObject(1, group->hash().digestAsString());
+        }
 
         // check if any element of this group is named. If so, we can just write the name and
         // then grab the group on the other side

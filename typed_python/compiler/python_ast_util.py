@@ -80,7 +80,7 @@ def pyAstForCode(codeObject):
 
     wholeFileAst = pyAstFromText(sourceText)
 
-    defs = functionDefsOrLambdaAtLineNumber(wholeFileAst, codeObject.co_firstlineno)
+    defs = functionDefsOrLambdaAtLineNumber(sourceText, wholeFileAst, codeObject.co_firstlineno)
 
     if len(defs) == 0:
         raise Exception(
@@ -191,7 +191,7 @@ class AtLineNumberVisitor(ast.NodeVisitor):
 
 
 @CachedByArgs
-def functionDefsOrLambdaAtLineNumber(sourceAst, lineNumber):
+def functionDefsOrLambdaAtLineNumber(sourceText, sourceAst, lineNumber):
     visitor = AtLineNumberVisitor(lineNumber)
     visitor.visit(sourceAst)
 

@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 import typed_python.python_ast as python_ast
-
+import tempfile
 import os
 import unittest
 
@@ -273,3 +273,31 @@ class TestPythonAst(unittest.TestCase):
             return y
 
         self.assertEqual(self.reverseParseCheck(f)(), f())
+
+    def test_conflicting_code_objects_for_list_comps(self):
+        with tempfile.TemporaryDirectory() as tf:
+            fname1 = os.path.join(tf, "a.py")
+            fname2 = os.path.join(tf, "b.py")
+
+            CODE1 = "def f(y):\n    return [x for x in lookupVar1]\n"
+            CODE2 = "def f(y):\n    return [x for x in lookupVar2]\n"
+
+            with open(fname1, "w") as f:
+                f.write(CODE1)
+            with open(fname2, "w") as f:
+                f.write(CODE2)
+
+            c1 = compile(CODE1, fname1, "exec").co_consts[0]
+            c2 = compile(CODE2, fname2, "exec").co_consts[0]
+
+            python_ast.convertFunctionToAlgebraicPyAst(c1)
+            python_ast.convertFunctionToAlgebraicPyAst(c2)
+
+            assert 'listcomp' in str(c1.co_consts[1])
+            assert 'listcomp' in str(c2.co_consts[1])
+
+            listCompAst1 = python_ast.convertFunctionToAlgebraicPyAst(c1.co_consts[1])
+            listCompAst2 = python_ast.convertFunctionToAlgebraicPyAst(c2.co_consts[1])
+
+            assert listCompAst1 == listCompAst2
+            assert 'lookupVar' not in str(listCompAst1)

@@ -16,7 +16,7 @@ from typed_python import _types
 
 from typed_python.python_ast import (
     convertFunctionToAlgebraicPyAst,
-    cacheAstForCode
+    cacheAstForCode,
 )
 from typed_python.hash import sha_hash
 from typed_python.type_function import ConcreteTypeFunction, reconstructTypeFunctionType, isTypeFunctionType
@@ -126,7 +126,8 @@ class SerializationContext:
         encodeLineInformationForCode=True,
         objectToNameOverride=None,
         internalizeTypeGroups=True,
-        serializeFunctionGlobalsAsIs=False
+        serializeFunctionGlobalsAsIs=False,
+        serializeHashSequence=False
     ):
         super().__init__()
 
@@ -140,6 +141,7 @@ class SerializationContext:
         self.encodeLineInformationForCode = encodeLineInformationForCode
         self.internalizeTypeGroups = internalizeTypeGroups
         self.serializeFunctionGlobalsAsIs = serializeFunctionGlobalsAsIs
+        self.serializeHashSequence = serializeHashSequence
 
     def addNamedObject(self, name, obj):
         self.nameToObjectOverride[name] = obj
@@ -186,7 +188,8 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionGlobalsAsIs=True
+            serializeFunctionGlobalsAsIs=True,
+            serializeHashSequence=self.serializeHashSequence
         )
 
     def withoutInternalizingTypeGroups(self):
@@ -204,7 +207,8 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=False,
-            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
+            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
+            serializeHashSequence=self.serializeHashSequence
         )
 
     def withoutLineInfoEncoded(self):
@@ -217,7 +221,8 @@ class SerializationContext:
             encodeLineInformationForCode=False,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
+            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
+            serializeHashSequence=self.serializeHashSequence
         )
 
     def withoutCompression(self):
@@ -230,7 +235,8 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
+            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
+            serializeHashSequence=self.serializeHashSequence
         )
 
     def withCompression(self):
@@ -243,7 +249,22 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             internalizeTypeGroups=self.internalizeTypeGroups,
-            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs
+            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
+            serializeHashSequence=self.serializeHashSequence
+        )
+
+    def withSerializeHashSequence(self):
+        if self.serializeHashSequence:
+            return self
+
+        return SerializationContext(
+            nameToObjectOverride=self.nameToObjectOverride,
+            compressionEnabled=self.compressionEnabled,
+            encodeLineInformationForCode=self.encodeLineInformationForCode,
+            objectToNameOverride=self.objectToNameOverride,
+            internalizeTypeGroups=self.internalizeTypeGroups,
+            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
+            serializeHashSequence=True
         )
 
     def nameForObject(self, t):

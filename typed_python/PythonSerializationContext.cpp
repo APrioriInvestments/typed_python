@@ -38,6 +38,14 @@ void PythonSerializationContext::setFlags() {
     }
 
     mInternalizeTypeGroups = ((PyObject*)internalizeTypeGroups) == Py_True;
+
+    PyObjectStealer serializeHashSequence(PyObject_GetAttrString(mContextObj, "serializeHashSequence"));
+
+    if (!serializeHashSequence) {
+        throw PythonExceptionSet();
+    }
+
+    mSerializeHashSequence = ((PyObject*)serializeHashSequence) == Py_True;
 }
 
 std::shared_ptr<ByteBuffer> PythonSerializationContext::compress(uint8_t* begin, uint8_t* end) const {

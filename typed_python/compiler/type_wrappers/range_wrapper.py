@@ -50,6 +50,9 @@ class RangeCls(NamedTuple(start=int, stop=int, step=int)):
         return RangeIterator(start=self.start - self.step, stop=self.stop, step=self.step)
 
     def __typed_python_int_iter_size__(self):
+        if self.step == 1:
+            return self.stop - self.start
+
         if self.step > 0:
             return ((self.stop - self.start - 1) // self.step) + 1
         else:
