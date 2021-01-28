@@ -192,7 +192,7 @@ class TestConstDictCompilation(unittest.TestCase):
         # because most of the time is spent in the dictionary lookup, and python's
         # dict lookup is quite fast.
         print("ConstDict lookup speedup is ", speedup)
-        self.assertGreater(speedup, 2)
+        self.assertGreater(speedup, 1.75)
 
     def test_const_dict_key_error(self):
         @Compiled
