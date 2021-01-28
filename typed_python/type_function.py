@@ -86,12 +86,22 @@ class ConcreteTypeFunction:
         raise TypeError("Instance of type '%s' is not a valid argument to a type function" % type(arg))
 
     def __call__(self, *args, **kwargs):
+        args = tuple(self.mapArg(a) for a in args)
+        kwargs = tuple(sorted([(k, self.mapArg(v)) for k, v in kwargs.items()]))
+
+        key = (args, kwargs)
+
+        if key in self._memoForKey:
+            res = self._memoForKey[key]
+            if isinstance(res, Exception):
+                raise res
+
+            if getattr(res, '__typed_python_category__', None) != 'Forward':
+                # only return fully resolved TypeFunction values without
+                # locking.
+                return res
+
         with runtimeLock:
-            args = tuple(self.mapArg(a) for a in args)
-            kwargs = tuple(sorted([(k, self.mapArg(v)) for k, v in kwargs.items()]))
-
-            key = (args, kwargs)
-
             if key in self._memoForKey:
                 res = self._memoForKey[key]
                 if isinstance(res, Exception):

@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import threading
 import os
 import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
@@ -28,6 +29,7 @@ from typed_python.compiler.type_wrappers.python_typed_function_wrapper import Py
 from typed_python import Function, _types, Value
 
 _singleton = [None]
+_singletonLock = threading.RLock()
 
 typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
 
@@ -126,7 +128,7 @@ class CountCompilationsVisitor(RuntimeEventVisitor):
 class Runtime:
     @staticmethod
     def singleton():
-        with runtimeLock:
+        with _singletonLock:
             if _singleton[0] is None:
                 _singleton[0] = Runtime()
 
