@@ -12,13 +12,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import threading
 import logging
 
 from types import FunctionType
+from typed_python.compiler.runtime_lock import runtimeLock
 from typed_python._types import Forward, ListOf, TupleOf, Dict, ConstDict
 
-_typeFunctionLock = threading.RLock()
 _type_to_typefunction = {}
 
 
@@ -87,7 +86,7 @@ class ConcreteTypeFunction:
         raise TypeError("Instance of type '%s' is not a valid argument to a type function" % type(arg))
 
     def __call__(self, *args, **kwargs):
-        with _typeFunctionLock:
+        with runtimeLock:
             args = tuple(self.mapArg(a) for a in args)
             kwargs = tuple(sorted([(k, self.mapArg(v)) for k, v in kwargs.items()]))
 

@@ -12,12 +12,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import threading
 import os
 import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
 import typed_python.compiler.llvm_compiler as llvm_compiler
 import typed_python
+from typed_python.compiler.runtime_lock import runtimeLock
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.compiler_cache import CompilerCache
 from typed_python.type_function import ConcreteTypeFunction
@@ -28,7 +28,6 @@ from typed_python.compiler.type_wrappers.python_typed_function_wrapper import Py
 from typed_python import Function, _types, Value
 
 _singleton = [None]
-_singletonLock = threading.Lock()
 
 typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
 
@@ -127,7 +126,7 @@ class CountCompilationsVisitor(RuntimeEventVisitor):
 class Runtime:
     @staticmethod
     def singleton():
-        with _singletonLock:
+        with runtimeLock:
             if _singleton[0] is None:
                 _singleton[0] = Runtime()
 
@@ -148,7 +147,7 @@ class Runtime:
             self.llvm_compiler,
             self.compilerCache
         )
-        self.lock = threading.RLock()
+        self.lock = runtimeLock
         self.timesCompiled = 0
 
     def verboselyDisplayNativeCode(self):
