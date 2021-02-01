@@ -94,10 +94,22 @@ def workExecutor():
         Job = None
 
 
+_maxPmapThreads = [1000]
+
+
+def getMaxPmapThreads():
+    return _maxPmapThreads[0]
+
+
+def setMaxPmapThreads(count):
+    assert count > 0
+    _maxPmapThreads[0] = count
+
+
 @NotCompiled
 def ensureThreads():
     if not _threads:
-        for i in range(os.cpu_count()):
+        for i in range(min(_maxPmapThreads[0], os.cpu_count())):
             _threads.append(threading.Thread(target=workExecutor, daemon=True))
             _threads[-1].start()
 
