@@ -52,12 +52,12 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install --upgrade pip
+        pip install --upgrade pip==20.2.4
         pip install pipenv
+        pip install -v -e .
 
         pipenv lock --dev --requirements > dev-reqs.txt
         pip install --requirement dev-reqs.txt
-        pip install -e .
 
     - name: Test with pytest
       env:
