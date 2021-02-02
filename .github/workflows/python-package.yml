@@ -54,6 +54,7 @@ jobs:
       run: |
         pip install --upgrade pip
         pip install pipenv
+        pip install numpy==1.19.4
         pip install -v -e .
 
         pipenv lock --dev --requirements > dev-reqs.txt
