@@ -1707,3 +1707,14 @@ class NativeClassTypesTests(unittest.TestCase):
 
         assert hasattr(CNonempty(), 'x')
         assert not hasattr(CEmpty(), 'x')
+
+    def test_class_mro_index_is_zero_for_self(self):
+        class BaseClass(Class):
+            pass
+
+        class ChildClass(BaseClass, Final):
+            pass
+
+        assert _types.classGetDispatchIndex(BaseClass, ChildClass) == 1
+        assert _types.classGetDispatchIndex(BaseClass, BaseClass) == 0
+        assert _types.classGetDispatchIndex(ChildClass, ChildClass) == 0

@@ -207,9 +207,8 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.
         # so whenever we interact with the pointer we need to chop off the top 16 bits
 
-        # TODO: seems like this should be legal?
-        # if self.typeRepresentation.IsFinal:
-        #    return nonref_expr.cast(self.layoutType)
+        if self.typeRepresentation.IsFinal:
+            return nonref_expr.cast(self.layoutType)
 
         return (
             nonref_expr
@@ -772,6 +771,30 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         return res
 
+    def stripClassDispatchIndex(self, context, instance):
+        """Return 'instance' with a class-dispatch of 0.
+
+        When we call a method that's overridden in a child class, we need to ensure
+        that the pointer argument matches the type that the child is expecting.
+
+        For instance, if class B is the base, C is the child, and they have
+        'f(self)' defined, both B and C's version of 'f' expect to receive an instance
+        with their own type. However, if we have an instance of C which we know as
+        B, then when we call 'f', C's version of 'f' will get 'self' masquerading as
+        C with a pointer dispatch of 1.
+
+        This function strips that 1 off.
+        """
+        return TypedExpression(
+            context,
+            instance.nonref_expr
+            .cast(native_ast.UInt64)
+            .bitand(native_ast.const_uint64_expr(0xFFFFFFFFFFFF))  # 48 bits of 1s
+            .cast(self.layoutType),
+            self,
+            False
+        )
+
     @staticmethod
     def compileMethodInstantiation(
         converter, interfaceClass, implementingClass,
@@ -808,7 +831,9 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         assert bytecount(pyImpl.ClosureType) == 0, "Class methods should have empty closures."
 
-        return typeWrapper(pyImpl).compileCall(converter, retType, argTypes, kwargTypes, False)
+        return typeWrapper(pyImpl).compileCall(
+            converter, retType, argTypes, kwargTypes, False, stripFirstArgClassDispatchIndex=True
+        )
 
     def convert_set_attribute(self, context, instance, attribute, value):
         if value is not None:
@@ -996,7 +1021,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         if self.has_method("__hash__"):
             return self.convert_method_call(context, expr, "__hash__", (), {})
 
-        layoutPtr = self.get_layout_pointer(expr.nonref_expr).cast(native_ast.UInt64)
+        layoutPtr = self.get_layout_pointer(expr).cast(native_ast.UInt64)
 
         return context.pushPod(
             Int32,

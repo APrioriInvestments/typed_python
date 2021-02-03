@@ -647,25 +647,45 @@ PyObject* isValidArithmeticUpcast(PyObject* nullValue, PyObject* args, PyObject*
     });
 }
 
+PyDoc_STRVAR(
+    classGetDispatchIndex_doc,
+    "classGetDispatchIndex(visibleClass, concreteClass) -> int\n\n"
+    "Return the dispatch index used by an instance of 'concreteClass' masquerading\n"
+    "as an instance of 'visibleClass'.\n"
+);
+
+
 PyObject* classGetDispatchIndex(PyObject* nullValue, PyObject* args, PyObject* kwargs)
 {
-    static const char *kwlist[] = {"instance", NULL};
+    static const char *kwlist[] = {"visibleClass", "concreteClass", NULL};
 
-    PyObject* instance;
+    PyObject* visibleClass;
+    PyObject* concreteClass;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist, &instance)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO", (char**)kwlist, &visibleClass, &concreteClass)) {
         return NULL;
     }
 
+    Type* visibleType = PyInstance::unwrapTypeArgToTypePtr(visibleClass);
+    Type* concreteType = PyInstance::unwrapTypeArgToTypePtr(concreteClass);
 
     return translateExceptionToPyObject([&]() {
-        Type* actualType = PyInstance::extractTypeFrom((PyTypeObject*)instance->ob_type);
-
-        if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catClass) {
-            throw std::runtime_error("Expected 'instance' to be an instance of a class");
+        if (!visibleType || !visibleType->isClass()) {
+            throw std::runtime_error("Expected 'visibleClass' to be a Class");
+        }
+        if (!concreteType || !concreteType->isClass()) {
+            throw std::runtime_error("Expected 'visibleClass' to be a Class");
         }
 
-        return PyLong_FromLong(Class::instanceToDispatchTableIndex(((PyInstance*)instance)->dataPtr()));
+        HeldClass* visibleHC = ((Class*)visibleType)->getHeldClass();
+        HeldClass* concreteHC = ((Class*)concreteType)->getHeldClass();
+        int index = concreteHC->getMroIndex(visibleHC);
+
+        if (index >= 0) {
+            return PyLong_FromLong(index);
+        }
+
+        throw std::runtime_error(visibleType->name() + " is not a superclass of " + concreteType->name());
     });
 }
 
@@ -2946,7 +2966,7 @@ static PyMethodDef module_methods[] = {
     {"getClassMethodDispatchSignature", (PyCFunction)getClassMethodDispatchSignature, METH_VARARGS | METH_KEYWORDS, NULL},
     {"installClassMethodDispatch", (PyCFunction)installClassMethodDispatch, METH_VARARGS | METH_KEYWORDS, NULL},
     {"installClassDestructor", (PyCFunction)installClassDestructor, METH_VARARGS | METH_KEYWORDS, NULL},
-    {"classGetDispatchIndex", (PyCFunction)classGetDispatchIndex, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"classGetDispatchIndex", (PyCFunction)classGetDispatchIndex, METH_VARARGS | METH_KEYWORDS, classGetDispatchIndex_doc},
     {"getDispatchIndexForType", (PyCFunction)getDispatchIndexForType, METH_VARARGS | METH_KEYWORDS, NULL},
     {"prepareArgumentToBePassedToCompiler", (PyCFunction)prepareArgumentToBePassedToCompiler, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setFunctionClosure", (PyCFunction)setFunctionClosure, METH_VARARGS | METH_KEYWORDS, NULL},

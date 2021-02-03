@@ -2322,3 +2322,23 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "Attribute 'x' is not initialized"):
             callIt(CEmpty).x
+
+    def test_class_hierarchy(self):
+        class Base(Class):
+            def f(self) -> int:
+                return 0
+
+            def g(self) -> int:
+                return self.f()
+
+        class C1(Base):
+            def f(self) -> int:
+                return 1
+
+            def g(self) -> int:
+                return self.f()
+
+        def callG(x: Base):
+            return x.g()
+
+        assert callG(C1()) == Entrypoint(callG)(C1())        
