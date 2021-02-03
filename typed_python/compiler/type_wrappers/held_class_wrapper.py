@@ -81,11 +81,6 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
         if attribute in self.nameToIndex:
             return self.memberRef(refToSelf, self.nameToIndex[attribute]).asPointer()
 
-        if attribute in self.classType.MemberFunctions:
-            methodType = BoundMethodWrapper(_types.BoundMethod(self.refToType, attribute))
-
-            return refToSelf.changeType(methodType, isReferenceOverride=False)
-
         return super().convert_attribute(context, pointerInstance, attribute)
 
     def _can_convert_to_type(self, otherType, explicit):

@@ -31,7 +31,7 @@ from typed_python.compiler.type_wrappers.python_typed_function_wrapper import Py
 from typed_python.compiler.type_wrappers.value_wrapper import ValueWrapper
 from typed_python.compiler.type_wrappers.tuple_of_wrapper import TupleOfWrapper
 from typed_python.compiler.type_wrappers.pointer_to_wrapper import PointerToWrapper, PointerToObjectWrapper
-from typed_python.compiler.type_wrappers.ref_to_wrapper import RefToWrapper
+from typed_python.compiler.type_wrappers.ref_to_wrapper import RefToWrapper, RefToObjectWrapper
 from typed_python.compiler.type_wrappers.list_of_wrapper import ListOfWrapper
 from typed_python.compiler.type_wrappers.isinstance_wrapper import IsinstanceWrapper
 from typed_python.compiler.type_wrappers.issubclass_wrapper import IssubclassWrapper
@@ -74,7 +74,7 @@ from typed_python import (
     ListOf, isCompiled,
     typeKnownToCompiler,
     localVariableTypesKnownToCompiler,
-    pointerTo
+    pointerTo, refTo
 )
 
 # the type of bound C methods on types.
@@ -267,6 +267,9 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
 
     if f is pointerTo:
         return TypedExpression(context, native_ast.nullExpr, PointerToObjectWrapper(), False)
+
+    if f is refTo:
+        return TypedExpression(context, native_ast.nullExpr, RefToObjectWrapper(), False)
 
     if f is isCompiled:
         return TypedExpression(context, native_ast.nullExpr, IsCompiledWrapper(), False)

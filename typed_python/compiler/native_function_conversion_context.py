@@ -37,6 +37,9 @@ class NativeFunctionConversionContext:
         """If the output type is known ahead, then that type (as a wrapper). Else, None"""
         return self._output_type
 
+    def __str__(self):
+        return f"NativeFunctionConversionContext({self._identity}, {self._generatingFunction})"
+
     @property
     def identity(self):
         return self._identity

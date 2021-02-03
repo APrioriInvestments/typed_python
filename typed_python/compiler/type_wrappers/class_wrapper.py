@@ -26,7 +26,7 @@ from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin impo
 from typed_python.compiler.type_wrappers.voidptr_masquerading_as_tp_type import (
     VoidPtrMasqueradingAsTPType
 )
-from typed_python import _types, PointerTo, Int32, Tuple, NamedTuple, bytecount
+from typed_python import _types, PointerTo, Int32, Tuple, NamedTuple, bytecount, RefTo
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -126,13 +126,27 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         return False
 
+    def convert_refTo(self, context, instance):
+        refToType = RefTo(self.typeRepresentation.HeldClass)
+
+        return TypedExpression(
+            context,
+            (
+                self.get_layout_pointer(instance)
+                .ElementPtrIntegers(0, 2)
+                .cast(typeWrapper(refToType).getNativeLayoutType())
+            ),
+            refToType,
+            False
+        )
+
     def convert_pointerTo(self, context, instance):
         PtrT = PointerTo(self.typeRepresentation.HeldClass)
 
         return TypedExpression(
             context,
             (
-                self.get_layout_pointer(instance.nonref_expr)
+                self.get_layout_pointer(instance)
                 .ElementPtrIntegers(0, 2)
                 .cast(typeWrapper(PtrT).getNativeLayoutType())
             ),
@@ -203,12 +217,25 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         This function will return a TypedExpression, or None if it set an exception."""
         return self.convert_method_call(context, instance, "__typed_python_int_iter_value__", [], {})
 
-    def get_layout_pointer(self, nonref_expr):
+    def get_layout_pointer(self, instance):
+        # diagnostic you can use to check whether our dispatch indices are getting
+        # messed up.
+        
+        # if self.typeRepresentation.IsFinal:
+        #     c = instance.context
+        #     with c.ifelse(self.get_dispatch_index(instance)) as (ifTrue, ifFalse):
+        #         with ifTrue:
+        #             c.logDiagnostic(str(c.functionContext), ": ", str(self), ":",
+        #                 c.pushPod(UInt64, self.get_dispatch_index(instance))
+        #             )
+
+        return self.get_layout_pointer_native(instance.nonref_expr)
+
+    def get_layout_pointer_native(self, nonref_expr):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.
         # so whenever we interact with the pointer we need to chop off the top 16 bits
-
-        if self.typeRepresentation.IsFinal:
-            return nonref_expr.cast(self.layoutType)
+        #if self.typeRepresentation.IsFinal:
+        #    return nonref_expr.cast(self.layoutType)
 
         return (
             nonref_expr
@@ -219,7 +246,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
     def classDispatchTable(self, instance):
         classDispatchTables = (
-            self.get_layout_pointer(instance.nonref_expr)
+            self.get_layout_pointer(instance)
             .ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 2).load()
         )
 
@@ -261,7 +288,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             return native_ast.const_uint64_expr(self.bytesOfInitBits)
         else:
             return (
-                self.get_layout_pointer(instance.nonref_expr)
+                self.get_layout_pointer(instance)
                 # get a pointer to the vtable
                 .ElementPtrIntegers(0, 1)
                 # load it
@@ -278,7 +305,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             nonref_expr - a native expression equivalent to 'self.nonref_expr'. In most cases
                 this will be the pointer to the actual refcounted data structure.
         """
-        return self.get_layout_pointer(nonref_expr).ElementPtrIntegers(0, 0)
+        return self.get_layout_pointer_native(nonref_expr).ElementPtrIntegers(0, 0)
 
     def get_dispatch_index(self, instance):
         """Return the integer index of the current class dispatch within this instances' vtable."""
@@ -303,7 +330,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
     def on_refcount_zero(self, context, instance):
         vtablePtr = (
-            self.get_layout_pointer(instance.nonref_expr)
+            self.get_layout_pointer(instance)
             .ElementPtrIntegers(0, 1)
             .load()
         )
@@ -335,6 +362,8 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         )
 
     def generateNativeDestructorFunction(self, context, out, instance):
+        instance = self.stripClassDispatchIndex(context, instance)
+
         for i in range(len(self.typeRepresentation.MemberTypes)):
             if not typeWrapper(self.typeRepresentation.MemberTypes[i]).is_pod:
                 with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(instance, i))) as (true_block, false_block):
@@ -343,11 +372,11 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                             self.convert_attribute(context, instance, i, nocheck=True).convert_destroy()
                         )
 
-        context.pushEffect(runtime_functions.free.call(self.get_layout_pointer(instance.nonref_expr).cast(native_ast.UInt8Ptr)))
+        context.pushEffect(runtime_functions.free.call(self.get_layout_pointer(instance).cast(native_ast.UInt8Ptr)))
 
     def memberPtr(self, instance, ix):
         return (
-            self.get_layout_pointer(instance.nonref_expr)
+            self.get_layout_pointer(instance)
             .cast(native_ast.UInt8.pointer())
             .elemPtr(self.bytesOfInitBitsForInstance(instance))
             .ElementPtrIntegers(self.indexToByteOffset[ix] + self.BYTES_BEFORE_INIT_BITS)
@@ -366,7 +395,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         bit = ix % 8
 
         return (
-            self.get_layout_pointer(instance.nonref_expr)
+            self.get_layout_pointer(instance)
             .cast(native_ast.UInt8.pointer())
             .ElementPtrIntegers(self.BYTES_BEFORE_INIT_BITS + byte)
             .load()
@@ -382,7 +411,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         bit = ix % 8
 
         bytePtr = (
-            self.get_layout_pointer(instance.nonref_expr)
+            self.get_layout_pointer(instance)
             .cast(native_ast.UInt8.pointer())
             .ElementPtrIntegers(self.BYTES_BEFORE_INIT_BITS + byte)
         )
@@ -399,7 +428,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         bit = ix % 8
 
         bytePtr = (
-            self.get_layout_pointer(instance.nonref_expr)
+            self.get_layout_pointer(instance)
             .cast(native_ast.UInt8.pointer())
             .ElementPtrIntegers(self.BYTES_BEFORE_INIT_BITS + byte)
         )
@@ -1036,7 +1065,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             return context.constant(self.typeRepresentation)
 
         vtablePtr = (
-            self.get_layout_pointer(instance.nonref_expr)
+            self.get_layout_pointer(instance)
             .ElementPtrIntegers(0, 1)
             .load()
         )

@@ -14,10 +14,30 @@
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.typed_expression import TypedExpression
+from typed_python._types import refTo
 
 import typed_python.compiler
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+class RefToObjectWrapper(Wrapper):
+    is_pod = True
+    is_empty = False
+    is_pass_by_ref = False
+
+    def __init__(self):
+        super().__init__(refTo)
+
+    def getNativeLayoutType(self):
+        return native_ast.Type.Void()
+
+    @Wrapper.unwrapOneOfAndValue
+    def convert_call(self, context, expr, args, kwargs):
+        if len(args) != 1 or kwargs:
+            return super().convert_call(context, expr, args, kwargs)
+
+        return args[0].expr_type.convert_refTo(context, args[0])
 
 
 class RefToWrapper(Wrapper):

@@ -19,7 +19,7 @@ import unittest
 from flaky import flaky
 from typed_python import (
     Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, UInt64, Int16,
-    Float32, Final, makeNamedTuple, Compiled, Function, Held, Value, pointerTo
+    Float32, Final, makeNamedTuple, Compiled, Function, Held, Value, pointerTo, refTo
 )
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime, CountCompilationsVisitor
@@ -1830,14 +1830,12 @@ class TestClassCompilationCompilation(unittest.TestCase):
         @Entrypoint
         def doit():
             res = f(Child())
-            print("done")
             return res
 
         @Entrypoint
         def done():
             doit()
-            print("done")
-
+            
         done()
 
     def test_compile_class_properties(self):
@@ -2342,3 +2340,20 @@ class TestClassCompilationCompilation(unittest.TestCase):
             return x.g()
 
         assert callG(C1()) == Entrypoint(callG)(C1())        
+
+    def test_convert_refTo(self):
+        class C(Class, Final):
+            x = Member(int)
+
+            def f(self):
+                return self.x
+
+        def f(c):
+            return c.f()
+
+        @Entrypoint
+        def doIt():
+            c = C(x=10)
+            return f(refTo(c))
+
+        assert doIt() == 10

@@ -185,6 +185,12 @@ class Wrapper:
             str(self.typeRepresentation),
         ))
 
+    def convert_refTo(self, context, instance):
+        """Generate code for 'refTo(self)'"""
+        return context.pushException(TypeError, "Can't call refTo with args of type (%s)" % (
+            str(self.typeRepresentation),
+        ))
+
     def convert_attribute_pointerTo(self, context, pointerInstance, attribute):
         """Implement getattr(PointerTo(self), attribute)"""
 
