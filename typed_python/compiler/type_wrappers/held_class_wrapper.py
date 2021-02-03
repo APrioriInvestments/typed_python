@@ -55,6 +55,13 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
 
         self.layoutType = native_ast.Type.Array(element_type=native_ast.UInt8, count=_types.bytecount(self.heldClassType))
 
+    def fieldGuaranteedInitialized(self, ix):
+        if self.classType.ClassMembers[
+            self.classType.MemberNames[ix]
+        ].isNonempty:
+            return True
+        return False
+
     def refTo(self, instance):
         # 'instance' must be a reference to the class, which means it's actually
         # held as a pointer to the HeldClass instance 'C' itself. This has the
@@ -73,6 +80,11 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
 
         if attribute in self.nameToIndex:
             return self.memberRef(refToSelf, self.nameToIndex[attribute]).asPointer()
+
+        if attribute in self.classType.MemberFunctions:
+            methodType = BoundMethodWrapper(_types.BoundMethod(self.refToType, attribute))
+
+            return refToSelf.changeType(methodType, isReferenceOverride=False)
 
         return super().convert_attribute(context, pointerInstance, attribute)
 
@@ -168,6 +180,9 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
         )
 
     def isInitializedNativeExpr(self, instance, ix):
+        if self.fieldGuaranteedInitialized(ix):
+            return native_ast.const_bool_expr(True)
+
         assert instance.isReference
 
         byte = ix // 8
@@ -183,6 +198,9 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
         )
 
     def setIsInitializedExpr(self, instance, ix):
+        if self.fieldGuaranteedInitialized(ix):
+            return native_ast.nullExpr
+
         assert instance.isReference
 
         byte = ix // 8
@@ -197,6 +215,9 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
         return bytePtr.store(bytePtr.load().bitor(native_ast.const_uint8_expr(1 << bit)))
 
     def clearIsInitializedExpr(self, instance, ix):
+        if self.fieldGuaranteedInitialized(ix):
+            return native_ast.nullExpr
+            
         assert instance.isReference
 
         byte = ix // 8

@@ -420,7 +420,7 @@ void PythonSerializationContext::deserializeAlternativeMembers(
 }
 
 void PythonSerializationContext::deserializeClassMembers(
-    std::vector<std::tuple<std::string, Type*, Instance> >& members,
+    std::vector<MemberDefinition>& members,
     DeserializationBuffer& b,
     int inWireType
 ) const {
@@ -428,6 +428,7 @@ void PythonSerializationContext::deserializeClassMembers(
         std::string name;
         Type* t = nullptr;
         Instance i;
+        bool isNonempty = false;
 
         b.consumeCompoundMessage(wireType, [&](size_t fieldNumber2, size_t wireType2) {
             if (fieldNumber2 == 0) {
@@ -436,6 +437,8 @@ void PythonSerializationContext::deserializeClassMembers(
                 t = deserializeNativeType(b, wireType2);
             } else if (fieldNumber2 == 2) {
                 i = deserializeNativeInstance(b, wireType2);
+            } else if (fieldNumber2 == 3) {
+                isNonempty = b.readUnsignedVarint();
             } else {
                 throw std::runtime_error("Corrupt ClassMember definition when deserializing class.");
             }
@@ -445,7 +448,7 @@ void PythonSerializationContext::deserializeClassMembers(
             throw std::runtime_error("Corrupt ClassMember definition when deserializing class.");
         }
 
-        members.push_back(std::tuple<std::string, Type*, Instance>(name, t, i));
+        members.push_back(MemberDefinition(name, t, i, isNonempty));
     });
 }
 
@@ -1343,7 +1346,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
     std::vector<std::pair<std::string, NamedTuple*> > alternativeMembers;
     std::map<std::string, Function*> classMethods, classStatics, classPropertyFunctions;
     std::map<std::string, PyObjectHolder> classClassMembers;
-    std::vector<std::tuple<std::string, Type*, Instance> > classMembers;
+    std::vector<MemberDefinition> classMembers;
 
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
         if (fieldNumber == 0) {

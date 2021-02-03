@@ -65,6 +65,10 @@ public:
         return res;
     }
 
+    bool isPODConcrete() {
+        return true;
+    }
+
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,

@@ -1082,7 +1082,7 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     }
 
     std::vector<Type*> bases;
-    std::vector<std::tuple<std::string, Type*, Instance> > members;
+    std::vector<MemberDefinition> members;
     std::vector<std::pair<std::string, Type*> > memberFunctions;
     std::vector<std::pair<std::string, Type*> > staticFunctions;
     std::vector<std::pair<std::string, Type*> > propertyFunctions;
@@ -1101,7 +1101,7 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
         baseClasses.push_back((Class*)t);
     }
 
-    if (!unpackTupleToStringTypesAndValues(memberTuple, members)) {
+    if (!unpackTupleToMemberDefinition(memberTuple, members)) {
         return NULL;
     }
     if (!unpackTupleToStringAndTypes(memberFunctionTuple, memberFunctions)) {
@@ -2251,6 +2251,23 @@ PyObject *isSimple(PyObject* nullValue, PyObject* args) {
     return incref(t->isSimple() ? Py_True : Py_False);
 }
 
+PyObject *isPOD(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "isPOD takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'isPOD' must be a type object");
+        return NULL;
+    }
+
+    return incref(t->isPOD() ? Py_True : Py_False);
+}
+
 PyObject *is_default_constructible(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "is_default_constructible takes 1 positional argument");
@@ -2894,6 +2911,7 @@ static PyMethodDef module_methods[] = {
     {"deserializeStream", (PyCFunction)deserializeStream, METH_VARARGS, NULL},
     {"is_default_constructible", (PyCFunction)is_default_constructible, METH_VARARGS, NULL},
     {"buildPyFunctionObject", (PyCFunction)buildPyFunctionObject, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"isPOD", (PyCFunction)isPOD, METH_VARARGS, NULL},
     {"isSimple", (PyCFunction)isSimple, METH_VARARGS, NULL},
     {"canConstructFrom", (PyCFunction)canConstructFrom, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},

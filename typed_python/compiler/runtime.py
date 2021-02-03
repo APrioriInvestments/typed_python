@@ -144,7 +144,7 @@ class Runtime:
             )
         else:
             self.compilerCache = None
-        self.llvm_compiler = llvm_compiler.Compiler()
+        self.llvm_compiler = llvm_compiler.Compiler(inlineThreshold=100)
         self.converter = python_to_native_converter.PythonToNativeConverter(
             self.llvm_compiler,
             self.compilerCache

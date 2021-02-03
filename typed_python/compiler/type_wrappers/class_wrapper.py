@@ -112,6 +112,20 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             )
         ).load()
 
+    def fieldGuaranteedInitialized(self, ix):
+        if self.classType.MemberNames[ix] not in self.typeRepresentation.ClassMembers:
+            raise Exception(
+                f"Can't find "
+                f"{self.typeRepresentation.MemberNames[ix]} in "
+                f"{list(self.typeRepresentation.ClassMembers)}"
+            )
+        if self.typeRepresentation.ClassMembers[
+            self.classType.MemberNames[ix]
+        ].isNonempty:
+            return True
+
+        return False
+
     def convert_pointerTo(self, context, instance):
         PtrT = PointerTo(self.typeRepresentation.HeldClass)
 
@@ -337,8 +351,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             self.get_layout_pointer(instance.nonref_expr)
             .cast(native_ast.UInt8.pointer())
             .elemPtr(self.bytesOfInitBitsForInstance(instance))
-            .ElementPtrIntegers(self.indexToByteOffset[ix])
-            .ElementPtrIntegers(self.BYTES_BEFORE_INIT_BITS)
+            .ElementPtrIntegers(self.indexToByteOffset[ix] + self.BYTES_BEFORE_INIT_BITS)
             .cast(
                 typeWrapper(self.typeRepresentation.MemberTypes[ix])
                 .getNativeLayoutType()
@@ -347,6 +360,9 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         )
 
     def isInitializedNativeExpr(self, instance, ix):
+        if self.fieldGuaranteedInitialized(ix):
+            return native_ast.const_bool_expr(True)
+
         byte = ix // 8
         bit = ix % 8
 
@@ -357,9 +373,12 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             .load()
             .rshift(native_ast.const_uint8_expr(bit))
             .bitand(native_ast.const_uint8_expr(1))
-        )
+        ).cast(native_ast.Bool)
 
     def setIsInitializedExpr(self, instance, ix):
+        if self.fieldGuaranteedInitialized(ix):
+            return native_ast.nullExpr
+
         byte = ix // 8
         bit = ix % 8
 
@@ -370,6 +389,23 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         )
 
         return bytePtr.store(bytePtr.load().bitor(native_ast.const_uint8_expr(1 << bit)))
+
+    def clearIsInitializedExpr(self, instance, ix):
+        if self.fieldGuaranteedInitialized(ix):
+            return native_ast.nullExpr
+            
+        assert instance.isReference
+
+        byte = ix // 8
+        bit = ix % 8
+
+        bytePtr = (
+            self.get_layout_pointer(instance.nonref_expr)
+            .cast(native_ast.UInt8.pointer())
+            .ElementPtrIntegers(self.BYTES_BEFORE_INIT_BITS + byte)
+        )
+
+        return bytePtr.store(bytePtr.load().bitand(native_ast.const_uint8_expr(255 - (1 << bit))))
 
     def convert_attribute(self, context, instance, attribute, nocheck=False):
         if attribute in self.typeRepresentation.MemberFunctions:
@@ -797,15 +833,44 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         attr_type = typeWrapper(self.typeRepresentation.MemberTypes[ix])
 
+        if value is None:
+            # we're deleting this attribute
+            if self.fieldGuaranteedInitialized(ix):
+                return context.pushException(
+                    AttributeError, 
+                    f"Attribute '{self.classType.MemberNames[ix]}' cannot be deleted"
+                )
+            
+            with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(instance, ix))) as (
+                true_block, false_block
+            ):
+                with true_block:
+                    if not attr_type.is_pod:
+                        member = context.pushReference(attr_type, self.memberPtr(instance, ix))
+                        member.convert_destroy()
+
+                    context.pushEffect(
+                        self.clearIsInitializedExpr(instance, ix)
+                    )
+
+                with false_block:
+                    context.pushException(
+                        AttributeError,
+                        f"Attribute '{self.classType.MemberNames[ix]}' is not initialized"
+                    )
+
+            return context.constant(None)
+
         value = value.convert_to_type(attr_type, ConversionLevel.ImplicitContainers)
         if value is None:
             return None
 
         if attr_type.is_pod:
-            return context.pushEffect(
+            context.pushEffect(
                 self.memberPtr(instance, ix).store(value.nonref_expr)
                 >> self.setIsInitializedExpr(instance, ix)
             )
+            return context.constant(None)
         else:
             member = context.pushReference(attr_type, self.memberPtr(instance, ix))
 
@@ -818,7 +883,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                         self.setIsInitializedExpr(instance, ix)
                     )
 
-            return native_ast.nullExpr
+            return context.constant(None)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         # pack the named arguments onto the back of the call, and pass
@@ -875,7 +940,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             )
 
         for i in range(len(self.classType.MemberTypes)):
-            if _types.wantsToDefaultConstruct(self.classType.MemberTypes[i]):
+            if _types.wantsToDefaultConstruct(self.classType.MemberTypes[i]) or self.fieldGuaranteedInitialized(i):
                 name = self.classType.MemberNames[i]
 
                 if name in self.classType.MemberDefaultValues:

@@ -78,22 +78,26 @@ bool unpackTupleToStringAndTypes(PyObject* tuple, std::vector<std::pair<std::str
     return true;
 }
 
-bool unpackTupleToStringTypesAndValues(PyObject* tuple, std::vector<std::tuple<std::string, Type*, Instance> >& out) {
+bool unpackTupleToMemberDefinition(
+    PyObject* tuple, 
+    std::vector<MemberDefinition>& out
+) {
     std::set<std::string> memberNames;
 
     for (int i = 0; i < PyTuple_Size(tuple); ++i) {
         PyObjectHolder entry(PyTuple_GetItem(tuple, i));
         Type* targetType = NULL;
 
-        if (!PyTuple_Check(entry) || PyTuple_Size(entry) != 3
+        if (!PyTuple_Check(entry) || PyTuple_Size(entry) != 4
                 || !PyUnicode_Check(PyTuple_GetItem(entry, 0))
+                || !PyBool_Check(PyTuple_GetItem(entry, 3))
                 || !(targetType =
                     PyInstance::tryUnwrapPyInstanceToType(
                         PyTuple_GetItem(entry, 1)
                         ))
                 )
         {
-            PyErr_SetString(PyExc_TypeError, "Badly formed class type argument.");
+            PyErr_SetString(PyExc_TypeError, "Badly formed class MemberDefinition.");
             return false;
         }
 
@@ -115,10 +119,11 @@ bool unpackTupleToStringTypesAndValues(PyObject* tuple, std::vector<std::tuple<s
         }
 
         out.push_back(
-            std::make_tuple(
+            MemberDefinition(
                 memberName,
                 targetType,
-                inst
+                inst,
+                PyTuple_GetItem(entry, 3) == Py_True
             )
         );
     }

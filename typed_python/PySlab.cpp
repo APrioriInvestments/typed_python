@@ -117,7 +117,7 @@ PyObject* PySlab::setTag(PySlab* self, PyObject* args, PyObject* kwargs) {
 
     PyObject* tag;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist), &tag) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist, &tag)) {
         return NULL;
     }
 

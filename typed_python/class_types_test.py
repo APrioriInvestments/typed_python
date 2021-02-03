@@ -1657,3 +1657,53 @@ class NativeClassTypesTests(unittest.TestCase):
         c.x = "bye"
 
         assert c.x == "bye"
+
+    def test_class_nonempty(self):
+        class CNonempty(Class, Final):
+            x = Member(str, nonempty=True)
+
+            def __init__(self):
+                pass
+
+        class CEmpty(Class, Final):
+            x = Member(str)
+
+            def __init__(self):
+                pass
+
+        assert CNonempty().x == ""
+
+        cN = CNonempty()
+        cE = CEmpty()
+
+        with self.assertRaisesRegex(Exception, "Attribute 'x' cannot be deleted"):
+            del cN.x
+
+        assert hasattr(cE, 'x')
+        del cE.x
+
+        with self.assertRaisesRegex(Exception, "Attribute 'x' is not initialized"):
+            del cE.x
+
+        assert not hasattr(cE, 'x')
+        cE.x = "hihi"
+        assert hasattr(cE, 'x')
+
+    def test_class_nonempty_forces_construction(self):
+        class SomeOtherClass(Class):
+            pass
+
+        class CNonempty(Class, Final):
+            x = Member(SomeOtherClass, nonempty=True)
+
+            def __init__(self):
+                pass
+
+        class CEmpty(Class, Final):
+            x = Member(SomeOtherClass)
+
+            def __init__(self):
+                pass
+
+        assert hasattr(CNonempty(), 'x')
+        assert not hasattr(CEmpty(), 'x')

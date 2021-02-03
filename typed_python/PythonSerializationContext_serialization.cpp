@@ -887,18 +887,18 @@ void PythonSerializationContext::serializeNativeTypeInner(
 }
 
 void PythonSerializationContext::serializeClassMembers(
-    const std::vector<std::tuple<std::string, Type*, Instance> >& members,
+    const std::vector<MemberDefinition>& members,
     SerializationBuffer& b,
     int fieldNumber
 ) const {
     b.writeBeginCompound(fieldNumber);
     for (long k = 0; k < members.size(); k++) {
         b.writeBeginCompound(k);
-            b.writeStringObject(0, std::get<0>(members[k]));
+            b.writeStringObject(0, members[k].getName());
 
-            serializeNativeType(std::get<1>(members[k]), b, 1);
+            serializeNativeType(members[k].getType(), b, 1);
 
-            Instance defaultValue = std::get<2>(members[k]);
+            Instance defaultValue = members[k].getDefaultValue();
 
             if (defaultValue.type()->getTypeCategory() != Type::TypeCategory::catNone) {
                 b.writeBeginCompound(2);
@@ -910,6 +910,8 @@ void PythonSerializationContext::serializeClassMembers(
 
                 b.writeEndCompound();
             }
+
+            b.writeUnsignedVarintObject(3, members[k].getIsNonempty() ? 1 : 0);
         b.writeEndCompound();
     }
     b.writeEndCompound();
@@ -923,9 +925,9 @@ void PythonSerializationContext::serializeAlternativeMembers(
     b.writeBeginCompound(fieldNumber);
     for (long k = 0; k < members.size(); k++) {
         b.writeBeginCompound(k);
-            b.writeStringObject(0, std::get<0>(members[k]));
+            b.writeStringObject(0, members[k].first);
 
-            serializeNativeType(std::get<1>(members[k]), b, 1);
+            serializeNativeType(members[k].second, b, 1);
         b.writeEndCompound();
     }
     b.writeEndCompound();

@@ -151,7 +151,7 @@ public:
 
     void serializeNativeTypeInner(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const;
 
-    void serializeClassMembers(const std::vector<std::tuple<std::string, Type*, Instance> >& members, SerializationBuffer& b, int fieldNumber) const;
+    void serializeClassMembers(const std::vector<MemberDefinition>& members, SerializationBuffer& b, int fieldNumber) const;
 
     void serializeAlternativeMembers(const std::vector<std::pair<std::string, NamedTuple*> >& members, SerializationBuffer& b, int fieldNumber) const;
 
@@ -161,7 +161,7 @@ public:
 
     void deserializeAlternativeMembers(std::vector<std::pair<std::string, NamedTuple*> >& members, DeserializationBuffer& b, int wireType) const;
 
-    void deserializeClassMembers(std::vector<std::tuple<std::string, Type*, Instance> >& members, DeserializationBuffer& b, int wireType) const;
+    void deserializeClassMembers(std::vector<MemberDefinition>& members, DeserializationBuffer& b, int wireType) const;
 
     void deserializeClassFunDict(std::string className, std::map<std::string, Function*>& dict, DeserializationBuffer& b, int wireType) const;
 

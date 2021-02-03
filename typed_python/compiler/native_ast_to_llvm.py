@@ -1567,6 +1567,10 @@ class Converter:
                 func = self._functions_by_name[name]
                 func.attributes.personality = external_function_references["__gxx_personality_v0"]
 
+                # for a in func.args:
+                #     if a.type.is_pointer:
+                #         a.add_attribute("noalias")
+
                 arg_assignments = {}
                 for i in range(len(func.args)):
                     arg_assignments[definition.args[i][0]] = \

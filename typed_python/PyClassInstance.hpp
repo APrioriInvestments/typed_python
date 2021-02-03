@@ -68,7 +68,7 @@ public:
 
     int pyInquiryConcrete(const char* op, const char* opErrRep);
 
-    static void mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyTypeObject* pyType);
+    static void mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyTypeObject* pyType, bool asHeldClass=false);
 
     int tp_setattr_concrete(PyObject* attrName, PyObject* attrVal);
 

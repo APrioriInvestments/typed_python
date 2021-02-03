@@ -2670,3 +2670,29 @@ class TypesSerializationTest(unittest.TestCase):
         s2 = s.serialize(moduleLevelFunctionUsedByExactlyOneSerializationTest)
 
         assert s1 == s2
+
+    def test_serialize_anonymous_class_with_defaults_and_nonempty(self):
+        class C1(Class):
+            x1 = Member(int, default_value=10, nonempty=True)
+            x2 = Member(str, default_value="10", nonempty=True)
+            x3 = Member(float, default_value=2.5)
+            x4 = Member(str, nonempty=True)
+
+        s = SerializationContext()
+
+        C2 = s.deserialize(s.serialize(C1))
+
+        assert C2.ClassMembers['x1'].type is int
+        assert C2.ClassMembers['x2'].type is str
+        assert C2.ClassMembers['x3'].type is float
+        assert C2.ClassMembers['x4'].type is str
+
+        assert C2.ClassMembers['x1'].isNonempty
+        assert C2.ClassMembers['x2'].isNonempty
+        assert not C2.ClassMembers['x3'].isNonempty
+        assert C2.ClassMembers['x4'].isNonempty
+
+        assert C2.ClassMembers['x1'].defaultValue == 10
+        assert C2.ClassMembers['x2'].defaultValue == "10"
+        assert C2.ClassMembers['x3'].defaultValue == 2.5
+        assert C2.ClassMembers['x4'].defaultValue is None

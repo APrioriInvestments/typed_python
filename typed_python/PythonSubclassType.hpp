@@ -123,6 +123,10 @@ public:
         return m_base->cmp(left, right, pyComparisonOp, suppressExceptions);
     }
 
+    bool isPODConcrete() {
+        return m_base->isPOD();
+    }
+
     void constructor(instance_ptr self) {
         m_base->constructor(self);
     }

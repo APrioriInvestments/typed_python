@@ -61,6 +61,49 @@ public:
     }
 };
 
+// models a single class member definition
+class MemberDefinition {
+public:
+    MemberDefinition(
+        const std::string& inName, 
+        Type* inType, 
+        const Instance& inDefaultValue,
+        bool nonempty
+    ) : 
+        mName(inName),
+        mType(inType),
+        mDefaultValue(inDefaultValue),
+        mIsNonempty(nonempty)
+    {}
+
+    const std::string& getName() const {
+        return mName;
+    }
+
+    Type*& getType() {
+        return mType;
+    }
+
+    Type* getType() const {
+        return mType;
+    }
+
+    const Instance& getDefaultValue() const {
+        return mDefaultValue;
+    }
+
+    bool getIsNonempty() const {
+        return mIsNonempty;
+    }
+
+private:
+    std::string mName;
+    Type* mType;
+    Instance mDefaultValue;
+    bool mIsNonempty;
+};
+
+
 /****
 ClassDispatchTable
 
@@ -289,7 +332,7 @@ public:
     HeldClass(std::string inName,
           const std::vector<HeldClass*>& baseClasses,
           bool isFinal,
-          const std::vector<std::tuple<std::string, Type*, Instance> >& members,
+          const std::vector<MemberDefinition>& members,
           const std::map<std::string, Function*>& memberFunctions,
           const std::map<std::string, Function*>& staticFunctions,
           const std::map<std::string, Function*>& propertyFunctions,
@@ -322,9 +365,10 @@ public:
 
         res += ShaHash(1);
         for (auto tup: m_own_members) {
-            res += ShaHash(std::get<0>(tup));
-            res += ShaHash(std::get<1>(tup)->identityHash(groupHead));
-            res += MutuallyRecursiveTypeGroup::tpInstanceShaHash(std::get<2>(tup), groupHead);
+            res += ShaHash(tup.getName());
+            res += ShaHash(tup.getType()->identityHash(groupHead));
+            res += MutuallyRecursiveTypeGroup::tpInstanceShaHash(tup.getDefaultValue(), groupHead);
+            res += ShaHash(tup.getIsNonempty());
         }
 
         res += ShaHash(2);
@@ -357,7 +401,7 @@ public:
     template<class visitor_type>
     void _visitCompilerVisibleInstances(const visitor_type& visitor) {
         for (auto tup: m_own_members) {
-            visitor(std::get<2>(tup));
+            visitor(tup.getDefaultValue());
         }
     }
 
@@ -366,7 +410,7 @@ public:
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
         for (auto& o: m_members) {
-            visitor(std::get<1>(o));
+            visitor(o.getType());
         }
     }
 
@@ -380,40 +424,44 @@ public:
             }
         }
         for (auto& o: m_own_members) {
-            visitor(std::get<1>(o));
+            // this is expected to actually modify the type
+            // if its a forward.
+            visitor(o.getType());
         }
         for (auto& o: m_own_memberFunctions) {
-            Type* t = std::get<1>(o);
+            Type* t = o.second;
             visitor(t);
-            assert(t == std::get<1>(o));
+            assert(t == o.second);
         }
         for (auto& o: m_own_staticFunctions) {
-            Type* t = std::get<1>(o);
+            Type* t = o.second;
             visitor(t);
-            assert(t == std::get<1>(o));
+            assert(t == o.second);
         }
         for (auto& o: m_own_propertyFunctions) {
-            Type* t = std::get<1>(o);
+            Type* t = o.second;
             visitor(t);
-            assert(t == std::get<1>(o));
+            assert(t == o.second);
         }
         for (auto& o: m_members) {
-            visitor(std::get<1>(o));
+            // this is expected to actually modify the type
+            // if its a forward.
+            visitor(o.getType());
         }
         for (auto& o: m_memberFunctions) {
-            Type* t = std::get<1>(o);
+            Type* t = o.second;
             visitor(t);
-            assert(t == std::get<1>(o));
+            assert(t == o.second);
         }
         for (auto& o: m_staticFunctions) {
-            Type* t = std::get<1>(o);
+            Type* t = o.second;
             visitor(t);
-            assert(t == std::get<1>(o));
+            assert(t == o.second);
         }
         for (auto& o: m_propertyFunctions) {
-            Type* t = std::get<1>(o);
+            Type* t = o.second;
             visitor(t);
-            assert(t == std::get<1>(o));
+            assert(t == o.second);
         }
     }
 
@@ -430,7 +478,7 @@ public:
         std::string inName,
         const std::vector<HeldClass*>& bases,
         bool isFinal,
-        const std::vector<std::tuple<std::string, Type*, Instance> >& members,
+        const std::vector<MemberDefinition>& members,
         const std::map<std::string, Function*>& memberFunctions,
         const std::map<std::string, Function*>& staticFunctions,
         const std::map<std::string, Function*>& propertyFunctions,
@@ -480,7 +528,7 @@ public:
     ) {
         for (int64_t k = 0; k < m_members.size(); k++) {
             if (checkInitializationFlag(src, k)) {
-                std::get<1>(m_members[k])->deepcopy(
+                m_members[k].getType()->deepcopy(
                     eltPtr(dest, k),
                     eltPtr(src, k),
                     alreadyAllocated,
@@ -495,7 +543,7 @@ public:
         size_t res = 0;
 
         for (long k = 0; k < m_members.size(); k++) {
-            res += std::get<1>(m_members[k])->deepBytecount(eltPtr(instance, k), alreadyVisited, outSlabs);
+            res += m_members[k].getType()->deepBytecount(eltPtr(instance, k), alreadyVisited, outSlabs);
         }
 
         return res;
@@ -524,7 +572,7 @@ public:
         for (long k = 0; k < m_members.size();k++) {
             bool isInitialized = checkInitializationFlag(self, k);
             if (isInitialized) {
-                std::get<1>(m_members[k])->serialize(eltPtr(self,k),buffer, k);
+                m_members[k].getType()->serialize(eltPtr(self,k),buffer, k);
             }
         }
 
@@ -543,7 +591,7 @@ public:
                 setInitializationFlag(self, k);
             } catch(...) {
                 for (long k2 = k-1; k2 >= 0; k2--) {
-                    std::get<1>(m_members[k2])->destroy(eltPtr(self,k2));
+                    m_members[k2].getType()->destroy(eltPtr(self,k2));
                 }
                 throw;
             }
@@ -567,11 +615,11 @@ public:
 
     void assign(instance_ptr self, instance_ptr other);
 
-    bool checkInitializationFlag(instance_ptr self, int memberIndex) const {
-        int byte = memberIndex / 8;
-        int bit = memberIndex % 8;
-        return bool( ((uint8_t*)self)[byte] & (1 << bit) );
+    bool fieldGuaranteedInitialized(int ix) const {
+        return m_members[ix].getIsNonempty();
     }
+
+    bool checkInitializationFlag(instance_ptr self, int memberIndex) const;
 
     bool isFinal() {
         return m_is_final;
@@ -581,31 +629,35 @@ public:
 
     void clearInitializationFlag(instance_ptr self, int memberIndex) const;
 
+    bool getMemberIsNonempty(int index) const {
+        return m_members[index].getIsNonempty();
+    }
+
     Type* getMemberType(int index) const {
-        return std::get<1>(m_members[index]);
+        return m_members[index].getType();
     }
 
     const std::string& getMemberName(int index) const {
-        return std::get<0>(m_members[index]);
+        return m_members[index].getName();
     }
 
     bool memberHasDefaultValue(int index) const {
-        return std::get<2>(m_members[index]).type()->getTypeCategory() != TypeCategory::catNone;
+        return m_members[index].getDefaultValue().type()->getTypeCategory() != TypeCategory::catNone;
     }
 
     const Instance& getMemberDefaultValue(int index) const {
-        return std::get<2>(m_members[index]);
+        return m_members[index].getDefaultValue();
     }
 
     const std::vector<HeldClass*> getBases() const {
         return m_bases;
     }
 
-    const std::vector<std::tuple<std::string, Type*, Instance> >& getMembers() const {
+    const std::vector<MemberDefinition>& getMembers() const {
         return m_members;
     }
 
-    const std::vector<std::tuple<std::string, Type*, Instance> >& getOwnMembers() const {
+    const std::vector<MemberDefinition>& getOwnMembers() const {
         return m_own_members;
     }
 
@@ -713,15 +765,15 @@ public:
         }
 
         for (auto nameAndType: m_members) {
-            membersSoFar.insert(std::get<0>(nameAndType));
+            membersSoFar.insert(nameAndType.getName());
         }
 
         for (auto nameAndType: m_own_members) {
-            if (membersSoFar.find(std::get<0>(nameAndType)) != membersSoFar.end()) {
-                throw std::runtime_error("Can't redefine member named " + std::get<0>(nameAndType));
+            if (membersSoFar.find(nameAndType.getName()) != membersSoFar.end()) {
+                throw std::runtime_error("Can't redefine member named " + nameAndType.getName());
             }
 
-            membersSoFar.insert(std::get<0>(nameAndType));
+            membersSoFar.insert(nameAndType.getName());
 
             m_members.push_back(nameAndType);
         }
@@ -730,7 +782,7 @@ public:
             // note that we explicitly leak the string so that the refcount on c_str
             // stays active. I'm sure there's a better way to do this, but types are
             // permanent, so we would never have cleaned this up anyways.
-            m_membersByName[(new std::string(std::get<0>(m_members[k])))->c_str()] = k;
+            m_membersByName[(new std::string(m_members[k].getName()))->c_str()] = k;
         }
 
         for (HeldClass* ancestor: m_mro) {
@@ -884,7 +936,7 @@ private:
     std::vector<ClassDispatchTable> mClassDispatchTables;
 
     //the members we
-    std::vector<std::tuple<std::string, Type*, Instance> > m_members;
+    std::vector<MemberDefinition> m_members;
 
     std::map<std::string, Function*> m_memberFunctions;
 
@@ -895,7 +947,7 @@ private:
     std::map<std::string, PyObject*> m_classMembers;
 
     // the original members we were provided with
-    std::vector<std::tuple<std::string, Type*, Instance> > m_own_members;
+    std::vector<MemberDefinition> m_own_members;
 
     std::map<std::string, Function*> m_own_memberFunctions;
 

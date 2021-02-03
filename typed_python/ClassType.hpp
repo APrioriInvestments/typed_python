@@ -122,7 +122,7 @@ public:
             std::string inName,
             const std::vector<Class*>& bases,
             bool isFinal,
-            const std::vector<std::tuple<std::string, Type*, Instance> >& members,
+            const std::vector<MemberDefinition>& members,
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
             const std::map<std::string, Function*>& propertyFunctions,
@@ -419,6 +419,10 @@ public:
 
     void assign(instance_ptr self, instance_ptr other);
 
+    bool getMemberIsNonempty(int index) const {
+        return m_heldClass->getMemberIsNonempty(index);
+    }
+
     Type* getMemberType(int index) const {
         return m_heldClass->getMemberType(index);
     }
@@ -435,7 +439,7 @@ public:
         return m_heldClass->getMemberFunctionMethodType(name, false);
     }
 
-    const std::vector<std::tuple<std::string, Type*, Instance> >& getMembers() const {
+    const std::vector<MemberDefinition>& getMembers() const {
         return m_heldClass->getMembers();
     }
 
@@ -455,7 +459,7 @@ public:
         return m_heldClass->getPropertyFunctions();
     }
 
-    const std::vector<std::tuple<std::string, Type*, Instance> >& getOwnMembers() const {
+    const std::vector<MemberDefinition>& getOwnMembers() const {
         return m_heldClass->getOwnMembers();
     }
 

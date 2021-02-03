@@ -2249,3 +2249,76 @@ class TestClassCompilationCompilation(unittest.TestCase):
         # if we know it as Base1, but it's a Child, we should be able
         # to cross call it
         assert callFromBase1(callAsBase2, Child()) == 3
+
+    def test_class_nonempty(self):
+        class CNonempty(Class, Final):
+            x = Member(str, nonempty=True)
+
+            def __init__(self):
+                pass
+
+        class CEmpty(Class, Final):
+            x = Member(str)
+
+            def __init__(self):
+                pass
+
+        @Entrypoint
+        def callIt(X):
+            return X()
+
+        @Entrypoint
+        def deleteX(x):
+            del x.x
+
+        @Entrypoint
+        def getX(x):
+            return x.x
+
+        @Entrypoint
+        def setX(x, xVal):
+            x.x = xVal
+
+        cN = callIt(CNonempty)
+        cE = callIt(CEmpty)
+
+        assert getX(cN) == ''
+        assert getX(cE) == ''
+        
+        with self.assertRaisesRegex(Exception, "Attribute 'x' cannot be deleted"):
+            deleteX(cN)
+        deleteX(cE)
+
+        with self.assertRaisesRegex(Exception, "Attribute 'x' is not initialized"):
+            deleteX(cE)
+
+        with self.assertRaisesRegex(Exception, "Attribute 'x' is not initialized"):
+            getX(cE)
+
+        setX(cE, 'hihi')
+        assert getX(cE) == "hihi"
+
+    def test_class_nonempty_forces_construction(self):
+        class SomeOtherClass(Class):
+            pass
+
+        class CNonempty(Class, Final):
+            x = Member(SomeOtherClass, nonempty=True)
+
+            def __init__(self):
+                pass
+
+        class CEmpty(Class, Final):
+            x = Member(SomeOtherClass)
+
+            def __init__(self):
+                pass
+
+        @Entrypoint
+        def callIt(X):
+            return X()
+
+        callIt(CNonempty).x
+
+        with self.assertRaisesRegex(Exception, "Attribute 'x' is not initialized"):
+            callIt(CEmpty).x

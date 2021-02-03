@@ -65,14 +65,14 @@ def sizeof_native_type(native_type):
 _engineCache = []
 
 
-def create_execution_engine():
+def create_execution_engine(inlineThreshold):
     if _engineCache:
         return _engineCache[0]
 
     pmb = llvm.create_pass_manager_builder()
     pmb.opt_level = 3
     pmb.size_level = 0
-    pmb.inlining_threshold = 1
+    pmb.inlining_threshold = inlineThreshold
     pmb.loop_vectorize = True
     pmb.slp_vectorize = True
 
@@ -91,10 +91,11 @@ def create_execution_engine():
 
 
 class Compiler:
-    def __init__(self):
-        self.engine, self.module_pass_manager = create_execution_engine()
+    def __init__(self, inlineThreshold):
+        self.engine, self.module_pass_manager = create_execution_engine(inlineThreshold)
         self.converter = native_ast_to_llvm.Converter()
         self.functions_by_name = {}
+        self.inlineThreshold = inlineThreshold
         self.verbose = False
         self.optimize = True
 

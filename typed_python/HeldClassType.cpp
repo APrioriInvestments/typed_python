@@ -28,8 +28,8 @@ bool HeldClass::isBinaryCompatibleWithConcrete(Type* other) {
     }
 
     for (long k = 0; k < m_members.size(); k++) {
-        if (std::get<0>(m_members[k]) != std::get<0>(otherO->m_members[k]) ||
-                !std::get<1>(m_members[k])->isBinaryCompatibleWith(std::get<1>(otherO->m_members[k]))) {
+        if (m_members[k].getName() != otherO->m_members[k].getName() ||
+                !m_members[k].getType()->isBinaryCompatibleWith(otherO->m_members[k].getType())) {
             return false;
         }
     }
@@ -46,7 +46,7 @@ bool HeldClass::_updateAfterForwardTypesChanged() {
 
     for (auto t: m_members) {
         m_byte_offsets.push_back(size);
-        size += std::get<1>(t)->bytecount();
+        size += t.getType()->bytecount();
     }
 
     bool anyChanged = size != m_size;
@@ -89,11 +89,11 @@ void HeldClass::repr(instance_ptr self, ReprAccumulator& stream, bool isStr, boo
         }
 
         if (checkInitializationFlag(self, k)) {
-            stream << std::get<0>(m_members[k]) << "=";
+            stream << m_members[k].getName() << "=";
 
-            std::get<1>(m_members[k])->repr(eltPtr(self,k), stream, false);
+            m_members[k].getType()->repr(eltPtr(self,k), stream, false);
         } else {
-            stream << std::get<0>(m_members[k]) << " not initialized";
+            stream << m_members[k].getName() << " not initialized";
         }
     }
     if (m_members.size() == 1) {
@@ -121,7 +121,7 @@ RefTo* HeldClass::getRefToType() {
 }
 
 void HeldClass::delAttribute(instance_ptr self, int memberIndex) const {
-    Type* member_t = std::get<1>(m_members[memberIndex]);
+    Type* member_t = m_members[memberIndex].getType();
     if (checkInitializationFlag(self, memberIndex)) {
         member_t->destroy(eltPtr(self, memberIndex));
         clearInitializationFlag(self, memberIndex);
@@ -129,7 +129,7 @@ void HeldClass::delAttribute(instance_ptr self, int memberIndex) const {
 }
 
 void HeldClass::setAttribute(instance_ptr self, int memberIndex, instance_ptr other) const {
-    Type* member_t = std::get<1>(m_members[memberIndex]);
+    Type* member_t = m_members[memberIndex].getType();
     if (checkInitializationFlag(self, memberIndex)) {
         member_t->assign(
             eltPtr(self, memberIndex),
@@ -146,14 +146,14 @@ void HeldClass::setAttribute(instance_ptr self, int memberIndex, instance_ptr ot
 
 void HeldClass::constructor(instance_ptr self) {
     for (size_t k = 0; k < m_members.size(); k++) {
-        Type* member_t = std::get<1>(m_members[k]);
+        Type* member_t = m_members[k].getType();
 
-        if (wantsToDefaultConstruct(member_t)) {
-            if (memberHasDefaultValue(k)) {
-                member_t->copy_constructor(self+m_byte_offsets[k], getMemberDefaultValue(k).data());
-            } else {
-                member_t->constructor(self+m_byte_offsets[k]);
-            }
+        if (memberHasDefaultValue(k)) {
+            member_t->copy_constructor(self+m_byte_offsets[k], getMemberDefaultValue(k).data());
+            setInitializationFlag(self, k);
+        }
+        else if (wantsToDefaultConstruct(member_t) || m_members[k].getIsNonempty()) {
+            member_t->constructor(self+m_byte_offsets[k]);
             setInitializationFlag(self, k);
         } else {
             clearInitializationFlag(self, k);
@@ -163,7 +163,7 @@ void HeldClass::constructor(instance_ptr self) {
 
 void HeldClass::destroy(instance_ptr self) {
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
-        Type* member_t = std::get<1>(m_members[k]);
+        Type* member_t = m_members[k].getType();
         if (checkInitializationFlag(self, k)) {
             member_t->destroy(self+m_byte_offsets[k]);
         }
@@ -172,7 +172,7 @@ void HeldClass::destroy(instance_ptr self) {
 
 void HeldClass::copy_constructor(instance_ptr self, instance_ptr other) {
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
-        Type* member_t = std::get<1>(m_members[k]);
+        Type* member_t = m_members[k].getType();
         if (checkInitializationFlag(other, k)) {
             member_t->copy_constructor(self+m_byte_offsets[k], other+m_byte_offsets[k]);
             setInitializationFlag(self, k);
@@ -184,7 +184,7 @@ void HeldClass::assign(instance_ptr self, instance_ptr other) {
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
         bool selfInit = checkInitializationFlag(self,k);
         bool otherInit = checkInitializationFlag(other,k);
-        Type* member_t = std::get<1>(m_members[k]);
+        Type* member_t = m_members[k].getType();
         if (selfInit && otherInit) {
             member_t->assign(self + m_byte_offsets[k], other+m_byte_offsets[k]);
         }
@@ -198,7 +198,21 @@ void HeldClass::assign(instance_ptr self, instance_ptr other) {
     }
 }
 
+bool HeldClass::checkInitializationFlag(instance_ptr self, int memberIndex) const {
+    if (fieldGuaranteedInitialized(memberIndex)) {
+        return true;
+    }
+
+    int byte = memberIndex / 8;
+    int bit = memberIndex % 8;
+    return bool( ((uint8_t*)self)[byte] & (1 << bit) );
+}
+
 void HeldClass::setInitializationFlag(instance_ptr self, int memberIndex) const {
+    if (fieldGuaranteedInitialized(memberIndex)) {
+        return;
+    }
+
     int byte = memberIndex / 8;
     int bit = memberIndex % 8;
     uint8_t mask = (1 << bit);
@@ -206,6 +220,10 @@ void HeldClass::setInitializationFlag(instance_ptr self, int memberIndex) const 
 }
 
 void HeldClass::clearInitializationFlag(instance_ptr self, int memberIndex) const {
+    if (fieldGuaranteedInitialized(memberIndex)) {
+        return;
+    }
+
     int byte = memberIndex / 8;
     int bit = memberIndex % 8;
     uint8_t mask = (1 << bit);
@@ -214,7 +232,7 @@ void HeldClass::clearInitializationFlag(instance_ptr self, int memberIndex) cons
 
 int HeldClass::memberNamed(const char* c) const {
     for (long k = 0; k < m_members.size(); k++) {
-        if (std::get<0>(m_members[k]) == c) {
+        if (m_members[k].getName() == c) {
             return k;
         }
     }
@@ -265,7 +283,7 @@ HeldClass* HeldClass::Make(
     std::string inName,
     const std::vector<HeldClass*>& bases,
     bool isFinal,
-    const std::vector<std::tuple<std::string, Type*, Instance> >& members,
+    const std::vector<MemberDefinition>& members,
     const std::map<std::string, Function*>& memberFunctions,
     const std::map<std::string, Function*>& staticFunctions,
     const std::map<std::string, Function*>& propertyFunctions,

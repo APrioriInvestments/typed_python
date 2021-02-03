@@ -67,11 +67,31 @@ def closurePassingType(x):
 
 
 class Member:
-    """A member of a Class object."""
+    """Describe a data member of a Class object.
 
-    def __init__(self, t, default_value=None):
+    A Class definition usually looks something like:
+
+        class MyClass(Class):
+            aMember = Member(int)
+            anotherMember = Member(int)
+
+    where 'Member' is this class.  Members always have a type which
+    describes which kinds of values can go into the class. Subclasses
+    are guaranteed to also have this type for this member name.
+
+    Members may be marked 'nonempty' by passing the 'nonempty=True' flag. 
+    This means that they cannot be deleted as attributes, they are 
+    always initialized when the object is constructed, and attribute 
+    access will always succeed. This also improves performance of 
+    compiled code because we don't have to check a flag to see if the 
+    value is populated.
+    """
+
+    def __init__(self, t, default_value=None, nonempty=False):
         self._type = t
         self._default_value = default_value
+        self._nonempty = nonempty
+
         if self._default_value is not None:
             assert isinstance(self._default_value, self._type)
 
@@ -80,6 +100,14 @@ class Member:
         if getattr(self._type, '__typed_python_category__', None) == "Forward":
             return self._type.get()
         return self._type
+
+    @property
+    def defaultValue(self):
+        return self._default_value
+
+    @property
+    def isNonempty(self):
+        return self._nonempty
 
     def __eq__(self, other):
         if not isinstance(other, Member):
@@ -248,7 +276,7 @@ class ClassMetaclass(type):
 
         for eltName, elt in namespace.order:
             if isinstance(elt, Member):
-                members.append((eltName, elt._type, elt._default_value))
+                members.append((eltName, elt._type, elt._default_value, elt._nonempty))
                 classMembers.append((eltName, elt))
             elif isinstance(elt, property):
                 properties[eltName] = makeFunctionType(eltName, elt.fget, assumeClosuresGlobal=True)

@@ -30,7 +30,7 @@ from typed_python.internals import makeFunctionType, checkOneOfType
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
-from typed_python import _types, Type, ListOf, PointerTo, pointerTo, Set, Dict
+from typed_python import _types, Type, ListOf, PointerTo, pointerTo, Set, Dict, Member
 from typed_python.generator import Generator
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.expression_conversion_context import ExpressionConversionContext
@@ -412,6 +412,7 @@ class ConversionContextBase:
         if self.variablesNeedingClosureSlots:
             # now build the closure type itself and replace the forward with the defined class
             closureMembers = []
+            classMembers = []
 
             replacedVarTypes = {}
 
@@ -421,7 +422,8 @@ class ConversionContextBase:
                         self._varname_to_type[var].typeRepresentation
                     )
 
-                    closureMembers.append((var, replacedVarTypes[var], None))
+                    closureMembers.append((var, replacedVarTypes[var], None, False))
+                    classMembers.append((var, Member(replacedVarTypes[var], None, False)))
 
             memberFunctions = {
                 '__init__':
@@ -429,7 +431,13 @@ class ConversionContextBase:
             }
 
             self.closureType = self.closureType.define(
-                _types.Class(self.name + ".closure", (), True, tuple(closureMembers), tuple(memberFunctions.items()), (), (), ())
+                _types.Class(self.name + ".closure", (), True, 
+                    tuple(closureMembers), 
+                    tuple(memberFunctions.items()), 
+                    (), 
+                    (), 
+                    tuple(classMembers)
+                )
             )
 
             assert not _types.is_default_constructible(self.closureType)
@@ -534,13 +542,19 @@ class ConversionContextBase:
         T = self._varname_to_type[FunctionYield].typeRepresentation
 
         generatorMembers = [
-            ("..slot", int, None),
-            ("..value", T, None)
+            ("..slot", int, None, True),
+            ("..value", T, None, True)
+        ]
+
+        classMembers = [
+            ("..slot", Member(int, None, True)),
+            ("..value", Member(T, None, True))
         ]
 
         for k, v in self._varname_to_type.items():
             if isinstance(k, str):
-                generatorMembers.append(("." + k, v.typeRepresentation, None))
+                generatorMembers.append(("." + k, v.typeRepresentation, None, False))
+                classMembers.append(("." + k, Member(v.typeRepresentation, None, False)))
 
         smts = self.createGeneratorFun()
 
@@ -584,7 +598,7 @@ class ConversionContextBase:
                 tuple(memberFunctions.items()),
                 (),
                 (),
-                ()
+                tuple(classMembers)
             )
         )
 

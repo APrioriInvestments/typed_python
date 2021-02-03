@@ -27,7 +27,10 @@ public:
     }
 
     static void mirrorTypeInformationIntoPyTypeConcrete(HeldClass* classT, PyTypeObject* pyType) {
-        //expose 'ElementType' as a member of the type object
-        PyDict_SetItemString(pyType->tp_dict, "Class", typePtrToPyTypeRepresentation(classT->getClassType()));
+        PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(
+            classT->getClassType(), 
+            pyType, 
+            true /* asHeldClass */
+        );
     }
 };

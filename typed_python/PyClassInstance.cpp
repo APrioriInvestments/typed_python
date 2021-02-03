@@ -127,6 +127,15 @@ int PyClassInstance::classInstanceSetAttributeFromPyObject(Class* cls, instance_
     }
 
     if (!attrVal) {
+        if (cls->getMemberIsNonempty(i)) {
+            PyErr_Format(
+                PyExc_AttributeError,
+                "Attribute '%S' cannot be deleted",
+                attrName
+            );
+            return -1;
+        }
+
         if (!cls->checkInitializationFlag(data, i)) {
             PyErr_Format(
                 PyExc_AttributeError,
@@ -416,7 +425,9 @@ PyObject* PyClassInstance::tp_getattr_concrete(PyObject* pyAttrName, const char*
             PyErr_Format(
                 PyExc_AttributeError,
                 "Attribute '%S' is not initialized",
-                pyAttrName
+                pyAttrName,
+                eltType->name().c_str(),
+                eltType->isPOD() ? "pod":"not pod"
             );
             return NULL;
         }
@@ -470,7 +481,11 @@ PyObject* PyClassInstance::tp_getattr_concrete(PyObject* pyAttrName, const char*
     return ret;
 }
 
-void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyTypeObject* pyType) {
+/* initialize the type object's dict.
+
+if 'asHeldClass', then this is the held class's dict we're initializing.
+*/
+void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyTypeObject* pyType, bool asHeldClass) {
     PyObjectStealer bases(PyTuple_New(classT->getHeldClass()->getBases().size()));
 
     for (long k = 0; k < classT->getHeldClass()->getBases().size(); k++) {
@@ -494,12 +509,12 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
     PyObjectStealer types(PyTuple_New(classT->getMembers().size()));
 
     for (long k = 0; k < classT->getMembers().size(); k++) {
-        PyTuple_SetItem(types, k, incref(typePtrToPyTypeRepresentation(std::get<1>(classT->getMembers()[k]))));
+        PyTuple_SetItem(types, k, incref(typePtrToPyTypeRepresentation(classT->getMembers()[k].getType())));
     }
 
     PyObjectStealer names(PyTuple_New(classT->getMembers().size()));
     for (long k = 0; k < classT->getMembers().size(); k++) {
-        PyObject* namePtr = PyUnicode_FromString(std::get<0>(classT->getMembers()[k]).c_str());
+        PyObject* namePtr = PyUnicode_FromString(classT->getMembers()[k].getName().c_str());
         PyTuple_SetItem(names, k, namePtr);
     }
 
@@ -551,7 +566,12 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
     }
 
     //expose 'ElementType' as a member of the type object
-    PyDict_SetItemString(pyType->tp_dict, "HeldClass", typePtrToPyTypeRepresentation(classT->getHeldClass()));
+    if (asHeldClass) {
+        PyDict_SetItemString(pyType->tp_dict, "Class", typePtrToPyTypeRepresentation(classT));
+    } else {
+        PyDict_SetItemString(pyType->tp_dict, "HeldClass", typePtrToPyTypeRepresentation(classT->getHeldClass()));
+    }
+
     PyDict_SetItemString(pyType->tp_dict, "MemberTypes", types);
     PyDict_SetItemString(pyType->tp_dict, "BaseClasses", bases);
     PyDict_SetItemString(pyType->tp_dict, "IsFinal", classT->isFinal() ? Py_True : Py_False);
