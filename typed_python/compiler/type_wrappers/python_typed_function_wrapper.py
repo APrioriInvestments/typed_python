@@ -723,30 +723,34 @@ class PythonTypedFunctionWrapper(Wrapper):
 
             argType = typeWrapper(argType)
 
-            convertedArg = context.allocateUninitializedSlot(argType)
-
-            successful = argExpr.convert_to_type_with_target(convertedArg, conversionLevel)
-
-            if successful.isConstant:
-                if successful.constantValue:
-                    context.markUninitializedSlotInitialized(convertedArg)
-                else:
-                    # we can return early
-                    context.pushTerminal(
-                        native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
-                    )
-                    return
+            if argExpr.expr_type == argType:
+                # nothing to do
+                convertedArg = argExpr
             else:
-                argConversionMightNotBeSuccessful = True
+                convertedArg = context.allocateUninitializedSlot(argType)
 
-                with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
-                    with ifFalse:
+                successful = argExpr.convert_to_type_with_target(convertedArg, conversionLevel)
+
+                if successful.isConstant:
+                    if successful.constantValue:
+                        context.markUninitializedSlotInitialized(convertedArg)
+                    else:
+                        # we can return early
                         context.pushTerminal(
                             native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
                         )
+                        return
+                else:
+                    argConversionMightNotBeSuccessful = True
 
-                    with ifTrue:
-                        context.markUninitializedSlotInitialized(convertedArg)
+                    with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
+                        with ifFalse:
+                            context.pushTerminal(
+                                native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
+                            )
+
+                        with ifTrue:
+                            context.markUninitializedSlotInitialized(convertedArg)
 
             if argNames[argIx] is None:
                 convertedArgs.append(convertedArg)
