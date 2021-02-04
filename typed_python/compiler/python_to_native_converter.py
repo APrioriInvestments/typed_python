@@ -246,7 +246,11 @@ class PythonToNativeConverter:
 
     def defineLinkName(self, identity, linkName):
         if identity in self._link_name_for_identity:
-            assert self._link_name_for_identity[identity] == linkName
+            if self._link_name_for_identity[identity] != linkName:
+                raise Exception(
+                    f"For identity {identity}:\n\n"
+                    f"{self._link_name_for_identity[identity]}\n\n!=\n\n{linkName}"
+                )
             assert self._identity_for_link_name[linkName] == identity
         else:
             self._link_name_for_identity[identity] = linkName

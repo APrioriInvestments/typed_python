@@ -33,7 +33,11 @@ public:
     }
 
     ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-        return ShaHash(1, m_typeCategory) + m_first_arg->identityHash(groupHead);
+        return (
+            ShaHash(1, m_typeCategory) +
+            m_first_arg->identityHash(groupHead) +
+            ShaHash(m_funcName)
+        );
     }
 
     template<class visitor_type>
