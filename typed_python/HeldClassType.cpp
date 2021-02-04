@@ -37,12 +37,27 @@ bool HeldClass::isBinaryCompatibleWithConcrete(Type* other) {
     return true;
 }
 
+void HeldClass::updateBytesOfInitBits() {
+    bool anyMembersWithInitializers = false;
+    for (auto& m: m_members) {
+        if (!m.getIsNonempty()) {
+            anyMembersWithInitializers = true;
+        }
+    }
+
+    if (!anyMembersWithInitializers) {
+        mBytesOfInitializationBits = 0;
+    } else {
+        mBytesOfInitializationBits = int((m_members.size() + 7) / 8); //round up to nearest byte
+    }
+}
+
 bool HeldClass::_updateAfterForwardTypesChanged() {
     m_byte_offsets.clear();
 
-    //first 8 bytes are the vtable pointer.
-    //the next m_members.size() bits (rounded up to nearest byte) contain the initialization flags.
-    size_t size = int((m_members.size() + 7) / 8); //round up to nearest byte
+    updateBytesOfInitBits();
+
+    size_t size = mBytesOfInitializationBits;
 
     for (auto t: m_members) {
         m_byte_offsets.push_back(size);

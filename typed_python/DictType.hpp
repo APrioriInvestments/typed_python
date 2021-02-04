@@ -216,8 +216,8 @@ public:
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
-        size_t count;
-        size_t id;
+        size_t count = 0;
+        size_t id = 0;
         bool wasFromId = false;
 
         size_t valuesRead = buffer.consumeCompoundMessageWithImpliedFieldNumbers(wireType,

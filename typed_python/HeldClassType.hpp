@@ -65,11 +65,11 @@ public:
 class MemberDefinition {
 public:
     MemberDefinition(
-        const std::string& inName, 
-        Type* inType, 
+        const std::string& inName,
+        Type* inType,
         const Instance& inDefaultValue,
         bool nonempty
-    ) : 
+    ) :
         mName(inName),
         mType(inType),
         mDefaultValue(inDefaultValue),
@@ -793,7 +793,13 @@ public:
             ancestor->m_implementors.insert(this);
         }
 
-        m_vtable->finalize(&mClassDispatchTables[0], (m_members.size() + 7) / 8, mClassDispatchTables.size());
+        updateBytesOfInitBits();
+
+        m_vtable->finalize(
+            &mClassDispatchTables[0],
+            mBytesOfInitializationBits,
+            mClassDispatchTables.size()
+        );
 
         // make sure that, for every interface we can take on, we have slots allocated
         // that the compiler can come along and compile.
@@ -803,6 +809,8 @@ public:
 
         setMagicMethodExistConstants();
     }
+
+    void updateBytesOfInitBits();
 
     void setMagicMethodExistConstants() {
         if (m_memberFunctions.find("__eq__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
@@ -915,6 +923,8 @@ private:
     std::vector<size_t> m_byte_offsets;
 
     std::vector<HeldClass*> m_bases;
+
+    size_t mBytesOfInitializationBits;
 
     // if final, we can't subclass this class
     bool m_is_final;

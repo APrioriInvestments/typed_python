@@ -90,9 +90,15 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         element_types = [('refcount', native_ast.Int64), ('vtable', vtable_type.pointer()), ('data', native_ast.UInt8)]
 
-        # this follows the general layout of 'held class' which is 1 bit per field for initialization and then
-        # each field packed directly according to byte size
-        self.bytesOfInitBits = (len(self.classType.MemberNames) + 7) // 8
+        # this follows the general layout of 'held class' which is 1 bit per field
+        # for initialization and then each field packed directly according to byte size
+        if all(
+            self.classType.ClassMembers[self.classType.MemberNames[i]].isNonempty
+            for i in range(len(self.classType.MemberNames))
+        ):
+            self.bytesOfInitBits = 0
+        else:
+            self.bytesOfInitBits = (len(self.classType.MemberNames) + 7) // 8
 
         byteOffset = 0
 
@@ -221,6 +227,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         # diagnostic you can use to check whether our dispatch indices are getting
         # messed up.
         # if self.typeRepresentation.IsFinal:
+        #     from typed_python import UInt64
         #     c = instance.context
         #     with c.ifelse(self.get_dispatch_index(instance)) as (ifTrue, ifFalse):
         #         with ifTrue:
