@@ -24,10 +24,7 @@ import inspect
 # some 'types' (threading.Lock, threading.RLock) aren't really types, they're
 # functions that produce some internal type. This contains the map from the
 # factory to the type that we actually expect instances to hold.
-_nonTypesAcceptedAsTypes = {
-    threading.Lock: _thread.LockType,
-    threading.RLock: _thread.RLock,
-}
+_nonTypesAcceptedAsTypes = {threading.Lock: _thread.LockType, threading.RLock: _thread.RLock}
 
 
 class CellAccess:
@@ -55,6 +52,7 @@ class Final:
     Final classes can't be subclassed, but generate faster code because
     we don't have to look up method dispatch in the vtable.
     """
+
     pass
 
 
@@ -79,11 +77,11 @@ class Member:
     describes which kinds of values can go into the class. Subclasses
     are guaranteed to also have this type for this member name.
 
-    Members may be marked 'nonempty' by passing the 'nonempty=True' flag. 
-    This means that they cannot be deleted as attributes, they are 
-    always initialized when the object is constructed, and attribute 
-    access will always succeed. This also improves performance of 
-    compiled code because we don't have to check a flag to see if the 
+    Members may be marked 'nonempty' by passing the 'nonempty=True' flag.
+    This means that they cannot be deleted as attributes, they are
+    always initialized when the object is constructed, and attribute
+    access will always succeed. This also improves performance of
+    compiled code because we don't have to check a flag to see if the
     value is populated.
     """
 
@@ -97,7 +95,7 @@ class Member:
 
     @property
     def type(self):
-        if getattr(self._type, '__typed_python_category__', None) == "Forward":
+        if getattr(self._type, "__typed_python_category__", None) == "Forward":
             return self._type.get()
         return self._type
 
@@ -132,37 +130,41 @@ class ClassMetaNamespace:
 
 
 magicMethodTypes = {
-    '__init__': type(None),
-    '__repr__': str,
-    '__str__': str,
-    '__bool__': bool,
-    '__bytes__': bytes,
-    '__contains__': bool,
-    '__float__': float,
-    '__int__': int,
-    '__len__': int,
-    '__lt__': bool,
-    '__gt__': bool,
-    '__le__': bool,
-    '__ge__': bool,
-    '__eq__': bool,
-    '__ne__': bool,
-    '__hash__': int,
-    '__setattr__': type(None),
-    '__delattr__': type(None),
-    '__setitem__': type(None),
-    '__delitem__': type(None),
+    "__init__": type(None),
+    "__repr__": str,
+    "__str__": str,
+    "__bool__": bool,
+    "__bytes__": bytes,
+    "__contains__": bool,
+    "__float__": float,
+    "__int__": int,
+    "__len__": int,
+    "__lt__": bool,
+    "__gt__": bool,
+    "__le__": bool,
+    "__ge__": bool,
+    "__eq__": bool,
+    "__ne__": bool,
+    "__hash__": int,
+    "__setattr__": type(None),
+    "__delattr__": type(None),
+    "__setitem__": type(None),
+    "__delitem__": type(None),
 }
 
 
-def makeFunctionType(name, f, classname=None, ignoreAnnotations=False, assumeClosuresGlobal=False, returnTypeOverride=None):
+def makeFunctionType(
+    name, f, classname=None, ignoreAnnotations=False, assumeClosuresGlobal=False, returnTypeOverride=None
+):
     if isinstance(f, typed_python._types.Function):
         if assumeClosuresGlobal:
             if typed_python.bytecount(type(f).ClosureType):
                 # we need to build the equivalent function with global closures
                 assert len(f.overloads) == 1, "Can't do this for multiple overloads yet"
 
-                res = makeFunctionType(name, f.extractPyFun(0), classname, ignoreAnnotations, assumeClosuresGlobal)
+                res = makeFunctionType(
+                    name, f.extractPyFun(0), classname, ignoreAnnotations, assumeClosuresGlobal
+                )
 
                 assert typed_python.bytecount(res.ClosureType) == 0
 
@@ -217,8 +219,8 @@ def makeFunctionType(name, f, classname=None, ignoreAnnotations=False, assumeClo
 
     return_type = None
 
-    if 'return' in spec.annotations and not ignoreAnnotations:
-        ann = spec.annotations.get('return')
+    if "return" in spec.annotations and not ignoreAnnotations:
+        ann = spec.annotations.get("return")
         if ann is None:
             ann = type(None)
         return_type = ann
@@ -282,23 +284,28 @@ class ClassMetaclass(type):
                 properties[eltName] = makeFunctionType(eltName, elt.fget, assumeClosuresGlobal=True)
             elif isinstance(elt, staticmethod):
                 if eltName not in staticFunctions:
-                    staticFunctions[eltName] = makeFunctionType(eltName, elt.__func__, assumeClosuresGlobal=True)
+                    staticFunctions[eltName] = makeFunctionType(
+                        eltName, elt.__func__, assumeClosuresGlobal=True
+                    )
                 else:
                     staticFunctions[eltName] = typed_python._types.Function(
                         staticFunctions[eltName],
-                        makeFunctionType(eltName, elt.__func__, assumeClosuresGlobal=True)
+                        makeFunctionType(eltName, elt.__func__, assumeClosuresGlobal=True),
                     )
             elif (
                 isinstance(elt, FunctionType)
                 or isinstance(elt, typed_python._types.Function)
-                or isinstance(elt, type) and issubclass(elt, typed_python._types.Function)
+                or isinstance(elt, type)
+                and issubclass(elt, typed_python._types.Function)
             ):
                 if eltName not in memberFunctions:
-                    memberFunctions[eltName] = makeFunctionType(eltName, elt, classname=name, assumeClosuresGlobal=True)
+                    memberFunctions[eltName] = makeFunctionType(
+                        eltName, elt, classname=name, assumeClosuresGlobal=True
+                    )
                 else:
                     memberFunctions[eltName] = typed_python._types.Function(
                         memberFunctions[eltName],
-                        makeFunctionType(eltName, elt, classname=name, assumeClosuresGlobal=True)
+                        makeFunctionType(eltName, elt, classname=name, assumeClosuresGlobal=True),
                     )
             else:
                 classMembers.append((eltName, elt))
@@ -319,7 +326,7 @@ class ClassMetaclass(type):
             tuple(memberFunctions.items()),
             tuple(staticFunctions.items()),
             tuple(properties.items()),
-            tuple(classMembers)
+            tuple(classMembers),
         )
 
     def __subclasscheck__(cls, subcls):
@@ -344,10 +351,7 @@ class ClassMetaclass(type):
 def Function(f, assumeClosuresGlobal=False, returnTypeOverride=None):
     """Turn a normal python function into a 'typed_python.Function' which obeys type restrictions."""
     return makeFunctionType(
-        f.__name__,
-        f,
-        assumeClosuresGlobal=assumeClosuresGlobal,
-        returnTypeOverride=returnTypeOverride
+        f.__name__, f, assumeClosuresGlobal=assumeClosuresGlobal, returnTypeOverride=returnTypeOverride
     )(f)
 
 
@@ -372,7 +376,7 @@ class FunctionOverloadArg:
 
     @property
     def typeFilter(self):
-        if getattr(self._typeFilter, '__typed_python_category__', None) == "Forward":
+        if getattr(self._typeFilter, "__typed_python_category__", None) == "Forward":
             return self._typeFilter.get()
         return self._typeFilter
 
@@ -471,10 +475,7 @@ class FunctionOverload:
         self.args = self.args + (FunctionOverloadArg(name, defaultVal, typeFilter, isStarArg, isKwarg),)
 
     def __str__(self):
-        return "FunctionOverload(returns %s, %s)" % (
-            self.returnType,
-            self.args
-        )
+        return "FunctionOverload(returns %s, %s)" % (self.returnType, self.args)
 
     def _installNativePointer(self, fp, returnType, argumentTypes):
         typed_python._types.installNativeFunctionPointer(
@@ -482,7 +483,7 @@ class FunctionOverload:
             self.index,
             fp,
             returnType,
-            tuple(argumentTypes)[len(self.closureVarLookups):]
+            tuple(argumentTypes)[len(self.closureVarLookups):],
         )
 
 

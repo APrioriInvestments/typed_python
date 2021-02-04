@@ -397,8 +397,15 @@ class PythonTypedFunctionWrapper(Wrapper):
                 return typeWrapper(overloadArg.typeFilter)
             return argType
 
-    def compileCall(self, converter, returnType, argTypes, kwargTypes, provideClosureArgument,
-        stripFirstArgClassDispatchIndex=False):
+    def compileCall(
+        self,
+        converter,
+        returnType,
+        argTypes,
+        kwargTypes,
+        provideClosureArgument,
+        stripFirstArgClassDispatchIndex=False
+    ):
         """Compile this function being called with a particular signature.
 
         Args:
@@ -441,8 +448,14 @@ class PythonTypedFunctionWrapper(Wrapper):
             ([self] if provideClosureArgument else []) + list(argTypes) + list(kwargTypes.values()),
             returnType,
             lambda context, outputVar, *args: (
-                self.generateMethodImplementation(context, returnType, args, argNames, provideClosureArgument,
-                    stripFirstArgClassDispatchIndex=stripFirstArgClassDispatchIndex)
+                self.generateMethodImplementation(
+                    context,
+                    returnType,
+                    args,
+                    argNames,
+                    provideClosureArgument,
+                    stripFirstArgClassDispatchIndex=stripFirstArgClassDispatchIndex
+                )
             )
         )
 
@@ -562,7 +575,10 @@ class PythonTypedFunctionWrapper(Wrapper):
 
         return None
 
-    def generateMethodImplementation(self, context, returnType, args, argNames, provideClosureArgument, stripFirstArgClassDispatchIndex=False):
+    def generateMethodImplementation(
+        self, context, returnType, args, argNames,
+        provideClosureArgument, stripFirstArgClassDispatchIndex=False
+    ):
         """Generate native code that calls us with a given return type and set of arguments.
 
         We try each overload with successively stronger type conversions. The first one that

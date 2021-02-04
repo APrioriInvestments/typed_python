@@ -24,7 +24,7 @@ from typed_python.compiler.python_ast_analysis import (
     computeVariablesAssignedOnlyOnce,
     computeVariablesReadByClosures,
     countYieldStatements,
-    extractFunctionDefs
+    extractFunctionDefs,
 )
 from typed_python.internals import makeFunctionType, checkOneOfType
 from typed_python.compiler.conversion_level import ConversionLevel
@@ -89,26 +89,30 @@ class ControlFlowBlocks:
 
     def pushTryCatch(self, return_to, try_flow):
         return ControlFlowBlocks(
-            return_to=return_to,
-            try_flow=try_flow,
-            in_loop=False,
-            in_loop_ever=self.in_loop_ever
+            return_to=return_to, try_flow=try_flow, in_loop=False, in_loop_ever=self.in_loop_ever
         )
 
     def pushLoop(self):
         return ControlFlowBlocks(
-            return_to=self.return_to,
-            try_flow=self.try_flow,
-            in_loop=True,
-            in_loop_ever=True,
+            return_to=self.return_to, try_flow=self.try_flow, in_loop=True, in_loop_ever=True
         )
 
 
 class ConversionContextBase:
     """Helper function for converting a single python function given some input and output types"""
 
-    def __init__(self, converter, name, identity, input_types, output_type,
-                 funcArgNames, closureVarnames, globalVars, globalVarsRaw):
+    def __init__(
+        self,
+        converter,
+        name,
+        identity,
+        input_types,
+        output_type,
+        funcArgNames,
+        closureVarnames,
+        globalVars,
+        globalVarsRaw,
+    ):
         """Initialize a FunctionConverter
 
         Args:
@@ -225,10 +229,7 @@ class ConversionContextBase:
             )
 
         if self.shouldReadAndWriteVariableFromClosure(name):
-            return (
-                self.localVariableExpression(context, ".closure")
-                .convert_attribute(name, nocheck=True)
-            )
+            return self.localVariableExpression(context, ".closure").convert_attribute(name, nocheck=True)
 
         if name != ".closure" and self._varname_to_type.get(name) is None:
             context.pushException(NameError, f"name '{name}' is not defined")
@@ -241,12 +242,9 @@ class ConversionContextBase:
 
         return TypedExpression(
             context,
-            native_ast.Expression.StackSlot(
-                name=name,
-                type=slot_type.getNativeLayoutType()
-            ),
+            native_ast.Expression.StackSlot(name=name, type=slot_type.getNativeLayoutType()),
             slot_type,
-            isReference=True
+            isReference=True,
         )
 
     def variableIsAlwaysEmpty(self, name):
@@ -287,29 +285,23 @@ class ConversionContextBase:
     def computeTypeForFunctionDef(self, ast):
         untypedFuncType = self.functionDefToClosurelessFunction(ast)
 
-        if hasattr(ast, 'decorator_list'):
+        if hasattr(ast, "decorator_list"):
             for decorator in ast.decorator_list:
                 ctx = ExpressionConversionContext(self, FunctionStackState())
                 decoratorEval = ctx.convert_expression_ast(decorator)
                 if decoratorEval is None:
-                    raise Exception(
-                        "Decorators other than NotCompiled or Entrypoint not supported yet"
-                    )
+                    raise Exception("Decorators other than NotCompiled or Entrypoint not supported yet")
 
                 if decoratorEval.expr_type.typeRepresentation is typed_python.NotCompiled:
                     untypedFuncType = untypedFuncType.typeWithNocompile(True)
                 elif decoratorEval.expr_type.typeRepresentation is typed_python.Entrypoint:
                     untypedFuncType = untypedFuncType.typeWithEntrypoint(True)
                 else:
-                    raise Exception(
-                        "Decorators other than NotCompiled or Entrypoint not supported yet"
-                    )
+                    raise Exception("Decorators other than NotCompiled or Entrypoint not supported yet")
 
         typedFuncType = untypedFuncType.withClosureType(self.closureType)
         typedFuncType = typedFuncType.withOverloadVariableBindings(
-            0,
-            {name: self.closurePathToName(name)
-             for name in untypedFuncType.overloads[0].closureVarLookups}
+            0, {name: self.closurePathToName(name) for name in untypedFuncType.overloads[0].closureVarLookups}
         )
 
         return untypedFuncType, typedFuncType
@@ -337,8 +329,8 @@ class ConversionContextBase:
     def replaceClosureTypeWith(self, nativeType, wantsCurrentClosure):
         """Return 'nativeType' stripped of any references to our closure, or None if unchanged."""
         assert isinstance(nativeType, type) and (
-            issubclass(nativeType, Type), (nativeType, type(nativeType))
-            or nativeType in (int, float, bool, str, bytes, type(None))
+            issubclass(nativeType, Type),
+            (nativeType, type(nativeType)) or nativeType in (int, float, bool, str, bytes, type(None)),
         )
 
         if nativeType in self.typedFunctionTypeToClosurelessFunctionType:
@@ -426,17 +418,21 @@ class ConversionContextBase:
                     classMembers.append((var, Member(replacedVarTypes[var], None, False)))
 
             memberFunctions = {
-                '__init__':
-                makeFunctionType('__init__', lambda self: None, classname=self.name + ".closure", assumeClosuresGlobal=True)
+                "__init__": makeFunctionType(
+                    "__init__", lambda self: None, classname=self.name + ".closure", assumeClosuresGlobal=True
+                )
             }
 
             self.closureType = self.closureType.define(
-                _types.Class(self.name + ".closure", (), True, 
-                    tuple(closureMembers), 
-                    tuple(memberFunctions.items()), 
-                    (), 
-                    (), 
-                    tuple(classMembers)
+                _types.Class(
+                    self.name + ".closure",
+                    (),
+                    True,
+                    tuple(closureMembers),
+                    tuple(memberFunctions.items()),
+                    (),
+                    (),
+                    tuple(classMembers),
                 )
             )
 
@@ -449,7 +445,9 @@ class ConversionContextBase:
                 if var in replacedVarTypes:
                     self._varname_to_type[var] = typeWrapper(replacedVarTypes[var])
                 elif isinstance(self._varname_to_type[var], type):
-                    self._varname_to_type[var] = typeWrapper(self.replaceClosureTypesIn(self._varname_to_type[var].typeRepresentation))
+                    self._varname_to_type[var] = typeWrapper(
+                        self.replaceClosureTypesIn(self._varname_to_type[var].typeRepresentation)
+                    )
 
         _closureCycleMemo[closureKey] = (self.closureType, dict(self.functionDefToType))
 
@@ -477,10 +475,7 @@ class ConversionContextBase:
             body_native_expr = initializer_expr >> body_native_expr
 
             if destructors:
-                body_native_expr = native_ast.Expression.Finally(
-                    teardowns=destructors,
-                    expr=body_native_expr
-                )
+                body_native_expr = native_ast.Expression.Finally(teardowns=destructors, expr=body_native_expr)
 
         return_type = self._varname_to_type.get(FunctionOutput, None)
 
@@ -489,31 +484,30 @@ class ConversionContextBase:
                 native_ast.Function(
                     args=self._native_args,
                     body=native_ast.FunctionBody.Internal(body=body_native_expr),
-                    output_type=native_ast.Void
+                    output_type=native_ast.Void,
                 ),
-                return_type
+                return_type,
             )
 
         if return_type.is_pass_by_ref:
             return (
                 native_ast.Function(
                     args=(
-                        (('.return', return_type.getNativeLayoutType().pointer()),)
-                        + tuple(self._native_args)
+                        ((".return", return_type.getNativeLayoutType().pointer()),) + tuple(self._native_args)
                     ),
                     body=native_ast.FunctionBody.Internal(body=body_native_expr),
-                    output_type=native_ast.Void
+                    output_type=native_ast.Void,
                 ),
-                return_type
+                return_type,
             )
         else:
             return (
                 native_ast.Function(
                     args=self._native_args,
                     body=native_ast.FunctionBody.Internal(body=body_native_expr),
-                    output_type=return_type.getNativeLayoutType()
+                    output_type=return_type.getNativeLayoutType(),
                 ),
-                return_type
+                return_type,
             )
 
     def createGeneratorFun(self):
@@ -524,11 +518,9 @@ class ConversionContextBase:
         based on the last 'yield' statement.
         """
         return GeneratorCodegen(
-            set(self._varname_to_type),
-            self._statements[0].line_number
+            set(self._varname_to_type), self._statements[0].line_number
         ).convertStatementsToFunctionDef(
-            rewriteForLoops(self._statements)
-            if self.isGenerator else self.statements
+            rewriteForLoops(self._statements) if self.isGenerator else self.statements
         )
 
     def convert_build_generator(self):
@@ -541,15 +533,9 @@ class ConversionContextBase:
         # if we have a FunctionYield, we have a type for our generator
         T = self._varname_to_type[FunctionYield].typeRepresentation
 
-        generatorMembers = [
-            ("..slot", int, None, True),
-            ("..value", T, None, True)
-        ]
+        generatorMembers = [("..slot", int, None, True), ("..value", T, None, True)]
 
-        classMembers = [
-            ("..slot", Member(int, None, True)),
-            ("..value", Member(T, None, True))
-        ]
+        classMembers = [("..slot", Member(int, None, True)), ("..value", Member(T, None, True))]
 
         for k, v in self._varname_to_type.items():
             if isinstance(k, str):
@@ -559,9 +545,7 @@ class ConversionContextBase:
         smts = self.createGeneratorFun()
 
         generatorFun = evaluateFunctionDefWithLocalsInCells(
-            smts,
-            {},
-            {".PointerType": PointerTo(T), ".pointerTo": pointerTo}
+            smts, {}, {".PointerType": PointerTo(T), ".pointerTo": pointerTo}
         )
 
         generatorBaseclass = Generator(T)
@@ -572,21 +556,16 @@ class ConversionContextBase:
             return self
 
         memberFunctions = {
-            '__fastnext__':
-            makeFunctionType(
-                '__fastnext__',
+            "__fastnext__": makeFunctionType(
+                "__fastnext__",
                 generatorFun,
                 classname=self.name + ".generator",
                 assumeClosuresGlobal=True,
-                returnTypeOverride=PointerTo(T)
+                returnTypeOverride=PointerTo(T),
             ).typeWithEntrypoint(True),
-            '__iter__':
-            makeFunctionType(
-                '__iter__',
-                __iter__,
-                classname=self.name + ".generator",
-                assumeClosuresGlobal=True,
-            ).typeWithEntrypoint(True)
+            "__iter__": makeFunctionType(
+                "__iter__", __iter__, classname=self.name + ".generator", assumeClosuresGlobal=True
+            ).typeWithEntrypoint(True),
         }
 
         generatorSubclass = generatorSubclass.define(
@@ -598,7 +577,7 @@ class ConversionContextBase:
                 tuple(memberFunctions.items()),
                 (),
                 (),
-                tuple(classMembers)
+                tuple(classMembers),
             )
         )
 
@@ -617,10 +596,7 @@ class ConversionContextBase:
             varType = self._varname_to_type[argByName]
 
             initializer = TypedExpression(
-                context,
-                native_ast.Expression.Variable(name=argByName),
-                varType,
-                varType.is_pass_by_ref
+                context, native_ast.Expression.Variable(name=argByName), varType, varType.is_pass_by_ref
             )
 
             if initializer is not None:
@@ -633,12 +609,7 @@ class ConversionContextBase:
         assert output is not None
 
         returnSlot = TypedExpression(
-            context,
-            native_ast.Expression.Variable(
-                name=".return",
-            ),
-            generatorType,
-            isReference=True
+            context, native_ast.Expression.Variable(name=".return"), generatorType, isReference=True
         )
 
         returnSlot.convert_copy_initialize(output)
@@ -651,15 +622,16 @@ class ConversionContextBase:
 
         if len(input_types) != len(self._argnames):
             raise ConversionException(
-                "%s at %s:%s, with closure %s, expected at least %s arguments but got %s. Expected argnames are %s. Input types are %s" %
-                (
+                "%s at %s:%s, with closure %s, expected at least %s arguments but got %s. Expected argnames are %s. Input types are %s"
+                % (
                     self.name,
                     self._statements[0].filename,
                     self._statements[0].line_number,
                     self._closureVarnames,
                     len(self._argnames),
                     len(input_types),
-                    self._argnames, input_types
+                    self._argnames,
+                    input_types,
                 )
             )
 
@@ -677,7 +649,7 @@ class ConversionContextBase:
         self._functionOutputTypeKnown = FunctionOutput in self._varname_to_type
 
         if self.isGenerator and self._functionOutputTypeKnown:
-            if hasattr(self._output_type, 'IteratorType'):
+            if hasattr(self._output_type, "IteratorType"):
                 self._varname_to_type[FunctionYield] = typeWrapper(self._output_type.IteratorType)
                 self._functionYieldTypeKnown = True
 
@@ -692,11 +664,11 @@ class ConversionContextBase:
 
     def allocateLetVarname(self):
         self.tempLetVarIx += 1
-        return "letvar.%s" % (self.tempLetVarIx-1)
+        return "letvar.%s" % (self.tempLetVarIx - 1)
 
     def allocateStackVarname(self):
         self._tempStackVarIx += 1
-        return "stackvar.%s" % (self._tempStackVarIx-1)
+        return "stackvar.%s" % (self._tempStackVarIx - 1)
 
     def externalScopeVarExpr(self, subcontext, varname):
         """If 'varname' refers to a known variable that doesn't use a stack slot, return an expression for it.
@@ -718,10 +690,7 @@ class ConversionContextBase:
         varType = self._varname_to_type[varname]
 
         return TypedExpression(
-            subcontext,
-            native_ast.Expression.Variable(name=varname),
-            varType,
-            varType.is_pass_by_ref
+            subcontext, native_ast.Expression.Variable(name=varname), varType, varType.is_pass_by_ref
         )
 
     def setVariableType(self, varname, new_type):
@@ -832,7 +801,11 @@ class ConversionContextBase:
 
                     if slot_type.is_empty:
                         pass
-                    elif name in self.variablesBound and name not in self.variablesAssigned and name not in self.variablesReadByClosures:
+                    elif (
+                        name in self.variablesBound
+                        and name not in self.variablesAssigned
+                        and name not in self.variablesReadByClosures
+                    ):
                         # this variable is bound but never assigned, so we don't need to
                         # generate a stackslot. We can just read it directly from our arguments
                         self._argumentsWithoutStackslots.add(name)
@@ -842,9 +815,10 @@ class ConversionContextBase:
                             native_ast.Expression.Store(
                                 ptr=self.localVariableExpression(context, name).expr,
                                 val=(
-                                    native_ast.Expression.Variable(name=name) if not slot_type.is_pass_by_ref else
-                                    native_ast.Expression.Variable(name=name).load()
-                                )
+                                    native_ast.Expression.Variable(name=name)
+                                    if not slot_type.is_pass_by_ref
+                                    else native_ast.Expression.Variable(name=name).load()
+                                ),
                             )
                         )
                         context.markVariableInitialized(name)
@@ -886,11 +860,7 @@ class ConversionContextBase:
                 )
 
         for expr in self.closureDestructor(variableStates):
-            destructors.append(
-                native_ast.Teardown.Always(
-                    expr=expr
-                )
-            )
+            destructors.append(native_ast.Teardown.Always(expr=expr))
 
         return destructors
 
@@ -900,12 +870,9 @@ class ConversionContextBase:
 
         return TypedExpression(
             context,
-            native_ast.Expression.StackSlot(
-                name=name + ".isInitialized",
-                type=native_ast.Bool
-            ),
+            native_ast.Expression.StackSlot(name=name + ".isInitialized", type=native_ast.Bool),
             bool,
-            isReference=True
+            isReference=True,
         )
 
     def assignToLocalVariable(self, varname, val_to_store, variableStates):
@@ -973,7 +940,7 @@ class ConversionContextBase:
             untypedFunction = python_ast.evaluateFunctionDefWithLocalsInCells(
                 ast,
                 globals=self._globals,
-                locals={name: None for name in (self.variablesBound | self.variablesAssigned)}
+                locals={name: None for name in (self.variablesBound | self.variablesAssigned)},
             )
 
             tpFunction = Function(untypedFunction)
@@ -1002,36 +969,53 @@ class ConversionContextBase:
         return None
 
     def restrictByCondition(self, variableStates, condition, result):
-        if condition.matches.Call and condition.func.matches.Name and len(condition.args) == 2 and condition.args[0].matches.Name:
+        if (
+            condition.matches.Call
+            and condition.func.matches.Name
+            and len(condition.args) == 2
+            and condition.args[0].matches.Name
+        ):
             if self.freeVariableLookup(condition.func.id) is isinstance:
                 context = ExpressionConversionContext(self, variableStates)
                 typeExpr = context.convert_expression_ast(condition.args[1])
 
                 if typeExpr is not None and isinstance(typeExpr.expr_type, PythonTypeObjectWrapper):
-                    variableStates.restrictTypeFor(condition.args[0].id, typeExpr.expr_type.typeRepresentation.Value, result)
+                    variableStates.restrictTypeFor(
+                        condition.args[0].id, typeExpr.expr_type.typeRepresentation.Value, result
+                    )
 
         # check if we are a 'var.matches.Y' expression
-        if (condition.matches.Attribute and
-                condition.value.matches.Attribute and
-                condition.value.attr == "matches" and
-                condition.value.value.matches.Name):
+        if (
+            condition.matches.Attribute
+            and condition.value.matches.Attribute
+            and condition.value.attr == "matches"
+            and condition.value.value.matches.Name
+        ):
             curType = variableStates.currentType(condition.value.value.id)
-            if curType is not None and getattr(curType, '__typed_python_category__', None) == "Alternative":
+            if curType is not None and getattr(curType, "__typed_python_category__", None) == "Alternative":
                 if result:
                     subType = [x for x in curType.__typed_python_alternatives__ if x.Name == condition.attr]
                     if subType:
-                        variableStates.restrictTypeFor(
-                            condition.value.value.id,
-                            subType[0],
-                            result
-                        )
+                        variableStates.restrictTypeFor(condition.value.value.id, subType[0], result)
 
 
 class ExpressionFunctionConversionContext(ConversionContextBase):
     """Helper function for converting a single python function given some input and output types"""
 
-    def __init__(self, converter, name, identity, input_types, generator, outputType=None, alwaysRaises=False):
-        super().__init__(converter, name, identity, input_types, outputType, [f'a{i}' for i in range(len(input_types))], [], {}, {})
+    def __init__(
+        self, converter, name, identity, input_types, generator, outputType=None, alwaysRaises=False
+    ):
+        super().__init__(
+            converter,
+            name,
+            identity,
+            input_types,
+            outputType,
+            [f"a{i}" for i in range(len(input_types))],
+            [],
+            {},
+            {},
+        )
 
         self._generator = generator
         self.variablesBound = set(self.funcArgNames)
@@ -1067,10 +1051,30 @@ class ExpressionFunctionConversionContext(ConversionContextBase):
 class FunctionConversionContext(ConversionContextBase):
     """Helper function for converting a single python function given some input and output types"""
 
-    def __init__(self, converter, name, identity, input_types, output_type, closureVarnames,
-                 globalVars, globalVarsRaw, ast_arg, ast):
-        super().__init__(converter, name, identity, input_types, output_type, ast_arg.argumentNames(),
-                         closureVarnames, globalVars, globalVarsRaw)
+    def __init__(
+        self,
+        converter,
+        name,
+        identity,
+        input_types,
+        output_type,
+        closureVarnames,
+        globalVars,
+        globalVarsRaw,
+        ast_arg,
+        ast,
+    ):
+        super().__init__(
+            converter,
+            name,
+            identity,
+            input_types,
+            output_type,
+            ast_arg.argumentNames(),
+            closureVarnames,
+            globalVars,
+            globalVarsRaw,
+        )
 
         self._statements = statements = self.extractStatements(ast)
 
@@ -1090,13 +1094,9 @@ class FunctionConversionContext(ConversionContextBase):
         # bound to the closure directly (in which case we don't even assign them to slots)
         self.variablesAssignedOnlyOnce = computeVariablesAssignedOnlyOnce(statements)
 
-        (
-            functionDefs,
-            assignedLambdas,
-            freeLambdas,
-            comprehensions,
-            generators,
-        ) = extractFunctionDefs(statements)
+        (functionDefs, assignedLambdas, freeLambdas, comprehensions, generators) = extractFunctionDefs(
+            statements
+        )
 
         # the list of 'def' statements and 'Lambda' expressions. each one engenders a function type.
         self.functionDefs = functionDefs + freeLambdas
@@ -1120,10 +1120,9 @@ class FunctionConversionContext(ConversionContextBase):
         self.functionDefToType = {}
 
         # variables in closure slots that are not single-assignment function defs need slots
-        self.variablesNeedingClosureSlots = set([
-            c for c in self.variablesReadByClosures
-            if c not in self.functionDefsAssignedOnce
-        ])
+        self.variablesNeedingClosureSlots = set(
+            [c for c in self.variablesReadByClosures if c not in self.functionDefsAssignedOnce]
+        )
 
         self._constructInitialVarnameToType()
 
@@ -1142,12 +1141,14 @@ class FunctionConversionContext(ConversionContextBase):
         if isinstance(pyast, python_ast.Statement.FunctionDef):
             return pyast.body
         else:
-            return [python_ast.Statement.Return(
-                value=pyast.body,
-                line_number=pyast.body.line_number,
-                col_offset=pyast.body.col_offset,
-                filename=pyast.body.filename
-            )]
+            return [
+                python_ast.Statement.Return(
+                    value=pyast.body,
+                    line_number=pyast.body.line_number,
+                    col_offset=pyast.body.col_offset,
+                    filename=pyast.body.filename,
+                )
+            ]
 
     def processYieldExpression(self, expr):
         """Called with the body of a yield statement so that subclasses can handle.
@@ -1165,11 +1166,10 @@ class FunctionConversionContext(ConversionContextBase):
 
     def convert_function_body(self, variableStates: FunctionStackState):
         return self.convert_statement_list_ast(
-            rewriteForLoops(self._statements) if
-            self.isGenerator else self._statements,
+            rewriteForLoops(self._statements) if self.isGenerator else self._statements,
             variableStates,
             ControlFlowBlocks(),
-            toplevel=True
+            toplevel=True,
         )
 
     def convert_delete(self, expression, variableStates):
@@ -1291,14 +1291,11 @@ class FunctionConversionContext(ConversionContextBase):
             if len(iterated_expressions) < len(targets):
                 subcontext.pushException(
                     ValueError,
-                    f"not enough values to unpack (expected {len(targets)}, got {len(iterated_expressions)})"
+                    f"not enough values to unpack (expected {len(targets)}, got {len(iterated_expressions)})",
                 )
                 return False
             elif len(iterated_expressions) > len(targets):
-                subcontext.pushException(
-                    ValueError,
-                    f"too many values to unpack (expected {len(targets)})"
-                )
+                subcontext.pushException(ValueError, f"too many values to unpack (expected {len(targets)})")
                 return False
 
             for i in range(len(iterated_expressions)):
@@ -1329,27 +1326,25 @@ class FunctionConversionContext(ConversionContextBase):
                             with if_true:
                                 tempVarnames.append(f".anonyous_iter{targets[0].line_number}.{targetIndex}")
                                 self.assignToLocalVariable(
-                                    tempVarnames[-1],
-                                    next_ptr.asReference(),
-                                    variableStates
+                                    tempVarnames[-1], next_ptr.asReference(), variableStates
                                 )
 
                             with if_false:
                                 subcontext.pushException(
                                     ValueError,
-                                    f"not enough values to unpack (expected {len(targets)}, got {targetIndex})"
+                                    f"not enough values to unpack (expected {len(targets)}, got {targetIndex})",
                                 )
                         else:
                             with if_true:
-                                subcontext.pushException(ValueError, f"too many values to unpack (expected {len(targets)})")
+                                subcontext.pushException(
+                                    ValueError, f"too many values to unpack (expected {len(targets)})"
+                                )
                 else:
                     return False
 
             for targetIndex in range(len(targets)):
                 self.convert_assignment(
-                    targets[targetIndex],
-                    None,
-                    subcontext.namedVariableLookup(tempVarnames[targetIndex])
+                    targets[targetIndex], None, subcontext.namedVariableLookup(tempVarnames[targetIndex])
                 )
 
             return True
@@ -1383,7 +1378,9 @@ class FunctionConversionContext(ConversionContextBase):
                 for varname in set(computeReadVariables(ast)).union(computeAssignedVariables(ast))
             }
 
-            newMessage = f"\n{ast.filename}:{ast.line_number}\n" + "\n".join(f"    {k}={v}" for k, v in types.items())
+            newMessage = f"\n{ast.filename}:{ast.line_number}\n" + "\n".join(
+                f"    {k}={v}" for k, v in types.items()
+            )
             if e.args:
                 e.args = (str(e.args[0]) + newMessage,)
             else:
@@ -1414,17 +1411,13 @@ class FunctionConversionContext(ConversionContextBase):
 
             if e.expr_type != self._varname_to_type[FunctionYield]:
                 e = e.convert_to_type(
-                    self._varname_to_type[FunctionYield],
-                    ConversionLevel.ImplicitContainers
+                    self._varname_to_type[FunctionYield], ConversionLevel.ImplicitContainers
                 )
 
                 if e is None:
                     return subcontext.finalize(None, exceptionsTakeFrom=ast), False
 
-            return (
-                subcontext.finalize(self.processYieldExpression(e), exceptionsTakeFrom=ast),
-                True
-            )
+            return (subcontext.finalize(self.processYieldExpression(e), exceptionsTakeFrom=ast), True)
 
         if ast.matches.AugAssign:
             subcontext = ExpressionConversionContext(self, variableStates)
@@ -1501,7 +1494,9 @@ class FunctionConversionContext(ConversionContextBase):
                 self.upsizeVariableType(FunctionOutput, e.expr_type)
 
             if e.expr_type != self._varname_to_type[FunctionOutput]:
-                e = e.convert_to_type(self._varname_to_type[FunctionOutput], ConversionLevel.ImplicitContainers)
+                e = e.convert_to_type(
+                    self._varname_to_type[FunctionOutput], ConversionLevel.ImplicitContainers
+                )
 
             if e is None:
                 return subcontext.finalize(None, exceptionsTakeFrom=ast), False
@@ -1514,16 +1509,12 @@ class FunctionConversionContext(ConversionContextBase):
                 self.assignToLocalVariable(".return_value", e, variableStates)
                 subcontext.pushEffect(
                     native_ast.Expression.Branch(
-                        cond=self.exception_occurred_slot.load(),
-                        true=runtime_functions.clear_exc_info.call()
+                        cond=self.exception_occurred_slot.load(), true=runtime_functions.clear_exc_info.call()
                     )
                 )
 
                 subcontext.pushTerminal(
-                    native_ast.Expression.Return(
-                        arg=None,
-                        blockName=controlFlowBlocks.return_to
-                    )
+                    native_ast.Expression.Return(arg=None, blockName=controlFlowBlocks.return_to)
                 )
 
                 return subcontext.finalize(None, exceptionsTakeFrom=ast), False
@@ -1553,9 +1544,7 @@ class FunctionConversionContext(ConversionContextBase):
                 truth_val = cond.expr.val.truth_value()
 
                 branch, flow_returns = self.convert_statement_list_ast(
-                    ast.body if truth_val else ast.orelse,
-                    variableStates,
-                    controlFlowBlocks
+                    ast.body if truth_val else ast.orelse, variableStates, controlFlowBlocks
                 )
 
                 return cond_context.finalize(None, exceptionsTakeFrom=ast) >> branch, flow_returns
@@ -1566,19 +1555,24 @@ class FunctionConversionContext(ConversionContextBase):
             self.restrictByCondition(variableStatesTrue, ast.test, result=True)
             self.restrictByCondition(variableStatesFalse, ast.test, result=False)
 
-            true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue, controlFlowBlocks)
-            false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse, controlFlowBlocks)
+            true, true_returns = self.convert_statement_list_ast(
+                ast.body, variableStatesTrue, controlFlowBlocks
+            )
+            false, false_returns = self.convert_statement_list_ast(
+                ast.orelse, variableStatesFalse, controlFlowBlocks
+            )
 
             variableStates.becomeMerge(
-                variableStatesTrue if true_returns else None,
-                variableStatesFalse if false_returns else None
+                variableStatesTrue if true_returns else None, variableStatesFalse if false_returns else None
             )
 
             return (
                 native_ast.Expression.Branch(
-                    cond=cond_context.finalize(cond.nonref_expr, exceptionsTakeFrom=ast), true=true, false=false
+                    cond=cond_context.finalize(cond.nonref_expr, exceptionsTakeFrom=ast),
+                    true=true,
+                    false=false,
                 ),
-                true_returns or false_returns
+                true_returns or false_returns,
             )
 
         if ast.matches.Pass:
@@ -1632,7 +1626,7 @@ class FunctionConversionContext(ConversionContextBase):
 
                 variableStates.becomeMerge(
                     variableStatesTrue if true_returns else None,
-                    variableStatesFalse if false_returns else None
+                    variableStatesFalse if false_returns else None,
                 )
 
                 variableStates.mergeWithSelf(initVariableStates)
@@ -1642,9 +1636,9 @@ class FunctionConversionContext(ConversionContextBase):
                         native_ast.Expression.While(
                             cond=cond_context.finalize(cond.nonref_expr, exceptionsTakeFrom=ast),
                             while_true=true.withReturnTargetName("loop_continue"),
-                            orelse=false
+                            orelse=false,
                         ).withReturnTargetName("loop_break"),
-                        (true_returns or false_returns) and not isWhileTrue
+                        (true_returns or false_returns) and not isWhileTrue,
                     )
 
         if ast.matches.Try:
@@ -1659,17 +1653,16 @@ class FunctionConversionContext(ConversionContextBase):
 
             body_context = ExpressionConversionContext(self, variableStates)
             body, body_returns = self.convert_statement_list_ast(
-                ast.body,
-                variableStates,
-                controlFlowBlocks.pushTryCatch(end_of_try_marker, control_flow)
+                ast.body, variableStates, controlFlowBlocks.pushTryCatch(end_of_try_marker, control_flow)
             )
             body_context.pushEffect(body)
 
             handlers_context = ExpressionConversionContext(self, variableStates)
 
             working_context = ExpressionConversionContext(self, variableStates)
-            working = runtime_functions.catch_exception.call() \
-                >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION))
+            working = runtime_functions.catch_exception.call() >> control_flow.store(
+                native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION)
+            )
             working_returns = True
 
             for h in reversed(ast.handlers):
@@ -1680,12 +1673,17 @@ class FunctionConversionContext(ConversionContextBase):
                 else:
                     if h.type.matches.Tuple:
                         # TODO: figure out compile-time Value for tuple of constant objects
-                        types = [cond_context.convert_expression_ast(elt).expr_type.typeRepresentation.Value for elt in h.type.elts]
+                        types = [
+                            cond_context.convert_expression_ast(elt).expr_type.typeRepresentation.Value
+                            for elt in h.type.elts
+                        ]
                         exc_type = tuple(types)
                         # exc_type = OneOf(*[Value(t) for t in types])
                         exc_type = BaseException
                     else:
-                        exc_match = cond_context.convert_expression_ast(h.type).expr_type.typeRepresentation.Value
+                        exc_match = cond_context.convert_expression_ast(
+                            h.type
+                        ).expr_type.typeRepresentation.Value
                         exc_type = exc_match
                 cond = cond_context.matchExceptionObject(exc_match)
 
@@ -1695,13 +1693,14 @@ class FunctionConversionContext(ConversionContextBase):
                     handler_context.pushEffect(runtime_functions.catch_exception.call())
                 else:
                     h_name = h.name
-                    self.assignToLocalVariable(h_name, handler_context.fetchExceptionObject(exc_type), variableStatesHandler)
+                    self.assignToLocalVariable(
+                        h_name, handler_context.fetchExceptionObject(exc_type), variableStatesHandler
+                    )
 
                 handler, handler_returns = self.convert_statement_list_ast(
-                    h.body, variableStatesHandler,
-                    controlFlowBlocks.pushTryCatch(
-                        end_of_try_marker, control_flow
-                    )
+                    h.body,
+                    variableStatesHandler,
+                    controlFlowBlocks.pushTryCatch(end_of_try_marker, control_flow),
                 )
 
                 if h.name is not None:
@@ -1714,22 +1713,18 @@ class FunctionConversionContext(ConversionContextBase):
                             native_ast.Teardown.Always(
                                 expr=cleanup_context.finalize(None).with_comment(f"Cleanup for {h_name}")
                             )
-                        ]
+                        ],
                     )
                     variableStatesHandler.variableUninitialized(h_name)
 
-                variableStates.becomeMerge(
-                    variableStates.clone(),
-                    variableStatesHandler
-                )
+                variableStates.becomeMerge(variableStates.clone(), variableStatesHandler)
                 handler = handler >> native_ast.Expression.Branch(
-                    cond=exception_occurred.load(),
-                    true=runtime_functions.clear_exc_info.call()
+                    cond=exception_occurred.load(), true=runtime_functions.clear_exc_info.call()
                 )
                 working = native_ast.Expression.Branch(
                     cond=cond_context.finalize(cond.nonref_expr),
                     true=handler_context.finalize(handler),
-                    false=working_context.finalize(working)
+                    false=working_context.finalize(working),
                 )
                 working_returns = handler_returns or working_returns
 
@@ -1738,8 +1733,9 @@ class FunctionConversionContext(ConversionContextBase):
             orelse_context = ExpressionConversionContext(self, variableStates)
             if len(ast.orelse) > 0:
                 orelse, orelse_returns = self.convert_statement_list_ast(
-                    ast.orelse, variableStates,
-                    controlFlowBlocks.pushTryCatch(end_of_try_marker, control_flow)
+                    ast.orelse,
+                    variableStates,
+                    controlFlowBlocks.pushTryCatch(end_of_try_marker, control_flow),
                 )
                 orelse_context.pushEffect(orelse)
             else:
@@ -1748,8 +1744,9 @@ class FunctionConversionContext(ConversionContextBase):
             final_context = ExpressionConversionContext(self, variableStates)
             if ast.finalbody is not None:
                 final, final_returns = self.convert_statement_list_ast(
-                    ast.finalbody, variableStates,
-                    controlFlowBlocks.pushTryCatch(end_of_finally_marker, control_flow)
+                    ast.finalbody,
+                    variableStates,
+                    controlFlowBlocks.pushTryCatch(end_of_finally_marker, control_flow),
                 )
                 final = final.withReturnTargetName(end_of_finally_marker)
                 final_returns = True
@@ -1757,16 +1754,18 @@ class FunctionConversionContext(ConversionContextBase):
             else:
                 final, final_returns = None, True
 
-            complete = exception_occurred.store(native_ast.falseExpr) \
-                >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_DEFAULT)) \
+            complete = (
+                exception_occurred.store(native_ast.falseExpr)
+                >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_DEFAULT))
                 >> native_ast.Expression.TryCatch(
                     expr=body_context.finalize(None),
                     handler=exception_occurred.store(native_ast.trueExpr)
                     >> native_ast.Expression.TryCatch(
                         expr=handlers_context.finalize(None),
                         handler=runtime_functions.catch_exception.call()
-                        >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION))
-                    )
+                        >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION)),
+                    ),
+                )
             )
             if orelse:
                 complete = complete >> native_ast.Expression.Branch(
@@ -1775,8 +1774,8 @@ class FunctionConversionContext(ConversionContextBase):
                         expr=orelse_context.finalize(None) >> native_ast.nullExpr,
                         handler=exception_occurred.store(native_ast.trueExpr)
                         >> runtime_functions.catch_exception.call()
-                        >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION))
-                    )
+                        >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION)),
+                    ),
                 )
 
             complete = complete.withReturnTargetName(end_of_try_marker)
@@ -1786,62 +1785,54 @@ class FunctionConversionContext(ConversionContextBase):
                     expr=final_context.finalize(None),
                     handler=exception_occurred.store(native_ast.trueExpr)
                     >> runtime_functions.catch_exception.call()
-                    >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION))
+                    >> control_flow.store(native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION)),
                 )
 
             if self.isLocalVariable(".return_value"):
                 return_context = ExpressionConversionContext(self, variableStates)
                 rtn, _ = self.convert_statement_ast(
-                    python_ast.Statement.Return(
-                        value=python_ast.Expr.Name(id=".return_value")
-                    ),
+                    python_ast.Statement.Return(value=python_ast.Expr.Name(id=".return_value")),
                     variableStates,
-                    controlFlowBlocks
+                    controlFlowBlocks,
                 )
 
                 complete = complete >> native_ast.Expression.Branch(
                     cond=control_flow.load().eq(CONTROL_FLOW_RETURN),
                     true=native_ast.Expression.Branch(
-                        cond=exception_occurred.load(),
-                        true=runtime_functions.clear_exc_info.call()
+                        cond=exception_occurred.load(), true=runtime_functions.clear_exc_info.call()
                     )
-                    >> return_context.finalize(rtn)
+                    >> return_context.finalize(rtn),
                 )
 
             if controlFlowBlocks.in_loop_ever:
                 break_context = ExpressionConversionContext(self, variableStates)
                 brk, _ = self.convert_statement_ast(
-                    python_ast.Statement.Break(),
-                    variableStates,
-                    controlFlowBlocks
+                    python_ast.Statement.Break(), variableStates, controlFlowBlocks
                 )
                 complete = complete >> native_ast.Expression.Branch(
                     cond=control_flow.load().eq(CONTROL_FLOW_BREAK),
                     true=native_ast.Expression.Branch(
-                        cond=exception_occurred.load(),
-                        true=runtime_functions.clear_exc_info.call()
-                    ) >> break_context.finalize(brk)
+                        cond=exception_occurred.load(), true=runtime_functions.clear_exc_info.call()
+                    )
+                    >> break_context.finalize(brk),
                 )
 
                 cont_context = ExpressionConversionContext(self, variableStates)
                 cont, _ = self.convert_statement_ast(
-                    python_ast.Statement.Continue(),
-                    variableStates,
-                    controlFlowBlocks
+                    python_ast.Statement.Continue(), variableStates, controlFlowBlocks
                 )
                 complete = complete >> native_ast.Expression.Branch(
                     cond=control_flow.load().eq(CONTROL_FLOW_CONTINUE),
                     true=native_ast.Expression.Branch(
-                        cond=exception_occurred.load(),
-                        true=runtime_functions.clear_exc_info.call()
-                    ) >> cont_context.finalize(cont)
+                        cond=exception_occurred.load(), true=runtime_functions.clear_exc_info.call()
+                    )
+                    >> cont_context.finalize(cont),
                 )
 
             raise_context = ExpressionConversionContext(self, variableStates)
             raise_context.pushExceptionObject(None, clear_exc=True)
             complete = complete >> native_ast.Expression.Branch(
-                cond=control_flow.load().eq(CONTROL_FLOW_EXCEPTION),
-                true=raise_context.finalize(None)
+                cond=control_flow.load().eq(CONTROL_FLOW_EXCEPTION), true=raise_context.finalize(None)
             )
 
             return (complete, ((body_returns and orelse_returns) or working_returns) and final_returns)
@@ -1853,9 +1844,8 @@ class FunctionConversionContext(ConversionContextBase):
             if to_iterate is None:
                 return context.finalize(None, exceptionsTakeFrom=ast), False
 
-            if (
-                isinstance(to_iterate.expr_type.typeRepresentation, type)
-                and issubclass(to_iterate.expr_type.typeRepresentation, OneOf)
+            if isinstance(to_iterate.expr_type.typeRepresentation, type) and issubclass(
+                to_iterate.expr_type.typeRepresentation, OneOf
             ):
                 # split the code on the different possible 'oneof' values
                 if not to_iterate.isReference:
@@ -1870,10 +1860,7 @@ class FunctionConversionContext(ConversionContextBase):
                     subcontext = ExpressionConversionContext(self, subVS)
 
                     expr, flowReturns = self.convert_iteration_expression(
-                        to_iterate.refAs(ix).changeContext(subcontext),
-                        ast,
-                        "." + str(ix),
-                        controlFlowBlocks
+                        to_iterate.refAs(ix).changeContext(subcontext), ast, "." + str(ix), controlFlowBlocks
                     )
 
                     subExprs.append(expr)
@@ -1885,19 +1872,16 @@ class FunctionConversionContext(ConversionContextBase):
                 switchExpr = subExprs[-1]
                 for ix in reversed(range(len(subExprs) - 1)):
                     switchExpr = native_ast.Expression.Branch(
-                        cond=to_iterate.expr_type
-                        .convert_which_native(to_iterate.expr)
-                        .cast(native_ast.Int64).eq(native_ast.const_int_expr(ix)),
+                        cond=to_iterate.expr_type.convert_which_native(to_iterate.expr)
+                        .cast(native_ast.Int64)
+                        .eq(native_ast.const_int_expr(ix)),
                         true=subExprs[ix],
-                        false=switchExpr
+                        false=switchExpr,
                     )
 
                 variableStates.becomeMergeOf(subVariableStates)
 
-                return context.finalize(
-                    switchExpr,
-                    exceptionsTakeFrom=ast
-                ), anyFlowsReturn
+                return context.finalize(switchExpr, exceptionsTakeFrom=ast), anyFlowsReturn
             else:
                 return self.convert_iteration_expression(to_iterate, ast, "", controlFlowBlocks)
 
@@ -1910,11 +1894,17 @@ class FunctionConversionContext(ConversionContextBase):
                 toThrow = expr_context.convert_expression_ast(ast.exc)
 
                 if toThrow is None:
-                    return expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast), False
+                    return (
+                        expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast),
+                        False,
+                    )
 
                 toThrow = toThrow.convert_to_type(object, ConversionLevel.Signature)
                 if toThrow is None:
-                    return expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast), False
+                    return (
+                        expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast),
+                        False,
+                    )
 
             if ast.cause is None:
                 expr_context.pushExceptionObject(toThrow)
@@ -1940,11 +1930,7 @@ class FunctionConversionContext(ConversionContextBase):
         if ast.matches.With:
             statements = expandWithBlockIntoTryCatch(ast)
 
-            return self.convert_statement_list_ast(
-                statements,
-                variableStates,
-                controlFlowBlocks
-            )
+            return self.convert_statement_list_ast(statements, variableStates, controlFlowBlocks)
 
         if ast.matches.Import:
             # TODO: correctly model the side-effectfulness of imports
@@ -1961,11 +1947,7 @@ class FunctionConversionContext(ConversionContextBase):
                     module = importlib.import_module(alias.name)
                     target = alias.asname
 
-                self.assignToLocalVariable(
-                    target,
-                    context.constant(module),
-                    variableStates
-                )
+                self.assignToLocalVariable(target, context.constant(module), variableStates)
 
             return context.finalize(None, exceptionsTakeFrom=ast), True
 
@@ -1977,13 +1959,12 @@ class FunctionConversionContext(ConversionContextBase):
 
             if controlFlowBlocks.try_flow:
                 return (
-                    controlFlowBlocks.try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_BREAK)) >>
-                    native_ast.Expression.Branch(
-                        cond=self.exception_occurred_slot.load(),
-                        true=runtime_functions.clear_exc_info.call()
-                    ) >>
-                    native_ast.Expression.Return(blockName=controlFlowBlocks.return_to),
-                    True
+                    controlFlowBlocks.try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_BREAK))
+                    >> native_ast.Expression.Branch(
+                        cond=self.exception_occurred_slot.load(), true=runtime_functions.clear_exc_info.call()
+                    )
+                    >> native_ast.Expression.Return(blockName=controlFlowBlocks.return_to),
+                    True,
                 )
             else:
                 return native_ast.Expression.Return(blockName=controlFlowBlocks.return_to), True
@@ -1996,13 +1977,12 @@ class FunctionConversionContext(ConversionContextBase):
 
             if controlFlowBlocks.try_flow:
                 return (
-                    controlFlowBlocks.try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_CONTINUE)) >>
-                    native_ast.Expression.Branch(
-                        cond=self.exception_occurred_slot.load(),
-                        true=runtime_functions.clear_exc_info.call()
-                    ) >>
-                    native_ast.Expression.Return(blockName=controlFlowBlocks.return_to),
-                    True
+                    controlFlowBlocks.try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_CONTINUE))
+                    >> native_ast.Expression.Branch(
+                        cond=self.exception_occurred_slot.load(), true=runtime_functions.clear_exc_info.call()
+                    )
+                    >> native_ast.Expression.Return(blockName=controlFlowBlocks.return_to),
+                    True,
                 )
             else:
                 return native_ast.Expression.Return(blockName=controlFlowBlocks.return_to), True
@@ -2042,9 +2022,7 @@ class FunctionConversionContext(ConversionContextBase):
 
             context = ExpressionConversionContext(self, variableStates)
 
-            res = self.localVariableExpression(context, ".closure").changeType(
-                self.functionDefToType[ast]
-            )
+            res = self.localVariableExpression(context, ".closure").changeType(self.functionDefToType[ast])
 
             self.assignToLocalVariable(ast.name, res, variableStates)
 
@@ -2074,8 +2052,7 @@ class FunctionConversionContext(ConversionContextBase):
                 self.convert_assignment(ast.target, None, subexpr)
 
                 thisOne, thisOneReturns = self.convert_statement_list_ast(
-                    ast.body, variableStates,
-                    controlFlowBlocks.pushLoop()
+                    ast.body, variableStates, controlFlowBlocks.pushLoop()
                 )
 
                 # if we hit 'continue', just come to the end of this expression
@@ -2084,11 +2061,13 @@ class FunctionConversionContext(ConversionContextBase):
                 context.pushEffect(thisOne)
 
                 if not thisOneReturns:
-                    return context.finalize(None, exceptionsTakeFrom=ast).withReturnTargetName("loop_break"), False
+                    return (
+                        context.finalize(None, exceptionsTakeFrom=ast).withReturnTargetName("loop_break"),
+                        False,
+                    )
 
             thisOne, thisOneReturns = self.convert_statement_list_ast(
-                ast.orelse, variableStates,
-                controlFlowBlocks,
+                ast.orelse, variableStates, controlFlowBlocks
             )
 
             context.pushEffect(thisOne)
@@ -2113,12 +2092,10 @@ class FunctionConversionContext(ConversionContextBase):
             inner, innerReturns = self.convert_statement_list_ast(
                 list(rewriteIntiterForLoop(iter_varname, ast.target, ast.body, ast.orelse)),
                 variableStates,
-                controlFlowBlocks
+                controlFlowBlocks,
             )
 
-            return context.finalize(
-                inner, exceptionsTakeFrom=ast
-            ), innerReturns
+            return context.finalize(inner, exceptionsTakeFrom=ast), innerReturns
 
         # create a variable to hold the iterator, and instantiate it there
         iter_varname = ".iter." + str(ast.line_number) + variableSuffix
@@ -2140,7 +2117,7 @@ class FunctionConversionContext(ConversionContextBase):
                 return (
                     context.finalize(None, exceptionsTakeFrom=ast)
                     >> cond_context.finalize(None, exceptionsTakeFrom=ast),
-                    False
+                    False,
                 )
 
             next_ptr = iter_obj.convert_fastnext()
@@ -2148,7 +2125,7 @@ class FunctionConversionContext(ConversionContextBase):
                 return (
                     context.finalize(None, exceptionsTakeFrom=ast)
                     >> cond_context.finalize(None, exceptionsTakeFrom=ast),
-                    False
+                    False,
                 )
 
             with cond_context.ifelse(next_ptr.nonref_expr) as (if_true, if_false):
@@ -2159,17 +2136,14 @@ class FunctionConversionContext(ConversionContextBase):
             variableStatesFalse = variableStates.clone()
 
             true, true_returns = self.convert_statement_list_ast(
-                ast.body, variableStatesTrue,
-                controlFlowBlocks.pushLoop()
+                ast.body, variableStatesTrue, controlFlowBlocks.pushLoop()
             )
             false, false_returns = self.convert_statement_list_ast(
-                ast.orelse, variableStatesFalse,
-                controlFlowBlocks.pushLoop()
+                ast.orelse, variableStatesFalse, controlFlowBlocks.pushLoop()
             )
 
             variableStates.becomeMerge(
-                variableStatesTrue if true_returns else None,
-                variableStatesFalse if false_returns else None
+                variableStatesTrue if true_returns else None, variableStatesFalse if false_returns else None
             )
 
             variableStates.mergeWithSelf(initVariableStates)
@@ -2177,13 +2151,13 @@ class FunctionConversionContext(ConversionContextBase):
             if variableStates == initVariableStates:
                 # if nothing changed, the loop is stable.
                 return (
-                    context.finalize(None, exceptionsTakeFrom=ast) >>
-                    native_ast.Expression.While(
+                    context.finalize(None, exceptionsTakeFrom=ast)
+                    >> native_ast.Expression.While(
                         cond=cond_context.finalize(next_ptr.nonref_expr, exceptionsTakeFrom=ast),
                         while_true=true.withReturnTargetName("loop_continue"),
-                        orelse=false
+                        orelse=false,
                     ).withReturnTargetName("loop_break"),
-                    true_returns or false_returns
+                    true_returns or false_returns,
                 )
 
     def checkIfStatementIsSplitOnOneOf(self, statement, variableStates):
@@ -2224,12 +2198,7 @@ class FunctionConversionContext(ConversionContextBase):
         return varname
 
     def splitOnOneOfAndConvertStatementList(
-        self,
-        varToSplitOn,
-        statements,
-        variableStates,
-        toplevel,
-        controlFlowBlocks
+        self, varToSplitOn, statements, variableStates, toplevel, controlFlowBlocks
     ):
         subExprs = []
         anyFlowsReturn = False
@@ -2243,11 +2212,7 @@ class FunctionConversionContext(ConversionContextBase):
 
             subVS.restrictTypeFor(varToSplitOn, varType.Types[ix], True)
 
-            expr, flowReturns = self.convert_statement_list_ast(
-                statements,
-                subVS,
-                controlFlowBlocks
-            )
+            expr, flowReturns = self.convert_statement_list_ast(statements, subVS, controlFlowBlocks)
 
             subExprs.append(expr)
             if flowReturns:
@@ -2261,11 +2226,11 @@ class FunctionConversionContext(ConversionContextBase):
         switchExpr = subExprs[-1]
         for ix in reversed(range(len(subExprs) - 1)):
             switchExpr = native_ast.Expression.Branch(
-                cond=toSplit.expr_type
-                .convert_which_native(toSplit.expr)
-                .cast(native_ast.Int64).eq(native_ast.const_int_expr(ix)),
+                cond=toSplit.expr_type.convert_which_native(toSplit.expr)
+                .cast(native_ast.Int64)
+                .eq(native_ast.const_int_expr(ix)),
                 true=subExprs[ix],
-                false=switchExpr
+                false=switchExpr,
             )
 
         variableStates.becomeMergeOf(subVariableStates)
@@ -2273,8 +2238,7 @@ class FunctionConversionContext(ConversionContextBase):
         return context.finalize(switchExpr), anyFlowsReturn
 
     def convert_statement_list_ast(
-            self, statements, variableStates: FunctionStackState, controlFlowBlocks,
-            *, toplevel=False
+        self, statements, variableStates: FunctionStackState, controlFlowBlocks, *, toplevel=False
     ):
         """Convert a sequence of statements to a native expression.
 
@@ -2301,18 +2265,12 @@ class FunctionConversionContext(ConversionContextBase):
 
             if varToSplitOn is not None:
                 expr, controlFlowReturns = self.splitOnOneOfAndConvertStatementList(
-                    varToSplitOn,
-                    statements[statementIx+1:],
-                    variableStates,
-                    toplevel,
-                    controlFlowBlocks
+                    varToSplitOn, statements[statementIx + 1:], variableStates, toplevel, controlFlowBlocks
                 )
                 exprAndReturns.append((expr, controlFlowReturns))
                 break
             else:
-                res = self.convert_statement_ast(
-                    s, variableStates, controlFlowBlocks
-                )
+                res = self.convert_statement_ast(s, variableStates, controlFlowBlocks)
 
                 if not isinstance(res, tuple) or len(res) != 2:
                     raise Exception(
@@ -2332,14 +2290,10 @@ class FunctionConversionContext(ConversionContextBase):
             flows_off_end = False
 
         if toplevel and flows_off_end:
-            exprAndReturns.append(
-                self.handleFlowsOffEnd(variableStates)
-            )
+            exprAndReturns.append(self.handleFlowsOffEnd(variableStates))
             assert exprAndReturns[-1][1] is False
 
-        seq_expr = native_ast.makeSequence(
-            [expr for expr, _ in exprAndReturns]
-        )
+        seq_expr = native_ast.makeSequence([expr for expr, _ in exprAndReturns])
 
         return seq_expr, exprAndReturns[-1][1] if exprAndReturns else True
 
@@ -2358,11 +2312,9 @@ class FunctionConversionContext(ConversionContextBase):
             self.upsizeVariableType(FunctionOutput, NoneWrapper())
 
         return self.convert_statement_ast(
-            python_ast.Statement.Return(
-                value=None, filename="", line_number=0, col_offset=0
-            ),
+            python_ast.Statement.Return(value=None, filename="", line_number=0, col_offset=0),
             variableStates,
-            ControlFlowBlocks()
+            ControlFlowBlocks(),
         )
 
 
@@ -2372,6 +2324,7 @@ class ComprehensionConversionContextBase(FunctionConversionContext):
     We generate an accumulator at the start of the function, replace all yields
     with an '.append' operation, and then at the end append the list.
     """
+
     @property
     def isGenerator(self):
         return False
@@ -2385,12 +2338,9 @@ class ComprehensionConversionContextBase(FunctionConversionContext):
 
             return TypedExpression(
                 context,
-                native_ast.Expression.StackSlot(
-                    name=name,
-                    type=listCompType.getNativeLayoutType()
-                ),
+                native_ast.Expression.StackSlot(name=name, type=listCompType.getNativeLayoutType()),
                 listCompType,
-                isReference=True
+                isReference=True,
             )
 
         return super().localVariableExpression(context, name)
@@ -2398,10 +2348,7 @@ class ComprehensionConversionContextBase(FunctionConversionContext):
     def functionVariableInitializations(self, variableStates):
         context = ExpressionConversionContext(self, variableStates)
 
-        self.localVariableExpression(
-            context,
-            ".comprehension_accumulator"
-        ).convert_default_initialize()
+        self.localVariableExpression(context, ".comprehension_accumulator").convert_default_initialize()
 
         return [context.finalize(None)]
 
@@ -2414,11 +2361,7 @@ class ComprehensionConversionContextBase(FunctionConversionContext):
 
         nativeDestructor = context.finalize(None)
 
-        return destructors + [
-            native_ast.Teardown.Always(
-                expr=nativeDestructor
-            )
-        ]
+        return destructors + [native_ast.Teardown.Always(expr=nativeDestructor)]
 
     def processYieldExpression(self, expr):
         """Called with the body of a yield statement so that subclasses can handle.
@@ -2441,9 +2384,8 @@ class ComprehensionConversionContextBase(FunctionConversionContext):
 
         subcontext = ExpressionConversionContext(self, variableStates)
 
-        resExpr = (
-            self.localVariableExpression(subcontext, ".comprehension_accumulator")
-            .changeType(self.getMasqueradeType())
+        resExpr = self.localVariableExpression(subcontext, ".comprehension_accumulator").changeType(
+            self.getMasqueradeType()
         )
 
         self.setVariableType(FunctionOutput, resExpr.expr_type)
@@ -2459,6 +2401,7 @@ class ListComprehensionConversionContext(ComprehensionConversionContextBase):
     We generate an accumulator at the start of the function, replace all yields
     with an '.append' operation, and then at the end append the list.
     """
+
     def comprehensionAccumulatorType(self):
         if FunctionYield in self._varname_to_type:
             return typeWrapper(ListOf(self._varname_to_type[FunctionYield].typeRepresentation))
@@ -2472,21 +2415,16 @@ class ListComprehensionConversionContext(ComprehensionConversionContextBase):
 
         We return a native expression handling the result. Flow must return.
         """
-        self.localVariableExpression(
-            expr.context,
-            ".comprehension_accumulator"
-        ).convert_method_call(
+        self.localVariableExpression(expr.context, ".comprehension_accumulator").convert_method_call(
             "append", [expr], {}
         )
 
     def getMasqueradeType(self):
         from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import (
-            TypedListMasqueradingAsList
+            TypedListMasqueradingAsList,
         )
 
-        return TypedListMasqueradingAsList(
-            self.comprehensionAccumulatorType().typeRepresentation
-        )
+        return TypedListMasqueradingAsList(self.comprehensionAccumulatorType().typeRepresentation)
 
 
 class SetComprehensionConversionContext(ComprehensionConversionContextBase):
@@ -2495,6 +2433,7 @@ class SetComprehensionConversionContext(ComprehensionConversionContextBase):
     We generate an accumulator at the start of the function, replace all yields
     with an '.append' operation, and then at the end append the list.
     """
+
     def comprehensionAccumulatorType(self):
         if FunctionYield in self._varname_to_type:
             return typeWrapper(Set(self._varname_to_type[FunctionYield].typeRepresentation))
@@ -2508,21 +2447,16 @@ class SetComprehensionConversionContext(ComprehensionConversionContextBase):
 
         We return a native expression handling the result. Flow must return.
         """
-        self.localVariableExpression(
-            expr.context,
-            ".comprehension_accumulator"
-        ).convert_method_call(
+        self.localVariableExpression(expr.context, ".comprehension_accumulator").convert_method_call(
             "add", [expr], {}
         )
 
     def getMasqueradeType(self):
         from typed_python.compiler.type_wrappers.typed_set_masquerading_as_set_wrapper import (
-            TypedSetMasqueradingAsSet
+            TypedSetMasqueradingAsSet,
         )
 
-        return TypedSetMasqueradingAsSet(
-            self.comprehensionAccumulatorType().typeRepresentation
-        )
+        return TypedSetMasqueradingAsSet(self.comprehensionAccumulatorType().typeRepresentation)
 
 
 class DictComprehensionConversionContext(ComprehensionConversionContextBase):
@@ -2531,12 +2465,14 @@ class DictComprehensionConversionContext(ComprehensionConversionContextBase):
     We generate an accumulator at the start of the function, replace all yields
     (which must be pairs) with an assignment operation, and then at the end append the list.
     """
+
     def comprehensionAccumulatorType(self):
         if FunctionYield in self._varname_to_type:
             # the tuple wrapper will already jam together the various types
             # into a single output tuple because there is only one 'yield' statement
-            from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper \
-                import TypedTupleMasqueradingAsTuple
+            from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import (
+                TypedTupleMasqueradingAsTuple,
+            )
 
             T = self._varname_to_type[FunctionYield]
 
@@ -2544,10 +2480,7 @@ class DictComprehensionConversionContext(ComprehensionConversionContextBase):
             assert len(T.typeRepresentation.ElementTypes) == 2
 
             return typeWrapper(
-                Dict(
-                    T.typeRepresentation.ElementTypes[0],
-                    T.typeRepresentation.ElementTypes[1]
-                )
+                Dict(T.typeRepresentation.ElementTypes[0], T.typeRepresentation.ElementTypes[1])
             )
         else:
             return typeWrapper(Dict(None, None))
@@ -2559,19 +2492,13 @@ class DictComprehensionConversionContext(ComprehensionConversionContextBase):
 
         We return a native expression handling the result. Flow must return.
         """
-        self.localVariableExpression(
-            expr.context,
-            ".comprehension_accumulator"
-        ).convert_setitem(
-            expr.convert_getitem(expr.context.constant(0)),
-            expr.convert_getitem(expr.context.constant(1))
+        self.localVariableExpression(expr.context, ".comprehension_accumulator").convert_setitem(
+            expr.convert_getitem(expr.context.constant(0)), expr.convert_getitem(expr.context.constant(1))
         )
 
     def getMasqueradeType(self):
         from typed_python.compiler.type_wrappers.typed_dict_masquerading_as_dict_wrapper import (
-            TypedDictMasqueradingAsDict
+            TypedDictMasqueradingAsDict,
         )
 
-        return TypedDictMasqueradingAsDict(
-            self.comprehensionAccumulatorType().typeRepresentation
-        )
+        return TypedDictMasqueradingAsDict(self.comprehensionAccumulatorType().typeRepresentation)

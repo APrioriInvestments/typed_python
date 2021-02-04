@@ -220,7 +220,6 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
     def get_layout_pointer(self, instance):
         # diagnostic you can use to check whether our dispatch indices are getting
         # messed up.
-        
         # if self.typeRepresentation.IsFinal:
         #     c = instance.context
         #     with c.ifelse(self.get_dispatch_index(instance)) as (ifTrue, ifFalse):
@@ -234,8 +233,8 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
     def get_layout_pointer_native(self, nonref_expr):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.
         # so whenever we interact with the pointer we need to chop off the top 16 bits
-        #if self.typeRepresentation.IsFinal:
-        #    return nonref_expr.cast(self.layoutType)
+        if self.typeRepresentation.IsFinal:
+            return nonref_expr.cast(self.layoutType)
 
         return (
             nonref_expr
@@ -421,7 +420,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
     def clearIsInitializedExpr(self, instance, ix):
         if self.fieldGuaranteedInitialized(ix):
             return native_ast.nullExpr
-            
+
         assert instance.isReference
 
         byte = ix // 8
@@ -891,10 +890,10 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             # we're deleting this attribute
             if self.fieldGuaranteedInitialized(ix):
                 return context.pushException(
-                    AttributeError, 
+                    AttributeError,
                     f"Attribute '{self.classType.MemberNames[ix]}' cannot be deleted"
                 )
-            
+
             with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(instance, ix))) as (
                 true_block, false_block
             ):

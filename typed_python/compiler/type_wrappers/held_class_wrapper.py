@@ -212,7 +212,7 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
     def clearIsInitializedExpr(self, instance, ix):
         if self.fieldGuaranteedInitialized(ix):
             return native_ast.nullExpr
-            
+
         assert instance.isReference
 
         byte = ix // 8

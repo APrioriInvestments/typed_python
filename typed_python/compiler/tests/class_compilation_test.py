@@ -18,8 +18,24 @@ from math import trunc, floor, ceil
 import unittest
 from flaky import flaky
 from typed_python import (
-    Class, Dict, ConstDict, TupleOf, ListOf, Member, OneOf, UInt64, Int16,
-    Float32, Final, makeNamedTuple, Compiled, Function, Held, Value, pointerTo, refTo
+    Class,
+    Dict,
+    ConstDict,
+    TupleOf,
+    ListOf,
+    Member,
+    OneOf,
+    UInt64,
+    Int16,
+    Float32,
+    Final,
+    makeNamedTuple,
+    Compiled,
+    Function,
+    Held,
+    Value,
+    pointerTo,
+    refTo,
 )
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime, CountCompilationsVisitor
@@ -264,7 +280,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         print("Times were ", elapsed1, elapsed2)
         # they should take the same amount of time. Takes about 1 second for me to
         # tun this test. Note that we generate two entrypoints (one for float, one for int)
-        self.assertTrue(.5 <= elapsed1 / elapsed2 <= 2.0, elapsed1 / elapsed2)
+        self.assertTrue(0.5 <= elapsed1 / elapsed2 <= 2.0, elapsed1 / elapsed2)
 
     def test_compile_class_method(self):
         c = AClass(x=20)
@@ -273,10 +289,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         uncompiled_res = c.loop(1000000)
         uncompiled_time = time.time() - t0
 
-        self.assertEqual(
-            AClass.loop.resultTypeFor(AClass, int).typeRepresentation,
-            float
-        )
+        self.assertEqual(AClass.loop.resultTypeFor(AClass, int).typeRepresentation, float)
 
         t0 = time.time()
         compiled_res = c.loop(1000000)
@@ -414,6 +427,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         # if you override a method you can't change its output type.
         with self.assertRaisesRegex(Exception, "Overloads of 'f' don't have the same return type"):
+
             class BadChild(Base):
                 def f(self) -> float:
                     pass
@@ -437,12 +451,16 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, int).typeRepresentation, int)
         self.assertEqual(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, str).typeRepresentation, str)
         self.assertEqual(
-            set(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, OneOf(str, int)).typeRepresentation.Types),
-            set(OneOf(str, int).Types)
+            set(
+                Function(lambda c, a: c.f(a))
+                .resultTypeFor(TestClass, OneOf(str, int))
+                .typeRepresentation.Types
+            ),
+            set(OneOf(str, int).Types),
         )
         self.assertEqual(
             set(Function(lambda c, a: c.f(a)).resultTypeFor(TestClass, object).typeRepresentation.Types),
-            set(OneOf(str, int).Types)
+            set(OneOf(str, int).Types),
         )
 
         @Compiled
@@ -770,7 +788,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         elapsedNoDispatch = t2 - t1
         speedup = elapsedDispatch / elapsedNoDispatch
 
-        self.assertTrue(.7 < speedup < 1.3, speedup)
+        self.assertTrue(0.7 < speedup < 1.3, speedup)
 
     def test_class_return_self(self):
         class C(Class):
@@ -785,7 +803,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertIsInstance(c_f(C()), C)
 
     def test_compile_class_magic_methods(self):
-
         class C(Class, Final):
             s = Member(str)
 
@@ -801,11 +818,11 @@ class TestClassCompilationCompilation(unittest.TestCase):
             __call__ = lambda self, i: "my call"
             __len__ = lambda self: 42
             __contains__ = lambda self, item: item == 1
-            __bytes__ = lambda self: b'my bytes'
+            __bytes__ = lambda self: b"my bytes"
 
             __int__ = lambda self: 43
             __float__ = lambda self: 44.44
-            __complex__ = lambda self: 3+4j
+            __complex__ = lambda self: 3 + 4j
 
             __add__ = lambda self, other: C("add")
             __sub__ = lambda self, other: C("sub")
@@ -972,11 +989,47 @@ class TestClassCompilationCompilation(unittest.TestCase):
             x **= C("")
             return x
 
-        test_cases = [f_int, f_float, f_bool, f_str, f_repr, f_call, f_0in, f_1in, f_len,
-                      f_add, f_sub, f_mul, f_div, f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift, f_pow,
-                      f_neg, f_pos, f_invert, f_abs,
-                      f_iadd, f_isub, f_imul, f_idiv, f_ifloordiv, f_imatmul,
-                      f_imod, f_iand, f_ior, f_ixor, f_irshift, f_ilshift, f_ipow]
+        test_cases = [
+            f_int,
+            f_float,
+            f_bool,
+            f_str,
+            f_repr,
+            f_call,
+            f_0in,
+            f_1in,
+            f_len,
+            f_add,
+            f_sub,
+            f_mul,
+            f_div,
+            f_floordiv,
+            f_matmul,
+            f_mod,
+            f_and,
+            f_or,
+            f_xor,
+            f_rshift,
+            f_lshift,
+            f_pow,
+            f_neg,
+            f_pos,
+            f_invert,
+            f_abs,
+            f_iadd,
+            f_isub,
+            f_imul,
+            f_idiv,
+            f_ifloordiv,
+            f_imatmul,
+            f_imod,
+            f_iand,
+            f_ior,
+            f_ixor,
+            f_irshift,
+            f_ilshift,
+            f_ipow,
+        ]
 
         for f in test_cases:
             compiled_f = Compiled(f)
@@ -985,7 +1038,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
             self.assertEqual(r1, r2)
 
     def test_compile_class_reverse_methods(self):
-
         class C(Class, Final):
             s = Member(str)
             __radd__ = lambda self, other: "radd" + repr(other)
@@ -1002,8 +1054,17 @@ class TestClassCompilationCompilation(unittest.TestCase):
             __rxor__ = lambda self, other: "rxor" + repr(other)
             __ror__ = lambda self, other: "ror" + repr(other)
 
-        values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
-                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"})]
+        values = [
+            1,
+            Int16(1),
+            UInt64(1),
+            1.234,
+            Float32(1.234),
+            True,
+            "abc",
+            ListOf(int)((1, 2)),
+            ConstDict(str, str)({"a": "1"}),
+        ]
         for v in values:
             T = type(v)
 
@@ -1046,15 +1107,27 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def f_ror(v: T, x: C):
                 return v * x
 
-            for f in [f_radd, f_rsub, f_rmul, f_rmatmul, f_rtruediv, f_rfloordiv, f_rmod, f_rpow,
-                      f_rlshift, f_rrshift, f_rand, f_rxor, f_ror]:
+            for f in [
+                f_radd,
+                f_rsub,
+                f_rmul,
+                f_rmatmul,
+                f_rtruediv,
+                f_rfloordiv,
+                f_rmod,
+                f_rpow,
+                f_rlshift,
+                f_rrshift,
+                f_rand,
+                f_rxor,
+                f_ror,
+            ]:
                 r1 = f(v, C())
                 compiled_f = Compiled(f)
                 r2 = compiled_f(v, C())
                 self.assertEqual(r1, r2)
 
     def test_compile_class_format(self):
-
         class C1(Class, Final):
             pass
 
@@ -1108,7 +1181,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
     def test_compile_class_bytes(self):
         class C(Class, Final):
-            __bytes__ = lambda self: b'my bytes'
+            __bytes__ = lambda self: b"my bytes"
 
         def f_bytes(x: C):
             return bytes(x)
@@ -1120,7 +1193,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(r1, r2)
 
     def test_compile_class_attr(self):
-
         class C(Class, Final):
             d = Member(Dict(str, str))
             i = Member(int)
@@ -1331,7 +1403,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertTrue(finalMem < initMem + 2)
 
     def test_compile_class_comparison_defaults(self):
-
         class C(Class, Final):
             i = Member(int)
             s = Member(str)
@@ -1388,7 +1459,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertTrue(isEqObj(C(x=10), makeNamedTuple(x=10)))
 
     def test_compile_class_comparison_methods(self):
-
         class C(Class, Final):
             i = Member(int)
             s = Member(str)
@@ -1451,7 +1521,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
                 self.assertEqual(r1, r2)
 
     def test_compile_class_hash_special_value(self):
-
         class C(Class, Final):
             i = Member(int)
 
@@ -1468,7 +1537,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(c_hash(C(i=-1)), -2)
 
     def test_compile_class_getsetitem(self):
-
         class C(Class, Final):
             d = Member(Dict(int, int))
 
@@ -1503,7 +1571,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
             self.assertEqual(c_getitem(c, i), i + 200)
 
     def test_compile_class_float_conv(self):
-
         class C0(Class, Final):
             __int__ = lambda self: 123
             __float__ = lambda self: 1234.5
@@ -1601,7 +1668,9 @@ class TestClassCompilationCompilation(unittest.TestCase):
             x ^= ClassWithoutInplaceOp()
             return x
 
-        expected = ClassWithoutInplaceOp(s="start add sub mul matmul truediv floordiv mod pow lshift rshift and or xor")
+        expected = ClassWithoutInplaceOp(
+            s="start add sub mul matmul truediv floordiv mod pow lshift rshift and or xor"
+        )
         v = ClassWithoutInplaceOp(s="start")
         r1 = inplace(v)
         self.assertEqual(r1.s, expected.s)
@@ -1616,10 +1685,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def __float__(self):
                 return 1.0
 
-        with self.assertRaisesRegex(
-            TypeError,
-            "Cannot construct a new float from an instance of C"
-        ):
+        with self.assertRaisesRegex(TypeError, "Cannot construct a new float from an instance of C"):
             aList.append(C())
 
         @Function
@@ -1748,20 +1814,20 @@ class TestClassCompilationCompilation(unittest.TestCase):
             self.compileCheck(lambda: T().f(1, y=2))
             self.compileCheck(lambda: T().f(1, y=2))
 
-            self.compileCheck(lambda: T().f('1', '2'))
-            self.compileCheck(lambda: T().f(x='1', y='2'))
-            self.compileCheck(lambda: T().f('1', y='2'))
-            self.compileCheck(lambda: T().f('1', y='2'))
+            self.compileCheck(lambda: T().f("1", "2"))
+            self.compileCheck(lambda: T().f(x="1", y="2"))
+            self.compileCheck(lambda: T().f("1", y="2"))
+            self.compileCheck(lambda: T().f("1", y="2"))
 
-            self.compileCheck(lambda: T().f('1', 2))
-            self.compileCheck(lambda: T().f(x='1', y=2))
-            self.compileCheck(lambda: T().f('1', y=2))
-            self.compileCheck(lambda: T().f('1', y=2))
+            self.compileCheck(lambda: T().f("1", 2))
+            self.compileCheck(lambda: T().f(x="1", y=2))
+            self.compileCheck(lambda: T().f("1", y=2))
+            self.compileCheck(lambda: T().f("1", y=2))
 
-            self.compileCheck(lambda: T().f(1, '2'))
-            self.compileCheck(lambda: T().f(x=1, y='2'))
-            self.compileCheck(lambda: T().f(1, y='2'))
-            self.compileCheck(lambda: T().f(1, y='2'))
+            self.compileCheck(lambda: T().f(1, "2"))
+            self.compileCheck(lambda: T().f(x=1, y="2"))
+            self.compileCheck(lambda: T().f(1, y="2"))
+            self.compileCheck(lambda: T().f(1, y="2"))
 
     def test_class_with_global_closure_variables(self):
         def makeInt():
@@ -1835,7 +1901,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         @Entrypoint
         def done():
             doit()
-            
+
         done()
 
     def test_compile_class_properties(self):
@@ -2280,9 +2346,9 @@ class TestClassCompilationCompilation(unittest.TestCase):
         cN = callIt(CNonempty)
         cE = callIt(CEmpty)
 
-        assert getX(cN) == ''
-        assert getX(cE) == ''
-        
+        assert getX(cN) == ""
+        assert getX(cE) == ""
+
         with self.assertRaisesRegex(Exception, "Attribute 'x' cannot be deleted"):
             deleteX(cN)
         deleteX(cE)
@@ -2293,7 +2359,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Attribute 'x' is not initialized"):
             getX(cE)
 
-        setX(cE, 'hihi')
+        setX(cE, "hihi")
         assert getX(cE) == "hihi"
 
     def test_class_nonempty_forces_construction(self):
@@ -2339,7 +2405,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         def callG(x: Base):
             return x.g()
 
-        assert callG(C1()) == Entrypoint(callG)(C1())        
+        assert callG(C1()) == Entrypoint(callG)(C1())
 
     def test_convert_refTo(self):
         class C(Class, Final):

@@ -15,6 +15,7 @@
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python._types import refTo
+import typed_python.compiler.native_ast as native_ast
 
 import typed_python.compiler
 
