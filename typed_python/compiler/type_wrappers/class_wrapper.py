@@ -88,7 +88,11 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         self.indexToByteOffset = {}
         self.classType = t
 
-        element_types = [('refcount', native_ast.Int64), ('vtable', vtable_type.pointer()), ('data', native_ast.UInt8)]
+        element_types = [
+            ('refcount', native_ast.Int64),
+            ('vtable', vtable_type.pointer()),
+            ('data', native_ast.UInt8)
+        ]
 
         # this follows the general layout of 'held class' which is 1 bit per field
         # for initialization and then each field packed directly according to byte size
@@ -108,7 +112,10 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
             byteOffset += _types.bytecount(self.classType.MemberTypes[i])
 
-        self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
+        self.layoutType = native_ast.Type.Struct(
+            element_types=element_types,
+            name=t.__qualname__+"Layout"
+        ).pointer()
 
         self.vtableExpr = native_ast.Expression.GlobalVariable(
             name="cls_vtable_" + str(self.typeRepresentation) + "_" + str(id(self.typeRepresentation)),

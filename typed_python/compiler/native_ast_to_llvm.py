@@ -55,7 +55,10 @@ def type_to_llvm_type(t):
         return llvmlite.ir.VoidType()
 
     if t.matches.Struct:
-        return llvmlite.ir.LiteralStructType(type_to_llvm_type(t[1]) for t in t.element_types)
+        return llvmlite.ir.LiteralStructType(
+            tuple(type_to_llvm_type(t[1]) for t in t.element_types),
+            packed=t.packed
+        )
 
     if t.matches.Pointer:
         # llvm won't allow a void*, so we model it as a pointer to an empty struct instead

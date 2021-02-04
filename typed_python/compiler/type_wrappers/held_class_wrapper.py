@@ -53,7 +53,16 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
         for i, m in enumerate(self.classType.MemberTypes):
             element_types.append(("member_" + str(i), typeWrapper(m).getNativeLayoutType()))
 
-        self.layoutType = native_ast.Type.Array(element_type=native_ast.UInt8, count=_types.bytecount(self.heldClassType))
+        self.layoutType = native_ast.Type.Struct(
+            element_types=element_types,
+            name=str(self.heldClassType) + "Layout",
+            packed=True
+        )
+
+        # self.layoutType = native_ast.Type.Array(
+        #     element_type=native_ast.UInt8,
+        #     count=_types.bytecount(self.heldClassType)
+        # )
 
     def fieldGuaranteedInitialized(self, ix):
         if self.classType.ClassMembers[
@@ -164,14 +173,7 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
 
         return (
             instance.expr
-            .cast(native_ast.UInt8.pointer())
-            .elemPtr(self.bytesOfInitBitsForInstance(instance))
-            .ElementPtrIntegers(self.indexToByteOffset[ix])
-            .cast(
-                typeWrapper(self.classType.MemberTypes[ix])
-                .getNativeLayoutType()
-                .pointer()
-            )
+            .ElementPtrIntegers(0, ix + 1)
         )
 
     def isInitializedNativeExpr(self, instance, ix):
