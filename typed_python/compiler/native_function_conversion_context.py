@@ -14,6 +14,7 @@
 
 import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.expression_conversion_context import ExpressionConversionContext
+from typed_python.compiler.function_metadata import FunctionMetadata
 
 
 class NativeFunctionConversionContext:
@@ -29,6 +30,7 @@ class NativeFunctionConversionContext:
         self._output_type = output_type
         self._generatingFunction = generatingFunction
         self._identity = identity
+        self.functionMetadata = FunctionMetadata()
 
     def getInputTypes(self):
         return self._input_types
@@ -68,6 +70,8 @@ class NativeFunctionConversionContext:
 
     def getFunction(self):
         self.varnames = 0
+        # reset the constant return value.
+        self.functionMetadata = FunctionMetadata()
 
         try:
             subcontext = ExpressionConversionContext(self, None)

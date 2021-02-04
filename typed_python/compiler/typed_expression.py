@@ -61,6 +61,15 @@ class TypedExpression:
     def changeContext(self, newContext):
         return TypedExpression(newContext, self.expr, self.expr_type, self.isReference)
 
+    def withConstantValue(self, newVal):
+        return TypedExpression(
+            self.context,
+            self.expr,
+            self.expr_type,
+            self.isReference,
+            constantValue=newVal
+        )
+
     def asPointer(self):
         """Change from being a reference to 'T' to being a _value_ of type 'T*'"""
         assert self.isReference

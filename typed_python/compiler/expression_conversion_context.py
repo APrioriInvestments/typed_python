@@ -1217,11 +1217,20 @@ class ExpressionConversionContext:
 
             return
 
+        constantRetval = call_target.functionMetadata.getConstantReturnValue()
+
         if call_target.output_type.is_pass_by_ref:
             assert len(call_target.named_call_target.arg_types) == len(native_args) + 1, "\n\n%s\n%s" % (
                 call_target.named_call_target.arg_types,
                 [a.expr_type for a in args]
             )
+
+            if constantRetval is not None:
+                self.push(
+                    call_target.output_type,
+                    lambda output_slot: call_target.call(output_slot.expr, *native_args)
+                )
+                return self.constant(constantRetval)
 
             return self.push(
                 call_target.output_type,
@@ -1234,6 +1243,10 @@ class ExpressionConversionContext:
                     f"Can't call {call_target} with {args} because we need "
                     f"{len(call_target.named_call_target.arg_types)} and we got {len(native_args)}"
                 )
+
+            if constantRetval is not None:
+                self.pushEffect(call_target.call(*native_args))
+                return self.constant(constantRetval)
 
             return self.pushPod(
                 call_target.output_type,

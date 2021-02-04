@@ -40,6 +40,7 @@ from typed_python.compiler.type_wrappers.python_type_object_wrapper import Pytho
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
 from typed_python import OneOf, Function, Tuple, Forward, Class
+from typed_python.compiler.function_metadata import FunctionMetadata
 
 from typed_python.python_ast import evaluateFunctionDefWithLocalsInCells
 
@@ -193,6 +194,7 @@ class ConversionContextBase:
         self._functionOutputTypeKnown = False
         self._functionYieldTypeKnown = False
         self._native_args = None
+        self.functionMetadata = FunctionMetadata()
 
     @property
     def isGenerator(self):
@@ -455,6 +457,7 @@ class ConversionContextBase:
         self.tempLetVarIx = 0
         self._tempStackVarIx = 0
         self._tempIterVarIx = 0
+        self.functionMetadata = FunctionMetadata()
 
         variableStates = FunctionStackState()
 

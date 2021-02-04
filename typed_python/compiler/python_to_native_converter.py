@@ -308,7 +308,8 @@ class PythonToNativeConverter:
                 name,
                 context.getInputTypes(),
                 context.knownOutputType(),
-                alwaysRaises=context.alwaysRaises()
+                alwaysRaises=context.alwaysRaises(),
+                functionMetadata=context.functionMetadata
             )
 
         if self._currentlyConverting is None:
@@ -352,7 +353,7 @@ class PythonToNativeConverter:
             )
         )
 
-    def getTypedCallTarget(self, name, input_types, output_type, alwaysRaises=False):
+    def getTypedCallTarget(self, name, input_types, output_type, alwaysRaises=False, functionMetadata=None):
         native_input_types = [a.getNativePassingType() for a in input_types if not a.is_empty]
         if output_type is None:
             native_output_type = native_ast.Type.Void()
@@ -374,7 +375,8 @@ class PythonToNativeConverter:
             ),
             input_types,
             output_type,
-            alwaysRaises=alwaysRaises
+            alwaysRaises=alwaysRaises,
+            functionMetadata=functionMetadata
         )
 
         return res
@@ -548,7 +550,8 @@ class PythonToNativeConverter:
                     name,
                     functionConverter._input_types,
                     actual_output_type,
-                    functionConverter.alwaysRaises()
+                    alwaysRaises=functionConverter.alwaysRaises(),
+                    functionMetadata=functionConverter.functionMetadata
                 )
 
             if dirtyUpstream:

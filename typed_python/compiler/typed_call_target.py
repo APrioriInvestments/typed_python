@@ -13,11 +13,12 @@
 #   limitations under the License.
 
 import typed_python.compiler.native_ast as native_ast
+from typed_python.compiler.function_metadata import FunctionMetadata
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 
 
 class TypedCallTarget:
-    def __init__(self, named_call_target, input_types, output_type, alwaysRaises=False):
+    def __init__(self, named_call_target, input_types, output_type, alwaysRaises=False, functionMetadata=None):
         super().__init__()
 
         assert isinstance(output_type, Wrapper) or output_type is None
@@ -31,6 +32,7 @@ class TypedCallTarget:
         self.named_call_target = named_call_target
         self.input_types = input_types
         self.output_type = output_type
+        self.functionMetadata = functionMetadata or FunctionMetadata()
 
     def call(self, *args):
         return native_ast.CallTarget.Named(target=self.named_call_target).call(*args)

@@ -2423,3 +2423,18 @@ class TestClassCompilationCompilation(unittest.TestCase):
             return f(refTo(c))
 
         assert doIt() == 10
+
+    def test_call_overridden_fun(self):
+        class C(Class):
+            def getIt(self) -> int:
+                return 0
+
+        class B(C, Final):
+            def getIt(self) -> int:
+                return 1
+
+        @Entrypoint
+        def f(c: C):
+            return c.getIt()
+
+        f(C())

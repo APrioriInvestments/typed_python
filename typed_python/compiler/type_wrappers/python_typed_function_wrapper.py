@@ -667,11 +667,12 @@ class PythonTypedFunctionWrapper(Wrapper):
 
                     # if we definitely match, we can return early
                     if mightMatch is True:
-                        context.pushException(
-                            TypeError,
-                            f"Thought we found overload for {self} matching {argTypes} and "
-                            f"{kwargTypes}, but it didn't accept the arguments."
-                        )
+                        if successful.constantValue is not True:
+                            context.pushException(
+                                TypeError,
+                                f"Thought we found overload for {self} matching {argTypes} and "
+                                f"{kwargTypes}, but it didn't accept the arguments."
+                            )
                         return
 
         # generate a cleanup handler for the cases where we don't match a method signature.
@@ -712,6 +713,8 @@ class PythonTypedFunctionWrapper(Wrapper):
         convertedArgs = []
         convertedKwargs = {}
 
+        argConversionMightNotBeSuccessful = False
+
         for argIx, argExpr in enumerate(args):
             if argNames[argIx] is None:
                 argType = argAndKwargTypes[0][argIx]
@@ -724,14 +727,26 @@ class PythonTypedFunctionWrapper(Wrapper):
 
             successful = argExpr.convert_to_type_with_target(convertedArg, conversionLevel)
 
-            with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
-                with ifFalse:
+            if successful.isConstant:
+                if successful.constantValue:
+                    context.markUninitializedSlotInitialized(convertedArg)
+                else:
+                    # we can return early
                     context.pushTerminal(
                         native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
                     )
+                    return
+            else:
+                argConversionMightNotBeSuccessful = True
 
-                with ifTrue:
-                    context.markUninitializedSlotInitialized(convertedArg)
+                with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
+                    with ifFalse:
+                        context.pushTerminal(
+                            native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
+                        )
+
+                    with ifTrue:
+                        context.markUninitializedSlotInitialized(convertedArg)
 
             if argNames[argIx] is None:
                 convertedArgs.append(convertedArg)
@@ -756,3 +771,8 @@ class PythonTypedFunctionWrapper(Wrapper):
         outputVar.changeType(typeWrapper(retType), True).convert_copy_initialize(res)
 
         context.pushReturnValue(context.constant(True))
+
+        if not argConversionMightNotBeSuccessful:
+            context.functionContext.functionMetadata.setConstantReturnValue(
+                True
+            )
