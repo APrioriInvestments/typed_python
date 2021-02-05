@@ -1083,3 +1083,35 @@ class TestCompilingClosures(unittest.TestCase):
             return g
 
         assert makeEntrypoint().isEntrypoint
+
+    def test_compile_closures_with_type_refs(self):
+        class C(Class):
+            pass
+
+        class D(C):
+            pass
+
+        def final(x):
+            return x
+
+        def makeClosure(T1, T2):
+            def h(x):
+                return final(x + T2(10))
+
+            def g(x: str):
+                return h(T1(x))
+
+            @Entrypoint
+            def f(c: C, x):
+                return g(x)
+
+            return f
+
+        def callIt2(f, x):
+            return f(D(), x)
+
+        @Entrypoint
+        def callIt(f, x):
+            return callIt2(f, x)
+
+        assert callIt(makeClosure(float, int), "1.2") == 11.2

@@ -90,7 +90,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                 else:
                     expr = expr.expr_type.refHeld(expr)
             elif isinstance(pathElt, type):
-                expr.changeType(typeWrapper(pathElt))
+                expr = expr.changeType(typeWrapper(pathElt))
             else:
                 assert False, "invalid cell path"
 
