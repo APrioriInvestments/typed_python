@@ -73,6 +73,9 @@ class Wrapper:
     # is this wrapping a Class object
     is_class_wrapper = False
 
+    # is this wrapping a known python type object
+    is_py_type_object_wrapper = False
+
     # is this wrapping a OneOf object
     is_oneof_wrapper = False
 

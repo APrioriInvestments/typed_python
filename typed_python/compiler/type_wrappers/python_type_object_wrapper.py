@@ -13,17 +13,24 @@
 #   limitations under the License.
 
 import typed_python.compiler
-from typed_python import Type, TupleOf
+import typed_python.compiler.native_ast as native_ast
+from typed_python import Type, TupleOf, Class
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 
+from typed_python.compiler.type_wrappers.voidptr_masquerading_as_tp_type import (
+    VoidPtrMasqueradingAsTPType
+)
+
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
 class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
+    is_py_type_object_wrapper = True
+
     def __init__(self, f):
         super().__init__(f, hasSideEffects=False)
 
@@ -101,6 +108,19 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
                 issubclass(
                     instance.expr_type.typeRepresentation.Value,
                     typeInstance.expr_type.typeRepresentation.Value
+                )
+            )
+
+        if (
+            issubclass(self.typeRepresentation.Value, Class)
+            and self.typeRepresentation.Value.IsFinal
+            and isinstance(instance.expr_type, VoidPtrMasqueradingAsTPType)
+        ):
+            return context.pushPod(
+                bool,
+                instance.nonref_expr.cast(native_ast.UInt64).eq(
+                    context.getTypePointer(self.typeRepresentation.Value)
+                    .cast(native_ast.UInt64)
                 )
             )
 

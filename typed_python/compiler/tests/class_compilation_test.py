@@ -2438,3 +2438,41 @@ class TestClassCompilationCompilation(unittest.TestCase):
             return c.getIt()
 
         f(C())
+
+    def test_isinstance_perf(self):
+        class C(Class):
+            pass
+
+        class D(C, Final):
+            pass
+
+        class E(C, Final):
+            pass
+
+        @Entrypoint
+        def countIt(times, c: C):
+            isC = 0
+            isD = 0
+            isE = 0
+            isInt = 0
+
+            for _ in range(times):
+                if isinstance(c, C):
+                    isC += 1
+                if isinstance(c, D):
+                    isD += 1
+                if isinstance(c, E):
+                    isE += 1
+                if isinstance(c, int):
+                    isInt += 1
+
+            return (isC, isD, isE, isInt)
+
+        countIt(1, D())
+        t0 = time.time()
+        countIt(1000000, D())
+        print(time.time() - t0, " to do 1mm")
+
+        # I get 0.002 on my machine. This should be very fast
+        # because either the compiler can figure it out
+        assert time.time() - t0 < 0.01
