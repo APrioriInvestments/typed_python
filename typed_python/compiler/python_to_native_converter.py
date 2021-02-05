@@ -149,6 +149,9 @@ class PythonToNativeConverter:
 
         self._dependencies = FunctionDependencyGraph()
 
+    def getDefinitionCount(self):
+        return len(self._definitions)
+
     def addVisitor(self, visitor):
         self._visitors.append(visitor)
 
@@ -839,8 +842,13 @@ class PythonToNativeConverter:
                         self._identifier_to_pyfunc[identifier]
                     )
 
+                    nativeFunction, actual_output_type = self._inflight_definitions.get(identifier)
+
                     try:
                         v.onNewFunction(
+                            identifier,
+                            functionConverter,
+                            nativeFunction,
                             funcName,
                             funcCode,
                             funcGlobals,

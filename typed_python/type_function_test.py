@@ -304,6 +304,9 @@ class TypeFunctionTest(unittest.TestCase):
             """
             def onNewFunction(
                 self,
+                identifier,
+                functionConverter,
+                nativeFunction,
                 funcName,
                 funcCode,
                 funcGlobals,

@@ -41,6 +41,9 @@ class DidCompileVisitor(RuntimeEventVisitor):
 
     def onNewFunction(
         self,
+        identifier,
+        functionConverter,
+        nativeFunction,
         funcName,
         funcCode,
         funcGlobals,

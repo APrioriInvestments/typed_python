@@ -411,6 +411,9 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         class Visitor(RuntimeEventVisitor):
             def onNewFunction(
                 self,
+                identifier,
+                functionConverter,
+                nativeFunction,
                 funcName,
                 funcCode,
                 funcGlobals,

@@ -78,6 +78,9 @@ class GetCompiledTypes(RuntimeEventVisitor):
 
     def onNewFunction(
         self,
+        identifier,
+        functionConverter,
+        nativeFunction,
         funcName,
         funcCode,
         funcGlobals,
@@ -1401,6 +1404,9 @@ class TestCompilationStructures(unittest.TestCase):
         class NoPythonObjectTypes(RuntimeEventVisitor):
             def onNewFunction(
                 self,
+                identifier,
+                functionConverter,
+                nativeFunction,
                 funcName,
                 funcCode,
                 funcGlobals,

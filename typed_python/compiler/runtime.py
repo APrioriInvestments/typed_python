@@ -14,6 +14,7 @@
 
 import threading
 import os
+import time
 import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
 import typed_python.compiler.llvm_compiler as llvm_compiler
@@ -50,6 +51,9 @@ class RuntimeEventVisitor:
     """
     def onNewFunction(
         self,
+        identifier,
+        functionConverter,
+        nativeFunction,
         funcName,
         funcCode,
         funcGlobals,
@@ -82,8 +86,14 @@ class PrintNewFunctionVisitor(RuntimeEventVisitor):
             # this should print out the fact that we compiled 'f'
             f()
     """
+    def __init__(self, short=False):
+        self.short = short
+
     def onNewFunction(
         self,
+        identifier,
+        functionConverter,
+        nativeFunction,
         funcName,
         funcCode,
         funcGlobals,
@@ -94,16 +104,33 @@ class PrintNewFunctionVisitor(RuntimeEventVisitor):
         variableTypes,
         conversionType
     ):
-        print("compiling ", funcName)
-        print("   inputs: ", inputTypes)
-        print("   output: ", outputType)
-        print("   vars: ")
+        if self.short:
+            print(
+                f"[complexity={len(str(nativeFunction))}] ",
+                funcName,
+                "(" + ",".join([str(x.typeRepresentation) for x in inputTypes]) + ")",
+                "->",
+                outputType,
+            )
+        else:
+            print("compiling ", funcName)
+            print("   inputs: ", inputTypes)
+            print("   output: ", outputType)
+            print("   vars: ")
 
-        for varname, varVal in variableTypes.items():
-            if isinstance(varVal, type) and issubclass(varVal, Value):
-                print("        ", varname, " which is a Value(", varVal.Value, " of type ", type(varVal.Value), ")")
-            else:
-                print("        ", varname, varVal)
+            for varname, varVal in variableTypes.items():
+                if isinstance(varVal, type) and issubclass(varVal, Value):
+                    print(
+                        "        ",
+                        varname,
+                        "which is a Value(",
+                        varVal.Value,
+                        "of type",
+                        type(varVal.Value),
+                        ")"
+                    )
+                else:
+                    print("        ", varname, varVal)
 
 
 class CountCompilationsVisitor(RuntimeEventVisitor):
@@ -112,6 +139,9 @@ class CountCompilationsVisitor(RuntimeEventVisitor):
 
     def onNewFunction(
         self,
+        identifier,
+        functionConverter,
+        nativeFunction,
         funcName,
         funcCode,
         funcGlobals,
@@ -131,10 +161,6 @@ class Runtime:
         with _singletonLock:
             if _singleton[0] is None:
                 _singleton[0] = Runtime()
-
-            if os.getenv("TP_COMPILER_VERBOSE"):
-                _singleton[0].verboselyDisplayNativeCode()
-
         return _singleton[0]
 
     def __init__(self):
@@ -152,9 +178,19 @@ class Runtime:
         self.lock = runtimeLock
         self.timesCompiled = 0
 
-    def verboselyDisplayNativeCode(self):
-        self.llvm_compiler.mark_converter_verbose()
-        self.llvm_compiler.mark_llvm_codegen_verbose()
+        if os.getenv("TP_COMPILER_VERBOSE"):
+            self.verbosityLevel = int(os.getenv("TP_COMPILER_VERBOSE"))
+            if self.verbosityLevel >= 2:
+                if self.verbosityLevel >= 3:
+                    self.addEventVisitor(PrintNewFunctionVisitor(False))
+                else:
+                    self.addEventVisitor(PrintNewFunctionVisitor(True))
+            if self.verbosityLevel >= 4:
+                self.llvm_compiler.mark_converter_verbose()
+            if self.verbosityLevel >= 5:
+                self.llvm_compiler.mark_llvm_codegen_verbose()
+        else:
+            self.verbosityLevel = 0
 
     def addEventVisitor(self, visitor: RuntimeEventVisitor):
         self.converter.addVisitor(visitor)
@@ -235,44 +271,54 @@ class Runtime:
 
         assert len(arguments) == len(overload.args)
 
-        with self.lock:
-            inputWrappers = []
+        try:
+            t0 = time.time()
+            defCount = self.converter.getDefinitionCount()
 
-            for i in range(len(arguments)):
-                inputWrappers.append(
-                    self.pickSpecializationTypeFor(overload.args[i], arguments[i], argumentsAreTypes)
+            with self.lock:
+                inputWrappers = []
+
+                for i in range(len(arguments)):
+                    inputWrappers.append(
+                        self.pickSpecializationTypeFor(overload.args[i], arguments[i], argumentsAreTypes)
+                    )
+
+                if any(x is None for x in inputWrappers):
+                    # this signature is unmatchable with these arguments.
+                    return None
+
+                self.timesCompiled += 1
+
+                callTarget = self.converter.convertTypedFunctionCall(
+                    functionType,
+                    overloadIx,
+                    inputWrappers,
+                    assertIsRoot=True
                 )
 
-            if any(x is None for x in inputWrappers):
-                # this signature is unmatchable with these arguments.
-                return None
+                callTarget = self.converter.demasqueradeCallTargetOutput(callTarget)
 
-            self.timesCompiled += 1
+                assert callTarget is not None
 
-            callTarget = self.converter.convertTypedFunctionCall(
-                functionType,
-                overloadIx,
-                inputWrappers,
-                assertIsRoot=True
-            )
+                wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
 
-            callTarget = self.converter.demasqueradeCallTargetOutput(callTarget)
+                self.converter.buildAndLinkNewModule()
 
-            assert callTarget is not None
+                fp = self.converter.functionPointerByName(wrappingCallTargetName)
 
-            wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
+                overload._installNativePointer(
+                    fp.fp,
+                    callTarget.output_type.typeRepresentation if callTarget.output_type is not None else type(None),
+                    [i.typeRepresentation for i in callTarget.input_types]
+                )
 
-            self.converter.buildAndLinkNewModule()
-
-            fp = self.converter.functionPointerByName(wrappingCallTargetName)
-
-            overload._installNativePointer(
-                fp.fp,
-                callTarget.output_type.typeRepresentation if callTarget.output_type is not None else type(None),
-                [i.typeRepresentation for i in callTarget.input_types]
-            )
-
-            return callTarget
+                return callTarget
+        finally:
+            if self.verbosityLevel > 0:
+                print(
+                    f"typed_python runtime spent {time.time()-t0:.3f} seconds adding "
+                    f"{self.converter.getDefinitionCount() - defCount} functions."
+                )
 
     def compileClassDispatch(self, interfaceClass, implementingClass, slotIndex):
         with self.lock:
