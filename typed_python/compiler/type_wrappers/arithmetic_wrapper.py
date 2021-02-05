@@ -343,6 +343,19 @@ class IntWrapper(ArithmeticTypeWrapper):
         return super().convert_unary_op(context, left, op)
 
     def convert_bin_op(self, context, left, op, right, inplace):
+        if left.isConstant and right.isConstant and isinstance(right.constantValue, int):
+            if op.matches.Add and not inplace:
+                return context.constant(left.constantValue + right.constantValue)
+
+            if op.matches.Sub and not inplace:
+                return context.constant(left.constantValue - right.constantValue)
+
+            if op.matches.Mul and not inplace:
+                return context.constant(left.constantValue * right.constantValue)
+
+            if op.matches.FloorDiv and not inplace:
+                return context.constant(left.constantValue // right.constantValue)
+
         if op.matches.Div and isinstance(right.expr_type, ArithmeticTypeWrapper):
             T = toWrapper(
                 computeArithmeticBinaryResultType(

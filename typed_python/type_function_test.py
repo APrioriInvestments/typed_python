@@ -330,3 +330,23 @@ class TypeFunctionTest(unittest.TestCase):
             do()
 
         assert vis.variableTypes['T'] is not object
+
+    def test_compiled_type_function_sees_through_constants(self):
+        @TypeFunction
+        def IntLevelClass(i):
+            if i == 0:
+                class C(Class, Final):
+                    def next(self):
+                        return self
+            else:
+                class C(Class, Final):
+                    def next(self):
+                        return IntLevelClass(i - 1)()
+
+            return C
+
+        @Entrypoint
+        def callNext(c):
+            return c.next()
+
+        assert callNext.resultTypeFor(IntLevelClass(10)).typeRepresentation is IntLevelClass(9)
