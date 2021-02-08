@@ -3321,7 +3321,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert iterate(ListOf(int)([1, 2, 3])) == 6
 
-        assert iterate.resultTypeFor(ListOf(int)).typeRepresentation == OneOf(int, float)
+        assert iterate.resultTypeFor(ListOf(int)).typeRepresentation == OneOf(float, int)
 
     def test_iterate_oneof_segregates_variables(self):
         @Entrypoint
@@ -3347,8 +3347,8 @@ class TestCompilationStructures(unittest.TestCase):
 
             return typeKnownToCompiler(res)
 
-        assert iterate(ListOf(int)([1, 2])) is OneOf(int, None, str)
-        assert iterate(ListOf(str)(["2"])) is OneOf(int, None, str)
+        assert iterate(ListOf(int)([1, 2])) is OneOf(None, int, str)
+        assert iterate(ListOf(str)(["2"])) is OneOf(None, int, str)
 
     def test_check_isinstance_on_oneof(self):
         @Entrypoint

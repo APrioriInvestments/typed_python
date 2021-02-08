@@ -293,7 +293,7 @@ class TestTypeInference(unittest.TestCase):
 
             return typeKnownToCompiler(y)
 
-        assert returnTypeOfArgument(10) is OneOf(int, float)
+        assert returnTypeOfArgument(10) is OneOf(float, int)
 
     def test_compiler_knows_that_isinstance_constrains_types(self):
         @Entrypoint
@@ -322,4 +322,4 @@ class TestTypeInference(unittest.TestCase):
             return localVariableTypesKnownToCompiler()
 
         res = localVariableTypes(10)
-        assert res == dict(x=int, y=OneOf(int, float))
+        assert res == dict(x=int, y=OneOf(float, int))

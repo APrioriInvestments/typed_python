@@ -14,11 +14,11 @@
 
 
 from typed_python import PointerTo, bytecount, NamedTuple, Class
+from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
 from typed_python._types import is_default_constructible
 from typed_python.internals import CellAccess
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -433,7 +433,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                 kwargTypes
             )
 
-            returnType = OneOfWrapper.mergeTypes(possibleTypes)
+            returnType = mergeTypeWrappers(possibleTypes)
 
             if returnType is None:
                 return None

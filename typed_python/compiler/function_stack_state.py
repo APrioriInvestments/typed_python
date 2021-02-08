@@ -1,15 +1,4 @@
-from typed_python import OneOf
-from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
-
-
-def mergeTypes(t1, t2):
-    if t1 is None:
-        return t2
-    if t2 is None:
-        return t1
-    if t1 == t2:
-        return t1
-    return OneOf(t1, t2)
+from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers, mergeTypes
 
 
 def removeTypeFrom(type, toRemove):
@@ -21,7 +10,7 @@ def removeTypeFrom(type, toRemove):
         if len(types) == 1:
             return types[0]
 
-        return OneOfWrapper.mergeTypes(types).interpreterTypeRepresentation
+        return mergeTypeWrappers(types).interpreterTypeRepresentation
     return type
 
 
@@ -117,7 +106,7 @@ class FunctionStackState:
         self._maybeUninitialized = set()
 
         for name in allNames:
-            self._types[name] = mergeTypes(left._types.get(name), right._types.get(name))
+            self._types[name] = mergeTypes([left._types.get(name), right._types.get(name)])
 
             if (name in left._maybeUninitialized or name in right._maybeUninitialized
                     or not (name in left._types and name in right._types)):

@@ -13,13 +13,12 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-
+from typed_python.compiler.merge_type_wrappers import mergeTypes
 from typed_python import (
     _types, Int32, Tuple, NamedTuple, Function, Dict, Set, ConstDict, ListOf, TupleOf
 )
 import typed_python._types
 from typed_python.compiler.conversion_level import ConversionLevel
-from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 import types
@@ -181,9 +180,7 @@ class TupleWrapper(Wrapper):
         bytecount = _types.bytecount(t)
 
         self.subTypeWrappers = tuple(typeWrapper(sub_t) for sub_t in t.ElementTypes)
-        self.unionType = OneOfWrapper.mergeTypes(t.ElementTypes)
-        if self.unionType is not None:
-            self.unionType = self.unionType.interpreterTypeRepresentation
+        self._unionType = None
 
         self.byteOffsets = [0]
 
@@ -194,6 +191,12 @@ class TupleWrapper(Wrapper):
 
         self._is_pod = all(typeWrapper(possibility).is_pod for possibility in self.subTypeWrappers)
         self.is_default_constructible = _types.is_default_constructible(t)
+
+    @property
+    def unionType(self):
+        if self._unionType is None and self.typeRepresentation.ElementTypes:
+            self._unionType = mergeTypes(self.typeRepresentation.ElementTypes)
+        return self._unionType
 
     def convert_hash(self, context, expr):
         val = context.constant(Int32(0))

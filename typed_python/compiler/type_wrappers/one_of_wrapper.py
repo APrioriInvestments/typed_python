@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-
+from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
 from typed_python import _types, OneOf, PointerTo
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_level import ConversionLevel
@@ -56,39 +56,6 @@ class OneOfWrapper(Wrapper):
     def getNativeLayoutType(self):
         return self.layoutType
 
-    @staticmethod
-    def mergeTypes(types):
-        """Produce a canonical 'OneOf' type wrapper from all of the arguments.
-
-        If there is only one argument, it will not be a one-of. If there are no arguments,
-        we return None.
-        """
-        if not types:
-            return None
-
-        if all(isinstance(t, Wrapper) for t in types):
-            types = list(set(types))
-            if len(types) == 1:
-                return types[0]
-
-        allTypes = set()
-        for t in types:
-            if isinstance(t, Wrapper):
-                t = t.interpreterTypeRepresentation
-
-            if isinstance(t, OneOf):
-                allTypes.update(t.Types)
-            else:
-                allTypes.add(t)
-
-        if not allTypes:
-            return None
-
-        if len(allTypes) == 1:
-            return typeWrapper(list(allTypes)[0])
-
-        return typeWrapper(OneOf(*sorted(allTypes, key=str)))
-
     def convert_which_native(self, expr):
         return expr.ElementPtrIntegers(0, 0).load()
 
@@ -114,7 +81,7 @@ class OneOfWrapper(Wrapper):
                         assert isinstance(t, Wrapper)
                         types.append(t)
 
-            output_type = OneOfWrapper.mergeTypes(types)
+            output_type = mergeTypeWrappers(types)
 
             if output_type is None:
                 return None

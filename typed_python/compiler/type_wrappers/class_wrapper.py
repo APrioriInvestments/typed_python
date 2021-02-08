@@ -13,12 +13,12 @@
 #   limitations under the License.
 
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
+from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
-from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
     ClassOrAlternativeWrapperMixin
@@ -561,7 +561,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         # compute the return type of dispatching to this function. it will be a one-of if we
         # might dispatch to multiple possible functions.
-        output_type = OneOfWrapper.mergeTypes(resultTypes)
+        output_type = mergeTypeWrappers(resultTypes)
 
         argSignatureStrings = [str(x) for x in argTypes[1:]]
         argSignatureStrings.extend([f"{k}={v}" for k, v in kwargTypes.items()])

@@ -300,9 +300,9 @@ class TestBuiltinCompilation(unittest.TestCase):
                         )
 
         test_cases = [
+            (1, 9), (9, 1),
             TupleOf(int)((1, 9)), TupleOf(int)((9, 1)),
             Tuple(int, int)((1, 9)), Tuple(int, int)((9, 1)),
-            (1, 9), (9, 1),
             [-1, -9], [-9, -1],
             {-2, 9}, {9, -2},
             Tuple(int, int)((1, 9)), Tuple(int, int)((9, 1)),
@@ -339,7 +339,7 @@ class TestBuiltinCompilation(unittest.TestCase):
             for v in test_cases:
                 r1 = f(v)
                 r2 = Entrypoint(f)(v)
-                self.assertEqual(r1, r2)
+                self.assertEqual(r1, r2, (f, v))
                 self.assertEqual(type(r1), type(r2))
 
     def test_min_max_iterable_with_key(self):

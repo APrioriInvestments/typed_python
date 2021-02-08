@@ -40,7 +40,7 @@ from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
 from typed_python import OneOf, Function, Tuple, Forward, Class
 from typed_python.compiler.function_metadata import FunctionMetadata
-
+from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
 from typed_python.python_ast import evaluateFunctionDefWithLocalsInCells
 
 # Constants for control flow instructions
@@ -716,25 +716,11 @@ class ConversionContextBase:
 
         existingTypeWrapper = self._varname_to_type[varname]
 
-        existingType = existingTypeWrapper.interpreterTypeRepresentation
+        finalType = mergeTypeWrappers([existingTypeWrapper, new_type])
 
-        # check if this is entirely subsumed by an existing OneOf
-        if issubclass(existingType, OneOf):
-            if new_type.interpreterTypeRepresentation in existingType.Types:
-                return
-
-            if issubclass(new_type.interpreterTypeRepresentation, OneOf):
-                if all(x in existingType.Types for x in new_type.interpreterTypeRepresentation.Types):
-                    return
-
-        if existingType == new_type.interpreterTypeRepresentation:
-            final_type = typeWrapper(new_type.interpreterTypeRepresentation)
-        else:
-            final_type = typeWrapper(OneOf(new_type.interpreterTypeRepresentation, existingType))
-
-        if final_type != existingTypeWrapper:
+        if finalType != existingTypeWrapper:
             self.markTypesAreUnstable()
-            self._varname_to_type[varname] = final_type
+            self._varname_to_type[varname] = finalType
 
     def closureDestructor(self, variableStates):
         if not issubclass(self.closureType, Class):

@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -20,7 +21,6 @@ from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python import _types
 import typed_python.compiler
 from typed_python.compiler.native_ast import VoidPtr
-from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
     ClassOrAlternativeWrapperMixin
 )
@@ -285,7 +285,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
                     context.pushException(AttributeError, "Object has no attribute '%s'" % attribute)
             return self.refAs(context, instance, validIndices[0]).convert_attribute(attribute)
         else:
-            outputType = OneOfWrapper.mergeTypes(possibleTypes)
+            outputType = mergeTypeWrappers(possibleTypes)
 
             output = context.allocateUninitializedSlot(outputType)
 

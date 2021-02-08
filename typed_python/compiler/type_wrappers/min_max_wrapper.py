@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
+from typed_python.compiler.merge_type_wrappers import mergeTypes
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.native_ast as native_ast
 import typed_python.python_ast as python_ast
@@ -171,7 +171,8 @@ class MinMaxWrapper(Wrapper):
             return context.call_py_function(self.i_call, (args[0],), {})
 
         if len(args) >= 2 and 'key' in kwargs:
-            outT = OneOfWrapper.mergeTypes([a.expr_type.typeRepresentation for a in args]).typeRepresentation
+            outT = mergeTypes([a.expr_type.typeRepresentation for a in args])
+
             selected = context.allocateUninitializedSlot(outT)
             selected.convert_copy_initialize(args[0].convert_to_type(outT, ConversionLevel.Signature))
             context.markUninitializedSlotInitialized(selected)
@@ -189,7 +190,7 @@ class MinMaxWrapper(Wrapper):
                 if keyT is None:
                     keyT = k.expr_type.typeRepresentation
                 else:
-                    keyT = OneOfWrapper.mergeTypes([keyT, k.expr_type.typeRepresentation]).typeRepresentation
+                    keyT = mergeTypes([keyT, k.expr_type.typeRepresentation])
 
             # evaluate key for each arg
             keys = []
@@ -216,7 +217,7 @@ class MinMaxWrapper(Wrapper):
             return selected
 
         if len(args) >= 2 and not kwargs:
-            outT = OneOfWrapper.mergeTypes([a.expr_type.typeRepresentation for a in args]).typeRepresentation
+            outT = mergeTypes([a.expr_type.typeRepresentation for a in args])
             selected = context.allocateUninitializedSlot(outT)
 
             for i in range(len(args)):

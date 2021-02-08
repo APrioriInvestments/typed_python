@@ -16,6 +16,7 @@ from typed_python.compiler.global_variable_definition import GlobalVariableMetad
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 import types
 
@@ -24,7 +25,6 @@ from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.SerializationContext import SerializationContext
 from typed_python.internals import makeFunctionType, FunctionOverload
 from typed_python.compiler.function_stack_state import FunctionStackState
-from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.python_object_representation import pythonObjectRepresentation
 from typed_python.compiler.python_object_representation import pythonObjectRepresentationType
 from typed_python.compiler.typed_expression import TypedExpression
@@ -1557,7 +1557,7 @@ class ExpressionConversionContext:
 
             # this is the merge of all the possible types that could
             # come out of the subexpression.
-            return_type = OneOfWrapper.mergeTypes(resultTypes)
+            return_type = mergeTypeWrappers(resultTypes)
 
             # allocate a new slot for the final value. every pathway
             # will either write into it and intialize it, or throw an
@@ -1851,12 +1851,7 @@ class ExpressionConversionContext:
                 elif false_res is None:
                     out_type = true_res.expr_type
                 elif true_res.expr_type != false_res.expr_type:
-                    out_type = typeWrapper(
-                        OneOf(
-                            true_res.expr_type.interpreterTypeRepresentation,
-                            false_res.expr_type.interpreterTypeRepresentation
-                        )
-                    )
+                    out_type = mergeTypeWrappers([true_res.expr_type, false_res.expr_type])
                 else:
                     out_type = true_res.expr_type
 

@@ -26,6 +26,11 @@ class TypedTupleMasqueradingAsTuple(MasqueradeWrapper):
         super().__init__(typeRepresentation)
         self.interiorTypeWrappers = interiorTypeWrappers
 
+    def __hash__(self):
+        return hash(
+            (type(self), self.typeRepresentation, self.interiorTypeWrappers)
+        )
+
     def __eq__(self, other):
         if type(self) != type(other):
             return False

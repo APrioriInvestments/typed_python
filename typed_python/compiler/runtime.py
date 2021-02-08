@@ -23,24 +23,16 @@ from typed_python.compiler.runtime_lock import runtimeLock
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.compiler_cache import CompilerCache
 from typed_python.type_function import ConcreteTypeFunction
-from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from typed_python import Function, _types, Value
+from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
 
 _singleton = [None]
 _singletonLock = threading.RLock()
 
 typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
-
-
-def toInterpreterType(setOfTypes):
-    res = OneOfWrapper.mergeTypes(setOfTypes)
-    if res is None:
-        return None
-
-    return res.interpreterTypeRepresentation
 
 
 class RuntimeEventVisitor:
@@ -374,7 +366,7 @@ class Runtime:
                     if callTarget is not None and callTarget.output_type is not None:
                         possibleTypes.append(callTarget.output_type)
 
-        return OneOfWrapper.mergeTypes(possibleTypes)
+        return mergeTypeWrappers(possibleTypes)
 
 
 def NotCompiled(pyFunc, returnTypeOverride=None):
