@@ -141,6 +141,19 @@ public:
             return;
         }
 
+        if (srcLayout->refcount == 1) {
+            int64_t new_byteCount = srcLayout->pointcount * srcLayout->bytes_per_codepoint;
+
+            destLayout = (layout_ptr)slab->allocate(sizeof(layout) + new_byteCount, this);
+            destLayout->refcount = 1;
+            destLayout->hash_cache = srcLayout->hash_cache;
+            destLayout->pointcount = srcLayout->pointcount;
+            destLayout->bytes_per_codepoint = srcLayout->bytes_per_codepoint;
+
+            memcpy(destLayout->data, srcLayout->data, new_byteCount);
+            return;
+        }
+
         auto it = alreadyAllocated.find((instance_ptr)srcLayout);
         if (it == alreadyAllocated.end()) {
             int64_t new_byteCount = srcLayout->pointcount * srcLayout->bytes_per_codepoint;
@@ -168,11 +181,15 @@ public:
             return 0;
         }
 
-        if (alreadyVisited.find((void*)l) != alreadyVisited.end()) {
-            return 0;
-        }
+        // we don't have to check if we've seen this before if the refcount is 1
+        // because there is only one holder.
+        if (l->refcount != 1) {
+            if (alreadyVisited.find((void*)l) != alreadyVisited.end()) {
+                return 0;
+            }
 
-        alreadyVisited.insert((void*)l);
+            alreadyVisited.insert((void*)l);
+        }
 
         if (outSlabs && Slab::slabForAlloc(l)) {
             outSlabs->insert(Slab::slabForAlloc(l));

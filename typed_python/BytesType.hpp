@@ -64,6 +64,15 @@ public:
             return;
         }
 
+        if (srcLayout->refcount == 1) {
+            destLayout = (layout_ptr)slab->allocate(sizeof(layout) + srcLayout->bytecount, this);
+            destLayout->refcount = 1;
+            destLayout->hash_cache = srcLayout->hash_cache;
+            destLayout->bytecount = srcLayout->bytecount;
+            memcpy(destLayout->data, srcLayout->data, srcLayout->bytecount);
+            return;
+        }
+
         auto it = alreadyAllocated.find((instance_ptr)srcLayout);
         if (it == alreadyAllocated.end()) {
             destLayout = (layout_ptr)slab->allocate(sizeof(layout) + srcLayout->bytecount, this);
@@ -87,11 +96,13 @@ public:
             return 0;
         }
 
-        if (alreadyVisited.find((void*)l) != alreadyVisited.end()) {
-            return 0;
-        }
+        if (l->refcount != 1) {
+            if (alreadyVisited.find((void*)l) != alreadyVisited.end()) {
+                return 0;
+            }
 
-        alreadyVisited.insert((void*)l);
+            alreadyVisited.insert((void*)l);
+        }
 
         if (outSlabs && Slab::slabForAlloc(l)) {
             outSlabs->insert(Slab::slabForAlloc(l));

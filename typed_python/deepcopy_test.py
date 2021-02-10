@@ -389,7 +389,7 @@ def test_deepcopy_perf():
     from typed_python import SerializationContext
 
     t0 = time.time()
-    deepcopyContiguous(x, trackInternalTypes=True)
+    deepcopyContiguous(x, trackInternalTypes=False)
     t1 = time.time()
     deepcopy(x)
     t2 = time.time()
