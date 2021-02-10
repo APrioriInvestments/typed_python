@@ -1402,7 +1402,7 @@ class ExpressionConversionContext:
                         return expr.refAs(index)
 
                 # it's possible that it's a subset of the oneof types
-                return expr.convert_to_type(varType, ConversionLevel.Signature)
+                return expr.convert_to_type(varType, ConversionLevel.Signature, assumeSuccessful=True)
 
             if getattr(expr.expr_type.typeRepresentation, "__typed_python_category__", None) == "Alternative" and \
                     getattr(varType, "__typed_python_category__", None) == "ConcreteAlternative":
@@ -1410,7 +1410,7 @@ class ExpressionConversionContext:
 
             # if its a class, and the variable is a subclass of our type
             if expr.expr_type.is_class_wrapper and issubclass(varType, expr.expr_type.classType):
-                return expr.convert_to_type(typeWrapper(varType), ConversionLevel.Signature)
+                return expr.convert_to_type(typeWrapper(varType), ConversionLevel.Signature, assumeSuccessful=True)
 
         return expr
 

@@ -481,7 +481,24 @@ class Wrapper:
         """
         return None
 
-    def convert_to_type(self, context, expr, target_type, level: ConversionLevel):
+    def convert_to_type_as_expression(
+        self,
+        context,
+        expr,
+        target_type,
+        level: ConversionLevel,
+        assumeSuccessful=False,
+        mayThrowOnFailure=False
+    ):
+        """Convert 'expr' to 'target_type' returning (result, success), or None.
+
+        If we are able to convert we return two expressions - a TypedExpression of the new
+        type and a boolean indicating whether we were successful. If we don't support this
+        style of conversion, then we return None.
+        """
+        return None
+
+    def convert_to_type(self, context, expr, target_type, level: ConversionLevel, assumeSuccessful=False):
         """Convert to 'target_type' and return a handle on the resulting expression.
 
         We return a TypedExpression, or None if the operation always throws an exception.
@@ -497,13 +514,18 @@ class Wrapper:
             context - an ExpressionConversionContext
             expr - a TypedExpression for the instance we're converting
             target_type - a Wrapper for the target type we're converting to
-            explicit (bool) - should we allow conversion or not?
+            level - the conversin level to use
+            assumeSuccessful - if True, then this conversion must succeed. Only valid for
+                'signature' conversions. May return a non-reference.
         """
-        # check if there's nothing to do
         assert isinstance(level, ConversionLevel)
+
+        if assumeSuccessful:
+            assert level == ConversionLevel.Signature
 
         target_type = typeWrapper(target_type)
 
+        # check if there's nothing to do
         if target_type == self:
             return expr
 
@@ -520,13 +542,42 @@ class Wrapper:
         canConvert = self.can_convert_to_type(target_type, level)
 
         if canConvert is False:
-            context.pushException(TypeError, "Couldn't initialize type %s from %s" % (target_type, self))
+            context.pushException(
+                TypeError,
+                "Couldn't initialize type %s from %s" % (target_type, self)
+            )
             return None
+
+        # give types a chance to convert themselves as expressions, which prevents
+        # unnecessary increfs
+        resultAndSuccess = expr.expr_type.convert_to_type_as_expression(
+            context,
+            expr,
+            target_type,
+            level,
+            mayThrowOnFailure=True,
+            assumeSuccessful=assumeSuccessful
+        )
+
+        if resultAndSuccess is not None:
+            result, succeeded = resultAndSuccess
+
+            with context.ifelse(succeeded.nonref_expr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushException(TypeError, f"Can't convert from type {self} to type {target_type} at level {level}")
+
+            return result
 
         # put conversion into its own function
         targetVal = context.allocateUninitializedSlot(target_type)
 
-        succeeded = expr.expr_type.convert_to_type_with_target(context, expr, targetVal, level, mayThrowOnFailure=True)
+        succeeded = expr.expr_type.convert_to_type_with_target(
+            context,
+            expr,
+            targetVal,
+            level,
+            mayThrowOnFailure=True
+        )
 
         if succeeded is None:
             return

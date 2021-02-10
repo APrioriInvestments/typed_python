@@ -324,6 +324,8 @@ public:
     // members are in this particular layout, so that we know how far ahead to look in
     // the object when we are looking up a particular data member.
     int64_t mInitializationBitByteCount;
+
+    Type* mClassType;
 };
 
 //a class held directly inside of another object
@@ -491,6 +493,7 @@ public:
             throw std::runtime_error("Class is already set.");
         }
         m_classType = inClass;
+        m_vtable->mClassType = (Type*)inClass;
     }
 
     Class* getClassType() const {

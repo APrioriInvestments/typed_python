@@ -64,7 +64,8 @@ vtable_type = native_ast.Type.Struct(
         ('heldTypePtr', native_ast.VoidPtr),
         ('destructorFun', native_destructor_function_type),
         ('classDispatchTable', class_dispatch_table_type.pointer()),
-        ('initializationBitsBytecount', native_ast.Int64)
+        ('initializationBitsBytecount', native_ast.Int64),
+        ('classTypePtr', native_ast.VoidPtr)
     ],
     name="VTable"
 )
@@ -179,6 +180,37 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
     def convert_fastnext(self, context, instance):
         return self.convert_method_call(context, instance, "__fastnext__", [], {})
 
+    def convert_to_type_as_expression(
+        self,
+        context,
+        expr,
+        target_type,
+        level: ConversionLevel,
+        mayThrowOnFailure=False,
+        assumeSuccessful=False
+    ):
+        if isinstance(target_type, ClassWrapper):
+            if target_type.typeRepresentation in self.typeRepresentation.MRO:
+                # this is an upcast
+                index = _types.getDispatchIndexForType(target_type.typeRepresentation, self.typeRepresentation)
+
+                return (
+                    TypedExpression(
+                        context,
+                        target_type.withDispatchIndex(expr, index),
+                        target_type,
+                        False
+                    ),
+                    context.constant(True)
+                )
+
+            if target_type.typeRepresentation.IsFinal:
+                if assumeSuccessful:
+                    return (
+                        target_type.stripClassDispatchIndex(context, expr),
+                        context.constant(True)
+                    )
+
     def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         otherType = targetVal.expr_type
 
@@ -196,14 +228,45 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
                 return context.constant(True)
 
-            return context.pushPod(
-                bool,
-                runtime_functions.classObjectDowncast.call(
-                    instance.nonref_expr.cast(native_ast.VoidPtr),
-                    targetVal.expr.cast(native_ast.VoidPtr),
-                    context.getTypePointer(targetVal.expr_type.typeRepresentation)
+            if otherType.typeRepresentation.IsFinal:
+                initialized = context.allocateUninitializedSlot(bool)
+
+                with context.ifelse(
+                    self.get_class_type_ptr_as_voidptr(instance).cast(native_ast.UInt64).eq(
+                        context.getTypePointer(targetVal.expr_type.typeRepresentation)
+                        .cast(native_ast.UInt64)
+                    )
+                ) as (ifTrue, ifFalse):
+                    with ifTrue:
+                        context.pushEffect(
+                            targetVal.expr.store(
+                                self.get_layout_pointer(instance)
+                            )
+                        )
+                        context.pushEffect(
+                            initialized.expr.store(
+                                native_ast.const_bool_expr(True)
+                            )
+                        )
+                        targetVal.convert_incref()
+
+                    with ifFalse:
+                        context.pushEffect(
+                            initialized.expr.store(
+                                native_ast.const_bool_expr(False)
+                            )
+                        )
+
+                return initialized
+            else:
+                return context.pushPod(
+                    bool,
+                    runtime_functions.classObjectDowncast.call(
+                        instance.nonref_expr.cast(native_ast.VoidPtr),
+                        targetVal.expr.cast(native_ast.VoidPtr),
+                        context.getTypePointer(targetVal.expr_type.typeRepresentation)
+                    )
                 )
-            )
 
         return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
@@ -303,6 +366,17 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                 .ElementPtrIntegers(0, 3)
                 .load()
             )
+
+    def get_class_type_ptr_as_voidptr(self, instance):
+        return (
+            self.get_layout_pointer(instance)
+            # get a pointer to the vtable
+            .ElementPtrIntegers(0, 1)
+            # load it
+            .load()
+            .ElementPtrIntegers(0, 4)
+            .load()
+        )
 
     def get_refcount_ptr_expr(self, nonref_expr):
         """Return a pointer to the object's refcount. Subclasses can override.
@@ -1070,15 +1144,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         if self.typeRepresentation.IsFinal:
             return context.constant(self.typeRepresentation)
 
-        vtablePtr = (
-            self.get_layout_pointer(instance)
-            .ElementPtrIntegers(0, 1)
-            .load()
-        )
-
         return context.pushPod(
             VoidPtrMasqueradingAsTPType(self.typeRepresentation),
-            runtime_functions.classTypeAsPointer.call(
-                vtablePtr.cast(native_ast.VoidPtr)
-            )
+            self.get_class_type_ptr_as_voidptr(instance)
         )

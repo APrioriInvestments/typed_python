@@ -288,7 +288,12 @@ class TypedExpression:
     def convert_method_call(self, methodname, args, kwargs):
         return self.expr_type.convert_method_call(self.context, self, methodname, args, kwargs)
 
-    def convert_to_type(self, target_type, conversionLevel: ConversionLevel):
+    def convert_to_type(
+        self,
+        target_type,
+        conversionLevel: ConversionLevel,
+        assumeSuccessful=False
+    ):
         """Convert to a target type as a function argument.
 
         If 'explicit', then allow conversions that may change type (e.g. int->float). Otherwise
@@ -296,7 +301,13 @@ class TypedExpression:
         """
         target_type = typeWrapper(target_type)
 
-        return self.expr_type.convert_to_type(self.context, self, target_type, conversionLevel)
+        return self.expr_type.convert_to_type(
+            self.context,
+            self,
+            target_type,
+            conversionLevel,
+            assumeSuccessful=assumeSuccessful
+        )
 
     def convert_context_manager_enter(self):
         return self.expr_type.convert_context_manager_enter(self.context, self)
