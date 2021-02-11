@@ -142,8 +142,7 @@ public:
             return;
         }
 
-        auto it = alreadyAllocated.find((instance_ptr)srcRecordPtr);
-        if (it == alreadyAllocated.end()) {
+        auto doDeepcopy = [&]() {
             int bytecount;
             if (srcRecordPtr->subpointers) {
                 bytecount = sizeof(layout) + srcRecordPtr->subpointers * m_bytes_per_key_subtree_pair;
@@ -189,10 +188,18 @@ public:
                     );
                 }
             }
+        };
 
-            alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
+        if (srcRecordPtr->refcount == 1) {
+            doDeepcopy();
         } else {
-            destRecordPtr = (layout_ptr)it->second;
+            auto it = alreadyAllocated.find((instance_ptr)srcRecordPtr);
+            if (it == alreadyAllocated.end()) {
+                doDeepcopy();
+                alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
+            } else {
+                destRecordPtr = (layout_ptr)it->second;
+            }
         }
 
         destRecordPtr->refcount++;
@@ -205,8 +212,10 @@ public:
             return 0;
         }
 
-        if (alreadyVisited.find((void*)l) != alreadyVisited.end()) {
-            return 0;
+        if (l->refcount != 1) {
+            if (alreadyVisited.find((void*)l) != alreadyVisited.end()) {
+                return 0;
+            }
         }
 
         alreadyVisited.insert((void*)l);
