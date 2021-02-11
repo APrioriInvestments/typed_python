@@ -65,6 +65,38 @@ jobs:
       run: |
         pytest --verbose --capture=no --log-level=info --log-cli-level=info
 
+  pip-install:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: [3.6, 3.7, 3.8]
+        exclude:
+          - os: macos-latest
+            python-version: 3.6
+          - os: macos-latest
+            python-version: 3.8
+          - os: windows-latest
+            python-version: 3.6
+          - os: windows-latest
+            python-version: 3.8
+    steps:
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: pip install typed_python from github
+      run: |
+        python --version
+        pip --version
+        pip freeze
+        pip install -v git+git://github.com/APrioriInvestments/typed_python.git@${GITHUB_SHA}
+
+    - name: import typed_python
+      run : |
+        python -c "import typed_python"
+
   lint:
     runs-on: ubuntu-latest
     steps:
