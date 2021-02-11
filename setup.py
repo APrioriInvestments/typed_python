@@ -69,9 +69,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     cmdclass={'build_ext': TypedPythonBuildExtension},
     ext_modules=ext_modules,
-    setup_requires=[
-        'numpy'
-    ],
+    # setup_requires=['numpy'],  # replaced by build-system:requires in pyproject.toml
     install_requires=INSTALL_REQUIRES,
 
     # https://pypi.org/classifiers/
