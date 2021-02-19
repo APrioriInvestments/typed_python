@@ -14,6 +14,7 @@
 
 import typed_python.python_ast as python_ast
 import importlib
+import typed_python.compiler.codegen_helpers as codegen_helpers
 from typed_python.compiler.for_loop_codegen import rewriteForLoops, rewriteIntiterForLoop
 from typed_python.compiler.generator_codegen import GeneratorCodegen
 from typed_python.compiler.withblock_codegen import expandWithBlockIntoTryCatch
@@ -26,7 +27,7 @@ from typed_python.compiler.python_ast_analysis import (
     countYieldStatements,
     extractFunctionDefs,
 )
-from typed_python.internals import makeFunctionType, checkOneOfType
+from typed_python.internals import makeFunctionType, checkOneOfType, checkType
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
@@ -959,18 +960,20 @@ class ConversionContextBase:
     def restrictByCondition(self, variableStates, condition, result):
         if (
             condition.matches.Call
-            and condition.func.matches.Name
-            and len(condition.args) == 2
+            and (
+                condition.func.matches.Name
+                and self.freeVariableLookup(condition.func.id) is isinstance
+                or condition.func.matches.Constant and condition.func.value is isinstance
+            ) and len(condition.args) == 2
             and condition.args[0].matches.Name
         ):
-            if self.freeVariableLookup(condition.func.id) is isinstance:
-                context = ExpressionConversionContext(self, variableStates)
-                typeExpr = context.convert_expression_ast(condition.args[1])
+            context = ExpressionConversionContext(self, variableStates)
+            typeExpr = context.convert_expression_ast(condition.args[1])
 
-                if typeExpr is not None and typeExpr.expr_type.is_py_type_object_wrapper:
-                    variableStates.restrictTypeFor(
-                        condition.args[0].id, typeExpr.expr_type.typeRepresentation.Value, result
-                    )
+            if typeExpr is not None and typeExpr.expr_type.is_py_type_object_wrapper:
+                variableStates.restrictTypeFor(
+                    condition.args[0].id, typeExpr.expr_type.typeRepresentation.Value, result
+                )
 
         # check if we are a 'var.matches.Y' expression
         if (
@@ -2148,6 +2151,38 @@ class FunctionConversionContext(ConversionContextBase):
                     true_returns or false_returns,
                 )
 
+    def checkIfStatementIsSplitOnType(self, statement, variableStates):
+        """Check if 'statement' is 'checkType(x, t1, t2, ...)' for some variable 'x'
+
+        If so, return the name of the variable 'x' and the expressions t1, t2.
+
+        Otherwise return None.
+        """
+        if not statement.matches.Expr:
+            return None, None
+
+        expr = statement.value
+
+        if not expr.matches.Call or len(expr.args) < 1 or expr.keywords:
+            return None, None
+
+        if expr.args[0].matches.Starred:
+            return None, None
+
+        if not expr.args[0].matches.Name or not expr.func.matches.Name:
+            return None, None
+
+        c = ExpressionConversionContext(self, variableStates)
+        callRes = c.convert_expression_ast(expr.func)
+
+        if callRes is None:
+            return None, None
+
+        if callRes.expr_type.typeRepresentation is not checkType:
+            return None, None
+
+        return expr.args[0].id, expr.args[1:]
+
     def checkIfStatementIsSplitOnOneOf(self, statement, variableStates):
         """Check if 'statement' is 'checkOneOfType(x)' for some variable 'x'
 
@@ -2225,6 +2260,44 @@ class FunctionConversionContext(ConversionContextBase):
 
         return context.finalize(switchExpr), anyFlowsReturn
 
+    def splitOnSubtypesAndConvertStatementList(
+        self, varToSplitOn, subtypeExprs, statements, variableStates, toplevel, controlFlowBlocks
+    ):
+        """Evaluate 'statements' as if 'varToSplitOn' had been checked against each of subtypes.
+
+        In practice, we generate something like
+
+            if isinstance(varToSplitOn, subtypes[0]):
+                statements
+            elif isinstance(varToSplitOn, subtypes[1]):
+                statements
+            else:
+                ...
+        """
+        outStatements = statements
+
+        for typeExpr in subtypeExprs:
+            checkExpr = codegen_helpers.makeCallExpr(
+                python_ast.Expr.Constant(value=isinstance),
+                python_ast.Expr.Name(id=varToSplitOn),
+                typeExpr
+            )
+
+            outStatements = [
+                python_ast.Statement.If(
+                    test=checkExpr,
+                    body=statements,
+                    orelse=outStatements
+                )
+            ]
+
+        return self.convert_statement_list_ast(
+            outStatements,
+            variableStates,
+            controlFlowBlocks,
+            toplevel=toplevel
+        )
+
     def convert_statement_list_ast(
         self, statements, variableStates: FunctionStackState, controlFlowBlocks, *, toplevel=False
     ):
@@ -2253,24 +2326,42 @@ class FunctionConversionContext(ConversionContextBase):
 
             if varToSplitOn is not None:
                 expr, controlFlowReturns = self.splitOnOneOfAndConvertStatementList(
-                    varToSplitOn, statements[statementIx + 1:], variableStates, toplevel, controlFlowBlocks
+                    varToSplitOn,
+                    statements[statementIx + 1:],
+                    variableStates,
+                    toplevel,
+                    controlFlowBlocks
                 )
                 exprAndReturns.append((expr, controlFlowReturns))
                 break
-            else:
-                res = self.convert_statement_ast(s, variableStates, controlFlowBlocks)
 
-                if not isinstance(res, tuple) or len(res) != 2:
-                    raise Exception(
-                        f"convert_statement_ast is supposed to return a pair. It returned {res}. "
-                        f"Statement type is {type(s)}"
-                    )
-                expr, controlFlowReturns = res
+            varToSplitOn, typeExprs = self.checkIfStatementIsSplitOnType(s, variableStates)
 
+            if varToSplitOn is not None:
+                expr, controlFlowReturns = self.splitOnSubtypesAndConvertStatementList(
+                    varToSplitOn,
+                    typeExprs,
+                    statements[statementIx + 1:],
+                    variableStates,
+                    toplevel,
+                    controlFlowBlocks
+                )
                 exprAndReturns.append((expr, controlFlowReturns))
+                break
 
-                if not controlFlowReturns:
-                    break
+            res = self.convert_statement_ast(s, variableStates, controlFlowBlocks)
+
+            if not isinstance(res, tuple) or len(res) != 2:
+                raise Exception(
+                    f"convert_statement_ast is supposed to return a pair. It returned {res}. "
+                    f"Statement type is {type(s)}"
+                )
+            expr, controlFlowReturns = res
+
+            exprAndReturns.append((expr, controlFlowReturns))
+
+            if not controlFlowReturns:
+                break
 
         if not exprAndReturns or exprAndReturns[-1][1]:
             flows_off_end = True

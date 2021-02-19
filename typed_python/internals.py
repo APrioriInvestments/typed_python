@@ -533,6 +533,22 @@ def checkOneOfType(x):
     return x
 
 
+def checkType(x, *types):
+    """Instruct compiler to fork based on whether 'x' is one of the types in 'types'
+
+    Specifically, if 'x' is known to the compiler as Base, and you wish to check
+    if its one of Child1, Child2 (which are subclasses of Base), you may write
+
+        checkType(x, Child1, Child2)
+
+    Then the compiler will generate code that checks the subsequent code based on
+    whether 'x' is one of these types.
+
+    In interpreted code, this is a no-op.
+    """
+    return x
+
+
 def typeKnownToCompiler(x):
     """Returns the type object that the compiler knows for 'x'
 

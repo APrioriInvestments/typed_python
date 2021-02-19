@@ -26,7 +26,7 @@ from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
     _types, Compiled, Member, Final, isCompiled, ConstDict,
     makeNamedTuple, UInt32, Int32, Type, identityHash, typeKnownToCompiler, checkOneOfType,
-    refcount
+    refcount, checkType
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
@@ -3370,6 +3370,29 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert doIt(1.0) is float
         assert doIt(1) is int
+
+    def test_check_subtype(self):
+        class Base(Class):
+            pass
+
+        class Child1(Base):
+            pass
+
+        class Child2(Base):
+            pass
+
+        class Child3(Base):
+            pass
+
+        @Entrypoint
+        def doIt(var: Base):
+            checkType(var, Child1, Child2)
+            return typeKnownToCompiler(var)
+
+        assert doIt(Base()) is Base
+        assert doIt(Child1()) is Child1
+        assert doIt(Child2()) is Child2
+        assert doIt(Child3()) is Base
 
     @flaky(max_runs=3, min_passes=1)
     def test_check_one_of_type_perf_difference(self):

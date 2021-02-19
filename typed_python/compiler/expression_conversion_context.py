@@ -1996,6 +1996,9 @@ class ExpressionConversionContext:
             ).convert_call([], {})
 
         if ast.matches.Constant:
+            if ast.value is isinstance:
+                return pythonObjectRepresentation(self, ast.value)
+
             return self.constant(ast.value, allowArbitrary=True)
 
         raise ConversionException("can't handle python expression type %s" % ast.Name)
