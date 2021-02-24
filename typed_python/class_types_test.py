@@ -1573,6 +1573,18 @@ class NativeClassTypesTests(unittest.TestCase):
         t[3] = t[2]
         self.assertEqual(t[3].x, 20)
 
+    def test_class_delitem(self):
+        class C(Class, Final):
+            deleted = Member(int)
+
+            def __delitem__(self, k):
+                self.deleted = k
+
+        c = C()
+        del c[10]
+
+        assert c.deleted == 10
+
     def test_class_len_leak(self):
         class C(Class, Final):
             def __len__(self):

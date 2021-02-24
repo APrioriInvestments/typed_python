@@ -727,10 +727,20 @@ PyObject* PyClassInstance::mp_subscript_concrete(PyObject* item) {
 }
 
 int PyClassInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* v) {
-    auto p = callMemberFunction("__setitem__", item, v);
+    std::pair<bool, PyObject*> p;
+
+    if (!v) {
+        p = callMemberFunction("__delitem__", item);
+    } else {
+        p = callMemberFunction("__setitem__", item, v);
+    }
 
     if (!p.first) {
-        PyErr_Format(PyExc_TypeError, "__setitem__ not defined for type %s", type()->name().c_str());
+        if (!v) {
+            PyErr_Format(PyExc_TypeError, "__delitem__ not defined for type %s", type()->name().c_str());
+        } else {
+            PyErr_Format(PyExc_TypeError, "__setitem__ not defined for type %s", type()->name().c_str());
+        }
         return -1;
     }
 

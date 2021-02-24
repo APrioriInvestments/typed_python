@@ -1192,6 +1192,21 @@ class TestClassCompilationCompilation(unittest.TestCase):
         r2 = c_f(v)
         self.assertEqual(r1, r2)
 
+    def test_compile_class_delitem(self):
+        class C(Class, Final):
+            deleted = Member(int)
+
+            def __delitem__(self, k):
+                self.deleted = k
+
+        @Entrypoint
+        def delIt(c, k):
+            del c[k]
+
+        c = C()
+        delIt(c, 10)
+        assert c.deleted == 10
+
     def test_compile_class_attr(self):
         class C(Class, Final):
             d = Member(Dict(str, str))

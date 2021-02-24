@@ -201,6 +201,11 @@ class ClassOrAlternativeWrapperMixin:
             return self.convert_method_call(context, instance, "__getitem__", (item,), {})
         return super().convert_getitem(context, instance, item)
 
+    def convert_delitem(self, context, instance, item):
+        if self.has_method("__delitem__"):
+            return self.convert_method_call(context, instance, "__delitem__", (item,), {})
+        return super().convert_delitem(context, instance, item)
+
     def convert_setitem(self, context, instance, item, value):
         if self.has_method("__setitem__"):
             return self.convert_method_call(context, instance, "__setitem__", (item, value), {})
