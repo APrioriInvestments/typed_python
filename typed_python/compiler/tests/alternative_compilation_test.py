@@ -26,6 +26,17 @@ from math import trunc, floor, ceil
 
 
 class TestAlternativeCompilation(unittest.TestCase):
+    def test_default_constructor(self):
+        @Entrypoint
+        def setIt(d, x):
+            return d.setdefault(x)
+
+        Simple = Alternative("Simple", A={}, B={}, C={})
+        Complex = Alternative("Complex", A=dict(x=str), B=dict(x=str, y=float), C={})
+
+        assert setIt(Dict(int, Simple)(), 10).matches.A
+        assert setIt(Dict(int, Complex)(), 10).matches.A
+
     def test_simple_alternative_passing(self):
         Simple = Alternative("Simple", A={}, B={}, C={})
 

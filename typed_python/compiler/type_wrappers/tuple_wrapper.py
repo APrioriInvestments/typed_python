@@ -218,9 +218,13 @@ class TupleWrapper(Wrapper):
         return self.layoutType
 
     def convert_initialize_from_args(self, context, target, *args):
-        assert len(args) == len(self.byteOffsets)
-        for i in range(len(args)):
-            self.refAs(context, target, i).convert_copy_initialize(args[i])
+        assert len(args) <= len(self.byteOffsets)
+
+        for i in range(len(self.byteOffsets)):
+            if i < len(args):
+                self.refAs(context, target, i).convert_copy_initialize(args[i])
+            else:
+                self.refAs(context, target, i).convert_default_initialize()
 
     def convert_default_initialize(self, context, target):
         if not self.is_default_constructible:

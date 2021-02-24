@@ -104,6 +104,11 @@ class SimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
     def getNativeLayoutType(self):
         return self.layoutType
 
+    def convert_default_initialize(self, context, instance):
+        context.pushEffect(
+            instance.expr.store(native_ast.const_uint8_expr(0))
+        )
+
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
         context.pushEffect(
@@ -156,14 +161,9 @@ class ConcreteSimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
     def getNativeLayoutType(self):
         return self.layoutType
 
-    def convert_default_initialize(self, context, target):
-        self.convert_copy_initialize(
-            context,
-            target,
-            typed_python.compiler.python_object_representation.pythonObjectRepresentation(
-                context,
-                self.typeRepresentation()
-            )
+    def convert_default_initialize(self, context, instance):
+        context.pushEffect(
+            instance.expr.store(native_ast.const_uint8_expr(self.typeRepresentation.Index))
         )
 
     def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
@@ -227,6 +227,14 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
 
     def getNativeLayoutType(self):
         return self.layoutType
+
+    def convert_default_initialize(self, context, instance):
+        defaultType = self.alternativeType.__typed_python_alternatives__[0]
+
+        typeWrapper(defaultType).convert_default_initialize(
+            context,
+            instance.changeType(defaultType)
+        )
 
     def on_refcount_zero(self, context, instance):
         return (
@@ -332,6 +340,12 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
         self.matcherType = typeWrapper(_types.AlternativeMatcher(self.typeRepresentation))
         self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
 
+    def convert_default_initialize(self, context, instance):
+        self.generateConstructor(
+            instance.context,
+            instance
+        )
+
     def getNativeLayoutType(self):
         return self.layoutType
 
@@ -411,8 +425,6 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
         ).changeType(typeWrapper(self.alternativeType))
 
     def generateConstructor(self, context, out, *args):
-        tupletype = self.typeRepresentation.ElementType
-
         context.pushEffect(
             out.expr.store(
                 runtime_functions.malloc.call(native_ast.const_int_expr(16 + self.underlyingLayout.getBytecount()))
@@ -421,8 +433,6 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
             out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>  # refcount
             out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int_expr(self.indexInParent))  # which
         )
-
-        assert len(args) == len(tupletype.ElementTypes)
 
         self.refToInner(context, out).convert_initialize_from_args(*args)
 

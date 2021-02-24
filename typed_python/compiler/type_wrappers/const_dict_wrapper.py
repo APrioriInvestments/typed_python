@@ -220,6 +220,11 @@ class ConstDictWrapper(ConstDictWrapperBase):
 
         return super().convert_attribute(context, instance, attr)
 
+    def convert_default_initialize(self, context, instance):
+        context.pushEffect(
+            instance.expr.store(self.layoutType.zero())
+        )
+
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         if methodname == "__iter__" and not args and not kwargs:
             res = context.push(
