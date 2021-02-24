@@ -548,7 +548,7 @@ class ConversionContextBase:
         smts = self.createGeneratorFun()
 
         generatorFun = evaluateFunctionDefWithLocalsInCells(
-            smts, {}, {".PointerType": PointerTo(T), ".pointerTo": pointerTo}
+            smts, self._globals, {".PointerType": PointerTo(T), ".pointerTo": pointerTo}
         )
 
         generatorBaseclass = Generator(T)
