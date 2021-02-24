@@ -17,6 +17,8 @@ import logging
 from types import FunctionType
 from typed_python.compiler.runtime_lock import runtimeLock
 from typed_python._types import Forward, ListOf, TupleOf, Dict, ConstDict
+import typed_python
+
 
 _type_to_typefunction = {}
 
@@ -81,7 +83,10 @@ class ConcreteTypeFunction:
             return tuple(sorted([(k, self.mapArg(v)) for k, v in arg.items()]))
 
         if isinstance(arg, FunctionType):
-            return self.mapArg(arg())
+            return self.mapArg(typed_python.Function(arg))
+
+        if isinstance(arg, typed_python._types.Function):
+            return arg
 
         raise TypeError("Instance of type '%s' is not a valid argument to a type function" % type(arg))
 
