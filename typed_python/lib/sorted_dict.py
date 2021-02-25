@@ -4,8 +4,12 @@ from typed_python import (
 )
 
 
+def less(x, y):
+    return x < y
+
+
 @TypeFunction
-def SortedDict(K, V, comparator=lambda x, y: x < y):
+def SortedDict(K, V, comparator=less):
     Node = Forward("Node")
 
     @Node.define
@@ -293,8 +297,8 @@ def SortedDict(K, V, comparator=lambda x, y: x < y):
                 self._root = None
             return res
 
-        @Entrypoint  # noqa
-        def pop(self, k: K, v: V) -> V:
+        @Entrypoint
+        def pop(self, k: K, v: V) -> V:  # noqa
             if self._root is None or k not in self._root:
                 return v
 
@@ -323,8 +327,8 @@ def SortedDict(K, V, comparator=lambda x, y: x < y):
                 self[k] = V()
             return self[k]
 
-        @Entrypoint # noqa
-        def setdefault(self, k: K, v: V) -> V:
+        @Entrypoint
+        def setdefault(self, k: K, v: V) -> V:  # noqa
             if k not in self:
                 self[k] = v
             print(self)
@@ -332,11 +336,11 @@ def SortedDict(K, V, comparator=lambda x, y: x < y):
 
         @Entrypoint
         def __str__(self):
-            return '{' + ",".join(f'{k}: {v}' for k, v in self.iteritems()) + '}'
+            return '{' + ",".join(f'{k}: {v}' for k, v in self.items()) + '}'
 
         @Entrypoint
         def __repr__(self):
-            return '{' + ",".join(f'{k}: {v}' for k, v in self.iteritems()) + '}'
+            return '{' + ",".join(f'{k}: {v}' for k, v in self.items()) + '}'
 
         def __len__(self):
             return self._root.count if self._root is not None else 0
