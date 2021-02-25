@@ -34,7 +34,10 @@ Expr = Forward("Expr")
 Arg = Forward("Arg")
 NumericConstant = Forward("NumericConstant")
 ExprContext = Forward("ExprContext")
+
+# this is deprecated in 3.9, but we still define it
 Slice = Forward("Slice")
+
 BooleanOp = Forward("BooleanOp")
 BinaryOp = Forward("BinaryOp")
 UnaryOp = Forward("UnaryOp")
@@ -601,7 +604,7 @@ Expr = Expr.define(Alternative(
     },
     Subscript={
         "value": Expr,
-        "slice": Slice,
+        "slice": Slice if sys.version_info.minor <= 8 else Expr,
         "ctx": ExprContext,
         'line_number': int,
         'col_offset': int,
@@ -674,6 +677,15 @@ Expr = Expr.define(Alternative(
         'col_offset': int,
         'filename': str
     },
+    **(
+        # 3.9 defines a 'Slice' expression, rather than having a separate
+        # 'Slice' object
+        dict(Slice={
+            "lower": OneOf(Expr, None),
+            "upper": OneOf(Expr, None),
+            "step": OneOf(Expr, None)
+        }) if sys.version_info.minor >= 9 else {}
+    ),
     __str__=ExpressionStr
 ))
 
@@ -705,6 +717,11 @@ ExprContext = ExprContext.define(Alternative(
     Param={}
 ))
 
+# 'Slice' is deprecated in 3.9. Instead, a Slice expression
+# gets used for regular Slices, a normal expression for 'Index' and
+# 'ExtSlice' gets replaced with a tuple Expression (which makes sense
+# because x[a,b] and x[(a,b)] are the same thing. We still define the class
+# though since it simplifies downstream imports.
 Slice = Slice.define(Alternative(
     "Slice",
     Ellipsis={},
@@ -828,7 +845,10 @@ Keyword = Keyword.define(Alternative(
     "Keyword",
     Item={
         "arg": OneOf(None, str),
-        "value": Expr
+        "value": Expr,
+        **(
+            {'line_number': int, 'col_offset': int} if sys.version_info.minor >= 9 else {}
+        )
     }
 ))
 
@@ -949,10 +969,11 @@ converters = {
     ast.AugLoad: ExprContext.AugLoad,
     ast.AugStore: ExprContext.AugStore,
     ast.Param: ExprContext.Param,
-    ast.Ellipsis: Slice.Ellipsis,
-    ast.Slice: Slice.Slice,
-    ast.ExtSlice: Slice.ExtSlice,
-    ast.Index: Slice.Index,
+    **({ast.Ellipsis: Slice.Ellipsis,
+        ast.Slice: Slice.Slice,
+        ast.ExtSlice: Slice.ExtSlice,
+        ast.Index: Slice.Index,
+        } if sys.version_info.minor <= 8 else {}),
     ast.And: BooleanOp.And,
     ast.Or: BooleanOp.Or,
     ast.Add: BinaryOp.Add,
@@ -1082,9 +1103,11 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
             return converter(**args)
         except Exception:
             if 'line_number' in args:
-                del args['line_number']
-                del args['col_offset']
-                del args['filename']
+                args['line_number']
+            if 'col_offset' in args:
+                args.pop('col_offset')
+            if 'filename' in args:
+                args.pop('filename')
 
             try:
                 return converter(**args)

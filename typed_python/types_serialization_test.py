@@ -2532,13 +2532,13 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert childInstance.f() == "concrete"
 
-        with self.assertRaisesRegex(TypeError, "abstract methods"):
+        with self.assertRaisesRegex(TypeError, "abstract method"):
             BaseClass()
 
         class ABadChildClass(BaseClass):
             pass
 
-        with self.assertRaisesRegex(TypeError, "abstract methods"):
+        with self.assertRaisesRegex(TypeError, "abstract method"):
             ABadChildClass()
 
         class AnotherChildClass(BaseClass):

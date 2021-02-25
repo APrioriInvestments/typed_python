@@ -15,6 +15,7 @@
 import typed_python.python_ast as python_ast
 import importlib
 import typed_python.compiler.codegen_helpers as codegen_helpers
+import sys
 from typed_python.compiler.for_loop_codegen import rewriteForLoops, rewriteIntiterForLoop
 from typed_python.compiler.generator_codegen import GeneratorCodegen
 from typed_python.compiler.withblock_codegen import expandWithBlockIntoTryCatch
@@ -1180,9 +1181,12 @@ class FunctionConversionContext(ConversionContextBase):
             if slicing is None:
                 return expr_context.finalize(None), False
 
-            # we are assuming this is an index. We ought to be checking this
-            # and doing something else if it's a Slice or an Ellipsis or whatnot
-            index = expr_context.convert_expression_ast(expression.slice.value)
+            if sys.version_info.minor <= 8:
+                # we are assuming this is an index. We ought to be checking this
+                # and doing something else if it's a Slice or an Ellipsis or whatnot
+                index = expr_context.convert_expression_ast(expression.slice.value)
+            else:
+                index = expr_context.convert_expression_ast(expression.slice)
 
             if slicing is None:
                 return expr_context.finalize(None), False
@@ -1226,15 +1230,18 @@ class FunctionConversionContext(ConversionContextBase):
             return True
 
         if target.matches.Subscript and target.ctx.matches.Store:
-            assert target.slice.matches.Index
-
             slicing = subcontext.convert_expression_ast(target.value)
             if slicing is None:
                 return False
 
-            # we are assuming this is an index. We ought to be checking this
-            # and doing something else if it's a Slice or an Ellipsis or whatnot
-            index = subcontext.convert_expression_ast(target.slice.value)
+            if sys.version_info.minor <= 8:
+                assert target.slice.matches.Index
+                # we are assuming this is an index. We ought to be checking this
+                # and doing something else if it's a Slice or an Ellipsis or whatnot
+                index = subcontext.convert_expression_ast(target.slice.value)
+            else:
+                # slice is an expression
+                index = subcontext.convert_expression_ast(target.slice)
 
             if index is None:
                 return False

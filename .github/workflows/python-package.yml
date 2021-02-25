@@ -11,16 +11,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: [3.6, 3.7, 3.8]
+        python-version: [3.6, 3.7, 3.8, 3.9]
         exclude:
           - os: macos-latest
             python-version: 3.6
           - os: macos-latest
             python-version: 3.8
-          - os: windows-latest
-            python-version: 3.6
-          - os: windows-latest
-            python-version: 3.8
+          - os: macos-latest
+            python-version: 3.9
     steps:
     - uses: actions/checkout@v2
 
@@ -70,16 +68,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: [3.6, 3.7, 3.8]
+        python-version: [3.6, 3.7, 3.8, 3.9]
         exclude:
           - os: macos-latest
             python-version: 3.6
           - os: macos-latest
             python-version: 3.8
-          - os: windows-latest
-            python-version: 3.6
-          - os: windows-latest
-            python-version: 3.8
+          - os: macos-latest
+            python-version: 3.9
     steps:
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2

@@ -1,4 +1,5 @@
 import typed_python.python_ast as python_ast
+import sys
 
 
 def expandWithBlockIntoTryCatch(ast):
@@ -100,7 +101,8 @@ def expandWithBlockIntoTryCatch(ast):
             value=x,
             slice=python_ast.Slice.Index(
                 value=makeExpr(ast, 'Num', n=python_ast.NumericConstant.Int(value=index))
-            ),
+            ) if sys.version_info.minor <= 8 else
+            makeExpr(ast, 'Num', n=python_ast.NumericConstant.Int(value=index)),
             ctx=python_ast.ExprContext.Load()
         )
 

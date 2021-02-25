@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import sys
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
@@ -1634,13 +1635,7 @@ class ExpressionConversionContext:
             if val is None:
                 return None
 
-            if ast.slice.matches.Index:
-                index = self.convert_expression_ast(ast.slice.value)
-                if index is None:
-                    return None
-
-                return val.convert_getitem(index)
-            elif ast.slice.matches.Slice:
+            if ast.slice.matches.Slice:
                 if ast.slice.lower is None:
                     lower = None
                 else:
@@ -1663,9 +1658,14 @@ class ExpressionConversionContext:
                         return None
 
                 return val.convert_getslice(lower, upper, step)
-            elif ast.slice.matches.ExtSlice:
+            elif ast.slice.matches.ExtSlice or ast.slice.matches.Tuple:
                 args = []
-                for dim in ast.slice.dims:
+                if ast.slice.matches.ExtSlice:
+                    sliceElts = ast.slice.dims
+                else:
+                    sliceElts = ast.slice.elts
+
+                for dim in sliceElts:
                     if dim.matches.Index:
                         index = self.convert_expression_ast(ast.slice.value)
                         if index is None:
@@ -1711,6 +1711,18 @@ class ExpressionConversionContext:
                         interiorTypeWrappers=[x.expr_type for x in args]
                     )
                 )
+
+                return val.convert_getitem(index)
+            elif ast.slice.matches.Index:
+                index = self.convert_expression_ast(ast.slice.value)
+                if index is None:
+                    return None
+
+                return val.convert_getitem(index)
+            elif sys.version_info.minor >= 9:
+                index = self.convert_expression_ast(ast.slice)
+                if index is None:
+                    return None
 
                 return val.convert_getitem(index)
             else:
