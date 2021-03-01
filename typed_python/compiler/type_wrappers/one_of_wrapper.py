@@ -206,9 +206,61 @@ class OneOfWrapper(Wrapper):
             ("oneof", self, "unaryop", op)
         )
 
+    def _simpleNoneCheckIndex(self):
+        """Returns the index of the oneof that matches None.
+
+        If no index matches None, returns -1.
+
+        If one of the types could match None (because it's object),
+        returns None.
+        """
+        noneIx = -1
+
+        for ix in range(len(self.typeRepresentation.Types)):
+            T = self.typeRepresentation.Types[ix]
+
+            if T is type(None):  # noqa
+                if noneIx is None:
+                    raise Exception(
+                        f"{self} has two slots that could be None, which makes no sense"
+                    )
+
+                noneIx = ix
+            elif isinstance(T, type) and issubclass(type(None), T):
+                return None
+
+        return noneIx
+
     def convert_bin_op(self, context, left, op, right, inplace):
+        if (
+            (op.matches.Is or op.matches.IsNot)
+            and right.expr_type.typeRepresentation is type(None)  # noqa
+        ):
+            # if one of our fields is actually None, and none of them is object,
+            # then we can answer this by just checking our slot type
+            index = self._simpleNoneCheckIndex()
+            if index is not None:
+                if index == -1:
+                    # none of our fields can match 'None'
+                    return context.constant(op.matches.IsNot)
+
+                if op.matches.Is:
+                    return context.pushPod(
+                        bool,
+                        self.convert_which_native(left.expr).eq(
+                            native_ast.const_uint8_expr(index)
+                        )
+                    )
+                else:
+                    return context.pushPod(
+                        bool,
+                        self.convert_which_native(left.expr).neq(
+                            native_ast.const_uint8_expr(index)
+                        )
+                    )
+
         return context.expressionAsFunctionCall(
-            "oneof_binop",
+            "oneof_binop_" + type(op).__name__,
             (left, right),
             lambda left, right: self.unwrap(
                 left.context,
@@ -287,6 +339,18 @@ class OneOfWrapper(Wrapper):
         )
 
     def convert_copy_initialize(self, context, expr, other):
+        res = context.expressionAsFunctionCall(
+            "copy_initialize_" + str(self),
+            (expr, other),
+            lambda instance, other: self.convert_copy_initialize_inner(instance.context, instance, other),
+            ("copy_initialize_", self),
+            outputType=context.constant(None).expr_type
+        )
+
+        if res is not None:
+            context.pushEffect(res.expr)
+
+    def convert_copy_initialize_inner(self, context, expr, other):
         assert expr.isReference
         assert other.expr_type == self
 
@@ -305,7 +369,19 @@ class OneOfWrapper(Wrapper):
                             expr.expr.ElementPtrIntegers(0, 0).store(native_ast.const_uint8_expr(ix))
                         )
 
-    def convert_destroy(self, context, expr):
+    def convert_destroy(self, context, target):
+        res = context.expressionAsFunctionCall(
+            "decref_" + str(self),
+            (target,),
+            lambda instance: self.convert_destroy_inner(instance.context, instance),
+            ("decref", self),
+            outputType=context.constant(None).expr_type
+        )
+
+        if res is not None:
+            context.pushEffect(res.expr)
+
+    def convert_destroy_inner(self, context, expr):
         if not self.is_pod:
             with context.switch(expr.expr.ElementPtrIntegers(0, 0).load(),
                                 range(len(self.typeRepresentation.Types)),
