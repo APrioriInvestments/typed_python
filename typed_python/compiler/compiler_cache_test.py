@@ -259,7 +259,7 @@ def test_reference_existing_function_twice():
 @pytest.mark.skipif('sys.platform=="darwin"')
 def test_compiler_cache_handles_class_destructors_correctly():
     xmodule = "\n".join([
-        "class C(Class, Final):",
+        "class C(Class):",
         "    def __init__(self, x):",
         "        self.x=x",
         "    x = Member(int)",

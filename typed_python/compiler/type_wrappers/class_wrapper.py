@@ -409,28 +409,33 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         return self.layoutType
 
     def on_refcount_zero(self, context, instance):
-        vtablePtr = (
-            self.get_layout_pointer(instance)
-            .ElementPtrIntegers(0, 1)
-            .load()
-        )
+        if self.typeRepresentation.IsFinal:
+            self.generateNativeDestructorFunction(context, None, instance)
+        else:
+            vtablePtr = (
+                self.get_layout_pointer(instance)
+                .ElementPtrIntegers(0, 1)
+                .load()
+            )
 
-        destructorPtr = (
-            vtablePtr
-            .ElementPtrIntegers(0, 1)
-            .load()
-        )
+            destructorPtr = (
+                vtablePtr
+                .ElementPtrIntegers(0, 1)
+                .load()
+            )
 
-        with context.ifelse(destructorPtr.cast(native_ast.Int64)) as (ifTrue, ifFalse):
-            with ifFalse:
-                # we have an empty slot. We need to compile it
-                context.pushEffect(
-                    runtime_functions.compileClassDestructor.call(
-                        vtablePtr.cast(native_ast.VoidPtr)
+            with context.ifelse(destructorPtr.cast(native_ast.Int64)) as (ifTrue, ifFalse):
+                with ifFalse:
+                    # we have an empty slot. We need to compile it
+                    context.pushEffect(
+                        runtime_functions.compileClassDestructor.call(
+                            vtablePtr.cast(native_ast.VoidPtr)
+                        )
                     )
-                )
 
-        return native_ast.CallTarget.Pointer(destructorPtr).call(instance.expr.cast(native_ast.VoidPtr))
+            return native_ast.CallTarget.Pointer(destructorPtr).call(
+                instance.expr.cast(native_ast.VoidPtr)
+            )
 
     def compileDestructor(self, converter):
         return converter.defineNativeFunction(

@@ -11,6 +11,7 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
+import typed_python
 
 from typed_python import (
     OneOf, TupleOf, Forward, ConstDict, Class, Final, Member,
@@ -20,6 +21,9 @@ from typed_python import (
 from typed_python import Value as ValueType
 import typed_python._types as _types
 import unittest
+
+
+typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
 # a simple recursive 'value' type for testing
@@ -68,6 +72,13 @@ class ClassB(Class, Final):
 
 
 class TestOneOfCompilation(unittest.TestCase):
+    def test_oneof_wrapper_fast_is_check(self):
+        assert typeWrapper(OneOf(int, float))._simpleNoneCheckIndex() == -1
+        assert typeWrapper(OneOf(int, None))._simpleNoneCheckIndex() == 1
+        assert typeWrapper(OneOf(int, type(None)))._simpleNoneCheckIndex() == 1
+        assert typeWrapper(OneOf(None, int))._simpleNoneCheckIndex() == 0
+        assert typeWrapper(OneOf(None, object))._simpleNoneCheckIndex() is None
+
     def test_one_of_basic(self):
         @Compiled
         def f(x: OneOf(int, float)) -> OneOf(int, float):

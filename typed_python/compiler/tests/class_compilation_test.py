@@ -35,7 +35,7 @@ from typed_python import (
     Held,
     Value,
     pointerTo,
-    refTo,
+    refTo
 )
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime, CountCompilationsVisitor

@@ -98,7 +98,7 @@ class PrintNewFunctionVisitor(RuntimeEventVisitor):
     ):
         if self.short:
             print(
-                f"[complexity={len(str(nativeFunction))}] ",
+                f"[complexity={len(str(nativeFunction)):8d}] ",
                 funcName,
                 "(" + ",".join([str(x.typeRepresentation) for x in inputTypes]) + ")",
                 "->",
@@ -265,6 +265,8 @@ class Runtime:
 
         try:
             t0 = time.time()
+            t1 = None
+            t2 = None
             defCount = self.converter.getDefinitionCount()
 
             with self.lock:
@@ -294,7 +296,9 @@ class Runtime:
 
                 wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
 
+                t1 = time.time()
                 self.converter.buildAndLinkNewModule()
+                t2 = time.time()
 
                 fp = self.converter.functionPointerByName(wrappingCallTargetName)
 
@@ -308,7 +312,9 @@ class Runtime:
         finally:
             if self.verbosityLevel > 0:
                 print(
-                    f"typed_python runtime spent {time.time()-t0:.3f} seconds adding "
+                    f"typed_python runtime spent {time.time()-t0:.3f} seconds "
+                    + (f"({t2 - t1:.3f})" if t2 is not None else "")
+                    + " adding " +
                     f"{self.converter.getDefinitionCount() - defCount} functions."
                 )
 

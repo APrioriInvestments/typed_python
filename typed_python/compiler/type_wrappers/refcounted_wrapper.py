@@ -92,6 +92,20 @@ class RefcountedWrapper(Wrapper):
             )
 
     def convert_destroy(self, context, target):
+        res = context.expressionAsFunctionCall(
+            "decref_" + str(self),
+            (target,),
+            lambda instance: self.convert_destroy_inner(instance.context, instance),
+            ("decref", self),
+            outputType=context.constant(None).expr_type
+        )
+
+        if res is not None:
+            context.pushEffect(res.expr)
+
+    def convert_destroy_inner(self, context, target):
+        assert isinstance(target, TypedExpression)
+
         assert target.isReference
         targetExpr = target.nonref_expr
 
