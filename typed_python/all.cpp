@@ -69,3 +69,4 @@ compile the entire group all at once.
 #include "Memory.cpp"
 #include "PySlab.cpp"
 #include "Slab.cpp"
+#include "PyTemporaryReferenceTracer.cpp"

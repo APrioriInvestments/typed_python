@@ -34,6 +34,7 @@
 #include "DeserializationBuffer.hpp"
 #include "PythonSerializationContext.hpp"
 #include "UnicodeProps.hpp"
+#include "PyTemporaryReferenceTracer.hpp"
 #include "PySlab.hpp"
 #include "_types.hpp"
 
@@ -1313,20 +1314,34 @@ PyObject *refTo(PyObject* nullValue, PyObject* args) {
 
     Type* actualType = PyInstance::extractTypeFrom(a1->ob_type);
 
-    if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catClass) {
+    if (!actualType || (!actualType->isClass() && !actualType->isHeldClass() && !actualType->isRefTo())) {
         PyErr_Format(
             PyExc_TypeError,
-            "first argument to refTo '%S' must be a Class",
+            "first argument to refTo '%S' must be a Class, HeldClass, or existing RefTo",
             (PyObject*)a1
             );
         return NULL;
     }
 
-    Class* clsType = (Class*)actualType;
-    Class::layout* layout = clsType->instanceToLayout(((PyInstance*)(PyObject*)a1)->dataPtr());
+    RefTo* refType;
+    void* ptrValue;
 
-    RefTo* refType = RefTo::Make(clsType->getHeldClass());
-    void* ptrValue = layout->data;
+    if (actualType->isRefTo()) {
+        refType = (RefTo*)actualType;
+        ptrValue = *(void**)((PyInstance*)(PyObject*)a1)->dataPtr();
+    } else
+    if (actualType->isClass()) {
+        Class* clsType = (Class*)actualType;
+        Class::layout* layout = clsType->instanceToLayout(((PyInstance*)(PyObject*)a1)->dataPtr());
+
+        refType = RefTo::Make(clsType->getHeldClass());
+        ptrValue = layout->data;
+    } else {
+        HeldClass* clsType = (HeldClass*)actualType;
+
+        refType = clsType->getRefToType();
+        ptrValue = ((PyInstance*)(PyObject*)a1)->dataPtr();
+    }
 
     return PyInstance::extractPythonObject((instance_ptr)&ptrValue, refType);
 }
@@ -3053,6 +3068,10 @@ PyInit__types(void)
     // initialize a couple of global references to things in typed_python.internals
     PythonObjectOfType::AnyPyObject();
     PythonObjectOfType::AnyPyType();
+
+    if (PyType_Ready(&PyType_TemporaryReferenceTracer) < 0) {
+        return NULL;
+    }
 
     if (PyType_Ready(&PyType_Slab) < 0) {
         return NULL;

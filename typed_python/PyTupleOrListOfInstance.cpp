@@ -561,7 +561,7 @@ PyObject* PyTupleOrListOfInstance::sq_item_concrete(Py_ssize_t ix) {
     return extractPythonObject(
         type()->eltPtr(dataPtr(), ix),
         eltType
-        );
+    );
 }
 
 Py_ssize_t PyTupleOrListOfInstance::mp_and_sq_length_concrete() {

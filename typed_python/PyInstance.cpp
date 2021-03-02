@@ -15,6 +15,8 @@
 ******************************************************************************/
 
 #include <Python.h>
+#include <pystate.h>
+
 #include <numpy/arrayobject.h>
 #include <type_traits>
 
@@ -45,6 +47,7 @@
 #include "PyEmbeddedMessageInstance.hpp"
 #include "PyPyCellInstance.hpp"
 #include "PyTypedCellInstance.hpp"
+#include "PyTemporaryReferenceTracer.hpp"
 #include "PySetInstance.hpp"
 #include "_types.hpp"
 
@@ -252,8 +255,45 @@ PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType) {
     return translateExceptionToPyObject([&]() {
         if (eltType->getTypeCategory() == Type::TypeCategory::catHeldClass) {
             // we never return 'held class' instances directly. Instead, we
-            // return a RefTo them.
-            return extractPythonObject((instance_ptr)&data, ((HeldClass*)eltType)->getRefToType());
+            // return a 'Temporary' RefTo them and install a trace handler
+            // that forces them to become non-refto objects on the execution of the
+            // next instruction
+            PyObject* res = extractPythonObject(
+                (instance_ptr)&data,
+                ((HeldClass*)eltType)->getRefToType()
+            );
+
+            PyThreadState *tstate = PyThreadState_GET();
+            PyFrameObject *f = _PyThreadState_GetFrame(tstate);
+
+            if (!f) {
+                decref(res);
+                throw std::runtime_error("No active python stackframe object found?");
+            }
+
+            PyTemporaryReferenceTracer* tracer = (PyTemporaryReferenceTracer*)
+                PyTemporaryReferenceTracer::new_(
+                    &PyType_TemporaryReferenceTracer,
+                    nullptr,
+                    nullptr
+                );
+
+            tracer->toTrigger = incref(res);
+            // tracer->existingFrameTracer = f->f_trace;
+
+            // this swallows the reference we're holding on 'tracer' into the function itself
+            // f->f_trace = (PyObject*)tracer;
+
+            if (tstate->c_tracefunc) {
+                tracer->existingGlobalTracer = tstate->c_tracefunc;
+                tracer->existingGlobalTracerArg = incref(tstate->c_traceobj);
+            }
+
+            // this will also pick up a reference to 'tracer'
+            PyEval_SetTrace(PyTemporaryReferenceTracer::globalTraceFun, (PyObject*)tracer);
+            decref((PyObject*)tracer);
+
+            return res;
         }
 
         //dispatch to the appropriate Py[]Instance type
