@@ -15,6 +15,8 @@
 ******************************************************************************/
 
 #include <Python.h>
+#include <pystate.h>
+
 #include <numpy/arrayobject.h>
 #include <type_traits>
 
@@ -45,6 +47,7 @@
 #include "PyEmbeddedMessageInstance.hpp"
 #include "PyPyCellInstance.hpp"
 #include "PyTypedCellInstance.hpp"
+#include "PyTemporaryReferenceTracer.hpp"
 #include "PySetInstance.hpp"
 #include "_types.hpp"
 
@@ -64,7 +67,22 @@ std::pair<Type*, instance_ptr> PyInstance::derefAnyRefTo() {
     return std::make_pair(t, p);
 }
 
+void PyInstance::resolveTemporaryReference() {
+    if (!mTemporaryRefTo) {
+        return;
+    }
+
+    // duplicate the HeldClass we're holding onto
+    mContainingInstance = Instance(mTemporaryRefTo, type());
+
+    // and mark that we are no longer a temporary reference.
+    mTemporaryRefTo = nullptr;
+}
+
 instance_ptr PyInstance::dataPtr() {
+    if (mTemporaryRefTo) {
+        return mTemporaryRefTo;
+    }
     return mContainingInstance.data();
 }
 
@@ -245,13 +263,29 @@ void PyInstance::constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, Py
  * such as integers, strings, bools, or None, we return an actual python object. Otherwise,
  * we return a pointer to a PyInstance representing the object.
  */
+
 // static
-PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType) {
+PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType, bool createTemporaryRef) {
     return translateExceptionToPyObject([&]() {
-        if (eltType->getTypeCategory() == Type::TypeCategory::catHeldClass) {
+        if (eltType->getTypeCategory() == Type::TypeCategory::catHeldClass && createTemporaryRef) {
             // we never return 'held class' instances directly. Instead, we
-            // return a RefTo them.
-            return extractPythonObject((instance_ptr)&data, ((HeldClass*)eltType)->getRefToType());
+            // return a 'Temporary' reference to them and install a trace handler
+            // that forces them to become non-refto objects on the execution of the
+            // next instruction in the parent stack frame.
+
+            // this allows us to mimic the behavior of the compiler when we're
+            // using these objects: by default, we never get naked reftos anywhere
+            // we can find them.
+            PyObject* res = PyInstance::initializeTemporaryRef(eltType, data);
+
+            PyThreadState *tstate = PyThreadState_GET();
+            PyFrameObject *f = tstate->frame;
+
+            if (f) {
+                PyTemporaryReferenceTracer::traceObject(res, f);
+            }
+
+            return res;
         }
 
         //dispatch to the appropriate Py[]Instance type
@@ -373,7 +407,7 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
                 constructFromPythonArguments(tgt, eltType, args, kwds);
             });
 
-            return extractPythonObject(inst.data(), eltType);
+            return extractPythonObject(inst.data(), eltType, false);
         }
     });
 }
@@ -687,7 +721,8 @@ PyObject* PyInstance::typePtrToPyTypeRepresentation(Type* inType) {
 PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
     if (    t->getTypeCategory() == Type::TypeCategory::catAlternative ||
             t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative ||
-            t->getTypeCategory() == Type::TypeCategory::catClass
+            t->getTypeCategory() == Type::TypeCategory::catClass ||
+            t->getTypeCategory() == Type::TypeCategory::catHeldClass
             ) {
         PySequenceMethods* res =
             new PySequenceMethods {0,0,0,0,0,0,0,0};
@@ -832,7 +867,9 @@ PyMappingMethods* PyInstance::mappingMethods(Type* t) {
         t->getTypeCategory() == Type::TypeCategory::catListOf ||
         t->getTypeCategory() == Type::TypeCategory::catAlternative ||
         t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative ||
-        t->getTypeCategory() == Type::TypeCategory::catClass) {
+        t->getTypeCategory() == Type::TypeCategory::catClass ||
+        t->getTypeCategory() == Type::TypeCategory::catHeldClass
+        ) {
         return mapMethods;
     }
 

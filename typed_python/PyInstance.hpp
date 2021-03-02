@@ -74,14 +74,20 @@ public:
 
     Instance mContainingInstance;
 
+    // we may be a temporary ref to a type
+    instance_ptr mTemporaryRefTo;
+
     // initialize our fields after we have called 'tp_alloc'
     void initializeEmpty() {
         mIteratorFlag = -1;
         mIteratorOffset = -1;
         mContainerSize = -1;
+        mTemporaryRefTo = nullptr;
 
         new (&mContainingInstance) Instance();
     }
+
+    void resolveTemporaryReference();
 
     template<class T>
     static auto specialize(PyObject* obj, const T& f, Type* typeOverride = nullptr) {
@@ -318,6 +324,18 @@ public:
         }
     }
 
+    static PyObject* initializeTemporaryRef(Type* eltType, instance_ptr data) {
+        eltType->assertForwardsResolvedSufficientlyToInstantiate();
+
+        PyInstance* self =
+            (PyInstance*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
+
+        self->initializeEmpty();
+        self->mTemporaryRefTo = data;
+
+        return (PyObject*)self;
+    }
+
     template<class init_func>
     void initialize(const init_func& i, Type* typeIfKnown = nullptr) {
         Type* type = typeIfKnown ? typeIfKnown : extractTypeFrom(((PyObject*)this)->ob_type);
@@ -378,7 +396,9 @@ public:
     //produce the pythonic representation of this object. for values that have a direct python representation,
     //such as integers, strings, bools, or None, we return an actual python object. Otherwise,
     //we return a pointer to a PyInstance representing the object.
-    static PyObject* extractPythonObject(instance_ptr data, Type* eltType);
+    //if 'createTemporaryRef' is 'false', then we don't create temporary references to HeldClass
+    //instances.
+    static PyObject* extractPythonObject(instance_ptr data, Type* eltType, bool createTemporaryRef=true);
 
     static PyObject* extractPythonObject(const Instance& instance);
 

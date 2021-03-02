@@ -390,7 +390,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             expr.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
                 self.underlyingWrapperType.getNativeLayoutType().pointer()
             ).elemPtr(actualItem.nonref_expr)
-        ).heldToRef()
+        )
 
     def convert_getitem_unsafe(self, context, expr, item):
         return context.pushReference(

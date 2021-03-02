@@ -23,7 +23,7 @@ BoundMethod* PyBoundMethodInstance::type() {
 
 PyObject* PyBoundMethodInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
     Function* f = type()->getFunction();
-    Type* c = type()->getFirstArgType();
+    Type* firstArgType = type()->getFirstArgType();
 
     if (!f) {
         PyErr_Format(
@@ -63,11 +63,22 @@ PyObject* PyBoundMethodInstance::tp_call_concrete(PyObject* args, PyObject* kwar
         mappedKwargs.set(kwargs);
     }
 
-    PyObjectStealer objectInstance(
-        PyInstance::initializePythonRepresentation(c, [&](instance_ptr d) {
-            c->copy_constructor(d, dataPtr());
-        })
-    );
+    PyObjectHolder objectInstance;
+
+    if (firstArgType->isRefTo()) {
+        objectInstance.steal(
+            PyInstance::initializeTemporaryRef(
+                ((RefTo*)firstArgType)->getEltType(),
+                *(instance_ptr*)dataPtr()
+            )
+        );
+    } else {
+        objectInstance.steal(
+            PyInstance::initializePythonRepresentation(firstArgType, [&](instance_ptr d) {
+                firstArgType->copy_constructor(d, dataPtr());
+            })
+        );
+    }
 
     for (ConversionLevel conversionLevel: {
         ConversionLevel::Signature,

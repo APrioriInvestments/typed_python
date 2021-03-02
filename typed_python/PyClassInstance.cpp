@@ -93,7 +93,7 @@ void PyClassInstance::initializeClassWithDefaultArguments(Class* cls, uint8_t* d
     Py_ssize_t pos = 0;
 
     while (PyDict_Next(kwargs, &pos, &key, &value)) {
-        int res = classInstanceSetAttributeFromPyObject(cls, data, key, value);
+        int res = tpSetattrGeneric(nullptr, cls, data, key, value);
 
         if (res != 0) {
             throw PythonExceptionSet();
@@ -105,29 +105,65 @@ void PyClassInstance::initializeClassWithDefaultArguments(Class* cls, uint8_t* d
  *  Return 0 if successful and -1 if it failed
  */
 // static
-int PyClassInstance::classInstanceSetAttributeFromPyObject(Class* cls, instance_ptr data, PyObject* attrName, PyObject* attrVal) {
-    int i = cls->memberNamed(PyUnicode_AsUTF8(attrName));
+int PyClassInstance::tpSetattrGeneric(
+    PyObject* self,
+    Type* t,
+    instance_ptr data,
+    PyObject* attrName,
+    PyObject* attrVal
+) {
+    HeldClass* heldClass = getHeldClassType(t);
+    instance_ptr heldData = getHeldClassData(t, data);
 
-    if (i < 0) {
-        auto it = cls->getClassMembers().find(PyUnicode_AsUTF8(attrName));
-        if (it == cls->getClassMembers().end()) {
+    if (!attrVal && heldClass->hasDelAttrMagicMethod() && self) {
+        auto p = callMemberFunctionGeneric(self, t, data, "__delattr__", attrName);
+        if (p.first) {
+            if (p.second) {
+                decref(p.second);
+                return 0;
+            } else {
+                return -1;
+            }
+        }
+    }
+    else if (heldClass->hasSetAttrMagicMethod() && self) {
+        auto p = callMemberFunctionGeneric(self, t, data, "__setattr__", attrName, attrVal);
+        if (p.first) {
+            if (p.second) {
+                decref(p.second);
+                return 0;
+            } else {
+                return -1;
+            }
+        }
+    }
+
+    int memberIndex = heldClass->memberNamed(PyUnicode_AsUTF8(attrName));
+
+    if (memberIndex < 0) {
+        auto it = heldClass->getClassMembers().find(
+            PyUnicode_AsUTF8(attrName)
+        );
+
+        if (it == heldClass->getClassMembers().end()) {
             PyErr_Format(
                 PyExc_AttributeError,
                 "'%s' object has no attribute '%S' and cannot add attributes to instances of this type",
-                cls->name().c_str(), attrName
+                t->name().c_str(), attrName
             );
         } else {
             PyErr_Format(
                 PyExc_AttributeError,
                 "Cannot modify read-only class member '%S' of instance of type '%s'",
-                attrName, cls->name().c_str()
+                attrName, t->name().c_str()
             );
         }
+
         return -1;
     }
 
     if (!attrVal) {
-        if (cls->getMemberIsNonempty(i)) {
+        if (heldClass->getMemberIsNonempty(memberIndex)) {
             PyErr_Format(
                 PyExc_AttributeError,
                 "Attribute '%S' cannot be deleted",
@@ -136,7 +172,7 @@ int PyClassInstance::classInstanceSetAttributeFromPyObject(Class* cls, instance_
             return -1;
         }
 
-        if (!cls->checkInitializationFlag(data, i)) {
+        if (!heldClass->checkInitializationFlag(heldData, memberIndex)) {
             PyErr_Format(
                 PyExc_AttributeError,
                 "Attribute '%S' is not initialized",
@@ -145,18 +181,18 @@ int PyClassInstance::classInstanceSetAttributeFromPyObject(Class* cls, instance_
             return -1;
         }
 
-        cls->delAttribute(data, i);
+        heldClass->delAttribute(heldData, memberIndex);
         return 0;
     }
 
-    Type* eltType = cls->getMemberType(i);
+    Type* eltType = heldClass->getMemberType(memberIndex);
 
     Type* attrType = extractTypeFrom(attrVal->ob_type);
 
     if (Type::typesEquivalent(eltType, attrType)) {
         PyInstance* item_w = (PyInstance*)attrVal;
 
-        cls->setAttribute(data, i, item_w->dataPtr());
+        heldClass->setAttribute(heldData, memberIndex, item_w->dataPtr());
 
         return 0;
     }
@@ -164,98 +200,111 @@ int PyClassInstance::classInstanceSetAttributeFromPyObject(Class* cls, instance_
             ((RefTo*)attrType)->getEltType() == eltType) {
         PyInstance* item_w = (PyInstance*)attrVal;
 
-        cls->setAttribute(data, i, *(instance_ptr*)item_w->dataPtr());
+        heldClass->setAttribute(heldData, memberIndex, *(instance_ptr*)item_w->dataPtr());
 
         return 0;
     } else {
-        instance_ptr tempObj = (instance_ptr)tp_malloc(eltType->bytecount());
-        try {
+        Instance temp = Instance::createAndInitialize(eltType, [&](instance_ptr tempObj) {
             copyConstructFromPythonInstance(eltType, tempObj, attrVal, ConversionLevel::ImplicitContainers);
-        } catch(PythonExceptionSet& e) {
-            tp_free(tempObj);
-            return -1;
-        } catch(std::exception& e) {
-            tp_free(tempObj);
-            PyErr_SetString(PyExc_TypeError, e.what());
-            return -1;
-        }
+        });
 
-
-        cls->setAttribute(data, i, tempObj);
-
-        eltType->destroy(tempObj);
-        tp_free(tempObj);
+        heldClass->setAttribute(heldData, memberIndex, temp.data());
 
         return 0;
     }
 }
 
 PyObject* PyClassInstance::pyUnaryOperatorConcrete(const char* op, const char* opErr) {
-    auto res = callMemberFunction(op);
+    return pyUnaryOperatorConcreteGeneric((PyObject*)this, type(), dataPtr(), op, opErr);
+}
+
+PyObject* PyClassInstance::pyUnaryOperatorConcreteGeneric(PyObject* self, Type* t, instance_ptr data, const char* op, const char* opErr) {
+    auto res = callMemberFunctionGeneric(self, t, data, op);
 
     if (!res.first) {
-        return PyInstance::pyUnaryOperatorConcrete(op, opErr);
+        // dispatch to the base class for a generic error message
+        return ((PyInstance*)self)->pyUnaryOperatorConcrete(op, opErr);
     }
 
     return res.second;
 }
 
 PyObject* PyClassInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
-    auto res = callMemberFunction(op, rhs);
+    return pyOperatorConcreteGeneric((PyObject*)this, type(), dataPtr(), rhs, op, opErr);
+}
+
+PyObject* PyClassInstance::pyOperatorConcreteGeneric(PyObject* self, Type* t, instance_ptr data, PyObject* rhs, const char* op, const char* opErr) {
+    auto res = callMemberFunctionGeneric(self, t, data, op, rhs);
 
     if (res.first) {
         return res.second;
     }
 
-    if (strlen(op) > 2 && strlen(op) < 16 && op[2] == 'i') { // an inplace operator should fall back to the regular operator
+    if (strlen(op) > 2 && strlen(op) < 16 && op[2] == 'i') {
+        // an inplace operator should fall back to the regular operator
         char reg_op[16] = "__";
         strcpy(&reg_op[2], op + 3);
 
-        auto res = callMemberFunction(reg_op, rhs);
-        if (res.first)
+        auto res = callMemberFunctionGeneric(self, t, data, reg_op, rhs);
+        if (res.first) {
             return res.second;
+        }
     }
 
-    return PyInstance::pyOperatorConcrete(rhs, op, opErr);
+    return ((PyInstance*)self)->pyOperatorConcrete(rhs, op, opErr);
 }
 
 PyObject* PyClassInstance::pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErr) {
+    return pyOperatorConcreteReverseGeneric((PyObject*)this, type(), dataPtr(), lhs, op, opErr);
+}
+
+PyObject* PyClassInstance::pyOperatorConcreteReverseGeneric(PyObject* self, Type* t, instance_ptr data, PyObject* lhs, const char* op, const char* opErr) {
     char buf[50];
     strncpy(buf+1, op, 45);
     buf[0] = '_';
     buf[2] = 'r';
 
-    auto res = callMemberFunction(buf, lhs);
+    auto res = callMemberFunctionGeneric(self, t, data, buf, lhs);
 
     if (!res.first) {
-        return PyInstance::pyOperatorConcreteReverse(lhs, buf, opErr);
+        return ((PyInstance*)self)->pyOperatorConcreteReverse(lhs, buf, opErr);
     }
 
     return res.second;
 }
 
 PyObject* PyClassInstance::pyTernaryOperatorConcrete(PyObject* rhs, PyObject* ternaryArg, const char* op, const char* opErr) {
+    return pyTernaryOperatorConcreteGeneric((PyObject*)this, type(), dataPtr(), rhs, ternaryArg, op, opErr);
+}
+
+PyObject* PyClassInstance::pyTernaryOperatorConcreteGeneric(PyObject* self, Type* t, instance_ptr data, PyObject* rhs, PyObject* ternaryArg, const char* op, const char* opErr) {
     if (ternaryArg == Py_None) {
         //if you pass 'None' as the third argument, python calls your class
         //__pow__ function with two arguments. This is the behavior for
         //'instance ** b' as well as if you write 'pow(instance,b,None)'
-        return pyOperatorConcrete(rhs, op, opErr);
+        return pyOperatorConcreteGeneric(self, t, data, rhs, op, opErr);
     }
 
-    auto res = callMemberFunction(op, rhs, ternaryArg);
+    auto res = callMemberFunctionGeneric(self, t, data, op, rhs, ternaryArg);
 
     if (!res.first) {
-        return PyInstance::pyTernaryOperatorConcrete(rhs, ternaryArg, op, opErr);
+        return ((PyInstance*)self)->pyTernaryOperatorConcrete(rhs, ternaryArg, op, opErr);
     }
 
     return res.second;
 }
 
 int PyClassInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
+    return pyInquiryGeneric((PyObject*)this, type(), dataPtr(), op, opErrRep);
+}
+
+int PyClassInstance::pyInquiryGeneric(
+    PyObject* self, Type* t, instance_ptr data, const char* op, const char* opErrRep
+) {
     // op == '__bool__'
-    auto p = callMemberFunction("__bool__");
+    auto p = callMemberFunctionGeneric(self, t, data, "__bool__");
     if (!p.first) {
-        p = callMemberFunction("__len__");
+        p = callMemberFunctionGeneric(self, t, data, "__len__");
         // if neither __bool__ nor __len__ is available, return True
         if (!p.first) {
             return 1;
@@ -290,9 +339,23 @@ int64_t PyClassInstance::tryCallHashMemberFunction() {
 }
 
 std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
-    auto it = type()->getMemberFunctions().find(name);
+    return callMemberFunctionGeneric((PyObject*)this, type(), dataPtr(), name, arg0, arg1, arg2);
+}
 
-    if (it == type()->getMemberFunctions().end()) {
+std::pair<bool, PyObject*> PyClassInstance::callMemberFunctionGeneric(
+    PyObject* self,
+    Type* t,
+    instance_ptr data,
+    const char* name,
+    PyObject* arg0,
+    PyObject* arg1,
+    PyObject* arg2
+) {
+    HeldClass* heldClass = getHeldClassType(t);
+
+    auto it = heldClass->getMemberFunctions().find(name);
+
+    if (it == heldClass->getMemberFunctions().end()) {
         return std::make_pair(false, (PyObject*)nullptr);
     }
 
@@ -311,7 +374,7 @@ std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name,
 
     PyObjectStealer targetArgTuple(PyTuple_New(argCount));
 
-    PyTuple_SetItem(targetArgTuple, 0, incref((PyObject*)this)); //steals a reference
+    PyTuple_SetItem(targetArgTuple, 0, incref(self)); //steals a reference
 
     if (arg0) {
         PyTuple_SetItem(targetArgTuple, 1, incref(arg0)); //steals a reference
@@ -332,17 +395,22 @@ std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name,
     PyErr_Format(
         PyExc_TypeError,
         "'%s.%s' cannot find a valid overload with these arguments",
-        type()->name().c_str(),
+        t->name().c_str(),
         name
     );
     return std::make_pair(true, (PyObject*)nullptr);
 }
 
 Py_ssize_t PyClassInstance::mp_and_sq_length_concrete() {
-    auto res = callMemberFunction("__len__");
+    return mpAndSqLengthGeneric((PyObject*)this, type(), dataPtr());
+}
+
+Py_ssize_t PyClassInstance::mpAndSqLengthGeneric(PyObject* self, Type* t, instance_ptr data) {
+    auto res = callMemberFunctionGeneric(self, t, data, "__len__");
 
     if (!res.first) {
-        return PyInstance::mp_and_sq_length_concrete();
+        // call the generic form of the function which produces the error message
+        return ((PyInstance*)self)->mp_and_sq_length_concrete();
     }
 
     if (!res.second) {
@@ -354,7 +422,7 @@ Py_ssize_t PyClassInstance::mp_and_sq_length_concrete() {
         PyErr_Format(
             PyExc_TypeError,
             "'%s.__len__' returned an object of type %s",
-            type()->name().c_str(),
+            t->name().c_str(),
             res.second->ob_type->tp_name
             );
         decref(res.second);
@@ -403,9 +471,54 @@ void PyClassInstance::constructFromPythonArgumentsConcrete(Class* classT, uint8_
     }
 }
 
+instance_ptr PyClassInstance::getHeldClassData(Type* t, instance_ptr data) {
+    if (t->isHeldClass()) {
+        return data;
+    }
+
+    if (t->isRefTo()) {
+        return *(instance_ptr*)data;
+    }
+
+    if (t->isClass()) {
+        return (instance_ptr)Class::instanceToLayout(data)->data;
+    }
+
+    throw std::runtime_error("Can't extract a HeldClass* from " + t->name());
+}
+
+HeldClass* PyClassInstance::getHeldClassType(Type* t) {
+    if (t->isRefTo()) {
+        return (HeldClass*)((RefTo*)t)->getEltType();
+    }
+
+    if (t->isHeldClass()) {
+        return (HeldClass*)t;
+    }
+
+    if (t->isClass()) {
+        return ((Class*)t)->getHeldClass();
+    }
+
+    throw std::runtime_error("Can't extract a HeldClass* from " + t->name());
+}
+
 PyObject* PyClassInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
-    if (type()->getHeldClass()->hasGetAttributeMagicMethod()) {
-        auto p = callMemberFunction("__getattribute__", pyAttrName);
+    return tpGetattrGeneric((PyObject*)this, type(), dataPtr(), pyAttrName, attrName);
+}
+
+PyObject* PyClassInstance::tpGetattrGeneric(
+    PyObject* self,
+    Type* t,
+    instance_ptr data,
+    PyObject* pyAttrName,
+    const char* attrName
+) {
+    HeldClass* heldClass = getHeldClassType(t);
+    instance_ptr heldData = getHeldClassData(t, data);
+
+    if (getHeldClassType(t)->hasGetAttributeMagicMethod()) {
+        auto p = callMemberFunctionGeneric(self, t, data, "__getattribute__", pyAttrName);
         if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_AttributeError)) {
             PyErr_Clear();
         }
@@ -416,36 +529,50 @@ PyObject* PyClassInstance::tp_getattr_concrete(PyObject* pyAttrName, const char*
         }
     }
 
-    int index = type()->getMemberIndex(attrName);
+    int index = heldClass->getMemberIndex(attrName);
 
     if (index >= 0) {
-        Type* eltType = type()->getMemberType(index);
+        Type* eltType = heldClass->getMemberType(index);
 
-        if (!type()->checkInitializationFlag(dataPtr(), index)) {
+        if (!heldClass->checkInitializationFlag(heldData, index)) {
             PyErr_Format(
                 PyExc_AttributeError,
                 "Attribute '%S' is not initialized",
                 pyAttrName,
-                eltType->name().c_str(),
-                eltType->isPOD() ? "pod":"not pod"
+                eltType->name().c_str()
             );
             return NULL;
         }
 
-        return extractPythonObject(type()->eltPtr(dataPtr(), index), eltType);
+        return extractPythonObject(heldClass->eltPtr(heldData, index), eltType);
     }
 
-    BoundMethod* method = type()->getMemberFunctionMethodType(attrName);
+    BoundMethod* method = heldClass->getMemberFunctionMethodType(
+        attrName,
+        t->isClass() ? false : true /* for held */
+    );
+
     if (method) {
-        return PyInstance::initializePythonRepresentation(method, [&](instance_ptr data) {
-            method->copy_constructor(data, dataPtr());
-        });
+        if (t->isClass()) {
+            return PyInstance::initializePythonRepresentation(method, [&](instance_ptr methodData) {
+                method->copy_constructor(methodData, data);
+            });
+        } else {
+            if (!method->getFirstArgType()->isRefTo()) {
+                throw std::runtime_error("BoundMethod of HeldClass should take a RefTo");
+            }
+
+            return PyInstance::initializePythonRepresentation(method, [&](instance_ptr methodData) {
+                method->copy_constructor(methodData, (instance_ptr)&heldData);
+            });
+        }
     }
 
     {
-        auto it = type()->getPropertyFunctions().find(attrName);
-        if (it != type()->getPropertyFunctions().end()) {
-            auto res = PyFunctionInstance::tryToCall(it->second, nullptr, (PyObject*)this);
+        auto it = heldClass->getPropertyFunctions().find(attrName);
+        if (it != heldClass->getPropertyFunctions().end()) {
+            auto res = PyFunctionInstance::tryToCall(it->second, nullptr, self);
+
             if (res.first) {
                 return res.second;
             }
@@ -454,27 +581,35 @@ PyObject* PyClassInstance::tp_getattr_concrete(PyObject* pyAttrName, const char*
                 PyExc_TypeError,
                 "Found a property for %s but failed to call it with 'self'",
                 attrName
-                );
+            );
+
             return NULL;
         }
     }
 
     {
-        auto it = type()->getClassMembers().find(attrName);
-        if (it != type()->getClassMembers().end()) {
+        auto it = heldClass->getClassMembers().find(attrName);
+        if (it != heldClass->getClassMembers().end()) {
             return incref(it->second);
         }
     }
 
-    PyObject* ret = PyInstance::tp_getattr_concrete(pyAttrName, attrName);
+    // call the generic tp_getattr, which can bind descriptors defined in classes correctly.
+    PyObject* ret = ((PyInstance*)self)->tp_getattr_concrete(pyAttrName, attrName);
+
     if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_AttributeError)) {
         PyErr_Clear();
-        auto p = callMemberFunction("__getattr__", pyAttrName);
+        auto p = callMemberFunctionGeneric(self, t, data, "__getattr__", pyAttrName);
         if (p.first) {
             return p.second;
         }
         else {
-            PyErr_Format(PyExc_AttributeError, "no attribute %s for instance of type %s", attrName, type()->name().c_str());
+            PyErr_Format(
+                PyExc_AttributeError,
+                "no attribute %s for instance of type %s",
+                attrName, t->name().c_str()
+            );
+            return NULL;
         }
     }
 
@@ -619,29 +754,13 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
 }
 
 int PyClassInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
-    if (!attrVal) {
-        auto p = callMemberFunction("__delattr__", attrName);
-        if (p.first) {
-            if (p.second) {
-                decref(p.second);
-                return 0;
-            } else {
-                return -1;
-            }
-        }
-    }
-    else {
-        auto p = callMemberFunction("__setattr__", attrName, attrVal);
-        if (p.first) {
-            if (p.second) {
-                decref(p.second);
-                return 0;
-            } else {
-                return -1;
-            }
-        }
-    }
-    return PyClassInstance::classInstanceSetAttributeFromPyObject(type(), dataPtr(), attrName, attrVal);
+    return PyClassInstance::tpSetattrGeneric(
+        (PyObject*)this,
+        type(),
+        dataPtr(),
+        attrName,
+        attrVal
+    );
 }
 
 /* static */
@@ -680,31 +799,46 @@ bool PyClassInstance::compare_to_python_concrete(Class* t, instance_ptr self, Py
 
 
 PyObject* PyClassInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
-    auto it = type()->getMemberFunctions().find("__call__");
+    return tpCallConcreteGeneric((PyObject*)this, type(), dataPtr(), args, kwargs);
+}
 
-    if (it == type()->getMemberFunctions().end()) {
+PyObject* PyClassInstance::tpCallConcreteGeneric(
+    PyObject* self, Type* t, instance_ptr data, PyObject* args, PyObject* kwargs
+) {
+    HeldClass* heldCls = getHeldClassType(t);
+
+    auto it = heldCls->getMemberFunctions().find("__call__");
+
+    if (it == heldCls->getMemberFunctions().end()) {
         PyErr_Format(
             PyExc_TypeError,
             "'%s' object is not callable because '__call__' was not defined",
-            type()->name().c_str()
-            );
+            t->name().c_str()
+        );
+
         throw PythonExceptionSet();
     }
     // else
     Function* method = it->second;
 
-    auto res = PyFunctionInstance::tryToCallAnyOverload(method, nullptr, (PyObject*)this, args, kwargs);
+    auto res = PyFunctionInstance::tryToCallAnyOverload(
+        method,
+        nullptr,
+        (PyObject*)self,
+        args,
+        kwargs
+    );
 
     if (res.first) {
         return res.second;
     }
-    // else
+
     throw PythonExceptionSet();
 }
 
 
-int PyClassInstance::sq_contains_concrete(PyObject* item) {
-    auto p = callMemberFunction("__contains__", item);
+int PyClassInstance::sqContainsGeneric(PyObject* self, Type* t, instance_ptr data, PyObject* item) {
+    auto p = callMemberFunctionGeneric(self, t, data, "__contains__", item);
     if (!p.first) {
         return 0;
     }
@@ -717,29 +851,41 @@ int PyClassInstance::sq_contains_concrete(PyObject* item) {
     }
 }
 
+int PyClassInstance::sq_contains_concrete(PyObject* item) {
+    return sqContainsGeneric((PyObject*)this, type(), dataPtr(), item);
+}
+
 PyObject* PyClassInstance::mp_subscript_concrete(PyObject* item) {
-    auto p = callMemberFunction("__getitem__", item);
+    return mpSubscriptGeneric((PyObject*)this, type(), dataPtr(), item);
+}
+
+PyObject* PyClassInstance::mpSubscriptGeneric(PyObject* self, Type* t, instance_ptr data, PyObject* item) {
+    auto p = callMemberFunctionGeneric(self, t, data, "__getitem__", item);
     if (!p.first) {
-        PyErr_Format(PyExc_TypeError, "__getitem__ not defined for type %s", type()->name().c_str());
+        PyErr_Format(PyExc_TypeError, "__getitem__ not defined for type %s", t->name().c_str());
         return NULL;
     }
     return p.second;
 }
 
 int PyClassInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* v) {
+    return mpAssignSubscriptGeneric((PyObject*)this, type(), dataPtr(), item, v);
+}
+
+int PyClassInstance::mpAssignSubscriptGeneric(PyObject* self, Type* t, instance_ptr data, PyObject* item, PyObject* v) {
     std::pair<bool, PyObject*> p;
 
     if (!v) {
-        p = callMemberFunction("__delitem__", item);
+        p = callMemberFunctionGeneric(self, t, data, "__delitem__", item);
     } else {
-        p = callMemberFunction("__setitem__", item, v);
+        p = callMemberFunctionGeneric(self, t, data, "__setitem__", item, v);
     }
 
     if (!p.first) {
         if (!v) {
-            PyErr_Format(PyExc_TypeError, "__delitem__ not defined for type %s", type()->name().c_str());
+            PyErr_Format(PyExc_TypeError, "__delitem__ not defined for type %s", t->name().c_str());
         } else {
-            PyErr_Format(PyExc_TypeError, "__setitem__ not defined for type %s", type()->name().c_str());
+            PyErr_Format(PyExc_TypeError, "__setitem__ not defined for type %s", t->name().c_str());
         }
         return -1;
     }
@@ -753,25 +899,33 @@ int PyClassInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* v) {
 }
 
 PyObject* PyClassInstance::tp_iter_concrete() {
-    auto p = callMemberFunction("__iter__");
+    return tpIterGeneric((PyObject*)this, type(), dataPtr());
+}
+
+PyObject* PyClassInstance::tpIterGeneric(PyObject* self, Type* t, instance_ptr data) {
+    auto p = callMemberFunctionGeneric(self, t, data, "__iter__");
     if (!p.first) {
-        PyErr_Format(PyExc_TypeError, "__iter__ not defined for type %s", type()->name().c_str());
+        PyErr_Format(PyExc_TypeError, "__iter__ not defined for type %s", t->name().c_str());
         return NULL;
     }
     return p.second;
 }
 
 PyObject* PyClassInstance::tp_iternext_concrete() {
-    auto p = callMemberFunction("__next__");
+    return tpIternextGeneric((PyObject*)this, type(), dataPtr());
+}
+
+PyObject* PyClassInstance::tpIternextGeneric(PyObject* self, Type* t, instance_ptr data) {
+    auto p = callMemberFunctionGeneric(self, t, data, "__next__");
     if (!p.first) {
-        PyErr_Format(PyExc_TypeError, "__next__ not defined for type %s", type()->name().c_str());
+        PyErr_Format(PyExc_TypeError, "__next__ not defined for type %s", t->name().c_str());
         return NULL;
     }
     return p.second;
 }
 
 // static
-PyObject* PyClassInstance::clsFormat(PyObject* o, PyObject* args, PyObject* kwargs) {
+PyObject* PyClassInstance::clsFormatGeneric(PyObject* o, Type* t, instance_ptr data, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() -> PyObject* {
         PyClassInstance* self = (PyClassInstance*)o;
 
@@ -781,7 +935,7 @@ PyObject* PyClassInstance::clsFormat(PyObject* o, PyObject* args, PyObject* kwar
         }
         PyObjectStealer arg0(PyTuple_GetItem(args, 0));
 
-        auto result = self->callMemberFunction("__format__", arg0);
+        auto result = self->callMemberFunctionGeneric(o, t, data, "__format__", arg0);
         if (!result.first) {
             PyErr_Format(PyExc_TypeError, "__format__ not defined for type %s", self->type()->name().c_str());
             return NULL;
@@ -796,7 +950,7 @@ PyObject* PyClassInstance::clsFormat(PyObject* o, PyObject* args, PyObject* kwar
 }
 
 // static
-PyObject* PyClassInstance::clsBytes(PyObject* o, PyObject* args, PyObject* kwargs) {
+PyObject* PyClassInstance::clsBytesGeneric(PyObject* o, Type* t, instance_ptr data, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() -> PyObject* {
         PyClassInstance* self = (PyClassInstance*)o;
 
@@ -805,7 +959,7 @@ PyObject* PyClassInstance::clsBytes(PyObject* o, PyObject* args, PyObject* kwarg
             return NULL;
         }
 
-        auto result = self->callMemberFunction("__bytes__");
+        auto result = self->callMemberFunctionGeneric(o, t, data, "__bytes__");
         if (!result.first) {
             PyErr_Format(PyExc_TypeError, "__bytes__ not defined for type %s", self->type()->name().c_str());
             return NULL;
@@ -820,7 +974,7 @@ PyObject* PyClassInstance::clsBytes(PyObject* o, PyObject* args, PyObject* kwarg
 }
 
 // static
-PyObject* PyClassInstance::clsDir(PyObject* o, PyObject* args, PyObject* kwargs) {
+PyObject* PyClassInstance::clsDirGeneric(PyObject* o, Type* t, instance_ptr data, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() -> PyObject* {
         PyClassInstance* self = (PyClassInstance*)o;
 
@@ -829,7 +983,7 @@ PyObject* PyClassInstance::clsDir(PyObject* o, PyObject* args, PyObject* kwargs)
             return NULL;
         }
 
-        auto result = self->callMemberFunction("__dir__");
+        auto result = self->callMemberFunctionGeneric(o, t, data, "__dir__");
         if (!result.first) {
             PyErr_Format(PyExc_TypeError, "__dir__ missing");
             return NULL;
@@ -844,7 +998,7 @@ PyObject* PyClassInstance::clsDir(PyObject* o, PyObject* args, PyObject* kwargs)
 }
 
 // static
-PyObject* PyClassInstance::clsReversed(PyObject* o, PyObject* args, PyObject* kwargs) {
+PyObject* PyClassInstance::clsReversedGeneric(PyObject* o, Type* t, instance_ptr data, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() -> PyObject* {
         PyClassInstance* self = (PyClassInstance*)o;
 
@@ -853,7 +1007,7 @@ PyObject* PyClassInstance::clsReversed(PyObject* o, PyObject* args, PyObject* kw
             return NULL;
         }
 
-        auto result = self->callMemberFunction("__reversed__");
+        auto result = self->callMemberFunctionGeneric(o, t, data, "__reversed__");
         if (!result.first) {
             PyErr_Format(PyExc_TypeError, "__reversed__ missing");
             return NULL;
@@ -864,7 +1018,7 @@ PyObject* PyClassInstance::clsReversed(PyObject* o, PyObject* args, PyObject* kw
 }
 
 // static
-PyObject* PyClassInstance::clsComplex(PyObject* o, PyObject* args, PyObject* kwargs) {
+PyObject* PyClassInstance::clsComplexGeneric(PyObject* o, Type* t, instance_ptr data, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() -> PyObject* {
         PyClassInstance* self = (PyClassInstance*)o;
 
@@ -873,7 +1027,7 @@ PyObject* PyClassInstance::clsComplex(PyObject* o, PyObject* args, PyObject* kwa
             return NULL;
         }
 
-        auto result = self->callMemberFunction("__complex__");
+        auto result = self->callMemberFunctionGeneric(o, t, data, "__complex__");
         if (!result.first) {
             PyErr_Format(PyExc_TypeError, "__complex__ missing");
             return NULL;
@@ -888,7 +1042,7 @@ PyObject* PyClassInstance::clsComplex(PyObject* o, PyObject* args, PyObject* kwa
 }
 
 // static
-PyObject* PyClassInstance::clsRound(PyObject* o, PyObject* args, PyObject* kwargs) {
+PyObject* PyClassInstance::clsRoundGeneric(PyObject* o, Type* t, instance_ptr data, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() -> PyObject* {
         PyClassInstance* self = (PyClassInstance*)o;
 
@@ -899,7 +1053,7 @@ PyObject* PyClassInstance::clsRound(PyObject* o, PyObject* args, PyObject* kwarg
 
         if (PyTuple_Size(args) == 1) {
             PyObjectStealer arg0(PyTuple_GetItem(args, 0));
-            auto result = self->callMemberFunction("__round__", arg0);
+            auto result = self->callMemberFunctionGeneric(o, t, data, "__round__", arg0);
             if (!result.first) {
                 PyErr_Format(PyExc_TypeError, "__round__ missing");
                 return NULL;
@@ -907,7 +1061,7 @@ PyObject* PyClassInstance::clsRound(PyObject* o, PyObject* args, PyObject* kwarg
             return result.second;
         }
 
-        auto result = self->callMemberFunction("__round__");
+        auto result = self->callMemberFunctionGeneric(o, t, data, "__round__");
         if (!result.first) {
             PyErr_Format(PyExc_TypeError, "__round__ missing");
             return NULL;
@@ -922,7 +1076,7 @@ PyObject* PyClassInstance::clsRound(PyObject* o, PyObject* args, PyObject* kwarg
 }
 
 // static
-PyObject* PyClassInstance::clsTrunc(PyObject* o, PyObject* args, PyObject* kwargs) {
+PyObject* PyClassInstance::clsTruncGeneric(PyObject* o, Type* t, instance_ptr data, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() -> PyObject* {
         PyClassInstance* self = (PyClassInstance*)o;
 
@@ -931,7 +1085,7 @@ PyObject* PyClassInstance::clsTrunc(PyObject* o, PyObject* args, PyObject* kwarg
             return NULL;
         }
 
-        auto result = self->callMemberFunction("__trunc__");
+        auto result = self->callMemberFunctionGeneric(o, t, data, "__trunc__");
         if (!result.first) {
             PyErr_Format(PyExc_TypeError, "__trunc__ missing");
             return NULL;
@@ -946,7 +1100,7 @@ PyObject* PyClassInstance::clsTrunc(PyObject* o, PyObject* args, PyObject* kwarg
 }
 
 // static
-PyObject* PyClassInstance::clsFloor(PyObject* o, PyObject* args, PyObject* kwargs) {
+PyObject* PyClassInstance::clsFloorGeneric(PyObject* o, Type* t, instance_ptr data, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() -> PyObject* {
         PyClassInstance* self = (PyClassInstance*)o;
 
@@ -955,7 +1109,7 @@ PyObject* PyClassInstance::clsFloor(PyObject* o, PyObject* args, PyObject* kwarg
             return NULL;
         }
 
-        auto result = self->callMemberFunction("__floor__");
+        auto result = self->callMemberFunctionGeneric(o, t, data, "__floor__");
         if (!result.first) {
             PyErr_Format(PyExc_TypeError, "__floor__ missing");
             return NULL;
@@ -970,7 +1124,7 @@ PyObject* PyClassInstance::clsFloor(PyObject* o, PyObject* args, PyObject* kwarg
 }
 
 // static
-PyObject* PyClassInstance::clsCeil(PyObject* o, PyObject* args, PyObject* kwargs) {
+PyObject* PyClassInstance::clsCeilGeneric(PyObject* o, Type* t, instance_ptr data, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() -> PyObject* {
         PyClassInstance* self = (PyClassInstance*)o;
 
@@ -979,7 +1133,7 @@ PyObject* PyClassInstance::clsCeil(PyObject* o, PyObject* args, PyObject* kwargs
             return NULL;
         }
 
-        auto result = self->callMemberFunction("__ceil__");
+        auto result = self->callMemberFunctionGeneric(o, t, data, "__ceil__");
         if (!result.first) {
             PyErr_Format(PyExc_TypeError, "__ceil__ missing");
             return NULL;
@@ -994,7 +1148,7 @@ PyObject* PyClassInstance::clsCeil(PyObject* o, PyObject* args, PyObject* kwargs
 }
 
 // static
-PyObject* PyClassInstance::clsEnter(PyObject* o, PyObject* args, PyObject* kwargs) {
+PyObject* PyClassInstance::clsEnterGeneric(PyObject* o, Type* t, instance_ptr data, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() -> PyObject* {
         PyClassInstance* self = (PyClassInstance*)o;
 
@@ -1003,7 +1157,7 @@ PyObject* PyClassInstance::clsEnter(PyObject* o, PyObject* args, PyObject* kwarg
             return NULL;
         }
 
-        auto result = self->callMemberFunction("__enter__");
+        auto result = self->callMemberFunctionGeneric(o, t, data, "__enter__");
 
         if (!result.first) {
             PyErr_Format(PyExc_TypeError, "__enter__ missing");
@@ -1015,7 +1169,7 @@ PyObject* PyClassInstance::clsEnter(PyObject* o, PyObject* args, PyObject* kwarg
 }
 
 // static
-PyObject* PyClassInstance::clsExit(PyObject* o, PyObject* args, PyObject* kwargs) {
+PyObject* PyClassInstance::clsExitGeneric(PyObject* o, Type* t, instance_ptr data, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() -> PyObject* {
         PyClassInstance* self = (PyClassInstance*)o;
 
@@ -1027,7 +1181,7 @@ PyObject* PyClassInstance::clsExit(PyObject* o, PyObject* args, PyObject* kwargs
         PyObject* arg1(PyTuple_GetItem(args, 1));
         PyObject* arg2(PyTuple_GetItem(args, 2));
 
-        auto result = self->callMemberFunction("__exit__", arg0, arg1, arg2);
+        auto result = self->callMemberFunctionGeneric(o, t, data, "__exit__", arg0, arg1, arg2);
         if (!result.first) {
             PyErr_Format(PyExc_TypeError, "__exit__ missing");
             return NULL;

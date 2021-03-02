@@ -27,6 +27,7 @@ PYSITE = $(shell python3 -c 'import sysconfig; print(sysconfig.get_paths()["plat
 NUMPYINCLUDE = $(shell python3 -c 'import pkg_resources; print(pkg_resources.resource_filename("numpy", "core/include"))')
 # name of the _types binary, which we can infer from the name of the _ssl binary
 TYPES_SO_NAME = $(shell python3 -c 'import _ssl; import os; print(os.path.split(_ssl.__file__)[1].replace("_ssl", "_types"))')
+TYPES_O_NAME = $(shell python3 -c 'import _ssl; import os; print(os.path.split(_ssl.__file__)[1].replace("_ssl", "_types")[:-2] + "o")')
 
 CPP_FLAGS = -std=c++14  -O$(TP_BUILD_OPT_LEVEL)  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
             -fstack-protector-strong  -D_FORTIFY_SOURCE=2  -fPIC            \
@@ -48,7 +49,7 @@ SHAREDLIB_FLAGS = -pthread -shared -g -fstack-protector-strong \
                   -D_FORTIFY_SOURCE=2
 
 UNICODEPROPS = $(TP_SRC_PATH)/UnicodeProps.hpp
-TP_O_FILES = $(TP_BUILD_PATH)/all.o
+TP_O_FILES = $(TP_BUILD_PATH)/$(TYPES_O_NAME)
 DT_SRC_PATH = $(TP_SRC_PATH)/direct_types
 TESTTYPES = $(DT_SRC_PATH)/GeneratedTypes1.hpp
 TESTTYPES2 = $(DT_SRC_PATH)/ClientToServer0.hpp
@@ -126,7 +127,7 @@ $(VIRTUAL_ENV): $(PYTHON) .env
 	pip install pipenv==2020.11.15
 	pip install wheel
 
-$(TP_BUILD_PATH)/all.o: $(TP_SRC_PATH)/*.hpp $(TP_SRC_PATH)/*.cpp
+$(TP_BUILD_PATH)/$(TYPES_O_NAME): $(TP_SRC_PATH)/*.hpp $(TP_SRC_PATH)/*.cpp
 	$(CC) $(CPP_FLAGS) -c $(TP_SRC_PATH)/all.cpp $ -o $@
 
 typed_python/$(TYPES_SO_NAME): $(TP_LIB_PATH)/$(TYPES_SO_NAME)

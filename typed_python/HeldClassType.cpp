@@ -159,7 +159,11 @@ void HeldClass::setAttribute(instance_ptr self, int memberIndex, instance_ptr ot
     }
 }
 
-void HeldClass::constructor(instance_ptr self) {
+void HeldClass::constructor(instance_ptr self, bool allowEmpty) {
+    if (!m_is_default_constructible and !allowEmpty) {
+        throw std::runtime_error(m_name + " is not default-constructible");
+    }
+
     for (size_t k = 0; k < m_members.size(); k++) {
         Type* member_t = m_members[k].getType();
 

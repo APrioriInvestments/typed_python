@@ -29,7 +29,7 @@ import typed_python.compiler
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
 
-class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
+class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -53,7 +53,10 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
         for i, m in enumerate(self.classType.MemberTypes):
             element_types.append(("member_" + str(i), typeWrapper(m).getNativeLayoutType()))
 
-        self.layoutType = native_ast.Type.Array(element_type=native_ast.UInt8, count=_types.bytecount(self.heldClassType))
+        self.layoutType = native_ast.Type.Array(
+            element_type=native_ast.UInt8,
+            count=_types.bytecount(self.heldClassType)
+        )
 
     def fieldGuaranteedInitialized(self, ix):
         if self.classType.ClassMembers[
@@ -118,7 +121,7 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
             with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(other, i))) as (true_block, false_block):
                 with true_block:
                     self.memberRef(expr, i).convert_copy_initialize(self.memberRef(other, i))
-                    self.setIsInitializedExpr(expr, i)
+                    context.pushEffect(self.setIsInitializedExpr(expr, i))
                 with false_block:
                     context.pushEffect(self.clearIsInitializedExpr(expr, i))
 
@@ -138,6 +141,90 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
                 context.pushEffect(self.setIsInitializedExpr(instance, i))
             else:
                 context.pushEffect(self.clearIsInitializedExpr(instance, i))
+
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        # pack the named arguments onto the back of the call, and pass
+        # a tuple of None|string representing the names
+        argNames = (None,) * len(args) + tuple(kwargs)
+        args = tuple(args) + tuple(kwargs.values())
+
+        return context.push(
+            self,
+            lambda new_class:
+                context.converter.defineNativeFunction(
+                    'construct(' + self.typeRepresentation.__name__ + ")("
+                    + ",".join([
+                        (argNames[i] + '=' if argNames[i] is not None else "") +
+                        args[i].expr_type.typeRepresentation.__name__
+                        for i in range(len(args))
+                    ]) + ")",
+                    ('util', self, 'construct', tuple([a.expr_type for a in args]), argNames),
+                    [a.expr_type for a in args],
+                    self,
+                    lambda context, out, *args: self.generateConstructor(context, out, argNames, *args)
+                ).call(new_class, *args)
+        )
+
+    def generateConstructor(self, context, out, argNames, *args):
+        """Generate native code to initialize a Class object from a set of args/kwargs.
+
+        Args:
+            context - the NativeFunctionConversionContext governing this conversion
+            out - a TypedExpression pointing to an uninitialized HeldClass instance.
+            argNames - a tuple of (None|str) with the names of the args as they were passed.
+            *args - Typed expressions representing each argument passed to us.
+        """
+        # clear bits of init flags
+        for byteOffset in range(self.bytesOfInitBits):
+            context.pushEffect(
+                out.expr
+                .cast(native_ast.UInt8.pointer())
+                .ElementPtrIntegers(byteOffset).store(
+                    native_ast.const_uint8_expr(0)
+                )
+            )
+
+        for i in range(len(self.classType.MemberTypes)):
+            if _types.wantsToDefaultConstruct(self.classType.MemberTypes[i]) or self.fieldGuaranteedInitialized(i):
+                name = self.classType.MemberNames[i]
+
+                if name in self.classType.MemberDefaultValues:
+                    defVal = self.classType.MemberDefaultValues.get(name)
+                    context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_copy_initialize(
+                        typed_python.compiler.python_object_representation.pythonObjectRepresentation(context, defVal)
+                    )
+                else:
+                    context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_default_initialize()
+                context.pushEffect(self.setIsInitializedExpr(out, i))
+
+        # break our args back out to unnamed and named arguments
+        unnamedArgs = []
+        namedArgs = {}
+
+        for argIx in range(len(args)):
+            if argNames[argIx] is not None:
+                namedArgs[argNames[argIx]] = args[argIx]
+            else:
+                unnamedArgs.append(args[argIx])
+
+        if '__init__' in self.typeRepresentation.MemberFunctions:
+            initFuncType = typeWrapper(self.typeRepresentation.MemberFunctions['__init__'])
+            initFuncType.convert_call(
+                context,
+                context.push(initFuncType, lambda expr: None),
+                (out,) + tuple(unnamedArgs),
+                namedArgs
+            )
+        else:
+            if len(unnamedArgs):
+                context.pushException(
+                    TypeError,
+                    "Can't construct a " + self.typeRepresentation.__qualname__ +
+                    " with positional arguments because it doesn't have an __init__"
+                )
+
+            for name, arg in namedArgs.items():
+                self.convert_set_attribute(context, out, name, arg)
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -228,8 +315,6 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
 
     def convert_attribute(self, context, instance, attribute, nocheck=False):
         if attribute in self.classType.MemberFunctions:
-            instance = instance.heldToRef()
-
             methodType = BoundMethodWrapper(_types.BoundMethod(self.refToType, attribute))
 
             return instance.changeType(methodType, isReferenceOverride=False)
@@ -271,7 +356,7 @@ class HeldClassWrapper(Wrapper, ClassOrAlternativeWrapperMixin):
         # figure out which signature we'd want to use on the given args/kwargs
         func = self.getMethodOrPropertyBody(methodName)
 
-        return typeWrapper(func).convert_call(context, None, [instance.heldToRef()] + list(args), kwargs)
+        return typeWrapper(func).convert_call(context, None, [instance] + list(args), kwargs)
 
     def convert_set_attribute(self, context, instance, attribute, value):
         if not isinstance(attribute, int):

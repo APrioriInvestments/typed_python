@@ -34,6 +34,7 @@
 #include "DeserializationBuffer.hpp"
 #include "PythonSerializationContext.hpp"
 #include "UnicodeProps.hpp"
+#include "PyTemporaryReferenceTracer.hpp"
 #include "PySlab.hpp"
 #include "_types.hpp"
 
@@ -1285,20 +1286,34 @@ PyObject *pointerTo(PyObject* nullValue, PyObject* args) {
 
     Type* actualType = PyInstance::extractTypeFrom(a1->ob_type);
 
-    if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catClass) {
+    if (!actualType || (!actualType->isClass() && !actualType->isHeldClass() && !actualType->isRefTo())) {
         PyErr_Format(
             PyExc_TypeError,
-            "first argument to pointerTo '%S' must be a Class",
+            "first argument to pointerTo '%S' must be a Class or HeldClass",
             (PyObject*)a1
             );
         return NULL;
     }
 
-    Class* clsType = (Class*)actualType;
-    Class::layout* layout = clsType->instanceToLayout(((PyInstance*)(PyObject*)a1)->dataPtr());
+    PointerTo* ptrType;
+    void* ptrValue;
 
-    PointerTo* ptrType = PointerTo::Make(clsType->getHeldClass());
-    void* ptrValue = layout->data;
+    if (actualType->isRefTo()) {
+        ptrType = PointerTo::Make(((RefTo*)actualType)->getEltType());
+        ptrValue = *(void**)((PyInstance*)(PyObject*)a1)->dataPtr();
+    } else
+    if (actualType->isClass()) {
+        Class* clsType = (Class*)actualType;
+        Class::layout* layout = clsType->instanceToLayout(((PyInstance*)(PyObject*)a1)->dataPtr());
+
+        ptrType = PointerTo::Make(clsType->getHeldClass());
+        ptrValue = layout->data;
+    } else {
+        HeldClass* clsType = (HeldClass*)actualType;
+
+        ptrType = PointerTo::Make(clsType);
+        ptrValue = ((PyInstance*)(PyObject*)a1)->dataPtr();
+    }
 
     return PyInstance::extractPythonObject((instance_ptr)&ptrValue, ptrType);
 }
@@ -1313,20 +1328,34 @@ PyObject *refTo(PyObject* nullValue, PyObject* args) {
 
     Type* actualType = PyInstance::extractTypeFrom(a1->ob_type);
 
-    if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catClass) {
+    if (!actualType || (!actualType->isClass() && !actualType->isHeldClass() && !actualType->isRefTo())) {
         PyErr_Format(
             PyExc_TypeError,
-            "first argument to refTo '%S' must be a Class",
+            "first argument to refTo '%S' must be a Class, HeldClass, or existing RefTo",
             (PyObject*)a1
             );
         return NULL;
     }
 
-    Class* clsType = (Class*)actualType;
-    Class::layout* layout = clsType->instanceToLayout(((PyInstance*)(PyObject*)a1)->dataPtr());
+    RefTo* refType;
+    void* ptrValue;
 
-    RefTo* refType = RefTo::Make(clsType->getHeldClass());
-    void* ptrValue = layout->data;
+    if (actualType->isRefTo()) {
+        refType = (RefTo*)actualType;
+        ptrValue = *(void**)((PyInstance*)(PyObject*)a1)->dataPtr();
+    } else
+    if (actualType->isClass()) {
+        Class* clsType = (Class*)actualType;
+        Class::layout* layout = clsType->instanceToLayout(((PyInstance*)(PyObject*)a1)->dataPtr());
+
+        refType = RefTo::Make(clsType->getHeldClass());
+        ptrValue = layout->data;
+    } else {
+        HeldClass* clsType = (HeldClass*)actualType;
+
+        refType = clsType->getRefToType();
+        ptrValue = ((PyInstance*)(PyObject*)a1)->dataPtr();
+    }
 
     return PyInstance::extractPythonObject((instance_ptr)&ptrValue, refType);
 }

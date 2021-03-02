@@ -352,6 +352,9 @@ public:
             m_own_classMembers(classMembers),
             m_hasComparisonOperators(false),
             m_hasGetAttributeMagicMethod(false),
+            m_hasGetAttrMagicMethod(false),
+            m_hasSetAttrMagicMethod(false),
+            m_hasDelAttrMagicMethod(false),
             m_refToType(nullptr)
     {
         m_name = inName;
@@ -610,7 +613,7 @@ public:
         return t->is_default_constructible() && t->getTypeCategory() != TypeCategory::catClass;
     }
 
-    void constructor(instance_ptr self);
+    void constructor(instance_ptr self, bool allowEmpty=false);
 
     void destroy(instance_ptr self);
 
@@ -720,6 +723,18 @@ public:
         return m_hasGetAttributeMagicMethod;
     }
 
+    bool hasGetAttrMagicMethod() const {
+        return m_hasGetAttrMagicMethod;
+    }
+
+    bool hasSetAttrMagicMethod() const {
+        return m_hasSetAttrMagicMethod;
+    }
+
+    bool hasDelAttrMagicMethod() const {
+        return m_hasDelAttrMagicMethod;
+    }
+
     void initializeMRO() {
         // this is not how the MRO actually works, but we have yet to actually
         // code it correctly.
@@ -816,14 +831,36 @@ public:
     void updateBytesOfInitBits();
 
     void setMagicMethodExistConstants() {
-        if (m_memberFunctions.find("__eq__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-        if (m_memberFunctions.find("__ne__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-        if (m_memberFunctions.find("__lt__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-        if (m_memberFunctions.find("__gt__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-        if (m_memberFunctions.find("__le__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-        if (m_memberFunctions.find("__ge__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-
-        if (m_memberFunctions.find("__getattribute__") != m_memberFunctions.end()) { m_hasGetAttributeMagicMethod = true; }
+        if (m_memberFunctions.find("__eq__") != m_memberFunctions.end()) {
+            m_hasComparisonOperators = true;
+        }
+        if (m_memberFunctions.find("__ne__") != m_memberFunctions.end()) {
+            m_hasComparisonOperators = true;
+        }
+        if (m_memberFunctions.find("__lt__") != m_memberFunctions.end()) {
+            m_hasComparisonOperators = true;
+        }
+        if (m_memberFunctions.find("__gt__") != m_memberFunctions.end()) {
+            m_hasComparisonOperators = true;
+        }
+        if (m_memberFunctions.find("__le__") != m_memberFunctions.end()) {
+            m_hasComparisonOperators = true;
+        }
+        if (m_memberFunctions.find("__ge__") != m_memberFunctions.end()) {
+            m_hasComparisonOperators = true;
+        }
+        if (m_memberFunctions.find("__getattribute__") != m_memberFunctions.end()) {
+            m_hasGetAttributeMagicMethod = true;
+        }
+        if (m_memberFunctions.find("__delattr__") != m_memberFunctions.end()) {
+            m_hasDelAttrMagicMethod = true;
+        }
+        if (m_memberFunctions.find("__setattr__") != m_memberFunctions.end()) {
+            m_hasSetAttrMagicMethod = true;
+        }
+        if (m_memberFunctions.find("__getattr__") != m_memberFunctions.end()) {
+            m_hasGetAttrMagicMethod = true;
+        }
     }
 
     size_t allocateMethodDispatch(std::string funcName, function_call_signature_type signature) {
@@ -976,4 +1013,7 @@ private:
 
     bool m_hasComparisonOperators;
     bool m_hasGetAttributeMagicMethod;
+    bool m_hasGetAttrMagicMethod;
+    bool m_hasSetAttrMagicMethod;
+    bool m_hasDelAttrMagicMethod;
 };

@@ -464,8 +464,6 @@ class ListOfWrapper(TupleOrListOfWrapper):
         if item is None:
             return None
 
-        item = item.refToHeld()
-
         item = item.convert_to_type(self.underlyingWrapperType, ConversionLevel.ImplicitContainers)
 
         if item is None:

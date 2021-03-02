@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import UInt64, PointerTo, RefTo
+from typed_python import UInt64, PointerTo
 from typed_python.python_ast import BinaryOp, ComparisonOp, BooleanOp
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -122,24 +122,6 @@ class TypedExpression:
             typeWrapper(self.expr_type.typeRepresentation.ElementType),
             True
         )
-
-    def refToHeld(self):
-        if getattr(self.expr_type.typeRepresentation, "__typed_python_category__", None) == "RefTo":
-            return TypedExpression(
-                self.context,
-                self.nonref_expr,
-                self.expr_type.typeRepresentation.ElementType,
-                True
-            )
-
-        return self
-
-    def heldToRef(self):
-        if getattr(self.expr_type.typeRepresentation, "__typed_python_category__", None) == "HeldClass":
-            assert self.isReference
-            return self.changeType(RefTo(self.expr_type.typeRepresentation), isReferenceOverride=False)
-
-        return self
 
     def changeType(self, newType, isReferenceOverride=None):
         """Return a TypedExpression with the same native_ast content but a different type-wrapper."""

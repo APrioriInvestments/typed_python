@@ -212,7 +212,7 @@ void Class::constructor(instance_ptr self, bool allowEmpty) {
     l.refcount = 1;
     l.vtable = m_heldClass->getVTable();
 
-    m_heldClass->constructor(l.data);
+    m_heldClass->constructor(l.data, allowEmpty);
 }
 
 int64_t Class::refcount(instance_ptr self) {
