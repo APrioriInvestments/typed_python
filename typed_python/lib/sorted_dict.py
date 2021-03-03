@@ -47,26 +47,32 @@ def SortedDict(K, V, comparator=less):
             else:
                 return self.value
 
-        def set(self, k: K, v: V):
+        def set(self, k: K, v: V) -> bool:
             if comparator(k, self.key):
                 if self.left is None:
                     self.left = Node(key=k, value=v, count=1)
+                    self.count += 1
+                    return True
                 else:
-                    self.left.set(k, v)
-
-                self.count += 1
-                self.rebalance()
+                    if self.left.set(k, v):
+                        self.count += 1
+                        self.rebalance()
+                        return True
+                    return False
             elif comparator(self.key, k):
                 if self.right is None:
                     self.right = Node(key=k, value=v, count=1)
+                    self.count += 1
+                    return True
                 else:
-                    self.right.set(k, v)
-
-                self.count += 1
-                self.rebalance()
+                    if self.right.set(k, v):
+                        self.count += 1
+                        self.rebalance()
+                        return True
+                    return False
             else:
                 self.value = v
-                return
+                return False
 
         def first(self) -> K:
             if self.left is not None:
@@ -322,6 +328,16 @@ def SortedDict(K, V, comparator=less):
             return self._root.last()
 
         @Entrypoint
+        def get(self, k: K) -> V:
+            return self[k]
+
+        @Entrypoint
+        def get(self, k: K, v: V) -> V:  # noqa
+            if k in self:
+                return self[k]
+            return v
+
+        @Entrypoint
         def setdefault(self, k: K) -> V:
             if k not in self:
                 self[k] = V()
@@ -331,7 +347,6 @@ def SortedDict(K, V, comparator=less):
         def setdefault(self, k: K, v: V) -> V:  # noqa
             if k not in self:
                 self[k] = v
-            print(self)
             return self[k]
 
         @Entrypoint

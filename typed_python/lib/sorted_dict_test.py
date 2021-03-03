@@ -64,6 +64,14 @@ def test_sorted_dict_insert():
     d._checkInvariants()
 
 
+def test_sorted_dict_size_on_repeat_set():
+    d = SortedDict(int, int)()
+    for i in range(10):
+        for j in range(10):
+            d[j] = 10
+    assert len(d) == 10
+
+
 def test_sorted_dict_invariants():
     numpy.random.seed(42)
 
