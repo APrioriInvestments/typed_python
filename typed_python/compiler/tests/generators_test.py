@@ -650,6 +650,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         print(list(c))
 
+    @flaky(max_runs=3, min_passes=1)
     def test_can_iterate_class_perf(self):
         class C(Class, Final):
             x = Member(int)
