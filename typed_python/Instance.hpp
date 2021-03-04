@@ -33,10 +33,6 @@ private:
 
     Instance(layout* l);
 
-    static layout* allocateNoneLayout();
-
-    static layout* noneLayout();
-
 public:
     static Instance create(bool val);
 
@@ -63,6 +59,11 @@ public:
 
     template<class initializer_type>
     Instance(Type* t, const initializer_type& initFun) : mLayout(nullptr) {
+        if (t->isNone()) {
+            initFun((instance_ptr)this);
+            return;
+        }
+
         t->assertForwardsResolvedSufficientlyToInstantiate();
 
         layout* l = (layout*)tp_malloc(sizeof(layout) + t->bytecount());
@@ -91,7 +92,9 @@ public:
     typed_python_hash_type hash() const;
 
     Type* type() const {
-        return mLayout->type;
+        static Type* noneType = NoneType::Make();
+
+        return mLayout ? mLayout->type : noneType;
     }
 
     template<class T>
@@ -100,13 +103,22 @@ public:
     }
 
     instance_ptr data() const {
-        return mLayout->data;
+        if (mLayout) {
+            return mLayout->data;
+        }
+
+        return (instance_ptr)this;
     }
 
     int64_t refcount() const {
+        if (!mLayout) {
+            return 1000000000;
+        }
+
         return mLayout->refcount;
     }
 
 private:
+    // if the nullptr, then this is the None object.
     layout* mLayout;
 };

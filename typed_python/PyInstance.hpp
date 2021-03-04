@@ -68,12 +68,20 @@ class PyInstance {
 public:
     PyObject_HEAD
 
-    bool mIsInitialized;
     char mIteratorFlag; //0 is keys, 1 is values, 2 is pairs
     int64_t mIteratorOffset; //-1 if we're not an iterator
     int64_t mContainerSize; //-1 if we're not an iterator
 
     Instance mContainingInstance;
+
+    // initialize our fields after we have called 'tp_alloc'
+    void initializeEmpty() {
+        mIteratorFlag = -1;
+        mIteratorOffset = -1;
+        mContainerSize = -1;
+
+        new (&mContainingInstance) Instance();
+    }
 
     template<class T>
     static auto specialize(PyObject* obj, const T& f, Type* typeOverride = nullptr) {
@@ -298,7 +306,7 @@ public:
         PyInstance* self =
             (PyInstance*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
 
-        self->mIteratorOffset = -1;
+        self->initializeEmpty();
 
         try {
             self->initialize(f, eltType);
@@ -315,9 +323,7 @@ public:
         Type* type = typeIfKnown ? typeIfKnown : extractTypeFrom(((PyObject*)this)->ob_type);
         type->assertForwardsResolvedSufficientlyToInstantiate();
 
-        mIsInitialized = false;
-        new (&mContainingInstance) Instance( type, i );
-        mIsInitialized = true;
+        mContainingInstance = Instance(type, i);
     }
 
     static PyObject* fromInstance(const Instance& instance) {

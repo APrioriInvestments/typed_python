@@ -17,21 +17,6 @@
 #include "AllTypes.hpp"
 #include "Instance.hpp"
 
-Instance::layout* Instance::allocateNoneLayout() {
-    layout* result = (layout*)tp_malloc(sizeof(layout));
-    result->refcount = 0;
-    result->type = NoneType::Make();
-
-    return result;
-}
-
-Instance::layout* Instance::noneLayout() {
-    static layout* noneLayout = allocateNoneLayout();
-    noneLayout->refcount++;
-
-    return noneLayout;
-}
-
 Instance Instance::create(bool val) {
     return create(Bool::Make(), (instance_ptr)&val);
 }
@@ -65,15 +50,20 @@ Instance Instance::create(Type*t) {
 
 Instance::Instance() {
     // by default, None
-    mLayout = noneLayout();
-    mLayout->refcount++;
+    mLayout = nullptr;
 }
 
 Instance::Instance(const Instance& other) : mLayout(other.mLayout) {
-    mLayout->refcount++;
+    if (mLayout) {
+        mLayout->refcount++;
+    }
 }
 
 Instance::Instance(instance_ptr p, Type* t) : mLayout(nullptr) {
+    if (t->isNone()) {
+        return;
+    }
+
     t->assertForwardsResolvedSufficientlyToInstantiate();
 
     layout* l = (layout*)tp_malloc(sizeof(layout) + t->bytecount());
@@ -92,16 +82,18 @@ Instance::Instance(instance_ptr p, Type* t) : mLayout(nullptr) {
 }
 
 Instance::~Instance() {
-    if (mLayout->refcount.fetch_sub(1) == 1) {
+    if (mLayout && mLayout->refcount.fetch_sub(1) == 1) {
         mLayout->type->destroy(mLayout->data);
         tp_free(mLayout);
     }
 }
 
 Instance& Instance::operator=(const Instance& other) {
-    other.mLayout->refcount++;
+    if (other.mLayout) {
+        other.mLayout->refcount++;
+    }
 
-    if (mLayout->refcount.fetch_sub(1) == 1) {
+    if (mLayout && mLayout->refcount.fetch_sub(1) == 1) {
         mLayout->type->destroy(mLayout->data);
         tp_free(mLayout);
     }
@@ -111,6 +103,15 @@ Instance& Instance::operator=(const Instance& other) {
 }
 
 bool Instance::operator<(const Instance& other) const {
+    if (!mLayout && !other.mLayout) {
+        return false;
+    }
+    if (!mLayout) {
+        return true;
+    }
+    if (!other.mLayout) {
+        return false;
+    }
     if (mLayout->type < other.mLayout->type) {
         return true;
     }
@@ -121,6 +122,10 @@ bool Instance::operator<(const Instance& other) const {
 }
 
 std::string Instance::repr() const {
+    if (!mLayout) {
+        return "None";
+    }
+
     std::ostringstream s;
     ReprAccumulator accumulator(s);
 
@@ -130,5 +135,9 @@ std::string Instance::repr() const {
 }
 
 typed_python_hash_type Instance::hash() const {
+    if (!mLayout) {
+        return 0;
+    }
+
     return mLayout->type->hash(mLayout->data);
 }

@@ -101,9 +101,7 @@ PyMethodDef* PyInstance::typeMethodsConcrete(Type* t) {
 void PyInstance::tp_dealloc(PyObject* self) {
     PyInstance* wrapper = (PyInstance*)self;
 
-    if (wrapper->mIsInitialized) {
-        wrapper->mContainingInstance.~Instance();
-    }
+    wrapper->mContainingInstance.~Instance();
 
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
@@ -355,7 +353,7 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
             PyInstance* self = (PyInstance*)subtype->tp_alloc(subtype, 0);
 
             try {
-                self->mIteratorOffset = -1;
+                self->initializeEmpty();
 
                 self->initialize([&](instance_ptr data) {
                     constructFromPythonArguments(data, eltType, args, kwds);
