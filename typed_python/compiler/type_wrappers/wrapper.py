@@ -141,6 +141,9 @@ class Wrapper:
         else:
             return self.getNativeLayoutType()
 
+    def getNativeLayoutType(self):
+        raise NotImplementedError(self)
+
     def getBytecount(self):
         if self.is_empty:
             return 0

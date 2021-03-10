@@ -2696,3 +2696,13 @@ class TypesSerializationTest(unittest.TestCase):
         assert C2.ClassMembers['x2'].defaultValue == "10"
         assert C2.ClassMembers['x3'].defaultValue == 2.5
         assert C2.ClassMembers['x4'].defaultValue is None
+
+    def test_serialize_unresolved_forward(self):
+        F = Forward("Hi")
+        T = NamedTuple(x=F)
+
+        s = SerializationContext()
+
+        T2 = s.deserialize(s.serialize(T))
+
+        assert T2.ElementTypes[0].__typed_python_category__ == "Forward"

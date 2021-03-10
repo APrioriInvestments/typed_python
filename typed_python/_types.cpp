@@ -2283,6 +2283,26 @@ PyObject *deserializeStream(PyObject* nullValue, PyObject* args) {
     }
 }
 
+PyObject *allForwardTypesResolved(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "allForwardTypesResolved takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t) {
+        PyErr_SetString(
+            PyExc_TypeError,
+            "first argument to 'allForwardTypesResolved' must be a type object"
+        );
+        return NULL;
+    }
+
+    return incref(t->resolved() ? Py_True : Py_False);
+}
+
 PyObject *isSimple(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "isSimple takes 1 positional argument");
@@ -2966,6 +2986,7 @@ static PyMethodDef module_methods[] = {
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
+    {"allForwardTypesResolved", (PyCFunction)allForwardTypesResolved, METH_VARARGS, NULL},
     {"recursiveTypeGroup", (PyCFunction)recursiveTypeGroup, METH_VARARGS, NULL},
     {"recursiveTypeGroupDeepRepr", (PyCFunction)recursiveTypeGroupDeepRepr, METH_VARARGS, NULL},
     {"recursiveTypeGroupHash", (PyCFunction)recursiveTypeGroupHash, METH_VARARGS, NULL},

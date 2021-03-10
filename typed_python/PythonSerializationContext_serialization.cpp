@@ -623,8 +623,6 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                             // so we just want to serialize the type of the inner
                             // which should be another MRTG reference
                             serializeNativeType(f->getTarget(), b, index);
-                        } else {
-                            throw std::runtime_error("Can't serialize empty forward " + f->name());
                         }
                     } else {
                         serializeNativeTypeInner(toSerialize, b, index);

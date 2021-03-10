@@ -25,6 +25,7 @@ from typed_python.compiler.type_wrappers.method_descriptor_wrapper import Method
 from typed_python.compiler.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 from typed_python.compiler.type_wrappers.module_wrapper import ModuleWrapper
 from typed_python.compiler.type_wrappers.typed_cell_wrapper import TypedCellWrapper
+from typed_python.compiler.type_wrappers.unresolved_forward_type_wrapper import UnresolvedForwardTypeWrapper
 from typed_python.compiler.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
 from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
@@ -67,7 +68,9 @@ from typed_python.compiler.type_wrappers.abs_wrapper import AbsWrapper
 from typed_python.compiler.type_wrappers.min_max_wrapper import MinWrapper, MaxWrapper
 from typed_python.compiler.type_wrappers.repr_wrapper import ReprWrapper
 from types import ModuleType
-from typed_python._types import TypeFor, bytecount, prepareArgumentToBePassedToCompiler
+from typed_python._types import (
+    TypeFor, bytecount, prepareArgumentToBePassedToCompiler, allForwardTypesResolved
+)
 from typed_python import (
     Type, Int32, Int16, Int8, UInt64, UInt32, UInt16,
     UInt8, Float32, makeNamedTuple,
@@ -138,6 +141,9 @@ def _typedPythonTypeToTypeWrapper(t):
         t = TypeFor(t)
 
     assert isinstance(t, type), t
+
+    if not allForwardTypesResolved(t):
+        return UnresolvedForwardTypeWrapper(t)
 
     if not hasattr(t, '__typed_python_category__'):
         # this is will be a PythonObjectOfType, but we never actually return such an object

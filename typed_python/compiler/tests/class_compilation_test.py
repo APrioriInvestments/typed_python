@@ -34,7 +34,8 @@ from typed_python import (
     Function,
     Value,
     pointerTo,
-    refTo
+    refTo,
+    Forward
 )
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime, CountCompilationsVisitor
@@ -2402,3 +2403,31 @@ class TestClassCompilationCompilation(unittest.TestCase):
         # I get 0.002 on my machine. This should be very fast
         # because either the compiler can figure it out
         assert time.time() - t0 < 0.01
+
+    def test_unresolved_forwards_in_class_type_signatures(self):
+        UnresolvedForward = Forward("UnresolvedForward")
+
+        class AClass(Class, Final):
+            def f(self, other: UnresolvedForward):
+                return "BAD"
+
+        @Entrypoint
+        def tryToCallF():
+            return AClass().f(10)
+
+        with self.assertRaisesRegex(TypeError, "unresolved forwards"):
+            tryToCallF()
+
+    def test_unresolved_forwards_in_function_type_signatures(self):
+        UnresolvedForward = Forward("UnresolvedForward")
+
+        @Function
+        def f(x: UnresolvedForward):
+            return "OK"
+
+        @Entrypoint
+        def tryToCallF():
+            f(10)
+
+        with self.assertRaisesRegex(TypeError, "has unresolved forwards"):
+            tryToCallF()
