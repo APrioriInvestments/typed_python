@@ -186,8 +186,7 @@ public:
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab
+        DeepcopyContext& context
     ) {
         if (m_all_alternatives_empty) {
             return;
@@ -198,10 +197,10 @@ public:
 
         size_t typeIx = srcRecordPtr->which;
 
-        auto it = alreadyAllocated.find((instance_ptr)srcRecordPtr);
+        auto it = context.alreadyAllocated.find((instance_ptr)srcRecordPtr);
 
-        if (it == alreadyAllocated.end()) {
-            destRecordPtr = (layout*)slab->allocate(
+        if (it == context.alreadyAllocated.end()) {
+            destRecordPtr = (layout*)context.slab->allocate(
                 sizeof(layout) + m_subtypes[typeIx].second->bytecount(),
                 this
             );
@@ -211,11 +210,10 @@ public:
             m_subtypes[typeIx].second->deepcopy(
                 destRecordPtr->data,
                 srcRecordPtr->data,
-                alreadyAllocated,
-                slab
+                context
             );
 
-            alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
+            context.alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
         } else {
             destRecordPtr = (layout_ptr)it->second;
         }

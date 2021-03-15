@@ -411,13 +411,12 @@ class hash_table_layout {
     }
 
     hash_table_layout* deepcopy(
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab,
+        DeepcopyContext& context,
         Type* dictOrSetType,
         Type* keyType,
         Type* valueType
     ) {
-        hash_table_layout* dest = (hash_table_layout*)slab->allocate(sizeof(hash_table_layout), dictOrSetType);
+        hash_table_layout* dest = (hash_table_layout*)context.slab->allocate(sizeof(hash_table_layout), dictOrSetType);
 
         new (dest) hash_table_layout();
 
@@ -425,7 +424,7 @@ class hash_table_layout {
 
         int bytesPerKVPair = keyType->bytecount() + (valueType ? valueType->bytecount() : 0);
 
-        dest->items = (uint8_t*)slab->allocate(
+        dest->items = (uint8_t*)context.slab->allocate(
             bytesPerKVPair * this->items_reserved,
             nullptr
         );
@@ -442,22 +441,20 @@ class hash_table_layout {
                     keyType->deepcopy(
                         dest->items + bytesPerKVPair * k,
                         this->items + bytesPerKVPair * k,
-                        alreadyAllocated,
-                        slab
+                        context
                     );
                     if (valueType) {
                         valueType->deepcopy(
                             dest->items + bytesPerKVPair * k + keyType->bytecount(),
                             this->items + bytesPerKVPair * k + keyType->bytecount(),
-                            alreadyAllocated,
-                            slab
+                            context
                         );
                     }
                 };
             }
         }
 
-        dest->items_populated = (uint8_t*)slab->allocate(
+        dest->items_populated = (uint8_t*)context.slab->allocate(
             this->items_reserved,
             nullptr
         );
@@ -475,14 +472,14 @@ class hash_table_layout {
         dest->hash_table_size = this->hash_table_size;
         dest->hash_table_empty_slots = this->hash_table_empty_slots;
 
-        dest->hash_table_slots = (int32_t*)slab->allocate(sizeof(int32_t) * this->hash_table_size, nullptr);
+        dest->hash_table_slots = (int32_t*)context.slab->allocate(sizeof(int32_t) * this->hash_table_size, nullptr);
         memcpy(
             dest->hash_table_slots,
             this->hash_table_slots,
             sizeof(int32_t) * this->hash_table_size
         );
 
-        dest->hash_table_hashes = (typed_python_hash_type*)slab->allocate(
+        dest->hash_table_hashes = (typed_python_hash_type*)context.slab->allocate(
             sizeof(typed_python_hash_type) * this->hash_table_size,
             nullptr
         );

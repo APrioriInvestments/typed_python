@@ -53,8 +53,7 @@ public:
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab
+        DeepcopyContext& context
     ) {
         layout_ptr& destLayout = *(layout**)dest;
         layout_ptr& srcLayout = *(layout**)src;
@@ -65,7 +64,7 @@ public:
         }
 
         if (srcLayout->refcount == 1) {
-            destLayout = (layout_ptr)slab->allocate(sizeof(layout) + srcLayout->bytecount, this);
+            destLayout = (layout_ptr)context.slab->allocate(sizeof(layout) + srcLayout->bytecount, this);
             destLayout->refcount = 1;
             destLayout->hash_cache = srcLayout->hash_cache;
             destLayout->bytecount = srcLayout->bytecount;
@@ -73,15 +72,15 @@ public:
             return;
         }
 
-        auto it = alreadyAllocated.find((instance_ptr)srcLayout);
-        if (it == alreadyAllocated.end()) {
-            destLayout = (layout_ptr)slab->allocate(sizeof(layout) + srcLayout->bytecount, this);
+        auto it = context.alreadyAllocated.find((instance_ptr)srcLayout);
+        if (it == context.alreadyAllocated.end()) {
+            destLayout = (layout_ptr)context.slab->allocate(sizeof(layout) + srcLayout->bytecount, this);
             destLayout->refcount = 0;
             destLayout->hash_cache = srcLayout->hash_cache;
             destLayout->bytecount = srcLayout->bytecount;
             memcpy(destLayout->data, srcLayout->data, srcLayout->bytecount);
 
-            alreadyAllocated[(instance_ptr)srcLayout] = (instance_ptr)destLayout;
+            context.alreadyAllocated[(instance_ptr)srcLayout] = (instance_ptr)destLayout;
         } else {
             destLayout = (layout_ptr)it->second;
         }

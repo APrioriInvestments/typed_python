@@ -381,9 +381,9 @@ public:
     static bool pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, ConversionLevel level);
 
     /**
-     construct an 'eltType' from a python object at 'tgt'. If 'isExplicit' then we're invoked from an explicit
-     copy constructor, so more liberal conversion is allowed than if 'isExplicit' is false, which happens
-     when we're attempting to convert for purposes of method dispatch.
+     construct an 'eltType' from a python object at 'tgt'. ConversionLevel determines what
+     level of type conversion we're willing to tolerate. If we can't do the conversion, we'll
+     throw an exception.
      */
     static void copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level);
 

@@ -131,8 +131,7 @@ public:
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab
+        DeepcopyContext& context
     ) {
         layout_ptr& destRecordPtr = *(layout**)dest;
         layout_ptr& srcRecordPtr = *(layout**)src;
@@ -150,7 +149,7 @@ public:
                 bytecount = sizeof(layout) + srcRecordPtr->count * m_bytes_per_key_value_pair;
             }
 
-            destRecordPtr = (layout_ptr)slab->allocate(bytecount, this);
+            destRecordPtr = (layout_ptr)context.slab->allocate(bytecount, this);
 
             destRecordPtr->count = srcRecordPtr->count;
             destRecordPtr->subpointers = srcRecordPtr->subpointers;
@@ -162,14 +161,12 @@ public:
                     m_key->deepcopy(
                         kdPairPtrKey(dest, k),
                         kdPairPtrKey(src, k),
-                        alreadyAllocated,
-                        slab
+                        context
                     );
                     this->deepcopy(
                         kdPairPtrDict(dest, k),
                         kdPairPtrDict(src, k),
-                        alreadyAllocated,
-                        slab
+                        context
                     );
                 }
             } else {
@@ -177,14 +174,12 @@ public:
                     m_key->deepcopy(
                         kvPairPtrKey(dest, k),
                         kvPairPtrKey(src, k),
-                        alreadyAllocated,
-                        slab
+                        context
                     );
                     m_value->deepcopy(
                         kvPairPtrValue(dest, k),
                         kvPairPtrValue(src, k),
-                        alreadyAllocated,
-                        slab
+                        context
                     );
                 }
             }
@@ -193,10 +188,10 @@ public:
         if (srcRecordPtr->refcount == 1) {
             doDeepcopy();
         } else {
-            auto it = alreadyAllocated.find((instance_ptr)srcRecordPtr);
-            if (it == alreadyAllocated.end()) {
+            auto it = context.alreadyAllocated.find((instance_ptr)srcRecordPtr);
+            if (it == context.alreadyAllocated.end()) {
                 doDeepcopy();
-                alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
+                context.alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
             } else {
                 destRecordPtr = (layout_ptr)it->second;
             }

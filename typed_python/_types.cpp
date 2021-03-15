@@ -1491,38 +1491,68 @@ PyObject* totalBytesAllocatedOnFreeStore(PyObject* nullValue, PyObject* args) {
 }
 
 PyDoc_STRVAR(deepcopy_doc,
-    "deepcopy(o)\n\n"
+    "deepcopy(o, typeMap=None)\n\n"
     "Make a 'deep copy' of the object graph starting at 'o'. The deepcopier\n"
     "looks inside of standard python objects with '__dict__', tuples, sets,\n"
     "dicts, lists, and typed_python instances.  It shallow copies functions,\n"
-    "types, modules, and anything without a standard __dict__."
+    "types, modules, and anything without a standard __dict__.\n\n"
+    "If 'typeMap' is provided, it must be a dict from Type to callable.  Any\n"
+    "instance of a type in the map will be passed through the callable instead\n"
+    "of being deepcopied.  It must preserve the type if the object is used\n"
+    "in a typed context.\n"
 );
 
-PyObject* deepcopy(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "deepcopy takes 1 argument");
+PyObject* deepcopy(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {"arg", "typeMap", NULL};
+
+    PyObject* arg;
+    PyObject* typeMap = nullptr;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", (char**)kwlist, &arg, &typeMap)) {
         return NULL;
     }
 
-    PyObject* arg = PyTuple_GetItem(args, 0);
+    DeepcopyContext context(new Slab(true, 0));
 
-    // this is the 'free store' slab
-    Slab* slab = new Slab(true, 0);
+    return translateExceptionToPyObject([&]() {
+        if (typeMap) {
+            if (!PyDict_Check(typeMap)) {
+                PyErr_SetString(
+                    PyExc_TypeError,
+                    "deepcopy typeMap argument must be a dict"
+                );
+                return (PyObject*)nullptr;
+            }
 
-    std::unordered_map<instance_ptr, instance_ptr> alreadyCopied;
 
-    try {
-        PyObject* res = PythonObjectOfType::deepcopyPyObject(arg, alreadyCopied, slab);
-        slab->decref();
-        return res;
-    } catch(PythonExceptionSet& e) {
-        slab->decref();
-        return NULL;
-    } catch(std::exception& e) {
-        slab->decref();
-        PyErr_SetString(PyExc_TypeError, e.what());
-        return NULL;
-    }
+            iterate(typeMap, [&](PyObject* type) {
+                if (!PyType_Check(type)) {
+                    throw std::runtime_error(
+                        "deepcopy typeMap argument must contain types as keys"
+                    );
+                }
+
+                Type* tpType = PyInstance::tryUnwrapPyInstanceToType(type);
+
+                if (tpType) {
+                    context.tpTypeMap[tpType] = PyDict_GetItem(typeMap, type);
+                }
+
+                context.pyTypeMap[type] = PyDict_GetItem(typeMap, type);
+            });
+        }
+
+        try {
+            PyObject* res = PythonObjectOfType::deepcopyPyObject(arg, context);
+
+            context.slab->decref();
+
+            return res;
+        } catch(...) {
+            context.slab->decref();
+            throw;
+        }
+    });
 }
 
 PyDoc_STRVAR(deepcopyContiguous_doc,
@@ -1564,10 +1594,10 @@ PyObject* deepcopyContiguous(PyObject* nullValue, PyObject* args, PyObject* kwar
         slab->enableTrackAllocTypes();
     }
 
-    std::unordered_map<instance_ptr, instance_ptr> alreadyCopied;
+    DeepcopyContext context(slab);
 
     try {
-        PyObject* res = PythonObjectOfType::deepcopyPyObject(arg, alreadyCopied, slab);
+        PyObject* res = PythonObjectOfType::deepcopyPyObject(arg, context);
         slab->decref();
         return res;
     } catch(PythonExceptionSet& e) {
@@ -2968,7 +2998,7 @@ static PyMethodDef module_methods[] = {
     {"getAllSlabs", (PyCFunction)getAllSlabs, METH_VARARGS, getAllSlabs_doc},
     {"totalBytesAllocatedOnFreeStore", (PyCFunction)totalBytesAllocatedOnFreeStore, METH_VARARGS, totalBytesAllocatedOnFreeStore_doc},
     {"totalBytesAllocatedInSlabs", (PyCFunction)totalBytesAllocatedInSlabs, METH_VARARGS, totalBytesAllocatedInSlabs_doc},
-    {"deepcopy", (PyCFunction)deepcopy, METH_VARARGS, deepcopy_doc},
+    {"deepcopy", (PyCFunction)deepcopy, METH_VARARGS | METH_KEYWORDS, deepcopy_doc},
     {"deepcopyContiguous", (PyCFunction)deepcopyContiguous, METH_VARARGS | METH_KEYWORDS, deepcopyContiguous_doc},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},

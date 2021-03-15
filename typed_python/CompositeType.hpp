@@ -86,15 +86,13 @@ public:
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab
+        DeepcopyContext& context
     ) {
         for (long k = (long)m_types.size() - 1; k >= 0; k--) {
             m_types[k]->deepcopy(
                 dest + m_byte_offsets[k],
                 src + m_byte_offsets[k],
-                alreadyAllocated,
-                slab
+                context
             );
         }
     }

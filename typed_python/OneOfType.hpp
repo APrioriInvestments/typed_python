@@ -80,11 +80,10 @@ public:
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab
+        DeepcopyContext& context
     ) {
         uint8_t which = *(uint8_t*)dest = *(uint8_t*)src;
-        m_types[which]->deepcopy(dest+1, src+1, alreadyAllocated, slab);
+        m_types[which]->deepcopy(dest+1, src+1, context);
     }
 
     size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {

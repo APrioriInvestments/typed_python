@@ -88,26 +88,24 @@ class SetType : public Type {
 void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab
+        DeepcopyContext& context
     ) {
         hash_table_layout_ptr& destRecordPtr = *(hash_table_layout**)dest;
         hash_table_layout_ptr& srcRecordPtr = *(hash_table_layout**)src;
 
-        auto it = alreadyAllocated.find((instance_ptr)srcRecordPtr);
+        auto it = context.alreadyAllocated.find((instance_ptr)srcRecordPtr);
 
-        if (it == alreadyAllocated.end()) {
+        if (it == context.alreadyAllocated.end()) {
             destRecordPtr = srcRecordPtr->deepcopy(
-                alreadyAllocated,
-                slab,
+                context,
                 this,
                 m_key_type,
                 nullptr
             );
 
-            alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
+            context.alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
         } else {
-            destRecordPtr = (hash_table_layout_ptr)alreadyAllocated[(instance_ptr)srcRecordPtr];
+            destRecordPtr = (hash_table_layout_ptr)context.alreadyAllocated[(instance_ptr)srcRecordPtr];
             destRecordPtr->refcount++;
         }
     }

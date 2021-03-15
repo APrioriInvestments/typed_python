@@ -529,16 +529,14 @@ public:
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab
+        DeepcopyContext& context
     ) {
         for (int64_t k = 0; k < m_members.size(); k++) {
             if (checkInitializationFlag(src, k)) {
                 m_members[k].getType()->deepcopy(
                     eltPtr(dest, k),
                     eltPtr(src, k),
-                    alreadyAllocated,
-                    slab
+                    context
                 );
                 setInitializationFlag(dest, k);
             }

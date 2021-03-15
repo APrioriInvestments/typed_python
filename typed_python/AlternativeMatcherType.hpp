@@ -99,10 +99,9 @@ public:
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab
+        DeepcopyContext& context
     ) {
-        m_alternative->deepcopy(dest, src, alreadyAllocated, slab);
+        m_alternative->deepcopy(dest, src, context);
     }
 
     template<class buf_t>

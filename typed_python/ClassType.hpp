@@ -193,21 +193,20 @@ public:
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab
+        DeepcopyContext& context
     ) {
         //layout_ptr& destRecordPtr = *(layout**)dest;
         layout_ptr srcRecordPtr = instanceToLayout(src);
 
-        auto it = alreadyAllocated.find((instance_ptr)srcRecordPtr);
+        auto it = context.alreadyAllocated.find((instance_ptr)srcRecordPtr);
 
-        if (it == alreadyAllocated.end()) {
+        if (it == context.alreadyAllocated.end()) {
             // we could have a pointer to a subclass of 'this', in which case
             // the layout could be larger and have more fields than
             // mHeldClass would indicate.
             HeldClass* actualHeldClassType = srcRecordPtr->vtable->mType;
 
-            layout_ptr destRecordPtr = (layout_ptr)slab->allocate(
+            layout_ptr destRecordPtr = (layout_ptr)context.slab->allocate(
                 sizeof(layout) + actualHeldClassType->bytecount(),
                 this
             );
@@ -218,18 +217,17 @@ public:
             actualHeldClassType->deepcopy(
                 destRecordPtr->data,
                 srcRecordPtr->data,
-                alreadyAllocated,
-                slab
+                context
             );
 
-            alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
+            context.alreadyAllocated[(instance_ptr)srcRecordPtr] = (instance_ptr)destRecordPtr;
         }
 
-        ((layout_ptr)alreadyAllocated[(instance_ptr)srcRecordPtr])->refcount++;
+        ((layout_ptr)context.alreadyAllocated[(instance_ptr)srcRecordPtr])->refcount++;
 
         initializeInstance(
             dest,
-            (layout_ptr)alreadyAllocated[(instance_ptr)srcRecordPtr],
+            (layout_ptr)context.alreadyAllocated[(instance_ptr)srcRecordPtr],
             instanceToDispatchTableIndex(src)
         );
     }

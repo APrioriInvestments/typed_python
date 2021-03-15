@@ -143,6 +143,49 @@ void Type::constructor(instance_ptr self) {
     this->check([&](auto& subtype) { subtype.constructor(self); } );
 }
 
+
+// deepcopy 'src' into a Slab at 'dest'. Memory must be allocated with 'alloc'
+// and any refcounts must be explicitly noted with 'markRefcount'
+void Type::deepcopy(
+    instance_ptr dest,
+    instance_ptr src,
+    DeepcopyContext& context
+) {
+    if (context.tpTypeMap.size()) {
+        auto it = context.tpTypeMap.find(this);
+        if (it != context.tpTypeMap.end()) {
+            PyEnsureGilAcquired getTheGil;
+
+            PyObjectStealer asPyObj(PyInstance::extractPythonObject(src, this));
+
+            PyObjectStealer result(
+                PyObject_CallFunction(
+                    it->second,
+                    "O",
+                    (PyObject*)asPyObj
+                )
+            );
+
+            if (!result) {
+                throw PythonExceptionSet();
+            }
+
+            PyInstance::copyConstructFromPythonInstance(
+                this,
+                dest,
+                result,
+                ConversionLevel::Signature
+            );
+
+            return;
+        }
+    }
+
+    this->check([&](auto& subtype) {
+        subtype.deepcopyConcrete(dest, src, context);
+    });
+}
+
 void Type::destroy(instance_ptr self) {
     this->check([&](auto& subtype) { subtype.destroy(self); } );
 }

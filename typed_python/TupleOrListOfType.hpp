@@ -75,8 +75,7 @@ public:
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab
+        DeepcopyContext& context
     ) {
         layout_ptr& destLayout = *(layout**)dest;
         layout_ptr& srcLayout = *(layout**)src;
@@ -86,15 +85,15 @@ public:
             return;
         }
 
-        auto it = alreadyAllocated.find((instance_ptr)srcLayout);
-        if (it == alreadyAllocated.end()) {
-            destLayout = (layout_ptr)slab->allocate(sizeof(layout), this);
+        auto it = context.alreadyAllocated.find((instance_ptr)srcLayout);
+        if (it == context.alreadyAllocated.end()) {
+            destLayout = (layout_ptr)context.slab->allocate(sizeof(layout), this);
             destLayout->hash_cache = srcLayout->hash_cache;
             destLayout->refcount = 0;
             destLayout->reserved = srcLayout->count;
             destLayout->count = srcLayout->count;
 
-            destLayout->data = (instance_ptr)slab->allocate(getEltType()->bytecount() * srcLayout->count, nullptr);
+            destLayout->data = (instance_ptr)context.slab->allocate(getEltType()->bytecount() * srcLayout->count, nullptr);
 
             if (destLayout->count) {
                 if (getEltType()->isPOD()) {
@@ -104,14 +103,13 @@ public:
                         m_element_type->deepcopy(
                             destLayout->data + k * m_element_type->bytecount(),
                             srcLayout->data + k * m_element_type->bytecount(),
-                            alreadyAllocated,
-                            slab
+                            context
                         );
                     }
                 }
             }
 
-            alreadyAllocated[(instance_ptr)srcLayout] = (instance_ptr)destLayout;
+            context.alreadyAllocated[(instance_ptr)srcLayout] = (instance_ptr)destLayout;
         } else {
             destLayout = (layout_ptr)it->second;
         }

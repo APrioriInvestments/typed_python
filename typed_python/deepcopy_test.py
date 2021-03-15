@@ -401,3 +401,43 @@ def test_deepcopy_perf():
     print("serialization", t3 - t2)
     print("deepcopy", t2 - t1)
     print("deepcopyContiguous", t1 - t0)
+
+
+def test_deepcopy_typeMap():
+    aTup = ([1], [2])
+
+    def mapper(aLst):
+        return aLst + aLst
+
+    res = deepcopy(aTup, typeMap={list: mapper})
+
+    assert res[0] == [1, 1]
+    assert res[1] == [2, 2]
+
+
+def test_deepcopy_typeMap_typed():
+    class C(Class):
+        x = Member(int)
+
+    def mapper(i):
+        return i + 1
+
+    res = deepcopy(C(x=10), typeMap={int: mapper})
+
+    assert res.x == 11
+
+
+def test_deepcopy_typeMap_baseclass():
+    class C(object):
+        def __init__(self, x):
+            self.x = x
+
+    class D(C):
+        pass
+
+    def mapper(c):
+        return type(c)(x=c.x + 1)
+
+    res = deepcopy(D(x=10), typeMap={C: mapper})
+
+    assert res.x == 11

@@ -38,6 +38,7 @@
 #include "util.hpp"
 #include "MutuallyRecursiveTypeGroup.hpp"
 #include "Slab.hpp"
+#include "DeepcopyContext.hpp"
 
 class SerializationBuffer;
 class DeserializationBuffer;
@@ -332,19 +333,13 @@ public:
     void deepcopy(
         instance_ptr dest,
         instance_ptr src,
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab
-    ) {
-        this->check([&](auto& subtype) {
-            subtype.deepcopyConcrete(dest, src, alreadyAllocated, slab);
-        });
-    }
+        DeepcopyContext& context
+    );
 
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
-        std::unordered_map<instance_ptr, instance_ptr>& alreadyAllocated,
-        Slab* slab
+        DeepcopyContext& context
     ) {
         throw std::runtime_error(
             "deepcopyConcrete not implemented for " + name() +
