@@ -411,9 +411,10 @@ class OneOfWrapper(Wrapper):
 
     def convert_to_type_as_expression(self, context, expr, targetType, level, mayThrowOnFailure, assumeSuccessful):
         if assumeSuccessful and level == ConversionLevel.Signature:
-            for ix in range(len(self.typeRepresentation.Types)):
-                if typeWrapper(self.typeRepresentation.Types[ix]) == targetType:
-                    return self.refAs(context, expr, ix), context.constant(True)
+            ix = self.unambiguousTypeIndexFor(targetType)
+
+            if ix is not None:
+                return self.refAs(context, expr, ix), context.constant(True)
 
     def convert_to_type_with_target(self, context, expr, targetVal, conversionLevel, mayThrowOnFailure=False):
         isInitialized = context.push(bool, lambda tgt: tgt.expr.store(native_ast.const_bool_expr(False)))

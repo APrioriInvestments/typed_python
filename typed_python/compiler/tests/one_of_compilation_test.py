@@ -673,28 +673,14 @@ class TestOneOfCompilation(unittest.TestCase):
         assert split("AHIB", "HI") == list
         assert split(b"AHIB", b"HI") == list
 
-    def test_blah(self):
-        import inspect
-        frame = inspect.currentframe()
+    def test_isinstance_convert_overlapping(self):
+        @Entrypoint
+        def checkIt(x: OneOf(1, 2, 3, int)):
+            # this verifies that the compiler understands that just because something
+            # is an 'int' doesn't mean it's the 4th slot of the OneOf.
+            if isinstance(x, int):
+                return x
 
-        def globalTraceFun(*args):
-            pass
+            return 10
 
-        def traceFun(*args):
-            print(args)
-
-        import sys
-        sys.settrace(globalTraceFun)
-
-        def setTraceFun(frame, x):
-            frame.f_trace = x
-
-        frame.f_trace = traceFun
-
-        sys.settrace(None)
-
-        print("hi")
-        print("hi")
-        print("hi")
-
-        sys.settrace(None)
+        assert checkIt(2) == 2

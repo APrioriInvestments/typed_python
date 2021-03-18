@@ -16,3 +16,4 @@ def test_merge_types():
     assert mergeTypes([float, Value(1.5)]) == float
     assert mergeTypes([OneOf(1, float), int]) == OneOf(float, int)
     assert mergeTypes([OneOf(float, Child), OneOf(int, Base)]) == OneOf(Base, float, int)
+    assert mergeTypes([object, str]) == object

@@ -72,6 +72,9 @@ def typeSubsumes(bigType, smallType):
     if bigType == smallType:
         return True
 
+    if bigType is object:
+        return True
+
     if issubclass(smallType, bigType) and issubclass(bigType, Class):
         return True
 
