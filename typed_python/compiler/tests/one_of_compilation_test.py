@@ -684,3 +684,11 @@ class TestOneOfCompilation(unittest.TestCase):
             return 10
 
         assert checkIt(2) == 2
+
+    def test_call_function_with_none_and_ifcheck(self):
+        @Entrypoint
+        def checkIt(x, y: object):
+            if x is None:
+                x = y
+
+        checkIt(None, float)

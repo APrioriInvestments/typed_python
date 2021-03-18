@@ -85,7 +85,12 @@ class ExpressionConversionContext:
         return not self.intermediates
 
     def inputArg(self, type, name):
-        return TypedExpression(self, native_ast.Expression.Variable(name), type, type.is_pass_by_ref)
+        return TypedExpression(
+            self,
+            native_ast.Expression.Variable(name) if not type.is_empty else native_ast.nullExpr,
+            type,
+            type.is_pass_by_ref
+        )
 
     def zero(self, T):
         """Return a TypedExpression matching the Zero form of the native layout of type T.
