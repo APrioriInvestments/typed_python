@@ -303,7 +303,7 @@ class TestBytesCompilation(unittest.TestCase):
         Entrypoint(splitAndCount)((b"a,") * 100, b",", 1000000)
 
         self.assertTrue(
-            compiled < uncompiled * 10,
+            compiled < uncompiled * 12,
             f"Expected compiled time {compiled} to be not much slower than uncompiled time {uncompiled}. "
             f"Compiler was {compiled / uncompiled} times slower."
         )
