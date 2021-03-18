@@ -100,13 +100,15 @@ def _mergeTypeWrappers(wrappers):
 
         for t in newTypes:
             shouldAdd = True
-            for ix in range(len(types)):
+            ix = 0
+            while ix < len(types):
                 if typeSubsumes(types[ix], t):
                     shouldAdd = False
                     break
                 elif typeSubsumes(t, types[ix]):
-                    shouldAdd = False
-                    types[ix] = t
+                    types.pop(ix)
+                    ix -= 1
+                ix += 1
 
             if shouldAdd:
                 types.append(t)
