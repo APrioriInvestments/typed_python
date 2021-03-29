@@ -1,5 +1,4 @@
 llvmlite
-lz4
 numpy < 1.20
 psutil
 pytz

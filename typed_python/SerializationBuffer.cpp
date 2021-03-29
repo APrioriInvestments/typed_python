@@ -15,10 +15,47 @@
 ******************************************************************************/
 
 #include "SerializationBuffer.hpp"
+#include "lz4frame.h"
 
 /* static */
 Bytes SerializationBuffer::serializeSingleBoolToBytes(bool value) {
     uint8_t existsValue[2] = { WireType::VARINT, value ? 1 : 0 };
 
     return Bytes((const char*)existsValue, 2);
+}
+
+void SerializationBuffer::compress() {
+    if (m_last_compression_point == m_size) {
+        return;
+    }
+
+    //replace the data we have here with a block of 4 bytes of size of compressed data and
+    //then the data stream
+    size_t bytesRequired = LZ4F_compressFrameBound(m_size - m_last_compression_point, nullptr);
+
+    void* compressedBytes = malloc(bytesRequired);
+
+    size_t compressedBytecount;
+
+    {
+        PyEnsureGilReleased releaseTheGil;
+
+        compressedBytecount = LZ4F_compressFrame(
+            compressedBytes,
+            bytesRequired,
+            m_buffer + m_last_compression_point,
+            m_size - m_last_compression_point,
+            nullptr
+        );
+    }
+
+    m_size = m_last_compression_point;
+
+    write<uint32_t>(compressedBytecount);
+
+    write_bytes((uint8_t*)compressedBytes, compressedBytecount, false);
+
+    free(compressedBytes);
+
+    m_last_compression_point = m_size;
 }

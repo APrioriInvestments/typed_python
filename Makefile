@@ -35,6 +35,7 @@ CPP_FLAGS = -std=c++14  -O$(TP_BUILD_OPT_LEVEL)  -Wall  -pthread  -DNDEBUG  -g  
             -Wno-cpp \
             -Wformat  -Werror=format-security  -Wdate-time -Wno-reorder     \
             -Wno-sign-compare  -Wno-narrowing  -Wno-int-in-bool-context     \
+            -I$(TP_SRC_PATH)/lz4                                  			\
             -I$(PYINCLUDE)                                       			\
             -I$(NUMPYINCLUDE)											    \
 

@@ -147,7 +147,7 @@ PyEnsureGilAcquired::~PyEnsureGilAcquired() {
 // check that we haven't released the GIL
 void assertHoldingTheGil() {
     if (curPyThreadState) {
-        std::cout << "WARNING: assertHoldingTheGil() is failing.\n";
+        std::cerr << "WARNING: assertHoldingTheGil() is failing.\n";
         asm("int3");
         throw std::runtime_error("We're not holding the gil!");
     }

@@ -210,8 +210,8 @@ public:
         if (m_size + t > m_reserved) {
             reserve(m_size + t + 1024 * 128);
 
-            //compress every 10 megs or so
-            if (m_wants_compress && allowCompression && m_size - m_last_compression_point > 10 * 1024 * 1024) {
+            //compress every meg or so
+            if (m_wants_compress && allowCompression && m_size - m_last_compression_point > 1024 * 1024) {
                 compress();
             }
         }
@@ -304,42 +304,7 @@ public:
         }
     }
 
-    void compress() {
-        if (m_last_compression_point == m_size) {
-            return;
-        }
-
-        //make sure we're holding the GIL because we use python to do the serialization
-        PyEnsureGilAcquired acquireTheGil;
-
-        //replace the data we have here with a block of 4 bytes of size of compressed data and
-        //then the data stream
-        std::shared_ptr<ByteBuffer> buf = m_context.compress(m_buffer + m_last_compression_point, m_buffer + m_size);
-        std::pair<uint8_t*, uint8_t*> range = buf->range();
-
-        if (range.first == m_buffer + m_last_compression_point) {
-            //we got back the original range
-            ensure(sizeof(uint32_t), false);
-            memmove(
-                m_buffer + m_last_compression_point + sizeof(uint32_t),
-                m_buffer + m_last_compression_point,
-                m_size - m_last_compression_point
-                );
-            *(uint32_t*)(m_buffer + m_last_compression_point) = (range.second - range.first);
-
-            m_size += sizeof(uint32_t);
-            m_last_compression_point = m_size;
-        } else {
-            m_size = m_last_compression_point;
-
-            //write an explicit 4 byte size here, not a varint
-            write<uint32_t>(range.second - range.first);
-
-            write_bytes(range.first, range.second - range.first, false);
-
-            m_last_compression_point = m_size;
-        }
-    }
+    void compress();
 
     template< class T>
     void write(T i) {

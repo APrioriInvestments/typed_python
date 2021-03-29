@@ -40,10 +40,4 @@ public:
     virtual bool isCompressionEnabled() const {
         return false;
     }
-    virtual std::shared_ptr<ByteBuffer> compress(uint8_t* begin, uint8_t* end) const {
-        return std::shared_ptr<ByteBuffer>(new RangeByteBuffer(begin, end));
-    }
-    virtual std::shared_ptr<ByteBuffer> decompress(uint8_t* begin, uint8_t* end) const {
-        return std::shared_ptr<ByteBuffer>(new RangeByteBuffer(begin, end));
-    }
 };

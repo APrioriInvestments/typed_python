@@ -53,6 +53,7 @@ ext_modules = [
         define_macros=[
             ("_FORTIFY_SOURCE", 2)
         ],
+        include_dirs=['typed_python/lz4'],
         extra_compile_args=extra_compile_args
     )
 ]

@@ -48,14 +48,6 @@ void PythonSerializationContext::setFlags() {
     mSerializeHashSequence = ((PyObject*)serializeHashSequence) == Py_True;
 }
 
-std::shared_ptr<ByteBuffer> PythonSerializationContext::compress(uint8_t* begin, uint8_t* end) const {
-    return compressOrDecompress(begin, end, true);
-}
-
-std::shared_ptr<ByteBuffer> PythonSerializationContext::decompress(uint8_t* begin, uint8_t* end) const {
-    return compressOrDecompress(begin, end, false);
-}
-
 std::string PythonSerializationContext::getNameForPyObj(PyObject* o) const {
     PyEnsureGilAcquired acquireTheGil;
 
@@ -75,42 +67,4 @@ std::string PythonSerializationContext::getNameForPyObj(PyObject* o) const {
     }
 
     return "";
-}
-
-std::shared_ptr<ByteBuffer> PythonSerializationContext::compressOrDecompress(uint8_t* begin, uint8_t* end, bool compress) const {
-    assertHoldingTheGil();
-
-    if (!mContextObj) {
-        return std::shared_ptr<ByteBuffer>(new RangeByteBuffer(begin,end));
-    }
-
-    PyObjectStealer pyBytes(
-        PyBytes_FromStringAndSize((const char*)begin, end-begin)
-        );
-
-    PyObjectStealer outBytes(
-        PyObject_CallMethod(
-            mContextObj,
-            compress ? "compress" : "decompress",
-            "(O)",
-            (PyObject*)pyBytes //without this cast, the actual "Stealer" object gets passed
-                               //because this is a C varargs function and it doesn't know
-                               //that the intended type is PyObject*.
-            )
-        );
-
-    if (!outBytes) {
-        throw PythonExceptionSet();
-    }
-
-    if (!PyBytes_Check(outBytes)) {
-        PyErr_Format(PyExc_TypeError,
-            compress ?
-                    "'compress' method didn't return bytes object."
-                :   "'decompress' method didn't return bytes object."
-            );
-        throw PythonExceptionSet();
-    }
-
-    return std::shared_ptr<ByteBuffer>(new PyBytesByteBuffer(outBytes));
 }

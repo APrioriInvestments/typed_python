@@ -63,6 +63,7 @@ compile the entire group all at once.
 #include "FunctionType.cpp"
 
 #include "SerializationBuffer.cpp"
+#include "DeserializationBuffer.cpp"
 #include "Sha1.cpp"
 #include "MutuallyRecursiveTypeGroup.cpp"
 #include "TypeOrPyobj.cpp"
@@ -70,3 +71,8 @@ compile the entire group all at once.
 #include "PySlab.cpp"
 #include "Slab.cpp"
 #include "PyTemporaryReferenceTracer.cpp"
+
+#include "lz4.c"
+#include "lz4frame.c"
+#include "lz4hc.c"
+#include "xxhash.c"

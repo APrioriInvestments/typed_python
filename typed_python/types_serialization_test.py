@@ -2706,3 +2706,49 @@ class TypesSerializationTest(unittest.TestCase):
         T2 = s.deserialize(s.serialize(T))
 
         assert T2.ElementTypes[0].__typed_python_category__ == "Forward"
+
+    def test_serialization_doesnt_starve_gil(self):
+        checkCount = [0]
+        serializeCount = [0]
+        contextSwaps = []
+        s = SerializationContext()
+
+        def loopThread():
+            t0 = time.time()
+            while time.time() - t0 < 1.0:
+                contextSwaps.append((0, time.time()))
+                checkCount[0] += 1
+
+        def serializeThread():
+            t0 = time.time()
+            while time.time() - t0 < 1.0:
+                contextSwaps.append((1, time.time()))
+                s.deserialize(s.serialize(moduleLevelRecursiveF))
+                serializeCount[0] += 1
+
+        threads = [threading.Thread(target=t) for t in [loopThread, serializeThread]]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        contextSwaps = sorted(contextSwaps, key=lambda a: a[1])
+        contextSwaps = contextSwaps[:1] + [
+            contextSwaps[i] for i in range(1, len(contextSwaps))
+            if contextSwaps[i][0] != contextSwaps[i-1][0]
+        ]
+
+        avgTimeHeld = {0: 0.0, 1: 0.0}
+
+        for i in range(1, len(contextSwaps)):
+            avgTimeHeld[contextSwaps[i-1][0]] += contextSwaps[i][1] - contextSwaps[i-1][1]
+
+        print("Time spent in python spin thread:  ", avgTimeHeld[0], " over ", checkCount[0], " cycles")
+        print("Time spent in serialization thread:", avgTimeHeld[1], " over ", serializeCount[0], " cycles")
+
+        # verify that we are spending a reasonable amount of time in each thread. If
+        # we release the gil directly in 'deserialize' or 'serialize', then we'll end up
+        # starving the serialization thread because we only get the thread back every
+        # few milliseconds.
+        assert .1 <= avgTimeHeld[0] <= .9
+        assert .1 <= avgTimeHeld[1] <= .9

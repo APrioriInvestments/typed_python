@@ -26,7 +26,6 @@ import abc
 import numpy
 import sys
 import datetime
-import lz4.frame
 import importlib
 import threading
 import types
@@ -152,19 +151,6 @@ class SerializationContext:
 
         del self.nameToObjectOverride[name]
         del self.objectToNameOverride[objId]
-
-    def compress(self, bytes):
-        if self.compressionEnabled:
-            res = lz4.frame.compress(bytes)
-            return res
-        else:
-            return bytes
-
-    def decompress(self, bytes):
-        if self.compressionEnabled:
-            return lz4.frame.decompress(bytes)
-        else:
-            return bytes
 
     def withFunctionGlobalsAsIs(self):
         """When serializing a function, don't replace its globals dict.
