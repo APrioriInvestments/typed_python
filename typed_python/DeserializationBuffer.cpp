@@ -21,6 +21,8 @@ bool DeserializationBuffer::decompress() {
 
         return true;
     } else {
+        PyEnsureGilReleased releaseTheGil;
+
         if (m_compressed_block_data_remaining < sizeof(uint32_t)) {
             return false;
         }
@@ -35,6 +37,7 @@ bool DeserializationBuffer::decompress() {
         m_compressed_block_data_remaining -= sizeof(uint32_t) + bytesToDecompress;
 
         LZ4F_decompressionContext_t compressionContext;
+
         if (LZ4F_createDecompressionContext(&compressionContext, LZ4F_VERSION)) {
             throw std::runtime_error("Failed to allocate an lz4 compression context.");
         }
