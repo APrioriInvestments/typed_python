@@ -1498,6 +1498,7 @@ class FunctionConversionContext(ConversionContextBase):
                         controlFlowBlocks.try_flow.store(native_ast.const_int_expr(CONTROL_FLOW_RETURN))
                     )
                 self.assignToLocalVariable(".return_value", e, variableStates)
+
                 subcontext.pushEffect(
                     native_ast.Expression.Branch(
                         cond=self.exception_occurred_slot.load(), true=runtime_functions.clear_exc_info.call()
@@ -1642,22 +1643,45 @@ class FunctionConversionContext(ConversionContextBase):
             exception_occurred = self.exception_occurred_slot
             control_flow = native_ast.Expression.StackSlot(name=control_flow_name, type=native_ast.Int64)
 
+            # the state of our variables going into the Try
+            variableStatesInitial = variableStates.clone()
+
+            # the state of the variables going into any handlers could be any of the states
+            # we were in at any point before an exception was thrown. Rather than try to
+            # reason about this precisely, we simply remove any information on any variables
+            # that are assigned within the try body
+            variableStatesGoingIntoHandler = variableStatesInitial.clone()
+            for varname in computeAssignedVariables(ast.body):
+                if varname in self._varname_to_type:
+                    # if the varname is assigned but not in _varname_to_type, then the
+                    # assignment is not reachable.
+                    variableStatesGoingIntoHandler.markVariableStateUnknown(
+                        varname,
+                        self._varname_to_type[varname].typeRepresentation
+                    )
+
             body_context = ExpressionConversionContext(self, variableStates)
+
             body, body_returns = self.convert_statement_list_ast(
                 ast.body, variableStates, controlFlowBlocks.pushTryCatch(end_of_try_marker, control_flow)
             )
+
             body_context.pushEffect(body)
 
             handlers_context = ExpressionConversionContext(self, variableStates)
 
             working_context = ExpressionConversionContext(self, variableStates)
+
             working = runtime_functions.catch_exception.call() >> control_flow.store(
                 native_ast.const_int_expr(CONTROL_FLOW_EXCEPTION)
             )
             working_returns = True
 
             for h in reversed(ast.handlers):
-                cond_context = ExpressionConversionContext(self, variableStates)
+                variableStatesHandler = variableStatesGoingIntoHandler.clone()
+
+                cond_context = ExpressionConversionContext(self, variableStatesHandler)
+
                 if h.type is None:
                     exc_match = BaseException
                     exc_type = BaseException
@@ -1678,7 +1702,6 @@ class FunctionConversionContext(ConversionContextBase):
                         exc_type = exc_match
                 cond = cond_context.matchExceptionObject(exc_match)
 
-                variableStatesHandler = variableStates.clone()
                 handler_context = ExpressionConversionContext(self, variableStatesHandler)
                 if h.name is None:
                     handler_context.pushEffect(runtime_functions.catch_exception.call())
@@ -1708,15 +1731,19 @@ class FunctionConversionContext(ConversionContextBase):
                     )
                     variableStatesHandler.variableUninitialized(h_name)
 
-                variableStates.becomeMerge(variableStates.clone(), variableStatesHandler)
+                if handler_returns:
+                    variableStates.becomeMerge(variableStates.clone(), variableStatesHandler)
+
                 handler = handler >> native_ast.Expression.Branch(
                     cond=exception_occurred.load(), true=runtime_functions.clear_exc_info.call()
                 )
+
                 working = native_ast.Expression.Branch(
                     cond=cond_context.finalize(cond.nonref_expr),
                     true=handler_context.finalize(handler),
                     false=working_context.finalize(working),
                 )
+
                 working_returns = handler_returns or working_returns
 
             handlers_context.pushEffect(working_context.finalize(working))
@@ -1780,10 +1807,12 @@ class FunctionConversionContext(ConversionContextBase):
                 )
 
             if self.isLocalVariable(".return_value"):
-                return_context = ExpressionConversionContext(self, variableStates)
+                variableStatesReturnBlock = variableStates.clone()
+
+                return_context = ExpressionConversionContext(self, variableStatesReturnBlock)
                 rtn, _ = self.convert_statement_ast(
                     python_ast.Statement.Return(value=python_ast.Expr.Name(id=".return_value")),
-                    variableStates,
+                    variableStatesReturnBlock,
                     controlFlowBlocks,
                 )
 

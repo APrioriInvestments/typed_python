@@ -49,6 +49,10 @@ class FunctionStackState:
         self._types[varname] = varType
         self._maybeUninitialized.discard(varname)
 
+    def markVariableStateUnknown(self, varname, varType):
+        self._maybeUninitialized.add(varname)
+        self._types[varname] = varType
+
     def variableUninitialized(self, varname):
         self._maybeUninitialized.add(varname)
 

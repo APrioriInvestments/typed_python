@@ -323,3 +323,48 @@ class TestTypeInference(unittest.TestCase):
 
         res = localVariableTypes(10)
         assert res == dict(x=int, y=OneOf(float, int))
+
+    def test_type_inference_with_exceptions(self):
+        # check that if we catch an arbitrary exception, then we can't really
+        # know what the type of a variable coming out of the exception block.
+        # this is a little crude because obviously we can tell below because we
+        # know we are not throwing exceptions, but we want to ensure that we don't
+        # mistakenly assume it's 'str'.
+        @Entrypoint
+        def check():
+            try:
+                y = 10
+                y = "hi"  # noqa
+            except Exception:
+                pass
+
+            return localVariableTypesKnownToCompiler()
+
+        assert check() == dict(y=OneOf(int, str))
+
+        # but if we return from the handler directly, then the only way to get to the
+        # code after the except is if everything passed.
+        @Entrypoint
+        def check2():
+            try:
+                y = 10
+                y = "hi"  # noqa
+            except Exception:
+                return
+
+            return localVariableTypesKnownToCompiler()
+
+        assert check2()['y'] == str
+
+        # check that the 'finally' block knows it could be the merge
+        @Entrypoint
+        def check3():
+            try:
+                y = 10
+                y = "hi"  # noqa
+            except Exception:
+                y = 12.5  # noqa
+            finally:
+                return localVariableTypesKnownToCompiler()
+
+        assert check3()['y'] == OneOf(float, str)

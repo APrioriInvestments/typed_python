@@ -187,3 +187,21 @@ def test_can_capture_exception_and_rethrow():
 
     # verify the compiler is the same
     assert getStringTraceback(f) == getStringTraceback(Entrypoint(f))
+
+
+def test_catch_and_return_none():
+    def blah(x):
+        if x:
+            raise Exception("boo")
+        return "a", "b"
+
+    @Entrypoint
+    def trySplit(x):
+        try:
+            a, b = x.split("_")
+            return a + b
+        except Exception:
+            return None
+
+    assert trySplit("a_b") == "ab"
+    assert trySplit("a_b_c") is None
