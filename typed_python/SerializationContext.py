@@ -362,13 +362,13 @@ class SerializationContext:
             moduleName = ".".join(items[:-2])
 
             try:
-                if moduleName in sys.modules:
-                    module = sys.modules[moduleName]
-                else:
-                    if moduleName in _badModuleCache or not allowImport:
-                        return None
+                with _importlibLock:
+                    if moduleName in sys.modules:
+                        module = sys.modules[moduleName]
+                    else:
+                        if moduleName in _badModuleCache or not allowImport:
+                            return None
 
-                    with _importlibLock:
                         module = importlib.import_module(moduleName)
             except ModuleNotFoundError:
                 _badModuleCache.add(moduleName)
@@ -395,16 +395,16 @@ class SerializationContext:
 
         if name.startswith(".modules."):
             try:
-                if name[9:] in _badModuleCache:
-                    return None
-
-                if name[9:] in sys.modules:
-                    return sys.modules[name[9:]]
-
-                if not allowImport:
-                    return None
-
                 with _importlibLock:
+                    if name[9:] in _badModuleCache:
+                        return None
+
+                    if name[9:] in sys.modules:
+                        return sys.modules[name[9:]]
+
+                    if not allowImport:
+                        return None
+
                     return importlib.import_module(name[9:])
             except ModuleNotFoundError:
                 _badModuleCache.add(name[9:])
@@ -425,13 +425,13 @@ class SerializationContext:
             if moduleName in _badModuleCache:
                 return None
 
-            if moduleName in sys.modules:
-                module = sys.modules[moduleName]
-            else:
-                if not allowImport:
-                    return None
+            with _importlibLock:
+                if moduleName in sys.modules:
+                    module = sys.modules[moduleName]
+                else:
+                    if not allowImport:
+                        return None
 
-                with _importlibLock:
                     module = importlib.import_module(moduleName)
 
             return getattr(module, objName, None)
