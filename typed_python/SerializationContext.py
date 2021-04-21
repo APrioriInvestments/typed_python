@@ -36,7 +36,7 @@ import logging
 # then two threads trying to deserialize at the same time can conflict
 # with each other, because one may see the half-imported module from
 # the other.
-_importlibLock = threading.Lock()
+_importlibLock = threading.RLock()
 
 
 _badModuleCache = set()
