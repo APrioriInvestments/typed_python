@@ -189,6 +189,7 @@ public:
         DeepcopyContext& context
     ) {
         if (m_all_alternatives_empty) {
+            ((uint8_t*)dest)[0] = ((uint8_t*)src)[0];
             return;
         }
 

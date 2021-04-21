@@ -441,3 +441,10 @@ def test_deepcopy_typeMap_baseclass():
     res = deepcopy(D(x=10), typeMap={C: mapper})
 
     assert res.x == 11
+
+
+def test_deepcopy_empty_alternatives():
+    X = Alternative("X", A=dict(), B=dict())
+    Y = Alternative("Y", C=dict(x=X))
+    y = Y.C(x=X.B())
+    print(deepcopy(y))
