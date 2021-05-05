@@ -233,7 +233,7 @@ public:
     }
 
     size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
-        layout* p = *(layout**)instance;
+        layout_ptr p = instanceToLayout(instance);
 
         if (alreadyVisited.find((void*)p) != alreadyVisited.end()) {
             return 0;
@@ -246,8 +246,10 @@ public:
             return 0;
         }
 
-        return m_heldClass->deepBytecount(p->data, alreadyVisited, outSlabs) +
-            bytesRequiredForAllocation(sizeof(layout) + m_heldClass->bytecount());
+        HeldClass* actualHeldClassType = p->vtable->mType;
+
+        return actualHeldClassType->deepBytecount(p->data, alreadyVisited, outSlabs) +
+            bytesRequiredForAllocation(sizeof(layout) + actualHeldClassType->bytecount());
     }
 
     template<class buf_t>

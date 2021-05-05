@@ -448,3 +448,21 @@ def test_deepcopy_empty_alternatives():
     Y = Alternative("Y", C=dict(x=X))
     y = Y.C(x=X.B())
     print(deepcopy(y))
+
+
+def test_deepcopy_class_subclass():
+    class Base(Class):
+        pass
+
+    class Child(Base):
+        child = Member(Tuple(int, int, int))
+
+    for i in range(100):
+        x = ListOf(Base)([Child() for _ in range(i)])
+        deepcopyContiguous(x)
+
+
+def test_deepcopy_tuple_of_strings():
+    for i in range(100):
+        x = ListOf(OneOf(str, float))(['h'] * i)
+        deepcopyContiguous(x)

@@ -168,6 +168,10 @@ public:
         return mSlabBytecount;
     }
 
+    size_t getAllocated() {
+        return mAllocationPoint - mSlabData;
+    }
+
     static std::atomic<int64_t>& totalBytesAllocatedInSlabs() {
         static std::atomic<int64_t> res;
         return res;
@@ -181,15 +185,15 @@ public:
                 return nullptr;
             }
 
+            if (bytes % sizeof(std::max_align_t)) {
+                bytes = bytes + sizeof(std::max_align_t) - (bytes % sizeof(std::max_align_t));
+            }
+
             if (mAllocationPoint + bytes > mSlabData + mSlabBytecount) {
                 throw std::runtime_error("Slab ran out of data.");
             }
 
             incref();
-
-            if (bytes % sizeof(std::max_align_t)) {
-                bytes = bytes + sizeof(std::max_align_t) - (bytes % sizeof(std::max_align_t));
-            }
 
             void* res = mAllocationPoint + sizeof(std::max_align_t);
             ((Slab**)mAllocationPoint)[0] = this;
