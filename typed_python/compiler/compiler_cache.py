@@ -55,6 +55,9 @@ class CompilerCache:
         self.loadedModules = Dict(str, LoadedModule)()
         self.nameToModuleHash = Dict(str, str)()
 
+        self.modulesMarkedValid = set()
+        self.modulesMarkedInvalid = set()
+
         for moduleHash in os.listdir(self.cacheDir):
             if len(moduleHash) == 40:
                 self.loadNameManifestFromStoredModuleByHash(moduleHash)
@@ -167,12 +170,23 @@ class CompilerCache:
             # for the moment, we don't try to clean up the cache, because
             # we can't be sure that some process is not still reading the
             # old files.
-            return
+            self.modulesMarkedInvalid.add(moduleHash)
+            return False
+
+        with open(os.path.join(targetDir, "submodules.dat"), "rb") as f:
+            submodules = SerializationContext().deserialize(f.read(), ListOf(str))
+
+        for subHash in submodules:
+            if not self.loadNameManifestFromStoredModuleByHash(subHash):
+                self.markModuleHashInvalid(subHash)
+                return False
 
         with open(os.path.join(targetDir, "name_manifest.dat"), "rb") as f:
             self.nameToModuleHash.update(
                 SerializationContext().deserialize(f.read(), Dict(str, str))
             )
+
+        return True
 
     def writeModuleToDisk(self, binarySharedObject, nameToTypedCallTarget, submodules):
         """Write out a disk representation of this module.
