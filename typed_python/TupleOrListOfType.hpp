@@ -90,10 +90,21 @@ public:
             destLayout = (layout_ptr)context.slab->allocate(sizeof(layout), this);
             destLayout->hash_cache = srcLayout->hash_cache;
             destLayout->refcount = 0;
-            destLayout->reserved = srcLayout->count;
+
+            size_t reserveCount = srcLayout->count;
+
+            if (reserveCount == 0 && !m_is_tuple) {
+                reserveCount = 1;
+            }
+
+            destLayout->reserved = reserveCount;
             destLayout->count = srcLayout->count;
 
-            destLayout->data = (instance_ptr)context.slab->allocate(getEltType()->bytecount() * srcLayout->count, nullptr);
+            if (reserveCount) {
+                destLayout->data = (instance_ptr)context.slab->allocate(getEltType()->bytecount() * reserveCount, nullptr);
+            } else {
+                destLayout->data = nullptr;
+            }
 
             if (destLayout->count) {
                 if (getEltType()->isPOD()) {
@@ -135,15 +146,21 @@ public:
             return 0;
         }
 
-        size_t res = (
-            bytesRequiredForAllocation(sizeof(layout)) +
-            bytesRequiredForAllocation(self_layout->reserved * getEltType()->bytecount())
-        );
+        size_t reserveCount = self_layout->count;
+
+        // always allocate something for a list
+        if (reserveCount == 0 && !m_is_tuple) {
+            reserveCount = 1;
+        }
+
+        size_t res = bytesRequiredForAllocation(sizeof(layout));
+
+        if (reserveCount) {
+            res += bytesRequiredForAllocation(reserveCount * getEltType()->bytecount());
+        }
 
         if (!getEltType()->isPOD()) {
-            int32_t ct = count(instance);
-
-            for (long k = 0; k < ct; k++) {
+            for (long k = 0; k < self_layout->count; k++) {
                 res += m_element_type->deepBytecount(eltPtr(instance, k), alreadyVisited, outSlabs);
             }
         }

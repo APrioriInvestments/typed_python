@@ -195,22 +195,7 @@ public:
         DeepcopyContext& context
     );
 
-    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
-        layout_type* layoutPtr = *(layout_type**)instance;
-
-        if (alreadyVisited.find((void*)layoutPtr) != alreadyVisited.end()) {
-            return 0;
-        }
-
-        alreadyVisited.insert((void*)layoutPtr);
-
-        if (outSlabs && Slab::slabForAlloc(layoutPtr)) {
-            outSlabs->insert(Slab::slabForAlloc(layoutPtr));
-            return 0;
-        }
-
-        return bytesRequiredForAllocation(sizeof(layout_type)) + deepBytecountForPyObj(layoutPtr->pyObj, alreadyVisited, outSlabs);
-    }
+    size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs);
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {

@@ -51,6 +51,10 @@ inline std::atomic<size_t>& tpBytesAllocatedOnFreeStore() {
 // how many bytes are required to back an allocation of size 's'
 // accounts for alignment and extra pointers.
 inline size_t bytesRequiredForAllocation(size_t s) {
+   if (s == 0) {
+      return 0;
+   }
+
    if (s % sizeof(std::max_align_t)) {
       s += sizeof(std::max_align_t) - (s % sizeof(std::max_align_t));
    }

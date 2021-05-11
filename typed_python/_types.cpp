@@ -1581,9 +1581,6 @@ PyObject* deepcopyContiguous(PyObject* nullValue, PyObject* args, PyObject* kwar
     std::unordered_set<void*> visited;
     size_t bytecount = PythonObjectOfType::deepBytecountForPyObj(arg, visited, nullptr);
 
-    // add some space to deal with the front python object we may need
-    bytecount += 128;
-
     Slab* slab = new Slab(false, bytecount);
 
     if (tag) {
@@ -1598,6 +1595,9 @@ PyObject* deepcopyContiguous(PyObject* nullValue, PyObject* args, PyObject* kwar
 
     try {
         PyObject* res = PythonObjectOfType::deepcopyPyObject(arg, context);
+        if (bytecount != slab->getAllocated()) {
+            throw std::runtime_error("Bytes wrong: " + format(slab->getBytecount()) + " != " + format(slab->getAllocated()));
+        }
         slab->decref();
         return res;
     } catch(PythonExceptionSet& e) {

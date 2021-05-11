@@ -206,8 +206,33 @@ void PythonObjectOfType::deepcopyConcrete(
     destPtr->pyObj = deepcopyPyObject(srcPtr->pyObj, context);
 }
 
+size_t PythonObjectOfType::deepBytecountConcrete(
+    instance_ptr instance,
+    std::unordered_set<void*>& alreadyVisited,
+    std::set<Slab*>* outSlabs
+) {
+    layout_type* layoutPtr = *(layout_type**)instance;
+
+    if (alreadyVisited.find((void*)layoutPtr) != alreadyVisited.end()) {
+        return 0;
+    }
+
+    alreadyVisited.insert((void*)layoutPtr);
+
+    if (outSlabs && Slab::slabForAlloc(layoutPtr)) {
+        outSlabs->insert(Slab::slabForAlloc(layoutPtr));
+        return 0;
+    }
+
+    return bytesRequiredForAllocation(sizeof(layout_type)) + deepBytecountForPyObj(layoutPtr->pyObj, alreadyVisited, outSlabs);
+}
+
 size_t PythonObjectOfType::deepBytecountForPyObj(PyObject* o, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
     PyEnsureGilAcquired getTheGil;
+
+    if (!o) {
+        throw std::runtime_error("Can't deepcopy the null pyobj.");
+    }
 
     if (alreadyVisited.find((void*)o) != alreadyVisited.end()) {
         return 0;
@@ -216,13 +241,13 @@ size_t PythonObjectOfType::deepBytecountForPyObj(PyObject* o, std::unordered_set
     alreadyVisited.insert((void*)o);
 
     if (PyType_Check(o) || PyModule_Check(o)) {
-        return sizeof(PyTypeObject);
+        return 0;
     }
 
     if (Type* t = PyInstance::extractTypeFrom(o->ob_type)) {
         PyEnsureGilReleased releaseTheGil;
 
-        return t->bytecount() + t->deepBytecount(((PyInstance*)o)->dataPtr(), alreadyVisited, outSlabs) + sizeof(PyInstance);
+        return t->deepBytecount(((PyInstance*)o)->dataPtr(), alreadyVisited, outSlabs);
     }
 
     if (PyDict_Check(o)) {
@@ -267,11 +292,11 @@ size_t PythonObjectOfType::deepBytecountForPyObj(PyObject* o, std::unordered_set
         PyObjectStealer dict(PyObject_GetAttrString(o, "__dict__"));
 
         if (dict) {
-            return sizeof(PyObject) + deepBytecountForPyObj(dict, alreadyVisited, outSlabs);
+            return deepBytecountForPyObj(dict, alreadyVisited, outSlabs);
         }
     }
 
-    return sizeof(PyObject);
+    return 0;
 }
 
 

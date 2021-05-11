@@ -161,6 +161,9 @@ class CompilerCache:
             self.nameToModuleHash[n] = hashToUse
 
     def loadNameManifestFromStoredModuleByHash(self, moduleHash):
+        if moduleHash in self.modulesMarkedValid:
+            return True
+
         targetDir = os.path.join(self.cacheDir, moduleHash)
 
         # ignore 'marked invalid'
@@ -185,6 +188,8 @@ class CompilerCache:
             self.nameToModuleHash.update(
                 SerializationContext().deserialize(f.read(), Dict(str, str))
             )
+
+        self.modulesMarkedValid.add(moduleHash)
 
         return True
 

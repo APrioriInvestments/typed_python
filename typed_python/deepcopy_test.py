@@ -144,6 +144,9 @@ def test_deepcopy_Class():
         x = Member(ListOf(int))
 
         def __eq__(self, other):
+            if not isinstance(other, C):
+                return False
+
             return self.x == other.x
 
     checkDeepcopySimple(C(x=ListOf(int)(range(1000))), True, True)
@@ -256,6 +259,9 @@ def test_deepcopy_with_Dict():
     mem = currentMemUsageMb()
 
     v = Dict(str, str)()
+
+    deepcopyContiguous(v)
+
     v["hi"] = "bye"
     for i in range(500):
         v[str(i)] = str(i) + "out"
@@ -455,9 +461,9 @@ def test_deepcopy_class_subclass():
         pass
 
     class Child(Base):
-        child = Member(Tuple(int, int, int))
+        child = Member(Tuple(int, int, int, int))
 
-    for i in range(100):
+    for i in range(10):
         x = ListOf(Base)([Child() for _ in range(i)])
         deepcopyContiguous(x)
 
