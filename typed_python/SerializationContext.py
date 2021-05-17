@@ -19,6 +19,7 @@ from typed_python.python_ast import (
     cacheAstForCode,
 )
 from typed_python.hash import sha_hash
+from typed_python.compiler.runtime_lock import runtimeLock
 from typed_python.type_function import ConcreteTypeFunction, reconstructTypeFunctionType, isTypeFunctionType
 from types import FunctionType, ModuleType, CodeType, MethodType, BuiltinFunctionType
 from _thread import LockType, RLock
@@ -31,12 +32,6 @@ import threading
 import types
 import traceback
 import logging
-
-# a lock to guard the calls to importlib below. It we don't have this,
-# then two threads trying to deserialize at the same time can conflict
-# with each other, because one may see the half-imported module from
-# the other.
-_importlibLock = threading.RLock()
 
 
 _badModuleCache = set()
@@ -362,7 +357,7 @@ class SerializationContext:
             moduleName = ".".join(items[:-2])
 
             try:
-                with _importlibLock:
+                with runtimeLock:
                     if moduleName in sys.modules:
                         module = sys.modules[moduleName]
                     else:
@@ -395,7 +390,7 @@ class SerializationContext:
 
         if name.startswith(".modules."):
             try:
-                with _importlibLock:
+                with runtimeLock:
                     if name[9:] in _badModuleCache:
                         return None
 
@@ -425,7 +420,7 @@ class SerializationContext:
             if moduleName in _badModuleCache:
                 return None
 
-            with _importlibLock:
+            with runtimeLock:
                 if moduleName in sys.modules:
                     module = sys.modules[moduleName]
                 else:
