@@ -26,7 +26,7 @@ from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
     _types, Compiled, Member, Final, isCompiled, ConstDict,
     makeNamedTuple, UInt32, Int32, Type, identityHash, typeKnownToCompiler, checkOneOfType,
-    refcount, checkType
+    refcount, checkType, map
 )
 
 from typed_python.compiler.runtime import Runtime, Entrypoint, RuntimeEventVisitor
@@ -3709,3 +3709,16 @@ class TestCompilationStructures(unittest.TestCase):
 
         closure = None
         assert refcount(x) == 1
+
+    def test_map_large_named_tuples(self):
+        def getNamedTupleOfLists(n):
+            nameToList = {"a" + str(i): ListOf(str)([str(i)]) for i in range(n)}
+            return makeNamedTuple(**nameToList)
+
+        @Entrypoint
+        def slice(tupOfLists):
+            return map(lambda l: l[0], tupOfLists)
+
+        nt = getNamedTupleOfLists(100)
+
+        slice(nt)
