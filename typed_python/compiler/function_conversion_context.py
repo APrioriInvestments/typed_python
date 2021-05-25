@@ -1935,17 +1935,14 @@ class FunctionConversionContext(ConversionContextBase):
             return expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast), False
 
         if ast.matches.Delete:
-            exprs = None
+            exprs = []
             for target in ast.targets:
                 subExprs, flowReturns = self.convert_delete(target, variableStates)
-                if exprs is None:
-                    exprs = subExprs
-                else:
-                    exprs = exprs >> subExprs
+                exprs.append(subExprs)
 
                 if not flowReturns:
-                    return exprs, flowReturns
-            return exprs, True
+                    return native_ast.makeSequence(exprs), flowReturns
+            return native_ast.makeSequence(exprs), True
 
         if ast.matches.With:
             statements = expandWithBlockIntoTryCatch(ast)
