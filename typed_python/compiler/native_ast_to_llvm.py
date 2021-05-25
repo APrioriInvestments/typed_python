@@ -720,6 +720,48 @@ class FunctionConverter:
 
     def _convert(self, expr):
         """Actually convert 'expr' into underlying llvm instructions."""
+        if expr.matches.ApplyIntermediates:
+            res = TypedLLVMValue(None, native_ast.Type.Void())
+
+            priorName = []
+            priorRes = []
+
+            for i in expr.intermediates:
+                if i.matches.Terminal or i.matches.Effect:
+                    res = self.convert(i.expr)
+
+                    if res is None:
+                        break
+
+                elif i.matches.StackSlot:
+                    res = self.convert(i.expr)
+
+                    if res is None:
+                        break
+
+                elif i.matches.Simple:
+                    lhs = self.convert(i.expr)
+
+                    prior = self.arg_assignments.get(i.name, None)
+                    self.arg_assignments[i.name] = lhs
+
+                    priorName.append(i.name)
+                    priorRes.append(prior)
+
+            if res is not None:
+                res = self.convert(expr.base)
+
+            while priorName:
+                name = priorName.pop()
+                prior = priorRes.pop()
+
+                if prior is not None:
+                    self.arg_assignments[name] = prior
+                else:
+                    del self.arg_assignments[name]
+
+            return res
+
         if expr.matches.Let:
             lhs = self.convert(expr.val)
 

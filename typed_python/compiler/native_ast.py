@@ -183,6 +183,15 @@ NamedCallTarget = NamedTuple(
 )
 
 
+ExpressionIntermediate = Alternative(
+    "ExpressionIntermediate",
+    Effect={"expr": Expression},
+    Terminal={"expr": Expression},
+    Simple={"name": str, "expr": Expression},
+    StackSlot={"name": str, "expr": Expression},
+)
+
+
 def filterCallTargetArgs(args):
     """Given a list of native expressions or typed expressions, filter them down,
     dropping 'empty' arguments, as per our calling convention."""
@@ -382,6 +391,10 @@ def expr_str(self):
             "try:\n" + indent(str(self.expr)) + "\n" +
             "rethrow with %s:\n" % self.varname + indent(str(self.handler)).rstrip()
         )
+    if self.matches.ApplyIntermediates:
+        return (
+            "apply intermediates:\n" + "\n".join(str(x) for x in self.intermediates) + "\nto " + str(self.base)
+        )
 
     assert False, type(self)
 
@@ -521,6 +534,7 @@ Expression = Expression.define(Alternative(
     ActivatesTeardown={'name': str},
     StackSlot={'name': str, 'type': Type},
     GlobalVariable={'name': str, 'type': Type, 'metadata': object},
+    ApplyIntermediates={'base': Expression, 'intermediates': TupleOf(ExpressionIntermediate)},
     ElementPtrIntegers=lambda self, *offsets:
         Expression.ElementPtr(
             left=self,

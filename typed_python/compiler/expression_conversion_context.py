@@ -43,13 +43,9 @@ builtinValueIdToNameAndValue = {id(v): (k, v) for k, v in __builtins__.items()}
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
-ExpressionIntermediate = Alternative(
-    "ExpressionIntermediate",
-    Effect={"expr": native_ast.Expression},
-    Terminal={"expr": native_ast.Expression},
-    Simple={"name": str, "expr": native_ast.Expression},
-    StackSlot={"name": str, "expr": native_ast.Expression}
-)
+
+ExpressionIntermediate = native_ast.ExpressionIntermediate
+
 
 _pyFuncToFuncCache = {}
 
@@ -746,13 +742,8 @@ class ExpressionConversionContext:
             assert isinstance(expr, TypedExpression), type(expr)
             expr = expr.nonref_expr
 
-        for i in reversed(self.intermediates):
-            if i.matches.Terminal or i.matches.Effect:
-                expr = i.expr >> expr
-            elif i.matches.StackSlot:
-                expr = i.expr >> expr
-            elif i.matches.Simple:
-                expr = native_ast.Expression.Let(var=i.name, val=i.expr, within=expr)
+        if len(self.intermediates):
+            expr = native_ast.Expression.ApplyIntermediates(base=expr, intermediates=self.intermediates)
 
         if self.teardowns:
             expr = native_ast.Expression.Finally(expr=expr, teardowns=self.teardowns)
