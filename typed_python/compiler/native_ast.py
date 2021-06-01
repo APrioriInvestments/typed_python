@@ -183,12 +183,29 @@ NamedCallTarget = NamedTuple(
 )
 
 
+def intm_could_throw(intm):
+    if intm.matches.Effect:
+        return intm.expr.couldThrow()
+
+    if intm.matches.Terminal:
+        return intm.expr.couldThrow()
+
+    if intm.matches.Simple:
+        return intm.expr.couldThrow()
+
+    if intm.matches.StackSlot:
+        return intm.expr.couldThrow()
+
+    assert False, f"Unrecognized expression intermediate {intm}"
+
+
 ExpressionIntermediate = Alternative(
     "ExpressionIntermediate",
     Effect={"expr": Expression},
     Terminal={"expr": Expression},
     Simple={"name": str, "expr": Expression},
     StackSlot={"name": str, "expr": Expression},
+    couldThrow=intm_could_throw,
 )
 
 
@@ -471,6 +488,10 @@ def expr_could_throw(self):
             if child.couldThrow():
                 return True
         elif isinstance(child, TupleOf(Expression)):
+            for c in child:
+                if c.couldThrow():
+                    return True
+        elif isinstance(child, TupleOf(ExpressionIntermediate)):
             for c in child:
                 if c.couldThrow():
                     return True
