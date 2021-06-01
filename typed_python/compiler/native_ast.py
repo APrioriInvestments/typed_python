@@ -183,6 +183,22 @@ NamedCallTarget = NamedTuple(
 )
 
 
+def intm_return_targets(intm):
+    if intm.matches.Effect:
+        return intm.expr.returnTargets()
+
+    if intm.matches.Terminal:
+        return intm.expr.returnTargets()
+
+    if intm.matches.Simple:
+        return intm.expr.returnTargets()
+
+    if intm.matches.StackSlot:
+        return intm.expr.returnTargets()
+
+    assert False, f"Unrecognized expression intermediate {intm}"
+
+
 def intm_could_throw(intm):
     if intm.matches.Effect:
         return intm.expr.couldThrow()
@@ -205,6 +221,7 @@ ExpressionIntermediate = Alternative(
     Terminal={"expr": Expression},
     Simple={"name": str, "expr": Expression},
     StackSlot={"name": str, "expr": Expression},
+    returnTargets=intm_return_targets,
     couldThrow=intm_could_throw,
 )
 
@@ -429,6 +446,8 @@ def expr_is_simple(expr):
         return expr_is_simple(expr.ptr)
     if expr.matches.Sequence and len(expr.vals) == 1:
         return expr_is_simple(expr.vals[0])
+    if expr.matches.ApplyIntermediates and len(expr.intermediates) == 0:
+        return expr_is_simple(expr.base)
     return False
 
 
@@ -456,6 +475,9 @@ def expr_return_targets(expr):
         if isinstance(child, Expression):
             res |= child.returnTargets()
         elif isinstance(child, TupleOf(Expression)):
+            for c in child:
+                res |= c.returnTargets()
+        elif isinstance(child, TupleOf(ExpressionIntermediate)):
             for c in child:
                 res |= c.returnTargets()
 
