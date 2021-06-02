@@ -19,6 +19,7 @@ import time
 import threading
 from flaky import flaky
 import numpy
+import numpy.random
 
 
 class TestDictCompilation(unittest.TestCase):
@@ -196,6 +197,39 @@ class TestDictCompilation(unittest.TestCase):
         self.assertEqual(d.get(30), None)
         self.assertEqual(d.get(20), 20)
 
+    def test_dict_position_same(self):
+        def check(someInts):
+            dInterp = Dict(int, int)()
+            dCompil = Dict(int, int)()
+
+            for i in someInts:
+                dInterp[i] = i
+
+            @Entrypoint
+            def putThemIn(d, ints):
+                for i in ints:
+                    d[i] = i
+
+            putThemIn(dCompil, ListOf(int)(someInts))
+
+            for i in someInts:
+                assert dCompil[i] == i
+
+            @Entrypoint
+            def checkThem(d, ints):
+                for i in ints:
+                    assert d[i] == i
+
+            checkThem(dInterp, ListOf(int)(someInts))
+
+        numpy.random.seed(42)
+
+        i = 2
+        while i < 100000:
+            i = int(i * 1.5)
+            check(range(i))
+            check(numpy.random.choice(1000000, size=i).tolist())
+
     def test_adding_to_dicts(self):
         @Entrypoint
         def f(count):
@@ -357,7 +391,7 @@ class TestDictCompilation(unittest.TestCase):
         # I get about 6.5
         self.assertGreater(ratio, 3)
 
-        print("Speedup was ", ratio)
+        print("Speedup was ", ratio, ". compiled time was ", t3 - t2)
 
     @flaky(max_runs=3, min_passes=1)
     def test_dict_read_write_perf_releases_gil(self):
@@ -805,3 +839,19 @@ class TestDictCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "dictionary size changed"):
             checkIt()
+
+    def test_dict_collisions(self):
+        aDict = Dict(int, int)()
+
+        CT = 1000000
+
+        for i in range(CT):
+            aDict[i] = i
+
+        for i in range(CT, CT * 10, CT // 10):
+            t0 = time.time()
+
+            i in aDict
+
+            if time.time() - t0 > 1e-5:
+                print(i, time.time() - t0)

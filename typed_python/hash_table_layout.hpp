@@ -34,7 +34,11 @@ class hash_table_layout {
         , hash_table_count(0)
         , hash_table_empty_slots(0) {}
 
-    enum { EMPTY = -1, DELETED = -2 };
+    // We follow the same hashing scheme as the internals of pythons dictionaries
+    // as detailed here:
+    //      https://hg.python.org/cpython/file/52f68c95e025/Objects/dictobject.c#l296
+
+    enum { EMPTY = -1, DELETED = -2, PERTURB_SHIFT = 5, MIN_SIZE = 8 };
 
     void setTo(int32_t* ptr, int32_t value, size_t count) {
         for (size_t k = 0; k < count; k++) {
@@ -49,39 +53,30 @@ class hash_table_layout {
             return -1;
         }
 
-        // because typed_python has to use python's mod, which is
-        // different than c++'s mod for negative numbers, we just map
-        // negatives to positives.
         if (hash < 0) {
             hash = -hash;
         }
 
-        int32_t offset = hash % hash_table_size;
+        uint64_t mask = hash_table_size - 1;
+        uint64_t perturb = hash;
+        uint64_t offset = hash;
 
         while (true) {
             // slot is empty
-            int32_t slot = hash_table_slots[offset];
+            int32_t slot = hash_table_slots[offset & mask];
 
             if (slot == EMPTY) {
                 return -1;
             }
 
-            if (slot != DELETED && hash_table_hashes[offset] == hash
+            if (slot != DELETED && hash_table_hashes[offset & mask] == hash
                 && compare(items + item_size * slot)) {
                 return slot;
             }
 
-            offset = nextOffset(offset);
+            offset = (offset << 2) + offset + perturb + 1;
+            perturb >>= PERTURB_SHIFT;
         }
-    }
-
-    // linear search
-    int32_t nextOffset(int32_t offset) const {
-        offset += 1;
-        if (offset >= hash_table_size) {
-            offset = 0;
-        }
-        return offset;
     }
 
     // add an item to the hash table
@@ -91,28 +86,29 @@ class hash_table_layout {
             resizeTable();
         }
 
-        // because typed_python has to use python's mod, which is
-        // different than c++'s mod for negative numbers, we just map
-        // negatives to positives.
         if (hash < 0) {
             hash = -hash;
         }
 
-        int32_t offset = hash % hash_table_size;
+        uint64_t mask = hash_table_size - 1;
+        uint64_t perturb = hash;
+        uint64_t offset = hash;
+
         while (true) {
-            if (hash_table_slots[offset] == EMPTY || hash_table_slots[offset] == DELETED) {
-                if (hash_table_slots[offset] == EMPTY) {
+            if (hash_table_slots[offset & mask] == EMPTY || hash_table_slots[offset & mask] == DELETED) {
+                if (hash_table_slots[offset & mask] == EMPTY) {
                     hash_table_empty_slots--;
                 }
 
-                hash_table_slots[offset] = slot;
-                hash_table_hashes[offset] = hash;
+                hash_table_slots[offset & mask] = slot;
+                hash_table_hashes[offset & mask] = hash;
                 items_populated[slot] = 1;
                 hash_table_count++;
                 return;
             }
 
-            offset = nextOffset(offset);
+            offset = (offset << 2) + offset + perturb + 1;
+            perturb >>= PERTURB_SHIFT;
         }
     }
 
@@ -134,17 +130,16 @@ class hash_table_layout {
             resizeTable();
         }
 
-        // because typed_python has to use python's mod, which is
-        // different than c++'s mod for negative numbers, we just map
-        // negatives to positives.
         if (hash < 0) {
             hash = -hash;
         }
 
-        int32_t offset = hash % hash_table_size;
+        uint64_t mask = hash_table_size - 1;
+        uint64_t perturb = hash;
+        uint64_t offset = hash;
 
         while (true) {
-            int32_t slot = hash_table_slots[offset];
+            int32_t slot = hash_table_slots[offset & mask];
 
             if (slot == EMPTY) {
                 // we never found the item
@@ -154,14 +149,15 @@ class hash_table_layout {
             if (slot != DELETED && compare(items + item_size * slot)) {
                 items_populated[slot] = 0;
 
-                hash_table_slots[offset] = DELETED;
-                hash_table_hashes[offset] = -1;
+                hash_table_slots[offset & mask] = DELETED;
+                hash_table_hashes[offset & mask] = -1;
                 hash_table_count -= 1;
 
                 return slot;
             }
 
-            offset = nextOffset(offset);
+            offset = (offset << 2) + offset + perturb + 1;
+            perturb >>= PERTURB_SHIFT;
         }
     }
 
@@ -243,39 +239,12 @@ class hash_table_layout {
         return top_item_slot++;
     }
 
-    int32_t computeNextPrime(int32_t p) {
-        static std::vector<int32_t> primes;
-        if (!primes.size()) {
-            primes.push_back(2);
+    int32_t pickHashTableSize(int32_t minSize) {
+        int32_t ct = MIN_SIZE;
+        while (ct < minSize) {
+            ct <<= 1;
         }
-
-        auto isprime = [&](int32_t candidate) {
-            for (auto d : primes) {
-                if (candidate % d == 0) {
-                    return false;
-                }
-                if (d * d > candidate) {
-                    return true;
-                }
-            }
-            throw std::logic_error("Expected to clear the primes list.");
-        };
-
-        while (true) {
-            while (primes.back() * primes.back() < p) {
-                int32_t cur = primes.back() + 1;
-                while (!isprime(cur)) {
-                    cur++;
-                }
-                primes.push_back(cur);
-            }
-
-            if (isprime(p)) {
-                return p;
-            }
-
-            p++;
-        }
+        return ct;
     }
 
     // called after we have deleted everything that's populated, and need to
@@ -334,12 +303,7 @@ class hash_table_layout {
 
     void resizeTable() {
         if (!hash_table_slots) {
-            // experiment with pre-allocation, but didn't detect performance improvement
-            if (!hash_table_count) {
-                hash_table_size = computeNextPrime(hash_table_count * 4 + 7);
-            }
-            else
-                hash_table_size = 7;
+            hash_table_size = pickHashTableSize(hash_table_count * 4);
             hash_table_slots = (int32_t*)tp_malloc(hash_table_size * sizeof(int32_t));
             setTo(hash_table_slots, EMPTY, hash_table_size);
             hash_table_hashes = (typed_python_hash_type*)tp_malloc(hash_table_size * sizeof(typed_python_hash_type));
@@ -353,7 +317,7 @@ class hash_table_layout {
             typed_python_hash_type* oldHashes = hash_table_hashes;
 
             // make sure the table's not too small
-            hash_table_size = computeNextPrime(hash_table_count * 4 + 7);
+            hash_table_size = pickHashTableSize(hash_table_count * 4);
 
             hash_table_slots = (int32_t*)tp_malloc(hash_table_size * sizeof(int32_t));
             setTo(hash_table_slots, EMPTY, hash_table_size);
@@ -393,7 +357,7 @@ class hash_table_layout {
 
     template <class hash_fun_type>
     void buildHashTableAfterDeserialization(size_t item_size, const hash_fun_type& hash_fun) {
-        hash_table_size = computeNextPrime(items_reserved * 2.5 + 7);
+        hash_table_size = pickHashTableSize(items_reserved * 2);
         hash_table_slots = (int32_t*)tp_malloc(hash_table_size * sizeof(int32_t));
         hash_table_hashes =
           (typed_python_hash_type*)tp_malloc(hash_table_size * sizeof(typed_python_hash_type));

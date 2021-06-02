@@ -750,7 +750,7 @@ class TestSetCompilation(unittest.TestCase):
             sets.append({T(x) for x in range(0, 10000, 2)})
             sets.append({T(x) for x in range(1, 10000, 2)})
             ourSets = [S(s) for s in sets]
-            for f, threshold in [(union, 0.8), (intersection, 0.2), (difference, 0.5), (symmetric_difference, 1.0)]:
+            for f, threshold in [(union, 0.7), (intersection, 0.1), (difference, 0.4), (symmetric_difference, .5)]:
                 repeat = 2
                 a1 = 0
                 a2 = 0
@@ -775,7 +775,7 @@ class TestSetCompilation(unittest.TestCase):
 
                 self.assertEqual(a1, a2, (f, S))
 
-                print("Speedup was", ratio, "for", f, "on", S)
+                print("Speedup was", (t1 - t0), "/", (t2-t1), "=", ratio, "for", f, "on", S, ": ")
 
                 # performance could be improved
                 self.assertGreater(ratio, threshold)

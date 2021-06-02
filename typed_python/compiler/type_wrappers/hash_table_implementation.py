@@ -12,12 +12,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Int32
+from typed_python import UInt64
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
-import typed_python.compiler.native_ast as native_ast
+
 
 EMPTY = -1
 DELETED = -2
+PERTURB_SHIFT = 5
 
 
 class NativeHash(CompilableBuiltin):
@@ -44,29 +45,6 @@ class NativeHash(CompilableBuiltin):
         return super().convert_call(context, instance, args, kwargs)
 
 
-class CPlusPlusStyleMod(CompilableBuiltin):
-    def __eq__(self, other):
-        return isinstance(other, CPlusPlusStyleMod)
-
-    def __hash__(self):
-        return hash("CPlusPlusStyleMod")
-
-    def convert_call(self, context, instance, args, kwargs):
-        if len(args) == 2 and args[0].expr_type.typeRepresentation == Int32 and args[1].expr_type.typeRepresentation == int:
-            return context.pushPod(
-                int,
-                args[0].nonref_expr.cast(native_ast.Int64).mod(args[1].nonref_expr)
-            )
-
-        if len(args) == 2 and args[0].expr_type.typeRepresentation == int and args[1].expr_type.typeRepresentation == int:
-            return context.pushPod(
-                int,
-                args[0].nonref_expr.mod(args[1].nonref_expr)
-            )
-
-        return super().convert_call(context, instance, args, kwargs)
-
-
 def table_add_slot(instance, itemHash, slot):
     if (instance._hash_table_count * 2 + 1 > instance._hash_table_size or
             instance._hash_table_empty_slots < (instance._hash_table_size >> 2) + 1):
@@ -75,24 +53,27 @@ def table_add_slot(instance, itemHash, slot):
     if itemHash < 0:
         itemHash = -itemHash
 
-    offset = CPlusPlusStyleMod()(itemHash, instance._hash_table_size)
+    mask = UInt64(instance._hash_table_size) - UInt64(1)
+    perturb = UInt64(itemHash)
+    offset = UInt64(itemHash)
 
     while True:
-        if instance._hash_table_slots[offset] == EMPTY or instance._hash_table_slots[offset] == DELETED:
-            if instance._hash_table_slots[offset] == EMPTY:
+        if (
+            instance._hash_table_slots[offset & mask] == EMPTY
+            or instance._hash_table_slots[offset & mask] == DELETED
+        ):
+            if instance._hash_table_slots[offset & mask] == EMPTY:
                 instance._hash_table_empty_slots -= 1
 
-            instance._hash_table_slots[offset] = slot
-            instance._hash_table_hashes[offset] = itemHash
+            instance._hash_table_slots[offset & mask] = slot
+            instance._hash_table_hashes[offset & mask] = itemHash
             instance._items_populated[slot] = 1
             instance._hash_table_count += 1
 
             return
 
-        offset += 1
-
-        if offset >= instance._hash_table_size:
-            offset = 0
+        offset = (offset << 2) + offset + perturb + 1
+        perturb = perturb >> PERTURB_SHIFT
 
 
 def table_slot_for_key(instance, itemHash, item):
@@ -104,25 +85,24 @@ def table_slot_for_key(instance, itemHash, item):
     if itemHash < 0:
         itemHash = -itemHash
 
-    modFun = CPlusPlusStyleMod()
-
-    offset = modFun(itemHash, instance._hash_table_size)
+    mask = UInt64(instance._hash_table_size) - UInt64(1)
+    perturb = UInt64(itemHash)
+    offset = UInt64(itemHash)
 
     assert instance._hash_table_empty_slots > 0
 
     while True:
-        slotIndex = int((slots + offset).get())
+        slotIndex = int((slots + (offset & mask)).get())
 
         if slotIndex == EMPTY:
             return -1
 
-        if slotIndex != DELETED and (instance._hash_table_hashes + offset).get() == itemHash:
+        if slotIndex != DELETED and (instance._hash_table_hashes + (offset & mask)).get() == itemHash:
             if instance.getKeyByIndexUnsafe(slotIndex) == item:
                 return slotIndex
 
-        offset += 1
-        if offset >= instance._hash_table_size:
-            offset = 0
+        offset = (offset << 2) + offset + perturb + 1
+        perturb = perturb >> PERTURB_SHIFT
 
     # not necessary, but currently we don't realize that the while loop
     # never exits, and so we think there's a possibility we return None
@@ -158,10 +138,12 @@ def table_remove_key(instance, item, itemHash, raises):
     if itemHash < 0:
         itemHash = -itemHash
 
-    offset = CPlusPlusStyleMod()(itemHash, instance._hash_table_size)
+    mask = UInt64(instance._hash_table_size) - UInt64(1)
+    perturb = UInt64(itemHash)
+    offset = UInt64(itemHash)
 
     while True:
-        slotIndex = int((slots + offset).get())
+        slotIndex = int((slots + (offset & mask)).get())
 
         if slotIndex == EMPTY:
             if raises:
@@ -169,19 +151,18 @@ def table_remove_key(instance, item, itemHash, raises):
             else:
                 return 0
 
-        if slotIndex != DELETED and (instance._hash_table_hashes + offset).get() == itemHash:
+        if slotIndex != DELETED and (instance._hash_table_hashes + (offset & mask)).get() == itemHash:
             if instance.getKeyByIndexUnsafe(slotIndex) == item:
-                instance._hash_table_hashes[offset] = -1
-                instance._hash_table_slots[offset] = DELETED
+                instance._hash_table_hashes[offset & mask] = -1
+                instance._hash_table_slots[offset & mask] = DELETED
                 instance._hash_table_count -= 1
                 instance._items_populated[slotIndex] = 0
 
                 instance.deleteItemByIndexUnsafe(slotIndex)
                 return
 
-        offset += 1
-        if offset >= instance._hash_table_size:
-            offset = 0
+        offset = (offset << 2) + offset + perturb + 1
+        perturb = perturb >> PERTURB_SHIFT
 
     # not necessary, but currently we don't currently realize that the while loop
     # never exits, and so we think there's a possibility we return None
