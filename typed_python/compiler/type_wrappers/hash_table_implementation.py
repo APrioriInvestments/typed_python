@@ -72,8 +72,8 @@ def table_add_slot(instance, itemHash, slot):
 
             return
 
-        offset = (offset << 2) + offset + perturb + 1
-        perturb = perturb >> PERTURB_SHIFT
+        offset = UInt64(offset << 2) + offset + perturb + UInt64(1)
+        perturb = UInt64(perturb >> PERTURB_SHIFT)
 
 
 def table_slot_for_key(instance, itemHash, item):
@@ -89,8 +89,6 @@ def table_slot_for_key(instance, itemHash, item):
     perturb = UInt64(itemHash)
     offset = UInt64(itemHash)
 
-    assert instance._hash_table_empty_slots > 0
-
     while True:
         slotIndex = int((slots + (offset & mask)).get())
 
@@ -101,8 +99,8 @@ def table_slot_for_key(instance, itemHash, item):
             if instance.getKeyByIndexUnsafe(slotIndex) == item:
                 return slotIndex
 
-        offset = (offset << 2) + offset + perturb + 1
-        perturb = perturb >> PERTURB_SHIFT
+        offset = UInt64(offset << 2) + offset + perturb + UInt64(1)
+        perturb = UInt64(perturb >> PERTURB_SHIFT)
 
     # not necessary, but currently we don't realize that the while loop
     # never exits, and so we think there's a possibility we return None
@@ -161,7 +159,7 @@ def table_remove_key(instance, item, itemHash, raises):
                 instance.deleteItemByIndexUnsafe(slotIndex)
                 return
 
-        offset = (offset << 2) + offset + perturb + 1
+        offset = (offset << 2) + offset + perturb + UInt64(1)
         perturb = perturb >> PERTURB_SHIFT
 
     # not necessary, but currently we don't currently realize that the while loop
