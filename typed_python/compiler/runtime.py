@@ -34,6 +34,8 @@ _singletonLock = threading.RLock()
 
 typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
 
+_resultTypeCache = {}
+
 
 class RuntimeEventVisitor:
     """Base class for a Visitor that gets to see what's going on in the runtime.
@@ -351,6 +353,11 @@ class Runtime:
         argTypes = [typeWrapper(a) for a in argTypes]
         kwargTypes = {k: typeWrapper(v) for k, v in kwargTypes.items()}
 
+        key = (type(funcObj), tuple(argTypes), tuple(kwargTypes.items()))
+
+        if key in _resultTypeCache:
+            return _resultTypeCache[key]
+
         possibleTypes = []
 
         for overloadIx in range(len(funcObj.overloads)):
@@ -372,7 +379,8 @@ class Runtime:
                     if callTarget is not None and callTarget.output_type is not None:
                         possibleTypes.append(callTarget.output_type)
 
-        return mergeTypeWrappers(possibleTypes)
+        _resultTypeCache[key] = mergeTypeWrappers(possibleTypes)
+        return _resultTypeCache[key]
 
 
 def NotCompiled(pyFunc, returnTypeOverride=None):

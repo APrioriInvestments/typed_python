@@ -19,8 +19,9 @@ from typed_python import (
     localVariableTypesKnownToCompiler
 )
 from typed_python.compiler.runtime import Entrypoint
+from typed_python.compiler.runtime import Runtime
 import unittest
-
+import time
 
 A = Alternative(
     "A",
@@ -323,6 +324,18 @@ class TestTypeInference(unittest.TestCase):
 
         res = localVariableTypes(10)
         assert res == dict(x=int, y=OneOf(float, int))
+
+    def test_type_inference_perf(self):
+        t0 = time.time()
+        f = Function(lambda o: o + 1)
+
+        Runtime.singleton().resultTypeForCall(f, [int], {})
+
+        for _ in range(10000):
+            Runtime.singleton().resultTypeForCall(f, [int], {})
+
+        # I get around 0.03 on my desktop with the caching, and .7 without it
+        assert time.time() - t0 < .4
 
     def test_type_inference_with_exceptions(self):
         # check that if we catch an arbitrary exception, then we can't really
