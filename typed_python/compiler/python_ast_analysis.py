@@ -128,6 +128,14 @@ def computeVariablesAssignmentCounts(astNode, includeImports=True):
             if x.matches.Lambda:
                 return False
 
+            if (
+                x.matches.ListComp
+                or x.matches.SetComp
+                or x.matches.DictComp
+                or x.matches.GeneratorExp
+            ):
+                return False
+
         if isinstance(x, Statement):
             # we don't need to worry about all the individual operations because
             # we can catch the variable names from the Expr.Name context as they're used
@@ -138,6 +146,7 @@ def computeVariablesAssignmentCounts(astNode, includeImports=True):
                 # don't recurse into the body, since assignments there are not propagated
                 # here. When we handle global/nonlocal, we'll need to modify this behavior
                 return False
+
             if x.matches.ClassDef:
                 assignmentCounts[x.name] += 1
                 return False
@@ -386,6 +395,31 @@ def computeReadVariables(astNode):
                 variables.update(computeReadVariables(x.args))
                 return False
 
+            if (
+                x.matches.ListComp
+                or x.matches.SetComp
+                or x.matches.GeneratorExp
+                or x.matches.DictComp
+            ):
+                masked = set()
+
+                for comp in x.generators:
+                    variables.update(computeReadVariables(comp.iter).difference(masked))
+
+                    masked.update(
+                        computeAssignedVariables(comp.target)
+                    )
+
+                    variables.update(computeReadVariables(comp.ifs).difference(masked))
+
+                if x.matches.DictComp:
+                    variables.update(computeReadVariables(x.key).difference(masked))
+                    variables.update(computeReadVariables(x.value).difference(masked))
+                else:
+                    variables.update(computeReadVariables(x.elt).difference(masked))
+
+                return False
+
         if isinstance(x, Statement):
             if x.matches.FunctionDef:
                 variables.update(
@@ -400,6 +434,17 @@ def computeReadVariables(astNode):
                     )
                 )
                 variables.update(computeReadVariables(x.decorator_list))
+
+                variables.update(computeReadVariables(x.args.defaults))
+                variables.update(computeReadVariables(x.args.kw_defaults))
+
+                for a in (
+                    list(x.args.args)
+                    + list(x.args.kwonlyargs)
+                    + ([x.args.vararg] if x.args.vararg else [])
+                    + ([x.args.kwarg] if x.args.kwarg else [])
+                ):
+                    variables.update(computeReadVariables(a.annotation))
 
                 return False
             if x.matches.ClassDef:

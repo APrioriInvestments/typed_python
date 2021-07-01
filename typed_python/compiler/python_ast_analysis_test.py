@@ -134,6 +134,75 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.freeVarCheck(f, ['z'], ['AClass'])
 
+    def test_function_default_args(self):
+        SomeVar = None
+
+        def f():
+            def someFunc(x=SomeVar()):
+                return x
+
+        self.freeVarCheck(f, ['SomeVar'], ['someFunc'])
+
+    def test_function_annotations(self):
+        Something = None
+
+        def f():
+            def someFunc(x: Something):
+                return x
+
+        self.freeVarCheck(f, ['Something'], ['someFunc'])
+
+        def f():
+            def someFunc(*x: Something):
+                return x
+
+        self.freeVarCheck(f, ['Something'], ['someFunc'])
+
+        def f():
+            def someFunc(**x: Something):
+                return x
+
+        self.freeVarCheck(f, ['Something'], ['someFunc'])
+
+    def test_iterators_in_generators_not_assigned(self):
+        something = None
+        z = None
+
+        def f():
+            x = [y + z for y in something]  # noqa
+
+        self.freeVarCheck(f, ['something', 'z'], ['x'])
+
+    def test_iterators_in_generators_masking(self):
+        # this does read from 'y' even though it masks the 'y' inside
+        y = None
+        z = None
+        something = None
+
+        def f():
+            x = [y for y in y]  # noqa
+
+        self.freeVarCheck(f, ['y'], ['x'])
+
+        # this doesn't read from 'y'
+        def f():
+            x = [y for y in something if y]  # noqa
+
+        self.freeVarCheck(f, ['something'], ['x'])
+
+        # this doesn't read from 'y' or 'z' because they're bound before usage
+        def f():
+            x = [z for y in something if y for z in y]  # noqa
+
+        self.freeVarCheck(f, ['something'], ['x'])
+
+        # this reads from 'z' because 'z' gets used in the 'if' that happens before 'z' gets
+        # bound
+        def f():
+            x = [z for y in something if y or z for z in y]  # noqa
+
+        self.freeVarCheck(f, ['something', 'z'], ['x'])
+
     def test_import_aliases(self):
         def f():
             import a.b  # noqa
