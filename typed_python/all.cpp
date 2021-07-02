@@ -69,6 +69,7 @@ compile the entire group all at once.
 #include "TypeOrPyobj.cpp"
 #include "Memory.cpp"
 #include "PySlab.cpp"
+#include "PyModuleRepresentation.cpp"
 #include "Slab.cpp"
 #include "PyTemporaryReferenceTracer.cpp"
 

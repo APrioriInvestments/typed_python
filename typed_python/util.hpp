@@ -150,6 +150,10 @@ public:
         return m_ptr;
     }
 
+    PyObject* get() const {
+        return m_ptr;
+    }
+
     void set(PyObject* val) {
         if (val == m_ptr) {
             return;

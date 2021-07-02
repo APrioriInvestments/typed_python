@@ -50,7 +50,8 @@ from typed_python._types import (
     TypedCell, pointerTo, refTo, copy, identityHash,
     deepBytecount, deepcopy, deepcopyContiguous, totalBytesAllocatedInSlabs,
     deepBytecountAndSlabs, Slab,
-    totalBytesAllocatedOnFreeStore
+    totalBytesAllocatedOnFreeStore,
+    ModuleRepresentation
 )
 import typed_python._types as _types
 import threading

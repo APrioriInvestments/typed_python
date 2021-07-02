@@ -328,8 +328,6 @@ public:
 
     typed_python_hash_type hash(instance_ptr left);
 
-    // deepcopy 'src' into a Slab at 'dest'. Memory must be allocated with 'alloc'
-    // and any refcounts must be explicitly noted with 'markRefcount'
     void deepcopy(
         instance_ptr dest,
         instance_ptr src,

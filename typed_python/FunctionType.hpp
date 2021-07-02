@@ -1030,6 +1030,52 @@ public:
             });
         }
 
+        static void extractGlobalAccessesFromCode(PyCodeObject* code, std::set<std::string>& outAccesses) {
+            uint8_t* bytes;
+            Py_ssize_t bytecount;
+
+            PyBytes_AsStringAndSize(((PyCodeObject*)code)->co_code, (char**)&bytes, &bytecount);
+
+            long opcodeCount = bytecount / 2;
+
+            // opcodes are encoded in the low byte
+            auto opcodeFor = [&](int i) { return bytes[i * 2]; };
+
+            // opcode targets are encoded in the high byte
+            auto opcodeTargetFor = [&](int i) { return bytes[i * 2 + 1]; };
+
+            const uint8_t LOAD_GLOBAL = 116;
+            const uint8_t DELETE_GLOBAL = 98;
+            const uint8_t STORE_GLOBAL = 97;
+
+            for (long ix = 0; ix < opcodeCount; ix++) {
+                // if we're loading a global, we start a new sequence
+                if (opcodeFor(ix) == LOAD_GLOBAL) {
+                    PyObject* name = PyTuple_GetItem(code->co_names, opcodeTargetFor(ix));
+                    if (!PyUnicode_Check(name)) {
+                        throw std::runtime_error("Function had a non-string object in co_names");
+                    }
+                    outAccesses.insert(PyUnicode_AsUTF8(name));
+                } else if (
+                    opcodeFor(ix) == STORE_GLOBAL
+                    || opcodeFor(ix) == DELETE_GLOBAL
+                ) {
+                    PyObject* name = PyTuple_GetItem(code->co_names, opcodeTargetFor(ix));
+                    if (!PyUnicode_Check(name)) {
+                        throw std::runtime_error("Function had a non-string object in co_names");
+                    }
+                    outAccesses.insert(PyUnicode_AsUTF8(name));
+                }
+            }
+
+            // recurse into sub code objects
+            iterate(code->co_consts, [&](PyObject* o) {
+                if (PyCode_Check(o)) {
+                    extractGlobalAccessesFromCode((PyCodeObject*)o, outAccesses);
+                }
+            });
+        }
+
         static void extractNamesFromCode(PyCodeObject* code, std::set<PyObject*>& outNames) {
             iterate(code->co_names, [&](PyObject* o) { outNames.insert(o); });
             iterate(code->co_freevars, [&](PyObject* o) { outNames.insert(o); });

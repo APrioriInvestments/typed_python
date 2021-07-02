@@ -51,3 +51,19 @@ PyObject *MakeAlternativeMatcherType(PyObject* nullValue, PyObject* args);
 PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args);
 PyObject *MakeClassType(PyObject* nullValue, PyObject* args);
 PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwargs);
+
+
+typedef struct {
+    PyObject_HEAD
+    PyObject *prop_get;
+    PyObject *prop_set;
+    PyObject *prop_del;
+    PyObject *prop_doc;
+    int getter_doc;
+} JustLikeAPropertyObject;
+
+typedef struct {
+    PyObject_HEAD
+    PyObject *cm_callable;
+    PyObject *cm_dict;
+} JustLikeAClassOrStaticmethod;

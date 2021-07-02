@@ -61,6 +61,12 @@ public:
         }
     }
 
+    static TypeOrPyobj steal(PyObject* o) {
+        TypeOrPyobj res;
+        res.mPyObj = o;
+        return res;
+    }
+
     TypeOrPyobj& operator=(const TypeOrPyobj& other) {
         if (other.mPyObj) {
             incref(other.mPyObj);

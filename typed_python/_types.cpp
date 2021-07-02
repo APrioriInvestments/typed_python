@@ -36,6 +36,7 @@
 #include "UnicodeProps.hpp"
 #include "PyTemporaryReferenceTracer.hpp"
 #include "PySlab.hpp"
+#include "PyModuleRepresentation.hpp"
 #include "_types.hpp"
 
 PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
@@ -1793,15 +1794,6 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
     return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
 }
 
-typedef struct {
-    PyObject_HEAD
-    PyObject *prop_get;
-    PyObject *prop_set;
-    PyObject *prop_del;
-    PyObject *prop_doc;
-    int getter_doc;
-} JustLikeAPropertyObject;
-
 PyObject *setPropertyGetSetDel(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 4) {
         PyErr_SetString(PyExc_TypeError, "setPropertyGetSetDel takes 2 positional arguments");
@@ -1826,12 +1818,6 @@ PyObject *setPropertyGetSetDel(PyObject* nullValue, PyObject* args) {
 
     return incref(Py_None);
 }
-
-typedef struct {
-    PyObject_HEAD
-    PyObject *cm_callable;
-    PyObject *cm_dict;
-} ClassOrStaticmethod;
 
 // a struct to let us access the md_dict of a module object.
 typedef struct {
@@ -1867,7 +1853,7 @@ PyObject *setClassOrStaticmethod(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    ClassOrStaticmethod* method = (ClassOrStaticmethod*)PyTuple_GetItem(args, 0);
+    JustLikeAClassOrStaticmethod* method = (JustLikeAClassOrStaticmethod*)PyTuple_GetItem(args, 0);
     PyObject* func = PyTuple_GetItem(args, 1);
 
     incref(func);
@@ -3138,7 +3124,12 @@ PyInit__types(void)
         return NULL;
     }
 
+    if (PyType_Ready(&PyType_ModuleRepresentation) < 0) {
+        return NULL;
+    }
+
     PyModule_AddObject(module, "Slab", (PyObject*)incref(&PyType_Slab));
+    PyModule_AddObject(module, "ModuleRepresentation", (PyObject*)incref(&PyType_ModuleRepresentation));
 
     return module;
 }

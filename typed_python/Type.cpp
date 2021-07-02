@@ -144,8 +144,6 @@ void Type::constructor(instance_ptr self) {
 }
 
 
-// deepcopy 'src' into a Slab at 'dest'. Memory must be allocated with 'alloc'
-// and any refcounts must be explicitly noted with 'markRefcount'
 void Type::deepcopy(
     instance_ptr dest,
     instance_ptr src,
