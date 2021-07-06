@@ -173,6 +173,23 @@ public:
                         mVisible[key].insert(n);
                     }
                 }
+
+                if (o.typeOrPyobjAsType() && o.typeOrPyobjAsType()->isFunction()) {
+                    Function* f = (Function*)o.typeOrPyobjAsType();
+
+                    std::set<std::string> names;
+
+                    for (auto& o: f->getOverloads()) {
+                        Function::Overload::extractGlobalAccessesFromCode(
+                            (PyCodeObject*)o.getFunctionCode(), 
+                            names
+                        );
+
+                        for (auto n: names) {
+                            mVisible[key].insert(n);
+                        }
+                    }
+                }
             }
         }
     }
@@ -218,8 +235,60 @@ public:
 
     // put all the objects reachable from 'source' into 'reachable'
     void computeReachableFrom(TypeOrPyobj source, std::set<TypeOrPyobj>& reachable) {
+        if (source.typeOrPyobjAsType()) {
+            Type* t = source.typeOrPyobjAsType();
+
+            if (t->isFunction()) {
+                Function* f = (Function*)t;
+
+                for (auto& o: f->getOverloads()) {
+                    reachable.insert(TypeOrPyobj(o.getFunctionGlobals()));
+
+                    for (auto nameAndObj: o.getFunctionGlobalsInCells()) {
+                        if (nameAndObj.second) {
+                            reachable.insert(TypeOrPyobj(nameAndObj.second));
+                        }
+                    }
+
+                    if (o.getFunctionAnnotations()) {
+                        reachable.insert(o.getFunctionAnnotations());
+                    }
+
+                    if (o.getFunctionDefaults()) {
+                        reachable.insert(o.getFunctionDefaults());
+                    }
+                }
+            }
+
+            if (t->isClass()) {
+                Class* c = (Class*)t;
+
+                for (auto& base: c->getBases()) {
+                    reachable.insert(TypeOrPyobj(base));
+                }
+
+                for (auto& nameAndF: c->getOwnMemberFunctions()) {
+                    reachable.insert(TypeOrPyobj(nameAndF.second));
+                }
+                for (auto& nameAndF: c->getOwnStaticFunctions()) {
+                    reachable.insert(TypeOrPyobj(nameAndF.second));
+                }
+                for (auto& nameAndF: c->getOwnPropertyFunctions()) {
+                    reachable.insert(TypeOrPyobj(nameAndF.second));
+                }
+                for (auto& nameAndObj: c->getOwnClassMembers()) {
+                    reachable.insert(TypeOrPyobj(nameAndObj.second));
+                }
+            }
+        }
+
         if (source.pyobj()) {
             PyObject* o = source.pyobj();
+
+            if (PyInstance::isNativeType(o->ob_type)) {
+                reachable.insert(TypeOrPyobj(PyInstance::extractTypeFrom(o->ob_type)));
+                return;
+            }
 
             if (PyDict_Check(o)) {
                 PyObject *key, *value;
@@ -293,11 +362,11 @@ public:
                 if (source->cm_callable) { 
                     reachable.insert(source->cm_callable);
                 }
-                
+
                 if (source->cm_dict) { 
                     reachable.insert(source->cm_dict);
                 }
-                
+
             } else if (PyObject_HasAttrString(o, "__dict__")) {
                 PyObjectStealer dict(PyObject_GetAttrString(o, "__dict__"));
 
@@ -357,6 +426,20 @@ public:
         }
     }
 
+    // we have to assign both the Type* and PyObject* form in the memo
+    static void setMemo(
+        std::map<TypeOrPyobj, TypeOrPyobj>& objectMemo, 
+        TypeOrPyobj key, 
+        Type* valueType
+    ) {
+        Type* keyType = key.typeOrPyobjAsType();
+
+        objectMemo[TypeOrPyobj(keyType)] = TypeOrPyobj(valueType);
+        objectMemo[TypeOrPyobj((PyObject*)PyInstance::typeObj(keyType))] = TypeOrPyobj(
+            (PyObject*)PyInstance::typeObj(valueType)
+        );
+    }
+
     // duplicate 'obj', replacing references to 'sourceModule' or its dict with 'destModule' and its dict.
     // objects should be placed into 'objectMemo' and recovered from there as well.
     static TypeOrPyobj copyObject(
@@ -392,12 +475,133 @@ public:
             return obj;
         }
 
+        auto copy = [&](TypeOrPyobj o) {
+            return copyObject(o, objectMemo, externalObjects, sourceModule, destModule);
+        };
+
+        if (obj.typeOrPyobjAsType()) {
+            Type* t = obj.typeOrPyobjAsType();
+
+            if (t->isFunction()) {
+                Forward* forwardF = Forward::Make(t->name());
+
+                // put the forward into the memo
+                setMemo(objectMemo, obj, forwardF);
+
+                Function* f = (Function*)t;
+
+                std::vector<Function::Overload> overloads;
+
+                for (auto& o: f->getOverloads()) {
+                    overloads.push_back(
+                        Function::Overload(
+                            o.getFunctionCode(),
+                            o.getFunctionGlobals() ? copy(o.getFunctionGlobals()).pyobj() : nullptr,
+                            o.getFunctionDefaults() ? copy(o.getFunctionDefaults()).pyobj() : nullptr,
+                            o.getFunctionAnnotations() ? copy(o.getFunctionAnnotations()).pyobj() : nullptr,
+                            o.getFunctionGlobalsInCells(),
+                            o.getFunctionClosureVarnames(),
+                            o.getClosureVariableBindings(),
+                            o.getReturnType(),
+                            o.getArgs()
+                        )
+                    );
+                }
+
+                Function* outF = 
+                    Function::Make(
+                        f->name(),
+                        f->qualname(),
+                        f->moduleName(),
+                        overloads, 
+                        f->getClosureType(),
+                        f->isEntrypoint(),
+                        f->isNocompile()
+                    );
+
+                forwardF->define(outF);
+
+                // update the memo so its not a forward
+                setMemo(objectMemo, obj, outF);
+
+                return objectMemo[obj];
+            }
+
+            if (t->isClass()) {
+                Forward* forwardC = Forward::Make(t->name());
+
+                // put the forward into the memo
+                setMemo(objectMemo, obj, forwardC);
+
+                Class* c = (Class*)t;
+
+                std::vector<Class*> bases;
+
+                std::map<std::string, Function*> memberFunctions;
+                std::map<std::string, Function*> staticFunctions;
+                std::map<std::string, Function*> propertyFunctions;
+                std::map<std::string, PyObject*> classMembers;
+
+                for (auto& base: c->getBases()) {
+                    bases.push_back((Class*)copy(TypeOrPyobj(base->getClassType())).typeOrPyobjAsType());
+                }
+
+                for (auto& nameAndF: c->getOwnMemberFunctions()) {
+                    memberFunctions[nameAndF.first] = (Function*)copy(nameAndF.second).typeOrPyobjAsType();
+                }
+                for (auto& nameAndF: c->getOwnStaticFunctions()) {
+                    staticFunctions[nameAndF.first] = (Function*)copy(nameAndF.second).typeOrPyobjAsType();
+                }
+                for (auto& nameAndF: c->getOwnPropertyFunctions()) {
+                    propertyFunctions[nameAndF.first] = (Function*)copy(nameAndF.second).typeOrPyobjAsType();
+                }
+                for (auto& nameAndObj: c->getOwnClassMembers()) {
+                    classMembers[nameAndObj.first] = copy(nameAndObj.second).typeOrPyobjAsObject();
+                }
+
+                Type* outC = Class::Make(
+                    c->name(),
+                    bases,
+                    c->isFinal(),
+                    c->getOwnMembers(),
+                    memberFunctions,
+                    staticFunctions,
+                    propertyFunctions,
+                    classMembers
+                );
+
+                forwardC->define(outC);
+
+                // update the memo so its not a forward
+                setMemo(objectMemo, obj, outC);
+
+                return objectMemo[obj];
+            }
+        }
+
         if (obj.pyobj()) {
             PyObject* o = obj.pyobj();
 
-            auto copy = [&](PyObject* o) {
-                return copyObject(o, objectMemo, externalObjects, sourceModule, destModule);
-            };
+            if (PyInstance::isNativeType(o->ob_type)) {
+                Type* t = PyInstance::extractTypeFrom(o->ob_type);
+
+                if (t->isFunction() || t->isClass()) {
+                    // 'duplicating' types doesn't change their layout, and for the moment
+                    // we ignore the possibility that class instances could hold references
+                    // to globals through their instance data
+                    Type* updatedF = copy(TypeOrPyobj(t)).typeOrPyobjAsType();
+
+                    return TypeOrPyobj::steal(
+                        PyInstance::fromInstance(
+                            Instance::create(updatedF, ((PyInstance*)o)->dataPtr())
+                        )
+                    );
+                }
+
+                // otherwise, don't do anything
+                return obj;
+            }
+
 
             // this object is 'internal' and needs to get duplicated.
             if (PyDict_Check(o)) {
@@ -638,7 +842,7 @@ public:
                 
                 objectMemo[obj] = res;
 
-                TypeOrPyobj otherDict = copy(dict);
+                TypeOrPyobj otherDict = copy((PyObject*)dict);
 
                 if (PyObject_GenericSetDict((PyObject*)res, otherDict.pyobj(), nullptr) == -1) {
                     decref(res);
@@ -647,8 +851,6 @@ public:
 
                 return TypeOrPyobj::steal(res);
             }
-        } else {
-            //TODO: duplicate types properly
         }
 
 

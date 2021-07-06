@@ -1,9 +1,28 @@
 from typed_python import ModuleRepresentation
+from typed_python import sha_hash, identityHash
+import tempfile
 import unittest
+import os
 
 
-def evaluateInto(module, code):
-    exec(code, module.getDict())
+def evaluateInto(module, code, codeDir=None):
+    if codeDir is None:
+        exec(code, module.getDict())
+    else:
+        filename = os.path.abspath(
+            os.path.join(codeDir, sha_hash(code).hexdigest)
+        )
+
+        try:
+            os.makedirs(os.path.dirname(filename))
+        except OSError:
+            pass
+
+        with open(filename, "wb") as codeFile:
+            codeFile.write(code.encode("utf8"))
+
+        exec(compile(code, filename, "exec"), module.getDict())
+
     module.update()
     return module.getDict()
 
@@ -38,21 +57,22 @@ class TestModuleRepresentation(unittest.TestCase):
 
         evaluateInto(mr, "x = [lambda: x + 10]\n")
         assert mr.getVisibleNames('x') == ['x']
-        
+
         evaluateInto(mr, "x = set([lambda: x + 10])\n")
         assert mr.getVisibleNames('x') == ['x']
-        
+
         evaluateInto(mr, "x = {'a': lambda: x + 10}\n")
         assert mr.getVisibleNames('x') == ['x']
-        
-        evaluateInto(mr, 
+
+        evaluateInto(
+            mr,
             "class C:\n"
             "    def __init__(self, x):\n"
             "        self.x = x\n"
             "x = C(lambda: x + 10)\n"
         )
         assert mr.getVisibleNames('x') == ['x']
-    
+
     def test_canSeeMutuallyRecursive(self):
         mr = ModuleRepresentation("module")
 
@@ -72,7 +92,6 @@ class TestModuleRepresentation(unittest.TestCase):
         evaluateInto(mr, "import numpy")
         evaluateInto(mr, "array = numpy.array")
 
-        import numpy
         assert len(mr.getExternalReferences('numpy')) == 1
         assert len(mr.getExternalReferences('array')) == 1
 
@@ -128,7 +147,7 @@ class TestModuleRepresentation(unittest.TestCase):
 
         evaluateInto(mr, "y = 10")
         evaluateInto(
-            mr, 
+            mr,
             "class C:\n"
             "    def __init__(self, x):\n"
             "        self.x = x\n"
@@ -174,7 +193,7 @@ class TestModuleRepresentation(unittest.TestCase):
         assert mr2.getDict()['C'](10).prop == 10
         assert mr2.getDict()['C'].classMeth() == 10
         assert mr2.getDict()['C'].staticMeth() == 10
-        
+
         # but now mr and mr2 should be independent
         evaluateInto(mr, "y = 11")
 
@@ -189,3 +208,125 @@ class TestModuleRepresentation(unittest.TestCase):
         assert mr2.getDict()['C'](10).prop == 10
         assert mr2.getDict()['C'].classMeth() == 10
         assert mr2.getDict()['C'].staticMeth() == 10
+
+    def test_tp_functions(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(mr, "from typed_python import Entrypoint", td)
+            evaluateInto(
+                mr,
+                "@Entrypoint\n"
+                "def f(x):\n"
+                "    return g(x)\n",
+                td
+            )
+
+            assert mr.getVisibleNames('f') == ['g']
+
+            # verify we can execute and compile this, and that it throws
+            # because 'g' is not defined
+
+            with self.assertRaisesRegex(NameError, "name 'g' is not defined"):
+                mr.getDict()['f'](10)
+
+            mr2 = ModuleRepresentation("module")
+
+            # copy into mr2
+            mr.copyInto(mr2, ['f'])
+
+            evaluateInto(
+                mr2,
+                "def g(x):\n"
+                "    return x + 1\n",
+                td
+            )
+
+            assert mr2.getDict()['f'](10) == 11
+
+            assert identityHash(mr.getDict()['f']) != identityHash(mr2.getDict()['f'])
+
+    def test_tp_classes(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(mr, "from typed_python import Class, Member, Final", td)
+            evaluateInto(
+                mr,
+                "class C(Class, Final):\n"
+                "    m = Member(int)\n"
+                "    def __init__(self, x):\n"
+                "        self.m = x\n"
+                "    def f(self):\n"
+                "        return g(self.m)\n"
+                "    @staticmethod\n"
+                "    def staticF(x):\n"
+                "        return g2(x)\n"
+                "    @property\n"
+                "    def propF(self):\n"
+                "        return g3(self.m)\n",
+                td
+            )
+
+            assert mr.getVisibleNames('C') == ['g', 'g2', 'g3']
+
+            # verify we can execute and compile this, and that it throws
+            # because 'g' is not defined
+
+            with self.assertRaisesRegex(NameError, "name 'g' is not defined"):
+                mr.getDict()['C'](10).f()
+
+            with self.assertRaisesRegex(NameError, "name 'g2' is not defined"):
+                mr.getDict()['C'](10).staticF(10)
+
+            with self.assertRaisesRegex(NameError, "name 'g3' is not defined"):
+                mr.getDict()['C'](10).propF
+
+            mr2 = ModuleRepresentation("module")
+
+            # copy into mr2
+            mr.copyInto(mr2, ['C'])
+
+            evaluateInto(
+                mr2,
+                "def g(x):\n"
+                "    return x + 1\n"
+                "def g2(x):\n"
+                "    return x + 2\n"
+                "def g3(x):\n"
+                "    return x + 3\n",
+                td
+            )
+
+            assert mr2.getDict()['C'](10).f() == 11
+            assert mr2.getDict()['C'](10).staticF(10) == 12
+            assert mr2.getDict()['C'](10).propF == 13
+
+    def test_tp_class_hierarchy(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(mr, "from typed_python import Class, Member, Final", td)
+            evaluateInto(
+                mr,
+                "class Base(Class):\n"
+                "    def f(self) -> int:\n"
+                "        return Base.g()\n"
+                "    @staticmethod\n"
+                "    def g():\n"
+                "        return 2\n"
+                "class Child(Base):\n"
+                "    def f(self) -> int:\n"
+                "        return 3\n",
+                td
+            )
+
+            mr2 = ModuleRepresentation("module")
+
+            # copy into mr2
+            mr.copyInto(mr2, ['Base', 'Child'])
+
+            print(mr2.getDict()['Child'].BaseClasses)
+
+            assert mr2.getDict()['Child'].BaseClasses[0] is not mr.getDict()['Base']
+            assert mr2.getDict()['Child'].BaseClasses[0] is mr2.getDict()['Base']
