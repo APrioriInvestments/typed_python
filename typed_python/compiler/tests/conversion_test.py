@@ -3448,7 +3448,7 @@ class TestCompilationStructures(unittest.TestCase):
         speedup = normalTime / checkTime
         # i get about 10x, 5 on the github test boxes
         print("float speedup is", speedup)
-        assert speedup > 2.5
+        assert speedup > 2.0
 
     def test_compile_annotated_assignment(self):
         def f():
