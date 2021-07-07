@@ -326,7 +326,38 @@ class TestModuleRepresentation(unittest.TestCase):
             # copy into mr2
             mr.copyInto(mr2, ['Base', 'Child'])
 
-            print(mr2.getDict()['Child'].BaseClasses)
-
             assert mr2.getDict()['Child'].BaseClasses[0] is not mr.getDict()['Base']
             assert mr2.getDict()['Child'].BaseClasses[0] is mr2.getDict()['Base']
+
+    def test_tp_class_mutually_recursive_child_and_base(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(
+                mr,
+                "from typed_python import Forward, Class\n"
+                "Base = Forward('Optimizer')\n"
+                "@Base.define\n"
+                "class Base(Class):\n"
+                "    def __add__(self, x: Base) -> Base:\n"
+                "        return Child()\n",
+                td
+            )
+
+            mr2 = ModuleRepresentation("module")
+
+            # copy into mr2
+            mr.copyInto(mr2, ['Base', 'Class'])
+
+            evaluateInto(
+                mr2,
+                "class Child(Base):\n"
+                "    def __add__(self, x: Base) -> Base:\n"
+                "        return Child()\n",
+                td
+            )
+
+            Child = mr2.getDict()['Child']
+            Base = mr2.getDict()['Base']
+
+            assert type(Base() + Base()) is Child
