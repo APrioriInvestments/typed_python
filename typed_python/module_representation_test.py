@@ -495,3 +495,62 @@ class TestModuleRepresentation(unittest.TestCase):
             Child = mr2.getDict()['Child']
 
             assert issubclass(Child, Base)
+
+    def test_copying_classes_with_methods_is_transitive(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(
+                mr,
+                "class C:\n"
+                "    def f(self):\n"
+                "        self.f = x\n",
+                td
+            )
+
+            mr2 = ModuleRepresentation("module")
+            mr.copyInto(mr2, ['C'])
+
+            assert mr2.getDict()['C'].f.__globals__ is mr2.getDict()
+
+            mr3 = ModuleRepresentation("module")
+            mr2.copyInto(mr3, ['C'])
+
+            assert mr3.getDict()['C'].f.__globals__ is not mr2.getDict()
+            assert mr3.getDict()['C'].f.__globals__ is mr3.getDict()
+
+    def test_assign_to_global_scope_updates_class_and_subclass(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(
+                mr,
+                "class Base:\n"
+                "    def __init__(self, x):\n"
+                "        self.x = x + g()\n"
+                "    def asChild(self):\n"
+                "        return Child(self.x)\n",
+                td
+            )
+
+            mr2 = ModuleRepresentation("module")
+            mr.copyInto(mr2, ['Base'])
+
+            assert mr2.getDict()['Base'].__init__.__globals__ is mr2.getDict()
+
+            evaluateInto(
+                mr2,
+                "class Child(Base):\n"
+                "    def __init__(self, x):\n"
+                "        super().__init__(x + 100 + g())\n",
+                td
+            )
+
+            mr3 = ModuleRepresentation("module")
+
+            # copy into mr2
+            mr2.copyInto(mr3, ['Child', 'Base'])
+
+            Base = mr3.getDict()['Base']
+
+            assert Base.__init__.__globals__ is mr3.getDict()

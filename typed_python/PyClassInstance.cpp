@@ -61,7 +61,9 @@ void PyClassInstance::copyConstructFromPythonInstanceConcrete(Class* eltType, in
         );
 
         if (mroIndex < 0) {
-            throw std::runtime_error("Invalid MRO index encountered");
+            throw std::runtime_error("Failed to make an " + eltType->name() + " out of a " + argType->name() +
+                " because even though the latter is a subclass of the former, we got an invalid MRO index"
+            );
         }
 
         Class::initializeInstance(

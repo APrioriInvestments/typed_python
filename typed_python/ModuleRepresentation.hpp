@@ -396,19 +396,13 @@ public:
                     other.markExternal(name, o);
                 }
 
-                PyObjectHandle updateVal;
-
-                if (mExternalObjects[name].find(mPriorUpdateValues[name]) == mExternalObjects[name].end()) {
-                    updateVal = copyObject(
-                        mPriorUpdateValues[name],
-                        objectMemo,
-                        mInternalObjects[name],
-                        mModuleObject,
-                        other.mModuleObject
-                    );
-                } else {
-                    updateVal = mPriorUpdateValues[name];
-                }
+                PyObjectHandle updateVal = copyObject(
+                    mPriorUpdateValues[name],
+                    objectMemo,
+                    mInternalObjects[name],
+                    mModuleObject,
+                    other.mModuleObject
+                );
 
                 PyDict_SetItemString(
                     PyModule_GetDict(other.mModuleObject),
@@ -416,19 +410,7 @@ public:
                     updateVal.pyobj()
                 );
 
-                other.mPriorUpdateValues[name] = updateVal;
-
-                for (auto o: mInternalObjects[name]) {
-                    other.mInternalObjects[name].insert(
-                        copyObject(
-                            o,
-                            objectMemo,
-                            mInternalObjects[name],
-                            mModuleObject,
-                            other.mModuleObject
-                        )
-                    );
-                }
+                other.update(name, updateVal);
             }
         }
     }
