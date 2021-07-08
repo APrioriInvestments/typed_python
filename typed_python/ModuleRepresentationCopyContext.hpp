@@ -18,7 +18,7 @@
 
 #include "PyInstance.hpp"
 #include "FunctionType.hpp"
-#include "TypeOrPyobj.hpp"
+#include "PyObjectHandle.hpp"
 #include "_types.hpp"
 #include <set>
 #include <unordered_map>
@@ -27,24 +27,19 @@
 class ModuleRepresentationCopyContext {
 public:
     ModuleRepresentationCopyContext(
-        std::map<TypeOrPyobj, TypeOrPyobj>& inObjectMemo,
-        const std::set<TypeOrPyobj>& inExternalObjects,
+        std::unordered_map<PyObjectHandle, PyObjectHandle>& inObjectMemo,
+        const std::unordered_set<PyObjectHandle>& inInternalObjects,
         PyObject* inSourceModule,
         PyObject* inDestModule
     ) : mObjectMemo(inObjectMemo),
-        mExternalObjects(inExternalObjects),
+        mInternalObjects(inInternalObjects),
         mSourceModule(inSourceModule),
         mDestModule(inDestModule)
     {
     }
 
-    void setMemo(TypeOrPyobj key, Type* valueType) {
-        Type* keyType = key.typeOrPyobjAsType();
-
-        mObjectMemo[TypeOrPyobj(keyType)] = TypeOrPyobj(valueType);
-        mObjectMemo[TypeOrPyobj((PyObject*)PyInstance::typeObj(keyType))] = TypeOrPyobj(
-            (PyObject*)PyInstance::typeObj(valueType)
-        );
+    void setMemo(PyObjectHandle key, Type* valueType) {
+        mObjectMemo[key] = PyObjectHandle(valueType);
     }
 
     Type* copyType(Type* t) {
@@ -52,7 +47,11 @@ public:
             return t;
         }
 
-        return copy(TypeOrPyobj(t)).typeOrPyobjAsType();
+        PyObjectHandle h(t);
+
+        Type* res = copy(h).forceTypeObj();
+
+        return res;
     }
 
     PyObject* copyObj(PyObject* o) {
@@ -60,10 +59,10 @@ public:
             return o;
         }
 
-        return copy(TypeOrPyobj(o)).typeOrPyobjAsObject();
+        return copy(PyObjectHandle(o)).pyobj();
     }
 
-    static bool isPrimitive(TypeOrPyobj topo) {
+    static bool isPrimitive(PyObjectHandle topo) {
         if (!topo.pyobj()) {
             return false;
         }
@@ -74,6 +73,30 @@ public:
             return true;
         }
 
+        if (o == (PyObject*)&PyLong_Type) {
+            return true;
+        }
+
+        if (o == (PyObject*)&PyFloat_Type) {
+            return true;
+        }
+
+        if (o == (PyObject*)Py_None->ob_type) {
+            return true;
+        }
+
+        if (o == (PyObject*)&PyBool_Type) {
+            return true;
+        }
+
+        if (o == (PyObject*)&PyBytes_Type) {
+            return true;
+        }
+
+        if (o == (PyObject*)&PyUnicode_Type) {
+            return true;
+        }
+
         if (PyUnicode_Check(o) || PyLong_Check(o) || PyBytes_Check(o) || PyFloat_Check(o) || o == Py_None) {
             return true;
         }
@@ -81,7 +104,7 @@ public:
         return false;
     }
 
-    static bool isModuleObjectOrModuleDict(TypeOrPyobj topo) {
+    static bool isModuleObjectOrModuleDict(PyObjectHandle topo) {
         if (!topo.pyobj()) {
             return false;
         }
@@ -104,15 +127,11 @@ public:
 
     // duplicate 'obj', replacing references to 'mSourceModule' or its dict with 'mDestModule' and its dict.
     // objects should be placed into 'mObjectMemo' and recovered from there as well.
-    TypeOrPyobj copy(TypeOrPyobj obj) {
+    PyObjectHandle copy(PyObjectHandle obj) {
         auto inMemo = mObjectMemo.find(obj);
 
         if (inMemo != mObjectMemo.end()) {
             return inMemo->second;
-        }
-
-        if (mExternalObjects.find(obj) != mExternalObjects.end()) {
-            return obj;
         }
 
         if (isPrimitive(obj)) {
@@ -120,19 +139,24 @@ public:
         }
 
         if (obj.pyobj() && obj.pyobj() == mSourceModule) {
-            return TypeOrPyobj(mDestModule);
+            return PyObjectHandle(mDestModule);
         }
 
         if (obj.pyobj() && obj.pyobj() == PyModule_GetDict(mSourceModule)) {
-            return TypeOrPyobj(PyModule_GetDict(mDestModule));
+            return PyObjectHandle(PyModule_GetDict(mDestModule));
         }
 
         if (isModuleObjectOrModuleDict(obj)) {
             return obj;
         }
 
-        if (obj.typeOrPyobjAsType()) {
-            Type* t = obj.typeOrPyobjAsType();
+        // don't duplicate anything that's not internal to our graph
+        if (mInternalObjects.find(obj) == mInternalObjects.end()) {
+            return obj;
+        }
+
+        if (obj.typeObj()) {
+            Type* t = obj.typeObj();
 
             if (t->isFunction()) {
                 Forward* forwardF = Forward::Make(t->name());
@@ -193,7 +217,9 @@ public:
             }
 
             if (t->isClass()) {
-                Forward* forwardC = Forward::Make(t->name());
+                std::string name = t->name();
+
+                Forward* forwardC = Forward::Make(name);
 
                 // put the forward into the memo
                 setMemo(obj, forwardC);
@@ -208,24 +234,24 @@ public:
                 std::map<std::string, PyObject*> classMembers;
 
                 for (auto& base: c->getBases()) {
-                    bases.push_back((Class*)copy(TypeOrPyobj(base->getClassType())).typeOrPyobjAsType());
+                    bases.push_back((Class*)copyType(base->getClassType()));
                 }
 
                 for (auto& nameAndF: c->getOwnMemberFunctions()) {
-                    memberFunctions[nameAndF.first] = (Function*)copy(nameAndF.second).typeOrPyobjAsType();
+                    memberFunctions[nameAndF.first] = (Function*)copyType(nameAndF.second);
                 }
                 for (auto& nameAndF: c->getOwnStaticFunctions()) {
-                    staticFunctions[nameAndF.first] = (Function*)copy(nameAndF.second).typeOrPyobjAsType();
+                    staticFunctions[nameAndF.first] = (Function*)copyType(nameAndF.second);
                 }
                 for (auto& nameAndF: c->getOwnPropertyFunctions()) {
-                    propertyFunctions[nameAndF.first] = (Function*)copy(nameAndF.second).typeOrPyobjAsType();
+                    propertyFunctions[nameAndF.first] = (Function*)copyType(nameAndF.second);
                 }
                 for (auto& nameAndObj: c->getOwnClassMembers()) {
-                    classMembers[nameAndObj.first] = copy(nameAndObj.second).typeOrPyobjAsObject();
+                    classMembers[nameAndObj.first] = copyObj(nameAndObj.second);
                 }
 
                 Type* outC = Class::Make(
-                    c->name(),
+                    name,
                     bases,
                     c->isFinal(),
                     c->getOwnMembers(),
@@ -252,7 +278,7 @@ public:
                 Forward* f = (Forward*)t;
 
                 if (f->getTarget()) {
-                    newForward->define(copy(f->getTarget()).typeOrPyobjAsType());
+                    newForward->define(copyType(f->getTarget()));
                 }
 
                 return mObjectMemo[obj];
@@ -269,9 +295,9 @@ public:
                     // 'duplicating' types doesn't change their layout, and for the moment
                     // we ignore the possibility that class instances could hold references
                     // to globals through their instance data
-                    Type* updatedF = copy(TypeOrPyobj(t)).typeOrPyobjAsType();
+                    Type* updatedF = copyType(t);
 
-                    return TypeOrPyobj::steal(
+                    return PyObjectHandle::steal(
                         PyInstance::fromInstance(
                             Instance::create(updatedF, ((PyInstance*)o)->dataPtr())
                         )
@@ -300,7 +326,7 @@ public:
                     );
                 }
 
-                return TypeOrPyobj::steal(res);
+                return PyObjectHandle::steal(res);
             } else if (PyTuple_Check(o)) {
                 // empty tuple is a singleton
                 if (!PyTuple_Size(o)) {
@@ -316,7 +342,7 @@ public:
                     PyTuple_SET_ITEM(res, k, incref(copy(PyTuple_GetItem(o, k)).pyobj()));
                 }
 
-                return TypeOrPyobj::steal(res);
+                return PyObjectHandle::steal(res);
             } else if (PyList_Check(o)) {
                 PyObject* res = PyList_New(PyList_Size(o));
                 mObjectMemo[obj] = res;
@@ -326,7 +352,7 @@ public:
                     PyList_SetItem(res, k, incref(copy(PyList_GetItem(o, k)).pyobj()));
                 }
 
-                return TypeOrPyobj::steal(res);
+                return PyObjectHandle::steal(res);
             } else if (PySet_Check(o)) {
                 PyObject* res = PySet_New(nullptr);
                 mObjectMemo[obj] = res;
@@ -335,7 +361,7 @@ public:
                     PySet_Add(res, copy(o2).pyobj());
                 });
 
-                return TypeOrPyobj::steal(res);
+                return PyObjectHandle::steal(res);
             } else if (o->ob_type == &PyProperty_Type) {
                 static PyObject* nones = PyTuple_Pack(3, Py_None, Py_None, Py_None);
 
@@ -377,7 +403,7 @@ public:
 
                 dest->getter_doc = source->getter_doc;
 
-                return TypeOrPyobj::steal(res);
+                return PyObjectHandle::steal(res);
             } else if (o->ob_type == &PyStaticMethod_Type || o->ob_type == &PyClassMethod_Type) {
                 static PyObject* nones = PyTuple_Pack(1, Py_None);
 
@@ -403,7 +429,7 @@ public:
                     dest->cm_dict = nullptr;
                 }
 
-                return TypeOrPyobj::steal(res);
+                return PyObjectHandle::steal(res);
             } else if (PyFunction_Check(o)) {
                 PyObject* res = PyFunction_New(
                     PyFunction_GetCode(o),
@@ -445,16 +471,21 @@ public:
                     outF->func_qualname = incref(inF->func_qualname);
                 }
 
-                return TypeOrPyobj::steal(res);
+                return PyObjectHandle::steal(res);
             } else if (PyCell_Check(o)) {
-                PyObject* res = PyCell_New(copy(PyCell_GET(o)).pyobj());
+                PyObject* res = PyCell_New(nullptr);
                 mObjectMemo[obj] = res;
-                return TypeOrPyobj::steal(res);
+
+                if (PyCell_GET(o)) {
+                    PyCell_Set(res, copy(PyCell_GET(o)).pyobj());
+                }
+
+                return PyObjectHandle::steal(res);
             } else if (PyType_Check(o)) {
                 if (o->ob_type == &PyType_Type) {
                     PyTypeObject* in = (PyTypeObject*)o;
 
-                    TypeOrPyobj bases;
+                    PyObjectHandle bases;
 
                     if (in->tp_bases) {
                         bases = copy(in->tp_bases);
@@ -475,12 +506,14 @@ public:
 
                     PyObject* res = PyObject_CallObject((PyObject*)&PyType_Type, (PyObject*)tpNewArgs);
 
+                    mObjectMemo[obj] = res;
+
                     if (!res) {
                         throw PythonExceptionSet();
                     }
 
                     if (in->tp_dict) {
-                        TypeOrPyobj newTypeDict = copy(in->tp_dict);
+                        PyObjectHandle newTypeDict = copy(in->tp_dict);
 
                         PyObject *key, *value;
                         Py_ssize_t pos = 0;
@@ -492,15 +525,21 @@ public:
                         }
                     }
 
-                    mObjectMemo[obj] = res;
+                    if (PyObject_HasAttrString(o, "__module__")) {
+                        PyObject_SetAttrString(res, "__module__", PyObject_GetAttrString(o, "__module__"));
+                    }
 
-                    return TypeOrPyobj::steal(res);
+                    if (PyObject_HasAttrString(o, "__doc__")) {
+                        PyObject_SetAttrString(res, "__doc__", PyObject_GetAttrString(o, "__doc__"));
+                    }
+
+                    return PyObjectHandle::steal(res);
                 }
             } else if (PyObject_HasAttrString(o, "__dict__")) {
                 PyObjectStealer dict(PyObject_GetAttrString(o, "__dict__"));
 
                 // duplicate the type object itself
-                TypeOrPyobj typeObjAsPyObj = copy((PyObject*)o->ob_type);
+                PyObjectHandle typeObjAsPyObj = copy((PyObject*)o->ob_type);
 
                 if (!PyType_Check(typeObjAsPyObj.pyobj())) {
                     throw std::runtime_error(
@@ -522,14 +561,14 @@ public:
 
                 mObjectMemo[obj] = res;
 
-                TypeOrPyobj otherDict = copy((PyObject*)dict);
+                PyObjectHandle otherDict = copy((PyObject*)dict);
 
                 if (PyObject_GenericSetDict((PyObject*)res, otherDict.pyobj(), nullptr) == -1) {
                     decref(res);
                     throw PythonExceptionSet();
                 }
 
-                return TypeOrPyobj::steal(res);
+                return PyObjectHandle::steal(res);
             }
         }
 
@@ -538,8 +577,8 @@ public:
     }
 
 private:
-    std::map<TypeOrPyobj, TypeOrPyobj>& mObjectMemo;
-    const std::set<TypeOrPyobj>& mExternalObjects;
+    std::unordered_map<PyObjectHandle, PyObjectHandle>& mObjectMemo;
+    const std::unordered_set<PyObjectHandle>& mInternalObjects;
     PyObject* mSourceModule;
     PyObject* mDestModule;
 };

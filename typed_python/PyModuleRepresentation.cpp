@@ -111,11 +111,7 @@ PyObject* PyModuleRepresentation::getInternalReferences(PyModuleRepresentation* 
         PyObject* res = PyList_New(0);
 
         for (auto o: self->mModuleRepresentation->getInternalReferences(name)) {
-            if (o.pyobj()) {
-                PyList_Append(res, o.pyobj());
-            } else {
-                PyList_Append(res, (PyObject*)PyInstance::typeObj(o.type()));
-            }
+            PyList_Append(res, o.pyobj());
         }
 
         return res;
@@ -139,11 +135,7 @@ PyObject* PyModuleRepresentation::getExternalReferences(PyModuleRepresentation* 
         PyObject* res = PyList_New(0);
 
         for (auto o: self->mModuleRepresentation->getExternalReferences(name)) {
-            if (o.pyobj()) {
-                PyList_Append(res, o.pyobj());
-            } else {
-                PyList_Append(res, (PyObject*)PyInstance::typeObj(o.type()));
-            }
+            PyList_Append(res, o.pyobj());
         }
 
         return res;
@@ -242,7 +234,7 @@ PyObject* PyModuleRepresentation::copyInto(PyModuleRepresentation* self, PyObjec
 
             namesAsStrings.insert(PyUnicode_AsUTF8(aName));
         });
-            
+
 
         self->mModuleRepresentation->copyInto(*otherAsModule->mModuleRepresentation, namesAsStrings);
 

@@ -134,6 +134,19 @@ public:
     // return pyobj(), or convert the Type to its pyobj and return that.
     PyObject* typeOrPyobjAsObject() const;
 
+    // make sure that if we're a type object, we have the type in the Type slot
+    TypeOrPyobj canonical() const {
+        if (mType) {
+            return *this;
+        }
+
+        if (typeOrPyobjAsType()) {
+            return TypeOrPyobj(typeOrPyobjAsType());
+        }
+
+        return *this;
+    }
+
 private:
     Type* mType;
     PyObject* mPyObj;

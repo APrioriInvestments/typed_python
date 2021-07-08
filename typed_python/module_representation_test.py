@@ -361,3 +361,137 @@ class TestModuleRepresentation(unittest.TestCase):
             Base = mr2.getDict()['Base']
 
             assert type(Base() + Base()) is Child
+
+    def test_copy_into_doesnt_duplicate_unnecessarily(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(
+                mr,
+                "list1 = [1, 2, 3]\n"
+                "def f(): return list2\n"
+                "list2 = [f]\n",
+                td
+            )
+
+            mr2 = ModuleRepresentation("module")
+
+            # copy into mr2
+            mr.copyInto(mr2, ['list1', 'list2', 'f'])
+
+            assert mr.getDict()['list1'] is mr2.getDict()['list1']
+            assert mr.getDict()['list2'] is not mr2.getDict()['list2']
+
+    def test_duplicated_class_object_module_and_name(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(
+                mr,
+                "class C:\n"
+                "    'docstring'\n"
+                "    def f(self): return 10\n"
+                "    def g(self): return C\n",
+                td
+            )
+
+            assert mr.getVisibleNames('C') == ['C']
+
+            mr2 = ModuleRepresentation("module")
+
+            # copy into mr2
+            mr.copyInto(mr2, ['C'])
+
+            C1 = mr.getDict()['C']
+            C2 = mr2.getDict()['C']
+
+            assert C1.__doc__ == C2.__doc__
+            assert C1.__module__ == C2.__module__
+
+    def test_class_method_closures_get_copied(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(
+                mr,
+                "class C:\n"
+                "    def c(self):\n"
+                "        return __class__\n"
+                "    def c2(self):\n"
+                "        return C\n"
+                "    def c3(self):\n"
+                "        return x\n"
+                "x = 10\n",
+                td
+            )
+
+            assert mr.getVisibleNames('C') == ['C', 'x']
+
+            mr2 = ModuleRepresentation("module")
+
+            # copy into mr2
+            mr.copyInto(mr2, ['C', 'x'])
+
+            C1 = mr.getDict()['C']
+            C2 = mr2.getDict()['C']
+
+            assert C1 is not C2
+
+            assert C1().c() is C1
+
+            assert C2().c2() is C2
+            assert C2().c() is C2
+            assert C2().c() is not C1
+
+    def test_copy_in_native_base_class(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(
+                mr,
+                "class Base:\n"
+                "    pass\n"
+                "class Child(Base):\n"
+                "    def f(self):\n"
+                "        return x\n",
+                td
+            )
+
+            assert mr.getDict()['Base'] not in mr.getInternalReferences('Child')
+
+            mr2 = ModuleRepresentation("module")
+
+            # copy into mr2
+            mr.copyInto(mr2, ['Child'])
+
+            Base = mr.getDict()['Base']
+            Child = mr2.getDict()['Child']
+
+            assert issubclass(Child, Base)
+
+    def test_copy_in_tp_base_class(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(
+                mr,
+                "from typed_python import Class\n"
+                "class Base(Class):\n"
+                "    pass\n"
+                "class Child(Base):\n"
+                "    def f(self) -> int:\n"
+                "        return x\n",
+                td
+            )
+
+            assert mr.getDict()['Base'] not in mr.getInternalReferences('Child')
+
+            mr2 = ModuleRepresentation("module")
+
+            # copy into mr2
+            mr.copyInto(mr2, ['Child'])
+
+            Base = mr.getDict()['Base']
+            Child = mr2.getDict()['Child']
+
+            assert issubclass(Child, Base)

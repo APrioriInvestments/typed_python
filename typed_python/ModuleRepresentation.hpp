@@ -18,7 +18,7 @@
 
 #include "PyInstance.hpp"
 #include "FunctionType.hpp"
-#include "TypeOrPyobj.hpp"
+#include "PyObjectHandle.hpp"
 #include "_types.hpp"
 #include <set>
 #include <unordered_map>
@@ -48,7 +48,7 @@ public:
         mExternalObjects[nameStr].clear();
         mInternalObjects[nameStr].clear();
 
-        markExternal(nameStr, TypeOrPyobj(value));
+        markExternal(nameStr, PyObjectHandle(value));
 
         mVisible[nameStr];
         mPriorUpdateValues[nameStr] = value;
@@ -74,7 +74,7 @@ public:
         }
     }
 
-    void update(std::string key, TypeOrPyobj value) {
+    void update(std::string key, PyObjectHandle value) {
         if (value == mPriorUpdateValues[key]) {
             return;
         }
@@ -100,65 +100,70 @@ public:
         // we've found an external object, which we mark
 
         // all objects we've seen.
-        std::set<TypeOrPyobj> visited;
+        std::unordered_set<PyObjectHandle> visited;
 
+        // for each object, all the objects that can see it that we visited
+        std::unordered_map<PyObjectHandle, std::unordered_set<PyObjectHandle> > incoming;
+
+        // everything we still need to walk
+        std::unordered_set<PyObjectHandle> toCheck;
+        toCheck.insert(value);
+
+        // don't look inside of these
+        visited.insert(moduleObjectDict);
+        visited.insert(mModuleObject.get());
+
+        while (toCheck.size()) {
+            PyObjectHandle item = *toCheck.begin();
+            toCheck.erase(item);
+
+            visited.insert(item);
+            std::set<PyObjectHandle> reachable;
+            computeReachableFrom(item, reachable);
+
+            for (auto r: reachable) {
+                incoming[r].insert(item);
+
+                // we need to look inside this object if its not visited.
+                // however we exclude modules and module dicts, as well as
+                // primitive (like integers, etc.)
+                if (!isPrimitive(r)
+                    && !isModuleObjectOrModuleDict(r)
+                    && visited.find(r) == visited.end()
+                    && mExternalCount.find(r) == mExternalCount.end()) {
+                    toCheck.insert(r);
+                }
+            }
+        }
+
+        // visited should have everything in it now, so we can walk over it and compute the
+        // internal subset, which consists of everything reachable from the module object
+        // or the module object dict.
         // objects that can reach our module object or its dict
-        std::set<TypeOrPyobj> internalObjects;
+        std::unordered_set<PyObjectHandle> internalObjects;
 
-        // the stack above us
-        std::vector<TypeOrPyobj> stack;
-        std::set<TypeOrPyobj> stackSet;
+        toCheck.insert(mModuleObject.get());
+        toCheck.insert(moduleObjectDict);
 
-        // for each thing we're checking, which values below it do we need
-        // to look at
-        std::map<TypeOrPyobj, std::set<TypeOrPyobj> > toCheck;
+        while (toCheck.size()) {
+            PyObjectHandle item = *toCheck.begin();
+            toCheck.erase(item);
 
-        stack.push_back(value);
-        stackSet.insert(value);
-        visited.insert(value);
-
-        while (stack.size()) {
-            // what we have on the stack is new.
-            TypeOrPyobj item = stack.back();
-
-            if (toCheck.find(item) == toCheck.end()) {
-                computeReachableFrom(item, toCheck[item]);
+            if (item != moduleObjectDict && item != mModuleObject.get()) {
+                internalObjects.insert(item);
             }
 
-            auto toCheckIt = toCheck.find(item);
-
-            if (toCheckIt->second.size() == 0) {
-                // we've checked everything below 'item' without consuming it,
-                // so it must not be 'internal'
-                stack.pop_back();
-                stackSet.erase(item);
-                toCheck.erase(item);
-                visited.insert(item);
-            } else {
-                TypeOrPyobj reachable = *toCheckIt->second.begin();
-                toCheckIt->second.erase(reachable);
-
-                // this object can reach our module. That means the entire stack above us
-                // also reaches the module object
-                if (reachable == moduleObjectDict || reachable == mModuleObject.get()) {
-                    // mark the entire stack as internal and 'visited'. We'll still unwind
-                    // the stack above us, but we won't worry about this otherwise
-                    for (long k = 0; k < stack.size(); k++) {
-                        internalObjects.insert(stack[k]);
-                        visited.insert(stack[k]);
-                    }
-                } else if (visited.find(reachable) == visited.end()) {
-                    // don't reach into module objects or module dicts
-                    if (!isModuleObjectOrModuleDict(reachable)) {
-                        // we have not visited this object before. Push it on the stack
-                        stack.push_back(reachable);
-                        stackSet.insert(reachable);
-                    }
+            for (auto i: incoming[item]) {
+                if (internalObjects.find(i) == internalObjects.end()) {
+                    toCheck.insert(i);
                 }
             }
         }
 
         for (auto o: visited) {
+            if (o == mModuleObject.get() || o == moduleObjectDict) {
+                // do nothing
+            } else
             if (internalObjects.find(o) == internalObjects.end()) {
                 markExternal(key, o);
             } else {
@@ -177,8 +182,8 @@ public:
                     }
                 }
 
-                if (o.typeOrPyobjAsType() && o.typeOrPyobjAsType()->isFunction()) {
-                    Function* f = (Function*)o.typeOrPyobjAsType();
+                if (o.typeObj() && o.typeObj()->isFunction()) {
+                    Function* f = (Function*)o.typeObj();
 
                     std::set<std::string> names;
 
@@ -197,18 +202,18 @@ public:
         }
     }
 
-    static bool isModuleObjectOrModuleDict(TypeOrPyobj topo) {
+    static bool isModuleObjectOrModuleDict(PyObjectHandle topo) {
         return ModuleRepresentationCopyContext::isModuleObjectOrModuleDict(topo);
     }
 
-    static bool isPrimitive(TypeOrPyobj topo) {
+    static bool isPrimitive(PyObjectHandle topo) {
         return ModuleRepresentationCopyContext::isPrimitive(topo);
     }
 
-    // put all the objects reachable from 'source' into 'reachable'
-    void computeReachableFrom(TypeOrPyobj source, std::set<TypeOrPyobj>& reachable) {
-        if (source.typeOrPyobjAsType()) {
-            Type* t = source.typeOrPyobjAsType();
+    // put all the objects reachable from 'source' into 'reachable'.
+    void computeReachableFrom(PyObjectHandle source, std::set<PyObjectHandle>& reachable) {
+        if (source.typeObj()) {
+            Type* t = source.typeObj();
 
             if (t->isFunction()) {
                 Function* f = (Function*)t;
@@ -224,11 +229,11 @@ public:
                         }
                     }
 
-                    reachable.insert(TypeOrPyobj(o.getFunctionGlobals()));
+                    reachable.insert(PyObjectHandle(o.getFunctionGlobals()));
 
                     for (auto nameAndObj: o.getFunctionGlobalsInCells()) {
                         if (nameAndObj.second) {
-                            reachable.insert(TypeOrPyobj(nameAndObj.second));
+                            reachable.insert(PyObjectHandle(nameAndObj.second));
                         }
                     }
 
@@ -241,7 +246,7 @@ public:
                     }
 
                     if (o.getReturnType()) {
-                        reachable.insert(TypeOrPyobj(o.getReturnType()));
+                        reachable.insert(PyObjectHandle(o.getReturnType()));
                     }
                 }
             }
@@ -250,20 +255,20 @@ public:
                 Class* c = (Class*)t;
 
                 for (auto& base: c->getBases()) {
-                    reachable.insert(TypeOrPyobj(base));
+                    reachable.insert(PyObjectHandle(base->getClassType()));
                 }
 
                 for (auto& nameAndF: c->getOwnMemberFunctions()) {
-                    reachable.insert(TypeOrPyobj(nameAndF.second));
+                    reachable.insert(PyObjectHandle(nameAndF.second));
                 }
                 for (auto& nameAndF: c->getOwnStaticFunctions()) {
-                    reachable.insert(TypeOrPyobj(nameAndF.second));
+                    reachable.insert(PyObjectHandle(nameAndF.second));
                 }
                 for (auto& nameAndF: c->getOwnPropertyFunctions()) {
-                    reachable.insert(TypeOrPyobj(nameAndF.second));
+                    reachable.insert(PyObjectHandle(nameAndF.second));
                 }
                 for (auto& nameAndObj: c->getOwnClassMembers()) {
-                    reachable.insert(TypeOrPyobj(nameAndObj.second));
+                    reachable.insert(PyObjectHandle(nameAndObj.second));
                 }
             }
 
@@ -271,16 +276,18 @@ public:
                 Forward* f = (Forward*)t;
 
                 if (f->getTarget()) {
-                    reachable.insert(TypeOrPyobj(f->getTarget()));
+                    reachable.insert(PyObjectHandle(f->getTarget()));
                 }
             }
+
+            return;
         }
 
         if (source.pyobj()) {
             PyObject* o = source.pyobj();
 
             if (PyInstance::isNativeType(o->ob_type)) {
-                reachable.insert(TypeOrPyobj(PyInstance::extractTypeFrom(o->ob_type)));
+                reachable.insert(PyObjectHandle(PyInstance::extractTypeFrom(o->ob_type)));
                 return;
             }
 
@@ -364,7 +371,7 @@ public:
             } else if (PyObject_HasAttrString(o, "__dict__")) {
                 PyObjectStealer dict(PyObject_GetAttrString(o, "__dict__"));
 
-                computeReachableFrom(TypeOrPyobj(dict), reachable);
+                computeReachableFrom(PyObjectHandle(dict), reachable);
 
                 // the type object itself is also reachable
                 reachable.insert((PyObject*)o->ob_type);
@@ -378,7 +385,7 @@ public:
         // make sure we're up to date
         update();
 
-        std::map<TypeOrPyobj, TypeOrPyobj> objectMemo;
+        std::unordered_map<PyObjectHandle, PyObjectHandle> objectMemo;
 
         for (auto name: names) {
             if (mPriorUpdateValues.find(name) != mPriorUpdateValues.end()) {
@@ -389,18 +396,24 @@ public:
                     other.markExternal(name, o);
                 }
 
-                TypeOrPyobj updateVal = copyObject(
-                    mPriorUpdateValues[name],
-                    objectMemo,
-                    mExternalObjects[name],
-                    mModuleObject,
-                    other.mModuleObject
-                );
+                PyObjectHandle updateVal;
+
+                if (mExternalObjects[name].find(mPriorUpdateValues[name]) == mExternalObjects[name].end()) {
+                    updateVal = copyObject(
+                        mPriorUpdateValues[name],
+                        objectMemo,
+                        mInternalObjects[name],
+                        mModuleObject,
+                        other.mModuleObject
+                    );
+                } else {
+                    updateVal = mPriorUpdateValues[name];
+                }
 
                 PyDict_SetItemString(
                     PyModule_GetDict(other.mModuleObject),
                     name.c_str(),
-                    updateVal.typeOrPyobjAsObject()
+                    updateVal.pyobj()
                 );
 
                 other.mPriorUpdateValues[name] = updateVal;
@@ -410,7 +423,7 @@ public:
                         copyObject(
                             o,
                             objectMemo,
-                            mExternalObjects[name],
+                            mInternalObjects[name],
                             mModuleObject,
                             other.mModuleObject
                         )
@@ -420,15 +433,15 @@ public:
         }
     }
 
-    static TypeOrPyobj copyObject(
-            TypeOrPyobj obj,
-            std::map<TypeOrPyobj, TypeOrPyobj>& objectMemo,
-            const std::set<TypeOrPyobj>& externalObjects,
+    static PyObjectHandle copyObject(
+            PyObjectHandle obj,
+            std::unordered_map<PyObjectHandle, PyObjectHandle>& objectMemo,
+            const std::unordered_set<PyObjectHandle>& internalObjects,
             PyObject* sourceModule,
             PyObject* destModule
         )
     {
-        ModuleRepresentationCopyContext ctx(objectMemo, externalObjects, sourceModule, destModule);
+        ModuleRepresentationCopyContext ctx(objectMemo, internalObjects, sourceModule, destModule);
 
         return ctx.copy(obj);
     }
@@ -445,7 +458,7 @@ public:
         mInternalObjects.erase(name);
     }
 
-    void markExternal(std::string name, TypeOrPyobj o) {
+    void markExternal(std::string name, PyObjectHandle o) {
         if (mExternalObjects[name].find(o) != mExternalObjects[name].end()) {
             return;
         }
@@ -454,11 +467,11 @@ public:
         incExternal(o);
     }
 
-    void incExternal(TypeOrPyobj o) {
+    void incExternal(PyObjectHandle o) {
         mExternalCount[o] += 1;
     }
 
-    void decExternal(TypeOrPyobj o) {
+    void decExternal(PyObjectHandle o) {
         mExternalCount[o] -= 1;
 
         if (!mExternalCount[o]) {
@@ -466,8 +479,8 @@ public:
         }
     }
 
-    const std::set<TypeOrPyobj>& getInternalReferences(std::string name) {
-        static std::set<TypeOrPyobj> empty;
+    const std::unordered_set<PyObjectHandle>& getInternalReferences(std::string name) {
+        static std::unordered_set<PyObjectHandle> empty;
 
         auto it = mInternalObjects.find(name);
         if (it == mInternalObjects.end()) {
@@ -477,8 +490,8 @@ public:
         return it->second;
     }
 
-    const std::set<TypeOrPyobj>& getExternalReferences(std::string name) {
-        static std::set<TypeOrPyobj> empty;
+    const std::unordered_set<PyObjectHandle>& getExternalReferences(std::string name) {
+        static std::unordered_set<PyObjectHandle> empty;
 
         auto it = mExternalObjects.find(name);
         if (it == mExternalObjects.end()) {
@@ -505,14 +518,14 @@ public:
     std::map<std::string, std::set<std::string> > mVisible;
 
     // for each module member, the last value we used to compute the update
-    std::map<std::string, TypeOrPyobj> mPriorUpdateValues;
+    std::map<std::string, PyObjectHandle> mPriorUpdateValues;
 
     // for each module member, what is reachable from it that's considered external
-    std::map<std::string, std::set<TypeOrPyobj> > mExternalObjects;
+    std::map<std::string, std::unordered_set<PyObjectHandle> > mExternalObjects;
 
     // for each module member, the objects that are reachable from it back to the module
-    std::map<std::string, std::set<TypeOrPyobj> > mInternalObjects;
+    std::map<std::string, std::unordered_set<PyObjectHandle> > mInternalObjects;
 
     // for each thing that's considered external, how many things can reach it?
-    std::map<TypeOrPyobj, long> mExternalCount;
+    std::unordered_map<PyObjectHandle, long> mExternalCount;
 };
