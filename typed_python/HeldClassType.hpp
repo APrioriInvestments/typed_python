@@ -940,6 +940,13 @@ public:
             return it->second;
         }
 
+        // check if an 'equivalent' class is floating around in there.
+        for (long k = 0; k < m_mro.size(); k++) {
+            if (Type::typesEquivalent(m_mro[k], ancestor)) {
+                return k;
+            }
+        }
+
         return -1;
     }
 

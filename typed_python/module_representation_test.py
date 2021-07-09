@@ -1,5 +1,6 @@
-from typed_python import ModuleRepresentation
-from typed_python import sha_hash, identityHash
+from typed_python import ModuleRepresentation, SerializationContext
+from typed_python import sha_hash, identityHash, ListOf
+
 import tempfile
 import unittest
 import os
@@ -554,3 +555,40 @@ class TestModuleRepresentation(unittest.TestCase):
             Base = mr3.getDict()['Base']
 
             assert Base.__init__.__globals__ is mr3.getDict()
+
+    def test_duplicated_child_class_interchangeable(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+            mr2 = ModuleRepresentation("module")
+
+            for m in [mr, mr2]:
+                evaluateInto(
+                    m,
+                    "from typed_python import Class\n"
+                    "class Base(Class):\n"
+                    "    pass\n"
+                    "class Child(Base):\n"
+                    "    pass\n",
+                    td
+                )
+
+            Base1 = mr.getDict()['Base']
+            Child1 = mr.getDict()['Child']
+
+            Base2 = mr2.getDict()['Base']
+            Child2 = mr2.getDict()['Child']
+
+            sc = SerializationContext()
+
+            # round-trip serialize these two, which places them in the main memo
+            sc.deserialize(sc.serialize(Child1))
+            sc.deserialize(sc.serialize(Base1))
+
+            ChildDup2 = sc.deserialize(sc.serialize(Child2))
+
+            # we should see that ChildDup2 is actually equal to Child1 because of the memo
+            assert ChildDup2 is Child1
+
+            # but that shouldn't prevent us from using it interchangeably because
+            # its the 'type identical'
+            ListOf(Base2)([Child1()])
