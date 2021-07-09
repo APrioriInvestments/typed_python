@@ -1119,6 +1119,9 @@ public:
             PyObject *key, *value;
             Py_ssize_t pos = 0;
 
+            // place them in sorted order
+            std::map<std::string, std::pair<PyObject*, PyObject*> > toCopy;
+
             while (PyDict_Next(mFunctionGlobals, &pos, &key, &value)) {
                 if (PyUnicode_Check(key)) {
                     std::string globalName = PyUnicode_AsUTF8(key);
@@ -1130,10 +1133,14 @@ public:
                     }
 
                     if (allNamesString.find(shortGlobalName) != allNamesString.end()) {
-                        if (PyDict_SetItem(result, key, value)) {
-                            throw PythonExceptionSet();
-                        }
+                        toCopy[globalName] = std::make_pair(key, value);
                     }
+                }
+            }
+
+            for (auto& nameandKV: toCopy) {
+                if (PyDict_SetItem(result, nameandKV.second.first, nameandKV.second.second)) {
+                    throw PythonExceptionSet();
                 }
             }
 

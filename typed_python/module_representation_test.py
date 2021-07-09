@@ -599,14 +599,19 @@ class TestModuleRepresentation(unittest.TestCase):
 
             evaluateInto(
                 mr,
+                "from typed_python import NotCompiled\n"
                 "x = 1\n"
                 "y = 1\n"
                 "def f():\n"
+                "    return x + y\n"
+                "@NotCompiled\n"
+                "def fTyped():\n"
                 "    return x + y\n",
                 td
             )
 
             f = mr.getDict()['f']
+            fTyped = mr.getDict()['fTyped']
 
             sc = (
                 SerializationContext()
@@ -615,21 +620,23 @@ class TestModuleRepresentation(unittest.TestCase):
                 .withSerializeHashSequence()
             )
 
+            globalDict = mr.getDict()
+
             # serialize once with 'x' before 'y'
-            del f.__globals__['x']
-            del f.__globals__['y']
-            f.__globals__['x'] = 1
-            f.__globals__['y'] = 1
-            assert list(f.__globals__).index('x') < list(f.__globals__).index('y')
-            serialization1 = sc.serialize(f)
+            del globalDict['x']
+            del globalDict['y']
+            globalDict['x'] = 1
+            globalDict['y'] = 1
+            assert list(globalDict).index('x') < list(globalDict).index('y')
+            serialization1 = sc.serialize((f, fTyped))
 
             # serialize again with 'x' after 'y'
-            del f.__globals__['x']
-            del f.__globals__['y']
-            f.__globals__['y'] = 1
-            f.__globals__['x'] = 1
-            assert list(f.__globals__).index('x') > list(f.__globals__).index('y')
-            serialization2 = sc.serialize(f)
+            del globalDict['x']
+            del globalDict['y']
+            globalDict['y'] = 1
+            globalDict['x'] = 1
+            assert list(globalDict).index('x') > list(globalDict).index('y')
+            serialization2 = sc.serialize((f, fTyped))
 
             # bytes on the wire shouldn't depend on this
             assert serialization1 == serialization2
