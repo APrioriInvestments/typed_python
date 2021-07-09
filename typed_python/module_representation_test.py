@@ -592,3 +592,44 @@ class TestModuleRepresentation(unittest.TestCase):
             # but that shouldn't prevent us from using it interchangeably because
             # its the 'type identical'
             ListOf(Base2)([Child1()])
+
+    def test_serialization_robust_to_module_ordering(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(
+                mr,
+                "x = 1\n"
+                "y = 1\n"
+                "def f():\n"
+                "    return x + y\n",
+                td
+            )
+
+            f = mr.getDict()['f']
+
+            sc = (
+                SerializationContext()
+                .withoutCompression()
+                .withoutLineInfoEncoded()
+                .withSerializeHashSequence()
+            )
+
+            # serialize once with 'x' before 'y'
+            del f.__globals__['x']
+            del f.__globals__['y']
+            f.__globals__['x'] = 1
+            f.__globals__['y'] = 1
+            assert list(f.__globals__).index('x') < list(f.__globals__).index('y')
+            serialization1 = sc.serialize(f)
+
+            # serialize again with 'x' after 'y'
+            del f.__globals__['x']
+            del f.__globals__['y']
+            f.__globals__['y'] = 1
+            f.__globals__['x'] = 1
+            assert list(f.__globals__).index('x') > list(f.__globals__).index('y')
+            serialization2 = sc.serialize(f)
+
+            # bytes on the wire shouldn't depend on this
+            assert serialization1 == serialization2

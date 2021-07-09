@@ -618,7 +618,7 @@ class SerializationContext:
                 # clients are allowed to put references to submodules (e.g. "lxml.etree")
                 # indicating that if we use 'lxml' we also need to import 'lxml.etree'
                 representation['globals'] = {
-                    k: v for k, v in inst.__globals__.items() if k.split(".")[0] in all_names
+                    k: v for k, v in sorted(inst.__globals__.items()) if k.split(".")[0] in all_names
                 }
 
             args = (
