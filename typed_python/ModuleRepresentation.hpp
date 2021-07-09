@@ -56,6 +56,29 @@ public:
         PyDict_SetItem(PyModule_GetDict(mModuleObject), name, value);
     }
 
+    void sortModuleObject() {
+        std::map<std::string, PyObjectHandle> items;
+
+        PyObject* moduleDict = PyModule_GetDict(mModuleObject);
+
+        PyObject *key, *value;
+        Py_ssize_t pos = 0;
+
+        while (PyDict_Next(moduleDict, &pos, &key, &value)) {
+            if (!PyUnicode_Check(key)) {
+                throw std::runtime_error("Module member names are supposed to be strings.");
+            }
+
+            items[std::string(PyUnicode_AsUTF8(key))] = value;
+        }
+
+        PyDict_Clear(moduleDict);
+
+        for (auto kv: items) {
+            PyDict_SetItemString(moduleDict, kv.first.c_str(), kv.second.pyobj());
+        }
+    }
+
     // walk over the module definition and do two things:
     //     (1) mark any new 'external' objects (objects that cannot see back to this object)
     //     (2) build a map of which module members can "see" which other module members
@@ -72,6 +95,8 @@ public:
 
             update(std::string(PyUnicode_AsUTF8(key)), value);
         }
+
+        sortModuleObject();
     }
 
     void update(std::string key, PyObjectHandle value) {
@@ -413,6 +438,8 @@ public:
                 other.update(name, updateVal);
             }
         }
+
+        other.sortModuleObject();
     }
 
     static PyObjectHandle copyObject(
