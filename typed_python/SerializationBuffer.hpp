@@ -286,8 +286,12 @@ public:
         return std::pair<uint32_t, bool>(it->second, false);
     }
 
+    bool isAlreadyCached(void* t) {
+        return m_idToPointerCache.find(t) != m_idToPointerCache.end();
+    }
+
     bool isAlreadyCached(PyObject* t) {
-        return m_idToPointerCache.find((void*)t) != m_idToPointerCache.end();
+        return isAlreadyCached((void*)t);
     }
 
     int32_t memoFor(PyObject* t) {

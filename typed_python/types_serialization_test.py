@@ -2415,6 +2415,19 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert callF1(child1) == callF2(child2)
 
+    def test_identity_hash_of_lambda_doesnt_change_serialization(self):
+        s = SerializationContext()
+
+        f = lambda: 10
+
+        ser1 = s.serialize(f)
+
+        identityHash(f)
+
+        ser2 = s.serialize(f)
+
+        assert ser1 == ser2
+
     def test_call_method_dispatch_on_two_versions_of_same_class_with_recursion(self):
         Base = Forward("Base")
 

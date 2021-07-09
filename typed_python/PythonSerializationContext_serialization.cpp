@@ -25,13 +25,19 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
 
     b.writeBeginCompound(fieldNumber);
 
-    // if this is already part of a recursive type group and its unnamed, then write it and exit
-    // if its named, we want to fall back to the normal mechanism for writing it, because
-    // otherwise, we have a dependency on whether this object is in a recursive type group.
+    // if this is already part of the recursive type group that we're currently writing, and its unnamed,
+    // then write a reference to this mutually recursive type group.
+    // however, if its named, we want to fall back to the normal mechanism for writing it.
+    // we can't actually _start_ serializing a mutually recursive type group here, however,
+    // because otherwise we'd create a dependency during serialization on _whether_ the
+    // group was already created, which would introduce a nondeterminism into serilization
+    // based on the compiler state
     if (PyCell_Check(o) || PyFunction_Check(o)) {
         auto groupAndIndex = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(o, false);
 
-        if (groupAndIndex.first) {
+        // if we have a group, check whether we've already memoized this group in the stream
+        // this prevents us from initiating the serialization of a new group here.
+        if (groupAndIndex.first && b.isAlreadyCached(groupAndIndex.first)) {
             //see if the object has a name. If so, we always want to use that.
             PyObjectStealer typeName(PyObject_CallMethod(mContextObj, "nameForObject", "(O)", o));
             if (!typeName) {
