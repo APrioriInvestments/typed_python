@@ -62,7 +62,7 @@ INSTALL_REQUIRES = [line.strip() for line in open('requirements.txt')]
 
 setuptools.setup(
     name='typed_python',
-    version='0.2.2',
+    version='0.2.3',
     description='opt-in strong typing at runtime for python, plus a compiler.',
     author='Braxton Mckee',
     author_email='braxton.mckee@gmail.com',
