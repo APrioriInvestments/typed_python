@@ -3,3 +3,5 @@ include typed_python/*.h
 include typed_python/*.cpp
 include typed_python/direct_types/*.hpp
 include typed_python/direct_types/*.cpp
+include typed_python/lz4/*.h
+include typed_python/lz4/*.c
