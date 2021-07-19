@@ -62,11 +62,11 @@ INSTALL_REQUIRES = [line.strip() for line in open('requirements.txt')]
 
 setuptools.setup(
     name='typed_python',
-    version='0.1.1',
+    version='0.2.1',
     description='opt-in strong typing at runtime for python, plus a compiler.',
     author='Braxton Mckee',
     author_email='braxton.mckee@gmail.com',
-    url='https://github.com/aprioriinvestments/nativepython',
+    url='https://github.com/aprioriinvestments/typed_python',
     packages=setuptools.find_packages(),
     cmdclass={'build_ext': TypedPythonBuildExtension},
     ext_modules=ext_modules,
