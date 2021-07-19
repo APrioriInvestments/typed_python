@@ -64,8 +64,8 @@ install: install-dependencies install-pre-commit
 .PHONY: install-dependencies
 .ONESHELL:
 install-dependencies: $(VIRTUAL_ENV)
-	. $(VIRTUAL_ENV)/bin/activate
-	pipenv install --dev --deploy
+	. $(VIRTUAL_ENV)/bin/activate; \
+		pipenv install --dev --deploy
 
 
 .PHONY: install-pre-commit
@@ -76,7 +76,8 @@ install-pre-commit:install-dependencies
 
 .PHONY: test
 test: js-test
-	. $(VIRTUAL_ENV)/bin/activate; pytest
+	. $(VIRTUAL_ENV)/bin/activate; \
+		pytest
 
 .PHONY: lint
 lint:
@@ -97,9 +98,8 @@ unicodeprops: ./unicodeprops.py
 .PHONY: generatetesttypes
 generatetesttypes: $(DT_SRC_PATH)/generate_types.py
 	. $(VIRTUAL_ENV)/bin/activate; \
-	python3 $(DT_SRC_PATH)/generate_types.py --testTypes3 $(TESTTYPES)
-	. $(VIRTUAL_ENV)/bin/activate; \
-	python3 $(DT_SRC_PATH)/generate_types.py --testTypes2 $(TESTTYPES2)
+		python3 $(DT_SRC_PATH)/generate_types.py --testTypes3 $(TESTTYPES); \
+		python3 $(DT_SRC_PATH)/generate_types.py --testTypes2 $(TESTTYPES2)
 
 .PHONY: clean
 clean:
@@ -109,7 +109,7 @@ clean:
 	rm -f typed_python/_types.cpython-*.so
 	rm -rf $(VIRTUAL_ENV) .env
 	rm -f .coverage*
-	rm -f dist/
+	rm -fr dist
 
 
 ##########################################################################
@@ -122,11 +122,11 @@ clean:
 
 .ONESHELL:
 $(VIRTUAL_ENV): $(PYTHON) .env
-	$(PYTHON) -m venv $(VIRTUAL_ENV)
-	. $(VIRTUAL_ENV)/bin/activate
-	pip install -U pip
-	pip install pipenv==2020.11.15
-	pip install wheel
+	$(PYTHON) -m venv $(VIRTUAL_ENV); \
+		. $(VIRTUAL_ENV)/bin/activate; \
+		pip install -U pip; \
+		pip install pipenv; \
+		pip install wheel;
 
 $(TP_BUILD_PATH)/$(TYPES_O_NAME): $(TP_SRC_PATH)/*.hpp $(TP_SRC_PATH)/*.cpp
 	$(CC) $(CPP_FLAGS) -c $(TP_SRC_PATH)/all.cpp $ -o $@
@@ -149,13 +149,13 @@ $(TP_LIB_PATH):
 .PHONY: testpypi-upload
 testpypi-upload: $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate; \
-	rm -rf dist
-	python setup.py sdist
-	twine upload --repository-url https://test.pypi.org/legacy/  dist/*
+		rm -rf dist; \
+		python setup.py sdist; \
+		twine upload --repository-url https://test.pypi.org/legacy/  dist/*;
 
 .PHONY: pypi-upload
 pypi-upload: $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate; \
-	rm -rf dist
-	python setup.py sdist
-	twine upload dist/*
+		rm -rf dist; \
+		python setup.py sdist; \
+		twine upload dist/*;
