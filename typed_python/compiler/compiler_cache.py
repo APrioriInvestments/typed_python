@@ -123,11 +123,16 @@ class CompilerCache:
 
         modulePath = os.path.join(targetDir, "module.so")
 
-        loaded = BinarySharedObject.fromDisk(
-            modulePath,
-            globalVarDefs,
-            functionNameToNativeType
-        ).loadFromPath(modulePath)
+        try:
+            loaded = BinarySharedObject.fromDisk(
+                modulePath,
+                globalVarDefs,
+                functionNameToNativeType
+            ).loadFromPath(modulePath)
+        except Exception:
+            from typed_python.compiler.compiler_cache_debug import displayHash
+            displayHash(targetDir)
+            raise
 
         self.loadedModules[moduleHash] = loaded
 
