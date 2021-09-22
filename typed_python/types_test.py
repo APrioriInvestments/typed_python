@@ -3426,3 +3426,12 @@ class NativeTypesTests(unittest.TestCase):
 
         assert _types.refcount(k1) == 1
         assert _types.refcount(k2) == 1
+
+    def test_list_of_constructor_from_numpy(self):
+        array = numpy.array([[0.0, 1.0, 2.0], [3.0, 4.0, 5.0]])
+
+        assert ListOf(float)(array[0]) == ListOf(float)([0.0, 1.0, 2.0])
+
+        assert ListOf(float)(array[:, 1]) == ListOf(float)([1.0, 4.0])
+
+        assert ListOf(float)(array.transpose()[2]) == ListOf(float)([2.0, 5.0])
