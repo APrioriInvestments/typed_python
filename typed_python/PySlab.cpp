@@ -180,7 +180,7 @@ void PySlab::dealloc(PySlab *self)
 }
 
 PyObject* PySlab::newPySlab(Slab* s) {
-    PySlab* self = (PySlab*)PyType_Slab.tp_alloc(&PyType_Slab, 0);
+    PySlab* self = (PySlab*)pySlabType()->tp_alloc(pySlabType(), 0);
     self->mSlab = s;
     self->mSlab->incref();
     return (PyObject*)self;
@@ -312,58 +312,68 @@ PyObject* PySlab::allocRefcount(PySlab* self, PyObject* args, PyObject* kwargs) 
     });
 }
 
+PyTypeObject* allocatePySlabType() {
+    PyTypeObject* result = new PyTypeObject {
+        PyVarObject_HEAD_INIT(NULL, 0)
+    };
 
-PyTypeObject PyType_Slab = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "Slab",
-    .tp_basicsize = sizeof(PySlab),
-    .tp_itemsize = 0,
-    .tp_dealloc = (destructor) PySlab::dealloc,
-    #if PY_MINOR_VERSION < 8
-    .tp_print = 0,
-    #else
-    .tp_vectorcall_offset = 0,                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
-    #endif
-    .tp_getattr = 0,
-    .tp_setattr = 0,
-    .tp_as_async = 0,
-    .tp_repr = 0,
-    .tp_as_number = 0,
-    .tp_as_sequence = 0,
-    .tp_as_mapping = 0,
-    .tp_hash = 0,
-    .tp_call = 0,
-    .tp_str = 0,
-    .tp_getattro = 0,
-    .tp_setattro = 0,
-    .tp_as_buffer = 0,
-    .tp_flags = Py_TPFLAGS_DEFAULT,
-    .tp_doc = PySlab_doc,
-    .tp_traverse = 0,
-    .tp_clear = 0,
-    .tp_richcompare = 0,
-    .tp_weaklistoffset = 0,
-    .tp_iter = 0,
-    .tp_iternext = 0,
-    .tp_methods = PySlabInstance_methods,
-    .tp_members = 0,
-    .tp_getset = 0,
-    .tp_base = 0,
-    .tp_dict = 0,
-    .tp_descr_get = 0,
-    .tp_descr_set = 0,
-    .tp_dictoffset = 0,
-    .tp_init = (initproc) PySlab::init,
-    .tp_alloc = 0,
-    .tp_new = PySlab::new_,
-    .tp_free = 0,
-    .tp_is_gc = 0,
-    .tp_bases = 0,
-    .tp_mro = 0,
-    .tp_cache = 0,
-    .tp_subclasses = 0,
-    .tp_weaklist = 0,
-    .tp_del = 0,
-    .tp_version_tag = 0,
-    .tp_finalize = 0,
-};
+    result->tp_name = "Slab";
+    result->tp_basicsize = sizeof(PySlab);
+    result->tp_itemsize = 0;
+    result->tp_dealloc = (destructor) PySlab::dealloc;
+#   if PY_MINOR_VERSION < 8
+        result->tp_print = 0;
+#   else
+        result->tp_vectorcall_offset = 0;                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
+#   endif
+    result->tp_getattr = 0;
+    result->tp_setattr = 0;
+    result->tp_as_async = 0;
+    result->tp_repr = 0;
+    result->tp_as_number = 0;
+    result->tp_as_sequence = 0;
+    result->tp_as_mapping = 0;
+    result->tp_hash = 0;
+    result->tp_call = 0;
+    result->tp_str = 0;
+    result->tp_getattro = 0;
+    result->tp_setattro = 0;
+    result->tp_as_buffer = 0;
+    result->tp_flags = Py_TPFLAGS_DEFAULT;
+    result->tp_doc = PySlab_doc;
+    result->tp_traverse = 0;
+    result->tp_clear = 0;
+    result->tp_richcompare = 0;
+    result->tp_weaklistoffset = 0;
+    result->tp_iter = 0;
+    result->tp_iternext = 0;
+    result->tp_methods = PySlabInstance_methods;
+    result->tp_members = 0;
+    result->tp_getset = 0;
+    result->tp_base = 0;
+    result->tp_dict = 0;
+    result->tp_descr_get = 0;
+    result->tp_descr_set = 0;
+    result->tp_dictoffset = 0;
+    result->tp_init = (initproc) PySlab::init;
+    result->tp_alloc = 0;
+    result->tp_new = PySlab::new_;
+    result->tp_free = 0;
+    result->tp_is_gc = 0;
+    result->tp_bases = 0;
+    result->tp_mro = 0;
+    result->tp_cache = 0;
+    result->tp_subclasses = 0;
+    result->tp_weaklist = 0;
+    result->tp_del = 0;
+    result->tp_version_tag = 0;
+    result->tp_finalize = 0;
+
+    return result;
+}
+
+PyTypeObject* pySlabType() {
+    static PyTypeObject* slabType = allocatePySlabType();
+
+    return slabType;
+}

@@ -982,79 +982,79 @@ PyObject* PyInstance::getInternalModuleMember(const char* name) {
     return result;
 }
 
-//construct the base class that all actual type instances of a given TypeCategory descend from
-PyTypeObject* PyInstance::allTypesBaseType() {
-    auto allocateBaseType = [&]() {
-        PyTypeObject* result = new PyTypeObject {
-            .ob_base = {
-                PyObject_HEAD_INIT(NULL) 0
-            },
-            .tp_name = "typed_python._types.Type",          // const char*
-            .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
-            .tp_itemsize = 0,                           // Py_ssize_t
-            .tp_dealloc = PyInstance::tp_dealloc,       // destructor
-
-            #if PY_MINOR_VERSION < 8
-            .tp_print = 0,                              // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
-            #else
-            .tp_vectorcall_offset = 0,                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
-            #endif
-
-            .tp_getattr = 0,                            // getattrfunc
-            .tp_setattr = 0,                            // setattrfunc
-            .tp_as_async = 0,                           // PyAsyncMethods*
-            .tp_repr = tp_repr,                         // reprfunc
-            .tp_as_number = 0,                          // PyNumberMethods*
-            .tp_as_sequence = 0,                        // PySequenceMethods*
-            .tp_as_mapping = 0,                         // PyMappingMethods*
-            .tp_hash = tp_hash,                         // hashfunc
-            .tp_call = tp_call,                         // ternaryfunc
-            .tp_str = tp_str,                           // reprfunc
-            .tp_getattro = 0,                           // getattrofunc
-            .tp_setattro = 0,                           // setattrofunc
-            .tp_as_buffer = 0,                          // PyBufferProcs*
-            .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-                                                        // unsigned long
-            .tp_doc = 0,                                // const char*
-            .tp_traverse = 0,                           // traverseproc
-            .tp_clear = 0,                              // inquiry
-            .tp_richcompare = 0,                        // richcmpfunc
-            .tp_weaklistoffset = 0,                     // Py_ssize_t
-            .tp_iter = 0,                               // getiterfunc tp_iter;
-            .tp_iternext = 0,                           // iternextfunc
-            .tp_methods = 0,                            // struct PyMethodDef*
-            .tp_members = 0,                            // struct PyMemberDef*
-            .tp_getset = 0,                             // struct PyGetSetDef*
-            .tp_base = 0,                               // struct _typeobject*
-            .tp_dict = 0,                               // PyObject*
-            .tp_descr_get = 0,                          // descrgetfunc
-            .tp_descr_set = 0,                          // descrsetfunc
-            .tp_dictoffset = 0,                         // Py_ssize_t
-            .tp_init = 0,                               // initproc
-            .tp_alloc = 0,                              // allocfunc
-            .tp_new = 0,                                // newfunc
-            .tp_free = 0,                               // freefunc /* Low-level free-memory routine */
-            .tp_is_gc = 0,                              // inquiry  /* For PyObject_IS_GC */
-            .tp_bases = 0,                              // PyObject*
-            .tp_mro = 0,                                // PyObject* /* method resolution order */
-            .tp_cache = 0,                              // PyObject*
-            .tp_subclasses = 0,                         // PyObject*
-            .tp_weaklist = 0,                           // PyObject*
-            .tp_del = 0,                                // destructor
-            .tp_version_tag = 0,                        // unsigned int
-            .tp_finalize = 0,                           // destructor
-
-            #if PY_MINOR_VERSION >= 8
-            .tp_vectorcall = 0,
-            .tp_print = 0,
-            #endif
-        };
-
-        PyType_Ready(result);
-
-        return result;
+PyTypeObject* allocateBaseType() {
+    PyTypeObject* result = new PyTypeObject {
+        PyObject_HEAD_INIT(NULL)
+        0
     };
 
+    result->tp_name = "typed_python._types.Type";      // const char*
+    result->tp_basicsize = sizeof(PyInstance);         // Py_ssize_t
+    result->tp_itemsize = 0;                           // Py_ssize_t
+    result->tp_dealloc = PyInstance::tp_dealloc;       // destructor
+
+    #if PY_MINOR_VERSION < 8
+    result->tp_print = 0;                              // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
+    #else
+    result->tp_vectorcall_offset = 0;                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
+    #endif
+
+    result->tp_getattr = 0;                            // getattrfunc
+    result->tp_setattr = 0;                            // setattrfunc
+    result->tp_as_async = 0;                           // PyAsyncMethods*
+    result->tp_repr = PyInstance::tp_repr;             // reprfunc
+    result->tp_as_number = 0;                          // PyNumberMethods*
+    result->tp_as_sequence = 0;                        // PySequenceMethods*
+    result->tp_as_mapping = 0;                         // PyMappingMethods*
+    result->tp_hash = PyInstance::tp_hash;             // hashfunc
+    result->tp_call = PyInstance::tp_call;             // ternaryfunc
+    result->tp_str = PyInstance::tp_str;               // reprfunc
+    result->tp_getattro = 0;                           // getattrofunc
+    result->tp_setattro = 0;                           // setattrofunc
+    result->tp_as_buffer = 0;                          // PyBufferProcs*
+    result->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+                                                       // unsigned long
+    result->tp_doc = 0;                                // const char*
+    result->tp_traverse = 0;                           // traverseproc
+    result->tp_clear = 0;                              // inquiry
+    result->tp_richcompare = 0;                        // richcmpfunc
+    result->tp_weaklistoffset = 0;                     // Py_ssize_t
+    result->tp_iter = 0;                               // getiterfunc tp_iter;
+    result->tp_iternext = 0;                           // iternextfunc
+    result->tp_methods = 0;                            // struct PyMethodDef*
+    result->tp_members = 0;                            // struct PyMemberDef*
+    result->tp_getset = 0;                             // struct PyGetSetDef*
+    result->tp_base = 0;                               // struct _typeobject*
+    result->tp_dict = 0;                               // PyObject*
+    result->tp_descr_get = 0;                          // descrgetfunc
+    result->tp_descr_set = 0;                          // descrsetfunc
+    result->tp_dictoffset = 0;                         // Py_ssize_t
+    result->tp_init = 0;                               // initproc
+    result->tp_alloc = 0;                              // allocfunc
+    result->tp_new = 0;                                // newfunc
+    result->tp_free = 0;                               // freefunc /* Low-level free-memory routine */
+    result->tp_is_gc = 0;                              // inquiry  /* For PyObject_IS_GC */
+    result->tp_bases = 0;                              // PyObject*
+    result->tp_mro = 0;                                // PyObject* /* method resolution order */
+    result->tp_cache = 0;                              // PyObject*
+    result->tp_subclasses = 0;                         // PyObject*
+    result->tp_weaklist = 0;                           // PyObject*
+    result->tp_del = 0;                                // destructor
+    result->tp_version_tag = 0;                        // unsigned int
+    result->tp_finalize = 0;                           // destructor
+
+    #if PY_MINOR_VERSION >= 8
+    result->tp_vectorcall = 0;
+    result->tp_print = 0;
+    #endif
+
+    PyType_Ready(result);
+
+    return result;
+};
+
+//construct the base class that all actual type instances of a given TypeCategory descend from
+PyTypeObject* PyInstance::allTypesBaseType() {
     static PyTypeObject* baseType = allocateBaseType();
 
     return baseType;
@@ -1069,71 +1069,70 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
         PyDict_SetItemString(classDict, "__typed_python_module__", PyUnicode_FromString("typed_python._types"));
 
         types[category] = new NativeTypeCategoryWrapper { {
-            .ob_base = {
                 PyObject_HEAD_INIT(NULL) 0
-            },
-            .tp_name = (new std::string("typed_python._types." + Type::categoryToString(category)))->c_str(),          // const char*
-            .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
-            .tp_itemsize = 0,                           // Py_ssize_t
-            .tp_dealloc = PyInstance::tp_dealloc,       // destructor
-
-            #if PY_MINOR_VERSION < 8
-            .tp_print = 0,                              // printfunc
-            #else
-            .tp_vectorcall_offset = 0,                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
-            #endif
-
-            .tp_getattr = 0,                            // getattrfunc
-            .tp_setattr = 0,                            // setattrfunc
-            .tp_as_async = 0,                           // PyAsyncMethods*
-            .tp_repr = tp_repr,                         // reprfunc
-            .tp_as_number = 0,                          // PyNumberMethods*
-            .tp_as_sequence = 0,                        // PySequenceMethods*
-            .tp_as_mapping = 0,                         // PyMappingMethods*
-            .tp_hash = tp_hash,                         // hashfunc
-            .tp_call = tp_call,                         // ternaryfunc
-            .tp_str = tp_str,                           // reprfunc
-            .tp_getattro = 0,                           // getattrofunc
-            .tp_setattro = 0,                           // setattrofunc
-            .tp_as_buffer = 0,                          // PyBufferProcs*
-            .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-                                                        // unsigned long
-            .tp_doc = 0,                                // const char*
-            .tp_traverse = 0,                           // traverseproc
-            .tp_clear = 0,                              // inquiry
-            .tp_richcompare = 0,                        // richcmpfunc
-            .tp_weaklistoffset = 0,                     // Py_ssize_t
-            .tp_iter = 0,                               // getiterfunc tp_iter;
-            .tp_iternext = 0,                           // iternextfunc
-            .tp_methods = 0,                            // struct PyMethodDef*
-            .tp_members = 0,                            // struct PyMemberDef*
-            .tp_getset = 0,                             // struct PyGetSetDef*
-            .tp_base = allTypesBaseType(),              // struct _typeobject*
-            .tp_dict = classDict,                       // PyObject*
-            .tp_descr_get = 0,                          // descrgetfunc
-            .tp_descr_set = 0,                          // descrsetfunc
-            .tp_dictoffset = 0,                         // Py_ssize_t
-            .tp_init = 0,                               // initproc
-            .tp_alloc = 0,                              // allocfunc
-            .tp_new = PyInstance::tp_new_type,          // newfunc
-            .tp_free = 0,                               // freefunc /* Low-level free-memory routine */
-            .tp_is_gc = 0,                              // inquiry  /* For PyObject_IS_GC */
-            .tp_bases = 0,                              // PyObject*
-            .tp_mro = 0,                                // PyObject* /* method resolution order */
-            .tp_cache = 0,                              // PyObject*
-            .tp_subclasses = 0,                         // PyObject*
-            .tp_weaklist = 0,                           // PyObject*
-            .tp_del = 0,                                // destructor
-            .tp_version_tag = 0,                        // unsigned int
-            .tp_finalize = 0,                           // destructor
-
-            #if PY_MINOR_VERSION >= 8
-            .tp_vectorcall = 0,
-            .tp_print = 0,
-            #endif
             },
             category
         };
+
+        types[category]->typeObj.tp_name = (new std::string("typed_python._types." + Type::categoryToString(category)))->c_str();          // const char*
+        types[category]->typeObj.tp_basicsize = sizeof(PyInstance);         // Py_ssize_t
+        types[category]->typeObj.tp_itemsize = 0;                           // Py_ssize_t
+        types[category]->typeObj.tp_dealloc = PyInstance::tp_dealloc;       // destructor
+
+        #if PY_MINOR_VERSION < 8
+        types[category]->typeObj.tp_print = 0;                              // printfunc
+        #else
+        types[category]->typeObj.tp_vectorcall_offset = 0;                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
+        #endif
+
+        types[category]->typeObj.tp_getattr = 0;                            // getattrfunc
+        types[category]->typeObj.tp_setattr = 0;                            // setattrfunc
+        types[category]->typeObj.tp_as_async = 0;                           // PyAsyncMethods*
+        types[category]->typeObj.tp_repr = tp_repr;                         // reprfunc
+        types[category]->typeObj.tp_as_number = 0;                          // PyNumberMethods*
+        types[category]->typeObj.tp_as_sequence = 0;                        // PySequenceMethods*
+        types[category]->typeObj.tp_as_mapping = 0;                         // PyMappingMethods*
+        types[category]->typeObj.tp_hash = tp_hash;                         // hashfunc
+        types[category]->typeObj.tp_call = tp_call;                         // ternaryfunc
+        types[category]->typeObj.tp_str = tp_str;                           // reprfunc
+        types[category]->typeObj.tp_getattro = 0;                           // getattrofunc
+        types[category]->typeObj.tp_setattro = 0;                           // setattrofunc
+        types[category]->typeObj.tp_as_buffer = 0;                          // PyBufferProcs*
+        types[category]->typeObj.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+                                                    // unsigned long
+        types[category]->typeObj.tp_doc = 0;                                // const char*
+        types[category]->typeObj.tp_traverse = 0;                           // traverseproc
+        types[category]->typeObj.tp_clear = 0;                              // inquiry
+        types[category]->typeObj.tp_richcompare = 0;                        // richcmpfunc
+        types[category]->typeObj.tp_weaklistoffset = 0;                     // Py_ssize_t
+        types[category]->typeObj.tp_iter = 0;                               // getiterfunc tp_iter;
+        types[category]->typeObj.tp_iternext = 0;                           // iternextfunc
+        types[category]->typeObj.tp_methods = 0;                            // struct PyMethodDef*
+        types[category]->typeObj.tp_members = 0;                            // struct PyMemberDef*
+        types[category]->typeObj.tp_getset = 0;                             // struct PyGetSetDef*
+        types[category]->typeObj.tp_base = allTypesBaseType();              // struct _typeobject*
+        types[category]->typeObj.tp_dict = classDict;                       // PyObject*
+        types[category]->typeObj.tp_descr_get = 0;                          // descrgetfunc
+        types[category]->typeObj.tp_descr_set = 0;                          // descrsetfunc
+        types[category]->typeObj.tp_dictoffset = 0;                         // Py_ssize_t
+        types[category]->typeObj.tp_init = 0;                               // initproc
+        types[category]->typeObj.tp_alloc = 0;                              // allocfunc
+        types[category]->typeObj.tp_new = PyInstance::tp_new_type;          // newfunc
+        types[category]->typeObj.tp_free = 0;                               // freefunc /* Low-level free-memory routine */
+        types[category]->typeObj.tp_is_gc = 0;                              // inquiry  /* For PyObject_IS_GC */
+        types[category]->typeObj.tp_bases = 0;                              // PyObject*
+        types[category]->typeObj.tp_mro = 0;                                // PyObject* /* method resolution order */
+        types[category]->typeObj.tp_cache = 0;                              // PyObject*
+        types[category]->typeObj.tp_subclasses = 0;                         // PyObject*
+        types[category]->typeObj.tp_weaklist = 0;                           // PyObject*
+        types[category]->typeObj.tp_del = 0;                                // destructor
+        types[category]->typeObj.tp_version_tag = 0;                        // unsigned int
+        types[category]->typeObj.tp_finalize = 0;                           // destructor
+
+        #if PY_MINOR_VERSION >= 8
+        types[category]->typeObj.tp_vectorcall = 0;
+        types[category]->typeObj.tp_print = 0;
+        #endif
 
         if (category == Type::TypeCategory::catClass) {
             static PyTypeObject* classMetaclass = (PyTypeObject*)getInternalModuleMember("ClassMetaclass");
@@ -1181,82 +1180,80 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
 
     Type::TypeCategory cat = inType->getTypeCategory();
 
-    types[inType] = new NativeTypeWrapper { {
-            .ob_base = {
-                PyObject_HEAD_INIT(NULL) 0
-            },
-            .tp_name = (new std::string(inType->name()))->c_str(),          // const char*
-            .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
-            .tp_itemsize = 0,                           // Py_ssize_t
-            .tp_dealloc = PyInstance::tp_dealloc,       // destructor
-
-            #if PY_MINOR_VERSION < 8
-            .tp_print = 0,                              // printfunc
-            #else
-            .tp_vectorcall_offset = 0,                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
-            #endif
-
-            .tp_getattr = 0,                            // getattrfunc
-            .tp_setattr = 0,                            // setattrfunc
-            .tp_as_async = 0,                           // PyAsyncMethods*
-            .tp_repr = tp_repr,                         // reprfunc
-            .tp_as_number = numberMethods(inType),      // PyNumberMethods*
-            .tp_as_sequence = sequenceMethodsFor(inType),   // PySequenceMethods*
-            .tp_as_mapping = mappingMethods(inType),    // PyMappingMethods*
-            .tp_hash = tp_hash,                         // hashfunc
-            .tp_call = tp_call,                         // ternaryfunc
-            .tp_str = tp_str,                           // reprfunc
-            .tp_getattro = PyInstance::tp_getattro,     // getattrofunc
-            .tp_setattro = PyInstance::tp_setattro,     // setattrofunc
-            .tp_as_buffer = bufferProcs(),              // PyBufferProcs*
-            .tp_flags = typeCanBeSubclassed(inType) ?
-                Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
-            :   Py_TPFLAGS_DEFAULT,                     // unsigned long
-            .tp_doc = inType->doc(),                    // const char*
-            .tp_traverse = 0,                           // traverseproc
-            .tp_clear = 0,                              // inquiry
-            .tp_richcompare = tp_richcompare,           // richcmpfunc
-            .tp_weaklistoffset = 0,                     // Py_ssize_t
-            .tp_iter = cat == Type::TypeCategory::catConstDict ||
-                        cat == Type::TypeCategory::catDict ||
-                        cat == Type::TypeCategory::catSet ||
-                        cat == Type::TypeCategory::catConcreteAlternative ||
-                        cat == Type::TypeCategory::catClass ||
-                        cat == Type::TypeCategory::catPointerTo
-                         ?
-                PyInstance::tp_iter
-            :   0,                                      // getiterfunc tp_iter;
-            .tp_iternext = PyInstance::tp_iternext,     // iternextfunc
-            .tp_methods = typeMethods(inType),          // struct PyMethodDef*
-            .tp_members = 0,                            // struct PyMemberDef*
-            .tp_getset = 0,                             // struct PyGetSetDef*
-            .tp_base = 0,                               // struct _typeobject*
-            .tp_dict = PyDict_New(),                    // PyObject*
-            .tp_descr_get = inType->getTypeCategory() == Type::TypeCategory::catFunction ?
-                PyInstance::tp_descr_get : 0,           // descrgetfunc
-            .tp_descr_set = 0,                          // descrsetfunc
-            .tp_dictoffset = 0,                         // Py_ssize_t
-            .tp_init = 0,                               // initproc
-            .tp_alloc = 0,                              // allocfunc
-            .tp_new = PyInstance::tp_new,                // newfunc
-            .tp_free = 0,                               // freefunc /* Low-level free-memory routine */
-            .tp_is_gc = 0,                              // inquiry  /* For PyObject_IS_GC */
-            .tp_bases = 0,                              // PyObject*
-            .tp_mro = 0,                                // PyObject* /* method resolution order */
-            .tp_cache = 0,                              // PyObject*
-            .tp_subclasses = 0,                         // PyObject*
-            .tp_weaklist = 0,                           // PyObject*
-            .tp_del = 0,                                // destructor
-            .tp_version_tag = 0,                        // unsigned int
-            .tp_finalize = 0,                           // destructor
-
-            #if PY_MINOR_VERSION >= 8
-            .tp_vectorcall = 0,
-            .tp_print = 0,
-            #endif
-            },
+    NativeTypeWrapper* newTypeWrapper = types[inType] = new NativeTypeWrapper { 
+        { PyObject_HEAD_INIT(NULL) 0 },
         inType
     };
+
+    newTypeWrapper->typeObj.tp_name = (new std::string(inType->name()))->c_str();          // const char*
+    newTypeWrapper->typeObj.tp_basicsize = sizeof(PyInstance);         // Py_ssize_t
+    newTypeWrapper->typeObj.tp_itemsize = 0;                           // Py_ssize_t
+    newTypeWrapper->typeObj.tp_dealloc = PyInstance::tp_dealloc;       // destructor
+
+    #if PY_MINOR_VERSION < 8
+    newTypeWrapper->typeObj.tp_print = 0;                              // printfunc
+    #else
+    newTypeWrapper->typeObj.tp_vectorcall_offset = 0;                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
+    #endif
+
+    newTypeWrapper->typeObj.tp_getattr = 0;                            // getattrfunc
+    newTypeWrapper->typeObj.tp_setattr = 0;                            // setattrfunc
+    newTypeWrapper->typeObj.tp_as_async = 0;                           // PyAsyncMethods*
+    newTypeWrapper->typeObj.tp_repr = tp_repr;                         // reprfunc
+    newTypeWrapper->typeObj.tp_as_number = numberMethods(inType);      // PyNumberMethods*
+    newTypeWrapper->typeObj.tp_as_sequence = sequenceMethodsFor(inType);   // PySequenceMethods*
+    newTypeWrapper->typeObj.tp_as_mapping = mappingMethods(inType);    // PyMappingMethods*
+    newTypeWrapper->typeObj.tp_hash = tp_hash;                         // hashfunc
+    newTypeWrapper->typeObj.tp_call = tp_call;                         // ternaryfunc
+    newTypeWrapper->typeObj.tp_str = tp_str;                           // reprfunc
+    newTypeWrapper->typeObj.tp_getattro = PyInstance::tp_getattro;     // getattrofunc
+    newTypeWrapper->typeObj.tp_setattro = PyInstance::tp_setattro;     // setattrofunc
+    newTypeWrapper->typeObj.tp_as_buffer = bufferProcs();              // PyBufferProcs*
+    newTypeWrapper->typeObj.tp_flags = typeCanBeSubclassed(inType) ?
+        Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
+    :   Py_TPFLAGS_DEFAULT;                     // unsigned long
+    newTypeWrapper->typeObj.tp_doc = inType->doc();                    // const char*
+    newTypeWrapper->typeObj.tp_traverse = 0;                           // traverseproc
+    newTypeWrapper->typeObj.tp_clear = 0;                              // inquiry
+    newTypeWrapper->typeObj.tp_richcompare = tp_richcompare;           // richcmpfunc
+    newTypeWrapper->typeObj.tp_weaklistoffset = 0;                     // Py_ssize_t
+    newTypeWrapper->typeObj.tp_iter = cat == Type::TypeCategory::catConstDict ||
+                cat == Type::TypeCategory::catDict ||
+                cat == Type::TypeCategory::catSet ||
+                cat == Type::TypeCategory::catConcreteAlternative ||
+                cat == Type::TypeCategory::catClass ||
+                cat == Type::TypeCategory::catPointerTo
+                 ?
+        PyInstance::tp_iter
+    :   0;                                      // getiterfunc tp_iter;
+    newTypeWrapper->typeObj.tp_iternext = PyInstance::tp_iternext;     // iternextfunc
+    newTypeWrapper->typeObj.tp_methods = typeMethods(inType);          // struct PyMethodDef*
+    newTypeWrapper->typeObj.tp_members = 0;                            // struct PyMemberDef*
+    newTypeWrapper->typeObj.tp_getset = 0;                             // struct PyGetSetDef*
+    newTypeWrapper->typeObj.tp_base = 0;                               // struct _typeobject*
+    newTypeWrapper->typeObj.tp_dict = PyDict_New();                    // PyObject*
+    newTypeWrapper->typeObj.tp_descr_get = inType->getTypeCategory() == Type::TypeCategory::catFunction ?
+        PyInstance::tp_descr_get : 0;           // descrgetfunc
+    newTypeWrapper->typeObj.tp_descr_set = 0;                          // descrsetfunc
+    newTypeWrapper->typeObj.tp_dictoffset = 0;                         // Py_ssize_t
+    newTypeWrapper->typeObj.tp_init = 0;                               // initproc
+    newTypeWrapper->typeObj.tp_alloc = 0;                              // allocfunc
+    newTypeWrapper->typeObj.tp_new = PyInstance::tp_new;                // newfunc
+    newTypeWrapper->typeObj.tp_free = 0;                               // freefunc /* Low-level free-memory routine */
+    newTypeWrapper->typeObj.tp_is_gc = 0;                              // inquiry  /* For PyObject_IS_GC */
+    newTypeWrapper->typeObj.tp_bases = 0;                              // PyObject*
+    newTypeWrapper->typeObj.tp_mro = 0;                                // PyObject* /* method resolution order */
+    newTypeWrapper->typeObj.tp_cache = 0;                              // PyObject*
+    newTypeWrapper->typeObj.tp_subclasses = 0;                         // PyObject*
+    newTypeWrapper->typeObj.tp_weaklist = 0;                           // PyObject*
+    newTypeWrapper->typeObj.tp_del = 0;                                // destructor
+    newTypeWrapper->typeObj.tp_version_tag = 0;                        // unsigned int
+    newTypeWrapper->typeObj.tp_finalize = 0;                           // destructor
+
+    #if PY_MINOR_VERSION >= 8
+    newTypeWrapper->typeObj.tp_vectorcall = 0;
+    newTypeWrapper->typeObj.tp_print = 0;
+    #endif
 
     // at this point, the dictionary has an entry, so if we recurse back to this function
     // we will return the correct entry.

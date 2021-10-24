@@ -45,4 +45,4 @@ public:
     static PyObject* copyInto(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs);
 };
 
-extern PyTypeObject PyType_ModuleRepresentation;
+PyTypeObject* pyTypeModuleRepresentation();

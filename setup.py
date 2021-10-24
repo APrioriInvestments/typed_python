@@ -32,6 +32,7 @@ if sys.platform == 'win32':
     extra_compile_args = [
         '/O2',
         '/std:c++latest',
+        '/w'
     ]
 else:
     extra_compile_args = [

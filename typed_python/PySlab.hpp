@@ -56,4 +56,4 @@ public:
     static PyObject* setTag(PySlab* self, PyObject* args, PyObject* kwargs);
 };
 
-extern PyTypeObject PyType_Slab;
+PyTypeObject* pySlabType();

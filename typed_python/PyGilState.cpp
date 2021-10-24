@@ -149,8 +149,7 @@ PyEnsureGilAcquired::~PyEnsureGilAcquired() {
 void assertHoldingTheGil() {
     if (curPyThreadState) {
         std::cerr << "WARNING: assertHoldingTheGil() is failing.\n";
-        asm("int3");
-        throw std::runtime_error("We're not holding the gil!");
+        abort();
     }
 }
 

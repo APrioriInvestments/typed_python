@@ -3120,16 +3120,16 @@ PyInit__types(void)
     PythonObjectOfType::AnyPyObject();
     PythonObjectOfType::AnyPyType();
 
-    if (PyType_Ready(&PyType_Slab) < 0) {
+    if (PyType_Ready(pySlabType()) < 0) {
         return NULL;
     }
 
-    if (PyType_Ready(&PyType_ModuleRepresentation) < 0) {
+    if (PyType_Ready(pyTypeModuleRepresentation()) < 0) {
         return NULL;
     }
 
-    PyModule_AddObject(module, "Slab", (PyObject*)incref(&PyType_Slab));
-    PyModule_AddObject(module, "ModuleRepresentation", (PyObject*)incref(&PyType_ModuleRepresentation));
+    PyModule_AddObject(module, "Slab", (PyObject*)incref(pySlabType()));
+    PyModule_AddObject(module, "ModuleRepresentation", (PyObject*)incref(pyTypeModuleRepresentation()));
 
     return module;
 }

@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 ******************************************************************************/
-
+#include <cctype>
 #include "AllTypes.hpp"
 
 typed_python_hash_type BytesType::hash(instance_ptr left) {

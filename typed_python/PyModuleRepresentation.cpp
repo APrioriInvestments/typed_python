@@ -215,7 +215,7 @@ PyObject* PyModuleRepresentation::copyInto(PyModuleRepresentation* self, PyObjec
             throw std::runtime_error("Unpopulated ModuleRepresentation");
         }
 
-        if (other->ob_type != &PyType_ModuleRepresentation) {
+        if (other->ob_type != pyTypeModuleRepresentation()) {
             throw std::runtime_error("'other' must be a ModuleRepresentation");
         }
 
@@ -242,58 +242,68 @@ PyObject* PyModuleRepresentation::copyInto(PyModuleRepresentation* self, PyObjec
     });
 }
 
+PyTypeObject* allocateModuleRepresentationTypeObject() {
+    PyTypeObject* res = new PyTypeObject {
+        PyVarObject_HEAD_INIT(NULL, 0)
+    };
 
-PyTypeObject PyType_ModuleRepresentation = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "ModuleRepresentation",
-    .tp_basicsize = sizeof(PyModuleRepresentation),
-    .tp_itemsize = 0,
-    .tp_dealloc = (destructor) PyModuleRepresentation::dealloc,
+    res->tp_name = "ModuleRepresentation";
+    res->tp_basicsize = sizeof(PyModuleRepresentation);
+    res->tp_itemsize = 0;
+    res->tp_dealloc = (destructor) PyModuleRepresentation::dealloc;
     #if PY_MINOR_VERSION < 8
-    .tp_print = 0,
+    res->tp_print = 0;
     #else
-    .tp_vectorcall_offset = 0,                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
+    res->tp_vectorcall_offset = 0;                  // printfunc  (Changed to tp_vectorcall_offset in Python 3.8)
     #endif
-    .tp_getattr = 0,
-    .tp_setattr = 0,
-    .tp_as_async = 0,
-    .tp_repr = 0,
-    .tp_as_number = 0,
-    .tp_as_sequence = 0,
-    .tp_as_mapping = 0,
-    .tp_hash = 0,
-    .tp_call = 0,
-    .tp_str = 0,
-    .tp_getattro = 0,
-    .tp_setattro = 0,
-    .tp_as_buffer = 0,
-    .tp_flags = Py_TPFLAGS_DEFAULT,
-    .tp_doc = PyModuleRepresentation_doc,
-    .tp_traverse = 0,
-    .tp_clear = 0,
-    .tp_richcompare = 0,
-    .tp_weaklistoffset = 0,
-    .tp_iter = 0,
-    .tp_iternext = 0,
-    .tp_methods = PyModuleRepresentationInstance_methods,
-    .tp_members = 0,
-    .tp_getset = 0,
-    .tp_base = 0,
-    .tp_dict = 0,
-    .tp_descr_get = 0,
-    .tp_descr_set = 0,
-    .tp_dictoffset = 0,
-    .tp_init = (initproc) PyModuleRepresentation::init,
-    .tp_alloc = 0,
-    .tp_new = PyModuleRepresentation::new_,
-    .tp_free = 0,
-    .tp_is_gc = 0,
-    .tp_bases = 0,
-    .tp_mro = 0,
-    .tp_cache = 0,
-    .tp_subclasses = 0,
-    .tp_weaklist = 0,
-    .tp_del = 0,
-    .tp_version_tag = 0,
-    .tp_finalize = 0,
-};
+    res->tp_getattr = 0;
+    res->tp_setattr = 0;
+    res->tp_as_async = 0;
+    res->tp_repr = 0;
+    res->tp_as_number = 0;
+    res->tp_as_sequence = 0;
+    res->tp_as_mapping = 0;
+    res->tp_hash = 0;
+    res->tp_call = 0;
+    res->tp_str = 0;
+    res->tp_getattro = 0;
+    res->tp_setattro = 0;
+    res->tp_as_buffer = 0;
+    res->tp_flags = Py_TPFLAGS_DEFAULT;
+    res->tp_doc = PyModuleRepresentation_doc;
+    res->tp_traverse = 0;
+    res->tp_clear = 0;
+    res->tp_richcompare = 0;
+    res->tp_weaklistoffset = 0;
+    res->tp_iter = 0;
+    res->tp_iternext = 0;
+    res->tp_methods = PyModuleRepresentationInstance_methods;
+    res->tp_members = 0;
+    res->tp_getset = 0;
+    res->tp_base = 0;
+    res->tp_dict = 0;
+    res->tp_descr_get = 0;
+    res->tp_descr_set = 0;
+    res->tp_dictoffset = 0;
+    res->tp_init = (initproc) PyModuleRepresentation::init;
+    res->tp_alloc = 0;
+    res->tp_new = PyModuleRepresentation::new_;
+    res->tp_free = 0;
+    res->tp_is_gc = 0;
+    res->tp_bases = 0;
+    res->tp_mro = 0;
+    res->tp_cache = 0;
+    res->tp_subclasses = 0;
+    res->tp_weaklist = 0;
+    res->tp_del = 0;
+    res->tp_version_tag = 0;
+    res->tp_finalize = 0;
+
+    return res;
+}
+
+PyTypeObject* pyTypeModuleRepresentation() {
+    static PyTypeObject* result = allocateModuleRepresentationTypeObject();
+    return result;
+}
+

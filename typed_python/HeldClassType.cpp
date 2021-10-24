@@ -160,7 +160,7 @@ void HeldClass::setAttribute(instance_ptr self, int memberIndex, instance_ptr ot
 }
 
 void HeldClass::constructor(instance_ptr self, bool allowEmpty) {
-    if (!m_is_default_constructible and !allowEmpty) {
+    if (!m_is_default_constructible && !allowEmpty) {
         throw std::runtime_error(m_name + " is not default-constructible");
     }
 

@@ -27,9 +27,13 @@ class Type;
 typedef uint8_t* instance_ptr;
 
 // if we end up doing windows, we'll have to just use malloc
-#define HAVE_MMAP 1
+#if defined(WIN32) || defined(_WIN32)
+#    define HAVE_MMAP 0
+#else
+#    define HAVE_MMAP 1
+#endif
 
-#ifdef HAVE_MMAP
+#if HAVE_MMAP
 
 #include <sys/mman.h>
 
@@ -66,7 +70,8 @@ public:
         mTag(nullptr)
     {
         if (!mIsFreeStore) {
-            if (slabSize > 1024 * 128 && HAVE_MMAP) {
+            if (slabSize > 1024 * 128) {
+#if HAVE_MMAP
                 size_t pageSize = ::getpagesize();
                 // round up to a page.
                 if (slabSize % pageSize) {
@@ -74,6 +79,7 @@ public:
                 }
 
                 mSlabData = (instance_ptr)::mmap(NULL, slabSize, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+#endif
             } else {
                 mSlabData = (instance_ptr)::malloc(slabSize);
             }
@@ -112,7 +118,9 @@ public:
         if (!mIsFreeStore) {
             if (mSlabData) {
                 if (mSlabBytecount > 1024 * 128 && HAVE_MMAP) {
+                    #if HAVE_MMAP
                     ::munmap(mSlabData, mSlabBytecount);
+                    #endif
                 } else {
                     ::free(mSlabData);
                 }

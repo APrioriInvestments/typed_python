@@ -183,7 +183,7 @@ PyObject* PyListOfInstance::listSetSizeUnsafe(PyObject* o, PyObject* args) {
 
 
 template<class dest_t, class source_t>
-void constructTupleOrListInst(TupleOrListOfType* tupT, instance_ptr tgt, size_t count, long* strides, uint8_t* source_data) {
+void constructTupleOrListInst(TupleOrListOfType* tupT, instance_ptr tgt, size_t count, npy_intp* strides, uint8_t* source_data) {
     tupT->constructor(tgt, count,
         [&](uint8_t* eltPtr, int64_t k) {
             ((dest_t*)eltPtr)[0] = ((source_t*)(source_data + k * strides[0]))[0];
@@ -192,7 +192,7 @@ void constructTupleOrListInst(TupleOrListOfType* tupT, instance_ptr tgt, size_t 
 }
 
 template<class dest_t>
-bool constructTupleOrListInstFromNumpy(TupleOrListOfType* tupT, instance_ptr tgt, size_t size, long* strides, uint8_t* data, int numpyType) {
+bool constructTupleOrListInstFromNumpy(TupleOrListOfType* tupT, instance_ptr tgt, size_t size, npy_intp* strides, uint8_t* data, int numpyType) {
     if (numpyType == NPY_FLOAT64) {
         constructTupleOrListInst<dest_t, double>(tupT, tgt, size, strides, data);
     } else if (numpyType == NPY_FLOAT32) {
@@ -233,7 +233,7 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
 
         uint8_t* data = (uint8_t*)PyArray_BYTES(pyRepresentation);
         size_t size = PyArray_SIZE(pyRepresentation);
-	long* strides = PyArray_STRIDES(pyRepresentation);
+        npy_intp* strides = PyArray_STRIDES(pyRepresentation);
 
         if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catBool) {
             if (constructTupleOrListInstFromNumpy<bool>(tupT, tgt, size, strides, data, PyArray_TYPE(pyRepresentation))) {
