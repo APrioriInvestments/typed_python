@@ -30,8 +30,8 @@ class TypedPythonBuildExtension(build_ext):
 
 if sys.platform == 'win32':
     extra_compile_args = [
-        '/O2',
-        '/std:c++latest',
+        '/Od',
+        '/std:c++14',
         '/w'
     ]
 else:

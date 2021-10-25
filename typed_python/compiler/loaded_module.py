@@ -78,7 +78,9 @@ class LoadedModule:
         pointers = ListOf(PointerTo(int))()
         pointers.resize(len(orderedDefs))
 
-        self.functionPointers[ModuleDefinition.GET_GLOBAL_VARIABLES_NAME](pointers.pointerUnsafe(0))
+        self.functionPointers[ModuleDefinition.GET_GLOBAL_VARIABLES_NAME](
+            pointers.pointerUnsafe(0)
+        )
 
         for i in range(len(orderedDefs)):
             assert pointers[i], f"Failed to get a pointer to {orderedDefs[i].name}"

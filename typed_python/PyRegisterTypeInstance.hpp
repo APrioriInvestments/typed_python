@@ -1062,13 +1062,15 @@ private:
 
 public:
     static PyMethodDef* typeMethodsConcrete(Type* t) {
-        return new PyMethodDef [6] {
+        PyMethodDef*  res = new PyMethodDef [6] {
             {"__complex__", (PyCFunction)_complex, METH_VARARGS | METH_KEYWORDS, _complex_doc},
             {"__round__", (PyCFunction)_round, METH_VARARGS | METH_KEYWORDS, _round_doc},
             {"__trunc__", (PyCFunction)_trunc, METH_VARARGS | METH_KEYWORDS, _trunc_doc},
             {"__floor__", (PyCFunction)_floor, METH_VARARGS | METH_KEYWORDS, _floor_doc},
             {"__ceil__", (PyCFunction)_ceil, METH_VARARGS | METH_KEYWORDS, _ceil_doc},
             {NULL, NULL}
-            };
-        }
+        };
+
+        return res;
+    }
 };

@@ -312,7 +312,7 @@ PyObject* PyPointerToInstance::tp_getattr_concrete(PyObject* pyAttrName, const c
 
 PyObject* PyPointerToInstance::pyUnaryOperatorConcrete(const char* op, const char* opErr) {
     if (strcmp(op, "__int__") == 0) {
-        return PyLong_FromUnsignedLong((uint64_t)*(void**)dataPtr());
+        return PyLong_FromSize_t((size_t)*(void**)dataPtr());
     }
 
     return PyInstance::pyUnaryOperatorConcrete(op, opErr);
