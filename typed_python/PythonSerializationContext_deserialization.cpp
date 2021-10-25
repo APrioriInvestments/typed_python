@@ -66,7 +66,7 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
             } else if (fieldNumber == FieldNumbers::LONG) {
                 assertWireTypesEqual(wireType, WireType::VARINT);
                 int64_t val = b.readSignedVarint();
-                result = PyLong_FromLong(val);
+                result = PyLong_FromSize_t(val);
             }else if (fieldNumber == FieldNumbers::BYTES) {
                 assertWireTypesEqual(wireType, WireType::BYTES);
                 int64_t sz = b.readUnsignedVarint();

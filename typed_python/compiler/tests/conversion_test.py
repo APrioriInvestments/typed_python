@@ -688,6 +688,15 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaises(AssertionError):
             check(10)
 
+    def test_int_to_float_conversion(self):
+        @Compiled
+        def f(x: float) -> str:
+            return str(x)
+
+        print("COMPILED", flush=True)
+
+        self.assertEqual(f(10.5), "10")
+
     def test_conditional_eval_or(self):
         @Compiled
         def f1(x: float, y: int):

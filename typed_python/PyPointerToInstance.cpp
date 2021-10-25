@@ -243,7 +243,7 @@ PyObject* PyPointerToInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
         uint8_t* ptr = *(uint8_t**)dataPtr();
         uint8_t* other_ptr = *(uint8_t**)other_w->dataPtr();
 
-        return PyLong_FromLong((ptr-other_ptr) / type()->getEltType()->bytecount());
+        return PyLong_FromSsize_t((ptr-other_ptr) / type()->getEltType()->bytecount());
     }
 
     return PyInstance::pyOperatorConcrete(rhs, op, opErr);

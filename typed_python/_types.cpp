@@ -331,7 +331,7 @@ PyObject *getVTablePointer(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    return PyLong_FromLong((size_t)((Class*)type)->getHeldClass()->getVTable());
+    return PyLong_FromSize_t((size_t)((Class*)type)->getHeldClass()->getVTable());
 }
 
 PyObject *allocateClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObject* kwargs)
@@ -378,7 +378,7 @@ PyObject *allocateClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObj
             )
         );
 
-        return PyLong_FromLong(dispatchSlot);
+        return PyLong_FromSize_t(dispatchSlot);
     });
 }
 
@@ -404,7 +404,7 @@ PyObject *getNextUnlinkedClassMethodDispatch(PyObject* nullValue, PyObject* args
             3,
             PyInstance::typeObj(dispatchAndSlot.first->getInterfaceClass()->getClassType()),
             PyInstance::typeObj(dispatchAndSlot.first->getImplementingClass()->getClassType()),
-            PyLong_FromLong(dispatchAndSlot.second)
+            PyLong_FromSize_t(dispatchAndSlot.second)
         );
     });
 }
@@ -564,7 +564,7 @@ PyObject *getDispatchIndexForType(PyObject* nullValue, PyObject* args, PyObject*
         HeldClass* heldInterface = ((Class*)interfaceClass)->getHeldClass();
         HeldClass* heldImplementing = ((Class*)implementingClass)->getHeldClass();
 
-        return PyLong_FromLong(heldImplementing->getMroIndex(heldInterface));
+        return PyLong_FromSize_t(heldImplementing->getMroIndex(heldInterface));
     });
 }
 
@@ -684,7 +684,7 @@ PyObject* classGetDispatchIndex(PyObject* nullValue, PyObject* args, PyObject* k
         int index = concreteHC->getMroIndex(visibleHC);
 
         if (index >= 0) {
-            return PyLong_FromLong(index);
+            return PyLong_FromSize_t(index);
         }
 
         throw std::runtime_error(visibleType->name() + " is not a superclass of " + concreteType->name());
@@ -1274,7 +1274,7 @@ PyObject *pyInstanceHeldObjectAddress(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    return PyLong_FromLong((size_t)((PyInstance*)a1)->dataPtr());
+    return PyLong_FromSize_t((size_t)((PyInstance*)a1)->dataPtr());
 }
 
 PyObject *pointerTo(PyObject* nullValue, PyObject* args) {
@@ -1458,7 +1458,7 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
         outRefcount = ((::TypedCellType*)actualType)->refcount(data);
     }
 
-    return PyLong_FromLong(outRefcount);
+    return PyLong_FromSize_t(outRefcount);
 }
 
 PyDoc_STRVAR(
@@ -1473,7 +1473,7 @@ PyObject* totalBytesAllocatedInSlabs(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    return PyLong_FromLong(Slab::totalBytesAllocatedInSlabs());
+    return PyLong_FromSize_t(Slab::totalBytesAllocatedInSlabs());
 }
 
 PyDoc_STRVAR(
@@ -1488,7 +1488,7 @@ PyObject* totalBytesAllocatedOnFreeStore(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    return PyLong_FromLong(tpBytesAllocatedOnFreeStore());
+    return PyLong_FromSize_t(tpBytesAllocatedOnFreeStore());
 }
 
 PyDoc_STRVAR(deepcopy_doc,
@@ -1714,7 +1714,7 @@ PyObject *deepBytecount(PyObject* nullValue, PyObject* args) {
             sz = actualType->deepBytecount(((PyInstance*)arg)->dataPtr(), seen, nullptr);
         }
 
-        return PyLong_FromLong(sz);
+        return PyLong_FromSize_t(sz);
     });
 }
 
@@ -2098,7 +2098,7 @@ PyObject *decodeSerializedObject(PyObject* nullValue, PyObject* args) {
 
     std::function<PyObject* (size_t)> decode = [&](size_t wireType) {
         if (wireType == WireType::VARINT) {
-            return PyLong_FromLong(buf.readSignedVarint());
+            return PyLong_FromSize_t(buf.readSignedVarint());
         }
         if (wireType == WireType::EMPTY) {
             return PyList_New(0);
@@ -2124,7 +2124,7 @@ PyObject *decodeSerializedObject(PyObject* nullValue, PyObject* args) {
             PyObjectStealer res(decode(fieldAndWire.second));
 
             PyObjectStealer result(PyList_New(0));
-            PyObjectStealer key(PyLong_FromLong(fieldAndWire.first));
+            PyObjectStealer key(PyLong_FromSize_t(fieldAndWire.first));
             PyObjectStealer tup(PyTuple_Pack(2, (PyObject*)key, (PyObject*)res));
             PyList_Append(result, tup);
             return incref(result);
@@ -2141,7 +2141,7 @@ PyObject *decodeSerializedObject(PyObject* nullValue, PyObject* args) {
 
                 PyObjectStealer res(decode(fieldAndWire.second));
 
-                PyObjectStealer key(PyLong_FromLong(fieldAndWire.first));
+                PyObjectStealer key(PyLong_FromSize_t(fieldAndWire.first));
                 //(PyObject*) are because this is a variadic function and doesn't cast the pointers
                 //correctly
                 PyObjectStealer tup(PyTuple_Pack(2, (PyObject*)key, (PyObject*)res));
@@ -2966,7 +2966,7 @@ PyObject *getTypePointer(PyObject* nullValue, PyObject* args) {
 
     Type* type = PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0));
 
-    return PyLong_FromLong((uint64_t)type);
+    return PyLong_FromSize_t((size_t)type);
 }
 
 PyObject* gilReleaseThreadLoop(PyObject* null, PyObject* args, PyObject* kwargs) {

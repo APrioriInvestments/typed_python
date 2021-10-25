@@ -35,11 +35,17 @@ to a Slab object which we decref when the allocation is released.
 #include <cstddef>
 #include <atomic>
 
+#if defined(WIN32) || defined(_WIN32)
+#define DllExport   __declspec( dllexport )
+#else
+#define DllExport
+#endif
+
 extern "C" {
 
-void* tp_malloc(size_t bytes);
-void* tp_realloc(void* ptr, size_t oldBytes, size_t newBytes);
-void tp_free(void* ptr);
+DllExport void* tp_malloc(size_t bytes);
+DllExport void* tp_realloc(void* ptr, size_t oldBytes, size_t newBytes);
+DllExport void tp_free(void* ptr);
 
 }
 

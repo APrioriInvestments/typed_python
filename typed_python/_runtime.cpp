@@ -49,10 +49,30 @@ PyObject* getRuntimeSingleton() {
     return singleton;
 }
 
+#if defined(WIN32) || defined(_WIN32)
+extern "C" {
+    DllExport int8_t* __cxa_allocate_exception(int64_t in) {
+        return nullptr;
+    }
+    DllExport void __cxa_throw(int8_t*, int8_t*) {
+
+    }
+    DllExport int8_t* __cxa_end_catch(int8_t*) {
+        return nullptr;
+    }
+    DllExport int8_t* __cxa_begin_catch(int8_t*) {
+        return nullptr;
+    }
+    DllExport int32_t __gxx_personality_v0(...) {
+        return 0;
+    }
+}
+#endif
+
 // Note: extern C identifiers are distinguished only up to 32 characters
 // nativepython_runtime_12345678901
 extern "C" {
-    void np_compileClassDispatch(ClassDispatchTable* classDispatchTable, int slot) {
+    DllExport void np_compileClassDispatch(ClassDispatchTable* classDispatchTable, int slot) {
         PyEnsureGilAcquired getTheGil;
 
         // check if there is an error already in place
@@ -105,18 +125,18 @@ extern "C" {
         }
     }
 
-    Type* np_classTypeAsPointer(VTable* vtable) {
+    DllExport Type* np_classTypeAsPointer(VTable* vtable) {
         return vtable->mType->getClassType();
     }
 
-    bool np_typePtrIsSubclass(Type* derived, Type* super) {
+    DllExport bool np_typePtrIsSubclass(Type* derived, Type* super) {
         if (Type::typesEquivalent(derived, super)) {
             return true;
         }
         return derived->isSubclassOf(super);
     }
 
-    PythonObjectOfType::layout_type* np_convertTypePtrToTypeObj(Type* p) {
+    DllExport PythonObjectOfType::layout_type* np_convertTypePtrToTypeObj(Type* p) {
         PyEnsureGilAcquired getTheGil;
 
         return  PythonObjectOfType::createLayout((PyObject*)PyInstance::typeObj(p));
@@ -124,7 +144,7 @@ extern "C" {
 
     // downcast the class instance pointer (classPtr) to targetType and write the downcast version
     // into 'outClassPtr' with an incref if possible, otherwise return false.
-    bool np_classObjectDowncast(void* classPtr, void** outClassPtr, Class* targetType) {
+    DllExport bool np_classObjectDowncast(void* classPtr, void** outClassPtr, Class* targetType) {
         Class::layout* layout = Class::instanceToLayout((instance_ptr)&classPtr);
         Class* actualClass = Class::actualTypeForLayout((instance_ptr)&classPtr);
 
@@ -142,7 +162,7 @@ extern "C" {
         return true;
     }
 
-    void np_compileClassDestructor(VTable* vtable) {
+    DllExport void np_compileClassDestructor(VTable* vtable) {
         PyEnsureGilAcquired getTheGil;
 
         // check if there is an error already in place
@@ -192,7 +212,7 @@ extern "C" {
         }
     }
 
-    void np_raiseAttributeErr(uint8_t* attributeName) {
+    DllExport void np_raiseAttributeErr(uint8_t* attributeName) {
         PyEnsureGilAcquired getTheGil;
 
         PyErr_Format(
@@ -218,37 +238,37 @@ extern "C" {
         }
     }
 
-    double np_acos_float64(double d) {
+    DllExport double np_acos_float64(double d) {
         double ret = std::acos(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    double np_acosh_float64(double d) {
+    DllExport double np_acosh_float64(double d) {
         double ret =  std::acosh(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    double np_asin_float64(double d) {
+    DllExport double np_asin_float64(double d) {
         double ret = std::asin(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    double np_asinh_float64(double d) {
+    DllExport double np_asinh_float64(double d) {
         double ret = std::asinh(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    double np_atan_float64(double d) {
+    DllExport double np_atan_float64(double d) {
         double ret = std::atan(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    double np_atan2_float64(double d1, double d2) {
+    DllExport double np_atan2_float64(double d1, double d2) {
         double ret = std::atan2(d1, d2);
         // If one of d1 or d2 is not finite, don't raise exception.
         // And d1+d2 is not finite if one of d1 or d2 is not finite.
@@ -256,31 +276,31 @@ extern "C" {
         return ret;
     }
 
-    double np_atanh_float64(double d) {
+    DllExport double np_atanh_float64(double d) {
         double ret = std::atanh(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    double np_cosh_float64(double d) {
+    DllExport DllExport double np_cosh_float64(double d) {
         double ret = std::cosh(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    double np_erf_float64(double d) {
+    DllExport double np_erf_float64(double d) {
         double ret = std::erf(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    double np_erfc_float64(double d) {
+    DllExport double np_erfc_float64(double d) {
         double ret = std::erfc(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    double np_expm1_float64(double d) {
+    DllExport double np_expm1_float64(double d) {
         double ret = std::expm1(d);
         raise_if_inf(d, ret);
         return ret;
@@ -289,7 +309,7 @@ extern "C" {
     // d = 171.0 will overflow 64-bit float, so could replace this calculation with a table lookup
     // from 0 to 170.
     // This also would avoid some accumulated errors in the multiplication.
-    double np_factorial64(double d) {
+    DllExport double np_factorial64(double d) {
         if (d >= 171.0) {
             PyErr_Format(PyExc_OverflowError, "math range error");
             throw PythonExceptionSet();
@@ -306,7 +326,7 @@ extern "C" {
     // As for all of these, parameter checks have already occurred.
     // n = 21 will overflow 64-bit integer, so could replace this calculation with a table lookup
     // from 0 to 20.
-    int64_t np_factorial(int64_t n) {
+    DllExport int64_t np_factorial(int64_t n) {
         if (n >= 21) {
             PyErr_Format(PyExc_OverflowError, "math range error");
             throw PythonExceptionSet();
@@ -320,11 +340,11 @@ extern "C" {
         return ret;
     }
 
-    double np_fmod_float64(double d1, double d2) {
+    DllExport double np_fmod_float64(double d1, double d2) {
         return std::fmod(d1, d2);
     }
 
-    void np_frexp_float64(double d, instance_ptr ret) {
+    DllExport void np_frexp_float64(double d, instance_ptr ret) {
         int exp;
         double man = frexp(d, &exp);
         static Tuple* tupleT = Tuple::Make({Float64::Make(), Int64::Make()});
@@ -339,13 +359,13 @@ extern "C" {
             );
     }
 
-    double np_gamma_float64(double d) {
+    DllExport double np_gamma_float64(double d) {
         double ret = std::tgamma(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    int64_t np_gcd(int64_t i1, int64_t i2) {
+    DllExport int64_t np_gcd(int64_t i1, int64_t i2) {
         if (i1 < 0) i1 = -i1;
         if (i2 < 0) i2 = -i2;
         if (i1 == 0) {
@@ -363,30 +383,30 @@ extern "C" {
         return i1;
     }
 
-    bool np_isclose_float64(double d1, double d2, double rel_tol, double abs_tol) {
+    DllExport bool np_isclose_float64(double d1, double d2, double rel_tol, double abs_tol) {
         double m = fmax(fabs(d1), fabs(d2));
         return fabs(d1 - d2) <= fmax(rel_tol * m, abs_tol);
     }
 
-    double np_ldexp_float64(double d, int i) {
+    DllExport double np_ldexp_float64(double d, int i) {
         double ret = std::ldexp(d, i);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    double np_lgamma_float64(double d) {
+    DllExport double np_lgamma_float64(double d) {
         double ret = std::lgamma(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    double np_log1p_float64(double d) {
+    DllExport double np_log1p_float64(double d) {
         double ret = std::log1p(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    void np_modf_float64(double d, instance_ptr ret) {
+    DllExport void np_modf_float64(double d, instance_ptr ret) {
         double integer;
         double frac = modf(d, &integer);
         static Tuple* tupleT = Tuple::Make({Float64::Make(), Float64::Make()});
@@ -396,13 +416,13 @@ extern "C" {
         );
     }
 
-    double np_sinh_float64(double d) {
+    DllExport double np_sinh_float64(double d) {
         double ret = std::sinh(d);
         raise_if_inf(d, ret);
         return ret;
     }
 
-    double np_tan_float64(double d) {
+    DllExport double np_tan_float64(double d) {
         double ret = std::tan(d);
         if (std::isinf(ret)) {
             PyErr_Format(PyExc_OverflowError, "math range error");
@@ -411,7 +431,7 @@ extern "C" {
         return ret;
     }
 
-    double np_tanh_float64(double d) {
+    DllExport double np_tanh_float64(double d) {
         double ret = std::tanh(d);
         raise_if_inf(d, ret);
         return ret;
@@ -419,7 +439,7 @@ extern "C" {
 
     // END math functions
 
-    bool nativepython_runtime_string_eq(StringType::layout* lhs, StringType::layout* rhs) {
+    DllExport bool nativepython_runtime_string_eq(StringType::layout* lhs, StringType::layout* rhs) {
         if (lhs == rhs) {
             return true;
         }
@@ -427,64 +447,64 @@ extern "C" {
         return StringType::cmpStaticEq(lhs, rhs);
     }
 
-    int64_t nativepython_runtime_string_cmp(StringType::layout* lhs, StringType::layout* rhs) {
+    DllExport int64_t nativepython_runtime_string_cmp(StringType::layout* lhs, StringType::layout* rhs) {
         return StringType::cmpStatic(lhs, rhs);
     }
 
-    bool np_runtime_alternative_cmp(Alternative* tp, instance_ptr lhs, instance_ptr rhs, int64_t pyComparisonOp) {
+    DllExport bool np_runtime_alternative_cmp(Alternative* tp, instance_ptr lhs, instance_ptr rhs, int64_t pyComparisonOp) {
         return Alternative::cmpStatic(tp, lhs, rhs, pyComparisonOp);
     }
 
-    bool np_runtime_class_cmp(Class* tp, instance_ptr lhs, instance_ptr rhs, int64_t pyComparisonOp) {
+    DllExport bool np_runtime_class_cmp(Class* tp, instance_ptr lhs, instance_ptr rhs, int64_t pyComparisonOp) {
         PyEnsureGilAcquired acquireTheGil;
         return Class::cmpStatic(tp, lhs, rhs, pyComparisonOp);
     }
 
-    StringType::layout* nativepython_runtime_string_concat(StringType::layout* lhs, StringType::layout* rhs) {
+    DllExport StringType::layout* nativepython_runtime_string_concat(StringType::layout* lhs, StringType::layout* rhs) {
         return StringType::concatenate(lhs, rhs);
     }
 
-    StringType::layout* nativepython_runtime_string_lower(StringType::layout* l) {
+    DllExport StringType::layout* nativepython_runtime_string_lower(StringType::layout* l) {
         return StringType::lower(l);
     }
 
-    StringType::layout* nativepython_runtime_string_upper(StringType::layout* l) {
+    DllExport StringType::layout* nativepython_runtime_string_upper(StringType::layout* l) {
         return StringType::upper(l);
     }
 
-    StringType::layout* nativepython_runtime_string_capitalize(StringType::layout* l) {
+    DllExport StringType::layout* nativepython_runtime_string_capitalize(StringType::layout* l) {
         return StringType::capitalize(l);
     }
 
-    StringType::layout* nativepython_runtime_string_casefold(StringType::layout* l) {
+    DllExport StringType::layout* nativepython_runtime_string_casefold(StringType::layout* l) {
         return StringType::casefold(l);
     }
 
-    StringType::layout* nativepython_runtime_string_swapcase(StringType::layout* l) {
+    DllExport StringType::layout* nativepython_runtime_string_swapcase(StringType::layout* l) {
         return StringType::swapcase(l);
     }
 
-    StringType::layout* nativepython_runtime_string_title(StringType::layout* l) {
+    DllExport StringType::layout* nativepython_runtime_string_title(StringType::layout* l) {
         return StringType::title(l);
     }
 
-    StringType::layout* nativepython_runtime_string_strip(StringType::layout* l, bool whitespace, StringType::layout* values, bool fromLeft, bool fromRight) {
+    DllExport StringType::layout* nativepython_runtime_string_strip(StringType::layout* l, bool whitespace, StringType::layout* values, bool fromLeft, bool fromRight) {
         return StringType::strip(l, whitespace, values, fromLeft, fromRight);
     }
 
-    int64_t nativepython_runtime_string_find(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+    DllExport int64_t nativepython_runtime_string_find(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
         return StringType::find(l, sub, start, end);
     }
 
-    int64_t nativepython_runtime_string_rfind(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+    DllExport int64_t nativepython_runtime_string_rfind(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
         return StringType::rfind(l, sub, start, end);
     }
 
-    int64_t nativepython_runtime_string_count(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+    DllExport int64_t nativepython_runtime_string_count(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
         return StringType::count(l, sub, start, end);
     }
 
-    int64_t nativepython_runtime_string_index(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+    DllExport int64_t nativepython_runtime_string_index(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
         int64_t ret =  StringType::find(l, sub, start, end);
         if (ret == -1) {
             PyEnsureGilAcquired acquireTheGil;
@@ -496,7 +516,7 @@ extern "C" {
         return ret;
     }
 
-    int64_t nativepython_runtime_string_rindex(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
+    DllExport int64_t nativepython_runtime_string_rindex(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
         int64_t ret =  StringType::rfind(l, sub, start, end);
         if (ret == -1) {
             PyEnsureGilAcquired acquireTheGil;
@@ -508,15 +528,15 @@ extern "C" {
         return ret;
     }
 
-    void nativepython_runtime_bytes_join(BytesType::layout** out, BytesType::layout* separator, ListOfType::layout* toJoin) {
+    DllExport void nativepython_runtime_bytes_join(BytesType::layout** out, BytesType::layout* separator, ListOfType::layout* toJoin) {
         BytesType::join(out, separator, toJoin);
     }
 
-    void nativepython_runtime_string_join(StringType::layout** out, StringType::layout* separator, ListOfType::layout* toJoin) {
+    DllExport void nativepython_runtime_string_join(StringType::layout** out, StringType::layout* separator, ListOfType::layout* toJoin) {
         StringType::join(out, separator, toJoin);
     }
 
-    ListOfType::layout* nativepython_runtime_bytes_split(BytesType::layout* l, BytesType::layout* sep, int64_t max) {
+    DllExport ListOfType::layout* nativepython_runtime_bytes_split(BytesType::layout* l, BytesType::layout* sep, int64_t max) {
         static ListOfType* listOfBytesT = ListOfType::Make(BytesType::Make());
 
         ListOfType::layout* outList;
@@ -528,7 +548,7 @@ extern "C" {
         return outList;
     }
 
-    ListOfType::layout* nativepython_runtime_bytes_rsplit(BytesType::layout* l, BytesType::layout* sep, int64_t max) {
+    DllExport ListOfType::layout* nativepython_runtime_bytes_rsplit(BytesType::layout* l, BytesType::layout* sep, int64_t max) {
         static ListOfType* listOfBytesT = ListOfType::Make(BytesType::Make());
 
         ListOfType::layout* outList;
@@ -540,7 +560,7 @@ extern "C" {
         return outList;
     }
 
-    ListOfType::layout* nativepython_runtime_bytes_splitlines(BytesType::layout* l, bool keepends) {
+    DllExport ListOfType::layout* nativepython_runtime_bytes_splitlines(BytesType::layout* l, bool keepends) {
         static ListOfType* listOfBytesT = ListOfType::Make(BytesType::Make());
 
         ListOfType::layout* outList;
@@ -552,7 +572,7 @@ extern "C" {
         return outList;
     }
 
-    ListOfType::layout* nativepython_runtime_string_split(StringType::layout* l, StringType::layout* sep, int64_t max) {
+    DllExport ListOfType::layout* nativepython_runtime_string_split(StringType::layout* l, StringType::layout* sep, int64_t max) {
         static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
 
         ListOfType::layout* outList;
@@ -563,7 +583,7 @@ extern "C" {
         return outList;
     }
 
-    ListOfType::layout* nativepython_runtime_string_rsplit(StringType::layout* l, StringType::layout* sep, int64_t max) {
+    DllExport ListOfType::layout* nativepython_runtime_string_rsplit(StringType::layout* l, StringType::layout* sep, int64_t max) {
         static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
 
         ListOfType::layout* outList;
@@ -575,7 +595,7 @@ extern "C" {
         return outList;
     }
 
-    ListOfType::layout* nativepython_runtime_string_splitlines(StringType::layout* l, bool keepends) {
+    DllExport ListOfType::layout* nativepython_runtime_string_splitlines(StringType::layout* l, bool keepends) {
         static ListOfType* listOfStringT = ListOfType::Make(StringType::Make());
 
         ListOfType::layout* outList;
@@ -587,23 +607,23 @@ extern "C" {
         return outList;
     }
 
-    bool nativepython_runtime_string_isalpha(StringType::layout* l) {
+    DllExport bool nativepython_runtime_string_isalpha(StringType::layout* l) {
         return StringType::isalpha(l);
     }
 
-    bool nativepython_runtime_string_isalnum(StringType::layout* l) {
+    DllExport bool nativepython_runtime_string_isalnum(StringType::layout* l) {
         return StringType::isalnum(l);
     }
 
-    bool nativepython_runtime_string_isdecimal(StringType::layout* l) {
+    DllExport bool nativepython_runtime_string_isdecimal(StringType::layout* l) {
         return StringType::isdecimal(l);
     }
 
-    bool nativepython_runtime_string_isdigit(StringType::layout* l) {
+    DllExport bool nativepython_runtime_string_isdigit(StringType::layout* l) {
         return StringType::isdigit(l);
     }
 
-    bool nativepython_runtime_string_isidentifier(StringType::layout* l) {
+    DllExport bool nativepython_runtime_string_isidentifier(StringType::layout* l) {
         // Not bothering to implement this myself...
         PyEnsureGilAcquired getTheGil;
         PyObject* s = PyInstance::extractPythonObject((instance_ptr)&l, StringType::Make());
@@ -620,39 +640,39 @@ extern "C" {
         return ret;
     }
 
-    bool nativepython_runtime_string_islower(StringType::layout* l) {
+    DllExport bool nativepython_runtime_string_islower(StringType::layout* l) {
         return StringType::islower(l);
     }
 
-    bool nativepython_runtime_string_isnumeric(StringType::layout* l) {
+    DllExport bool nativepython_runtime_string_isnumeric(StringType::layout* l) {
         return StringType::isnumeric(l);
     }
 
-    bool nativepython_runtime_string_isprintable(StringType::layout* l) {
+    DllExport bool nativepython_runtime_string_isprintable(StringType::layout* l) {
         return StringType::isprintable(l);
     }
 
-    bool nativepython_runtime_string_isspace(StringType::layout* l) {
+    DllExport bool nativepython_runtime_string_isspace(StringType::layout* l) {
         return StringType::isspace(l);
     }
 
-    bool nativepython_runtime_string_istitle(StringType::layout* l) {
+    DllExport bool nativepython_runtime_string_istitle(StringType::layout* l) {
         return StringType::istitle(l);
     }
 
-    bool nativepython_runtime_string_isupper(StringType::layout* l) {
+    DllExport bool nativepython_runtime_string_isupper(StringType::layout* l) {
         return StringType::isupper(l);
     }
 
-    StringType::layout* nativepython_runtime_string_getitem_int64(StringType::layout* lhs, int64_t index) {
+    DllExport StringType::layout* nativepython_runtime_string_getitem_int64(StringType::layout* lhs, int64_t index) {
         return StringType::getitem(lhs, index);
     }
 
-    StringType::layout* nativepython_runtime_string_mult(StringType::layout* lhs, int64_t rhs) {
+    DllExport StringType::layout* nativepython_runtime_string_mult(StringType::layout* lhs, int64_t rhs) {
         return StringType::mult(lhs, rhs);
     }
 
-    StringType::layout* nativepython_runtime_string_chr(int64_t code) {
+    DllExport StringType::layout* nativepython_runtime_string_chr(int64_t code) {
         if (code < 0 || code > 0x10ffff) {
             PyEnsureGilAcquired getTheGil;
 
@@ -666,7 +686,7 @@ extern "C" {
         return StringType::singleFromCodepoint(code);
     }
 
-    int64_t nativepython_runtime_string_ord(StringType::layout* lhs) {
+    DllExport int64_t nativepython_runtime_string_ord(StringType::layout* lhs) {
         if (StringType::countStatic(lhs) != 1) {
             PyEnsureGilAcquired getTheGil;
             PyErr_Format(
@@ -680,15 +700,15 @@ extern "C" {
         return StringType::getord(lhs);
     }
 
-    StringType::layout* nativepython_runtime_string_getslice_int64(StringType::layout* lhs, int64_t start, int64_t stop) {
+    DllExport StringType::layout* nativepython_runtime_string_getslice_int64(StringType::layout* lhs, int64_t start, int64_t stop) {
         return StringType::getsubstr(lhs, start, stop);
     }
 
-    StringType::layout* nativepython_runtime_string_from_utf8_and_len(const char* utf8_str, int64_t len) {
+    DllExport StringType::layout* nativepython_runtime_string_from_utf8_and_len(const char* utf8_str, int64_t len) {
         return StringType::createFromUtf8(utf8_str, len);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_getslice_int64(BytesType::layout* lhs, int64_t start, int64_t stop) {
+    DllExport BytesType::layout* nativepython_runtime_bytes_getslice_int64(BytesType::layout* lhs, int64_t start, int64_t stop) {
         if (!lhs) {
             return nullptr;
         }
@@ -719,51 +739,51 @@ extern "C" {
         return BytesType::createFromPtr((char*)lhs->data + start, stop - start);
     }
 
-    int64_t nativepython_runtime_bytes_cmp(BytesType::layout* lhs, BytesType::layout* rhs) {
+    DllExport int64_t nativepython_runtime_bytes_cmp(BytesType::layout* lhs, BytesType::layout* rhs) {
         return BytesType::cmpStatic(lhs, rhs);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_concat(BytesType::layout* lhs, BytesType::layout* rhs) {
+    DllExport BytesType::layout* nativepython_runtime_bytes_concat(BytesType::layout* lhs, BytesType::layout* rhs) {
         return BytesType::concatenate(lhs, rhs);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_from_ptr_and_len(const char* utf8_str, int64_t len) {
+    DllExport BytesType::layout* nativepython_runtime_bytes_from_ptr_and_len(const char* utf8_str, int64_t len) {
         return BytesType::createFromPtr(utf8_str, len);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_lower(BytesType::layout* l) {
+    DllExport BytesType::layout* nativepython_runtime_bytes_lower(BytesType::layout* l) {
         return BytesType::lower(l);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_upper(BytesType::layout* l) {
+    DllExport BytesType::layout* nativepython_runtime_bytes_upper(BytesType::layout* l) {
         return BytesType::upper(l);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_capitalize(BytesType::layout* l) {
+    DllExport BytesType::layout* nativepython_runtime_bytes_capitalize(BytesType::layout* l) {
         return BytesType::capitalize(l);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_swapcase(BytesType::layout* l) {
+    DllExport BytesType::layout* nativepython_runtime_bytes_swapcase(BytesType::layout* l) {
         return BytesType::swapcase(l);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_title(BytesType::layout* l) {
+    DllExport BytesType::layout* nativepython_runtime_bytes_title(BytesType::layout* l) {
         return BytesType::title(l);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_strip(BytesType::layout* l, bool fromLeft, bool fromRight) {
+    DllExport BytesType::layout* nativepython_runtime_bytes_strip(BytesType::layout* l, bool fromLeft, bool fromRight) {
         return BytesType::strip(l, true, nullptr, fromLeft, fromRight);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_strip2(BytesType::layout* l, BytesType::layout* values, bool fromLeft, bool fromRight) {
+    DllExport BytesType::layout* nativepython_runtime_bytes_strip2(BytesType::layout* l, BytesType::layout* values, bool fromLeft, bool fromRight) {
         return BytesType::strip(l, false, values, fromLeft, fromRight);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_mult(BytesType::layout* lhs, int64_t rhs) {
+    DllExport BytesType::layout* nativepython_runtime_bytes_mult(BytesType::layout* lhs, int64_t rhs) {
         return BytesType::mult(lhs, rhs);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_replace(
+    DllExport BytesType::layout* nativepython_runtime_bytes_replace(
             BytesType::layout* l,
             BytesType::layout* old,
             BytesType::layout* the_new,
@@ -795,7 +815,7 @@ extern "C" {
         }
     }
 
-    StringType::layout* nativepython_runtime_bytes_decode(
+    DllExport StringType::layout* nativepython_runtime_bytes_decode(
             BytesType::layout* l,
             StringType::layout* encoding,
             StringType::layout* errors
@@ -902,7 +922,7 @@ extern "C" {
         return out;
     }
 
-    BytesType::layout* nativepython_runtime_str_encode(
+    DllExport BytesType::layout* nativepython_runtime_str_encode(
             StringType::layout* l,
             StringType::layout* encoding,
             StringType::layout* errors
@@ -951,7 +971,7 @@ extern "C" {
         return ret;
     }
 
-    BytesType::layout* nativepython_runtime_bytes_translate(
+    DllExport BytesType::layout* nativepython_runtime_bytes_translate(
             BytesType::layout* l,
             BytesType::layout* table,
             BytesType::layout* to_delete
@@ -959,19 +979,19 @@ extern "C" {
         return BytesType::translate(l, table, to_delete);
     }
 
-    BytesType::layout* nativepython_runtime_bytes_maketrans(
+    DllExport BytesType::layout* nativepython_runtime_bytes_maketrans(
             BytesType::layout* from,
             BytesType::layout* to
     ) {
         return BytesType::maketrans(from, to);
     }
 
-    PythonObjectOfType::layout_type* nativepython_runtime_create_pyobj(PyObject* p) {
+    DllExport PythonObjectOfType::layout_type* nativepython_runtime_create_pyobj(PyObject* p) {
         PyEnsureGilAcquired getTheGil;
         return PythonObjectOfType::createLayout(p);
     }
 
-    void np_initialize_exception(PythonObjectOfType::layout_type* layout) {
+    DllExport void np_initialize_exception(PythonObjectOfType::layout_type* layout) {
         PyEnsureGilAcquired getTheGil;
 
         PyObject* prevType;
@@ -1023,7 +1043,7 @@ extern "C" {
         }
     }
 
-    void np_initialize_exception_w_cause(
+    DllExport void np_initialize_exception_w_cause(
             PythonObjectOfType::layout_type* layoutExc,
             PythonObjectOfType::layout_type* layoutCause
             ) {
@@ -1071,17 +1091,17 @@ extern "C" {
         }
     }
 
-    void np_clear_exception() {
+    DllExport void np_clear_exception() {
         PyEnsureGilAcquired getTheGil;
         PyErr_Clear();
     }
 
-    void np_clear_exc_info() {
+    DllExport void np_clear_exc_info() {
         PyEnsureGilAcquired getTheGil;
         PyErr_SetExcInfo(NULL, NULL, NULL);
     }
 
-    void np_fetch_exception_tuple(instance_ptr inst) {
+    DllExport void np_fetch_exception_tuple(instance_ptr inst) {
         PyEnsureGilAcquired getTheGil;
 
         static Type* return_type = Tuple::Make({
@@ -1113,7 +1133,7 @@ extern "C" {
         PyErr_SetExcInfo(type, value, traceback);
     }
 
-    void np_raise_exception_tuple(
+    DllExport void np_raise_exception_tuple(
         // this should be a pointer to a Tuple(object, object, object), as returned by
         // fetch_exception_tuple
         PythonObjectOfType::layout_type** tuple
@@ -1129,12 +1149,12 @@ extern "C" {
         throw PythonExceptionSet();
     }
 
-    bool np_match_exception(PyObject* exc) {
+    DllExport bool np_match_exception(PyObject* exc) {
         PyEnsureGilAcquired getTheGil;
         return PyErr_ExceptionMatches(exc);
     }
 
-    bool np_match_given_exception(PythonObjectOfType::layout_type* given, PyObject* exc) {
+    DllExport bool np_match_given_exception(PythonObjectOfType::layout_type* given, PyObject* exc) {
         PyEnsureGilAcquired getTheGil;
         return PyErr_GivenExceptionMatches(given->pyObj, exc);
     }
@@ -1142,7 +1162,7 @@ extern "C" {
     // fetch = catch + return the caught exception
     // This should be only called within an exception handler, so we know there
     // is an exception waiting for us to fetch.
-    PythonObjectOfType::layout_type* np_fetch_exception() {
+    DllExport PythonObjectOfType::layout_type* np_fetch_exception() {
         PyEnsureGilAcquired getTheGil;
 
         PyObject* type;
@@ -1165,7 +1185,7 @@ extern "C" {
 
     // This should be only called within an exception handler, so we know there
     // is an exception waiting for us to fetch.
-    void np_catch_exception() {
+    DllExport void np_catch_exception() {
         PyEnsureGilAcquired getTheGil;
 
         PyObject* type;
@@ -1182,12 +1202,12 @@ extern "C" {
         PyErr_SetExcInfo(type, value, traceback);
     }
 
-    void np_add_traceback(const char* funcname, const char* filename, int lineno) {
+    DllExport void np_add_traceback(const char* funcname, const char* filename, int lineno) {
         PyEnsureGilAcquired getTheGil;
         _PyTraceback_Add(funcname, filename, lineno);
     }
 
-    PythonObjectOfType::layout_type* np_builtin_pyobj_by_name(const char* utf8_name) {
+    DllExport PythonObjectOfType::layout_type* np_builtin_pyobj_by_name(const char* utf8_name) {
         PyEnsureGilAcquired getTheGil;
 
         static PyObject* module = builtinsModule();
@@ -1195,13 +1215,13 @@ extern "C" {
         return PythonObjectOfType::createLayout(PyObject_GetAttrString(module, utf8_name));
     }
 
-    PythonObjectOfType::layout_type* nativepython_runtime_get_pyobj_None() {
+    DllExport PythonObjectOfType::layout_type* nativepython_runtime_get_pyobj_None() {
         PyEnsureGilAcquired acquireTheGil;
 
         return PythonObjectOfType::createLayout(Py_None);
     }
 
-    StringType::layout* nativepython_runtime_repr(instance_ptr inst, Type* tp) {
+    DllExport StringType::layout* nativepython_runtime_repr(instance_ptr inst, Type* tp) {
         PyEnsureGilAcquired getTheGil;
 
         PyObjectStealer o(PyInstance::extractPythonObject(inst, tp));
@@ -1223,7 +1243,7 @@ extern "C" {
     // attempt to convert object in 'inst' of type 'tp' to a string using the interpreter
     // on success, return True, and outStr points to a string. On failure, return false,
     // and outStr remains uninitialized.
-    bool np_try_pyobj_to_str(instance_ptr inst, StringType::layout** outStr, Type* tp) {
+    DllExport bool np_try_pyobj_to_str(instance_ptr inst, StringType::layout** outStr, Type* tp) {
         PyEnsureGilAcquired getTheGil;
 
         PyObjectStealer o(PyInstance::extractPythonObject(inst, tp));
@@ -1245,7 +1265,7 @@ extern "C" {
         return true;
     }
 
-    uint64_t nativepython_pyobj_len(PythonObjectOfType::layout_type* layout) {
+    DllExport uint64_t nativepython_pyobj_len(PythonObjectOfType::layout_type* layout) {
         PyEnsureGilAcquired getTheGil;
 
         int ret = PyObject_Length(layout->pyObj);
@@ -1256,7 +1276,7 @@ extern "C" {
     }
 
     // call a Function object from the interpreter
-    PythonObjectOfType::layout_type* nativepython_runtime_call_func_as_pyobj(
+    DllExport PythonObjectOfType::layout_type* nativepython_runtime_call_func_as_pyobj(
         Function* func,
         instance_ptr closure,
         int argCount,
@@ -1305,7 +1325,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* nativepython_runtime_call_pyobj(PythonObjectOfType::layout_type* toCall, int argCount, int kwargCount, ...) {
+    DllExport PythonObjectOfType::layout_type* nativepython_runtime_call_pyobj(PythonObjectOfType::layout_type* toCall, int argCount, int kwargCount, ...) {
         PyEnsureGilAcquired getTheGil;
 
         // each of 'argCount' arguments is a PyObject* followed by a const char*
@@ -1337,7 +1357,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* nativepython_runtime_getattr_pyobj(PythonObjectOfType::layout_type* p, const char* a) {
+    DllExport PythonObjectOfType::layout_type* nativepython_runtime_getattr_pyobj(PythonObjectOfType::layout_type* p, const char* a) {
         PyEnsureGilAcquired getTheGil;
 
         PyObject* res = PyObject_GetAttrString(p->pyObj, a);
@@ -1349,7 +1369,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* nativepython_runtime_getitem_pyobj(PythonObjectOfType::layout_type* p, PythonObjectOfType::layout_type* a) {
+    DllExport PythonObjectOfType::layout_type* nativepython_runtime_getitem_pyobj(PythonObjectOfType::layout_type* p, PythonObjectOfType::layout_type* a) {
         PyEnsureGilAcquired getTheGil;
 
         PyObject* res = PyObject_GetItem(p->pyObj, a->pyObj);
@@ -1361,7 +1381,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    void nativepython_runtime_delitem_pyobj(PythonObjectOfType::layout_type* p, PythonObjectOfType::layout_type* a) {
+    DllExport void nativepython_runtime_delitem_pyobj(PythonObjectOfType::layout_type* p, PythonObjectOfType::layout_type* a) {
         PyEnsureGilAcquired getTheGil;
 
         int success = PyObject_DelItem(p->pyObj, a->pyObj);
@@ -1371,7 +1391,7 @@ extern "C" {
         }
     }
 
-    void nativepython_runtime_setitem_pyobj(
+    DllExport void nativepython_runtime_setitem_pyobj(
             PythonObjectOfType::layout_type* p,
             PythonObjectOfType::layout_type* index,
             PythonObjectOfType::layout_type* value
@@ -1385,7 +1405,7 @@ extern "C" {
         }
     }
 
-    void nativepython_runtime_setattr_pyobj(PythonObjectOfType::layout_type* p, const char* a, PythonObjectOfType::layout_type* val) {
+    DllExport void nativepython_runtime_setattr_pyobj(PythonObjectOfType::layout_type* p, const char* a, PythonObjectOfType::layout_type* val) {
         PyEnsureGilAcquired getTheGil;
 
         int res = PyObject_SetAttrString(p->pyObj, a, val->pyObj);
@@ -1395,11 +1415,11 @@ extern "C" {
         }
     }
 
-    void np_destroy_pyobj_handle(PythonObjectOfType::layout_type* p) {
+    DllExport void np_destroy_pyobj_handle(PythonObjectOfType::layout_type* p) {
         PythonObjectOfType::destroyLayoutIfRefcountIsZero(p);
     }
 
-    int64_t nativepython_runtime_mod_int64_int64(int64_t l, int64_t r) {
+    DllExport int64_t nativepython_runtime_mod_int64_int64(int64_t l, int64_t r) {
         if (r == 1 || r == -1 || r == 0 || l == 0) {
             return 0;
         }
@@ -1418,7 +1438,7 @@ extern "C" {
         return l % r;
     }
 
-    int64_t nativepython_runtime_mod_uint64_uint64(uint64_t l, uint64_t r) {
+    DllExport int64_t nativepython_runtime_mod_uint64_uint64(uint64_t l, uint64_t r) {
         if (r == 1 || r == 0 || l == 0) {
             return 0;
         }
@@ -1426,7 +1446,7 @@ extern "C" {
         return l % r;
     }
 
-    double nativepython_runtime_mod_float64_float64(double l, double r) {
+    DllExport double nativepython_runtime_mod_float64_float64(double l, double r) {
         if (std::isnan(r) || std::isnan(l)) {
             return NAN;
         }
@@ -1450,7 +1470,7 @@ extern "C" {
         return mod;
     }
 
-    double nativepython_runtime_pow_float64_float64(double l, double r) {
+    DllExport double nativepython_runtime_pow_float64_float64(double l, double r) {
         if (l == 0.0 && r < 0.0)
         {
             PyEnsureGilAcquired acquireTheGil;
@@ -1467,7 +1487,7 @@ extern "C" {
         return result;
     }
 
-    double nativepython_runtime_pow_int64_int64(int64_t l, int64_t r) {
+    DllExport double nativepython_runtime_pow_int64_int64(int64_t l, int64_t r) {
         if (l == 0 && r < 0) {
             PyEnsureGilAcquired acquireTheGil;
             PyErr_Format(PyExc_ZeroDivisionError, "0.0 cannot be raised to a negative power");
@@ -1482,12 +1502,12 @@ extern "C" {
         return result;
     }
 
-    double nativepython_runtime_pow_uint64_uint64(uint64_t l, uint64_t r) {
+    DllExport double nativepython_runtime_pow_uint64_uint64(uint64_t l, uint64_t r) {
         return std::pow(l,r);
     }
 
     // should match corresponding function in PyRegisterTypeInstance.hpp
-    int64_t nativepython_runtime_lshift_int64_int64(int64_t l, int64_t r) {
+    DllExport int64_t nativepython_runtime_lshift_int64_int64(int64_t l, int64_t r) {
         if (r < 0) {
             PyEnsureGilAcquired acquireTheGil;
             PyErr_Format(PyExc_ValueError, "negative shift count");
@@ -1508,7 +1528,7 @@ extern "C" {
     }
 
     // should match corresponding function in PyRegisterTypeInstance.hpp
-    uint64_t nativepython_runtime_lshift_uint64_uint64(uint64_t l, uint64_t r) {
+    DllExport uint64_t nativepython_runtime_lshift_uint64_uint64(uint64_t l, uint64_t r) {
         if ((l == 0 && r > std::numeric_limits<int64_t>::max()) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
             PyEnsureGilAcquired acquireTheGil;
             PyErr_Format(PyExc_OverflowError, "shift count too large");
@@ -1518,7 +1538,7 @@ extern "C" {
     }
 
     // should match corresponding function in PyRegisterTypeInstance.hpp
-    uint64_t nativepython_runtime_rshift_uint64_uint64(uint64_t l, uint64_t r) {
+    DllExport uint64_t nativepython_runtime_rshift_uint64_uint64(uint64_t l, uint64_t r) {
         if (r > std::numeric_limits<int64_t>::max()) {
             PyEnsureGilAcquired acquireTheGil;
             PyErr_Format(PyExc_OverflowError, "shift count too large");
@@ -1532,7 +1552,7 @@ extern "C" {
     }
 
     // should match corresponding function in PyRegisterTypeInstance.hpp
-    int64_t nativepython_runtime_rshift_int64_int64(int64_t l, int64_t r) {
+    DllExport int64_t nativepython_runtime_rshift_int64_int64(int64_t l, int64_t r) {
         if (r < 0) {
             PyEnsureGilAcquired acquireTheGil;
             PyErr_Format(PyExc_ValueError, "negative shift count");
@@ -1556,7 +1576,7 @@ extern "C" {
     }
 
     // should match corresponding function in PyRegisterTypeInstance.hpp
-    int64_t nativepython_runtime_floordiv_int64_int64(int64_t l, int64_t r) {
+    DllExport int64_t nativepython_runtime_floordiv_int64_int64(int64_t l, int64_t r) {
         if (r == 0) {
             PyEnsureGilAcquired acquireTheGil;
             PyErr_Format(PyExc_ZeroDivisionError, "integer floordiv by zero");
@@ -1575,7 +1595,7 @@ extern "C" {
     }
 
     // should match corresponding function in PyRegisterTypeInstance.hpp
-    double nativepython_runtime_floordiv_float64_float64(double l, double r) {
+    DllExport double nativepython_runtime_floordiv_float64_float64(double l, double r) {
         if (r == 0.0) {
             PyEnsureGilAcquired acquireTheGil;
             PyErr_Format(PyExc_ZeroDivisionError, "floating point floordiv by zero");
@@ -1592,14 +1612,14 @@ extern "C" {
         return floorresult;
     }
 
-    void np_throwNullPtr() {
+    DllExport void np_throwNullPtr() {
         throw (void*)nullptr;
     }
 
     // attempt to initialize 'tgt' of type 'tp' with data from 'obj'. Returns true if we
     // are able to do so, false otherwise. If 'canThrow', then allow an exception to propagate
     // if we can't convert.
-    bool np_runtime_pyobj_to_typed(
+    DllExport bool np_runtime_pyobj_to_typed(
         PythonObjectOfType::layout_type *layout,
         instance_ptr tgt,
         Type* tp,
@@ -1639,7 +1659,7 @@ extern "C" {
         }
     }
 
-    PythonObjectOfType::layout_type* np_runtime_to_pyobj(instance_ptr obj, Type* tp) {
+    DllExport PythonObjectOfType::layout_type* np_runtime_to_pyobj(instance_ptr obj, Type* tp) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyInstance::extractPythonObject(obj, tp);
@@ -1651,11 +1671,11 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    void np_print_bytes(uint8_t* bytes) {
+    DllExport void np_print_bytes(uint8_t* bytes) {
         std::cout << bytes << std::flush;
     }
 
-    void nativepython_print_string(StringType::layout* layout) {
+    DllExport void nativepython_print_string(StringType::layout* layout) {
         std::cout << StringType::Make()->toUtf8String((instance_ptr)&layout) << std::flush;
     }
 
@@ -1666,7 +1686,7 @@ extern "C" {
 
     Type* determines what kind of instance we're writing into.
     */
-    bool nativepython_float32_to_int(void* out, float f, bool canThrow, Type* targetType) {
+    DllExport bool nativepython_float32_to_int(void* out, float f, bool canThrow, Type* targetType) {
         if (!std::isfinite(f)) {
             if (!canThrow) {
                 return false;
@@ -1692,6 +1712,7 @@ extern "C" {
 
         return true;
     }
+
 
     /* convert a double to an int, returning true if conversion is successful.
 
@@ -1700,7 +1721,7 @@ extern "C" {
 
     Type* determines what kind of instance we're writing into.
     */
-    bool nativepython_float64_to_int(void* out, double f, bool canThrow, Type* targetType) {
+    DllExport bool nativepython_float64_to_int(void* out, double f, bool canThrow, Type* targetType) {
         if (!std::isfinite(f)) {
             if (!canThrow) {
                 return false;
@@ -1727,14 +1748,14 @@ extern "C" {
         return true;
     }
 
-    StringType::layout* nativepython_int64_to_string(int64_t i) {
+    DllExport StringType::layout* nativepython_int64_to_string(int64_t i) {
         char data[21];
 
         int64_t count = sprintf((char*)data, "%ld", i);
         return StringType::createFromUtf8(data, count);
     }
 
-    StringType::layout* nativepython_uint64_to_string(uint64_t u) {
+    DllExport StringType::layout* nativepython_uint64_to_string(uint64_t u) {
         char data[24];
 
         int64_t count = sprintf((char*)data, "%luu64", u);
@@ -1742,7 +1763,7 @@ extern "C" {
     }
 
 
-    StringType::layout* nativepython_float64_to_string(double f) {
+    DllExport StringType::layout* nativepython_float64_to_string(double f) {
         char buf[32] = "";
         double a = fabs(f);
 
@@ -1774,7 +1795,7 @@ extern "C" {
         return StringType::createFromUtf8(&buf[0], strlen(buf));
     }
 
-    StringType::layout* nativepython_float32_to_string(float f) {
+    DllExport StringType::layout* nativepython_float32_to_string(float f) {
         std::ostringstream s;
 
         s << f << "f32";
@@ -1784,14 +1805,14 @@ extern "C" {
         return StringType::createFromUtf8(&rep[0], rep.size());
     }
 
-    StringType::layout* nativepython_bool_to_string(bool b) {
+    DllExport StringType::layout* nativepython_bool_to_string(bool b) {
         if (b)
             return StringType::createFromUtf8("True", 4);
         else
             return StringType::createFromUtf8("False", 5);
     }
 
-    hash_table_layout* nativepython_tableCreate() {
+    DllExport hash_table_layout* nativepython_tableCreate() {
         hash_table_layout* result;
 
         result = (hash_table_layout*)tp_malloc(sizeof(hash_table_layout));
@@ -1803,11 +1824,11 @@ extern "C" {
         return result;
     }
 
-    int32_t nativepython_tableAllocateNewSlot(hash_table_layout* layout, size_t kvPairSize) {
+    DllExport int32_t nativepython_tableAllocateNewSlot(hash_table_layout* layout, size_t kvPairSize) {
         return layout->allocateNewSlot(kvPairSize);
     }
 
-    hash_table_layout* nativepython_tableCopy(hash_table_layout* layout, Type* tp) {
+    DllExport hash_table_layout* nativepython_tableCopy(hash_table_layout* layout, Type* tp) {
         Type* itemType = 0;
 
         if (tp->getTypeCategory() == Type::TypeCategory::catSet) {
@@ -1834,15 +1855,15 @@ extern "C" {
         );
     }
 
-    void nativepython_tableResize(hash_table_layout* layout) {
+    DllExport void nativepython_tableResize(hash_table_layout* layout) {
         layout->resizeTable();
     }
 
-    void nativepython_tableCompress(hash_table_layout* layout, size_t kvPairSize) {
+    DllExport void nativepython_tableCompress(hash_table_layout* layout, size_t kvPairSize) {
         layout->compressItemTable(kvPairSize);
     }
 
-    int32_t nativepython_hash_float32(float val) {
+    DllExport int32_t nativepython_hash_float32(float val) {
         HashAccumulator acc;
 
         acc.addRegister(val);
@@ -1850,7 +1871,7 @@ extern "C" {
         return acc.get();
     }
 
-    int32_t nativepython_hash_float64(double val) {
+    DllExport int32_t nativepython_hash_float64(double val) {
         HashAccumulator acc;
 
         acc.addRegister(val);
@@ -1858,7 +1879,7 @@ extern "C" {
         return acc.get();
     }
 
-    int32_t nativepython_hash_int64(int64_t val) {
+    DllExport int32_t nativepython_hash_int64(int64_t val) {
         HashAccumulator acc;
 
         acc.addRegister(val);
@@ -1866,7 +1887,7 @@ extern "C" {
         return acc.get();
     }
 
-    int32_t nativepython_hash_uint64(uint64_t val) {
+    DllExport int32_t nativepython_hash_uint64(uint64_t val) {
         HashAccumulator acc;
 
         acc.addRegister(val);
@@ -1874,41 +1895,41 @@ extern "C" {
         return acc.get();
     }
 
-    int32_t nativepython_hash_string(StringType::layout* s) {
+    DllExport int32_t nativepython_hash_string(StringType::layout* s) {
         return StringType::hash_static((instance_ptr)&s);
     }
 
-    int32_t nativepython_hash_bytes(BytesType::layout* s) {
+    DllExport int32_t nativepython_hash_bytes(BytesType::layout* s) {
         return BytesType::Make()->hash((instance_ptr)&s);
     }
 
-    int32_t nativepython_hash_alternative(Alternative::layout* s, Alternative* tp) {
+    DllExport int32_t nativepython_hash_alternative(Alternative::layout* s, Alternative* tp) {
         // TODO: assert tp is an Alternative
         //if (tp->getTypeCategory() != Type::TypeCategory::catAlternative)
         //    throw std::logic_error("Called hash_alternative with a non-Alternative type");
         return tp->hash((instance_ptr)&s);
     }
 
-    int32_t nativepython_hash_class(Class::layout* s, Class* tp) {
+    DllExport int32_t nativepython_hash_class(Class::layout* s, Class* tp) {
         // TODO: assert tp is a Class
         //if (tp->getTypeCategory() != Type::TypeCategory::catClass)
         //    throw std::logic_error("Called hash_class with a non-Class type");
         return tp->hash((instance_ptr)&s);
     }
 
-    bool nativepython_isinf_float32(float f) { return std::isinf(f); }
+    DllExport bool nativepython_isinf_float32(float f) { return std::isinf(f); }
 
-    bool nativepython_isnan_float32(float f) { return std::isnan(f); }
+    DllExport bool nativepython_isnan_float32(float f) { return std::isnan(f); }
 
-    bool nativepython_isfinite_float32(float f) { return std::isfinite(f); }
+    DllExport bool nativepython_isfinite_float32(float f) { return std::isfinite(f); }
 
-    bool nativepython_isinf_float64(double f) { return std::isinf(f); }
+    DllExport bool nativepython_isinf_float64(double f) { return std::isinf(f); }
 
-    bool nativepython_isnan_float64(double f) { return std::isnan(f); }
+    DllExport bool nativepython_isnan_float64(double f) { return std::isnan(f); }
 
-    bool nativepython_isfinite_float64(double f) { return std::isfinite(f); }
+    DllExport bool nativepython_isfinite_float64(double f) { return std::isfinite(f); }
 
-    double nativepython_runtime_round_float64(double l, int64_t n) {
+    DllExport double nativepython_runtime_round_float64(double l, int64_t n) {
         double ret;
         int64_t m = 1;
         int64_t d = 1;
@@ -1933,19 +1954,19 @@ extern "C" {
             return ret;
     }
 
-    double nativepython_runtime_trunc_float64(double l) {
+    DllExport double nativepython_runtime_trunc_float64(double l) {
         return trunc(l);
     }
 
-    double nativepython_runtime_floor_float64(double l) {
+    DllExport double nativepython_runtime_floor_float64(double l) {
         return floor(l);
     }
 
-    double nativepython_runtime_ceil_float64(double l) {
+    DllExport double nativepython_runtime_ceil_float64(double l) {
         return ceil(l);
     }
 
-    ListOfType::layout* nativepython_runtime_dir(instance_ptr i, Type* tp) {
+    DllExport ListOfType::layout* nativepython_runtime_dir(instance_ptr i, Type* tp) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObjectStealer o(PyInstance::extractPythonObject(i, tp));
@@ -1958,7 +1979,7 @@ extern "C" {
         return ret;
     }
 
-    int64_t np_pyobj_pynumber_index(PythonObjectOfType::layout_type* lhs) {
+    DllExport int64_t np_pyobj_pynumber_index(PythonObjectOfType::layout_type* lhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Index(lhs->pyObj);
@@ -1975,7 +1996,7 @@ extern "C" {
         return PyLong_AsLong(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_typeof(PythonObjectOfType::layout_type* lhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_typeof(PythonObjectOfType::layout_type* lhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = incref((PyObject*)lhs->pyObj->ob_type);
@@ -1987,7 +2008,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_Add(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_Add(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Add(lhs->pyObj, rhs->pyObj);
@@ -1999,7 +2020,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_Subtract(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_Subtract(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Subtract(lhs->pyObj, rhs->pyObj);
@@ -2011,7 +2032,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_Multiply(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_Multiply(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Multiply(lhs->pyObj, rhs->pyObj);
@@ -2023,7 +2044,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_Pow(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_Pow(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Power(lhs->pyObj, rhs->pyObj, Py_None);
@@ -2035,7 +2056,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_MatrixMultiply(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_MatrixMultiply(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_MatrixMultiply(lhs->pyObj, rhs->pyObj);
@@ -2047,7 +2068,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_TrueDivide(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_TrueDivide(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_TrueDivide(lhs->pyObj, rhs->pyObj);
@@ -2059,7 +2080,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_FloorDivide(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_FloorDivide(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_FloorDivide(lhs->pyObj, rhs->pyObj);
@@ -2071,7 +2092,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_Remainder(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_Remainder(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Remainder(lhs->pyObj, rhs->pyObj);
@@ -2083,7 +2104,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_Lshift(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_Lshift(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Lshift(lhs->pyObj, rhs->pyObj);
@@ -2095,7 +2116,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_Rshift(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_Rshift(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Rshift(lhs->pyObj, rhs->pyObj);
@@ -2107,7 +2128,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_Or(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_Or(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Or(lhs->pyObj, rhs->pyObj);
@@ -2119,7 +2140,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_Xor(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_Xor(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Xor(lhs->pyObj, rhs->pyObj);
@@ -2131,7 +2152,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_And(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_And(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_And(lhs->pyObj, rhs->pyObj);
@@ -2143,7 +2164,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_compare(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs, int comparisonOp) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_compare(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs, int comparisonOp) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyObject_RichCompare(lhs->pyObj, rhs->pyObj, comparisonOp);
@@ -2155,7 +2176,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    bool np_pyobj_issubclass(PythonObjectOfType::layout_type* subclass, PythonObjectOfType::layout_type* superclass, int comparisonOp) {
+    DllExport bool np_pyobj_issubclass(PythonObjectOfType::layout_type* subclass, PythonObjectOfType::layout_type* superclass, int comparisonOp) {
         PyEnsureGilAcquired acquireTheGil;
 
         int res = PyObject_IsSubclass(subclass->pyObj, superclass->pyObj);
@@ -2167,31 +2188,31 @@ extern "C" {
         return res;
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_EQ(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_EQ(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_EQ);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_NE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_NE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_NE);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_LT(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_LT(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_LT);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_GT(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_GT(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_GT);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_LE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_LE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_LE);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_GE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_GE(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         return np_pyobj_compare(lhs, rhs, Py_GE);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_In(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_In(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         int res = PySequence_Contains(rhs->pyObj, lhs->pyObj);
@@ -2203,7 +2224,7 @@ extern "C" {
         return PythonObjectOfType::createLayout(res == 1 ? Py_True : Py_False);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_NotIn(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_NotIn(PythonObjectOfType::layout_type* lhs, PythonObjectOfType::layout_type* rhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         int res = PySequence_Contains(rhs->pyObj, lhs->pyObj);
@@ -2215,7 +2236,7 @@ extern "C" {
         return PythonObjectOfType::createLayout(res == 1 ? Py_False : Py_True);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_Invert(PythonObjectOfType::layout_type* lhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_Invert(PythonObjectOfType::layout_type* lhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Invert(lhs->pyObj);
@@ -2227,7 +2248,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_Positive(PythonObjectOfType::layout_type* lhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_Positive(PythonObjectOfType::layout_type* lhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Positive(lhs->pyObj);
@@ -2239,7 +2260,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* np_pyobj_Negative(PythonObjectOfType::layout_type* lhs) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_Negative(PythonObjectOfType::layout_type* lhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         PyObject* res = PyNumber_Negative(lhs->pyObj);
@@ -2251,7 +2272,7 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    bool np_pyobj_Not(PythonObjectOfType::layout_type* lhs) {
+    DllExport bool np_pyobj_Not(PythonObjectOfType::layout_type* lhs) {
         PyEnsureGilAcquired acquireTheGil;
 
         int64_t res = PyObject_Not(lhs->pyObj);
@@ -2272,7 +2293,7 @@ extern "C" {
         char locked; /* for sanity checking */
     } np_lockobject_equivalent;
 
-    bool np_pyobj_locktype_lock(PythonObjectOfType::layout_type* lockPtr) {
+    DllExport bool np_pyobj_locktype_lock(PythonObjectOfType::layout_type* lockPtr) {
         PyThread_acquire_lock_timed(
             ((np_lockobject_equivalent*)(lockPtr->pyObj))->lock_lock,
             -1,
@@ -2284,7 +2305,7 @@ extern "C" {
         return true;
     }
 
-    bool np_pyobj_locktype_unlock(PythonObjectOfType::layout_type* lockPtr) {
+    DllExport bool np_pyobj_locktype_unlock(PythonObjectOfType::layout_type* lockPtr) {
         // if (!((np_lockobject_equivalent*)(lockPtr->pyObj))->locked) {
         //     PyEnsureGilAcquired getTheGil;
         //     PyErr_SetString(PyExc_RuntimeError, "release unlocked lock");
@@ -2309,7 +2330,7 @@ extern "C" {
         PyObject *in_weakreflist;
     } np_lockobject_rlockobject;
 
-    bool np_pyobj_rlocktype_lock(PythonObjectOfType::layout_type* lockPtr) {
+    DllExport bool np_pyobj_rlocktype_lock(PythonObjectOfType::layout_type* lockPtr) {
         np_lockobject_rlockobject* lockObj = (np_lockobject_rlockobject*)(lockPtr->pyObj);
 
         unsigned long tid = PyThread_get_thread_ident();
@@ -2347,7 +2368,7 @@ extern "C" {
         return true;
     }
 
-    bool np_pyobj_rlocktype_unlock(PythonObjectOfType::layout_type* lockPtr) {
+    DllExport bool np_pyobj_rlocktype_unlock(PythonObjectOfType::layout_type* lockPtr) {
         np_lockobject_rlockobject* lockObj = (np_lockobject_rlockobject*)(lockPtr->pyObj);
 
         unsigned long tid = PyThread_get_thread_ident();
@@ -2365,7 +2386,7 @@ extern "C" {
         return false; // __exit__ returning false means don't suppress exceptions
     }
 
-    double np_pyobj_ceil(PythonObjectOfType::layout_type* obj) {
+    DllExport double np_pyobj_ceil(PythonObjectOfType::layout_type* obj) {
         PyEnsureGilAcquired acquireTheGil;
 
         if (!PyObject_HasAttrString(obj->pyObj, "__ceil__")) {
@@ -2402,7 +2423,7 @@ extern "C" {
         return ret;
     }
 
-    double np_pyobj_floor(PythonObjectOfType::layout_type* obj) {
+    DllExport double np_pyobj_floor(PythonObjectOfType::layout_type* obj) {
         PyEnsureGilAcquired acquireTheGil;
 
         if (!PyObject_HasAttrString(obj->pyObj, "__floor__")) {
@@ -2439,7 +2460,7 @@ extern "C" {
         return ret;
     }
 
-    double np_pyobj_trunc(PythonObjectOfType::layout_type* obj) {
+    DllExport double np_pyobj_trunc(PythonObjectOfType::layout_type* obj) {
         PyEnsureGilAcquired acquireTheGil;
         if (PyFloat_Check(obj->pyObj)) {
             double val = PyFloat_AsDouble(obj->pyObj);
@@ -2490,7 +2511,7 @@ extern "C" {
         return ret;
     }
 
-    int64_t np_str_to_int64(StringType::layout* s) {
+    DllExport int64_t np_str_to_int64(StringType::layout* s) {
         int64_t ret = 0;
         if (StringType::to_int64(s, &ret)) {
             return ret;
@@ -2502,7 +2523,7 @@ extern "C" {
         }
     }
 
-    double np_str_to_float64(StringType::layout* s) {
+    DllExport double np_str_to_float64(StringType::layout* s) {
         double ret = 0;
         if (StringType::to_float64(s, &ret)) {
             return ret;
@@ -2515,7 +2536,7 @@ extern "C" {
         }
     }
 
-    int64_t np_bytes_to_int64(BytesType::layout* s) {
+    DllExport int64_t np_bytes_to_int64(BytesType::layout* s) {
         int64_t ret = 0;
         if (BytesType::to_int64(s, &ret)) {
             return ret;
@@ -2527,7 +2548,7 @@ extern "C" {
         }
     }
 
-    double np_bytes_to_float64(BytesType::layout* s) {
+    DllExport double np_bytes_to_float64(BytesType::layout* s) {
         double ret = 0;
         if (BytesType::to_float64(s, &ret)) {
             return ret;
@@ -2542,7 +2563,7 @@ extern "C" {
         }
     }
 
-    double np_pyobj_to_float64(PythonObjectOfType::layout_type* obj) {
+    DllExport double np_pyobj_to_float64(PythonObjectOfType::layout_type* obj) {
     // This conversion matches how the python math module converts arguments to float
         PyEnsureGilAcquired getTheGil;
 
@@ -2553,7 +2574,7 @@ extern "C" {
         return res;
     }
 
-    int64_t np_pyobj_to_int64(PythonObjectOfType::layout_type* obj) {
+    DllExport int64_t np_pyobj_to_int64(PythonObjectOfType::layout_type* obj) {
         PyEnsureGilAcquired getTheGil;
 
         int64_t res = PyLong_AsLong(obj->pyObj);
@@ -2563,7 +2584,7 @@ extern "C" {
         return res;
     }
 
-    BytesType::layout* tp_list_or_tuple_of_to_bytes(TupleOrListOfType::layout* obj, Type* typeObj) {
+    DllExport BytesType::layout* tp_list_or_tuple_of_to_bytes(TupleOrListOfType::layout* obj, Type* typeObj) {
         if (!typeObj->isTupleOrListOf() || !((TupleOrListOfType*)typeObj)->getEltType()->isPOD()) {
             PyEnsureGilAcquired getTheGil;
             PyErr_Format(PyExc_TypeError, "Expected a POD Tuple or List. Got %s", typeObj->name().c_str());
@@ -2578,7 +2599,7 @@ extern "C" {
         );
     }
 
-    TupleOrListOfType::layout* tp_list_or_tuple_of_from_bytes(BytesType::layout* bytes, Type* typeObj) {
+    DllExport TupleOrListOfType::layout* tp_list_or_tuple_of_from_bytes(BytesType::layout* bytes, Type* typeObj) {
         if (!typeObj->isTupleOrListOf() || !((TupleOrListOfType*)typeObj)->getEltType()->isPOD()) {
             PyEnsureGilAcquired getTheGil;
             PyErr_Format(PyExc_TypeError, "Expected a POD Tuple or List. Got %s", typeObj->name().c_str());
@@ -2607,7 +2628,7 @@ extern "C" {
         return res;
     }
 
-    bool np_pyobj_to_bool(PythonObjectOfType::layout_type* obj) {
+    DllExport bool np_pyobj_to_bool(PythonObjectOfType::layout_type* obj) {
         PyEnsureGilAcquired getTheGil;
 
         bool res = PyObject_IsTrue(obj->pyObj);
@@ -2627,7 +2648,7 @@ extern "C" {
      This function retains the convention that upon exhausting the container we return 'nullptr',
      but raises the exception if its present.
     ******/
-    PythonObjectOfType::layout_type* np_pyobj_iter_next(PythonObjectOfType::layout_type* toIterate) {
+    DllExport PythonObjectOfType::layout_type* np_pyobj_iter_next(PythonObjectOfType::layout_type* toIterate) {
         PyEnsureGilAcquired getTheGil;
 
         if (!PyIter_Check(toIterate->pyObj)) {
@@ -2649,7 +2670,7 @@ extern "C" {
     }
 
     // set the python exception state, but don't actually throw.
-    void np_raise_exception_fastpath(const char* message, const char* exceptionTypeName) {
+    DllExport void np_raise_exception_fastpath(const char* message, const char* exceptionTypeName) {
         PyEnsureGilAcquired getTheGil;
 
         PyObject* module = builtinsModule();

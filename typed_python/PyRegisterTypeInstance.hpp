@@ -752,7 +752,7 @@ public:
             if (cat == Type::TypeCategory::catUInt64) {
                 return PyLong_FromUnsignedLong(get());
             }
-            return PyLong_FromLong(get());
+            return PyLong_FromLongLong(get());
         }
         if (strcmp(op, "__neg__") == 0) {
             T val = get();
@@ -770,7 +770,7 @@ public:
         }
         if (strcmp(op, "__index__") == 0 && RegisterTypeProperties::isInteger(type()->getTypeCategory())) {
             int64_t val = get();
-            return PyLong_FromLong(val);
+            return PyLong_FromLongLong(val);
         }
         if (strcmp(op, "__abs__") == 0) {
             T val = get();
@@ -971,7 +971,7 @@ public:
             RegisterTypeProperties::isUnsigned(type->getTypeCategory()) ? Py_True : Py_False
             );
         PyDict_SetItemString(pyType->tp_dict, "Bits",
-            PyLong_FromLong(RegisterTypeProperties::bits(type))
+            PyLong_FromLongLong(RegisterTypeProperties::bits(type))
             );
     }
 

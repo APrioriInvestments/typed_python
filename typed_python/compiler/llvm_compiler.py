@@ -38,13 +38,19 @@ target_machine_shared_object = target.create_target_machine(reloc='pic', codemod
 if sys.platform == "darwin":
     ctypes.CDLL("libstdc++.dylib", mode=ctypes.RTLD_GLOBAL)
 elif sys.platform == "win32":
-    pass
-    # ctypes.CDLL("UCRTBASE.DLL", mode=ctypes.RTLD_GLOBAL)
+    ctypes.CDLL("UCRTBASE.DLL", mode=ctypes.RTLD_GLOBAL)
 else:
     ctypes.CDLL("libstdc++.so.6", mode=ctypes.RTLD_GLOBAL)
 
-ctypes.CDLL(_types.__file__, mode=ctypes.RTLD_GLOBAL)
-
+aDll = ctypes.CDLL(_types.__file__, mode=ctypes.RTLD_GLOBAL)
+aDll['__cxa_allocate_exception']
+aDll['__cxa_throw']
+aDll['__cxa_end_catch']
+aDll['__cxa_begin_catch']
+aDll['__gxx_personality_v0']
+aDll['tp_free']
+aDll['nativepython_float64_to_string']
+aDll['np_add_traceback']
 
 pointer_size = (
     llvmlite.ir.PointerType(llvmlite.ir.DoubleType())

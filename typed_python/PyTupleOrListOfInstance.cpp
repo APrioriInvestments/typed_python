@@ -136,7 +136,7 @@ PyObject* PyTupleOrListOfInstance::pyOperatorAdd(PyObject* rhs, const char* op, 
                             type()->eltPtr(dataPtr(), reversed ? k - count_rhs : k)
                             );
                     } else {
-                        PyObjectStealer kval(PyLong_FromLong(reversed ? k : k - count_lhs));
+                        PyObjectStealer kval(PyLong_FromLongLong(reversed ? k : k - count_lhs));
                         PyObjectStealer o(PyObject_GetItem(rhs, kval));
 
                         if (!o) {
@@ -800,7 +800,7 @@ PyObject* PyListOfInstance::listReserved(PyObject* o, PyObject* args) {
 
     PyListOfInstance* self_w = (PyListOfInstance*)o;
 
-    return PyLong_FromLong(self_w->type()->reserved(self_w->dataPtr()));
+    return PyLong_FromSize_t(self_w->type()->reserved(self_w->dataPtr()));
 }
 
 PyDoc_STRVAR(listReserve_doc,

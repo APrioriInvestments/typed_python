@@ -135,7 +135,7 @@ PyObject* PySlab::slabPtr(PySlab* self, PyObject* args, PyObject* kwargs)
     }
 
     return translateExceptionToPyObject([&]() {
-        return PyLong_FromLong((size_t)self->mSlab);
+        return PyLong_FromSize_t((size_t)self->mSlab);
     });
 }
 
@@ -149,7 +149,7 @@ PyObject* PySlab::refcount(PySlab* self, PyObject* args, PyObject* kwargs)
     }
 
     return translateExceptionToPyObject([&]() {
-        return PyLong_FromLong(self->mSlab->refcount());
+        return PyLong_FromSize_t(self->mSlab->refcount());
     });
 }
 
@@ -163,7 +163,7 @@ PyObject* PySlab::bytecount(PySlab* self, PyObject* args, PyObject* kwargs)
     }
 
     return translateExceptionToPyObject([&]() {
-        return PyLong_FromLong(self->mSlab->getBytecount());
+        return PyLong_FromSize_t(self->mSlab->getBytecount());
     });
 }
 
@@ -214,7 +214,7 @@ PyObject* PySlab::allocCount(PySlab* self, PyObject* args, PyObject* kwargs) {
         return NULL;
     }
 
-    return PyLong_FromLong(self->mSlab->allocCount());
+    return PyLong_FromSize_t(self->mSlab->allocCount());
 }
 
 PyObject* PySlab::liveAllocCount(PySlab* self, PyObject* args, PyObject* kwargs) {
@@ -224,7 +224,7 @@ PyObject* PySlab::liveAllocCount(PySlab* self, PyObject* args, PyObject* kwargs)
         return NULL;
     }
 
-    return PyLong_FromLong(self->mSlab->liveAllocCount());
+    return PyLong_FromSize_t(self->mSlab->liveAllocCount());
 }
 
 PyObject* PySlab::extractObject(PySlab* self, PyObject* args, PyObject* kwargs) {
@@ -308,7 +308,7 @@ PyObject* PySlab::allocRefcount(PySlab* self, PyObject* args, PyObject* kwargs) 
     }
 
     return translateExceptionToPyObject([&]() {
-        return PyLong_FromLong(self->mSlab->allocRefcount(index));
+        return PyLong_FromSize_t(self->mSlab->allocRefcount(index));
     });
 }
 
