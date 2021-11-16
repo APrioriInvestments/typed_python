@@ -14,7 +14,7 @@ pytest-cov = "*"
 
 [packages]
 sortedcontainers = "*"
-llvmlite = "*"
+llvmlite = "==0.36.0"
 lz4 = "*"
 numpy = "<1.20"
 psutil = "*"
