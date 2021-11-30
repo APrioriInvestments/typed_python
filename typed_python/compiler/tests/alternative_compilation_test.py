@@ -1676,3 +1676,12 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         assert checkMatchesX(A.X())
         assert not checkMatchesX(B.Y())
+
+    def test_can_construct_empty_alternatives(self):
+        A = Alternative("A", X=dict(), Y=dict(y=int))
+
+        @Entrypoint
+        def make():
+            return A.X()
+
+        make()

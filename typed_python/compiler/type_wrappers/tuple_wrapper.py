@@ -182,10 +182,13 @@ class TupleWrapper(Wrapper):
         self.subTypeWrappers = tuple(typeWrapper(sub_t) for sub_t in t.ElementTypes)
         self._unionType = None
 
-        self.byteOffsets = [0]
+        if not self.subTypeWrappers:
+            self.byteOffsets = []
+        else:
+            self.byteOffsets = [0]
 
-        for i in range(len(self.subTypeWrappers)-1):
-            self.byteOffsets.append(self.byteOffsets[-1] + _types.bytecount(t.ElementTypes[i]))
+            for i in range(len(self.subTypeWrappers)-1):
+                self.byteOffsets.append(self.byteOffsets[-1] + _types.bytecount(t.ElementTypes[i]))
 
         self.layoutType = native_ast.Type.Array(element_type=native_ast.UInt8, count=bytecount)
 
