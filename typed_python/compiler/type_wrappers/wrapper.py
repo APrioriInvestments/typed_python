@@ -107,6 +107,9 @@ class Wrapper:
         self.typeRepresentation = typeRepresentation
         self._conversionCache = {}
 
+    def isIterable(self):
+        return "Maybe"
+
     def identityHash(self):
         return (
             Hash(_types.identityHash(self.typeRepresentation))

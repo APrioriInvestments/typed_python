@@ -401,8 +401,16 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
 
             // not reachable
             assert(false);
-
         } else {
+            if (eltType->isClass() && ((Class*)eltType)->getOwnClassMembers().find("__typed_python_template__")
+                    != ((Class*)eltType)->getOwnClassMembers().end()) {
+                return PyObject_Call(
+                    ((Class*)eltType)->getOwnClassMembers().find("__typed_python_template__")->second,
+                    args,
+                    kwds
+                );
+            }
+
             Instance inst(eltType, [&](instance_ptr tgt) {
                 constructFromPythonArguments(tgt, eltType, args, kwds);
             });
@@ -1064,7 +1072,7 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
 
     if (types.find(category) == types.end()) {
         PyObject* classDict = PyDict_New();
-        PyDict_SetItemString(classDict, "__typed_python_module__", PyUnicode_FromString("typed_python._types"));
+        PyDict_SetItemString(classDict, "__module__", PyUnicode_FromString("typed_python._types"));
 
         types[category] = new NativeTypeCategoryWrapper { {
             PyVarObject_HEAD_INIT(NULL, 0)              // TYPE (c.f., Type Objects)
@@ -1179,7 +1187,7 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
 
     types[inType] = new NativeTypeWrapper { {
             PyVarObject_HEAD_INIT(NULL, 0)              // TYPE (c.f., Type Objects)
-            .tp_name = (new std::string(inType->name()))->c_str(),          // const char*
+            .tp_name = (new std::string(inType->nameWithModule()))->c_str(),          // const char*
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
             .tp_dealloc = PyInstance::tp_dealloc,       // destructor
@@ -1827,6 +1835,6 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
         return valueType;
     }
 
-    PyErr_Format(PyExc_TypeError, "Cannot convert to a native type.");
+    PyErr_Format(PyExc_TypeError, "Cannot convert %R to a typed_python Type", typearg);
     return NULL;
 }

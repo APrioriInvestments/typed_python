@@ -34,6 +34,25 @@ public:
 
     static std::pair<bool, PyObject*> tryToCallAnyOverload(const Function* f, instance_ptr functionClosure, PyObject* self, PyObject* args, PyObject* kwargs);
 
+    // determine the exact return type of a specific overload. Returns <result, isException>
+    static std::pair<Type*, bool> getOverloadReturnType(
+        const Function* f,
+        long overloadIx,
+        FunctionCallArgMapping& matchedArgs
+    );
+
+    // Given that we have matched a collection of arguments, what return type are we?
+    // this calls signature functions, and checks for return type consistency.
+    // Returns <result, isException>
+    static std::pair<Type*, bool> determineReturnTypeForMatchedCall(
+        const Function* f,
+        long overloadIx,
+        FunctionCallArgMapping& matchedArgs,
+        PyObject* self,
+        PyObject* args,
+        PyObject* kwargs
+    );
+
     // determine the 'compiler type' of an argument 'o'. If 'o' is already the right type, just
     // use that. But for untyped function objects, and for Function objects with interpreter
     // closures, we attempt to walk the closure graph and build a better type signature.

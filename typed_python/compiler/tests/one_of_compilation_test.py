@@ -692,3 +692,13 @@ class TestOneOfCompilation(unittest.TestCase):
                 x = y
 
         checkIt(None, float)
+
+    def test_call_type_on_oneof(self):
+        @Entrypoint
+        def checkIt(x: OneOf(int, float)):
+            if type(x) is int:
+                return "int"
+            return "float"
+
+        assert checkIt(1) == "int"
+        assert checkIt(1.0) == "float"

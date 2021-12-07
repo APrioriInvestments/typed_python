@@ -869,12 +869,17 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
         }
 
         Type* rType = 0;
+        PyObject* rSignature = 0;
 
         if (retType != Py_None) {
             rType = PyInstance::unwrapTypeArgToTypePtr(retType);
             if (!rType) {
-                PyErr_SetString(PyExc_TypeError, "Expected second argument to be None or a type");
-                return NULL;
+                if (!PyCallable_Check(retType)) {
+                    PyErr_SetString(PyExc_TypeError, "Expected second argument to be None, a type, or a callable type signature function");
+                    return NULL;
+                }
+                PyErr_Clear();
+                rSignature = retType;
             }
         }
 
@@ -1022,7 +1027,9 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                 closureVarnames,
                 closureBindings,
                 rType,
-                argList
+                rSignature,
+                argList,
+                nullptr
             )
         );
 
@@ -1204,6 +1211,46 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
         );
     });
 }
+
+PyDoc_STRVAR(
+    canConvertToTrivially_doc,
+    "canConvertToTrivially_doc(sourceT, destT) -> bool\n\n"
+    "Determines whether instances of sourceT can be converted to destT without\n"
+    "modification of data or change of identity.\n\nFor instance, int converts trivially\n"
+    "to Oneof(int, float), but not to float or str. Subclasses can convert to any base class\n"
+    "and Value types can convert to the type of the value."
+);
+PyObject *canConvertToTrivially(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "canConvertToTrivially takes 2 positional arguments");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+    PyObjectHolder a2(PyTuple_GetItem(args, 1));
+
+    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t1) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'canConvertToTrivially' must be a type object");
+        return NULL;
+    }
+
+    Type* t2 = PyInstance::unwrapTypeArgToTypePtr(a2);
+
+    if (!t2) {
+        PyErr_SetString(PyExc_TypeError, "second argument to 'canConvertToTrivially' must be a type object");
+        return NULL;
+    }
+
+    bool can = t1->canConvertToTrivially(t2);
+
+    if (can) {
+        return incref(Py_True);
+    }
+
+    return incref(Py_False);
+}
+
 
 PyObject* convertObjectToTypeAtLevel(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() {
@@ -2457,41 +2504,6 @@ PyObject *typesAreEquivalent(PyObject* nullValue, PyObject* args) {
     return Type::typesEquivalent(t1, t2) ? incref(Py_True) : incref(Py_False);
 }
 
-PyObject *canConstructFrom(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 2) {
-        PyErr_SetString(PyExc_TypeError, "canConstructFrom takes 3 positional arguments");
-        return NULL;
-    }
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
-    PyObjectHolder a2(PyTuple_GetItem(args, 1));
-
-    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
-
-    if (!t1) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'canConstructFrom' must be a type object");
-        return NULL;
-    }
-
-    Type* t2 = PyInstance::unwrapTypeArgToTypePtr(a2);
-
-    if (!t2) {
-        PyErr_SetString(PyExc_TypeError, "second argument to 'canConstructFrom' must be a type object");
-        return NULL;
-    }
-
-    Maybe can = t1->canConstructFrom(t2, PyTuple_GetItem(args, 2) == Py_True);
-
-    if (can == Maybe::Maybe) {
-        return PyUnicode_FromString("Maybe");
-    }
-
-    if (can == Maybe::True) {
-        return incref(Py_True);
-    }
-
-    return incref(Py_False);
-}
-
 PyObject *disableNativeDispatch(PyObject* nullValue, PyObject* args) {
     native_dispatch_disabled++;
     return incref(Py_None);
@@ -2978,6 +2990,7 @@ PyObject* gilReleaseThreadLoop(PyObject* null, PyObject* args, PyObject* kwargs)
 }
 
 static PyMethodDef module_methods[] = {
+    {"canConvertToTrivially", (PyCFunction)canConvertToTrivially, METH_VARARGS, canConvertToTrivially_doc},
     {"TypeFor", (PyCFunction)MakeTypeFor, METH_VARARGS, NULL},
     {"deepBytecount", (PyCFunction)deepBytecount, METH_VARARGS, deepBytecount_doc},
     {"deepBytecountAndSlabs", (PyCFunction)deepBytecountAndSlabs, METH_VARARGS, deepBytecountAndSlabs_doc},
@@ -2998,7 +3011,6 @@ static PyMethodDef module_methods[] = {
     {"buildPyFunctionObject", (PyCFunction)buildPyFunctionObject, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isPOD", (PyCFunction)isPOD, METH_VARARGS, NULL},
     {"isSimple", (PyCFunction)isSimple, METH_VARARGS, NULL},
-    {"canConstructFrom", (PyCFunction)canConstructFrom, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
@@ -3064,7 +3076,7 @@ static struct PyModuleDef moduledef = {
 
 void updateTypeRepForType(Type* type, PyTypeObject* pyType) {
     //deliberately leak the name.
-    pyType->tp_name = (new std::string(type->name()))->c_str();
+    pyType->tp_name = (new std::string(type->nameWithModule()))->c_str();
 
     PyInstance::mirrorTypeInformationIntoPyType(type, pyType);
 }

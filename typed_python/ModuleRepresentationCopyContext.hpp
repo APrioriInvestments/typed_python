@@ -192,7 +192,9 @@ public:
                             o.getFunctionClosureVarnames(),
                             o.getClosureVariableBindings(),
                             copyType(o.getReturnType()),
-                            args
+                            o.getSignatureFunction(),
+                            args,
+                            o.getMethodOf()
                         )
                     );
                 }

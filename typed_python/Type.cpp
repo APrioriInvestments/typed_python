@@ -232,33 +232,37 @@ bool Type::isBinaryCompatibleWith(Type* other) {
     return isCompatible;
 }
 
-Maybe Type::canConstructFrom(Type* otherType, bool isExplicit) {
-    if (Type::typesEquivalent(otherType, this)) {
-        return Maybe::True;
+bool Type::canConvertToTrivially(Type* otherType) {
+    if (typesEquivalent(this, otherType)) {
+        return true;
     }
 
-    if (mCanConvertOnStack.find(otherType) != mCanConvertOnStack.end()) {
-        return Maybe::Maybe;
+    if (otherType->isSubclassOf(this)) {
+        return true;
     }
 
-    auto it = mCanConvert.find(otherType);
-    if (it != mCanConvert.end()) {
-        return it->second;
+    if (isValue()) {
+        return ((Value*)this)->value().type()->canConvertToTrivially(otherType);
     }
 
-    mCanConvertOnStack.insert(otherType);
+    if (isOneOf() && otherType->isOneOf()) {
+        for (Type* ownOneofElt: ((OneOfType*)this)->getTypes()) {
+            if (!ownOneofElt->canConvertToTrivially(otherType)) {
+                return false;
+            }
 
-    try {
-        mCanConvert[otherType] = this->check([&](auto& subtype) {
-            return subtype.canConstructFromConcrete(otherType, isExplicit);
-        });
-        mCanConvertOnStack.erase(otherType);
-    } catch (...) {
-        mCanConvertOnStack.erase(otherType);
-        throw;
+            return true;
+        }
+    } else
+    if (otherType->isOneOf()) {
+        for (Type* otherOneofT: ((OneOfType*)otherType)->getTypes()) {
+            if (canConvertToTrivially(otherOneofT)) {
+                return true;
+            }
+        }
     }
 
-    return mCanConvert[otherType];
+    return false;
 }
 
 void Type::endOfConstructorInitialization() {

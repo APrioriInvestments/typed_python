@@ -153,6 +153,53 @@ public:
         }
     }
 
+    void pushArguments(PyObject* self, PyObject* args, PyObject* kwargs) {
+        if (self) {
+            pushPositionalArg(self);
+        }
+
+        for (long k = 0; k < PyTuple_Size(args); k++) {
+            pushPositionalArg(PyTuple_GetItem(args, k));
+        }
+
+        if (kwargs) {
+            PyObject *key, *value;
+            Py_ssize_t pos = 0;
+
+            while (PyDict_Next(kwargs, &pos, &key, &value)) {
+                if (!PyUnicode_Check(key)) {
+                    PyErr_SetString(PyExc_TypeError, "Keywords arguments must be strings.");
+                    throw PythonExceptionSet();
+                }
+
+                pushKeywordArg(PyUnicode_AsUTF8(key), value);
+            }
+        }
+
+        finishedPushing();
+    }
+
+    // return true if we can show we don't match without having to do
+    // type coersion
+    bool definitelyDoesntMatch(ConversionLevel conversionLevel) {
+        for (long k = 0; k < mArgs.size(); k++) {
+            auto& arg = mArgs[k];
+
+            if (arg.getIsNormalArg() && arg.getTypeFilter()) {
+                if (!PyInstance::pyValCouldBeOfType(
+                    arg.getTypeFilter(),
+                    mSingleValueArgs[k],
+                    conversionLevel
+                    )
+                ) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     bool isValid() const {
         return mIsValid;
     }
@@ -170,7 +217,7 @@ public:
     }
 
     // flatten all the args for passing to regular python
-    PyObject* buildPositionalArgTuple() const {
+    PyObject* buildPositionalArgTuple(bool returnTypes=false) const {
         size_t count = 0;
         for (long k = 0; k < mArgs.size(); k++) {
             if (mArgs[k].getIsNormalArg()) {
@@ -190,10 +237,10 @@ public:
                     throw std::runtime_error("Expected a populated value here.");
                 }
 
-                PyTuple_SetItem(tup, count++, incref(mSingleValueArgs[k]));
+                PyTuple_SetItem(tup, count++, incref(returnTypes ? (PyObject*)mSingleValueArgs[k]->ob_type : mSingleValueArgs[k]));
             } else if (mArgs[k].getIsStarArg()) {
                 for (auto subElt: mStarArgValues) {
-                    PyTuple_SetItem(tup, count++, incref(subElt));
+                    PyTuple_SetItem(tup, count++, incref(returnTypes ? (PyObject*)subElt->ob_type : subElt));
                 }
             }
         }
@@ -216,12 +263,16 @@ public:
         return nullptr;
     }
 
-    PyObject* buildKeywordArgTuple() const {
+    PyObject* buildKeywordArgTuple(bool returnTypes=false) const {
         for (long k = 0; k < mArgs.size(); k++) {
             if (mArgs[k].getIsKwarg()) {
                 PyObject* res = PyDict_New();
                 for (auto nameAndObj: mKwargValues) {
-                    PyDict_SetItemString(res, nameAndObj.first.c_str(), nameAndObj.second);
+                    PyDict_SetItemString(
+                        res,
+                        nameAndObj.first.c_str(),
+                        returnTypes ? (PyObject*)nameAndObj.second->ob_type : nameAndObj.second
+                    );
                 }
                 return res;
             }

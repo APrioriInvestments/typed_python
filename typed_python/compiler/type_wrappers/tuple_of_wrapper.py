@@ -525,6 +525,9 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
             return "Maybe"
 
+        if otherType.isIterable() is False:
+            return False
+
         return super()._can_convert_from_type(otherType, conversionLevel)
 
     def convert_to_self_with_target(self, context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure=False):

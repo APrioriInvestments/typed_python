@@ -273,13 +273,18 @@ class ClassMetaclass(type):
 
         memberFunctions = {}
         staticFunctions = {}
-        classMembers = []
+        classMembers = {}
         properties = {}
 
+        if "__name__" in kwds:
+            name = kwds["__name__"]
+
         for eltName, elt in namespace.order:
-            if isinstance(elt, Member):
+            if eltName == '__name__':
+                name = elt
+            elif isinstance(elt, Member):
                 members.append((eltName, elt._type, elt._default_value, elt._nonempty))
-                classMembers.append((eltName, elt))
+                classMembers[eltName] = elt
             elif isinstance(elt, property):
                 properties[eltName] = makeFunctionType(eltName, elt.fget, assumeClosuresGlobal=True)
             elif isinstance(elt, staticmethod):
@@ -298,7 +303,9 @@ class ClassMetaclass(type):
                 or isinstance(elt, type)
                 and issubclass(elt, typed_python._types.Function)
             ):
-                if eltName not in memberFunctions:
+                if eltName == '__typed_python_template__':
+                    classMembers[eltName] = elt
+                elif eltName not in memberFunctions:
                     memberFunctions[eltName] = makeFunctionType(
                         eltName, elt, classname=name, assumeClosuresGlobal=True
                     )
@@ -308,15 +315,7 @@ class ClassMetaclass(type):
                         makeFunctionType(eltName, elt, classname=name, assumeClosuresGlobal=True),
                     )
             else:
-                classMembers.append((eltName, elt))
-
-                if eltName == "__module__":
-                    # __module__ gets swallowed by the base Class instance, so we have to
-                    # communicate the variable by sticking the 'typed_python' in it
-                    classMembers.append(("__typed_python_module__", elt))
-
-        if "__name__" in kwds:
-            name = kwds["__name__"]
+                classMembers[eltName] = elt
 
         return typed_python._types.Class(
             name,
@@ -326,7 +325,7 @@ class ClassMetaclass(type):
             tuple(memberFunctions.items()),
             tuple(staticFunctions.items()),
             tuple(properties.items()),
-            tuple(classMembers),
+            tuple(classMembers.items()),
         )
 
     def __subclasscheck__(cls, subcls):
@@ -396,7 +395,7 @@ class FunctionOverloadArg:
 
 
 class FunctionOverload:
-    def __init__(self, functionTypeObject, index, code, funcGlobalsInCells, closureVarLookups, returnType):
+    def __init__(self, functionTypeObject, index, code, funcGlobalsInCells, closureVarLookups, returnType, signatureFunction, methodOf):
         """Initialize a FunctionOverload.
 
         Args:
@@ -410,6 +409,9 @@ class FunctionOverload:
                 actual function.
             returnType - the return type annotation, or None if None provided. (if None was
                 specified, that would be the NoneType)
+            signatureFunction - None, or the user-provided callable that determines the
+                return type as a function of the types of the arguments to the function.
+            methodOf - if we are a method of a class, the class object
         """
         self.functionTypeObject = functionTypeObject
         self.index = index
@@ -417,7 +419,9 @@ class FunctionOverload:
         self.functionCode = code
         self.funcGlobalsInCells = funcGlobalsInCells
         self.returnType = returnType
+        self.signatureFunction = signatureFunction
         self._realizedGlobals = None
+        self.methodOf = methodOf
         self.args = ()
 
     @property
@@ -475,6 +479,8 @@ class FunctionOverload:
         self.args = self.args + (FunctionOverloadArg(name, defaultVal, typeFilter, isStarArg, isKwarg),)
 
     def __str__(self):
+        if self.methodOf:
+            return "FunctionOverload(%s, returns %s, %s)" % (self.methodOf.Class.__name__, self.returnType, self.args)
         return "FunctionOverload(returns %s, %s)" % (self.returnType, self.args)
 
     def _installNativePointer(self, fp, returnType, argumentTypes):

@@ -109,29 +109,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
 
     FunctionCallArgMapping mapping(overload);
 
-    if (self) {
-        mapping.pushPositionalArg(self);
-    }
-
-    for (long k = 0; k < PyTuple_Size(args); k++) {
-        mapping.pushPositionalArg(PyTuple_GetItem(args, k));
-    }
-
-    if (kwargs) {
-        PyObject *key, *value;
-        Py_ssize_t pos = 0;
-
-        while (PyDict_Next(kwargs, &pos, &key, &value)) {
-            if (!PyUnicode_Check(key)) {
-                PyErr_SetString(PyExc_TypeError, "Keywords arguments must be strings.");
-                return std::make_pair(true, nullptr);
-            }
-
-            mapping.pushKeywordArg(PyUnicode_AsUTF8(key), value);
-        }
-    }
-
-    mapping.finishedPushing();
+    mapping.pushArguments(self, args, kwargs);
 
     if (!mapping.isValid()) {
         return std::make_pair(false, nullptr);
@@ -139,19 +117,8 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
 
     //first, see if we can short-circuit without producing temporaries, which
     //can be slow.
-    for (long k = 0; k < overload.getArgs().size(); k++) {
-        auto arg = overload.getArgs()[k];
-
-        if (arg.getIsNormalArg() && arg.getTypeFilter()) {
-            if (!PyInstance::pyValCouldBeOfType(
-                arg.getTypeFilter(),
-                mapping.getSingleValueArgs()[k],
-                conversionLevel
-                )
-            ) {
-                return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
-            }
-        }
+    if (mapping.definitelyDoesntMatch(conversionLevel)) {
+        return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
     }
 
     //perform argument coercion
@@ -189,11 +156,29 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
         return std::make_pair(true, result);
     }
 
-    //force ourselves to convert to the native type
-    if (overload.getReturnType()) {
+    // determine if we have a valid type-signature. If this is a method of a class,
+    // we'll need to look up the chain and see whether there are any terms that match
+    // this signature, and verify that all the signature types above us are valid.
+    std::pair<Type*, bool> returnTypeAndIsException = determineReturnTypeForMatchedCall(
+        f,
+        overloadIx,
+        mapping,
+        self,
+        args,
+        kwargs
+    );
+
+    if (returnTypeAndIsException.second) {
+        return std::make_pair(true, nullptr);
+    }
+
+    Type* returnType = returnTypeAndIsException.first;
+
+    //force ourselves to convert to the returnType
+    if (returnType) {
         try {
-            PyObject* newRes = PyInstance::initializePythonRepresentation(overload.getReturnType(), [&](instance_ptr data) {
-                copyConstructFromPythonInstance(overload.getReturnType(), data, result, ConversionLevel::ImplicitContainers);
+            PyObject* newRes = PyInstance::initializePythonRepresentation(returnType, [&](instance_ptr data) {
+                copyConstructFromPythonInstance(returnType, data, result, ConversionLevel::ImplicitContainers);
             });
 
             return std::make_pair(true, newRes);
@@ -204,6 +189,171 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
     }
 
     return std::make_pair(true, incref(result));
+}
+
+std::pair<Type*, bool> PyFunctionInstance::getOverloadReturnType(
+    const Function* f,
+    long overloadIx,
+    FunctionCallArgMapping& matchedArgs
+) {
+    const Function::Overload& overload(f->getOverloads()[overloadIx]);
+    Type* returnType = overload.getReturnType();
+
+    if (overload.getSignatureFunction()) {
+        // this function has a signature function. we need to invoke it to determine
+        // what type we're going to be returning
+        PyObjectHolder sigFuncReturnType;
+
+        PyObjectStealer argTypeTup(matchedArgs.buildPositionalArgTuple(true /*types*/));
+        PyObjectStealer kwargTypeDict(matchedArgs.buildKeywordArgTuple(true /*types*/));
+
+        sigFuncReturnType.steal(
+            PyObject_Call(overload.getSignatureFunction(), (PyObject*)argTypeTup, (PyObject*)kwargTypeDict)
+        );
+
+        if (!sigFuncReturnType) {
+            // user code threw an exception
+            return std::make_pair(nullptr, true);
+        }
+
+        returnType = PyInstance::unwrapTypeArgToTypePtr(sigFuncReturnType);
+
+        if (!returnType) {
+            // user code didn't return a proper type!
+            return std::make_pair(nullptr, true);
+        }
+    }
+
+    return std::make_pair(returnType, false);
+}
+
+std::pair<Type*, bool> PyFunctionInstance::determineReturnTypeForMatchedCall(
+    const Function* f,
+    long overloadIx,
+    FunctionCallArgMapping& matchedArgs,
+    PyObject* self,
+    PyObject* args,
+    PyObject* kwargs
+) {
+    std::pair<Type*, bool> returnTypeAndIsException = getOverloadReturnType(f, overloadIx, matchedArgs);
+
+    if (returnTypeAndIsException.second) {
+        return returnTypeAndIsException;
+    }
+
+    if (!f->getOverloads()[overloadIx].getMethodOf()) {
+        return returnTypeAndIsException;
+    }
+
+    Type* returnType = returnTypeAndIsException.first;
+
+    std::vector<std::pair<Type*, Type*> > returnTypeAndCls;
+
+    // this is the method of a class. We need to check that all types in classes
+    // above this are valid also. We will do that by grouping the overloads
+    // into blocks based on the class they're a method of, and for each base class,
+    // determining what return type it would have for this set of arguments.
+    size_t overloadCount = f->getOverloads().size();
+
+    auto methodFor = [&](int64_t ix) {
+        return f->getOverloads()[ix].getMethodOf();
+    };
+
+    auto blockEndIx = [&](int64_t ix) {
+        int64_t startIx = ix;
+        while (ix < overloadCount && methodFor(ix) == methodFor(startIx)) {
+            ix++;
+        }
+        return ix;
+    };
+
+    returnTypeAndCls.push_back(std::make_pair(returnType, methodFor(overloadIx)));
+
+    int64_t nextOverloadIx = blockEndIx(overloadIx);
+
+    while (nextOverloadIx < overloadCount) {
+        int64_t topIx = blockEndIx(nextOverloadIx);
+
+        bool anyMatched = false;
+
+        // within this block of overloads, find the first overload
+        // we would have matched
+        for (ConversionLevel conversionLevel: {
+            ConversionLevel::Signature,
+            ConversionLevel::Upcast,
+            ConversionLevel::UpcastContainers,
+            ConversionLevel::Implicit,
+            ConversionLevel::ImplicitContainers
+        }) {
+            if (!anyMatched) {
+                for (long matchingIx = nextOverloadIx; matchingIx < topIx && !anyMatched; matchingIx++) {
+                    FunctionCallArgMapping subMapping(f->getOverloads()[matchingIx]);
+
+                    subMapping.pushArguments(self, args, kwargs);
+
+                    if (!subMapping.definitelyDoesntMatch(conversionLevel)) {
+                        subMapping.applyTypeCoercion(conversionLevel);
+
+                        if (subMapping.isValid()) {
+                            anyMatched = true;
+
+                            std::pair<Type*, bool> baseClassReturnType = getOverloadReturnType(f, matchingIx, subMapping);
+
+                            // if the signature function fails, we have to stop processing
+                            if (baseClassReturnType.second) {
+                                return baseClassReturnType;
+                            }
+
+                            returnTypeAndCls.push_back(std::make_pair(baseClassReturnType.first, methodFor(matchingIx)));
+                        }
+                    }
+                }
+            }
+        }
+
+        // roll to the next block
+        nextOverloadIx = topIx;
+    }
+
+    // now we have a list of matched types. We need to ensure that they're progressively
+    // tighter in reverse order.
+    std::pair<Type*, Type*> actualReturnTypeAndCls;
+
+    for (int64_t ix = (int64_t)returnTypeAndCls.size() - 1; ix >= 0; ix--) {
+        if (!actualReturnTypeAndCls.first) {
+            // if we don't have a stated return type yet, anything is OK
+            actualReturnTypeAndCls = returnTypeAndCls[ix];
+        } else
+        if (returnTypeAndCls[ix].first) {
+            if (!returnTypeAndCls[ix].first->canConvertToTrivially(actualReturnTypeAndCls.first)) {
+                Type* baseType = actualReturnTypeAndCls.second;
+                Type* childType = returnTypeAndCls[ix].second;
+
+                if (baseType->isHeldClass()) {
+                    baseType = ((HeldClass*)baseType)->getClassType();
+                }
+
+                if (childType->isHeldClass()) {
+                    childType = ((HeldClass*)childType)->getClassType();
+                }
+
+                PyErr_Format(
+                    PyExc_TypeError,
+                    "Method %s.%s promised a return type of '%s', but subclass %s proposed to return '%s'. ",
+                    baseType->name().c_str(),
+                    f->name().c_str(),
+                    actualReturnTypeAndCls.first->name().c_str(),
+                    childType->name().c_str(),
+                    returnTypeAndCls[ix].first->name().c_str()
+                );
+                return std::make_pair(nullptr, true);
+            } else {
+                actualReturnTypeAndCls = returnTypeAndCls[ix];
+            }
+        }
+    }
+
+    return std::make_pair(actualReturnTypeAndCls.first, false);
 }
 
 std::pair<bool, PyObject*> PyFunctionInstance::tryToCall(const Function* f, instance_ptr closure, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
@@ -529,6 +679,8 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
         PyDict_SetItemString(pyOverloadInstDict, "functionCode", (PyObject*)overload.getFunctionCode());
         PyDict_SetItemString(pyOverloadInstDict, "funcGlobalsInCells", (PyObject*)pyGlobalCellDict);
         PyDict_SetItemString(pyOverloadInstDict, "returnType", overload.getReturnType() ? (PyObject*)typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None);
+        PyDict_SetItemString(pyOverloadInstDict, "signatureFunction", overload.getSignatureFunction() ? (PyObject*)overload.getSignatureFunction() : Py_None);
+        PyDict_SetItemString(pyOverloadInstDict, "methodOf", overload.getMethodOf() ? (PyObject*)typePtrToPyTypeRepresentation(overload.getMethodOf()) : Py_None);
         PyDict_SetItemString(pyOverloadInstDict, "_realizedGlobals", Py_None);
         PyDict_SetItemString(pyOverloadInstDict, "args", argsTup);
 
@@ -606,13 +758,7 @@ void PyFunctionInstance::mirrorTypeInformationIntoPyTypeConcrete(Function* inTyp
 
     PyDict_SetItemString(
         pyType->tp_dict,
-        "__typed_python_qualname__",
-        PyUnicode_FromString(inType->qualname().c_str())
-    );
-
-    PyDict_SetItemString(
-        pyType->tp_dict,
-        "__typed_python_module__",
+        "__module__",
         PyUnicode_FromString(inType->moduleName().c_str())
     );
 

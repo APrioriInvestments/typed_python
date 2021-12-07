@@ -20,7 +20,7 @@ from typed_python.python_ast import (
 )
 from typed_python.hash import sha_hash
 from typed_python.compiler.runtime_lock import runtimeLock
-from typed_python.type_function import ConcreteTypeFunction, reconstructTypeFunctionType, isTypeFunctionType
+from typed_python.type_function import TypeFunction, reconstructTypeFunctionType, isTypeFunctionType
 from types import FunctionType, ModuleType, CodeType, MethodType, BuiltinFunctionType
 from _thread import LockType, RLock
 import abc
@@ -258,11 +258,12 @@ class SerializationContext:
             if tName is not None:
                 return ".alt." + tName + ":" + str(t.Index)
 
-        if isinstance(t, ConcreteTypeFunction):
-            name = t._concreteTypeFunction.__module__ + "." + t._concreteTypeFunction.__name__
-            if self.objectFromName(name, allowImport=False) is t:
-                return name
-            return None
+        if issubclass(t, TypeFunction):
+            if len(t.MRO) == 2:
+                name = t.__module__ + "." + t.__name__
+                if self.objectFromName(name, allowImport=False) is t:
+                    return name
+                return None
 
         if isinstance(t, dict) and '__name__' in t and isinstance(t['__name__'], str):
             maybeModule = self.objectFromName('.modules.' + t['__name__'], allowImport=False)
@@ -270,8 +271,8 @@ class SerializationContext:
                 return ".module_dict." + t['__name__']
 
         if isinstance(t, (FunctionType, BuiltinFunctionType)) or isinstance(t, type) and issubclass(t, _types.Function):
-            mname = getattr(t, "__typed_python_module__", t.__module__)
-            qualname = getattr(t, "__typed_python_qualname__", t.__qualname__)
+            mname = getattr(t, "__module__", t.__module__)
+            qualname = getattr(t, "__qualname__", t.__qualname__)
             fname = t.__name__
 
             if mname is not None:
@@ -289,7 +290,7 @@ class SerializationContext:
                     return ".typeof." + name
 
         elif isinstance(t, type) and issubclass(t, Alternative):
-            mname = t.__typed_python_module__
+            mname = t.__module__
             fname = t.__name__
 
             if self.objectFromName(mname + "." + fname, allowImport=False) is t:
@@ -301,11 +302,6 @@ class SerializationContext:
 
         elif isinstance(t, type):
             fname = t.__name__
-
-            if hasattr(t, "__typed_python_module__"):
-                mname = getattr(t, "__typed_python_module__", None)
-                if self.objectFromName(mname + "." + fname, allowImport=False) is t:
-                    return mname + "." + fname
 
             if getattr(t, "__typed_python_category__", None) == 'Value':
                 return None

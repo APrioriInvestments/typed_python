@@ -574,7 +574,9 @@ public:
             const std::vector<std::string>& pyFuncClosureVarnames,
             const std::map<std::string, ClosureVariableBinding> closureBindings,
             Type* returnType,
-            const std::vector<FunctionArg>& args
+            PyObject* pySignatureFunction,
+            const std::vector<FunctionArg>& args,
+            Type* methodOf
         ) :
                 mFunctionCode(pyFuncCode),
                 mFunctionGlobals(pyFuncGlobals),
@@ -583,13 +585,15 @@ public:
                 mFunctionGlobalsInCells(pyFuncGlobalsInCells),
                 mFunctionClosureVarnames(pyFuncClosureVarnames),
                 mReturnType(returnType),
+                mSignatureFunction(pySignatureFunction),
                 mArgs(args),
                 mHasKwarg(false),
                 mHasStarArg(false),
                 mMinPositionalArgs(0),
                 mMaxPositionalArgs(-1),
                 mClosureBindings(closureBindings),
-                mCachedFunctionObj(nullptr)
+                mCachedFunctionObj(nullptr),
+                mMethodOf(methodOf)
         {
             long argsWithDefaults = 0;
             long argsDefinitelyConsuming = 0;
@@ -623,6 +627,8 @@ public:
             mFunctionGlobals = other.mFunctionGlobals;
             mFunctionDefaults = other.mFunctionDefaults;
             mFunctionAnnotations = other.mFunctionAnnotations;
+            mSignatureFunction = other.mSignatureFunction;
+            mMethodOf = other.mMethodOf;
 
             mFunctionClosureVarnames = other.mFunctionClosureVarnames;
 
@@ -660,7 +666,25 @@ public:
                 mFunctionClosureVarnames,
                 bindings,
                 mReturnType,
-                mArgs
+                mSignatureFunction,
+                mArgs,
+                mMethodOf
+            );
+        }
+
+        Overload withMethodOf(Type* methodOf) const {
+            return Overload(
+                mFunctionCode,
+                mFunctionGlobals,
+                mFunctionDefaults,
+                mFunctionAnnotations,
+                mFunctionGlobalsInCells,
+                mFunctionClosureVarnames,
+                mClosureBindings,
+                mReturnType,
+                mSignatureFunction,
+                mArgs,
+                methodOf
             );
         }
 
@@ -674,7 +698,9 @@ public:
                 mFunctionClosureVarnames,
                 bindings,
                 mReturnType,
-                mArgs
+                mSignatureFunction,
+                mArgs,
+                mMethodOf
             );
         }
 
@@ -735,33 +761,6 @@ public:
             return argCount >= mMinPositionalArgs && argCount < mMaxPositionalArgs;
         }
 
-        bool disjointFrom(const Overload& other) const {
-            // we need to determine if all possible call signatures of these overloads
-            // would route to one or the other unambiguously. we ignore keyword callsignatures
-            // for the moment. For each possible positional argument, if we get disjointedness
-            // then the whole set is disjoint.
-
-            // if the set of numbers of arguments we can accept are disjoint, then we can't possibly
-            // match the same queries.
-            if (mMaxPositionalArgs < other.mMinPositionalArgs || other.mMaxPositionalArgs < mMinPositionalArgs) {
-                return true;
-            }
-
-            // now check each positional argument
-            for (long k = 0; k < mArgs.size() && k < other.mArgs.size(); k++) {
-                const FunctionArg* arg1 = argForPositionalArgument(k);
-                const FunctionArg* arg2 = other.argForPositionalArgument(k);
-
-                if (arg1 && arg2 && !arg1->getDefaultValue() && !arg2->getDefaultValue() && arg1->getTypeFilter() && arg2->getTypeFilter()) {
-                    if (arg1->getTypeFilter()->canConstructFrom(arg2->getTypeFilter(), false) == Maybe::False) {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
         Type* getReturnType() const {
             return mReturnType;
         }
@@ -785,6 +784,9 @@ public:
             for (auto& varnameAndBinding: mClosureBindings) {
                 varnameAndBinding.second._visitReferencedTypes(visitor);
             }
+            if (mMethodOf) {
+                visitor(mMethodOf);
+            }
         }
 
         template<class visitor_type>
@@ -803,6 +805,10 @@ public:
                 } else {
                     visitor(mFunctionAnnotations);
                 }
+            }
+
+            if (mSignatureFunction) {
+                visitor(mSignatureFunction);
             }
 
             if (mFunctionDefaults) {
@@ -940,6 +946,9 @@ public:
             if (mArgs < other.mArgs) { return true; }
             if (mArgs > other.mArgs) { return false; }
 
+            if (mMethodOf > other.mMethodOf) { return true; }
+            if (mMethodOf < other.mMethodOf) { return false; }
+
             return false;
         }
 
@@ -957,6 +966,14 @@ public:
 
         PyObject* getFunctionAnnotations() const {
             return mFunctionAnnotations;
+        }
+
+        Type* getMethodOf() const {
+            return mMethodOf;
+        }
+
+        PyObject* getSignatureFunction() const {
+            return mSignatureFunction;
         }
 
         PyObject* getFunctionGlobals() const {
@@ -1164,6 +1181,9 @@ public:
             mFunctionGlobals = other.mFunctionGlobals;
             mFunctionDefaults = other.mFunctionDefaults;
             mFunctionAnnotations = other.mFunctionAnnotations;
+            mSignatureFunction = other.mSignatureFunction;
+
+            mMethodOf = other.mMethodOf;
 
             mFunctionClosureVarnames = other.mFunctionClosureVarnames;
 
@@ -1233,6 +1253,14 @@ public:
 
             buffer.writeEndCompound();
 
+            if (mSignatureFunction) {
+                context.serializePythonObject(mSignatureFunction, buffer, 9);
+            }
+
+            if (mMethodOf) {
+                context.serializeNativeType(mMethodOf, buffer, 10);
+            }
+
             buffer.writeEndCompound();
         }
 
@@ -1242,11 +1270,13 @@ public:
             PyObjectHolder functionGlobals;
             PyObjectHolder functionAnnotations;
             PyObjectHolder functionDefaults;
+            PyObjectHolder functionSignature;
             std::vector<std::string> closureVarnames;
             std::map<std::string, PyObjectHolder> functionGlobalsInCells;
             std::map<std::string, PyObject*> functionGlobalsInCellsRaw;
             std::map<std::string, ClosureVariableBinding> closureBindings;
             Type* returnType = nullptr;
+            Type* methodOf = nullptr;
             std::vector<FunctionArg> args;
 
             functionGlobals.steal(PyDict_New());
@@ -1302,6 +1332,12 @@ public:
                         args.push_back(FunctionArg::deserialize(context, buffer, wireType));
                     });
                 }
+                else if (fieldNumber == 9) {
+                    functionSignature.steal(context.deserializePythonObject(buffer, wireType));
+                }
+                else if (fieldNumber == 10) {
+                    methodOf = context.deserializeNativeType(buffer, wireType);
+                }
             });
 
             return Overload(
@@ -1313,7 +1349,9 @@ public:
                 closureVarnames,
                 closureBindings,
                 returnType,
-                args
+                functionSignature,
+                args,
+                methodOf
             );
         }
 
@@ -1322,6 +1360,7 @@ public:
             incref(mFunctionGlobals);
             incref(mFunctionDefaults);
             incref(mFunctionAnnotations);
+            incref(mSignatureFunction);
 
             for (auto nameAndOther: mFunctionGlobalsInCells) {
                 incref(nameAndOther.second);
@@ -1333,6 +1372,7 @@ public:
             decref(mFunctionGlobals);
             decref(mFunctionDefaults);
             decref(mFunctionAnnotations);
+            decref(mSignatureFunction);
 
             for (auto nameAndOther: mFunctionGlobalsInCells) {
                 decref(nameAndOther.second);
@@ -1343,6 +1383,12 @@ public:
             ShaHash res = (
                 mReturnType ? mReturnType->identityHash(groupHead) : ShaHash()
             );
+
+            if (mMethodOf) {
+                res += mMethodOf->identityHash(groupHead);
+            } else {
+                res += ShaHash();
+            }
 
             for (auto nameAndClosure: mClosureBindings) {
                 res += ShaHash(nameAndClosure.first) + nameAndClosure.second.identityHash(groupHead);
@@ -1404,6 +1450,8 @@ public:
 
         PyObject* mFunctionAnnotations;
 
+        PyObject* mSignatureFunction;
+
         // note that we are deliberately leaking this value because Overloads get
         // stashed in static std::map memos anyways.
         mutable PyObject* mCachedFunctionObj;
@@ -1411,6 +1459,9 @@ public:
         std::map<std::string, ClosureVariableBinding> mClosureBindings;
 
         Type* mReturnType;
+
+        // if we are a method of a class, what class? Used to
+        Type* mMethodOf;
 
         std::vector<FunctionArg> mArgs;
 
@@ -1663,11 +1714,20 @@ public:
         return mIsNocompile;
     }
 
-    Function* withEntrypoint(bool isEntrypoint) {
+    Function* withMethodOf(Type* methodOf) const {
+        std::vector<Overload> overloads;
+        for (auto& o: mOverloads) {
+            overloads.push_back(o.withMethodOf(methodOf));
+        }
+
+        return replaceOverloads(overloads);
+    }
+
+    Function* withEntrypoint(bool isEntrypoint) const {
         return Function::Make(mRootName, mQualname, mModulename, mOverloads, mClosureType, isEntrypoint, mIsNocompile);
     }
 
-    Function* withNocompile(bool isNocompile) {
+    Function* withNocompile(bool isNocompile) const {
         return Function::Make(mRootName, mQualname, mModulename, mOverloads, mClosureType, mIsEntrypoint, isNocompile);
     }
 
@@ -1732,11 +1792,11 @@ public:
         mClosureType->assertForwardsResolvedSufficientlyToInstantiate();
     }
 
-    Function* replaceClosure(Type* closureType) {
+    Function* replaceClosure(Type* closureType) const {
         return Function::Make(mRootName, mQualname, mModulename, mOverloads, closureType, mIsEntrypoint, mIsNocompile);
     }
 
-    Function* replaceOverloads(const std::vector<Overload>& overloads) {
+    Function* replaceOverloads(const std::vector<Overload>& overloads) const {
         return Function::Make(mRootName, mQualname, mModulename, overloads, mClosureType, mIsEntrypoint, mIsNocompile);
     }
 

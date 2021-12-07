@@ -281,14 +281,6 @@ void PyAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Alternative*
         "__typed_python_methods__",
         methodsDict
     );
-
-    if (alt->moduleName().size()) {
-        PyDict_SetItemString(
-            pyType->tp_dict,
-            "__typed_python_module__",
-            PyUnicode_FromString(alt->moduleName().c_str())
-        );
-    }
 }
 
 void PyConcreteAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(ConcreteAlternative* alt, PyTypeObject* pyType) {

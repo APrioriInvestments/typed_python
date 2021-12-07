@@ -40,6 +40,14 @@ public:
         // deliberately don't invoke 'endOfConstructorInitialization'
     }
 
+    std::string nameWithModuleConcrete() {
+        if (mTarget) {
+            return mTarget->nameWithModule();
+        }
+
+        return m_name;
+    }
+
     static Forward* Make() {
         return Make("unnamed");
     }

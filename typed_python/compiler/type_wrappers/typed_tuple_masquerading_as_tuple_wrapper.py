@@ -24,7 +24,7 @@ class TypedTupleMasqueradingAsTuple(MasqueradeWrapper):
 
     def __init__(self, typeRepresentation, interiorTypeWrappers=None):
         super().__init__(typeRepresentation)
-        self.interiorTypeWrappers = interiorTypeWrappers
+        self.interiorTypeWrappers = tuple(interiorTypeWrappers) if interiorTypeWrappers is not None else None
 
     def __hash__(self):
         return hash(

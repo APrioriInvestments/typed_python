@@ -63,6 +63,9 @@ class ArithmeticTypeWrapper(Wrapper):
     is_pass_by_ref = False
     is_arithmetic = True
 
+    def isIterable(self):
+        return False
+
     def convert_default_initialize(self, context, target):
         self.convert_copy_initialize(
             context,

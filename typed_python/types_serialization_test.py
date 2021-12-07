@@ -1785,7 +1785,7 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serialize_named_alternative(self):
         self.assertEqual(
-            ModuleLevelAlternative.__typed_python_module__,
+            ModuleLevelAlternative.__module__,
             "typed_python.types_serialization_test"
         )
 
@@ -2053,7 +2053,6 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert len(sc.serialize(native_ast.Type)) < 100
         assert len(sc.serialize(TupleOf(native_ast.Type))) < 100
-        assert len(sc.serialize(NamedCallTarget)) < 100
 
     def test_badly_named_module_works(self):
         sc = SerializationContext()

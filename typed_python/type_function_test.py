@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2021 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -59,6 +59,11 @@ class TypeFunctionTest(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             List(int).Node(head=10, tail=l_f)
+
+    def test_name_and_qualname(self):
+        assert TfLevelMethod.__name__ == 'TfLevelMethod'
+        assert TfLevelMethod.__module__ == 'typed_python.type_function_test'
+        assert TfLevelMethod.__qualname__ == 'TfLevelMethod'
 
     def test_mutually_recursive(self):
         @TypeFunction
@@ -353,3 +358,17 @@ class TypeFunctionTest(unittest.TestCase):
             return c.next()
 
         assert callNext.resultTypeFor(IntLevelClass(10)).typeRepresentation is IntLevelClass(9)
+
+    def test_type_functions_are_classes(self):
+        @TypeFunction
+        def Temp(C):
+            class Temp_(Temp, __name__=f"Temp({C.__name__})"):
+                x = Member(C)
+
+                def __init__(self, y):
+                    self.x = y
+
+            return Temp_
+
+        assert issubclass(Temp(int), Temp)
+        assert issubclass(Temp, TypeFunction)

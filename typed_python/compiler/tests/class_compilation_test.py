@@ -35,10 +35,12 @@ from typed_python import (
     Value,
     pointerTo,
     refTo,
-    Forward
+    Forward,
+    TypeFunction
 )
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime, CountCompilationsVisitor
+from typed_python.compiler.type_wrappers.class_wrapper import classCouldBeInstanceOf
 
 
 def resultType(f, **kwargs):
@@ -419,25 +421,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
         clearList(aListOfBase)
 
         self.assertEqual(_types.refcount(aListOfInt), 1)
-
-    def test_class_inheritance_method_signatures(self):
-        class Base(Class):
-            def f(self) -> int:
-                return 0
-
-        # if you override a method you can't change its output type.
-        with self.assertRaisesRegex(Exception, "Overloads of 'f' don't have the same return type"):
-
-            class BadChild(Base):
-                def f(self) -> float:
-                    pass
-
-        # but if you have a non-overlapping signature it's OK because
-        # the compiler wouldn't have a problem figuring out which one
-        # to dispatch to.
-        class GoodChild(Base):
-            def f(self, x) -> float:
-                pass
 
     def test_dispatch_with_multiple_overloads(self):
         # check that we can dispatch appropriately
@@ -2431,3 +2414,87 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "has unresolved forwards"):
             tryToCallF()
+
+    def test_could_be_instance_of(self):
+        class A(Class):
+            pass
+
+        class B(Class):
+            pass
+
+        class C(A, B):
+            pass
+
+        # instances of A can be B and vice versa
+        assert classCouldBeInstanceOf(A, B) == "Maybe"
+        assert classCouldBeInstanceOf(B, A) == "Maybe"
+
+        # instances of A and B can both be 'C'
+        assert classCouldBeInstanceOf(A, C) == "Maybe"
+        assert classCouldBeInstanceOf(B, C) == "Maybe"
+
+        # instances of C are definitely A and B
+        assert classCouldBeInstanceOf(C, A) == True  # noqa
+        assert classCouldBeInstanceOf(C, B) == True  # noqa
+
+        class AFinal(A, Final):
+            pass
+
+        class BFinal(B, Final):
+            pass
+
+        # instances of B cannot be AFinal, because we know exactly what base classes could
+        # back a 'B'
+        assert classCouldBeInstanceOf(A, BFinal) == False  # noqa
+
+        class AWithMembers(A):
+            x = Member(int)
+
+        class BWithMembers(B):
+            x = Member(int)
+
+        # an instance of A could be a B with members, because its possible for
+        # a subclass of BWithMembers to descend from A
+        assert classCouldBeInstanceOf(A, BWithMembers) == "Maybe"
+
+        # but if its an AWithMembers, then its not possible to create that subclass
+        assert classCouldBeInstanceOf(AWithMembers, BWithMembers) == False  # noqa
+
+        class AWithType(A):
+            X = int
+
+        class BWithType(B):
+            X = float
+
+        # an instance of A could be a BWithType
+        assert classCouldBeInstanceOf(A, BWithType) == "Maybe"
+
+        # but if its an AWithType, then its not possible to create that subclass
+        assert classCouldBeInstanceOf(AWithType, BWithType) == False  # noqa
+
+        # its possible to descend from two separate type functions that don't declare
+        # any classmembers
+        @TypeFunction
+        def TF1(X):
+            class TF1_(TF1):
+                __name__ = f"TF2({X})"
+
+                def f(self) -> X:
+                    return X()
+
+            return TF1_
+
+        @TypeFunction
+        def TF2(X):
+            class TF2_(TF2):
+                __name__ = f"TF2({X})"
+
+                def g(self) -> X:
+                    return X()
+
+            return TF2_
+
+        assert classCouldBeInstanceOf(TF1(int), TF2(float))
+
+        class ActualSubclass(TF1(int), TF2(float)):
+            pass

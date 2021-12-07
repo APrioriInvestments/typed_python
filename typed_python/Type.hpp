@@ -285,6 +285,16 @@ public:
         return m_name;
     }
 
+    std::string nameWithModule() {
+        return this->check([&](auto& subtype) {
+            return subtype.nameWithModuleConcrete();
+        });
+    }
+
+    std::string nameWithModuleConcrete() {
+        return name();
+    }
+
     const char* doc() const {
         return m_doc;
     }
@@ -752,14 +762,8 @@ public:
         m_recursive_forward_index = index;
     }
 
-    // can we construct an instance of 'this' from an instance of 'otherType'
-    // if 'True' then we can always do this. if False, then never. If Maybe, then
-    // we cannot make any assumptions..
-    Maybe canConstructFrom(Type* otherType, bool isExplicit);
-
-    Maybe canConstructFromConcrete(Type* otherType, bool isExplicit) {
-        return Maybe::Maybe;
-    }
+    // are we guaranteed we can convert to this other type at the 'Signature' level
+    bool canConvertToTrivially(Type* otherType);
 
     /*****
         determine the full group of types that this type is a part of as far
@@ -931,10 +935,6 @@ protected:
     enum BinaryCompatibilityCategory { Incompatible, Checking, Compatible };
 
     std::map<Type*, BinaryCompatibilityCategory> mIsBinaryCompatible;
-
-    std::map<Type*, Maybe> mCanConvert;
-
-    std::set<Type*> mCanConvertOnStack;
 
     // a set of forward types that we need to be resolved before we
     // could be resolved

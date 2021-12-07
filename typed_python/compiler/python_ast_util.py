@@ -92,8 +92,19 @@ def pyAstForCode(codeObject):
     if len(defs) == 1:
         return defs[0]
 
+    if codeObject.co_name != "<lambda>":
+        defs = [d for d in defs if not isinstance(d, ast.Lambda)]
+
+        if len(defs) == 1:
+            return defs[0]
+    else:
+        defs = [d for d in defs if isinstance(d, ast.Lambda)]
+
+        if len(defs) == 1:
+            return defs[0]
+
     for d in defs:
-        assert isinstance(d, ast.Lambda), type(d)
+        assert isinstance(d, ast.Lambda), [type(x) for x in defs]
 
     # for each Lambda, convert it to an Expression object, compile it to a code
     # object that evaluates to that lambda, and pull out the constant 'code' object

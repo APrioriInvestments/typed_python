@@ -46,7 +46,7 @@ def mergeTypeWrappers(wrappers):
     Returns:
         None, or a Wrapper instance.
     """
-    wrappers = [w for w in wrappers if w is not None]
+    wrappers = [typeWrapper(w) if not isinstance(w, Wrapper) else w for w in wrappers if w is not None]
 
     if not wrappers:
         return None
@@ -57,7 +57,7 @@ def mergeTypeWrappers(wrappers):
     if len(wrappers) == 2 and wrappers[0] == wrappers[1]:
         return wrappers[0]
 
-    wrappers = tuple([typeWrapper(w) if not isinstance(w, Wrapper) else w for w in wrappers])
+    wrappers = tuple(wrappers)
 
     if wrappers in _mergedWrapperCache:
         return _mergedWrapperCache[wrappers]

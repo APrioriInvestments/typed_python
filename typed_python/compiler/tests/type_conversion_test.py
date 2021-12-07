@@ -208,6 +208,10 @@ def test_register_conversion_semantics():
     checkConversionToType("0", str, ConversionLevel.Signature)
 
 
+def test_int_to_list_of_int():
+    checkConversionToType(1, ListOf(int), None)
+
+
 def test_untyped_dict_conversion_semantics():
     aDict = {1: 2}
     checkConversionToType(aDict, Dict(int, int), ConversionLevel.ImplicitContainers)

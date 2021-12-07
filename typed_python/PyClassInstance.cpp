@@ -592,6 +592,11 @@ PyObject* PyClassInstance::tpGetattrGeneric(
     {
         auto it = heldClass->getClassMembers().find(attrName);
         if (it != heldClass->getClassMembers().end()) {
+            // if this follows the descriptor protocol, use that
+            if (PyObject_HasAttrString(it->second, "__get__")) {
+                return PyObject_CallMethod(it->second, "__get__", "OO", self, (PyObject*)self->ob_type);
+            }
+
             return incref(it->second);
         }
     }

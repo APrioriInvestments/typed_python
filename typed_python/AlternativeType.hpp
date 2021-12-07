@@ -118,6 +118,14 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
+    std::string nameWithModuleConcrete() {
+        if (m_moduleName.size() == 0) {
+            return m_name;
+        }
+
+        return m_moduleName + "." + m_name;
+    }
+
     bool hasGetAttributeMagicMethod() const {
         return m_hasGetAttributeMagicMethod;
     }

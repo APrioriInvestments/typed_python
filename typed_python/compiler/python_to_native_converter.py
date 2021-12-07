@@ -29,7 +29,9 @@ from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
 from typed_python.compiler.function_conversion_context import FunctionConversionContext, FunctionOutput, FunctionYield
 from typed_python.compiler.native_function_conversion_context import NativeFunctionConversionContext
-from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
+from typed_python.compiler.type_wrappers.python_typed_function_wrapper import (
+    PythonTypedFunctionWrapper, CannotBeDetermined, NoReturnTypeSpecified
+)
 from typed_python.compiler.typed_call_target import TypedCallTarget
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
@@ -631,6 +633,18 @@ class PythonToNativeConverter:
 
         realizedInputWrappers.extend(inputWrappers)
 
+        returnType = PythonTypedFunctionWrapper.computeFunctionOverloadReturnType(
+            overload,
+            inputWrappers,
+            {}
+        )
+
+        if returnType is CannotBeDetermined:
+            returnType = object
+
+        if returnType is NoReturnTypeSpecified:
+            returnType = None
+
         return self.convert(
             overload.name,
             overload.functionCode,
@@ -639,7 +653,7 @@ class PythonToNativeConverter:
             overload.funcGlobalsInCells,
             list(overload.closureVarLookups),
             realizedInputWrappers,
-            overload.returnType,
+            returnType,
             assertIsRoot=assertIsRoot
         )
 

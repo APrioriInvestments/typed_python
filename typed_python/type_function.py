@@ -16,7 +16,7 @@ import logging
 
 from types import FunctionType
 from typed_python.compiler.runtime_lock import runtimeLock
-from typed_python._types import Forward, ListOf, TupleOf, Dict, ConstDict
+from typed_python._types import Forward, ListOf, TupleOf, Dict, ConstDict, Class
 import typed_python
 
 
@@ -42,102 +42,7 @@ def reconstructTypeFunctionType(typeFunction, args, kwargs):
     return typeFunction(*args, **dict(kwargs))
 
 
-class ConcreteTypeFunction:
-    __typed_python_is_compile_time_constant__ = True
-
-    def __init__(self, concreteTypeFunction):
-        self._concreteTypeFunction = concreteTypeFunction
-
-        self._memoForKey = {}
-
-    def __str__(self):
-        return self._concreteTypeFunction.__name__
-
-    def __repr__(self):
-        return self._concreteTypeFunction.__qualname__
-
-    def nameFor(self, args, kwargs):
-        def toStr(x):
-            if isinstance(x, type):
-                return x.__qualname__
-            return str(x)
-
-        return self._concreteTypeFunction.__qualname__ + "(" + ",".join(
-            [toStr(x) for x in args] + ["%s=%s" % (k, v) for k, v in kwargs]
-        ) + ")"
-
-    def mapArg(self, arg):
-        """Map a type argument to a valid value. Type arguments must be hashable,
-        and if they're forward types, they must be resolvable.
-        """
-        if arg is None:
-            return None
-
-        if isinstance(arg, (type, float, int, bool, str, bytes)):
-            return arg
-
-        if isinstance(arg, (tuple, list, TupleOf, ListOf)):
-            return tuple(self.mapArg(x) for x in arg)
-
-        if isinstance(arg, (dict, Dict, ConstDict)):
-            return tuple(sorted([(k, self.mapArg(v)) for k, v in arg.items()]))
-
-        if isinstance(arg, FunctionType):
-            return self.mapArg(typed_python.Function(arg))
-
-        if isinstance(arg, typed_python._types.Function):
-            return arg
-
-        raise TypeError("Instance of type '%s' is not a valid argument to a type function" % type(arg))
-
-    def __call__(self, *args, **kwargs):
-        args = tuple(self.mapArg(a) for a in args)
-        kwargs = tuple(sorted([(k, self.mapArg(v)) for k, v in kwargs.items()]))
-
-        key = (args, kwargs)
-
-        if key in self._memoForKey:
-            res = self._memoForKey[key]
-            if isinstance(res, Exception):
-                raise res
-
-            if getattr(res, '__typed_python_category__', None) != 'Forward':
-                # only return fully resolved TypeFunction values without
-                # locking.
-                return res
-
-        with runtimeLock:
-            if key in self._memoForKey:
-                res = self._memoForKey[key]
-                if isinstance(res, Exception):
-                    raise res
-                return res
-
-            forward = Forward(self.nameFor(args, kwargs))
-
-            self._memoForKey[key] = forward
-            _type_to_typefunction[forward] = (self, key)
-
-            try:
-                resultType = self._concreteTypeFunction(*args, **dict(kwargs))
-
-                forward.define(resultType)
-
-                _type_to_typefunction.pop(forward)
-
-                if resultType not in _type_to_typefunction:
-                    _type_to_typefunction[resultType] = (self, key)
-
-                self._memoForKey[key] = resultType
-
-                return resultType
-            except Exception as e:
-                self._memoForKey[key] = e
-                logging.exception("TypeFunction errored")
-                raise
-
-
-def TypeFunction(f):
+def makeTypeFunction(f):
     """Decorate 'f' to be a 'TypeFunction'.
 
     The resulting function is expected to take a set of hashable arguments and
@@ -154,5 +59,96 @@ def TypeFunction(f):
     Don't stash the type you return, since the actual type returned by the
     function may not be the one you returned.
     """
+    def nameFor(args, kwargs):
+        def toStr(x):
+            if isinstance(x, type):
+                return x.__qualname__
+            return str(x)
 
-    return ConcreteTypeFunction(f)
+        return f.__qualname__ + "(" + ",".join(
+            [toStr(x) for x in args] + ["%s=%s" % (k, v) for k, v in kwargs]
+        ) + ")"
+
+    def mapArg(arg):
+        """Map a type argument to a valid value. Type arguments must be hashable,
+        and if they're forward types, they must be resolvable.
+        """
+        if arg is None:
+            return None
+
+        if isinstance(arg, (type, float, int, bool, str, bytes)):
+            return arg
+
+        if isinstance(arg, (tuple, list, TupleOf, ListOf)):
+            return tuple(mapArg(x) for x in arg)
+
+        if isinstance(arg, (dict, Dict, ConstDict)):
+            return tuple(sorted([(k, mapArg(v)) for k, v in arg.items()]))
+
+        if isinstance(arg, FunctionType):
+            return mapArg(typed_python.Function(arg))
+
+        if isinstance(arg, typed_python._types.Function):
+            return arg
+
+        raise TypeError("Instance of type '%s' is not a valid argument to a type function" % type(arg))
+
+    _memoForKey = {}
+
+    def buildType(*args, **kwargs):
+        args = tuple(mapArg(a) for a in args)
+        kwargs = tuple(sorted([(k, mapArg(v)) for k, v in kwargs.items()]))
+
+        key = (args, kwargs)
+
+        if key in _memoForKey:
+            res = _memoForKey[key]
+            if isinstance(res, Exception):
+                raise res
+
+            if getattr(res, '__typed_python_category__', None) != 'Forward':
+                # only return fully resolved TypeFunction values without
+                # locking.
+                return res
+
+        with runtimeLock:
+            if key in _memoForKey:
+                res = _memoForKey[key]
+                if isinstance(res, Exception):
+                    raise res
+                return res
+
+            forward = Forward(nameFor(args, kwargs))
+
+            _memoForKey[key] = forward
+            _type_to_typefunction[forward] = (TypeFunction_, key)
+
+            try:
+                resultType = f(*args, **dict(kwargs))
+
+                forward.define(resultType)
+
+                _type_to_typefunction.pop(forward)
+
+                if resultType not in _type_to_typefunction:
+                    _type_to_typefunction[resultType] = (TypeFunction_, key)
+
+                _memoForKey[key] = resultType
+
+                return resultType
+            except Exception as e:
+                _memoForKey[key] = e
+                logging.exception("TypeFunction errored")
+                raise
+
+    class TypeFunction_(TypeFunction):
+        __module__ = f.__module__
+        __qualname__ = f.__qualname__
+        __name__ = f.__name__
+        __typed_python_template__ = buildType
+
+    return TypeFunction_
+
+
+class TypeFunction(Class):
+    __typed_python_template__ = makeTypeFunction

@@ -17,10 +17,10 @@ import time
 import gc
 import math
 from typed_python.test_util import currentMemUsageMb
-from typed_python._types import is_default_constructible
+from typed_python._types import is_default_constructible, canConvertToTrivially
 from typed_python import (
     Int16, UInt64, Float32, ListOf, TupleOf, OneOf, NamedTuple, Class, Alternative,
-    ConstDict, Member, _types, Forward, Final, Function, Entrypoint, Tuple
+    ConstDict, Member, _types, Forward, Final, Function, Entrypoint, Tuple, Value
 )
 
 
@@ -88,6 +88,11 @@ class ClassWithComplexDispatch(Class):
 
 
 class NativeClassTypesTests(unittest.TestCase):
+    def test_class_name(self):
+        assert ClassWithInit.__name__ == 'ClassWithInit'
+        assert ClassWithInit.__module__ == 'typed_python.class_types_test'
+        assert ClassWithInit.__qualname__ == 'ClassWithInit'
+
     def test_member_default_value(self):
         c = DefaultVal()
 
@@ -112,28 +117,6 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.f(10), 'x')
         self.assertEqual(c.f(x=10), 'x')
         self.assertEqual(c.f(y=10), 'y')
-
-    def test_nonfinal_classes_require_type_annotations(self):
-        # nonfinal classes _MUST_ declare their types, because otherwise
-        # we don't know what return type would come out, and if we subclass,
-        # then code compiled against the base class will have no idea what to
-        # do. So, we require that if you really mean 'object', put object!
-        class GoodNonfinalClass(Class):
-            def f(self) -> object:
-                return 0
-
-        # not putting 'object' will cause an exception at define time.
-        with self.assertRaisesRegex(TypeError, "BadNonfinalClass.f has no return type"):
-            class BadNonfinalClass(Class):
-                def f(self):
-                    return 0
-
-        # this is OK, because the class is final. we don't need
-        # to know what the return type is because we can figure it out
-        # from the source.
-        class FinalClass(Class, Final):
-            def f(self):
-                return 0
 
     def test_class_with_uninitializable(self):
         c = ClassWithInit()
@@ -1010,7 +993,10 @@ class NativeClassTypesTests(unittest.TestCase):
             def g(self) -> str:
                 return "BaseB"
 
-        with self.assertRaisesRegex(TypeError, "Can't inherit from multiple base classes that both have members."):
+        with self.assertRaisesRegex(
+            TypeError,
+            "Class BaseBoth can't have data members because its base classes BaseA and BaseB both have members."
+        ):
             class BaseBoth(BaseA, BaseB):
                 pass
 
@@ -1034,7 +1020,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertFalse(BaseClass.IsFinal)
         self.assertTrue(ChildClass.IsFinal)
 
-        with self.assertRaisesRegex(Exception, "Can't subclass ChildClass because it's marked 'final'."):
+        with self.assertRaisesRegex(Exception, "Can't subclass ChildClass because it's marked 'Final'"):
             class BadClass(ChildClass):
                 pass
 
@@ -1630,3 +1616,176 @@ class NativeClassTypesTests(unittest.TestCase):
         assert _types.classGetDispatchIndex(BaseClass, ChildClass) == 1
         assert _types.classGetDispatchIndex(BaseClass, BaseClass) == 0
         assert _types.classGetDispatchIndex(ChildClass, ChildClass) == 0
+
+    def test_method_return_type_overrides_are_sensible(self):
+        def makeClassReturning(Base, T, value):
+            if not T:
+                class Cls(Class, *([Base] if Base else [])):
+                    def f(self):
+                        return value
+            else:
+                class Cls(Class, *([Base] if Base else [])):
+                    def f(self) -> T:
+                        return value
+
+            return Cls
+
+        def makeOverrideSequence(*typesAndValues):
+            C = makeClassReturning(None, typesAndValues[0][0], typesAndValues[0][1])
+            classes = [C]
+
+            for T, value in typesAndValues[1:]:
+                C = makeClassReturning(C, T, value)
+                classes.append(C)
+
+            return classes
+
+        def assertSequenceValid(*typesAndValues):
+            classes = makeOverrideSequence(*typesAndValues)
+
+            for i in range(len(classes)):
+                instance = classes[i]()
+
+                # this shouldn't throw
+                instance.f()
+
+                for priorI in range(i + 1):
+                    if typesAndValues[priorI][0] and typesAndValues[i][0]:
+                        assert canConvertToTrivially(typesAndValues[i][0], typesAndValues[priorI][0])
+
+        def assertSequenceInvalid(*typesAndValues):
+            classes = makeOverrideSequence(*typesAndValues)
+
+            with self.assertRaises(TypeError):
+                classes[-1]().f()
+
+        # assert that a sequence of (T, value) pairs in base->child class relationships
+        # is valid. None encodes that we have no assumptions about the type.
+        assertSequenceValid((None, 0))
+        assertSequenceValid((int, 0))
+        assertSequenceValid((int, 0), (int, 1))
+        assertSequenceValid((OneOf(int, float), 0.5), (int, 1))
+        assertSequenceValid((None, 0), (int, 1))
+        assertSequenceValid((int, 0), (None, 1))
+        assertSequenceValid((int, 0), (Value(1), 1))
+
+        assertSequenceInvalid((int, 0), (float, 1.0))
+        assertSequenceInvalid((int, 0), (None, 0), (float, 1.0))
+        assertSequenceInvalid((int, 0), (int, 0), (float, 1.0))
+
+    def test_method_return_types_depend_on_specialization(self):
+        class BaseClass(Class):
+            def f(self, x: OneOf(int, None)) -> int:
+                return x or 0
+
+        class ChildClass(BaseClass):
+            def f(self, x: OneOf(str, None)) -> str:
+                return x or ""
+
+        assert ChildClass().f("1.5") == "1.5"
+        assert ChildClass().f(0) == 0
+
+        # in this case, it's ambiguous what we should be returning
+        with self.assertRaisesRegex(TypeError, "promise"):
+            ChildClass().f(None)
+
+    def test_compiled_dispatch_on_class(self):
+        class A(Class):
+            pass
+
+        class B(Class):
+            pass
+
+        class Both(A, B):
+            pass
+
+        class TestClass(Class):
+            def f(self, x: A) -> str:
+                return "A"
+
+            def f(self, x: B) -> str:  # noqa
+                return "B"
+
+        # interpreter can tell the difference between the two of these
+        assert TestClass().f(A()) == "A"
+        assert TestClass().f(B()) == "B"
+
+        # and 'Both' should match 'A' first
+        assert TestClass().f(Both()) == "A"
+
+        def callItAs(T):
+            @Entrypoint
+            def callIt(c: T, x):
+                return c.f(x)
+
+            return callIt
+
+        @Entrypoint
+        def callIt(c, x):
+            return c.f(x)
+
+        assert callIt(TestClass(), A()) == "A"
+        assert callIt(TestClass(), B()) == "B"
+        assert callIt(TestClass(), Both()) == "A"
+
+        class Subclass(TestClass):
+            def f(self, x: Both):
+                return "Both"
+
+        assert callItAs(TestClass)(Subclass(), A()) == "A"
+        assert callItAs(TestClass)(Subclass(), B()) == "B"
+        assert callItAs(TestClass)(Subclass(), Both()) == "Both"
+
+    def test_dispatch_on_class_infers_type_correctly(self):
+        class A(Class):
+            pass
+
+        class B(Class):
+            pass
+
+        class C(Class):
+            pass
+
+        class TestClass(Class):
+            def f(self, x: A) -> int:
+                return "A"
+
+            def f(self, x: B) -> float:  # noqa
+                return "B"
+
+        @Entrypoint
+        def callIt(c, x):
+            return c.f(x)
+
+        assert callIt.resultTypeFor(TestClass, A).typeRepresentation is int
+        assert callIt.resultTypeFor(TestClass, B).typeRepresentation is OneOf(float, int)
+        assert callIt.resultTypeFor(TestClass, C).typeRepresentation is OneOf(float, int)
+
+    def test_cant_override_class_members(self):
+        class A(Class):
+            X = int
+
+        with self.assertRaisesRegex(TypeError, "Class B can't redefine classmember X"):
+            class B(A):
+                X = float
+
+    def test_classmethods(self):
+        class Normal:
+            @classmethod
+            def f(cls):
+                return cls
+
+        assert Normal.f() is Normal
+        assert Normal().f() is Normal
+
+        class A(Class):
+            @classmethod
+            def f(cls):
+                return cls
+
+        def checkIt():
+            assert A.f() is A
+            assert A().f() is A
+
+        checkIt()
+        Entrypoint(checkIt)()

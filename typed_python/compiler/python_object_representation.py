@@ -17,7 +17,7 @@ import _thread
 
 from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.native_ast as native_ast
-from typed_python.type_function import ConcreteTypeFunction
+from typed_python.type_function import TypeFunction
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
@@ -381,14 +381,14 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
             # global class instances get held as constants
             return context.constantTypedPythonObject(f, owningGlobalScopeAndName)
 
+    if isinstance(f, type) and issubclass(f, TypeFunction) and len(f.MRO) == 2:
+        return TypedExpression(context, native_ast.nullExpr, PythonFreeObjectWrapper(f, False), False)
+
     if isinstance(f, type):
         return TypedExpression(context, native_ast.nullExpr, PythonTypeObjectWrapper(f), False)
 
     if isinstance(f, ModuleType):
         return TypedExpression(context, native_ast.nullExpr, ModuleWrapper(f), False)
-
-    if isinstance(f, ConcreteTypeFunction):
-        return TypedExpression(context, native_ast.nullExpr, PythonFreeObjectWrapper(f, False), False)
 
     if isinstance(f, Type):
         # it's a typed python object at module level scope

@@ -1,6 +1,6 @@
 import threading
 
-from typed_python.type_function import ConcreteTypeFunction
+from typed_python.type_function import TypeFunction
 from typed_python.compiler.python_ast_util import _linesCache
 
 from keyword import iskeyword
@@ -66,13 +66,12 @@ def getNamespace(constructor):
     return constructor["locals"]
 
 
-class ConcreteMacro(ConcreteTypeFunction):
+class ConcreteMacro:
     def __init__(self, concreteMacro):
         self.count = 0
         self.concreteMacro = concreteMacro
-
-        concreteTypeFunction = self.getConcreteTypeFunction()
-        super().__init__(concreteTypeFunction)
+        self.__name__ = concreteMacro.__name__
+        self.__qualname__ = concreteMacro.__qualname__
 
     def printCodeFor(self, *args, **kwargs):
         constructor = self.concreteMacro(*args, **kwargs)
@@ -80,57 +79,54 @@ class ConcreteMacro(ConcreteTypeFunction):
         for line in sourceText:
             print(line[:-1])
 
-    def getConcreteTypeFunction(self):
-        def concreteTypeFunction(*args, **kwargs):
-            constructor = self.concreteMacro(*args, **kwargs)
-            checkFormat(constructor)
-            sourceText = getSourceText(constructor)
-            returnName = getReturnName(constructor)
-            namespace = getNamespace(constructor)
+    def __call__(self, *args, **kwargs):
+        constructor = self.concreteMacro(*args, **kwargs)
+        checkFormat(constructor)
+        sourceText = getSourceText(constructor)
+        returnName = getReturnName(constructor)
+        namespace = getNamespace(constructor)
 
-            with _fileNameLock:
-                filename = (
-                    "macro stash at"
-                    + self.concreteMacro.__code__.co_filename
-                    + ", line "
-                    + str(self.concreteMacro.__code__.co_firstlineno)
-                    + ", unique call number "
-                    + str(self.count)
-                )
-                self.count += 1
+        with _fileNameLock:
+            filename = (
+                "macro stash at"
+                + self.concreteMacro.__code__.co_filename
+                + ", line "
+                + str(self.concreteMacro.__code__.co_firstlineno)
+                + ", unique call number "
+                + str(self.count)
+            )
+            self.count += 1
 
-            code = compile("".join(sourceText), filename, "exec")
+        code = compile("".join(sourceText), filename, "exec")
 
-            if code.co_filename in _linesCache:
-                raise Exception(
-                    f"Filename collision on {code.co_filename}, review the macro code naming "
-                    + "logic"
-                )
-            _linesCache[code.co_filename] = sourceText
+        if code.co_filename in _linesCache:
+            raise Exception(
+                f"Filename collision on {code.co_filename}, review the macro code naming "
+                + "logic"
+            )
+        _linesCache[code.co_filename] = sourceText
 
-            fake_globals = dict(self.concreteMacro.__globals__)
-            fake_globals.update(namespace)
+        fake_globals = dict(self.concreteMacro.__globals__)
+        fake_globals.update(namespace)
 
-            try:
-                exec(code, fake_globals)
-            except NameError as e:
-                msg = e.args[0]
-                msg = msg.split(" ")
-                varname = msg[1]
-                varname = varname[1: len(varname) - 1]
-                assert varname not in fake_globals
-                raise MacroNameError(
-                    f"Macro source text contains {varname} but it's not in the namespace"
-                )
-            try:
-                return fake_globals[returnName]
-            except KeyError as e:
-                assert e.args[0] == returnName
-                raise MacroNameError(
-                    f"Macro source text tries to return {returnName} but does not define it"
-                )
-
-        return concreteTypeFunction
+        try:
+            exec(code, fake_globals)
+        except NameError as e:
+            msg = e.args[0]
+            msg = msg.split(" ")
+            varname = msg[1]
+            varname = varname[1: len(varname) - 1]
+            assert varname not in fake_globals
+            raise MacroNameError(
+                f"Macro source text contains {varname} but it's not in the namespace"
+            )
+        try:
+            return fake_globals[returnName]
+        except KeyError as e:
+            assert e.args[0] == returnName
+            raise MacroNameError(
+                f"Macro source text tries to return {returnName} but does not define it"
+            )
 
 
 def Macro(f):
@@ -179,4 +175,4 @@ def Macro(f):
     defined in the body of f or in the scope where f is defined.
     """
 
-    return ConcreteMacro(f)
+    return TypeFunction(ConcreteMacro(f))

@@ -358,6 +358,10 @@ public:
             m_refToType(nullptr)
     {
         m_name = inName;
+
+        for (auto& nameAndF: m_own_memberFunctions) {
+            nameAndF.second = nameAndF.second->withMethodOf(this);
+        }
     }
 
     ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
@@ -887,29 +891,6 @@ public:
             if (it == target.end()) {
                 target[nameAndFunc.first] = nameAndFunc.second;
             } else {
-                // we need to check that the function signatures we produce can obey the
-                // return types dictated by the base class. This means that any function
-                // already in 'target' (the subclass methods we've already accepted) that
-                // overlaps with a method in the base class (meaning that a dispatch to the
-                // child could also dispatch to the base) must have a return type that is
-                // _more_ precise than the base class, so that we can ensure that when we
-                // compile the child class to masquerade as the base class we are able
-                // to comply with the return-type assumptions made by callers.
-                for (auto childOverload: target[nameAndFunc.first]->getOverloads()) {
-                    for (auto baseOverload: nameAndFunc.second->getOverloads()) {
-                        if (!childOverload.disjointFrom(baseOverload)) {
-                            if (childOverload.getReturnType() != baseOverload.getReturnType()) {
-                                // we should really be checking for 'coverage' but for now we just
-                                // check for type equality
-                                throw std::runtime_error(
-                                    "Overloads of '" + nameAndFunc.first + "' don't have the same return type:\n" +
-                                    "    " + childOverload.toString() + "\n" +
-                                    "    " + baseOverload.toString()
-                                );
-                            }
-                        }
-                    }
-                }
                 target[nameAndFunc.first] = Function::merge(target[nameAndFunc.first], nameAndFunc.second);
             }
         }

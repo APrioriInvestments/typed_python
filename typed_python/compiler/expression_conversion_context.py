@@ -66,7 +66,6 @@ class ExpressionConversionContext:
     evaluation, and provides convenience methods to allow expression generators to stash
     compound expressions and get back simple variable references.
     """
-
     def __init__(self, functionContext, variableStates: FunctionStackState):
         self.functionContext = functionContext
         self.intermediates = []
@@ -1170,6 +1169,13 @@ class ExpressionConversionContext:
             for path in overload.closureVarLookups.values()
         ]
 
+        if returnTypeOverload is not None:
+            returnType = returnTypeOverload
+        elif overload.signatureFunction:
+            raise Exception("At this point, the signature should be fully known")
+        else:
+            returnType = typeWrapper(overload.returnType) if overload.returnType is not None else None
+
         call_target = self.functionContext.converter.convert(
             overload.name,
             overload.functionCode,
@@ -1179,9 +1185,7 @@ class ExpressionConversionContext:
             list(overload.closureVarLookups),
             [a.expr_type for a in closureArgs]
             + [a.expr_type for a in concreteArgs],
-            returnTypeOverload if returnTypeOverload is not None else
-            typeWrapper(overload.returnType) if overload.returnType is not None else
-            None
+            returnType
         )
 
         if call_target is None:

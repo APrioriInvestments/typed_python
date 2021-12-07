@@ -31,6 +31,14 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
+    std::string nameWithModuleConcrete() {
+        if (m_alternative->moduleName().size() == 0) {
+            return m_name;
+        }
+
+        return m_alternative->moduleName() + "." + m_name;
+    }
+
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,

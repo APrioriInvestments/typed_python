@@ -310,34 +310,52 @@ HeldClass* HeldClass::Make(
 ) {
     //we only allow one base class to have members because we want native code to be
     //able to just find those values in subclasses without hitting the vtable.
-    long countWithMembers = 0;
+    std::vector<HeldClass*> withMembers;
 
     for (auto base: bases) {
         if (base->m_members.size()) {
-            countWithMembers++;
+            withMembers.push_back(base);
         }
 
         if (base->isFinal()) {
-            throw std::runtime_error("Can't subclass " + base->getClassType()->name() + " because it's marked 'final'.");
+            PyErr_Format(
+                PyExc_TypeError,
+                "Can't subclass %s because it's marked 'Final'",
+                base->getClassType()->name().c_str()
+            );
+
+            throw PythonExceptionSet();
         }
-    }
 
-    if (countWithMembers > 1) {
-        throw std::runtime_error("Can't inherit from multiple base classes that both have members.");
-    }
-
-    if (!isFinal) {
-        for (auto nameAndMemberFunc: memberFunctions) {
-            for (auto overload: nameAndMemberFunc.second->getOverloads()) {
-                if (!overload.getReturnType()) {
-                    throw std::runtime_error("Overload of " + inName + "." + nameAndMemberFunc.first
-                        + " has no return type, but the class is not marked final, so the compiler"
-                        + " won't have a return type defined for this method. Either add an '-> object' annotation"
-                        + " to the method, or mark the class Final (so that the compiler can apply type inference directly)"
+        for (auto nameAndCM: classMembers) {
+            auto it = base->getOwnClassMembers().find(nameAndCM.first);
+            if (it != base->getOwnClassMembers().end()
+                && nameAndCM.first != "__typed_python_template__") {
+                // check that they're the same object
+                if (it->second != nameAndCM.second && nameAndCM.first != "__qualname__"
+                    && nameAndCM.first != "__module__"
+                ) {
+                    PyErr_Format(
+                        PyExc_TypeError,
+                        "Class %s can't redefine classmember %s",
+                        inName.c_str(),
+                        nameAndCM.first.c_str()
                     );
+                    throw PythonExceptionSet();
                 }
             }
         }
+    }
+
+    if (withMembers.size() > 1) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "Class %s can't have data members because its base classes %s and %s both have members.",
+            inName.c_str(),
+            withMembers[0]->getClassType()->name().c_str(),
+            withMembers[1]->getClassType()->name().c_str()
+        );
+        throw PythonExceptionSet();
     }
 
     HeldClass* result = new HeldClass(

@@ -39,6 +39,12 @@ from typed_python.type_promotion import (
 from typed_python.test_util import currentMemUsageMb
 
 
+AnAlternative = Alternative("AnAlternative", X={'x': int})
+
+AForwardAlternative = Forward("AForwardAlternative")
+AForwardAlternative.define(Alternative("AForwardAlternative", Y={}, X={'x': AForwardAlternative}))
+
+
 def typeFor(t):
     assert not isinstance(t, list), t
     return type(t)
@@ -177,7 +183,11 @@ class RandomValueProducer:
         return choice(self.levels[choice(list(self.levels))])
 
 
-class NativeTypesTests(unittest.TestCase):
+class TypesTests(unittest.TestCase):
+    def test_alternative_module(self):
+        assert AnAlternative.__module__ == 'typed_python.types_test'
+        assert AForwardAlternative.__module__ == 'typed_python.types_test'
+
     def test_refcount_bug_with_simple_string(self):
         with self.assertRaisesRegex(TypeError, "first argument to refcount '111' not a permitted Type"):
             _types.refcount(111)

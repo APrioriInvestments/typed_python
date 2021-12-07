@@ -22,10 +22,10 @@ import typed_python
 from typed_python.compiler.runtime_lock import runtimeLock
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.compiler_cache import CompilerCache
-from typed_python.type_function import ConcreteTypeFunction
+from typed_python.type_function import TypeFunction
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
-from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
+from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper, NoReturnTypeSpecified
 from typed_python import Function, _types, Value
 from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
 
@@ -197,10 +197,10 @@ class Runtime:
         if isinstance(arg, types.FunctionType):
             return type(Function(arg))
 
-        elif isinstance(arg, type):
+        elif isinstance(arg, type) and issubclass(arg, TypeFunction) and len(arg.MRO) == 2:
             return Value(arg)
 
-        elif isinstance(arg, ConcreteTypeFunction):
+        elif isinstance(arg, type):
             return Value(arg)
 
         return type(arg)
@@ -369,8 +369,18 @@ class Runtime:
 
             if argumentSignature is not None:
                 if funcObj.isNocompile:
-                    if overload.returnType is not None:
-                        possibleTypes.append(typeWrapper(overload.returnType))
+                    actualArgTypes, actualKwargTypes = ExpressionConversionContext.computeOverloadSignature(
+                        overload,
+                        argTypes,
+                        kwargTypes
+                    )
+
+                    returnType = PythonTypedFunctionWrapper.computeFunctionOverloadReturnType(
+                        overload, actualArgTypes, actualKwargTypes
+                    )
+
+                    if returnType is not NoReturnTypeSpecified:
+                        possibleTypes.append(typeWrapper(returnType))
                     else:
                         possibleTypes.append(typeWrapper(object))
                 else:

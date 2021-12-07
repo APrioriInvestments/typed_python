@@ -18,7 +18,12 @@ from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
-from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
+from typed_python.compiler.type_wrappers.python_typed_function_wrapper import (
+    PythonTypedFunctionWrapper,
+    CannotBeDetermined,
+    SomeInvalidClassReturnType,
+    NoReturnTypeSpecified
+)
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
     ClassOrAlternativeWrapperMixin
@@ -69,6 +74,45 @@ vtable_type = native_ast.Type.Struct(
     ],
     name="VTable"
 )
+
+
+_classCouldBeInstanceOfCache = {}
+
+
+def classCouldBeInstanceOf(cls, other):
+    """Determine whether an instance of cls could be an instance of other.
+
+    Returns True, False, or "Maybe"
+    """
+    if (cls, other) not in _classCouldBeInstanceOfCache:
+        _classCouldBeInstanceOfCache[cls, other] = _classCouldBeInstanceOf(cls, other)
+
+    return _classCouldBeInstanceOfCache[cls, other]
+
+
+def _classCouldBeInstanceOf(cls, other):
+    if other in cls.MRO:
+        return True
+
+    elif cls in other.MRO:
+        return "Maybe"
+
+    # the only way we could be a subclass of the other is if there is a common subclass
+    # of both of us.
+    if cls.IsFinal or other.IsFinal:
+        # if we're final, and this is not a parent of us, we are not one of it
+        return False
+
+    # if both classes have physical members, then there cannot be a common subclass
+    if len(cls.MemberNames) and len(other.MemberNames):
+        return False
+
+    for name in set(cls.ClassMembers) & set(other.ClassMembers):
+        if name not in ['__qualname__', '__name__', '__module__', '__typed_python_template__']:
+            if cls.ClassMembers[name] is not other.ClassMembers[name]:
+                return False
+
+    return "Maybe"
 
 
 class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
@@ -163,14 +207,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
     def _can_convert_to_type(self, otherType, conversionLevel):
         if isinstance(otherType, ClassWrapper):
-            if otherType.typeRepresentation in self.typeRepresentation.MRO:
-                return True
-            elif self.typeRepresentation in otherType.typeRepresentation.MRO:
-                return "Maybe"
-            elif not (self.typeRepresentation.IsFinal and otherType.typeRepresentation.IsFinal):
-                # if both of the types are final, then it's not possible that we have
-                # a subclass inheriting from both floating around
-                return "Maybe"
+            return classCouldBeInstanceOf(self.typeRepresentation, otherType.typeRepresentation)
 
         return super()._can_convert_to_type(otherType, conversionLevel)
 
@@ -558,10 +595,25 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                 mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(o, argTypes, kwargTypes, conversionLevel)
 
                 if mightMatch is not False:
-                    if o.returnType is None:
+                    ExpressionConversionContext = typed_python.compiler.expression_conversion_context.ExpressionConversionContext
+
+                    actualArgTypes, actualKwargTypes = ExpressionConversionContext.computeOverloadSignature(
+                        o,
+                        argTypes,
+                        kwargTypes
+                    )
+
+                    returnType = PythonTypedFunctionWrapper.computeFunctionOverloadReturnType(
+                        o, actualArgTypes, actualKwargTypes
+                    )
+
+                    if returnType is SomeInvalidClassReturnType:
+                        pass
+                    elif returnType is NoReturnTypeSpecified:
                         resultTypes.add(object)
                     else:
-                        resultTypes.add(o.returnType)
+                        assert isinstance(returnType, type)
+                        resultTypes.add(returnType)
 
                     if mightMatch is True:
                         return resultTypes
@@ -638,9 +690,17 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             )
             return None
 
-        # compute the return type of dispatching to this function. it will be a one-of if we
-        # might dispatch to multiple possible functions.
-        output_type = mergeTypeWrappers(resultTypes)
+        definitelyThrows = False
+
+        if any(r is CannotBeDetermined for r in resultTypes):
+            output_type = typeWrapper(object)
+        else:
+            validTypes = [x for x in resultTypes if x is not SomeInvalidClassReturnType]
+            if validTypes:
+                output_type = mergeTypeWrappers(validTypes)
+            else:
+                output_type = type(None)
+                definitelyThrows = True
 
         argSignatureStrings = [str(x) for x in argTypes[1:]]
         argSignatureStrings.extend([f"{k}={v}" for k, v in kwargTypes.items()])
@@ -659,7 +719,14 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             )
         )
 
-        return context.call_typed_call_target(dispatchToOverloads, [instance] + args + list(kwargs.values()))
+        res = context.call_typed_call_target(dispatchToOverloads, [instance] + args + list(kwargs.values()))
+
+        if definitelyThrows:
+            # we defined this as returning None, but because it throws we don't want to
+            # actually return None into the typing layer.
+            return
+
+        return res
 
     def generateMethodDispatch(self, context, methodName, methodReturnType, args, argNames):
         """Generate native code that tries to dispatch to each of func's overloads
@@ -683,9 +750,9 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         argTypes = [a.expr_type for i, a in enumerate(args) if argNames[i] is None]
         kwargTypes = {argNames[i]: a.expr_type for i, a in enumerate(args) if argNames[i] is not None}
 
-        def makeOverloadDispatcher(overload, conversionLevel):
+        def makeOverloadDispatcher(overload, outputType, conversionLevel):
             return lambda context, _, outputVar, *args: self.generateOverloadDispatch(
-                context, methodName, overload, conversionLevel, outputVar, args, argNames
+                context, methodName, overload, conversionLevel, outputType, outputVar, args, argNames
             )
 
         for conversionLevel in ConversionLevel.functionConversionSequence():
@@ -693,7 +760,19 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                 mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, argTypes, kwargTypes, conversionLevel)
 
                 if mightMatch is not False:
-                    overloadRetType = overload.returnType or object
+                    overloadRetType = PythonTypedFunctionWrapper.computeFunctionOverloadReturnType(overload, argTypes, kwargTypes)
+
+                    if overloadRetType is CannotBeDetermined:
+                        assert False, "We should be forcing and checking the type at runtime here"
+
+                    if overloadRetType is SomeInvalidClassReturnType or overloadRetType is NoReturnTypeSpecified:
+                        # even if the overloadRetType for the overloads presented here is
+                        # invalid, its possible for someone to define an additional override that's
+                        # not invalid. So we need to stick with the stated overload type of the
+                        # existing overloads
+                        overloadRetType = methodReturnType.typeRepresentation
+
+                    assert isinstance(overloadRetType, type), type(overloadRetType)
 
                     testSingleOverloadForm = context.converter.defineNativeFunction(
                         f'call_overload.{self}.{methodName}.{overloadIndex}.'
@@ -702,7 +781,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                          overloadRetType, tuple(argTypes[1:]), tuple(kwargTypes.items())),
                         [PointerTo(overloadRetType)] + list(argTypes) + list(kwargTypes.values()),
                         typeWrapper(bool),
-                        makeOverloadDispatcher(overload, conversionLevel)
+                        makeOverloadDispatcher(overload, overloadRetType, conversionLevel)
                     )
 
                     outputSlot = context.allocateUninitializedSlot(overloadRetType)
@@ -731,7 +810,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         # this should actually be hitting the interpreter instead.
         context.pushException(TypeError, f"Failed to find a dispatchable overload for {self}.{methodName} matching {args}")
 
-    def generateOverloadDispatch(self, context, methodName, overload, conversionLevel, outputVar, args, argNames):
+    def generateOverloadDispatch(self, context, methodName, overload, conversionLevel, retType, outputVar, args, argNames):
         """Produce the code that calls this specific overload.
 
         We return True if successful, False otherwise, and the output is a pointer to the result
@@ -745,6 +824,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             methodName - the name of the method we're compiling
             overload - the FunctionOverload we're trying to convert.
             conversionLevel - the degree of conversion we apply to each argument.
+            retType - the return type we're expected to match
             outputVar - a TypedExpression(PointerTo(returnType)) we're supposed to initialize.
             args - the arguments to pass to the method (including the instance)
             argNames - a list containing, for each argument, None if the argument is a positional argument,
@@ -764,24 +844,6 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         argTupleType = Tuple(*[x.typeRepresentation for x in argAndKwargTypes[0][1:]])
         kwargTupleType = NamedTuple(**{k: v.typeRepresentation for k, v in argAndKwargTypes[1].items()})
-        retType = overload.returnType or typeWrapper(object).typeRepresentation
-
-        # each entrypoint generates a slot we could call.
-        dispatchSlot = context.allocateClassMethodDispatchSlot(self.typeRepresentation, methodName, retType, argTupleType, kwargTupleType)
-
-        classDispatchTable = self.classDispatchTable(instance)
-
-        funcPtr = classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
-
-        with context.ifelse(funcPtr.cast(native_ast.Int64)) as (ifTrue, ifFalse):
-            with ifFalse:
-                # we have an empty slot. We need to compile it
-                context.pushEffect(
-                    runtime_functions.compileClassDispatch.call(
-                        classDispatchTable.cast(native_ast.VoidPtr),
-                        dispatchSlot
-                    )
-                )
 
         convertedArgs = []
 
@@ -809,6 +871,29 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                     context.markUninitializedSlotInitialized(convertedArg)
 
             convertedArgs.append(convertedArg)
+
+        # each entrypoint generates a slot we could call.
+        dispatchSlot = context.allocateClassMethodDispatchSlot(
+            self.typeRepresentation,
+            methodName,
+            retType,
+            argTupleType,
+            kwargTupleType
+        )
+
+        classDispatchTable = self.classDispatchTable(instance)
+
+        funcPtr = classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
+
+        with context.ifelse(funcPtr.cast(native_ast.Int64)) as (ifTrue, ifFalse):
+            with ifFalse:
+                # we have an empty slot. We need to compile it
+                context.pushEffect(
+                    runtime_functions.compileClassDispatch.call(
+                        classDispatchTable.cast(native_ast.VoidPtr),
+                        dispatchSlot
+                    )
+                )
 
         if outputVar.expr_type.typeRepresentation.ElementType != retType:
             raise Exception(f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}")
@@ -838,7 +923,30 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         argTupleType = Tuple(*[x.typeRepresentation for x in argAndKwargTypes[0][1:]])
         kwargTupleType = NamedTuple(**{k: v.typeRepresentation for k, v in argAndKwargTypes[1].items()})
-        retType = overload.returnType or object
+
+        actualArgTypes, actualKwargTypes = context.computeOverloadSignature(overload, argTypes, kwargTypes)
+
+        retType = PythonTypedFunctionWrapper.computeFunctionOverloadReturnType(
+            overload,
+            actualArgTypes,
+            actualKwargTypes
+        )
+
+        if retType is CannotBeDetermined:
+            return instance.convert_to_type(
+                object, ConversionLevel.Signature
+            ).convert_method_call(methodName, args, kwargs)
+
+        if retType is SomeInvalidClassReturnType:
+            funcWrapper = typeWrapper(overload.functionTypeObject)
+            canBail = funcWrapper.checkInvalidClassReturn(context, overload.index, [instance] + args, kwargs)
+            assert canBail is True
+            return
+
+        if retType is NoReturnTypeSpecified:
+            # if the user doesn't annotate anything, and we're dispatching
+            # then the best we can do is to assume object.
+            retType = object
 
         # each entrypoint generates a slot we could call.
         dispatchSlot = context.allocateClassMethodDispatchSlot(self.typeRepresentation, methodName, retType, argTupleType, kwargTupleType)
