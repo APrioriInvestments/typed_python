@@ -334,6 +334,7 @@ HeldClass* HeldClass::Make(
                 // check that they're the same object
                 if (it->second != nameAndCM.second && nameAndCM.first != "__qualname__"
                     && nameAndCM.first != "__module__"
+                    && nameAndCM.first != "__classcell__"
                 ) {
                     PyErr_Format(
                         PyExc_TypeError,

@@ -1789,3 +1789,38 @@ class NativeClassTypesTests(unittest.TestCase):
 
         checkIt()
         Entrypoint(checkIt)()
+
+    def test_mro_equivalent_to_python_diamond(self):
+        def makeClasses(base):
+            class B(base):
+                pass
+
+            class C(B):
+                pass
+
+            class D(B):
+                pass
+
+            class E(C, D):
+                pass
+
+            return E
+
+        EPy = makeClasses(object)
+        ETP = makeClasses(Class)
+
+        mroPy = [T.__name__ for T in EPy.__mro__][:4]
+        mroTP = [T.__name__ for T in ETP.MRO][:4]
+
+        assert mroPy == mroTP
+
+    def test_super(self):
+        class B(Class):
+            def f(self, x):
+                return x
+
+        class C(B):
+            def f(self, x):
+                return super().f(x) + 1
+
+        assert C().f(10) == 11

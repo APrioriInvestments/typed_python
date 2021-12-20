@@ -2498,3 +2498,89 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         class ActualSubclass(TF1(int), TF2(float)):
             pass
+
+    def test_super(self):
+        class B(Class):
+            def f(self, x):
+                return x
+
+        class C(B):
+            def f(self, x):
+                return super().f(x) + 1
+
+        @Entrypoint
+        def callIt(c, x):
+            return c.f(x)
+
+        assert callIt(C(), 10) == 11
+
+    def test_super_with_diamond(self):
+        class B(Class):
+            def f(self, x: ListOf(str)):
+                x.append('B')
+
+        class C(B):
+            def f(self, x):
+                x.append('C')
+                super().f(x)
+
+        class D(B):
+            def f(self, x):
+                x.append('D')
+                super().f(x)
+
+        class E(C, D):
+            def f(self, x):
+                x.append('E')
+                super().f(x)
+
+        lst = ListOf(str)()
+        E().f(lst)
+
+        assert lst == ['E', 'C', 'D', 'B']
+
+        @Entrypoint
+        def callIt(c, x):
+            return c.f(x)
+
+        lst.resize(0)
+        callIt(E(), lst)
+
+        assert lst == ['E', 'C', 'D', 'B']
+
+    def test_super_with_no_superclass(self):
+        class B(Class):
+            def f(self):
+                return super().f()
+
+        @Entrypoint
+        def callIt(c):
+            return c.f()
+
+        with self.assertRaisesRegex(AttributeError, r"'super' object has no attribute 'f'"):
+            B().f()
+
+        with self.assertRaisesRegex(AttributeError, r"'super' object has no attribute 'f'"):
+            callIt(B())
+
+    def test_super_in_init(self):
+        class B(Class):
+            x = Member(int)
+
+            def __init__(self, x):
+                self.x = x
+
+        class C(B):
+            y = Member(int)
+
+            def __init__(self, x, y):
+                super().__init__(x)
+                self.y = y
+
+        def check():
+            c = C(10, 11)
+            assert c.x == 10
+            assert c.y == 11
+
+        check()
+        Entrypoint(check)()

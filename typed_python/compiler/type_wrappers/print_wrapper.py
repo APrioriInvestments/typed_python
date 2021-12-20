@@ -58,7 +58,10 @@ class PrintWrapper(Wrapper):
             else:
                 res = res + sep + converted
 
-        res = res + end
+        if res is None:
+            res = end
+        else:
+            res = res + end
 
         context.pushEffect(print_string.call(res.nonref_expr.cast(native_ast.VoidPtr)))
 

@@ -266,6 +266,8 @@ class ClassMetaclass(type):
         if not bases:
             return type.__new__(cls, name, bases, namespace.ns, **kwds)
 
+        classCell = namespace.ns.get('__classcell__')
+
         members = []
         isFinal = Final in bases
 
@@ -280,7 +282,9 @@ class ClassMetaclass(type):
             name = kwds["__name__"]
 
         for eltName, elt in namespace.order:
-            if eltName == '__name__':
+            if eltName == '__classcell__':
+                pass
+            elif eltName == '__name__':
                 name = elt
             elif isinstance(elt, Member):
                 members.append((eltName, elt._type, elt._default_value, elt._nonempty))
@@ -317,7 +321,7 @@ class ClassMetaclass(type):
             else:
                 classMembers[eltName] = elt
 
-        return typed_python._types.Class(
+        res = typed_python._types.Class(
             name,
             tuple(bases),
             isFinal,
@@ -327,6 +331,11 @@ class ClassMetaclass(type):
             tuple(properties.items()),
             tuple(classMembers.items()),
         )
+
+        if classCell is not None:
+            typed_python._types.setPyCellContents(classCell, res)
+
+        return res
 
     def __subclasscheck__(cls, subcls):
         if getattr(subcls, "__typed_python_category__", None) != "Class":
@@ -446,12 +455,16 @@ class FunctionOverload:
             res = {}
 
             globalNames = set(self.extractGlobalNamesFromCode(self.functionCode))
+
             for name in self.functionGlobals:
                 if name.split(".")[0] in globalNames:
                     res[name] = self.functionGlobals[name]
 
             for varname, cell in self.funcGlobalsInCells.items():
                 res[varname] = cell.cell_contents
+
+            if self.methodOf is not None:
+                res['__class__'] = self.methodOf.Class
 
             self._realizedGlobals = res
 

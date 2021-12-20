@@ -51,6 +51,7 @@ from typed_python.compiler.type_wrappers.len_wrapper import LenWrapper
 from typed_python.compiler.type_wrappers.hash_wrapper import HashWrapper
 from typed_python.compiler.type_wrappers.range_wrapper import range as compilableRange
 from typed_python.compiler.type_wrappers.print_wrapper import PrintWrapper
+from typed_python.compiler.type_wrappers.super_wrapper import SuperWrapper
 from typed_python.compiler.type_wrappers.compiler_introspection_wrappers import (
     IsCompiledWrapper,
     TypeKnownToCompiler,
@@ -92,6 +93,7 @@ def typedPythonTypeToTypeWrapper(t):
 
     if t not in _type_to_type_wrapper_cache:
         _type_to_type_wrapper_cache[t] = _typedPythonTypeToTypeWrapper(t)
+
     return _type_to_type_wrapper_cache[t]
 
 
@@ -270,6 +272,9 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
 
     if f is print:
         return TypedExpression(context, native_ast.nullExpr, PrintWrapper(), False)
+
+    if f is super:
+        return TypedExpression(context, native_ast.nullExpr, SuperWrapper(), False)
 
     if f is pointerTo:
         return TypedExpression(context, native_ast.nullExpr, PointerToObjectWrapper(), False)

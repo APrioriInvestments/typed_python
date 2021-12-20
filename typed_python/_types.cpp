@@ -1972,6 +1972,22 @@ PyObject *setFunctionGlobals(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
+PyObject *setPyCellContents(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "setPyCellContents takes 2 positional arguments");
+        return NULL;
+    }
+
+    if (!PyCell_Check(PyTuple_GetItem(args, 0))) {
+        PyErr_SetString(PyExc_TypeError, "First argument to setPyCellContents must be a cell.");
+        return NULL;
+    }
+
+    PyCell_Set(PyTuple_GetItem(args, 0), PyTuple_GetItem(args, 1));
+
+    return incref(Py_None);
+}
+
 PyObject *createPyCell(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "createPyCell takes 1 positional argument");
@@ -3033,6 +3049,7 @@ static PyMethodDef module_methods[] = {
     {"pointerTo", (PyCFunction)pointerTo, METH_VARARGS, NULL},
     {"pyInstanceHeldObjectAddress", (PyCFunction)pyInstanceHeldObjectAddress, METH_VARARGS, NULL},
     {"createPyCell", (PyCFunction)createPyCell, METH_VARARGS, NULL},
+    {"setPyCellContents", (PyCFunction)setPyCellContents, METH_VARARGS, NULL},
     {"copy", (PyCFunction)copyRefTo, METH_VARARGS, NULL},
     {"refTo", (PyCFunction)refTo, METH_VARARGS, NULL},
     {"typesAreEquivalent", (PyCFunction)typesAreEquivalent, METH_VARARGS, NULL},

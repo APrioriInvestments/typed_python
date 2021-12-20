@@ -130,11 +130,21 @@ PyObject* Function::Overload::buildFunctionObj(Type* closureType, instance_ptr c
 
             auto globalIt = mFunctionGlobalsInCells.find(varname);
             if (globalIt != mFunctionGlobalsInCells.end()) {
-                PyTuple_SetItem(
-                    (PyObject*)closureTup,
-                    k,
-                    incref(globalIt->second)
-                );
+                if (varname == "__class__" && getMethodOf()) {
+                    PyTuple_SetItem(
+                        (PyObject*)closureTup,
+                        k,
+                        PyCell_New((PyObject*)PyInstance::typeObj(
+                            ((HeldClass*)getMethodOf())->getClassType()
+                        ))
+                    );
+                } else {
+                    PyTuple_SetItem(
+                        (PyObject*)closureTup,
+                        k,
+                        incref(globalIt->second)
+                    );
+                }
             } else {
                 auto bindingIt = mClosureBindings.find(varname);
                 if (bindingIt == mClosureBindings.end()) {

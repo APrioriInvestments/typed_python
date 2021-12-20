@@ -228,13 +228,13 @@ class Wrapper:
 
         return context.pushException(
             AttributeError,
-            "%s object has no attribute '%s'" % (self, attribute)
+            "'%s' object has no attribute '%s'" % (self, attribute)
         )
 
     def convert_set_attribute(self, context, instance, attribute, value):
         return context.pushException(
             AttributeError,
-            "%s object has no attribute '%s'" % (self, attribute)
+            "'%s' object has no attribute '%s'" % (self, attribute)
         )
 
     def convert_delitem(self, context, instance, item):

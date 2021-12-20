@@ -758,6 +758,43 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
             )
         );
     }
+
+    if (!asHeldClass) {
+        // mirror the MRO + the hierarchy above into the actual __mro__ variable, which
+        // over the long run should replace MRO and Bases.
+        // we have to include the base classes above us (Class, Type, object)
+        // so that standard python object model behaviors work.
+        PyObjectStealer realMro(PyTuple_New(classT->getHeldClass()->getMro().size() + 3));
+
+        long k = 0;
+        for (;k < classT->getHeldClass()->getMro().size(); k++) {
+            PyTuple_SetItem(
+                realMro,
+                k,
+                incref(typePtrToPyTypeRepresentation(classT->getHeldClass()->getMro()[k]->getClassType()))
+            );
+        }
+
+        PyTuple_SetItem(
+            realMro,
+            k++,
+            incref((PyObject*)pyType->tp_base)
+        );
+
+        PyTuple_SetItem(
+            realMro,
+            k++,
+            incref((PyObject*)pyType->tp_base->tp_base)
+        );
+
+        PyTuple_SetItem(
+            realMro,
+            k++,
+            incref((PyObject*)pyType->tp_base->tp_base->tp_base)
+        );
+
+        pyType->tp_mro = incref(realMro);
+    }
 }
 
 int PyClassInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {

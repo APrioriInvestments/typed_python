@@ -737,25 +737,91 @@ public:
         return m_hasDelAttrMagicMethod;
     }
 
+    // fill out m_mro according to C3 precedence rules
+    void _computeMroSequence() {
+        m_mro.push_back(this);
+
+        std::vector<std::vector<HeldClass*> > chains;
+        std::vector<std::set<HeldClass*> > chainTails;
+
+        for (HeldClass* base: m_bases) {
+            chains.push_back(base->getMro());
+        }
+
+        chains.push_back(m_bases);
+        chainTails.resize(chains.size());
+
+        for (size_t i = 0; i < chains.size(); i++) {
+            for (size_t j = 1; j < chains[i].size(); j++) {
+                chainTails[i].insert(chains[i][j]);
+            }
+        }
+
+        // check if 'h' is in one of the linearization tails. If it is
+        // then we can't use it
+        auto isValid = [&](HeldClass* h) {
+            for (auto& ct: chainTails) {
+                if (ct.find(h) != ct.end()) {
+                    return false;
+                }
+            }
+
+            return true;
+        };
+
+        auto pickCls = [&]() {
+            bool anyPopulated = false;
+
+            for (auto& chain: chains) {
+                if (chain.size() && isValid(chain[0])) {
+                    return chain[0];
+                }
+
+                if (chain.size()) {
+                    anyPopulated = true;
+                }
+            }
+
+            if (anyPopulated) {
+                throw std::runtime_error(
+                    "Class MRO order for " + name() + " couldn't be determined. No "
+                    "valid linearization exists."
+                );
+            }
+
+            return (HeldClass*)nullptr;
+        };
+
+        while (true) {
+            HeldClass* hc = pickCls();
+
+            if (!hc) {
+                return;
+            }
+
+            m_mro.push_back(hc);
+
+            for (size_t i = 0; i < chains.size(); i++) {
+                if (chains[i].size() && chains[i][0] == hc) {
+                    chains[i].erase(chains[i].begin(), chains[i].begin() + 1);
+                    chainTails[i].erase(hc);
+
+                    if (chains[i].size()) {
+                        chainTails[i].erase(chains[i][0]);
+                    }
+                }
+            }
+        }
+    }
+
     void initializeMRO() {
         // this is not how the MRO actually works, but we have yet to actually
         // code it correctly.
-        std::set<HeldClass*> seen;
+        _computeMroSequence();
 
-        std::function<void (HeldClass*)> visit = [&](HeldClass* cls) {
-            if (seen.find(cls) == seen.end()) {
-                seen.insert(cls);
-
-                m_mro.push_back(cls);
-                m_ancestor_to_mro_index[cls] = m_mro.size() - 1;
-
-                for (auto b: cls->getBases()) {
-                    visit(b);
-                }
-            }
-        };
-
-        visit(this);
+        for (size_t i = 0; i < m_mro.size(); i++) {
+            m_ancestor_to_mro_index[m_mro[i]] = i;
+        }
 
         if (m_ancestor_to_mro_index.find(this) == m_ancestor_to_mro_index.end() ||
                 m_ancestor_to_mro_index.find(this)->second != 0) {

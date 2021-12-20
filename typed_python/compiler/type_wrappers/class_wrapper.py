@@ -108,7 +108,7 @@ def _classCouldBeInstanceOf(cls, other):
         return False
 
     for name in set(cls.ClassMembers) & set(other.ClassMembers):
-        if name not in ['__qualname__', '__name__', '__module__', '__typed_python_template__']:
+        if name not in ['__qualname__', '__name__', '__module__', '__typed_python_template__', '__classcell__']:
             if cls.ClassMembers[name] is not other.ClassMembers[name]:
                 return False
 
