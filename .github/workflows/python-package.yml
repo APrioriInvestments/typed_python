@@ -10,12 +10,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-10.15]
         python-version: [3.6, 3.7, 3.8]
         exclude:
-          - os: macos-latest
+          - os: macos-10.15
             python-version: 3.6
-          - os: macos-latest
+          - os: macos-10.15
             python-version: 3.8
           - os: windows-latest
             python-version: 3.6
@@ -69,12 +69,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-10.15]
         python-version: [3.6, 3.7, 3.8]
         exclude:
-          - os: macos-latest
+          - os: macos-10.15
             python-version: 3.6
-          - os: macos-latest
+          - os: macos-10.15
             python-version: 3.8
           - os: windows-latest
             python-version: 3.6
