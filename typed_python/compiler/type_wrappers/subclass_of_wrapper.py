@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 from typed_python import Class
+import typed_python
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
@@ -49,6 +50,103 @@ class SubclassOfWrapper(Wrapper):
 
     def convert_destroy(self, context, instance):
         pass
+
+    def _can_convert_to_type(self, otherType, conversionLevel):
+        classCouldBeInstanceOf = (
+            typed_python.compiler.type_wrappers.class_wrapper.classCouldBeInstanceOf
+        )
+
+        PythonTypeObjectWrapper = (
+            typed_python.compiler.type_wrappers.python_type_object_wrapper.PythonTypeObjectWrapper
+        )
+
+        if isinstance(otherType, SubclassOfWrapper):
+            if typed_python._types.canConvertToTrivially(self.typeRepresentation.Type, otherType.typeRepresentation.Type):
+                return True
+
+            if classCouldBeInstanceOf(self.typeRepresentation.Type, otherType.typeRepresentation.Type) is False:
+                return False
+
+            return "Maybe"
+
+        if isinstance(otherType, PythonTypeObjectWrapper):
+            if typed_python._types.canConvertToTrivially(self.typeRepresentation.Type, otherType.typeRepresentation.Value):
+                return True
+
+            if classCouldBeInstanceOf(self.typeRepresentation.Type, otherType.typeRepresentation.Value) is False:
+                return False
+
+            return "Maybe"
+
+        return super()._can_convert_to_type(otherType, conversionLevel)
+
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        PythonTypeObjectWrapper = (
+            typed_python.compiler.type_wrappers.python_type_object_wrapper.PythonTypeObjectWrapper
+        )
+
+        canConvert = self._can_convert_to_type(targetVal.expr_type, conversionLevel)
+
+        if isinstance(targetVal.expr_type, SubclassOfWrapper):
+            targetT = targetVal.expr_type.typeRepresentation.Type
+
+            if canConvert is True:
+                context.pushEffect(
+                    targetVal.expr.store(
+                        instance.nonref_expr
+                    )
+                )
+                return context.constant(True)
+
+            if canConvert is False:
+                return context.constant(False)
+
+            with context.ifelse(
+                runtime_functions.typePtrIsSubclass.call(
+                    instance.nonref_expr,
+                    context.getTypePointer(targetT)
+                )
+            ) as (ifTrue, ifFalse):
+                initialized = context.allocateUninitializedSlot(bool)
+
+                with ifTrue:
+                    context.pushEffect(
+                        targetVal.expr.store(
+                            instance.nonref_expr
+                        )
+                    )
+                    context.pushEffect(
+                        initialized.expr.store(
+                            native_ast.const_bool_expr(True)
+                        )
+                    )
+
+                with ifFalse:
+                    context.pushEffect(
+                        initialized.expr.store(
+                            native_ast.const_bool_expr(False)
+                        )
+                    )
+
+                return initialized
+
+        if isinstance(targetVal.expr_type, PythonTypeObjectWrapper):
+            targetT = targetVal.expr_type.typeRepresentation.Value
+
+            if canConvert is True:
+                return context.constant(True)
+
+            if canConvert is False:
+                return context.constant(False)
+
+            return context.pushPod(
+                bool,
+                instance.nonref_expr.cast(native_ast.UInt64).eq(
+                    context.getTypePointer(targetT).cast(native_ast.UInt64)
+                )
+            )
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
     def convert_issubclass(self, context, instance, ofType, isSubclassCall):
         classCouldBeInstanceOf = (

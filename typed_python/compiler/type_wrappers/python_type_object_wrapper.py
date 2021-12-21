@@ -36,6 +36,26 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
     def __str__(self):
         return self.typeRepresentation.Value.__qualname__
 
+    def _can_convert_to_type(self, otherType, conversionLevel):
+        if isinstance(otherType, SubclassOfWrapper):
+            canConvert = otherType.typeRepresentation.Type in self.typeRepresentation.Value.MRO
+            return canConvert
+
+        return super()._can_convert_to_type(otherType, conversionLevel)
+
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        canConvert = self._can_convert_to_type(targetVal.expr_type, conversionLevel)
+
+        if canConvert is True and isinstance(targetVal.expr_type, SubclassOfWrapper):
+            context.pushEffect(
+                targetVal.expr.store(
+                    context.getTypePointer(self.typeRepresentation.Value)
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
+
     @Wrapper.unwrapOneOfAndValue
     def convert_call_on_container_expression(self, context, inst, argExpr):
         if issubclass(self.typeRepresentation.Value, CompilableBuiltin):

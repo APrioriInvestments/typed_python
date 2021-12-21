@@ -19,7 +19,9 @@ from typed_python.compiler.type_wrappers.function_signature_calculator import (
     SomeInvalidClassReturnType
 )
 
-from typed_python import Class, Final, ListOf, Function, OneOf
+from typed_python import Class, Final, ListOf, Function, OneOf, SubclassOf
+
+from typed_python._types import canConvertToTrivially
 
 
 def anyIsBad(types):
@@ -132,3 +134,15 @@ def test_understands_more_specific_types():
     calc = FunctionSignatureCalculator(f)
 
     assert calc.returnTypeFor([OneOf(int, float)], {}) is int
+
+
+def test_convert_subclass_of_trivially():
+    class C(Class):
+        pass
+
+    class D(C):
+        pass
+
+    assert canConvertToTrivially(SubclassOf(D), SubclassOf(D))
+    assert canConvertToTrivially(SubclassOf(D), SubclassOf(C))
+    assert not canConvertToTrivially(SubclassOf(C), SubclassOf(D))

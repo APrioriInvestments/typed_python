@@ -237,12 +237,22 @@ bool Type::canConvertToTrivially(Type* otherType) {
         return true;
     }
 
-    if (otherType->isSubclassOf(this)) {
+    if (this->isSubclassOf(otherType)) {
         return true;
     }
 
     if (isValue()) {
         return ((Value*)this)->value().type()->canConvertToTrivially(otherType);
+    }
+
+    if (isSubclassOf() && otherType->isSubclassOf()) {
+        return ((SubclassOfType*)this)->getSubclassOf()->isSubclassOf(
+            ((SubclassOfType*)otherType)->getSubclassOf()
+        );
+    }
+
+    if (isSubclassOf()) {
+        return ((SubclassOfType*)this)->getSubclassOf()->isSubclassOf(otherType);
     }
 
     if (isOneOf() && otherType->isOneOf()) {
