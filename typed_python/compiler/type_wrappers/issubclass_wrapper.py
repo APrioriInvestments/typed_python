@@ -30,6 +30,6 @@ class IssubclassWrapper(Wrapper):
     @Wrapper.unwrapOneOfAndValue
     def convert_call(self, context, expr, args, kwargs):
         if len(args) == 2 and not kwargs:
-            return args[1].expr_type.convert_issubclass(context, args[1], args[0], True)
+            return args[0].expr_type.convert_issubclass(context, args[0], args[1], True)
 
         return super().convert_call(context, expr, args, kwargs)

@@ -435,6 +435,7 @@ class ConversionContextBase:
                     (),
                     (),
                     tuple(classMembers),
+                    ()
                 )
             )
 
@@ -581,6 +582,7 @@ class ConversionContextBase:
                 (),
                 (),
                 tuple(classMembers),
+                ()
             )
         )
 

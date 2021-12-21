@@ -100,6 +100,31 @@ PyObject *MakeRefToType(PyObject* nullValue, PyObject* args) {
     });
 }
 
+PyObject *MakeSubclassOfType(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "SubclassOf takes 1 positional argument.");
+        return NULL;
+    }
+
+    PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
+
+    Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "SubclassOf needs a type.");
+        return NULL;
+    }
+
+    // types that can't be subclassed just produce values
+    if (!t->isClass() || ((Class*)t)->isFinal()) {
+        return MakeValueType(nullValue, args);
+    }
+
+    return translateExceptionToPyObject([&]{
+        return incref((PyObject*)PyInstance::typeObj(SubclassOfType::Make(t)));
+    });
+}
+
 PyObject *MakeTypedCellType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "TypedCell takes 1 positional argument.");
@@ -1052,7 +1077,8 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
-    int expected_args = 8;
+    int expected_args = 9;
+
     if (PyTuple_Size(args) != expected_args) {
         PyErr_Format(PyExc_TypeError, "Class takes %S arguments", expected_args);
         return NULL;
@@ -1074,6 +1100,7 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     PyObjectHolder staticFunctionTuple(PyTuple_GetItem(args, 5));
     PyObjectHolder propertyFunctionTuple(PyTuple_GetItem(args, 6));
     PyObjectHolder classMemberTuple(PyTuple_GetItem(args, 7));
+    PyObjectHolder classMethodTuple(PyTuple_GetItem(args, 8));
 
     if (!PyTuple_Check(basesTuple)) {
         PyErr_SetString(PyExc_TypeError, "Class needs a tuple of Class type objects in the second argument");
@@ -1110,12 +1137,18 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
+    if (!PyTuple_Check(classMethodTuple)) {
+        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, object) in the ninth argument");
+        return NULL;
+    }
+
     std::vector<Type*> bases;
     std::vector<MemberDefinition> members;
     std::vector<std::pair<std::string, Type*> > memberFunctions;
     std::vector<std::pair<std::string, Type*> > staticFunctions;
     std::vector<std::pair<std::string, Type*> > propertyFunctions;
     std::vector<std::pair<std::string, PyObject*> > classMembers;
+    std::vector<std::pair<std::string, Type*> > classMethods;
 
     if (!unpackTupleToTypes(basesTuple, bases)) {
         return NULL;
@@ -1139,6 +1172,9 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     if (!unpackTupleToStringAndTypes(staticFunctionTuple, staticFunctions)) {
         return NULL;
     }
+    if (!unpackTupleToStringAndTypes(classMethodTuple, classMethods)) {
+        return NULL;
+    }
     if (!unpackTupleToStringAndTypes(propertyFunctionTuple, propertyFunctions)) {
         return NULL;
     }
@@ -1148,6 +1184,7 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
 
     std::map<std::string, Function*> memberFuncs;
     std::map<std::string, Function*> staticFuncs;
+    std::map<std::string, Function*> classMethodFuncs;
     std::map<std::string, Function*> propertyFuncs;
 
     for (auto mf: memberFunctions) {
@@ -1188,6 +1225,19 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
         staticFuncs[mf.first] = (Function*)mf.second;
     }
 
+    for (auto mf: classMethods) {
+        if (mf.second->getTypeCategory() != Type::TypeCategory::catFunction) {
+            PyErr_Format(PyExc_TypeError, "Class method %s is not a function.", mf.first.c_str());
+            return NULL;
+        }
+        if (classMethodFuncs.find(mf.first) != classMethodFuncs.end()) {
+            PyErr_Format(PyExc_TypeError, "Class method %s repeated. This should have"
+                                    " been compressed as an overload.", mf.first.c_str());
+            return NULL;
+        }
+        classMethodFuncs[mf.first] = (Function*)mf.second;
+    }
+
     std::map<std::string, PyObject*> clsMembers;
 
     for (auto mf: classMembers) {
@@ -1205,7 +1255,8 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
                     memberFuncs,
                     staticFuncs,
                     propertyFuncs,
-                    clsMembers
+                    clsMembers,
+                    classMethodFuncs
                 )
             )
         );
@@ -3141,6 +3192,7 @@ PyInit__types(void)
     PyModule_AddObject(module, "PyCell", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPyCell)));
     PyModule_AddObject(module, "PythonObjectOfType", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPythonObjectOfType)));
     PyModule_AddObject(module, "PythonSubclass", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPythonSubclass)));
+    PyModule_AddObject(module, "SubclassOf", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catSubclassOf)));
 
     if (module == NULL)
         return NULL;

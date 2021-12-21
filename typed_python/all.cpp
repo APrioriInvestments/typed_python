@@ -42,6 +42,7 @@ compile the entire group all at once.
 #include "PyGilState.cpp"
 #include "PySetInstance.cpp"
 
+#include "SubclassOfType.cpp"
 #include "SetType.cpp"
 #include "AlternativeType.cpp"
 #include "BytesType.cpp"

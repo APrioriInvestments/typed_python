@@ -126,7 +126,8 @@ public:
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
             const std::map<std::string, Function*>& propertyFunctions,
-            const std::map<std::string, PyObject*>& classMembers
+            const std::map<std::string, PyObject*>& classMembers,
+            const std::map<std::string, Function*>& classMethods
             )
     {
         std::vector<HeldClass*> heldClassBases;
@@ -145,7 +146,8 @@ public:
                 memberFunctions,
                 staticFunctions,
                 propertyFunctions,
-                classMembers
+                classMembers,
+                classMethods
             )
         );
     }
@@ -451,6 +453,10 @@ public:
         return m_heldClass->getStaticFunctions();
     }
 
+    const std::map<std::string, Function*>& getClassMethods() const {
+        return m_heldClass->getClassMethods();
+    }
+
     const std::map<std::string, PyObject*>& getClassMembers() const {
         return m_heldClass->getClassMembers();
     }
@@ -473,6 +479,10 @@ public:
 
     const std::map<std::string, PyObject*>& getOwnClassMembers() const {
         return m_heldClass->getOwnClassMembers();
+    }
+
+    const std::map<std::string, Function*>& getOwnClassMethods() const {
+        return m_heldClass->getOwnClassMethods();
     }
 
     const std::map<std::string, Function*>& getOwnPropertyFunctions() const {

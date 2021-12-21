@@ -28,10 +28,7 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
     ClassOrAlternativeWrapperMixin
 )
-from typed_python.compiler.type_wrappers.voidptr_masquerading_as_tp_type import (
-    VoidPtrMasqueradingAsTPType
-)
-from typed_python import _types, PointerTo, Int32, Tuple, NamedTuple, bytecount, RefTo
+from typed_python import _types, PointerTo, Int32, Tuple, NamedTuple, bytecount, RefTo, SubclassOf, Class
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -91,6 +88,15 @@ def classCouldBeInstanceOf(cls, other):
 
 
 def _classCouldBeInstanceOf(cls, other):
+    assert issubclass(cls, Class) or cls is Class, cls
+    assert issubclass(other, Class) or other is Class, other
+
+    if other is Class:
+        return True
+
+    if cls is Class:
+        return "Maybe"
+
     if other in cls.MRO:
         return True
 
@@ -557,11 +563,38 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         return bytePtr.store(bytePtr.load().bitand(native_ast.const_uint8_expr(255 - (1 << bit))))
 
+    def convert_type_attribute(self, context, typeInst, attr):
+        if attr in self.typeRepresentation.ClassMemberFunctions:
+            methodType = BoundMethodWrapper(
+                _types.BoundMethod(typeInst.expr_type.typeRepresentation, attr)
+            )
+
+            return typeInst.changeType(methodType)
+
+        return super().convert_type_attribute(context, typeInst, attr)
+
+    def convert_type_method_call(self, context, typeInst, methodName, args, kwargs):
+        if methodName in self.typeRepresentation.ClassMemberFunctions:
+            func = self.typeRepresentation.ClassMemberFunctions[methodName]
+
+            return typeWrapper(func).convert_call(context, None, [typeInst] + list(args), kwargs)
+
+        return super().convert_type_method_call(context, typeInst, methodName, args, kwargs)
+
     def convert_attribute(self, context, instance, attribute, nocheck=False):
         if attribute in self.typeRepresentation.MemberFunctions:
             methodType = BoundMethodWrapper(_types.BoundMethod(self.typeRepresentation, attribute))
 
             return instance.changeType(methodType)
+
+        if attribute in self.typeRepresentation.ClassMemberFunctions:
+            instanceType = instance.convert_typeof()
+
+            methodType = BoundMethodWrapper(
+                _types.BoundMethod(instanceType.expr_type.typeRepresentation, attribute)
+            )
+
+            return instanceType.changeType(methodType)
 
         if attribute in self.typeRepresentation.PropertyFunctions:
             return self.convert_method_call(context, instance, attribute, (), {})
@@ -1255,6 +1288,6 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             return context.constant(self.typeRepresentation)
 
         return context.pushPod(
-            VoidPtrMasqueradingAsTPType(self.typeRepresentation),
+            SubclassOf(self.typeRepresentation),
             self.get_class_type_ptr_as_voidptr(instance)
         )

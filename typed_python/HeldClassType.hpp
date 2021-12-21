@@ -338,7 +338,8 @@ public:
           const std::map<std::string, Function*>& memberFunctions,
           const std::map<std::string, Function*>& staticFunctions,
           const std::map<std::string, Function*>& propertyFunctions,
-          const std::map<std::string, PyObject*>& classMembers
+          const std::map<std::string, PyObject*>& classMembers,
+          const std::map<std::string, Function*>& classMethods
           ) :
             Type(catHeldClass),
             m_vtable(new VTable(this)),
@@ -350,6 +351,7 @@ public:
             m_own_staticFunctions(staticFunctions),
             m_own_propertyFunctions(propertyFunctions),
             m_own_classMembers(classMembers),
+            m_own_classMethods(classMethods),
             m_hasComparisonOperators(false),
             m_hasGetAttributeMagicMethod(false),
             m_hasGetAttrMagicMethod(false),
@@ -404,6 +406,12 @@ public:
             res += MutuallyRecursiveTypeGroup::pyObjectShaHash(nameAndFun.second, groupHead);
         }
 
+        res += ShaHash(6);
+        for (auto nameAndFun: m_own_classMethods) {
+            res += ShaHash(nameAndFun.first);
+            res += nameAndFun.second->identityHash(groupHead);
+        }
+
         return res;
     }
 
@@ -443,6 +451,11 @@ public:
             assert(t == o.second);
         }
         for (auto& o: m_own_staticFunctions) {
+            Type* t = o.second;
+            visitor(t);
+            assert(t == o.second);
+        }
+        for (auto& o: m_own_classMethods) {
             Type* t = o.second;
             visitor(t);
             assert(t == o.second);
@@ -491,7 +504,8 @@ public:
         const std::map<std::string, Function*>& memberFunctions,
         const std::map<std::string, Function*>& staticFunctions,
         const std::map<std::string, Function*>& propertyFunctions,
-        const std::map<std::string, PyObject*>& classMembers
+        const std::map<std::string, PyObject*>& classMembers,
+        const std::map<std::string, Function*>& classMethods
     );
 
     // this gets called by Class. These types are always produced in pairs.
@@ -518,7 +532,8 @@ public:
             m_own_memberFunctions,
             m_own_staticFunctions,
             m_own_propertyFunctions,
-            m_own_classMembers
+            m_own_classMembers,
+            m_own_classMethods
         );
     }
 
@@ -687,6 +702,10 @@ public:
         return m_staticFunctions;
     }
 
+    const std::map<std::string, Function*>& getClassMethods() const {
+        return m_classMethods;
+    }
+
     const std::map<std::string, PyObject*>& getClassMembers() const {
         return m_classMembers;
     }
@@ -701,6 +720,10 @@ public:
 
     const std::map<std::string, Function*>& getOwnStaticFunctions() const {
         return m_own_staticFunctions;
+    }
+
+    const std::map<std::string, Function*>& getOwnClassMethods() const {
+        return m_own_classMethods;
     }
 
     const std::map<std::string, PyObject*>& getOwnClassMembers() const {
@@ -838,6 +861,7 @@ public:
 
             mergeInto(m_memberFunctions, base->m_own_memberFunctions);
             mergeInto(m_staticFunctions, base->m_own_staticFunctions);
+            mergeInto(m_classMethods, base->m_own_classMethods);
             mergeInto(m_propertyFunctions, base->m_own_propertyFunctions);
         }
 
@@ -1046,6 +1070,8 @@ private:
 
     std::map<std::string, Function*> m_propertyFunctions;
 
+    std::map<std::string, Function*> m_classMethods;
+
     std::map<std::string, PyObject*> m_classMembers;
 
     // the original members we were provided with
@@ -1058,6 +1084,8 @@ private:
     std::map<std::string, Function*> m_own_propertyFunctions;
 
     std::map<std::string, PyObject*> m_own_classMembers;
+
+    std::map<std::string, Function*> m_own_classMethods;
 
     std::unordered_map<const char*, size_t, HashConstCharPtr, ConstCharPtrsAreEqual> m_membersByName;
 

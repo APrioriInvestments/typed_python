@@ -36,6 +36,7 @@ from typed_python.compiler.type_wrappers.ref_to_wrapper import RefToWrapper, Ref
 from typed_python.compiler.type_wrappers.list_of_wrapper import ListOfWrapper
 from typed_python.compiler.type_wrappers.isinstance_wrapper import IsinstanceWrapper
 from typed_python.compiler.type_wrappers.issubclass_wrapper import IssubclassWrapper
+from typed_python.compiler.type_wrappers.subclass_of_wrapper import SubclassOfWrapper
 from typed_python.compiler.type_wrappers.one_of_wrapper import OneOfWrapper
 from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
 from typed_python.compiler.type_wrappers.held_class_wrapper import HeldClassWrapper
@@ -207,6 +208,9 @@ def _typedPythonTypeToTypeWrapper(t):
 
     if t.__typed_python_category__ == "TypedCell":
         return TypedCellWrapper(t)
+
+    if t.__typed_python_category__ == "SubclassOf":
+        return SubclassOfWrapper(t)
 
     if t.__typed_python_category__ == "Value":
         if type(t.Value) in _concreteWrappers or type(t.Value) in (str, int, float, bool):

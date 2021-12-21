@@ -276,6 +276,7 @@ class ClassMetaclass(type):
         memberFunctions = {}
         staticFunctions = {}
         classMembers = {}
+        classMethods = {}
         properties = {}
 
         if "__name__" in kwds:
@@ -291,6 +292,16 @@ class ClassMetaclass(type):
                 classMembers[eltName] = elt
             elif isinstance(elt, property):
                 properties[eltName] = makeFunctionType(eltName, elt.fget, assumeClosuresGlobal=True)
+            elif isinstance(elt, classmethod):
+                if eltName not in classMethods:
+                    classMethods[eltName] = makeFunctionType(
+                        eltName, elt.__func__, assumeClosuresGlobal=True
+                    )
+                else:
+                    classMethods[eltName] = typed_python._types.Function(
+                        classMethods[eltName],
+                        makeFunctionType(eltName, elt.__func__, assumeClosuresGlobal=True),
+                    )
             elif isinstance(elt, staticmethod):
                 if eltName not in staticFunctions:
                     staticFunctions[eltName] = makeFunctionType(
@@ -330,6 +341,7 @@ class ClassMetaclass(type):
             tuple(staticFunctions.items()),
             tuple(properties.items()),
             tuple(classMembers.items()),
+            tuple(classMethods.items()),
         )
 
         if classCell is not None:
@@ -338,6 +350,9 @@ class ClassMetaclass(type):
         return res
 
     def __subclasscheck__(cls, subcls):
+        if cls is subcls:
+            return True
+
         if getattr(subcls, "__typed_python_category__", None) != "Class":
             return False
 
@@ -347,6 +362,9 @@ class ClassMetaclass(type):
         return cls in subcls.MRO
 
     def __instancecheck__(cls, instance):
+        if type(instance) is cls:
+            return True
+
         if getattr(type(instance), "__typed_python_category__", None) != "Class":
             return False
 

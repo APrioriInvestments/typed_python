@@ -28,10 +28,10 @@ from typed_python import (
     Value,
     Int8, Int16, Int32,
     UInt8, UInt16, UInt32, UInt64,
-    Float32,
+    Float32, SubclassOf,
     TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
     ConstDict, Alternative, serialize, deserialize, Class,
-    TypeFilter, Function, Forward, Set, PointerTo, Entrypoint
+    TypeFilter, Function, Forward, Set, PointerTo, Entrypoint, Final
 )
 from typed_python.type_promotion import (
     computeArithmeticBinaryResultType, floatness, bitness, isSignedInt
@@ -3445,3 +3445,48 @@ class TypesTests(unittest.TestCase):
         assert ListOf(float)(array[:, 1]) == ListOf(float)([1.0, 4.0])
 
         assert ListOf(float)(array.transpose()[2]) == ListOf(float)([2.0, 5.0])
+
+    def test_subclass_of(self):
+        class C(Class):
+            pass
+
+        T = SubclassOf(C)
+
+        assert T.Type is C
+
+        with self.assertRaisesRegex(TypeError, 'Cannot construct a SubclassOf\\(C\\) from the type "hi"'):
+            T("hi")
+
+        with self.assertRaisesRegex(TypeError, "Cannot construct a SubclassOf\\(C\\) from the type int"):
+            T(int)
+
+        class D(C):
+            pass
+
+        class E(Class):
+            pass
+
+        with self.assertRaisesRegex(TypeError, "Cannot construct"):
+            T(E)
+
+        assert T(D) is D
+
+        lst = ListOf(SubclassOf(C))()
+
+        lst.append(D)
+        lst.append(C)
+
+        assert lst[0] is D
+        assert lst[1] is C
+
+        assert issubclass(T, SubclassOf)
+
+        class F(D, Final):
+            pass
+
+        assert SubclassOf(F) is Value(F)
+        assert SubclassOf(F)(F) is F
+
+        lst = ListOf(SubclassOf(F))()
+        lst.append(F)
+        assert lst[0] == F

@@ -13,17 +13,13 @@
 #   limitations under the License.
 
 import typed_python.compiler
-import typed_python.compiler.native_ast as native_ast
-from typed_python import Type, TupleOf, Class
+from typed_python import Type, TupleOf
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
-
-from typed_python.compiler.type_wrappers.voidptr_masquerading_as_tp_type import (
-    VoidPtrMasqueradingAsTPType
-)
+from typed_python.compiler.type_wrappers.subclass_of_wrapper import SubclassOfWrapper
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
@@ -35,10 +31,10 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
         super().__init__(f, hasSideEffects=False)
 
     def __repr__(self):
-        return "Wrapper(TypeObject(%s))" % self.typeRepresentation.Value.__qualname__
+        return "Wrapper(%s)" % self.typeRepresentation.Value.__qualname__
 
     def __str__(self):
-        return "TypeObject(%s)" % self.typeRepresentation.Value.__qualname__
+        return self.typeRepresentation.Value.__qualname__
 
     @Wrapper.unwrapOneOfAndValue
     def convert_call_on_container_expression(self, context, inst, argExpr):
@@ -102,35 +98,21 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
 
         return pythonObjectRepresentation(context, type)
 
-    def convert_issubclass(self, context, typeInstance, instance, isSubclassCall):
-        if isinstance(instance.expr_type, PythonTypeObjectWrapper):
+    def convert_issubclass(self, context, instance, ofType, isSubclassCall):
+        if isinstance(ofType.expr_type, PythonTypeObjectWrapper):
             return context.constant(
                 issubclass(
                     instance.expr_type.typeRepresentation.Value,
-                    typeInstance.expr_type.typeRepresentation.Value
+                    ofType.expr_type.typeRepresentation.Value
                 )
             )
 
-        if (
-            issubclass(self.typeRepresentation.Value, Class)
-            and self.typeRepresentation.Value.IsFinal
-            and isinstance(instance.expr_type, VoidPtrMasqueradingAsTPType)
-        ):
-            return context.pushPod(
-                bool,
-                instance.nonref_expr.cast(native_ast.UInt64).eq(
-                    context.getTypePointer(self.typeRepresentation.Value)
-                    .cast(native_ast.UInt64)
+        if isinstance(ofType.expr_type, SubclassOfWrapper):
+            return context.constant(
+                issubclass(
+                    instance.expr_type.typeRepresentation.Value,
+                    ofType.expr_type.typeRepresentation.Type
                 )
             )
 
-        if instance.expr_type.can_convert_to_type(typeWrapper(type), ConversionLevel.Signature) is False:
-            return context.pushException(
-                TypeError,
-                'issubclass() arg 1 must be a class'
-            )
-
-        return typeInstance.convert_to_type(object, ConversionLevel.Signature).convert_issubclass(
-            instance,
-            isSubclassCall
-        )
+        return super().convert_issubclass(context, instance, ofType, isSubclassCall)

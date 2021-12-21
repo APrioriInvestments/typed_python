@@ -47,6 +47,7 @@ from typed_python import (
     Dict, Set, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject,
     Forward, Final, Function, Entrypoint, TypeFunction, PointerTo,
+    SubclassOf
 )
 
 from typed_python._types import (
@@ -2066,6 +2067,21 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert sc.deserialize(sc.serialize(type(x))) == type(x)
         assert sc.deserialize(sc.serialize(x)) == x
+
+    def test_can_serialize_subclassOf(self):
+        class C(Class):
+            pass
+
+        class D(C):
+            pass
+
+        T = SubclassOf(C)
+        lst = ListOf(SubclassOf(C))([C, D])
+
+        sc = SerializationContext()
+
+        assert sc.deserialize(sc.serialize(T)) is T
+        assert sc.deserialize(sc.serialize(lst)) == lst
 
     def test_can_serialize_nested_function_references(self):
         sc = SerializationContext().withoutInternalizingTypeGroups()

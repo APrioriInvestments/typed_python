@@ -36,7 +36,8 @@ from typed_python import (
     pointerTo,
     refTo,
     Forward,
-    TypeFunction
+    TypeFunction,
+    typeKnownToCompiler
 )
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime, CountCompilationsVisitor
@@ -2366,6 +2367,8 @@ class TestClassCompilationCompilation(unittest.TestCase):
             isE = 0
             isInt = 0
 
+            assert typeKnownToCompiler(c) is C
+
             for _ in range(times):
                 if isinstance(c, C):
                     isC += 1
@@ -2378,14 +2381,19 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
             return (isC, isD, isE, isInt)
 
-        countIt(1, D())
-        t0 = time.time()
-        countIt(1000000, D())
-        print(time.time() - t0, " to do 1mm")
+        assert countIt(1, D()) == (1, 1, 0, 0)
+        assert countIt(1, C()) == (1, 0, 0, 0)
+        assert countIt(1, E()) == (1, 0, 1, 0)
 
-        # I get 0.002 on my machine. This should be very fast
-        # because either the compiler can figure it out
-        assert time.time() - t0 < 0.01
+        t0 = time.time()
+        assert countIt(1000000, D())[1] == 1000000
+        elapsed = time.time() - t0
+        print(elapsed, " to do 1mm")
+
+        # I get 1e-5 on my machine. This code doesn't have to hit
+        # any functions to determine this because final classes have
+        # an exactly known type.
+        assert elapsed < 0.01
 
     def test_unresolved_forwards_in_class_type_signatures(self):
         UnresolvedForward = Forward("UnresolvedForward")
@@ -2584,3 +2592,24 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         check()
         Entrypoint(check)()
+
+    def test_compile_classmethods(self):
+        class Normal:
+            @classmethod
+            def f(cls):
+                return cls
+
+        assert Normal.f() is Normal
+        assert Normal().f() is Normal
+
+        class A(Class):
+            @classmethod
+            def f(cls):
+                return cls
+
+        def checkIt():
+            assert A.f() is A
+            assert A().f() is A
+
+        checkIt()
+        Entrypoint(checkIt)()

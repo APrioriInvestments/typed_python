@@ -438,13 +438,11 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
             )
         )
 
-    def convert_issubclass(self, context, typeInstance, instance, isSubclassCall):
-        instance = instance.convert_to_type(object, ConversionLevel.Signature)
-
+    def convert_issubclass(self, context, instance, ofType, isSubclassCall):
         return context.pushPod(
             bool,
             runtime_functions.pyobj_issubclass.call(
                 instance.nonref_expr.cast(VoidPtr),
-                typeInstance.nonref_expr.cast(VoidPtr),
+                ofType.toPyObj().nonref_expr.cast(VoidPtr)
             )
         )

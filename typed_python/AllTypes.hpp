@@ -48,4 +48,5 @@
 #include "SetType.hpp"
 #include "PyCellType.hpp"
 #include "TypedCellType.hpp"
+#include "SubclassOfType.hpp"
 #include "direct_types/Bytes.hpp"

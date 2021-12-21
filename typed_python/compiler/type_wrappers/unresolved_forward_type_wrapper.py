@@ -58,7 +58,7 @@ class UnresolvedForwardTypeWrapper(Wrapper):
     def convert_typeof(self, context, instance):
         return self.throwUnresolvedForwardException(context)
 
-    def convert_issubclass(self, context, typeInstance, instance, isSubclassCall):
+    def convert_issubclass(self, context, instance, ofType, isSubclassCall):
         return self.throwUnresolvedForwardException(context)
 
     def convert_masquerade_to_untyped(self, context, instance):

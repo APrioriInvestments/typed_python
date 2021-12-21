@@ -59,6 +59,7 @@ class Float64;
 class StringType;
 class BytesType;
 class OneOfType;
+class SubclassOfType;
 class Value;
 class TupleOfType;
 class PointerTo;
@@ -141,6 +142,7 @@ public:
         catTypedCell = 34,
         catPyCell = 35,
         catRefTo = 36,
+        catSubclassOf = 38, // holds a Type* which is a subclass of a given set of Type instances
     };
 
     bool isTuple() const {
@@ -221,6 +223,10 @@ public:
 
     bool isOneOf() const {
         return m_typeCategory == catOneOf;
+    }
+
+    bool isSubclassOf() const {
+        return m_typeCategory == catSubclassOf;
     }
 
     bool isValue() const {
@@ -443,6 +449,7 @@ public:
         if (category == Type::TypeCategory::catPythonObjectOfType) { return "PythonObjectOfType"; }
         if (category == Type::TypeCategory::catPyCell) { return "PyCell"; }
         if (category == Type::TypeCategory::catTypedCell) { return "TypedCell"; }
+        if (category == Type::TypeCategory::catSubclassOf) { return "SubclassOf"; }
 
         return "Unknown";
     }
@@ -526,6 +533,8 @@ public:
                 return f(*(PyCellType*)this);
             case catTypedCell:
                 return f(*(TypedCellType*)this);
+            case catSubclassOf:
+                return f(*(SubclassOfType*)this);
             default:
                 throw std::runtime_error("Invalid type found");
         }

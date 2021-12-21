@@ -43,7 +43,7 @@ from typed_python.hash import sha_hash
 from typed_python.SerializationContext import SerializationContext
 from typed_python.type_filter import TypeFilter
 from typed_python._types import (
-    Forward, TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict,
+    Forward, TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict, SubclassOf,
     Alternative, Value, serialize, deserialize, serializeStream, deserializeStream,
     PointerTo, RefTo, Dict, validateSerializedObject, validateSerializedObjectStream, decodeSerializedObject,
     getOrSetTypeResolver, Set, Class, Type, BoundMethod,

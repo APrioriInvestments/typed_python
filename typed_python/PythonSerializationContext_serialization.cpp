@@ -795,6 +795,8 @@ void PythonSerializationContext::serializeNativeTypeInner(
         serializeNativeType(((PointerTo*)nativeType)->getEltType(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catRefTo) {
         serializeNativeType(((RefTo*)nativeType)->getEltType(), b, 1);
+    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catSubclassOf) {
+        serializeNativeType(((SubclassOfType*)nativeType)->getSubclassOf(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catBoundMethod) {
         b.writeStringObject(1, ((BoundMethod*)nativeType)->getFuncName());
         serializeNativeType(((BoundMethod*)nativeType)->getFirstArgType(), b, 2);
@@ -864,6 +866,7 @@ void PythonSerializationContext::serializeNativeTypeInner(
         //methods
         serializeClassFunDict(cls->getOwnMemberFunctions(), b, 3);
         serializeClassFunDict(cls->getOwnStaticFunctions(), b, 4);
+        serializeClassFunDict(cls->getOwnClassMethods(), b, 9);
         serializeClassFunDict(cls->getOwnPropertyFunctions(), b, 5);
         serializeClassClassMemberDict(cls->getOwnClassMembers(), b, 6);
 

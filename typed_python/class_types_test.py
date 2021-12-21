@@ -1769,27 +1769,6 @@ class NativeClassTypesTests(unittest.TestCase):
             class B(A):
                 X = float
 
-    def test_classmethods(self):
-        class Normal:
-            @classmethod
-            def f(cls):
-                return cls
-
-        assert Normal.f() is Normal
-        assert Normal().f() is Normal
-
-        class A(Class):
-            @classmethod
-            def f(cls):
-                return cls
-
-        def checkIt():
-            assert A.f() is A
-            assert A().f() is A
-
-        checkIt()
-        Entrypoint(checkIt)()
-
     def test_mro_equivalent_to_python_diamond(self):
         def makeClasses(base):
             class B(base):

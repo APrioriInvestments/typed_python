@@ -234,6 +234,7 @@ public:
                 std::map<std::string, Function*> staticFunctions;
                 std::map<std::string, Function*> propertyFunctions;
                 std::map<std::string, PyObject*> classMembers;
+                std::map<std::string, Function*> classMethods;
 
                 for (auto& base: c->getBases()) {
                     bases.push_back((Class*)copyType(base->getClassType()));
@@ -244,6 +245,9 @@ public:
                 }
                 for (auto& nameAndF: c->getOwnStaticFunctions()) {
                     staticFunctions[nameAndF.first] = (Function*)copyType(nameAndF.second);
+                }
+                for (auto& nameAndF: c->getOwnClassMethods()) {
+                    classMethods[nameAndF.first] = (Function*)copyType(nameAndF.second);
                 }
                 for (auto& nameAndF: c->getOwnPropertyFunctions()) {
                     propertyFunctions[nameAndF.first] = (Function*)copyType(nameAndF.second);
@@ -260,7 +264,8 @@ public:
                     memberFunctions,
                     staticFunctions,
                     propertyFunctions,
-                    classMembers
+                    classMembers,
+                    classMethods
                 );
 
                 forwardC->define(outC);

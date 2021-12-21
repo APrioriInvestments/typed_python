@@ -50,6 +50,7 @@ PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args);
 PyObject *MakeAlternativeMatcherType(PyObject* nullValue, PyObject* args);
 PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args);
 PyObject *MakeClassType(PyObject* nullValue, PyObject* args);
+PyObject *MakeSubclassOfType(PyObject* nullValue, PyObject* args);
 PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwargs);
 
 

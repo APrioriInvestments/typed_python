@@ -325,8 +325,8 @@ class TypedExpression:
     def get_iteration_expressions(self):
         return self.expr_type.get_iteration_expressions(self.context, self)
 
-    def convert_issubclass(self, instance, isSuclassCall):
-        return self.expr_type.convert_issubclass(self.context, self, instance, isSuclassCall)
+    def convert_issubclass(self, ofType, isSubclassCall):
+        return self.expr_type.convert_issubclass(self.context, self, ofType, isSubclassCall)
 
     def convert_masquerade_to_untyped(self):
         return self.expr_type.convert_masquerade_to_untyped(self.context, self)
@@ -342,6 +342,9 @@ class TypedExpression:
             stopped.
         """
         return self.expr_type.convert_fastnext(self.context, self)
+
+    def toPyObj(self):
+        return self.convert_to_type(object, ConversionLevel.Signature)
 
     def toFloat64(self):
         return self.convert_to_type(float, ConversionLevel.New)

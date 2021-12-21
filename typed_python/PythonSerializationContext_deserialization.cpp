@@ -1344,7 +1344,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
     std::vector<Class*> classBases;
     bool classIsFinal = false;
     std::vector<std::pair<std::string, NamedTuple*> > alternativeMembers;
-    std::map<std::string, Function*> classMethods, classStatics, classPropertyFunctions;
+    std::map<std::string, Function*> classMethods, classStatics, classClassMethods, classPropertyFunctions;
     std::map<std::string, PyObjectHolder> classClassMembers;
     std::vector<MemberDefinition> classMembers;
 
@@ -1412,6 +1412,8 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
                     deserializeClassFunDict(names.back(), classMethods, b, wireType);
                 } else if (fieldNumber == 4) {
                     deserializeClassFunDict(names.back(), classStatics, b, wireType);
+                } else if (fieldNumber == 9) {
+                    deserializeClassFunDict(names.back(), classClassMethods, b, wireType);
                 } else if (fieldNumber == 5) {
                     deserializeClassFunDict(names.back(), classPropertyFunctions, b, wireType);
                 } else if (fieldNumber == 6) {
@@ -1468,6 +1470,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
                 category == Type::TypeCategory::catConstDict ||
                 category == Type::TypeCategory::catPointerTo ||
                 category == Type::TypeCategory::catRefTo ||
+                category == Type::TypeCategory::catSubclassOf ||
                 category == Type::TypeCategory::catTuple ||
                 (category == Type::TypeCategory::catPythonSubclass && fieldNumber == 1) ||
                 //named tuples alternate between strings for names and type values
@@ -1552,7 +1555,8 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             classMethods,
             classStatics,
             classPropertyFunctions,
-            classClassMembersRaw
+            classClassMembersRaw,
+            classClassMethods
         )->getHeldClass();
     }
     else if (category == Type::TypeCategory::catFunction) {
@@ -1662,6 +1666,12 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             throw std::runtime_error("Invalid native type: AternativeMatcher needs exactly 1 type.");
         }
         resultType = ::AlternativeMatcher::Make(types[0]);
+    }
+    else if (category == Type::TypeCategory::catSubclassOf) {
+        if (types.size() != 1) {
+            throw std::runtime_error("Invalid native type: SubclassOf needs exactly 1 type.");
+        }
+        resultType = ::SubclassOfType::Make(types[0]);
     }
     else if (category == Type::TypeCategory::catRefTo) {
         if (types.size() != 1) {

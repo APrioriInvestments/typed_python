@@ -55,6 +55,7 @@ class PyValueInstance;
 class PyPythonSubclassInstance;
 class PyPythonObjectOfTypeInstance;
 class PyOneOfInstance;
+class PySubclassOfInstance;
 class PyForwardInstance;
 class PyEmbeddedMessageInstance;
 class PySetInstance;
@@ -251,6 +252,8 @@ public:
                 return f((PyOneOfInstance*)nullptr);
             case Type::TypeCategory::catForward:
                 return f((PyForwardInstance*)nullptr);
+            case Type::TypeCategory::catSubclassOf:
+                return f((PySubclassOfInstance*)nullptr);
             default:
                 throw std::runtime_error("Invalid type category. Memory must have been corrupted.");
         }

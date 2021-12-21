@@ -316,17 +316,8 @@ class Wrapper:
 
         return pythonObjectRepresentation(context, T)
 
-    def convert_issubclass(self, context, typeInstance, instance, isSubclassCall):
-        """Return the result of 'issubclass(instance, typeInstance)'.
-
-        If 'isSuclassCall' is False, then this originated from an isinstance call.
-        We use this to tailor the error message only.
-        """
-        return context.pushException(
-            TypeError,
-            ('isinstance' if not isSubclassCall else 'issubclass')
-            + "() arg 2 must be a type or tuple of types."
-        )
+    def convert_issubclass(self, context, instance, ofType, isSubclassCall):
+        return instance.toPyObj().convert_issubclass(ofType, isSubclassCall)
 
     def convert_masquerade_to_untyped(self, context, instance):
         """If we are masquerading as an untyped type, convert us to that type."""

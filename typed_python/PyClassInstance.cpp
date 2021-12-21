@@ -740,7 +740,11 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
 
     PyDict_SetItemString(pyType->tp_dict, "ClassMembers", classMembers);
 
+    PyObjectStealer staticMemberFunctions(PyDict_New());
+    PyDict_SetItemString(pyType->tp_dict, "StaticMemberFunctions", staticMemberFunctions);
     for (auto nameAndObj: classT->getStaticFunctions()) {
+        PyDict_SetItemString(staticMemberFunctions, nameAndObj.first.c_str(), typePtrToPyTypeRepresentation(nameAndObj.second));
+
         if (nameAndObj.second->getClosureType()->bytecount()) {
             throw std::runtime_error(
                 "Somehow, " + classT->name() + "."
@@ -752,6 +756,29 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
             pyType->tp_dict,
             nameAndObj.first.c_str(),
             PyStaticMethod_New(
+                PyInstance::initialize(nameAndObj.second, [&](instance_ptr data){
+                    //nothing to do - functions like this are just types.
+                })
+            )
+        );
+    }
+
+    PyObjectStealer classMemberFunctions(PyDict_New());
+    PyDict_SetItemString(pyType->tp_dict, "ClassMemberFunctions", classMemberFunctions);
+    for (auto nameAndObj: classT->getClassMethods()) {
+        PyDict_SetItemString(classMemberFunctions, nameAndObj.first.c_str(), typePtrToPyTypeRepresentation(nameAndObj.second));
+
+        if (nameAndObj.second->getClosureType()->bytecount()) {
+            throw std::runtime_error(
+                "Somehow, " + classT->name() + "."
+                + nameAndObj.first + " has a populated closure."
+            );
+        }
+
+        PyDict_SetItemString(
+            pyType->tp_dict,
+            nameAndObj.first.c_str(),
+            PyClassMethod_New(
                 PyInstance::initialize(nameAndObj.second, [&](instance_ptr data){
                     //nothing to do - functions like this are just types.
                 })

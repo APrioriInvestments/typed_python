@@ -113,6 +113,7 @@ extern "C" {
         if (Type::typesEquivalent(derived, super)) {
             return true;
         }
+
         return derived->isSubclassOf(super);
     }
 

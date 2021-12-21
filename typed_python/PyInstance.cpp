@@ -43,6 +43,7 @@
 #include "PyPythonSubclassInstance.hpp"
 #include "PyPythonObjectOfTypeInstance.hpp"
 #include "PyOneOfInstance.hpp"
+#include "PySubclassOfInstance.hpp"
 #include "PyForwardInstance.hpp"
 #include "PyEmbeddedMessageInstance.hpp"
 #include "PyPyCellInstance.hpp"
@@ -367,6 +368,7 @@ PyObject* PyInstance::tp_new_type(PyTypeObject *subtype, PyObject *args, PyObjec
     if (catToProduce == Type::TypeCategory::catFunction ) { return MakeFunctionType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catClass ) { return MakeClassType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catAlternative ) { return MakeAlternativeType(nullptr, args, kwds); }
+    if (catToProduce == Type::TypeCategory::catSubclassOf ) { return MakeSubclassOfType(nullptr, args); }
 
     PyErr_Format(PyExc_TypeError, "unknown TypeCategory %S", (PyObject*)subtype);
     return NULL;
@@ -1618,6 +1620,7 @@ PyObject* PyInstance::categoryToPyString(Type::TypeCategory cat) {
     if (cat == Type::TypeCategory::catPyCell) { static PyObject* res = PyUnicode_FromString("PyCell"); return res; }
     if (cat == Type::TypeCategory::catTypedCell) { static PyObject* res = PyUnicode_FromString("TypedCell"); return res; }
     if (cat == Type::TypeCategory::catPythonObjectOfType) { static PyObject* res = PyUnicode_FromString("PythonObjectOfType"); return res; }
+    if (cat == Type::TypeCategory::catSubclassOf) { static PyObject* res = PyUnicode_FromString("SubclassOf"); return res; }
 
     static PyObject* res = PyUnicode_FromString("Unknown");
     return res;

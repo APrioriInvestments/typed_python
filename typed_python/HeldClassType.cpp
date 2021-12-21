@@ -306,7 +306,8 @@ HeldClass* HeldClass::Make(
     const std::map<std::string, Function*>& memberFunctions,
     const std::map<std::string, Function*>& staticFunctions,
     const std::map<std::string, Function*>& propertyFunctions,
-    const std::map<std::string, PyObject*>& classMembers
+    const std::map<std::string, PyObject*>& classMembers,
+    const std::map<std::string, Function*>& classMethods
 ) {
     //we only allow one base class to have members because we want native code to be
     //able to just find those values in subclasses without hitting the vtable.
@@ -367,7 +368,8 @@ HeldClass* HeldClass::Make(
         memberFunctions,
         staticFunctions,
         propertyFunctions,
-        classMembers
+        classMembers,
+        classMethods
     );
 
     // we do these outside of the constructor so that if they throw we
