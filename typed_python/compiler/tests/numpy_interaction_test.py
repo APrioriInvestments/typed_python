@@ -37,3 +37,10 @@ def test_can_call_numpy_matrix_funs():
         return numpy.diagonal(a)
 
     assert callDiagonal(10).tolist() == [1 for _ in range(10)]
+
+
+def test_listof_from_sliced_numpy_array():
+    x = numpy.array((0, 1, 2))
+    y = x[::2]
+
+    assert ListOf(int)(y) == [0, 2]
