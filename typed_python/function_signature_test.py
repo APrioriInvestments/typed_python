@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 import unittest
-from typed_python import Entrypoint, Function, ListOf, isCompiled, OneOf, NotCompiled, Class, Final
+from typed_python import Entrypoint, Function, ListOf, isCompiled, OneOf, NotCompiled, Class, Final, TypeOf
 
 
 class FunctionSignatureTest(unittest.TestCase):
@@ -493,3 +493,38 @@ class FunctionSignatureTest(unittest.TestCase):
         assert f.resultTypeFor(int).typeRepresentation == ListOf(int)
         assert f.resultTypeFor(A).typeRepresentation != ListOf(A)
         assert f.resultTypeFor(B).typeRepresentation == ListOf(B)
+
+    def test_typeof(self):
+        @Function
+        def f(x) -> TypeOf(lambda x: x + x):
+            return x
+
+        assert f.resultTypeFor(int).typeRepresentation == int
+        assert f.resultTypeFor(float).typeRepresentation == float
+
+    def test_typeof_with_class_arg(self):
+        class A(Class):
+            def f(self, x) -> float:
+                return x
+
+        @Function
+        def f(a, x) -> TypeOf(lambda a, x: a.f(x)):
+            return a.f(x)
+
+        assert f.resultTypeFor(A, int).typeRepresentation == float
+        assert f.resultTypeFor(A, float).typeRepresentation == float
+
+    def test_typeof_with_mutual_recursion(self):
+        class A(Class):
+            def f(self, x) -> TypeOf(lambda self, x: B().f(x - 1) + 1 if x > 0 else x):
+                return x
+
+        class B(Class):
+            def f(self, x) -> TypeOf(lambda self, x: A().f(x - 1) + 1 if x > 0 else x):
+                return x
+
+        @Function
+        def f(x):
+            return A().f(x)
+
+        assert f.resultTypeFor(int).typeRepresentation == int

@@ -166,10 +166,6 @@ class FunctionSignatureCalculator:
 
             self.indexToBlockIx[o.index] = len(self.overloadBlocks) - 1
 
-        # a cache for questions about what kind of types a function returns
-        self._returnTypeForCache = {}
-        self._returnTypeForLevelCache = {}
-
     def returnTypeFor(self, argTypes, kwargTypes):
         return self.returnTypeForLevel(0, argTypes, kwargTypes)
 
@@ -332,41 +328,6 @@ class FunctionSignatureCalculator:
 
         return res
 
-    def returnTypesForOverload(self, overloadIx, argTypes, kwargTypes):
-        """Determine what the stated return types for an overload given info about its args.
-
-        If the overload matches, then in the interpreter, there will be some specific
-        sequence of overloads within the function that match (exactly one if its a regular
-        function, more than one if it happens to be a method on a class). Each of those
-        sequence items will be asked for a type, and the interpreter will check that they
-        are increasingly broad as we go up the list of overloads.
-
-        This function returns a list of the various possibilities, each one of which represents
-        a possible overload (higher in the stack) that might have matched.
-
-        Each term in the resulting list will be a pair of (T, overloadIx) where T is
-
-            CannotBeDetermined - If we cannot determine the type the function will apply to us
-                (because we don't know the types of the arguments fully. This means
-                that it is possible that the function states that it returns as wide as
-                'object', but that we cannot determine anything about it.
-
-            SomeInvalidClassReturnType - this pathway definitely throws
-
-            NoReturnTypeSpecified - this pathway didn't specify a return type at all.
-
-            a type - this pathway will insist that objects have this type.
-        """
-        argTypes = tuple(argTypes)
-        kwargTypesKey = tuple(kwargTypes.items())
-
-        if (overloadIx, argTypes, kwargTypesKey) not in self._returnTypeForCache:
-            self._returnTypeForCache[overloadIx, argTypes, kwargTypesKey] = (
-                self._returnTypesForOverload(overloadIx, argTypes, kwargTypes)
-            )
-
-        return self._returnTypeForCache[overloadIx, argTypes, kwargTypesKey]
-
     def returnTypesForLevel(self, blockLevel, argTypes, kwargTypes):
         """Determine what return types might apply to us if we were to flow into
         a whole 'level' of overload blocks.
@@ -377,17 +338,6 @@ class FunctionSignatureCalculator:
             and mustMatch is a bool indicating whether we are guaranteed that one of those
             matches definitely applies to us.
         """
-        argTypes = tuple(argTypes)
-        kwargTypesKey = tuple(kwargTypes.items())
-
-        if (blockLevel, argTypes, kwargTypesKey) not in self._returnTypeForLevelCache:
-            self._returnTypeForLevelCache[blockLevel, argTypes, kwargTypesKey] = (
-                self._returnTypesForLevel(blockLevel, argTypes, kwargTypes)
-            )
-
-        return self._returnTypeForLevelCache[blockLevel, argTypes, kwargTypesKey]
-
-    def _returnTypesForLevel(self, blockLevel, argTypes, kwargTypes):
         if blockLevel >= len(self.overloadBlocks):
             return [], False
 
@@ -417,7 +367,31 @@ class FunctionSignatureCalculator:
 
         return pathways, nextLevelApplies
 
-    def _returnTypesForOverload(self, overloadIx, argTypes, kwargTypes):
+    def returnTypesForOverload(self, overloadIx, argTypes, kwargTypes):
+        """Determine what the stated return types for an overload given info about its args.
+
+        If the overload matches, then in the interpreter, there will be some specific
+        sequence of overloads within the function that match (exactly one if its a regular
+        function, more than one if it happens to be a method on a class). Each of those
+        sequence items will be asked for a type, and the interpreter will check that they
+        are increasingly broad as we go up the list of overloads.
+
+        This function returns a list of the various possibilities, each one of which represents
+        a possible overload (higher in the stack) that might have matched.
+
+        Each term in the resulting list will be a pair of (T, overloadIx) where T is
+
+            CannotBeDetermined - If we cannot determine the type the function will apply to us
+                (because we don't know the types of the arguments fully. This means
+                that it is possible that the function states that it returns as wide as
+                'object', but that we cannot determine anything about it.
+
+            SomeInvalidClassReturnType - this pathway definitely throws
+
+            NoReturnTypeSpecified - this pathway didn't specify a return type at all.
+
+            a type - this pathway will insist that objects have this type.
+        """
         argTypes = tuple(typeWrapper(x) for x in argTypes)
         kwargTypes = {name: typeWrapper(val) for name, val in kwargTypes.items()}
 
@@ -550,6 +524,9 @@ class FunctionSignatureCalculator:
 
             res = overload.signatureFunction(*typeArgs, **typeKwargs)
 
+            if res is NoReturnTypeSpecified:
+                return res
+
             if isinstance(res, (Either, SubclassOf)):
                 return CannotBeDetermined
 
@@ -558,9 +535,12 @@ class FunctionSignatureCalculator:
             # same rules in the compiler as we do in the interpreter: converting
             # to a 'OneOf' forces the type to get passed as a 'type argument', and
             # simple values get promoted to Value types.
-            res = OneOf(res).Types[0]
+            res = OneOf(res)
 
-            return res
+            if not res.Types:
+                return res
+
+            return res.Types[0]
         elif overload.returnType is None:
             return NoReturnTypeSpecified
         else:

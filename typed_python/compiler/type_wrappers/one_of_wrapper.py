@@ -35,8 +35,6 @@ class OneOfWrapper(Wrapper):
         assert hasattr(t, '__typed_python_category__')
         super().__init__(t)
 
-        assert len(t.Types) > 1
-
         excessBytes = _types.bytecount(t)-1
 
         self.layoutType = native_ast.Type.Struct(

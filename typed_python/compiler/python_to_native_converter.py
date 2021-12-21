@@ -151,6 +151,9 @@ class PythonToNativeConverter:
 
         self._dependencies = FunctionDependencyGraph()
 
+    def isCurrentlyConverting(self):
+        return len(self._inflight_function_conversions) > 0
+
     def getDefinitionCount(self):
         return len(self._definitions)
 

@@ -669,6 +669,9 @@ class ExpressionConversionContext:
 
             def __exit__(scope, t, v, traceback):
                 if t is None:
+                    if not targets:
+                        return
+
                     expr = results.get(targets[-1], native_ast.nullExpr)
 
                     for t in reversed(targets[:-1]):
