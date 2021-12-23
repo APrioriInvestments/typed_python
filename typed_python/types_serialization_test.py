@@ -2687,6 +2687,7 @@ class TypesSerializationTest(unittest.TestCase):
         C = SerializationContext().deserialize(serializedC)
 
         assert C.anF() is C
+        assert C.anF.overloads[0].methodOf.Class is C
 
     def test_serialization_independent_of_whether_function_is_hashed(self):
         s = SerializationContext().withoutLineInfoEncoded().withoutCompression()

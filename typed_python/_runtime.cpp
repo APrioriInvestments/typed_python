@@ -204,6 +204,30 @@ extern "C" {
         throw PythonExceptionSet();
     }
 
+    ClassDispatchTable* computeTypeClassDispatchTable(Type* concreteType, Type* knownAsType) {
+        if (concreteType->isClass()) {
+            concreteType = ((Class*)concreteType)->getHeldClass();
+        }
+
+        if (knownAsType->isClass()) {
+            knownAsType = ((Class*)knownAsType)->getHeldClass();
+        }
+
+        HeldClass* concreteCls = (HeldClass*)concreteType;
+        HeldClass* knownAsCls = (HeldClass*)knownAsType;
+
+        VTable* table = concreteCls->getVTable();
+        ClassDispatchTable* dispatchTable = table->mDispatchTables;
+        while (true) {
+            if (dispatchTable->getInterfaceClass() == knownAsCls) {
+                return dispatchTable;
+            }
+
+            dispatchTable++;
+        }
+    }
+
+
     // START math functions
     // parameters are checked before calling these functions
 

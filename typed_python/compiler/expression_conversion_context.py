@@ -116,6 +116,9 @@ class ExpressionConversionContext:
         ).load()
 
     def allocateClassMethodDispatchSlot(self, clsType, methodName, retType, argTupleType, kwargTupleType):
+        # the first argument indicates whether this is an instance or type-level dispatch
+        assert argTupleType.ElementTypes[0].Value in ('type', 'instance')
+
         identHash = self.converter.hashObjectToIdentity(
             (clsType, methodName, retType, argTupleType, kwargTupleType)
         )

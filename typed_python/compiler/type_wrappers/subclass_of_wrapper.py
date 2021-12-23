@@ -222,4 +222,6 @@ class SubclassOfWrapper(Wrapper):
         return instance.toPyObj().convert_attribute(attribute)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        return instance.toPyObj().convert_method_call(methodname, args, kwargs)
+        return typeWrapper(instance.expr_type.typeRepresentation.Type).convert_type_method_call_virtual(
+            context, instance, methodname, args, kwargs
+        )

@@ -1803,3 +1803,16 @@ class NativeClassTypesTests(unittest.TestCase):
                 return super().f(x) + 1
 
         assert C().f(10) == 11
+
+    def test_classmethod_has_methodOf(self):
+        class B(Class):
+            @classmethod
+            def method(cls, x) -> int:
+                return x
+
+            @staticmethod
+            def staticMeth(x) -> int:
+                return x
+
+        assert B.method.__func__.overloads[0].methodOf.Class is B
+        assert B.staticMeth.overloads[0].methodOf.Class is B

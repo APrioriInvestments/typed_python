@@ -1556,7 +1556,9 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             classStatics,
             classPropertyFunctions,
             classClassMembersRaw,
-            classClassMethods
+            classClassMethods,
+            // the methodOf should already be set in the class
+            false
         )->getHeldClass();
     }
     else if (category == Type::TypeCategory::catFunction) {

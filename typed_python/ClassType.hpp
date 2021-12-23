@@ -127,8 +127,9 @@ public:
             const std::map<std::string, Function*>& staticFunctions,
             const std::map<std::string, Function*>& propertyFunctions,
             const std::map<std::string, PyObject*>& classMembers,
-            const std::map<std::string, Function*>& classMethods
-            )
+            const std::map<std::string, Function*>& classMethods,
+            bool isNew
+        )
     {
         std::vector<HeldClass*> heldClassBases;
 
@@ -147,7 +148,8 @@ public:
                 staticFunctions,
                 propertyFunctions,
                 classMembers,
-                classMethods
+                classMethods,
+                isNew
             )
         );
     }

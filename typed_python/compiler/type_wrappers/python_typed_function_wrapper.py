@@ -600,7 +600,7 @@ class PythonTypedFunctionWrapper(Wrapper):
         argTypes,
         kwargTypes,
         provideClosureArgument,
-        stripFirstArgClassDispatchIndex=False
+        firstArgConversion=None
     ):
         """Compile this function being called with a particular signature.
 
@@ -613,10 +613,8 @@ class PythonTypedFunctionWrapper(Wrapper):
                 arguments we're passing.
             provideClosureArgument - if True, then the first argument is of our closure type.
                 If false, then our closure type must be empty, and no argument for it is provided.
-            stripFirstArgClassDispatchIndex - if True, then the first argument is a class 'self', and
-                we want to strip out its class dispatch index, because it was dispatched
-                from code that knew that class as one of 'self''s base-classes. In fact,
-                the dispatch index should be zero.
+            firstArgConversion - if not None, then call this with a TypedExpression containing
+                the first argument, and use that instead.
         Returns:
             a TypedCallTarget, or None
         """
@@ -650,7 +648,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                     args,
                     argNames,
                     provideClosureArgument,
-                    stripFirstArgClassDispatchIndex=stripFirstArgClassDispatchIndex
+                    firstArgConversion=firstArgConversion
                 )
             )
         )
@@ -833,7 +831,7 @@ class PythonTypedFunctionWrapper(Wrapper):
 
     def generateMethodImplementation(
         self, context, returnType, args, argNames,
-        provideClosureArgument, stripFirstArgClassDispatchIndex=False
+        provideClosureArgument, firstArgConversion=None
     ):
         """Generate native code that calls us with a given return type and set of arguments.
 
@@ -851,10 +849,8 @@ class PythonTypedFunctionWrapper(Wrapper):
                 argument, or the name of the argument if passed as a keyword argument.
             provideClosureArgument - if True, then the first argument is of our closure type.
                 If false, then our closure type must be empty, and no argument for it is provided.
-            stripFirstArgClassDispatchIndex - if True, then the first argument is a class 'self', and
-                we want to strip out its class dispatch index, because it was dispatched
-                from code that knew that class as one of 'self''s base-classes. In fact,
-                the dispatch index should be zero.
+            firstArgConversion - if not None, replace the first argument with the result
+                of calling this function with the first argument as given.
         """
         func = self.typeRepresentation
 
@@ -864,11 +860,13 @@ class PythonTypedFunctionWrapper(Wrapper):
         else:
             closureArg = None
 
-        if stripFirstArgClassDispatchIndex:
-            args = (args[0].expr_type.stripClassDispatchIndex(
-                args[0].context,
-                args[0]
-            ),) + args[1:]
+        if firstArgConversion is not None:
+            replacement = firstArgConversion(args[0])
+            if replacement is None:
+                args = args[1:]
+                argNames = argNames[1:]
+            else:
+                args = (replacement,) + tuple(args[1:])
 
         argTypes = [a.expr_type for i, a in enumerate(args) if argNames[i] is None]
         kwargTypes = {argNames[i]: a.expr_type for i, a in enumerate(args) if argNames[i] is not None}

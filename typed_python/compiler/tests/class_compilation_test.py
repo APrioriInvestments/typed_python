@@ -2613,3 +2613,146 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         checkIt()
         Entrypoint(checkIt)()
+
+    def test_compile_classmethod_on_subclass_multi(self):
+        class B(Class):
+            @classmethod
+            def f(cls, x: int) -> int:
+                return 1
+
+            @classmethod
+            def f(cls, x: float) -> float:  # noqa
+                return 1.5
+
+        class C(B):
+            @classmethod
+            def f(cls, x: int) -> int:
+                return 2
+
+        @Entrypoint
+        def callIt(b: B, x: OneOf(int, float)):
+            return b.f(x)
+
+        assert callIt(B(), 1) == 1
+        assert callIt(B(), 1.0) == 1.5
+        assert callIt(C(), 1) == 2
+        assert callIt(C(), 1.0) == 1.5
+
+    def test_compile_staticmethod_on_subclass_multi(self):
+        class B(Class):
+            @staticmethod
+            def f(x: int) -> int:
+                return 1
+
+            @staticmethod
+            def f(x: float) -> float:  # noqa
+                return 1.5
+
+        class C(B):
+            @staticmethod
+            def f(x: int) -> int:
+                return 2
+
+        @Entrypoint
+        def callIt(b: B, x: OneOf(int, float)):
+            return b.f(x)
+
+        assert callIt(B(), 1) == 1
+        assert callIt(B(), 1.0) == 1.5
+        assert callIt(C(), 1) == 2
+        assert callIt(C(), 1.0) == 1.5
+
+    def test_compile_classmethod_on_subclass(self):
+        class BPy(object):
+            @classmethod
+            def f(cls, x) -> int:
+                return 1
+
+        class CPy(BPy):
+            @classmethod
+            def f(cls, x) -> int:
+                return 2
+
+        class DPy(CPy):
+            @classmethod
+            def f(cls, x) -> int:
+                return 3
+
+        def callItPy(b, times):
+            x = 0
+            for i in range(times):
+                x += b.f(i)
+            return x
+
+        t0 = time.time()
+        callItPy(BPy(), 1000000)
+        callItPy(CPy(), 1000000)
+        pyTime = time.time() - t0
+
+        class B(Class):
+            @classmethod
+            def f(cls, x) -> int:
+                return 1
+
+        class C(B):
+            @classmethod
+            def f(cls, x) -> int:
+                return 2
+
+        class D(C, Final):
+            @classmethod
+            def f(cls, x) -> int:
+                return 3
+
+        def callItAs(T):
+            @Entrypoint
+            def callIt(b: T, times: int):
+                x = 0
+                for i in range(times):
+                    x += b.f(i)
+                return x
+
+            return callIt
+
+        callItAs(B)(B(), 1)
+        callItAs(B)(C(), 1)
+
+        t0 = time.time()
+        assert callItAs(B)(B(), 1000000) == 1000000
+        assert callItAs(B)(C(), 1000000) == 2000000
+        compiledTime = time.time() - t0
+
+        speedup = pyTime / compiledTime
+
+        print("compiled virtual dispatch", speedup, "times faster")
+
+    def test_compile_staticmethod_on_subclass(self):
+        class B(Class):
+            @staticmethod
+            def f(x) -> int:
+                return 1
+
+        class C(B):
+            @staticmethod
+            def f(x) -> int:
+                return 2
+
+        class D(C, Final):
+            @staticmethod
+            def f(x) -> int:
+                return 3
+
+        def callItAs(T):
+            @Entrypoint
+            def callIt(b: T, times: int):
+                x = 0
+                for i in range(times):
+                    x += b.f(i)
+                return x
+
+            return callIt
+
+        assert B().f(10) == 1
+
+        assert callItAs(B)(B(), 1000000) == 1000000
+        assert callItAs(B)(C(), 1000000) == 2000000

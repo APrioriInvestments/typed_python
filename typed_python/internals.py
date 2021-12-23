@@ -293,6 +293,9 @@ class ClassMetaclass(type):
             elif isinstance(elt, property):
                 properties[eltName] = makeFunctionType(eltName, elt.fget, assumeClosuresGlobal=True)
             elif isinstance(elt, classmethod):
+                if eltName in staticFunctions:
+                    raise TypeError(f"method {eltName} can't be both a staticmethod and a classmethod")
+
                 if eltName not in classMethods:
                     classMethods[eltName] = makeFunctionType(
                         eltName, elt.__func__, assumeClosuresGlobal=True
@@ -303,6 +306,9 @@ class ClassMetaclass(type):
                         makeFunctionType(eltName, elt.__func__, assumeClosuresGlobal=True),
                     )
             elif isinstance(elt, staticmethod):
+                if eltName in classMethods:
+                    raise TypeError(f"method {eltName} can't be both a staticmethod and a classmethod")
+
                 if eltName not in staticFunctions:
                     staticFunctions[eltName] = makeFunctionType(
                         eltName, elt.__func__, assumeClosuresGlobal=True

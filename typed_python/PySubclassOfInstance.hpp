@@ -42,7 +42,7 @@ public:
     }
 
     static PyObject* extractPythonObjectConcrete(modeled_type* subclassOfT, instance_ptr data) {
-        return typePtrToPyTypeRepresentation(*((Type**)data));
+        return incref(typePtrToPyTypeRepresentation(*((Type**)data)));
     }
 
     static bool compare_to_python_concrete(SubclassOfType* subclassOf, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {

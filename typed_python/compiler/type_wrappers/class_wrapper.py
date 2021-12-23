@@ -28,7 +28,7 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
     ClassOrAlternativeWrapperMixin
 )
-from typed_python import _types, PointerTo, Int32, Tuple, NamedTuple, bytecount, RefTo, SubclassOf, Class
+from typed_python import _types, PointerTo, Int32, Tuple, NamedTuple, bytecount, RefTo, SubclassOf, Class, Value
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -357,21 +357,27 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         )
 
     def classDispatchTable(self, instance):
-        classDispatchTables = (
-            self.get_layout_pointer(instance)
-            .ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 2).load()
-        )
+        if isinstance(instance.expr_type, ClassWrapper):
+            classDispatchTables = (
+                self.get_layout_pointer(instance)
+                .ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 2).load()
+            )
 
-        # instances of a class can 'masquerade' as any one of their base classes. They have a vtable
-        # for each one indicating how to dispatch method calls to the concrete class when they
-        # are masquerading as that particular base class. Whenever we represent a child class
-        # as a base class, we need to track which of the class' concrete vtable entries we should
-        # be using for dispatch. We encode this in the top 16 bits of the pointer because on modern
-        # x64 systems, the pointer address space is 48 bits. If somehow we need to compile on
-        # itanium, we'll have to rethink this.
-        return classDispatchTables.elemPtr(
-            self.get_dispatch_index(instance)
-        )
+            # instances of a class can 'masquerade' as any one of their base classes. They have a vtable
+            # for each one indicating how to dispatch method calls to the concrete class when they
+            # are masquerading as that particular base class. Whenever we represent a child class
+            # as a base class, we need to track which of the class' concrete vtable entries we should
+            # be using for dispatch. We encode this in the top 16 bits of the pointer because on modern
+            # x64 systems, the pointer address space is 48 bits. If somehow we need to compile on
+            # itanium, we'll have to rethink this.
+            return classDispatchTables.elemPtr(
+                self.get_dispatch_index(instance)
+            )
+        else:
+            return runtime_functions.computeTypeClassDispatchTable.call(
+                instance.nonref_expr,
+                instance.context.getTypePointer(self.typeRepresentation)
+            ).cast(class_dispatch_table_type.pointer())
 
     def withDispatchIndex(self, instance, index):
         """Return a native expression representing 'instance' as the 'index'th base class in the MRO.
@@ -579,6 +585,11 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
             return typeWrapper(func).convert_call(context, None, [typeInst] + list(args), kwargs)
 
+        if methodName in self.typeRepresentation.StaticMemberFunctions:
+            func = self.typeRepresentation.StaticMemberFunctions[methodName]
+
+            return typeWrapper(func).convert_call(context, None, list(args), kwargs)
+
         return super().convert_type_method_call(context, typeInst, methodName, args, kwargs)
 
     def convert_attribute(self, context, instance, attribute, nocheck=False):
@@ -587,7 +598,10 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
             return instance.changeType(methodType)
 
-        if attribute in self.typeRepresentation.ClassMemberFunctions:
+        if (
+            attribute in self.typeRepresentation.ClassMemberFunctions
+            or attribute in self.typeRepresentation.StaticMemberFunctions
+        ):
             instanceType = instance.convert_typeof()
 
             methodType = BoundMethodWrapper(
@@ -663,9 +677,17 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         assert isinstance(methodName, str)
         return self.getMethodOrPropertyBody(methodName) is not None
 
+    def convert_type_method_call_virtual(self, context, typeInst, methodName, args, kwargs):
+        """Convert a method call on a Type* which is us, or a subclass."""
+        if self.typeRepresentation.IsFinal:
+            return self.convert_type_method_call(context, typeInst, methodName, args, kwargs)
+
+        return self.convert_method_call_virtual(context, typeInst, methodName, args, kwargs)
+
     def convert_method_call(self, context, instance, methodName, args, kwargs):
         # figure out which signature we'd want to use on the given args/kwargs
         func = self.getMethodOrPropertyBody(methodName)
+
         if func is None:
             context.pushException(AttributeError, methodName)
             return None
@@ -674,32 +696,50 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             # we can sidestep the vtable entirely
             return typeWrapper(func).convert_call(context, None, [instance] + list(args), kwargs)
 
+        return self.convert_method_call_virtual(context, instance, methodName, args, kwargs)
+
+    def convert_method_call_virtual(self, context, instance, methodName, args, kwargs):
+        """Convert a method call where dispatch is 'virtual'.
+
+        This means we don't know the concrete type of 'self' (or 'cls') - its us or
+        a subclass of us, and we have to use a virtual dispatch table to find the
+        appropriate implementation.
+
+        This version of the method will work if 'instance' is a ClassWrapper or
+        a SubclassOfWrapper, dispatching to MemberFunction if its a classwrapper and
+        Static/Classmethods otherwise.
+
+        In both cases, we have to determine which of the visible function signatures
+        we match. There may be more than one, in which case we have to generate code
+        that checks if we match the signature before dispatching.
+
+        Once we find a match, we'll look in a VTable attached to 'instance' to find
+        an appropriate function pointer and use that to actually execute the function.
+        """
         argTypes = [instance.expr_type] + [a.expr_type for a in args]
         kwargTypes = {k: v.expr_type for k, v in kwargs.items()}
 
-        # each of 'func''s overloads represents one of the functions defined with this name
-        # in this class and in its base classes, ordered by the method resolution order.
-        # we can think of each one as a pattern that we are sequentially matching against,
-        # and we should invoke the first one that matches the specific values that we have
-        # in our argTypes. In fact, we may match more than one (for instance if we know all of
-        # our values as 'object') in which case we need to generate runtime tests for each value
-        # against each type pattern and take the union of the return types.
+        if isinstance(instance.expr_type, ClassWrapper):
+            # this is a regular method call
+            func = self.typeRepresentation.MemberFunctions[methodName]
+            isStatic = False
+        else:
+            # this is a call where instance is a Type*.
+            if methodName in self.typeRepresentation.ClassMemberFunctions:
+                func = self.typeRepresentation.ClassMemberFunctions[methodName]
+                isStatic = False
+            else:
+                func = self.typeRepresentation.StaticMemberFunctions[methodName]
+                isStatic = True
 
-        # each term that we might match against generates an entrypoint in the class vtable
-        # for this class and for all of its children. That entry represents calling the function
-        # with name 'methodName' with the given signature.
+        if isStatic:
+            matchArgTypes = argTypes[1:]
+        else:
+            matchArgTypes = argTypes
 
-        # because children can override the behavior of parent signatures, we insist at class
-        # definition time that when a child class overrides a parent class its return type
-        # signatures become more specific: if a base class defines
-        #     def f(self) -> int:
-        # then the child class must also return 'int', (or something like OneOf(0, 1)).
-        # this is necessary for type inference to work correctly, because if we didn't
-        # insist on that we can't make any assumptions about the types that come out
-        # of a base class implementation.
-
-        # first, see if there is exacly one possible overload
-        overloadAndConversionLevel = PythonTypedFunctionWrapper.pickSingleOverloadForCall(func, argTypes, kwargTypes)
+        # first, see if there is exacly one possible overload we could match. If so,
+        # we don't need multiple dispatch code.
+        overloadAndConversionLevel = PythonTypedFunctionWrapper.pickSingleOverloadForCall(func, matchArgTypes, kwargTypes)
 
         if overloadAndConversionLevel is not None:
             return self.dispatchToSingleOverload(
@@ -709,17 +749,18 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                 methodName,
                 instance,
                 args,
-                kwargs
+                kwargs,
+                isStatic
             )
 
-        resultTypes = self.resultTypesForCall(func, argTypes, kwargTypes)
+        resultTypes = self.resultTypesForCall(func, matchArgTypes, kwargTypes)
 
         if not resultTypes:
             # we can't call anything
             context.pushException(
                 Exception,
                 f"No overload could be found for compiled dispatch to "
-                f"{self}.{methodName} with args {argTypes} and {kwargTypes}."
+                f"{self}.{methodName} with args {matchArgTypes} and {kwargTypes}."
             )
             return None
 
@@ -735,24 +776,29 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                 output_type = type(None)
                 definitelyThrows = True
 
-        argSignatureStrings = [str(x) for x in argTypes[1:]]
+        argSignatureStrings = [str(x) for x in matchArgTypes[1:]]
         argSignatureStrings.extend([f"{k}={v}" for k, v in kwargTypes.items()])
 
         dispatchToOverloads = context.converter.defineNativeFunction(
             f'call_method.{self}.{methodName}({",".join(argSignatureStrings)})',
-            ('call_method', self, methodName, tuple(argTypes[1:]), tuple(kwargTypes.items())),
+            ('call_method', self, methodName, tuple(matchArgTypes), tuple(kwargTypes.items())),
             list(argTypes) + list(kwargTypes.values()),
             output_type,
             lambda context, outputVar, *args: self.generateMethodDispatch(
                 context,
+                instance,
                 methodName,
                 output_type,
                 args,
-                [None for a in argTypes] + list(kwargTypes)
+                [None for a in argTypes] + list(kwargTypes),
+                isStatic
             )
         )
 
-        res = context.call_typed_call_target(dispatchToOverloads, [instance] + args + list(kwargs.values()))
+        res = context.call_typed_call_target(
+            dispatchToOverloads,
+            [instance] + args + list(kwargs.values())
+        )
 
         if definitelyThrows:
             # we defined this as returning None, but because it throws we don't want to
@@ -761,7 +807,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         return res
 
-    def generateMethodDispatch(self, context, methodName, methodReturnType, args, argNames):
+    def generateMethodDispatch(self, context, instance, methodName, methodReturnType, args, argNames, isStatic):
         """Generate native code that tries to dispatch to each of func's overloads
 
         We try each overload, with conversionLevel going up through the alternatives.
@@ -772,28 +818,39 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             methodName - the name of the method we're trying to dispatch to
             methodReturnType - the output type we are expecting to return. This will be the union
                 of the return types of all the overloads that might participate in this dispatch.
-            args - the typed_expression for all of our actual arguments, which in this case
-                are the instance, and then the actual arguments we want to convert, and then
-                the keyword arguments
+            instance - the class or type we are dispatching on.
+            args - the typed_expression for our arguments, including 'instance'
             argNames - for each arg, None if it was a positional argument, or the name
                 of the argument.
         """
-        func = self.getMethodOrPropertyBody(methodName)
-
+        # these are the arguments we'll pass to the dispatch
         argTypes = [a.expr_type for i, a in enumerate(args) if argNames[i] is None]
         kwargTypes = {argNames[i]: a.expr_type for i, a in enumerate(args) if argNames[i] is not None}
 
+        # these are the arguments we'll use when matching against the function's args
+        if isStatic:
+            matchArgTypes = argTypes[1:]
+        else:
+            matchArgTypes = argTypes
+
+        if isinstance(instance.expr_type, ClassWrapper):
+            func = self.getMethodOrPropertyBody(methodName)
+        elif isStatic:
+            func = self.typeRepresentation.StaticMemberFunctions[methodName]
+        else:
+            func = self.typeRepresentation.ClassMemberFunctions[methodName]
+
         def makeOverloadDispatcher(overload, outputType, conversionLevel):
             return lambda context, _, outputVar, *args: self.generateOverloadDispatch(
-                context, methodName, overload, conversionLevel, outputType, outputVar, args, argNames
+                context, methodName, overload, conversionLevel, outputType, outputVar, args, argNames, isStatic
             )
 
         for conversionLevel in ConversionLevel.functionConversionSequence():
             for overloadIndex, overload in enumerate(func.overloads):
-                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, argTypes, kwargTypes, conversionLevel)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, matchArgTypes, kwargTypes, conversionLevel)
 
                 if mightMatch is not False:
-                    overloadRetType = PythonTypedFunctionWrapper.computeFunctionOverloadReturnType(overload, argTypes, kwargTypes)
+                    overloadRetType = PythonTypedFunctionWrapper.computeFunctionOverloadReturnType(overload, matchArgTypes, kwargTypes)
 
                     if overloadRetType is CannotBeDetermined:
                         assert False, "We should be forcing and checking the type at runtime here"
@@ -843,7 +900,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         # this should actually be hitting the interpreter instead.
         context.pushException(TypeError, f"Failed to find a dispatchable overload for {self}.{methodName} matching {args}")
 
-    def generateOverloadDispatch(self, context, methodName, overload, conversionLevel, retType, outputVar, args, argNames):
+    def generateOverloadDispatch(self, context, methodName, overload, conversionLevel, retType, outputVar, args, argNames, isStatic):
         """Produce the code that calls this specific overload.
 
         We return True if successful, False otherwise, and the output is a pointer to the result
@@ -862,6 +919,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             args - the arguments to pass to the method (including the instance)
             argNames - a list containing, for each argument, None if the argument is a positional argument,
                 or the string name if it was a keyword argument.
+            isStatic - is this a staticmethod, so that we don't pass an instance arg
         """
         instance = args[0]
 
@@ -870,18 +928,22 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         argTypes = [a.expr_type for i, a in enumerate(args) if argNames[i] is None]
         kwargTypes = {argNames[i]: a.expr_type for i, a in enumerate(args) if argNames[i] is not None}
 
+        if isStatic:
+            matchArgTypes = argTypes[1:]
+            matchArgs = args[1:]
+        else:
+            matchArgTypes = argTypes
+            matchArgs = args
+
         ExpressionConversionContext = typed_python.compiler.expression_conversion_context.ExpressionConversionContext
 
-        argAndKwargTypes = ExpressionConversionContext.computeOverloadSignature(overload, argTypes, kwargTypes)
+        argAndKwargTypes = ExpressionConversionContext.computeOverloadSignature(overload, matchArgTypes, kwargTypes)
         assert argAndKwargTypes is not None, "we should have already guaranteed this signature matches."
-
-        argTupleType = Tuple(*[x.typeRepresentation for x in argAndKwargTypes[0][1:]])
-        kwargTupleType = NamedTuple(**{k: v.typeRepresentation for k, v in argAndKwargTypes[1].items()})
 
         convertedArgs = []
 
-        for argIx, argExpr in enumerate(args):
-            if argIx == 0:
+        for argIx, argExpr in enumerate(matchArgs):
+            if argIx == 0 and not isStatic:
                 argType = args[0].expr_type
             elif argNames[argIx] is None:
                 argType = argAndKwargTypes[0][argIx]
@@ -905,7 +967,20 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
             convertedArgs.append(convertedArg)
 
-        # each entrypoint generates a slot we could call.
+        # determine if we're matching based on the instance (method) or type (classmethod/staticmethod)
+        matchesAsInstance = isinstance(args[0].expr_type, ClassWrapper)
+
+        # each entrypoint generates a slot we could call which is indexed by whether we're
+        # matching as an instance, and the arguments to the function.
+
+        # note that we explicitly disregard the type of the first argument in the signature, since
+        # we don't want to generate a separate entrypoint for each possible overloaded known call type.
+        argTupleType = Tuple(
+            Value('instance' if matchesAsInstance else 'type'),
+            *[x.typeRepresentation for x in argAndKwargTypes[0][0 if isStatic else 1:]]
+        )
+        kwargTupleType = NamedTuple(**{k: v.typeRepresentation for k, v in argAndKwargTypes[1].items()})
+
         dispatchSlot = context.allocateClassMethodDispatchSlot(
             self.typeRepresentation,
             methodName,
@@ -931,15 +1006,37 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         if outputVar.expr_type.typeRepresentation.ElementType != retType:
             raise Exception(f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}")
 
+        if isStatic:
+            # if we're a staticmethod call we need to stick ourselves on the front.
+            # this is because the method signature still expects the argument
+            convertedArgs = [args[0]] + convertedArgs
+
         outputVar.changeType(typeWrapper(retType), True).convert_copy_initialize(
             context.call_function_pointer(funcPtr, convertedArgs, typeWrapper(retType))
         )
 
         context.pushReturnValue(context.constant(True))
 
-    def dispatchToSingleOverload(self, context, overload, conversionLevel, methodName, instance, args, kwargs):
-        # pack the args/kwargs
-        argTypes = [instance.expr_type] + [a.expr_type for a in args]
+    def dispatchToSingleOverload(
+        self,
+        context,
+        overload,
+        conversionLevel,
+        methodName,
+        instance,
+        args,
+        kwargs,
+        isStatic
+    ):
+        """Dispatch a single call to a vtable.
+
+        Given that there is a single overload 'overload' that definitely matches our signature,
+        we have to generate code that picks the correct function pointer, compiles it if its
+        empty, and dispatches to it.
+        """
+
+        # pack the args/kwargs into the form that will actually be passed to the function itself.
+        argTypes = ([instance.expr_type] if not isStatic else []) + [a.expr_type for a in args]
         kwargTypes = {k: v.expr_type for k, v in kwargs.items()}
 
         ExpressionConversionContext = typed_python.compiler.expression_conversion_context.ExpressionConversionContext
@@ -949,13 +1046,8 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         assert argAndKwargTypes is not None, "we should have already guaranteed this signature matches."
 
-        # note that we explicitly disregard the type of the first argument in the signature, since
-        # we don't want to generate a separate entrypoint for each possible overloaded known call type.
         for k in argAndKwargTypes[1]:
             assert isinstance(k, str), argAndKwargTypes[1]
-
-        argTupleType = Tuple(*[x.typeRepresentation for x in argAndKwargTypes[0][1:]])
-        kwargTupleType = NamedTuple(**{k: v.typeRepresentation for k, v in argAndKwargTypes[1].items()})
 
         actualArgTypes, actualKwargTypes = context.computeOverloadSignature(overload, argTypes, kwargTypes)
 
@@ -981,8 +1073,28 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             # then the best we can do is to assume object.
             retType = object
 
-        # each entrypoint generates a slot we could call.
-        dispatchSlot = context.allocateClassMethodDispatchSlot(self.typeRepresentation, methodName, retType, argTupleType, kwargTupleType)
+        # determine if we're matching based on the instance (method) or type (classmethod/staticmethod)
+        matchesAsInstance = isinstance(instance.expr_type, ClassWrapper)
+
+        # each entrypoint generates a slot we could call which is indexed by whether we're
+        # matching as an instance, and the arguments to the function.
+
+        # note that we explicitly disregard the type of the first argument in the signature, since
+        # we don't want to generate a separate entrypoint for each possible overloaded known call type.
+        argTupleType = Tuple(
+            Value('instance' if matchesAsInstance else 'type'),
+            *[x.typeRepresentation for x in argAndKwargTypes[0][1 if not isStatic else 0:]]
+        )
+
+        kwargTupleType = NamedTuple(**{k: v.typeRepresentation for k, v in argAndKwargTypes[1].items()})
+
+        dispatchSlot = context.allocateClassMethodDispatchSlot(
+            self.typeRepresentation,
+            methodName,
+            retType,
+            argTupleType,
+            kwargTupleType
+        )
 
         classDispatchTable = self.classDispatchTable(instance)
 
@@ -998,12 +1110,19 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
                     )
                 )
 
+        # we always pass the instance, regardless of whether this is a
+        # regular method, classmethod or staticmethod call. Receiving code
+        # can decide what to do with it. We don't have to worry about the case
+        # where the instance we're passing is Void (which would happen if
+        # this were a Final class and we knew the type exactly) since then
+        # we wouldn't be using virtual dispatch at all
+        assert not self.typeRepresentation.IsFinal
         convertedArgs = [instance]
 
         for argIx in range(len(args)):
             convertedArgs.append(
                 args[argIx].convert_to_type(
-                    argAndKwargTypes[0][argIx + 1],
+                    argAndKwargTypes[0][argIx + (1 if not isStatic else 0)],
                     conversionLevel
                 )
             )
@@ -1051,7 +1170,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         )
 
     @staticmethod
-    def compileMethodInstantiation(
+    def compileVirtualMethodInstantiation(
         converter, interfaceClass, implementingClass,
         methodName, retType, argTypeTuple, kwargTypeTuple
     ):
@@ -1068,26 +1187,55 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             methodName - (str) the name of the method we're compiling
             retType - (Type) - the return type for this version of the function
             argTypeTuple - (Tuple) - a Tuple type containing the types of the positional arguments
-                to the function
+                to the function, including the instance or type object itself.
             kwargTypeTuple - (NamedTuple) - a NamedTuple type containing the types of the
-                keyword arguments to thiis function.
+                keyword arguments to this function.
         """
+        # the first argument tuple will either be 'instance' or 'type'
+        firstArgType = argTypeTuple.ElementTypes[0].Value
+
+        assert firstArgType in ('type', 'instance')
+
         # these are the types that we actually know from the signature
-        argTypes = [typeWrapper(implementingClass)] + [typeWrapper(x) for x in argTypeTuple.ElementTypes]
+        argTypesWithoutInstance = [typeWrapper(x) for x in argTypeTuple.ElementTypes[1:]]
         kwargTypes = {
             kwargTypeTuple.ElementNames[i]: typeWrapper(kwargTypeTuple.ElementTypes[i])
             for i in range(len(kwargTypeTuple.ElementNames))
         }
 
-        # this is the function we're implementing. It has its own type signature
-        # but we have the signature from the base class as well, which may be more precise
-        # in the inputs and less precise in the outputs.
-        pyImpl = typeWrapper(implementingClass).getMethodOrPropertyBody(methodName)
+        if firstArgType == 'instance':
+            argTypes = [typeWrapper(implementingClass)] + argTypesWithoutInstance
+            funcObj = typeWrapper(implementingClass).getMethodOrPropertyBody(methodName)
 
-        assert bytecount(pyImpl.ClosureType) == 0, "Class methods should have empty closures."
+            def firstArgConversion(arg):
+                # Ensure that the function knows 'arg' as implementingClass, not interfaceClass
+                return arg.expr_type.stripClassDispatchIndex(arg.context, arg)
 
-        return typeWrapper(pyImpl).compileCall(
-            converter, retType, argTypes, kwargTypes, False, stripFirstArgClassDispatchIndex=True
+        else:
+            # either way, we'll get passed a pointer. The interface won't be final
+            # since otherwise we wouldn't need to use virtual dispatch
+            assert not interfaceClass.IsFinal
+
+            argTypes = [typeWrapper(SubclassOf(interfaceClass))] + argTypesWithoutInstance
+
+            if methodName in implementingClass.ClassMemberFunctions:
+                # we'll get passed
+                funcObj = implementingClass.ClassMemberFunctions[methodName]
+
+                def firstArgConversion(arg):
+                    # Ensure that the function knows 'arg' as implementingClass, not interfaceClass
+                    return arg.context.constant(implementingClass)
+            else:
+                funcObj = implementingClass.StaticMemberFunctions[methodName]
+
+                def firstArgConversion(arg):
+                    # Static methods don't take an argument at all
+                    return None
+
+        assert bytecount(funcObj.ClosureType) == 0, "Class methods should have empty closures."
+
+        return typeWrapper(funcObj).compileCall(
+            converter, retType, argTypes, kwargTypes, False, firstArgConversion=firstArgConversion
         )
 
     def convert_set_attribute(self, context, instance, attribute, value):

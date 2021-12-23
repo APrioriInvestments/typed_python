@@ -120,6 +120,10 @@ realloc = externalCallTarget("tp_realloc", UInt8Ptr, UInt8Ptr, Int64, Int64)
 memcpy = externalCallTarget("memcpy", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 memmove = externalCallTarget("memmove", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 
+computeTypeClassDispatchTable = externalCallTarget(
+    "computeTypeClassDispatchTable", Void.pointer(), Void.pointer(), Void.pointer()
+)
+
 acos64 = externalCallTarget("np_acos_float64", Float64, Float64)
 
 acosh64 = externalCallTarget("np_acosh_float64", Float64, Float64)

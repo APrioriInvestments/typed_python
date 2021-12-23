@@ -571,7 +571,7 @@ class PythonToNativeConverter:
         # we are compiling the function 'name' in 'implementingClass' to be installed when
         # viewing an instance of 'implementingClass' as 'interfaceClass' that's function
         # 'name' called with signature '(*argTypeTuple, **kwargTypeTuple) -> retType'
-        typedCallTarget = ClassWrapper.compileMethodInstantiation(
+        typedCallTarget = ClassWrapper.compileVirtualMethodInstantiation(
             self,
             interfaceClass,
             implementingClass,

@@ -1714,7 +1714,19 @@ public:
         return mIsNocompile;
     }
 
-    Function* withMethodOf(Type* methodOf) const {
+    Function* withMethodOf(Type* methodOf) {
+        bool anyDifferent = false;
+        for (auto& o: mOverloads) {
+            if (o.getMethodOf() != methodOf) {
+                anyDifferent = true;
+                break;
+            }
+        }
+
+        if (!anyDifferent) {
+            return this;
+        }
+
         std::vector<Overload> overloads;
         for (auto& o: mOverloads) {
             overloads.push_back(o.withMethodOf(methodOf));

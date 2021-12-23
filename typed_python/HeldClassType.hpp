@@ -339,7 +339,11 @@ public:
           const std::map<std::string, Function*>& staticFunctions,
           const std::map<std::string, Function*>& propertyFunctions,
           const std::map<std::string, PyObject*>& classMembers,
-          const std::map<std::string, Function*>& classMethods
+          const std::map<std::string, Function*>& classMethods,
+          // set to True if this is the first time the class is being created
+          // and we need to make copies of all the function objects so that
+          // they know who their methods are.
+          bool isNew
           ) :
             Type(catHeldClass),
             m_vtable(new VTable(this)),
@@ -361,8 +365,18 @@ public:
     {
         m_name = inName;
 
-        for (auto& nameAndF: m_own_memberFunctions) {
-            nameAndF.second = nameAndF.second->withMethodOf(this);
+        if (isNew) {
+            for (auto& nameAndF: m_own_memberFunctions) {
+                nameAndF.second = nameAndF.second->withMethodOf(this);
+            }
+
+            for (auto& nameAndF: m_own_classMethods) {
+                nameAndF.second = nameAndF.second->withMethodOf(this);
+            }
+
+            for (auto& nameAndF: m_own_staticFunctions) {
+                nameAndF.second = nameAndF.second->withMethodOf(this);
+            }
         }
     }
 
@@ -505,7 +519,8 @@ public:
         const std::map<std::string, Function*>& staticFunctions,
         const std::map<std::string, Function*>& propertyFunctions,
         const std::map<std::string, PyObject*>& classMembers,
-        const std::map<std::string, Function*>& classMethods
+        const std::map<std::string, Function*>& classMethods,
+        bool isNew
     );
 
     // this gets called by Class. These types are always produced in pairs.
@@ -533,7 +548,8 @@ public:
             m_own_staticFunctions,
             m_own_propertyFunctions,
             m_own_classMembers,
-            m_own_classMethods
+            m_own_classMethods,
+            true
         );
     }
 
