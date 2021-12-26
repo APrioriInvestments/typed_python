@@ -570,7 +570,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         return bytePtr.store(bytePtr.load().bitand(native_ast.const_uint8_expr(255 - (1 << bit))))
 
     def convert_type_attribute(self, context, typeInst, attr):
-        if attr in self.typeRepresentation.ClassMemberFunctions:
+        if (attr in self.typeRepresentation.StaticMemberFunctions or attr in self.typeRepresentation.ClassMemberFunctions):
             methodType = BoundMethodWrapper(
                 _types.BoundMethod(typeInst.expr_type.typeRepresentation, attr)
             )
@@ -721,11 +721,21 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         if isinstance(instance.expr_type, ClassWrapper):
             # this is a regular method call
-            func = self.typeRepresentation.MemberFunctions[methodName]
+            if methodName in self.typeRepresentation.MemberFunctions:
+                func = self.typeRepresentation.MemberFunctions[methodName]
+            else:
+                func = self.typeRepresentation.PropertyFunctions[methodName]
             isStatic = False
         else:
             # this is a call where instance is a Type*.
-            if methodName in self.typeRepresentation.ClassMemberFunctions:
+            if methodName == '__typed_python_virtual_new__':
+                @typed_python.Function
+                def funcObj(cls, *args, **kwargs):
+                    return cls(*args, **kwargs)
+
+                func = type(funcObj)
+                isStatic = False
+            elif methodName in self.typeRepresentation.ClassMemberFunctions:
                 func = self.typeRepresentation.ClassMemberFunctions[methodName]
                 isStatic = False
             else:
@@ -1218,7 +1228,19 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
             argTypes = [typeWrapper(SubclassOf(interfaceClass))] + argTypesWithoutInstance
 
-            if methodName in implementingClass.ClassMemberFunctions:
+            if methodName == '__typed_python_virtual_new__':
+                # we're supposed to return a concrete instance
+                @typed_python.Function
+                def funcInst(cls, *args, **kwargs):
+                    return cls(*args, **kwargs)
+
+                funcObj = type(funcInst)
+
+                def firstArgConversion(arg):
+                    # Ensure that the function knows 'arg' as implementingClass, not interfaceClass
+                    return arg.context.constant(implementingClass)
+
+            elif methodName in implementingClass.ClassMemberFunctions:
                 # we'll get passed
                 funcObj = implementingClass.ClassMemberFunctions[methodName]
 

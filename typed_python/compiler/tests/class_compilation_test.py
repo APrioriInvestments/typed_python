@@ -37,7 +37,8 @@ from typed_python import (
     refTo,
     Forward,
     TypeFunction,
-    typeKnownToCompiler
+    typeKnownToCompiler,
+    SubclassOf
 )
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime, CountCompilationsVisitor
@@ -2714,17 +2715,36 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
             return callIt
 
+        def callItAsWithType(T):
+            @Entrypoint
+            def callIt(b: SubclassOf(T), times: int):
+                x = 0
+                for i in range(times):
+                    x += b.f(i)
+                return x
+
+            return callIt
+
         callItAs(B)(B(), 1)
         callItAs(B)(C(), 1)
+        callItAsWithType(B)(B, 1)
+        callItAsWithType(B)(C, 1)
 
         t0 = time.time()
         assert callItAs(B)(B(), 1000000) == 1000000
         assert callItAs(B)(C(), 1000000) == 2000000
         compiledTime = time.time() - t0
 
-        speedup = pyTime / compiledTime
+        t0 = time.time()
+        assert callItAsWithType(B)(B, 1000000) == 1000000
+        assert callItAsWithType(B)(C, 1000000) == 2000000
+        compiledTypeTime = time.time() - t0
 
-        print("compiled virtual dispatch", speedup, "times faster")
+        speedup = pyTime / compiledTime
+        speedupType = pyTime / compiledTypeTime
+
+        print("compiled virtual dispatch on instances ", speedup, "times faster")
+        print("compiled virtual dispatch on type ", speedupType, "times faster")
 
     def test_compile_staticmethod_on_subclass(self):
         class B(Class):
@@ -2756,3 +2776,69 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         assert callItAs(B)(B(), 1000000) == 1000000
         assert callItAs(B)(C(), 1000000) == 2000000
+
+    def test_class_dispatch_on_type(self):
+        class B(Class):
+            @classmethod
+            def f(cls) -> int:
+                return 0
+
+        @Entrypoint
+        def call(T: SubclassOf(B)):
+            return T.f()
+
+        assert call.resultTypeFor(SubclassOf(B)).typeRepresentation is int
+        assert call(B) == 0
+
+    def test_interpreter_can_see_class_members(self):
+        class B(Class):
+            X = int
+
+        @Entrypoint
+        def callType(T: SubclassOf(B)):
+            return T.X
+
+        @Entrypoint
+        def callInst(T: B):
+            return T.X
+
+        assert callType.resultTypeFor(SubclassOf(B)).typeRepresentation.Value is int
+        assert callInst.resultTypeFor(B).typeRepresentation.Value is int
+
+    def test_class_init_is_virtual(self):
+        B = Forward("B")
+
+        @B.define
+        class B(Class):
+            x = Member(int)
+
+            def __init__(self, x):
+                self.x = x
+
+            def f(self) -> int:
+                return self.x
+
+            @classmethod
+            def makeOne(cls, x) -> B:
+                return cls(x)
+
+        class C(B):
+            def __init__(self, x):
+                super().__init__(x + 10)
+
+            def f(self):
+                return self.x + 100
+
+        @Entrypoint
+        def constructOne(T: SubclassOf(B), x, times):
+            res = 0
+            for i in range(times):
+                res += T.makeOne(x).f()
+            return res
+
+        assert constructOne(C, 0, 1) == C(0).f()
+        assert constructOne.resultTypeFor(SubclassOf(B), int, int).typeRepresentation is int
+
+        t0 = time.time()
+        assert constructOne(C, 0, 1000000) == C(0).f() * 1000000
+        print(time.time() - t0)

@@ -18,6 +18,7 @@ import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
@@ -216,12 +217,30 @@ class SubclassOfWrapper(Wrapper):
         return pythonObjectRepresentation(context, type)
 
     def convert_attribute(self, context, instance, attribute):
-        if hasattr(self.typeRepresentation.Type, attribute):
-            assert False
+        if attribute in self.typeRepresentation.Type.ClassMembers:
+            return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+                context,
+                self.typeRepresentation.Type.ClassMembers[attribute]
+            )
+
+        if (
+            attribute in self.typeRepresentation.Type.StaticMemberFunctions
+            or attribute in self.typeRepresentation.Type.ClassMemberFunctions
+        ):
+            methodType = BoundMethodWrapper(
+                typed_python._types.BoundMethod(self.typeRepresentation, attribute)
+            )
+
+            return instance.changeType(methodType)
 
         return instance.toPyObj().convert_attribute(attribute)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         return typeWrapper(instance.expr_type.typeRepresentation.Type).convert_type_method_call_virtual(
             context, instance, methodname, args, kwargs
+        )
+
+    def convert_call(self, context, instance, args, kwargs):
+        return typeWrapper(instance.expr_type.typeRepresentation.Type).convert_type_method_call_virtual(
+            context, instance, '__typed_python_virtual_new__', args, kwargs
         )
