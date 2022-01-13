@@ -252,13 +252,6 @@ def SortedDict(K, V, comparator=less):
     class SortedDict_(Class, Final):
         _root = Member(OneOf(None, Node), nonempty=True)
 
-        def __init__(self):
-            pass
-
-        def __init__(self, other):  # noqa
-            for key in other:
-                self[key] = other[key]
-
         def height(self):
             if self._root is None:
                 return 0
@@ -303,8 +296,8 @@ def SortedDict(K, V, comparator=less):
                 self._root = None
             return res
 
-        @Entrypoint
-        def pop(self, k: K, v: V) -> V:  # noqa
+        @Entrypoint  # noqa: F811
+        def pop(self, k: K, v: V) -> V:
             if self._root is None or k not in self._root:
                 return v
 
@@ -331,8 +324,8 @@ def SortedDict(K, V, comparator=less):
         def get(self, k: K) -> V:
             return self[k]
 
-        @Entrypoint
-        def get(self, k: K, v: V) -> V:  # noqa
+        @Entrypoint  # noqa: F811
+        def get(self, k: K, v: V) -> V:
             if k in self:
                 return self[k]
             return v
@@ -343,8 +336,8 @@ def SortedDict(K, V, comparator=less):
                 self[k] = V()
             return self[k]
 
-        @Entrypoint
-        def setdefault(self, k: K, v: V) -> V:  # noqa
+        @Entrypoint  # noqa: F811
+        def setdefault(self, k: K, v: V) -> V:
             if k not in self:
                 self[k] = v
             return self[k]
@@ -414,6 +407,32 @@ def SortedDict(K, V, comparator=less):
                             stack.append((node.right, True))
                 else:
                     yield node.key
+
+                    if node.right:
+                        stack.append((node.right, True))
+
+        @Entrypoint
+        def values(self) -> Generator(V):
+            stack = ListOf(Tuple(Node, bool))()
+            if self._root is None:
+                return
+
+            stack.append((self._root, True))
+
+            while stack:
+                node, wayDown = stack.pop()
+
+                if wayDown:
+                    if node.left:
+                        stack.append((node, False))
+                        stack.append((node.left, True))
+                    else:
+                        yield node.value
+
+                        if node.right:
+                            stack.append((node.right, True))
+                else:
+                    yield node.value
 
                     if node.right:
                         stack.append((node.right, True))
