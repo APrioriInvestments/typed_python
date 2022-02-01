@@ -168,7 +168,9 @@ public:
         }
 
 
-        if (PyLong_Check(cellContents)) {
+        if (cellContents == Py_True || cellContents == Py_False) {
+            mCellTypes[contentsPath] = Bool::Make();
+        } else if (PyLong_Check(cellContents)) {
             mCellTypes[contentsPath] = Int64::Make();
         } else if (PyUnicode_Check(cellContents)) {
             mCellTypes[contentsPath] = StringType::Make();
@@ -178,8 +180,6 @@ public:
             mCellTypes[contentsPath] = Float64::Make();
         } else if (cellContents == Py_None) {
             mCellTypes[contentsPath] = NoneType::Make();
-        } else if (cellContents == Py_True || cellContents == Py_False) {
-            mCellTypes[contentsPath] = Bool::Make();
         } else {
             mCellTypes[contentsPath] = PythonObjectOfType::AnyPyObject();
         }
