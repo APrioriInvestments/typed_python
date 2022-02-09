@@ -205,7 +205,7 @@ class ConversionContextBase:
         return False
 
     def getInputTypes(self):
-        return [typeWrapper(t.typeRepresentation) for t in self._input_types]
+        return self._input_types
 
     def knownOutputType(self):
         """If the output type is known ahead, then that type (as a wrapper). Else, None"""
@@ -439,17 +439,6 @@ class ConversionContextBase:
             )
 
             assert not _types.is_default_constructible(self.closureType)
-
-            # now rebuild each of our var types. we have to do this after
-            # setting 'closureType' because otherwise we'll end up with undefined
-            # forwards floating around.
-            for var in self._varname_to_type:
-                if var in replacedVarTypes:
-                    self._varname_to_type[var] = typeWrapper(replacedVarTypes[var])
-                elif isinstance(self._varname_to_type[var], type):
-                    self._varname_to_type[var] = typeWrapper(
-                        self.replaceClosureTypesIn(self._varname_to_type[var].typeRepresentation)
-                    )
 
         _closureCycleMemo[closureKey] = (self.closureType, dict(self.functionDefToType))
 
