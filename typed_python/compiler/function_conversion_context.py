@@ -205,7 +205,7 @@ class ConversionContextBase:
         return False
 
     def getInputTypes(self):
-        return self._input_types
+        return [typeWrapper(t.typeRepresentation) for t in self._input_types]
 
     def knownOutputType(self):
         """If the output type is known ahead, then that type (as a wrapper). Else, None"""
@@ -619,7 +619,7 @@ class ConversionContextBase:
         return context.finalize(native_ast.Expression.Return())
 
     def _constructInitialVarnameToType(self):
-        input_types = self._input_types
+        input_types = self.getInputTypes()
 
         self._argnames = list(self._closureVarnames) + list(self.funcArgNames)
 
