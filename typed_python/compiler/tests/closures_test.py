@@ -1118,3 +1118,20 @@ class TestCompilingClosures(unittest.TestCase):
             return callIt2(f, x)
 
         assert callIt(makeClosure(float, int), "1.2") == 11.2
+
+    def test_nonpod_masquerading_closures(self):
+        def closureFunc(args):
+            strings = [str(arg) for arg in args]
+            res = ""
+            for string in strings:
+                res += string
+            return res
+
+        @Entrypoint
+        def call(func, arg1, arg2):
+            return func(arg1, arg2)
+
+        def bind(arg1, arg2):
+            return call(lambda *args: closureFunc(args), arg1, arg2)
+
+        bind("a", "b")
