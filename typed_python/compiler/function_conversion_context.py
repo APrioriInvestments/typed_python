@@ -1692,7 +1692,7 @@ class FunctionConversionContext(ConversionContextBase):
                             cond_context.convert_expression_ast(elt).expr_type.typeRepresentation.Value
                             for elt in h.type.elts
                         ]
-                        exc_type = tuple(types)
+                        exc_match = tuple(types)
                         # exc_type = OneOf(*[Value(t) for t in types])
                         exc_type = BaseException
                     else:

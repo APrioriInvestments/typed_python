@@ -205,3 +205,34 @@ def test_catch_and_return_none():
 
     assert trySplit("a_b") == "ab"
     assert trySplit("a_b_c") is None
+
+
+def test_catch_tuples_of_exceptions():
+    @Entrypoint
+    def f(g):
+        try:
+            return g()
+
+        except (ValueError, KeyError):
+            return 0
+
+    def g1():
+        raise ValueError()
+
+    def g2():
+        raise KeyError()
+
+    def g3():
+        raise TypeError()
+
+    assert f(g1) == 0
+    assert f(g2) == 0
+
+    try:
+        f(g3)
+        raisedTypeError = False
+    except TypeError:
+        raisedTypeError = True
+    finally:
+        if not raisedTypeError:
+            raise Exception("Failed")
