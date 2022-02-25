@@ -13,6 +13,11 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
+from typed_python.compiler.type_wrappers.tuple_of_wrapper import (
+    tuple_or_list_contains,
+    tuple_or_list_contains_not,
+)
+
 from typed_python.compiler.merge_type_wrappers import mergeTypes
 from typed_python import (
     _types, Int32, Tuple, NamedTuple, Function, Dict, Set, ConstDict, ListOf, TupleOf
@@ -259,6 +264,34 @@ class TupleWrapper(Wrapper):
             return funcTypeWrapper.convert_call(context, None, (left, right), {})
 
         return super().convert_bin_op(context, left, op, right, inplace)
+
+    def convert_bin_op_reverse(self, context, right, op, left, inplace):  # For TupleOf(int)
+        if op.matches.In or op.matches.NotIn:
+            uniqueElementTypes = set(self.typeRepresentation.ElementTypes)
+
+            if len(uniqueElementTypes) == 0:
+                return context.constant(False) if op.matches.In else context.constant(True)
+
+            elif len(uniqueElementTypes) == 1:
+                elementType = uniqueElementTypes.pop()
+
+                left = left.convert_to_type(elementType, ConversionLevel.Implicit)
+
+                if left is None:
+                    return None
+
+                return context.call_py_function(
+                    tuple_or_list_contains if op.matches.In else tuple_or_list_contains_not,
+                    (right, left),
+                    {},
+                )
+
+            else:
+                raise Exception(
+                    "You can't call In on a Tuple containing more than one element type... yet."
+                )
+
+        return super().convert_bin_op_reverse(context, right, op, left, inplace)
 
     def convert_getitem(self, context, expr, index):
         index = index.toIndex()

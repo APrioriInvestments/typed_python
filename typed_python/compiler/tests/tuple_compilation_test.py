@@ -459,3 +459,34 @@ class TestTupleCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "Can't default initialize member 'c'"):
             checkIt()
+
+    def test_can_handle_in_op(self):
+        @Entrypoint
+        def check(value, tpTuple, isIn=True):
+            if isIn:
+                return value in tpTuple
+            else:
+                return value not in tpTuple
+
+        tpTuple = Tuple(int, int, int)((1, 2, 3))
+        @Entrypoint
+        def checkCapture(value):
+            return value in tpTuple
+
+        # Check case where you pass a Tuple
+        assert check(1, tpTuple)
+        assert not check(4, tpTuple)
+
+        # Check empty case
+        assert not check(1, Tuple()())
+        assert check(1, Tuple()(), False)
+
+        # Check capture.
+        assert checkCapture(1)
+        assert not checkCapture(4)
+
+        # Check exception in heterogeneous case.
+        with self.assertRaisesRegex(
+            Exception, "You can't call In on a Tuple containing more than one element type... yet."
+        ):
+            check(1, Tuple(str, int)(("a", 1)))
