@@ -115,6 +115,9 @@ class hash_table_layout {
     // remove an item with the given hash. returning the item slot where it
     // lived.
     //-1 if not found
+    // This might compress the table, invalidating any pointers to its internals that are
+    // held by the caller. In particular, the caller should NOT pass a 'compare' function
+    // that compares to a pointer to our internals.
     template <class eq_func>
     int32_t remove(int32_t item_size, typed_python_hash_type hash, const eq_func& compare) {
         if (!hash_table_slots) {
