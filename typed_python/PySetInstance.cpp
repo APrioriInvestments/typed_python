@@ -1020,7 +1020,13 @@ PyObject* PySetInstance::setPop(PyObject* o, PyObject* args) {
 
     PyObject* result = extractPythonObject(keyPtr, self_type->keyType());
 
-    self_type->discard(self_ptr, keyPtr);
+    Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
+        copyConstructFromPythonInstance(self_w->type()->keyType(), data, result, ConversionLevel::UpcastContainers);
+    });
+
+    if (!self_type->discard(self_ptr, key.data())) {
+        throw std::runtime_error("failed to discard the element popped");
+    }
 
     return result;
 }
