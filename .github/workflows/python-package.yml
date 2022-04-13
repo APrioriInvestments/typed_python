@@ -91,7 +91,7 @@ jobs:
         python --version
         pip --version
         pip freeze
-        pip install -v git+git://github.com/APrioriInvestments/typed_python.git@${GITHUB_SHA}
+        pip install -v git+https://github.com/APrioriInvestments/typed_python.git@${GITHUB_SHA}
 
     - name: import typed_python
       run : |
