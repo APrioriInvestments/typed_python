@@ -583,7 +583,11 @@ class SerializationContext:
             representation = {}
             representation["qualname"] = inst.__qualname__
             representation["name"] = inst.__name__
-            representation["module"] = inst.__module__
+            if self.encodeLineInformationForCode:
+                representation["module"] = inst.__module__
+            else:
+                representation["module"] = ""
+
             representation["annotations"] = inst.__annotations__
             representation["defaults"] = inst.__defaults__
             representation["kwdefaults"] = inst.__kwdefaults__
