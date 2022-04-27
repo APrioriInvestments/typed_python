@@ -2781,3 +2781,9 @@ class TypesSerializationTest(unittest.TestCase):
         # few milliseconds.
         assert .1 <= avgTimeHeld[0] <= .9
         assert .1 <= avgTimeHeld[1] <= .9
+
+    def test_serialization_context_names_for_pmap_functions(self):
+        from typed_python.lib.pmap import ensureThreads
+        sc = SerializationContext()
+        assert sc.nameForObject(type(ensureThreads)) is not None
+

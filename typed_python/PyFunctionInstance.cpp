@@ -758,12 +758,6 @@ void PyFunctionInstance::mirrorTypeInformationIntoPyTypeConcrete(Function* inTyp
 
     PyDict_SetItemString(
         pyType->tp_dict,
-        "__module__",
-        PyUnicode_FromString(inType->moduleName().c_str())
-    );
-
-    PyDict_SetItemString(
-        pyType->tp_dict,
         "overloads",
         overloads
     );

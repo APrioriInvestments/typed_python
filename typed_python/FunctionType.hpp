@@ -1500,6 +1500,14 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
+    std::string nameWithModuleConcrete() {
+        if (mModulename.size() == 0) {
+            return mRootName;
+        }
+
+        return mModulename + "." + mRootName;
+    }
+
     bool _updateAfterForwardTypesChanged() {
         m_name = mRootName;
         m_stripped_name = "";

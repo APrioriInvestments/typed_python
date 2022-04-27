@@ -15,7 +15,21 @@ import unittest
 from typed_python import TupleOf, ConstDict, Function, Entrypoint
 
 
+@Function
+def thisIsAFunction():
+    pass
+
+
 class NativeFunctionTypesTests(unittest.TestCase):
+    def test_function_names_correct(self):
+        assert type(thisIsAFunction).__name__ == 'thisIsAFunction'
+        assert type(thisIsAFunction).__module__ == NativeFunctionTypesTests.__module__
+        assert type(thisIsAFunction).__qualname__ == "thisIsAFunction"
+
+        assert thisIsAFunction.__name__ == 'thisIsAFunction'
+        assert thisIsAFunction.__module__ == NativeFunctionTypesTests.__module__
+        assert thisIsAFunction.__qualname__ == "thisIsAFunction"
+
     def test_create_simple_function(self):
         @Function
         def f(x: int) -> int:
