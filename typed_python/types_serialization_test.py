@@ -2786,4 +2786,3 @@ class TypesSerializationTest(unittest.TestCase):
         from typed_python.lib.pmap import ensureThreads
         sc = SerializationContext()
         assert sc.nameForObject(type(ensureThreads)) is not None
-
