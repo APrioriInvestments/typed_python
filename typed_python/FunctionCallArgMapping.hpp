@@ -91,6 +91,14 @@ public:
     }
 
     void pushPositionalArg(PyObject* arg) {
+        if (!arg) {
+            PyErr_Format(
+                PyExc_RuntimeError,
+                "Can't push an empty positional argument!"
+            );
+            throw PythonExceptionSet();
+        }
+
         if (!mIsValid) {
             return;
         }
@@ -182,17 +190,35 @@ public:
     // return true if we can show we don't match without having to do
     // type coersion
     bool definitelyDoesntMatch(ConversionLevel conversionLevel) {
+        if (!mIsValid) {
+            return true;
+        }
+
         for (long k = 0; k < mArgs.size(); k++) {
             auto& arg = mArgs[k];
 
             if (arg.getIsNormalArg() && arg.getTypeFilter()) {
-                if (!PyInstance::pyValCouldBeOfType(
-                    arg.getTypeFilter(),
-                    mSingleValueArgs[k],
-                    conversionLevel
-                    )
-                ) {
-                    return true;
+                if (k >= mSingleValueArgs.size()) {
+                    return false;
+                } else {
+                    if (!mSingleValueArgs[k]) {
+                        PyErr_Format(
+                            PyExc_RuntimeError,
+                            "Found an empty arg at slot %d / %d",
+                            k,
+                            mSingleValueArgs.size()
+                        );
+                        throw PythonExceptionSet();
+                    }
+
+                    if (!PyInstance::pyValCouldBeOfType(
+                        arg.getTypeFilter(),
+                        mSingleValueArgs[k],
+                        conversionLevel
+                        )
+                    ) {
+                        return true;
+                    }
                 }
             }
         }
