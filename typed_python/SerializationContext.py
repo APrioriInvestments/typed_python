@@ -258,7 +258,7 @@ class SerializationContext:
             if tName is not None:
                 return ".alt." + tName + ":" + str(t.Index)
 
-        if issubclass(t, TypeFunction):
+        if isinstance(t, type) and issubclass(t, TypeFunction):
             if len(t.MRO) == 2:
                 name = t.__module__ + "." + t.__name__
                 if self.objectFromName(name, allowImport=False) is t:

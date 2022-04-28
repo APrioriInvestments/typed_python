@@ -1810,6 +1810,8 @@ class TypesSerializationTest(unittest.TestCase):
         )
 
     def test_serialize_module_level_class(self):
+        assert ModuleLevelClass.__module__ == 'typed_python.types_serialization_test'
+
         sc = SerializationContext().withoutCompression()
 
         self.assertIs(sc.deserialize(sc.serialize(ModuleLevelClass)), ModuleLevelClass)

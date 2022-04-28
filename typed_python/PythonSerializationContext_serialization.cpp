@@ -301,10 +301,19 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
     serializePythonObject((PyObject*)o->ob_type, b, 0);
     PyObjectStealer objDict(PyObject_GenericGetDict(o, nullptr));
     if (!objDict) {
-        PyErr_Format(PyExc_TypeError,
-            "Object %S (of type %S) had no dict", o, o->ob_type
-        );
-
+        if (PyCFunction_Check(o)) {
+            PyErr_Format(PyExc_TypeError,
+                "Method %s (of instance %S) had no dict.",
+                ((PyCFunctionObject*)o)->m_ml ? ((PyCFunctionObject*)o)->m_ml->ml_name : "<NULL>",
+                PyCFunction_GetSelf(o) ? (PyObject*)PyCFunction_GetSelf(o) : Py_None
+            );
+        } else {
+            PyErr_Format(PyExc_TypeError,
+                "Object %S (of type %S) had no dict.",
+                o,
+                o->ob_type
+            );
+        }
         throw PythonExceptionSet();
     }
     serializePythonObject(objDict, b, 1);
@@ -610,11 +619,21 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                         PyObjectStealer objDict(PyObject_GenericGetDict(obj.pyobj(), nullptr));
 
                         if (!objDict) {
-                            PyErr_Format(PyExc_TypeError,
-                                "Object %S (of type %S) had no dict.",
-                                obj.pyobj(),
-                                obj.pyobj()->ob_type
-                            );
+                            if (PyCFunction_Check(obj.pyobj())) {
+                                auto o = obj.pyobj();
+
+                                PyErr_Format(PyExc_TypeError,
+                                    "Method %s (of instance %S) had no dict.",
+                                    ((PyCFunctionObject*)o)->m_ml ? ((PyCFunctionObject*)o)->m_ml->ml_name : "<NULL>",
+                                    PyCFunction_GetSelf(o) ? (PyObject*)PyCFunction_GetSelf(o) : Py_None
+                                );
+                            } else {
+                                PyErr_Format(PyExc_TypeError,
+                                    "Object %S (of type %S) had no dict.",
+                                    obj.pyobj(),
+                                    obj.pyobj()->ob_type
+                                );
+                            }
 
                             throw PythonExceptionSet();
                         }
