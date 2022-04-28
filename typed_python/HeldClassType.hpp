@@ -853,21 +853,20 @@ public:
         }
     }
 
-    void initializeMRO() {
-        // this is not how the MRO actually works, but we have yet to actually
-        // code it correctly.
-        _computeMroSequence();
+    // every HeldClass has a set of functions that are defined within that specific
+    // class body, and then they have the fully formed versions of those functions that
+    // inherit and overload the versions defined in their base classes.
+    // this function builds the versions we actually call from our own and our parent
+    // versions.
 
-        for (size_t i = 0; i < m_mro.size(); i++) {
-            m_ancestor_to_mro_index[m_mro[i]] = i;
-        }
+    // this function can be called multiple times, which happens after the class is
+    // deserialized, since we may be rebuilding the function globals.
+    void mergeOwnFunctionsIntoInheritanceTree() {
+        m_classMembers.clear();
+        m_memberFunctions.clear();
+        m_classMethods.clear();
+        m_propertyFunctions.clear();
 
-        if (m_ancestor_to_mro_index.find(this) == m_ancestor_to_mro_index.end() ||
-                m_ancestor_to_mro_index.find(this)->second != 0) {
-            throw std::runtime_error("Somehow " + m_name + " doesn't have itself as MRO 0");
-        }
-
-        // build our own method resolution table directly from our parents.
         for (HeldClass* base: m_mro) {
             for (auto nameAndObj: base->m_own_classMembers) {
                 if (m_classMembers.find(nameAndObj.first) == m_classMembers.end()) {
@@ -880,6 +879,22 @@ public:
             mergeInto(m_classMethods, base->m_own_classMethods);
             mergeInto(m_propertyFunctions, base->m_own_propertyFunctions);
         }
+    }
+
+    void initializeMRO() {
+        _computeMroSequence();
+
+        for (size_t i = 0; i < m_mro.size(); i++) {
+            m_ancestor_to_mro_index[m_mro[i]] = i;
+        }
+
+        if (m_ancestor_to_mro_index.find(this) == m_ancestor_to_mro_index.end() ||
+                m_ancestor_to_mro_index.find(this)->second != 0) {
+            throw std::runtime_error("Somehow " + m_name + " doesn't have itself as MRO 0");
+        }
+
+        // build our own method resolution table directly from our parents.
+        mergeOwnFunctionsIntoInheritanceTree();
 
         std::set<std::string> membersSoFar;
 

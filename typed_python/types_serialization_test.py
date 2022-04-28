@@ -2613,6 +2613,25 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert f(10) == 10
 
+    def test_can_serialize_classes_with_methods_and_custom_globals(self):
+        def f(self):
+            return x
+
+        f = Function(createFunctionWithLocalsAndGlobals(f.__code__, {'x': 10}))
+
+        class Base(Class):
+            def func(self):
+                pass
+
+        class Child(Base):
+            func = f
+
+        s = SerializationContext().withoutInternalizingTypeGroups().withFunctionGlobalsAsIs()
+
+        Child2 = s.deserialize(s.serialize(Child))
+
+        assert Child2().func() == 10
+
     def test_can_reserialize_deserialized_function_with_no_backing_file(self):
         # when we serialize an anonymous function on one machine, where we have
         # a definition for that code, we need to ensure that on another machine,

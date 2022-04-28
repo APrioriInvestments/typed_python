@@ -946,6 +946,18 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                     }
                 });
             });
+
+            // now that we've set function globals, we need to go over all the classes and
+            // held classes and make sure the versions of the function types they're actually
+            // using have the new definitions. Unfortunately, Overload objects are not pointers
+            // (maybe they should be?) and so when we merge Overloads from base/child classes
+            // they don't get their globals replaced with the appropriate values
+            for (auto& indexAndNativeType: indicesOfNativeTypes) {
+                Type* nt = indexAndNativeType.second;
+                if (nt && nt->isHeldClass()) {
+                    ((HeldClass*)nt)->mergeOwnFunctionsIntoInheritanceTree();
+                }
+            }
         } else
         if (fieldNumber == 5) {
             // field 5 indicates that this is a mutually recursive type group

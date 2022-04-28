@@ -1,7 +1,7 @@
 import numpy
 import pytest
 import time
-from typed_python import Entrypoint, ListOf, Dict
+from typed_python import Entrypoint, ListOf, Dict, SerializationContext
 from typed_python.lib.sorted_dict import SortedDict
 
 
@@ -126,3 +126,19 @@ def test_sorted_dict_comparator():
     d._checkInvariants()
 
     assert list(d) == list(reversed(range(10)))
+
+
+def test_sorted_dict_compiled_iter():
+    d = SortedDict(int, int)()
+
+    for i in range(10):
+        d[i] = i
+
+    def addItUp(d):
+        res = 0
+        for k in d:
+            res  += k
+        return res
+
+    assert addItUp(d) == 45
+    assert Entrypoint(addItUp)(d) == 45
