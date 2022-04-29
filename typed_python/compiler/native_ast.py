@@ -69,15 +69,15 @@ Type = Type.define(Alternative(
     attr_ix=type_attr_ix,
     __str__=type_str,
     pointer=lambda self: Type.Pointer(value_type=self),
-    zero=lambda self: Expression.Constant(
+    zero=lambda self: Expression.Constant(self.zeroConstant()),
+    zeroConstant=lambda self:
         Constant.Void() if self.matches.Void else
         Constant.Float(val=0.0, bits=self.bits) if self.matches.Float else
         Constant.Int(val=0, bits=self.bits, signed=self.signed) if self.matches.Int else
-        Constant.Struct(elements=[(name, t.zero()) for name, t in self.element_types]) if self.matches.Struct else
+        Constant.Struct(elements=[(name, t.zeroConstant()) for name, t in self.element_types]) if self.matches.Struct else
         Constant.NullPointer(value_type=self.value_type) if self.matches.Pointer else
-        Constant.Array(value_type=self, values=[self.element_type.zero()] * self.count) if self.matches.Array else
+        Constant.Array(value_type=self, values=[self.element_type.zeroConstant()] * self.count) if self.matches.Array else
         raising(Exception("Can't make a zero value from %s" % self))
-    )
 ))
 
 

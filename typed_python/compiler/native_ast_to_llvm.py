@@ -158,7 +158,7 @@ def constant_to_typed_llvm_value(module, builder, c):
         return TypedLLVMValue(None, native_ast.Type.Void())
 
     if c.matches.Array:
-        vals = [constant_to_typed_llvm_value(module, builder, t) for _, t in c.values]
+        vals = [constant_to_typed_llvm_value(module, builder, t) for t in c.values]
 
         t = llvmlite.ir.ArrayType(type_to_llvm_type(c.value_type.element_type), c.value_type.count)
 
