@@ -660,7 +660,7 @@ class PythonToNativeConverter:
             assertIsRoot=assertIsRoot
         )
 
-    def hashObjectToIdentity(self, hashable):
+    def hashObjectToIdentity(self, hashable, isModuleVal=False):
         if isinstance(hashable, Hash):
             return hashable
 
@@ -673,17 +673,14 @@ class PythonToNativeConverter:
         if hashable is None:
             return Hash.from_integer(1) + Hash.from_integer(0)
 
+        if isinstance(hashable, (dict, list)) and isModuleVal:
+            # don't look into dicts and lists at module level
+            return Hash.from_integer(2)
+
         if isinstance(hashable, (tuple, list)):
             res = Hash.from_integer(len(hashable))
             for t in hashable:
-                res += self.hashObjectToIdentity(t)
-            return res
-
-        if isinstance(hashable, dict):
-            res = Hash.from_integer(len(hashable))
-            for t in sorted(hashable):
-                res += self.hashObjectToIdentity(t)
-                res += self.hashObjectToIdentity(hashable[t])
+                res += self.hashObjectToIdentity(t, isModuleVal)
             return res
 
         if isinstance(hashable, Wrapper):
@@ -716,12 +713,12 @@ class PythonToNativeConverter:
         item = funcGlobals[dotSeq[0]]
 
         if not isinstance(item, ModuleType) or len(dotSeq) == 1:
-            return Hash.from_string(dotSeq[0]) + self.hashObjectToIdentity(item)
+            return Hash.from_string(dotSeq[0]) + self.hashObjectToIdentity(item, True)
 
         if not hasattr(item, dotSeq[1]):
             return Hash.from_integer(0)
 
-        return Hash.from_string(dotSeq[0] + "." + dotSeq[1]) + self.hashObjectToIdentity(getattr(item, dotSeq[1]))
+        return Hash.from_string(dotSeq[0] + "." + dotSeq[1]) + self.hashObjectToIdentity(getattr(item, dotSeq[1]), True)
 
     def convert(
         self,
