@@ -106,6 +106,9 @@ DEFAULT_NAME_TO_OVERRIDE = {
     ".builtin.module_type": ModuleType,
     ".builtin.method_type": MethodType,
     ".builtin.function_type": FunctionType,
+    ".builtin.ellipsis_type": type(...),
+    ".builtin.ellipsis": ...,
+    ".builtin.NotImplemented": NotImplemented
 }
 
 
@@ -461,15 +464,21 @@ class SerializationContext:
             @param inst: an instance to be serialized
             @return a representation object or None
         '''
+        if type(inst) in (tuple, list, dict, set, str, int, bool, float):
+            return None
+
+        if isinstance(inst, CellType):
+            return None
+
         if isinstance(inst, types.ModuleType) and inst is not sys.modules.get(inst.__name__):
             # this is an 'unnamed' module
             return (types.ModuleType, (inst.__name__,), inst.__dict__)
 
         if isinstance(inst, LockType):
-            return (threading.Lock, (), None)
+            return (threading.Lock, ())
 
         if isinstance(inst, RLock):
-            return (threading.RLock, (), None)
+            return (threading.RLock, ())
 
         if isinstance(inst, type):
             # only serialize Class and Alternative objects from type functions.
@@ -520,30 +529,6 @@ class SerializationContext:
 
         if isinstance(inst, classmethod):
             return (classmethod, (None,), inst.__func__)
-
-        if isinstance(inst, numpy.ndarray):
-            return inst.__reduce__()
-
-        if isinstance(inst, numpy.number):
-            return inst.__reduce__() + (None,)
-
-        if isinstance(inst, numpy.dtype):
-            return (numpy.dtype, (str(inst),), None)
-
-        if isinstance(inst, datetime.datetime):
-            return inst.__reduce__() + (None,)
-
-        if isinstance(inst, datetime.date):
-            return inst.__reduce__() + (None,)
-
-        if isinstance(inst, datetime.time):
-            return inst.__reduce__() + (None,)
-
-        if isinstance(inst, datetime.timedelta):
-            return inst.__reduce__() + (None,)
-
-        if isinstance(inst, datetime.tzinfo):
-            return inst.__reduce__() + (None,)
 
         if isinstance(inst, CodeType):
             pyast = convertFunctionToAlgebraicPyAst(
@@ -626,9 +611,17 @@ class SerializationContext:
 
             return (createFunctionWithLocalsAndGlobals, args, representation)
 
+        if not isinstance(inst, type) and hasattr(type(inst), '__reduce_ex__'):
+            return inst.__reduce_ex__(4)
+
+        if not isinstance(inst, type) and hasattr(type(inst), '__reduce__'):
+            return inst.__reduce__()
+
         return None
 
-    def setInstanceStateFromRepresentation(self, instance, representation):
+    def setInstanceStateFromRepresentation(
+        self, instance, representation=None, itemIt=None, kvPairIt=None, setStateFun=None
+    ):
         if representation is reconstructTypeFunctionType:
             return True
 
@@ -662,31 +655,6 @@ class SerializationContext:
         if isinstance(instance, CodeType):
             return True
 
-        if isinstance(instance, datetime.datetime):
-            return True
-
-        if isinstance(instance, datetime.date):
-            return True
-
-        if isinstance(instance, datetime.time):
-            return True
-
-        if isinstance(instance, datetime.timedelta):
-            return True
-
-        if isinstance(instance, datetime.tzinfo):
-            return True
-
-        if isinstance(instance, numpy.dtype):
-            return True
-
-        if isinstance(instance, numpy.number):
-            return True
-
-        if isinstance(instance, numpy.ndarray):
-            instance.__setstate__(representation)
-            return True
-
         if isinstance(instance, FunctionType):
             instance.__name__ = representation['name']
             instance.__qualname__ = representation['qualname']
@@ -714,5 +682,19 @@ class SerializationContext:
 
         if isinstance(instance, ModuleType):
             return True
+
+        if setStateFun is not None:
+            setStateFun(instance, representation)
+        elif hasattr(type(instance), '__setstate__') and representation is not None:
+            type(instance).__setstate__(instance, representation)
+        elif representation is not None:
+            instance.__dict__.update(representation)
+
+        if itemIt:
+            instance.extend(itemIt)
+
+        if kvPairIt:
+            for key, val in kvPairIt:
+                instance[key] = val
 
         return False

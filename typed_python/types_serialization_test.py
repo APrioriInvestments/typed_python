@@ -320,7 +320,7 @@ def ping_pong(obj, serialization_context=None):
     try:
         return serialization_context.withoutCompression().deserialize(s)
     except Exception:
-        print("FAILED TO DECODE:")
+        print("FAILED TO DESERIALIZE:")
         print(s)
         print(pprint.PrettyPrinter(indent=2).pprint(decodeSerializedObject(s)))
         raise
@@ -824,38 +824,17 @@ class TypesSerializationTest(unittest.TestCase):
         self.check_recursive_collection_and_inst(frozenset)
 
     def test_serialize_base_type_subclass(self):
-        with self.assertRaises(TypeError):
-            sc.serialize(MyInt())
-
-        with self.assertRaises(TypeError):
-            sc.serialize(MyFloat())
-
-        with self.assertRaises(TypeError):
-            sc.serialize(MyComplex())
-
-        with self.assertRaises(TypeError):
-            sc.serialize(MyStr())
-
-        with self.assertRaises(TypeError):
-            sc.serialize(MyUnicode())
-
-        with self.assertRaises(TypeError):
-            sc.serialize(MyBytes())
-
-        with self.assertRaises(TypeError):
-            sc.serialize(MyTuple())
-
-        with self.assertRaises(TypeError):
-            sc.serialize(MyList())
-
-        with self.assertRaises(TypeError):
-            sc.serialize(MyDict())
-
-        with self.assertRaises(TypeError):
-            sc.serialize(MySet())
-
-        with self.assertRaises(TypeError):
-            sc.serialize(MyFrozenSet())
+        assert sc.deserialize(sc.serialize(MyInt())) == MyInt()
+        assert sc.deserialize(sc.serialize(MyFloat())) == MyFloat()
+        assert sc.deserialize(sc.serialize(MyComplex())) == MyComplex()
+        assert sc.deserialize(sc.serialize(MyStr())) == MyStr()
+        assert sc.deserialize(sc.serialize(MyUnicode())) == MyUnicode()
+        assert sc.deserialize(sc.serialize(MyBytes())) == MyBytes()
+        assert sc.deserialize(sc.serialize(MyTuple())) == MyTuple()
+        assert sc.deserialize(sc.serialize(MyList())) == MyList()
+        assert sc.deserialize(sc.serialize(MyDict())) == MyDict()
+        assert sc.deserialize(sc.serialize(MySet())) == MySet()
+        assert sc.deserialize(sc.serialize(MyFrozenSet())) == MyFrozenSet()
 
     def test_serialize_unicode_1(self):
         endcases = ['', '<\\u>', '<\\\u1234>', '<\n>',
@@ -908,13 +887,11 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(deserializedVal, 1.0)
         self.assertIsInstance(deserializedVal, numpy.float64)
 
-    @pytest.mark.skip(reason="it fails")
     def test_serialize_reduce(self):
         inst = AAA()
         loaded = ping_pong(inst, sc)
         self.assertEqual(loaded, REDUCE_A)
 
-    @pytest.mark.skip(reason="fails with: tp_new threw an exception")
     def test_serialize_getinitargs(self):
         inst = initarg(1, 2)
         loaded = ping_pong(inst)
@@ -935,7 +912,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(a, b)
         self.assertIs(type(a), type(b))
 
-    @pytest.mark.skip(reason="fails with: TypeError: Classes derived from `tuple` cannot be serialized")
+    @pytest.mark.skip(reason="Fails on 3.8 for some reason")
     def test_serialize_structseq(self):
         import time
         import os
@@ -952,17 +929,14 @@ class TypesSerializationTest(unittest.TestCase):
             u = ping_pong(t)
             self.assert_is_copy(t, u)
 
-    @pytest.mark.skip(reason="fails")
     def test_serialize_ellipsis(self):
         u = ping_pong(...)
         self.assertIs(..., u)
 
-    @pytest.mark.skip(reason="fails")
     def test_serialize_notimplemented(self):
         u = ping_pong(NotImplemented)
         self.assertIs(NotImplemented, u)
 
-    @pytest.mark.skip(reason="fails")
     def test_serialize_singleton_types(self):
         # Issue #6477: Test that types of built-in singletons can be pickled.
         singletons = [None, ..., NotImplemented]
@@ -980,7 +954,6 @@ class TypesSerializationTest(unittest.TestCase):
         loaded = ping_pong(obj)
         self.assert_is_copy(obj, loaded)
 
-    @pytest.mark.skip(reason="fails with: AssertionError: 'bar' is not 'bar'")
     def test_serialize_attribute_name_interning(self):
         # Test that attribute names of pickled objects are interned when
         # unpickling.

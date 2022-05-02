@@ -258,45 +258,6 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
 
     b.writeUnsignedVarintObject(FieldNumbers::MEMO, b.cachePointer(o).first);
 
-    //check whether this is a type derived from a serializable native type, which we don't support
-    if (PyLong_Check(o)) {
-        throwDerivedClassError("long");
-    }
-    if (PyFloat_Check(o)) {
-        throwDerivedClassError("float");
-    }
-    if (PyBytes_Check(o)) {
-        throwDerivedClassError("bytes");
-    }
-    if (PyComplex_Check(o)) {
-        throwDerivedClassError("complex");
-    }
-    if (PyUnicode_Check(o)) {
-        throwDerivedClassError("str");
-    }
-    if (PyList_Check(o)) {
-        throwDerivedClassError("list");
-    }
-    if (PyTuple_Check(o)) {
-        throwDerivedClassError("tuple");
-    }
-    if (PySet_Check(o)) {
-        throwDerivedClassError("set");
-    }
-    if (PyFrozenSet_Check(o)) {
-        throwDerivedClassError("frozenset");
-    }
-    if (PyDict_Check(o)) {
-        throwDerivedClassError("dict");
-    }
-    if (PyModule_Check(o)) {
-        throw std::runtime_error(
-            std::string("Cannot serialize module '")
-            + PyModule_GetName(o)
-            + "'. This code should be unreachable."
-        );
-    }
-
     b.writeBeginCompound(FieldNumbers::OBJECT_TYPEANDDICT);
     serializePythonObject((PyObject*)o->ob_type, b, 0);
     PyObjectStealer objDict(PyObject_GenericGetDict(o, nullptr));
@@ -323,21 +284,19 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
 void PythonSerializationContext::serializePythonObjectRepresentation(PyObject* representation, SerializationBuffer& b, size_t fieldNumber) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    if (!PyTuple_Check(representation) || PyTuple_Size(representation) != 3) {
-        throw std::runtime_error("representationFor should return None or a tuple with 3 things");
+    if (!PyTuple_Check(representation) || PyTuple_Size(representation) < 2 
+            || PyTuple_Size(representation) > 6) {
+        throw std::runtime_error("representationFor should return None or a tuple with 2 to 6 things");
     }
     if (!PyTuple_Check(PyTuple_GetItem(representation, 1))) {
         throw std::runtime_error("representationFor second arguments should be a tuple");
     }
 
-    PyObjectHolder rep0(PyTuple_GetItem(representation, 0));
-    PyObjectHolder rep1(PyTuple_GetItem(representation, 1));
-    PyObjectHolder rep2(PyTuple_GetItem(representation, 2));
-
     b.writeBeginCompound(fieldNumber);
-    serializePythonObject(rep0, b, 0);
-    serializePythonObject(rep1, b, 1);
-    serializePythonObject(rep2, b, 2);
+    for (long ix = 0; ix < PyTuple_Size(representation); ix++) {
+        PyObjectHolder rep(PyTuple_GetItem(representation, ix));
+        serializePythonObject(rep, b, ix);
+    }
     b.writeEndCompound();
 }
 
@@ -533,8 +492,9 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                     }
 
                     if (representation != Py_None) {
-                        if (!PyTuple_Check(representation) || PyTuple_Size(representation) != 3) {
-                            throw std::runtime_error("representationFor should return None or a tuple with 3 things");
+                        if (!PyTuple_Check(representation) || PyTuple_Size(representation) < 2 
+                                || PyTuple_Size(representation) > 6) {
+                            throw std::runtime_error("representationFor should return None or a tuple with 2 to 6 things");
                         }
                         if (!PyTuple_Check(PyTuple_GetItem(representation, 1))) {
                             throw std::runtime_error("representationFor second arguments should be a tuple");
@@ -548,7 +508,9 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                         serializePythonObject(PyTuple_GetItem(representation, 0), b, 1);
                         serializePythonObject(PyTuple_GetItem(representation, 1), b, 2);
 
-                        indicesWrittenAsObjectAndRep[index].set(PyTuple_GetItem(representation, 2));
+                        indicesWrittenAsObjectAndRep[index].steal(
+                            PyTuple_GetSlice(representation, 2, PyTuple_Size(representation))
+                        );
                     } else
                     if (PyTuple_Check(obj.pyobj())) {
                         b.writeUnsignedVarintObject(0, 5);

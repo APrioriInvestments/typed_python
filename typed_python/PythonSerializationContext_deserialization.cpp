@@ -274,26 +274,26 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromName(Deserializ
 PyObject* PythonSerializationContext::deserializePythonObjectFromRepresentation(DeserializationBuffer& b, size_t inWireType, int64_t memo) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    PyObjectHolder factory, factoryArgs;
     PyObjectHolder value;
-    PyObjectHolder state;
+
+    std::vector<PyObjectHolder> holders;
 
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
-        if (fieldNumber == 0) {
-            factory.steal(deserializePythonObject(b, wireType));
-        }
-        else if (fieldNumber == 1) {
-            if (!factory) {
-                throw std::runtime_error("Corrupt stream: no factory defined for python object representation");
-            }
+        if (fieldNumber != holders.size()) {
+            throw std::runtime_error("Corrupt stream: pythonObjectRepresentation");
+        } else {
+            PyObjectHolder holder;
+            holder.steal(deserializePythonObject(b, wireType));
 
-            factoryArgs.steal(deserializePythonObject(b, wireType));
-
-            if (!factoryArgs) {
+            if (!holder) {
                 throw PythonExceptionSet();
             }
 
-            value.steal(PyObject_Call((PyObject*)factory, (PyObject*)factoryArgs, NULL));
+            holders.push_back(holder);
+        }
+
+        if (holders.size() == 2) {
+            value.steal(PyObject_Call((PyObject*)holders[0], (PyObject*)holders[1], NULL));
 
             if (!value) {
                 throw PythonExceptionSet();
@@ -303,34 +303,37 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromRepresentation(
                 b.addCachedPyObj(memo, incref(value));
             }
         }
-        else if (fieldNumber == 2) {
-            if (!value) {
-                throw std::runtime_error("Invalid representation.");
-            }
-
-            state.steal(deserializePythonObject(b, wireType));
-
-            if (!state) {
-                throw PythonExceptionSet();
-            }
-
-            PyObjectStealer res(
-                PyObject_CallMethod(mContextObj, "setInstanceStateFromRepresentation", "OO", (PyObject*)value, (PyObject*)state)
-            );
-
-            if (!res) {
-                throw PythonExceptionSet();
-            }
-            if (res != Py_True) {
-                throw std::runtime_error("setInstanceStateFromRepresentation didn't return True.");
-            }
-        } else {
-            throw std::runtime_error("corrupt python object representation");
-        }
     });
+
+    if (holders.size() < 2 || holders.size() > 6) {
+        throw std::runtime_error("Corrupt stream: pythonObjectRepresentation should be 2-6 items");
+    }
 
     if (!value) {
         throw std::runtime_error("Invalid representation.");
+    }
+
+    PyObjectHolder res;
+
+    static PyObject* methodName = PyUnicode_FromString(
+        "setInstanceStateFromRepresentation"
+    );
+
+    res.steal(
+        PyObject_CallMethodObjArgs(
+            mContextObj, 
+            methodName, 
+            (PyObject*)value,
+            (holders.size() > 2 ? (PyObject*)holders[2] : (PyObject*)nullptr),
+            (holders.size() > 3 ? (PyObject*)holders[3] : (PyObject*)nullptr),
+            (holders.size() > 4 ? (PyObject*)holders[4] : (PyObject*)nullptr),
+            (holders.size() > 5 ? (PyObject*)holders[5] : (PyObject*)nullptr),
+            (PyObject*)nullptr
+        )
+    );
+
+    if (!res) {
+        throw PythonExceptionSet();
     }
 
     return incref(value);
@@ -794,8 +797,9 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                 }
 
                 if (indicesWrittenAsObjectAndRep.find(indexInGroup) != indicesWrittenAsObjectAndRep.end()) {
-                    PyObjectStealer state(deserializePythonObject(b, subWireType));
-                    if (!state) {
+                    // the remaining parts of the __reduce__ call are encoded here
+                    PyObjectStealer trailingRepresentationParts(deserializePythonObject(b, subWireType));
+                    if (!trailingRepresentationParts) {
                         throw PythonExceptionSet();
                     }
 
@@ -804,13 +808,32 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                             throw std::runtime_error("Somehow indicesWrittenAsObjectAndRep[indexInGroup] is empty");
                         }
 
-                        PyObjectStealer res(
-                            PyObject_CallMethod(
-                                mContextObj,
-                                "setInstanceStateFromRepresentation",
-                                "OO",
-                                indicesWrittenAsObjectAndRep[indexInGroup],
-                                (PyObject*)state
+                        PyObjectHolder res;
+
+                        if (!PyTuple_Check(trailingRepresentationParts) || 
+                                PyTuple_Size(trailingRepresentationParts) > 4) {
+                            throw std::runtime_error(
+                                "trailingRepresentationParts is not a tuple with <= 4 elements"
+                            );
+                        }
+
+                        // this just seems so inelegant...
+                        int argCount = PyTuple_Size(trailingRepresentationParts);
+
+                        static PyObject* methodName = PyUnicode_FromString(
+                            "setInstanceStateFromRepresentation"
+                        );
+
+                        res.steal(
+                            PyObject_CallMethodObjArgs(
+                                mContextObj, 
+                                methodName, 
+                                (PyObject*)indicesWrittenAsObjectAndRep[indexInGroup],
+                                argCount > 0 ? PyTuple_GetItem((PyObject*)trailingRepresentationParts, 0) : (PyObject*)nullptr,
+                                argCount > 1 ? PyTuple_GetItem((PyObject*)trailingRepresentationParts, 1) : (PyObject*)nullptr,
+                                argCount > 2 ? PyTuple_GetItem((PyObject*)trailingRepresentationParts, 2) : (PyObject*)nullptr,
+                                argCount > 3 ? PyTuple_GetItem((PyObject*)trailingRepresentationParts, 3) : (PyObject*)nullptr,
+                                (PyObject*)nullptr
                             )
                         );
 

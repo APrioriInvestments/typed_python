@@ -26,12 +26,6 @@
 #endif
 
 
-static inline void throwDerivedClassError(std::string type) {
-    throw std::runtime_error(
-        std::string("Classes derived from `" + type + "` cannot be serialized")
-    );
-}
-
 // Wrapping this macro with a function so we can use it in templated code
 inline PyObject* PyList_Get_Item_No_Checks(PyObject* obj, long idx) {
     return PyList_GET_ITEM(obj, idx);
