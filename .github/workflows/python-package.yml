@@ -52,11 +52,18 @@ jobs:
 
     - name: Install dependencies
       run: |
+        echo "**** UPGRADE PIP"
         pip install --upgrade pip
+        echo "**** INSTALL PIPENV"
         pip install pipenv
 
+        echo "**** PIPENV LOCK"
         pipenv lock --dev --requirements > dev-reqs.txt
+        echo "**** dev-reqs.txt"
+        cat dev-reqs.txt
+        echo "**** pip install requirements"
         pip install --requirement dev-reqs.txt
+        echo "**** install TP locally"
         pip install -v -e .
 
     - name: Test with pytest
