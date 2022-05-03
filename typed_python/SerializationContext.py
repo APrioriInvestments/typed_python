@@ -24,9 +24,7 @@ from typed_python.type_function import TypeFunction, reconstructTypeFunctionType
 from types import FunctionType, ModuleType, CodeType, MethodType, BuiltinFunctionType
 from _thread import LockType, RLock
 import abc
-import numpy
 import sys
-import datetime
 import importlib
 import threading
 import types

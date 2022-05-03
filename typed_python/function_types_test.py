@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 import unittest
-from typed_python import TupleOf, ConstDict, Function, Entrypoint, Class
+from typed_python import TupleOf, ConstDict, Function, Entrypoint
 
 
 @Function

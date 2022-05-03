@@ -2615,7 +2615,7 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_can_serialize_classes_with_methods_and_custom_globals(self):
         def f(self):
-            return x
+            return x  # noqa
 
         f = Function(createFunctionWithLocalsAndGlobals(f.__code__, {'x': 10}))
 
