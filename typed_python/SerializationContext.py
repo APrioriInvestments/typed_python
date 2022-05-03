@@ -612,10 +612,28 @@ class SerializationContext:
             return (createFunctionWithLocalsAndGlobals, args, representation)
 
         if not isinstance(inst, type) and hasattr(type(inst), '__reduce_ex__'):
-            return inst.__reduce_ex__(4)
+            res = inst.__reduce_ex__(4)
+
+            # pickle supports a protocol where __reduce__ can return a string
+            # giving a global name. We'll already find that separately, so we
+            # don't want to handle it here. We ought to look at this in more detail
+            # however
+            if isinstance(res, str):
+                return None
+            
+            return res
 
         if not isinstance(inst, type) and hasattr(type(inst), '__reduce__'):
-            return inst.__reduce__()
+            res = inst.__reduce__()
+
+            # pickle supports a protocol where __reduce__ can return a string
+            # giving a global name. We'll already find that separately, so we
+            # don't want to handle it here. We ought to look at this in more detail
+            # however
+            if isinstance(res, str):
+                return None
+            
+            return res
 
         return None
 
