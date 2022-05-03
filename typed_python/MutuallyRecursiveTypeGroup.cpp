@@ -53,7 +53,7 @@ bool isCanonicalName(std::string name) {
         "numpy", "pandas", "scipy", "pytest", "_pytest", "typed_python", "object_database", "llvmlite",
         "requests", "redis", "websockets", "boto3", "py", "xdist", "pytest_jsonreport",
         "pytest_metadata", "flask", "flaky", "coverage", "pyasn1", "cryptography", "paramiko",
-        "six"
+        "six", "torch"
     });
 
     std::string moduleNameRoot;
