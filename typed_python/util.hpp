@@ -420,3 +420,13 @@ inline PyObject* osModule() {
     static PyObject* module = PyImport_ImportModule("os");
     return module;
 }
+
+
+inline bool startsWith(std::string name, std::string prefix) {
+    if (name.size() < prefix.size()) {
+        return false;
+    }
+
+    return name.substr(0, prefix.size()) == prefix;
+}
+

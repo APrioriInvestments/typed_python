@@ -8,7 +8,15 @@ public:
     DeepcopyContext(Slab* inSlab) : slab(inSlab) {
     }
 
+    void memoize(PyObject* source, PyObject* dest) {
+        pyObjectsToKeepAlive.push_back(PyObjectHolder(source));
+        pyObjectsToKeepAlive.push_back(PyObjectHolder(dest));
+        alreadyAllocated[(instance_ptr)source] = (instance_ptr)dest;
+    }
+
     std::unordered_map<instance_ptr, instance_ptr> alreadyAllocated;
+
+    std::vector<PyObjectHolder> pyObjectsToKeepAlive;
 
     Slab* slab;
 

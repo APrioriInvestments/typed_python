@@ -19,6 +19,7 @@ from typed_python import (
 )
 from typed_python.test_util import currentMemUsageMb
 import time
+import numpy
 
 
 def checkDeepcopySimple(obj, requiresSlab, objectIsSlabRoot=False):
@@ -472,3 +473,79 @@ def test_deepcopy_tuple_of_strings():
     for i in range(100):
         x = ListOf(OneOf(str, float))(['h'] * i)
         deepcopyContiguous(x)
+
+
+def test_deepcopy_numpy_array():
+    x = numpy.array([1, 2, 3])
+
+    y = deepcopy(x)
+
+    assert x is not y
+    assert x.tolist() == y.tolist()
+
+    x[1] = 100
+    assert y[1] == 2
+
+
+class ClassWithReduce:
+    def __init__(self, state):
+        self.state = state
+
+    def __reduce__(self):
+        return (ClassWithReduce, (None,), (self.state,))
+
+    def __setstate__(self, state):
+        self.state = state[0]
+
+
+def test_deepcopy_class_with_custom_reduce():
+    c = ClassWithReduce("state")
+
+    c2 = deepcopy(c)
+
+    assert c is not c2
+
+
+class ClassWithCustomSetState:
+    def __init__(self, state):
+        self.state = state
+
+    def __reduce__(self):
+        return (ClassWithReduce, (None,), (self.state,), None, None, ClassWithCustomSetState.setState)
+
+    def setState(self, state):
+        self.state = state[0]
+
+
+def test_deepcopy_class_with_custom_setState():
+    c = ClassWithCustomSetState("state")
+
+    c2 = deepcopy(c)
+
+    assert c is not c2
+
+
+class ClassWithIterators:
+    def __init__(self):
+        self.items = []
+        self.kvs = {}
+
+    def __reduce__(self):
+        return (ClassWithIterators, (), None, ['1', '2'], [('a', 'b')])
+
+    def extend(self, x):
+        self.items.extend(x)
+
+    def __setitem__(self, x, y):
+        self.kvs[x] = y
+
+
+def test_deepcopy_class_with_custom_reduce_iterators():
+    c = ClassWithIterators()
+
+    c2 = deepcopy(c)
+
+    assert c is not c2
+
+    assert c2.items == ['1', '2']
+    assert c2.kvs == {'a': 'b'}

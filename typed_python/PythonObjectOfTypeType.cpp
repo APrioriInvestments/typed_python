@@ -62,7 +62,7 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
             t->deepcopy(p, ((PyInstance*)o)->dataPtr(), context);
         });
 
-        context.alreadyAllocated[(instance_ptr)o] = (instance_ptr)res;
+        context.memoize(o, res);
         return res;
     }
 
@@ -76,7 +76,7 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
                 PyObject* result(
                     PyObject_CallFunction(
                         it->second,
-                        "O",
+                        "(O)",
                         o
                     )
                 );
@@ -85,7 +85,7 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
                     throw PythonExceptionSet();
                 }
 
-                context.alreadyAllocated[(instance_ptr)o] = (instance_ptr)result;
+                context.memoize(o, result);
                 return result;
             }
 
@@ -95,7 +95,7 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
 
     if (PyDict_Check(o)) {
         PyObject* res = PyDict_New();
-        context.alreadyAllocated[(instance_ptr)o] = (instance_ptr)res;
+        context.memoize(o, res);
 
         // this increfs 'res'
         PyObject *key, *value;
@@ -115,7 +115,7 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
 
     if (PyList_Check(o)) {
         PyObject* res = PyList_New(PyList_Size(o));
-        context.alreadyAllocated[(instance_ptr)o] = (instance_ptr)res;
+        context.memoize(o, res);
 
         for (long k = 0; k < PyList_Size(o); k++) {
             PyObject* val = deepcopyPyObject(PyList_GetItem(o, k), context);
@@ -133,7 +133,7 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
             throw PythonExceptionSet();
         }
 
-        context.alreadyAllocated[(instance_ptr)o] = (instance_ptr)res;
+        context.memoize(o, res);
         for (long k = 0; k < PyTuple_Size(o); k++) {
             PyObject* entombed = deepcopyPyObject(PyTuple_GetItem(o, k), context);
             //PyTuple_SET_ITEM steals a reference
@@ -143,9 +143,14 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
         return res;
     }
 
+    if (PyTuple_Check(o)) {
+        context.memoize(o, o);
+        return incref(o);
+    }
+
     if (PySet_Check(o)) {
         PyObject* res = PySet_New(nullptr);
-        context.alreadyAllocated[(instance_ptr)o] = (instance_ptr)res;
+        context.memoize(o, res);
 
         iterate(o, [&](PyObject* o2) {
             PyObjectStealer setItem(deepcopyPyObject(o2, context));
@@ -155,29 +160,210 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
         return res;
     }
 
-    if (PyObject_HasAttrString(o, "__dict__") && !PyFunction_Check(o)) {
-        PyObjectStealer dict(PyObject_GetAttrString(o, "__dict__"));
+    if (PyLong_CheckExact(o) ||
+        PyFloat_CheckExact(o) || 
+        o == Py_None || 
+        o == Py_True || 
+        o == Py_False || 
+        PyUnicode_CheckExact(o) || 
+        PyBytes_CheckExact(o) || 
+        PyComplex_CheckExact(o)        
+    ) {
+        // don't duplicate primitives
+        return incref(o);
+    }
 
-        static PyObject* emptyTuple = PyTuple_Pack(0);
+    if ((
+        PyObject_HasAttrString((PyObject*)o->ob_type, "__reduce__")
+        || PyObject_HasAttrString((PyObject*)o->ob_type, "__reduce_ex__")
+    ) && !PyFunction_Check(o)) {
+        PyObjectHolder reduceRes;
 
-        PyObject* res = o->ob_type->tp_new(o->ob_type, emptyTuple, NULL);
+        if (PyObject_HasAttrString((PyObject*)o->ob_type, "__reduce_ex__")) {
+            static PyObject* four = PyLong_FromLong(4);
 
-        if (!res) {
-            throw std::runtime_error(
-                "tp_new for " + std::string(o->ob_type->tp_name) + " threw an exception."
+            reduceRes.steal(
+                PyObject_CallMethod(o, "__reduce_ex__", "(O)", four)
+            );
+        } else {
+            reduceRes.steal(
+                PyObject_CallMethod(o, "__reduce__", NULL)
             );
         }
-        context.alreadyAllocated[(instance_ptr)o] = (instance_ptr)res;
 
-        PyObject* otherDict = deepcopyPyObject(dict, context);
+        if (!reduceRes) {
+            // this can't be deepcopied
+            PyErr_Clear();
+            return incref(o);
+        }
 
-        if (PyObject_GenericSetDict(res, otherDict, nullptr) == -1) {
+        if (PyUnicode_Check(reduceRes) || reduceRes == Py_None) {
+            return incref(o);
+        }
+
+        if (!PyTuple_Check(reduceRes) 
+                || PyTuple_Size(reduceRes) < 2 
+                || PyTuple_Size(reduceRes) > 6) {
+            PyObjectStealer repr(PyObject_Repr(o));
+            if (!repr) {
+                throw PythonExceptionSet();
+            }
+
+            throw std::runtime_error(
+                "deepcopy encountered an invalid __reduce__ result for "
+                + std::string(PyUnicode_AsUTF8(repr))
+            );
+        }
+
+        // now take the first two arguments, and use them to produce the
+        // interior object
+        PyObjectStealer callable(
+            deepcopyPyObject(PyTuple_GetItem(reduceRes, 0), context)
+        );
+        PyObjectStealer args(
+            deepcopyPyObject(PyTuple_GetItem(reduceRes, 1), context)
+        );
+
+        if (!PyTuple_Check(args)) {
+            PyObjectStealer repr(PyObject_Repr(o));
+            if (!repr) {
+                throw PythonExceptionSet();
+            }
+
+            throw std::runtime_error(
+                "deepcopy encountered an invalid __reduce__ result for "
+                + std::string(PyUnicode_AsUTF8(repr)) + ": callable arg was not a tuple"
+            );
+        }
+
+        PyObjectStealer value(PyObject_Call(
+            (PyObject*)callable,
+            (PyObject*)args,
+            NULL
+        ));
+
+        if (!value) {
             throw PythonExceptionSet();
         }
 
-        decref(otherDict);
+        // memoize the result since it may be referred to within the
+        // state of our objects
+        context.memoize(o, value);
 
-        return res;
+        std::vector<PyObjectHolder> remainingArgs;
+
+        for (long ix = 2; ix < PyTuple_Size(reduceRes); ix++) {
+            remainingArgs.push_back(
+                PyObjectStealer(
+                    deepcopyPyObject(PyTuple_GetItem(reduceRes, ix), context)
+                )
+            );
+        }
+
+        // now implement the standard pickle protocol on the 
+        // remaining arguments. Recall that the 3rd tuple element is the 'state'
+        // the 4th and 5th are iterators of elements, and the 6th is a state setter
+        if (remainingArgs.size() == 4 && remainingArgs[3] != Py_None) {
+            PyObjectStealer setStateRes(
+                PyObject_CallFunction(
+                    (PyObject*)remainingArgs[3],
+                    "OO",
+                    (PyObject*)value,
+                    (PyObject*)remainingArgs[0]
+                )
+            );
+            if (!setStateRes) {
+                throw PythonExceptionSet();
+            }
+        } else if (remainingArgs.size() > 0 && remainingArgs[0] != Py_None) {
+            if (!PyObject_HasAttrString((PyObject*)value->ob_type, "__setstate__")) {
+                PyObjectStealer repr(PyObject_Repr(o));
+                if (!repr) {
+                    throw PythonExceptionSet();
+                }
+
+                PyObjectStealer dict(
+                    PyObject_GenericGetDict((PyObject*)value, nullptr)
+                );
+
+                if (!dict) {
+                    throw PythonExceptionSet();
+                }
+
+                if (!PyDict_Check(dict)) {
+                    throw std::runtime_error("GenericGetDict didn't return a dict!");
+                }
+
+                if (!PyDict_Check(remainingArgs[0])) {
+                    throw std::runtime_error("remainingArgs[0] is not a dict!");
+                }
+                
+                PyObjectStealer updateResult(
+                    PyObject_CallMethod(
+                        (PyObject*)dict, 
+                        "update", 
+                        "(O)", 
+                        (PyObject*)remainingArgs[0]
+                    )
+                );
+
+                if (!updateResult) {
+                    throw PythonExceptionSet();
+                }
+            } else {
+                PyObjectStealer setStateRes(
+                    PyObject_CallMethod(
+                        (PyObject*)value, 
+                        "__setstate__", 
+                        "(O)", 
+                        (PyObject*)remainingArgs[0]
+                    )
+                );
+                if (!setStateRes) {
+                    throw PythonExceptionSet();
+                }
+            }
+        }
+
+        if (remainingArgs.size() > 1 && remainingArgs[1] != Py_None) {
+            PyObjectStealer extendRes(
+                PyObject_CallMethod(
+                    (PyObject*)value, 
+                    "extend", 
+                    "(O)",
+                    (PyObject*)remainingArgs[1]
+                )
+            );
+            if (!extendRes) {
+                throw PythonExceptionSet();
+            }
+        }
+
+        if (remainingArgs.size() > 2 && remainingArgs[2] != Py_None) {
+            iterate(remainingArgs[2], [&](PyObject* kvPair) {
+                // TODO: should we be iterating here?
+                static PyObject* zero = PyLong_FromLong(0);
+                static PyObject* one = PyLong_FromLong(1);
+
+                PyObjectStealer getItem0(PyObject_GetItem(kvPair, zero));
+                
+                if (!getItem0) {
+                    throw PythonExceptionSet();
+                }
+                
+                PyObjectStealer getItem1(PyObject_GetItem(kvPair, one));
+
+                if (!getItem1) {
+                    throw PythonExceptionSet();
+                }
+                
+                if (PyObject_SetItem((PyObject*)value, getItem0, getItem1) == -1) {
+                    throw PythonExceptionSet();
+                }
+            });
+        }
+
+        return incref((PyObject*)value);
     }
 
     return incref(o);
