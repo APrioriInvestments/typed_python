@@ -620,7 +620,7 @@ class SerializationContext:
             # however
             if isinstance(res, str):
                 return None
-            
+
             return res
 
         if not isinstance(inst, type) and hasattr(type(inst), '__reduce__'):
@@ -632,7 +632,7 @@ class SerializationContext:
             # however
             if isinstance(res, str):
                 return None
-            
+
             return res
 
         return None
