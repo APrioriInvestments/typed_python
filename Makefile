@@ -21,8 +21,6 @@ TP_BUILD_OPT_LEVEL ?= 2
 
 # location of python include paths
 PYINCLUDE = $(shell python3 -c 'import sysconfig; print(sysconfig.get_paths()["include"])')
-# location of python site-packages
-PYSITE = $(shell python3 -c 'import sysconfig; print(sysconfig.get_paths()["platlib"])')
 # location of numpy
 NUMPYINCLUDE = $(shell python3 -c 'import pkg_resources; print(pkg_resources.resource_filename("numpy", "core/include"))')
 # name of the _types binary, which we can infer from the name of the _ssl binary
