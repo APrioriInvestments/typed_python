@@ -24,8 +24,6 @@ import time
 import unittest
 import numpy
 import numpy.linalg
-import lz4
-import lz4.frame
 import datetime
 import pytest
 import pytz
@@ -1049,11 +1047,6 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(
             sc.deserialize(sc.serialize(numpy.linalg)),
             numpy.linalg
-        )
-
-        self.assertEqual(
-            sc.deserialize(sc.serialize(lz4.frame)),
-            lz4.frame
         )
 
     def test_serialize_functions_with_references_in_list_comprehensions(self):
