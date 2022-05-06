@@ -26,6 +26,8 @@ hedge fund in New York.  If you're interested in working with us, drop us a line
 You can read the [introductory tutorial](docs/introduction.md) for using `typed_python` or
 check out the documentation [typed_python](docs/typed_python.md).
 
+For installation instruction see [here](INSTALLATION.md).
+
 ## Where did this come from?
 
 Every time I (Braxton) find myself writing a lot of Python code, I eventually

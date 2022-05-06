@@ -3,6 +3,6 @@
 requires = [
     "setuptools",
     "wheel",
-    "numpy < 1.20",
+    "numpy",
 ]
 # build-backend = "setuptools.build_meta:__legacy__"

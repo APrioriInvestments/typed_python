@@ -4,6 +4,7 @@
 __pycache__
 build/
 typed_python.egg-info
+*.swp
 
 # Ignore node modules
 # and evironments EVERYWHERE

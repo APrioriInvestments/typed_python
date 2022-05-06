@@ -36,7 +36,10 @@ target_machine_shared_object = target.create_target_machine(reloc='pic', codemod
 
 # we need to load the appropriate libstdc++ so that we can get __cxa_begin_catch and friends
 if sys.platform == "darwin":
-    ctypes.CDLL("libstdc++.dylib", mode=ctypes.RTLD_GLOBAL)
+    try:
+        ctypes.CDLL("libstdc++.dylib", mode=ctypes.RTLD_GLOBAL)
+    except Exception:
+        ctypes.CDLL("libc++.dylib", mode=ctypes.RTLD_GLOBAL)
 else:
     ctypes.CDLL("libstdc++.so.6", mode=ctypes.RTLD_GLOBAL)
 

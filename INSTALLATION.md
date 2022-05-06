@@ -1,3 +1,16 @@
+# Installation #
+## OSX ##
+(as of writing tested on both Apple Intel and Silicon Macs, OSX Big Sur+, and Python 3.6 & 3.7 only!)
+
+### Steps ###
+1. Install [Anaconda](https://www.anaconda.com/products/distribution). We'll be using their Conda package and environment manager.
+2. Clone the repo: `git clone https://github.com/APrioriInvestments/typed_python`
+3. Create and activate conda environmet (we'll use python 3.7 here): `conda create --name pyenv37 python=3.7 && conda activate pyenv37` (see this [cheatsheet](https://docs.conda.io/projects/conda/en/4.6.0/_downloads/52a95608c49671267e40c689e0bc00ca/conda-cheatsheet.pdf) for other conda environment relate commands).
+4. Install typed python: `pip install -e .` (assuming you are in the root of the directory)
+5. Test it out: `pytest -v` (note a few performance tests could fail, but the majority should pass) 
+
+## Linux ##
+
 ## Development ##
 There are several methods for building and setting up a development environment.
   
@@ -20,21 +33,7 @@ The included Makefile in this repository contains recipes for building, installi
 You can also customize the name and location of any built virtual environments with the `VIRTUAL_ENV` variable.
 
 
-## Installation ##
 
-### OSX ###
-
-#### Prerequisites ####
-* Python 3.6 (recommended installed with homebrew)
-  * Currently build is tested against `clang`, not `gcc`. For more information about installing `clang` and configuring your environment see [here](https://embeddedartistry.com/blog/2017/2/20/installing-clangllvm-on-osx)
-* It is recommended you use Pipenv ([see this link](https://pipenv.readthedocs.io/en/latest/install/#installing-pipenv)) to manage the application.
-  * You can also use virtualenv.
-* install Redis (`brew install redis`)
-
-
-
-
-### Linux ###
 (These instructions are only for Ubuntu for the moment)
 
 #### Prerequisites ####

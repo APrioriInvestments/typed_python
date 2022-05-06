@@ -1,6 +1,9 @@
 llvmlite
-numpy < 1.20
+numpy
 psutil
 pytz
 sortedcontainers
+pytest
+flaky
+lz4
 
