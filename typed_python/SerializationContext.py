@@ -641,14 +641,14 @@ class SerializationContext:
         self, instance, representation=None, itemIt=None, kvPairIt=None, setStateFun=None
     ):
         if representation is reconstructTypeFunctionType:
-            return True
+            return
 
         if isinstance(instance, types.MethodType):
             _types.setMethodObjectInternals(instance, representation[0], representation[1])
-            return True
+            return
 
         if isinstance(instance, (LockType, RLock)):
-            return True
+            return
 
         if isinstance(instance, types.ModuleType):
             # note that we can't simply copy the contents of the dict into
@@ -656,22 +656,22 @@ class SerializationContext:
             # dict itself as their 'globals', and copying directly would break
             # that relationship.
             _types.setModuleDict(instance, representation)
-            return True
+            return
 
         if isinstance(instance, property):
             _types.setPropertyGetSetDel(instance, representation[0], representation[1], representation[2])
-            return True
+            return
 
         if isinstance(instance, staticmethod):
             _types.setClassOrStaticmethod(instance, representation)
-            return True
+            return
 
         if isinstance(instance, classmethod):
             _types.setClassOrStaticmethod(instance, representation)
-            return True
+            return
 
         if isinstance(instance, CodeType):
-            return True
+            return
 
         if isinstance(instance, FunctionType):
             instance.__name__ = representation['name']
@@ -689,17 +689,17 @@ class SerializationContext:
 
             _types.setFunctionClosure(instance, representation['closure'])
 
-            return True
+            return
 
         if isinstance(instance, type):
             # set class members
             if representation is not None:
                 for k, v in representation.items():
                     setattr(instance, k, v)
-            return True
+            return
 
         if isinstance(instance, ModuleType):
-            return True
+            return
 
         if setStateFun is not None:
             setStateFun(instance, representation)
@@ -714,5 +714,3 @@ class SerializationContext:
         if kvPairIt:
             for key, val in kvPairIt:
                 instance[key] = val
-
-        return False

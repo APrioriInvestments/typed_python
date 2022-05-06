@@ -321,8 +321,8 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromRepresentation(
 
     res.steal(
         PyObject_CallMethodObjArgs(
-            mContextObj, 
-            methodName, 
+            mContextObj,
+            methodName,
             (PyObject*)value,
             (holders.size() > 2 ? (PyObject*)holders[2] : (PyObject*)nullptr),
             (holders.size() > 3 ? (PyObject*)holders[3] : (PyObject*)nullptr),
@@ -810,7 +810,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
 
                         PyObjectHolder res;
 
-                        if (!PyTuple_Check(trailingRepresentationParts) || 
+                        if (!PyTuple_Check(trailingRepresentationParts) ||
                                 PyTuple_Size(trailingRepresentationParts) > 4) {
                             throw std::runtime_error(
                                 "trailingRepresentationParts is not a tuple with <= 4 elements"
@@ -826,8 +826,8 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
 
                         res.steal(
                             PyObject_CallMethodObjArgs(
-                                mContextObj, 
-                                methodName, 
+                                mContextObj,
+                                methodName,
                                 (PyObject*)indicesWrittenAsObjectAndRep[indexInGroup],
                                 argCount > 0 ? PyTuple_GetItem((PyObject*)trailingRepresentationParts, 0) : (PyObject*)nullptr,
                                 argCount > 1 ? PyTuple_GetItem((PyObject*)trailingRepresentationParts, 1) : (PyObject*)nullptr,
@@ -839,9 +839,6 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
 
                         if (!res) {
                             throw PythonExceptionSet();
-                        }
-                        if (res != Py_True) {
-                            throw std::runtime_error("setInstanceStateFromRepresentation didn't return True.");
                         }
                     }
                 } else
