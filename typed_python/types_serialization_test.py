@@ -910,6 +910,20 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(a, b)
         self.assertIs(type(a), type(b))
 
+    def test_class_serialization_stable(self):
+        class C:
+            pass
+
+        s = SerializationContext()
+
+        CSer = s.serialize(C)
+
+        s.serialize(C())
+
+        CSer2 = s.serialize(C)
+
+        assert CSer == CSer2
+
     @pytest.mark.skip(reason="Fails on 3.8 for some reason")
     def test_serialize_structseq(self):
         import time

@@ -508,7 +508,10 @@ class SerializationContext:
                     getset_descriptor = type(type.__dict__['__doc__'])
                     wrapper_descriptor = type(object.__repr__)
 
-                    if name != "__dict__" and not isinstance(memb, (wrapper_descriptor, getset_descriptor)):
+                    if (
+                        name not in ("__dict__", '__slotnames__') 
+                        and not isinstance(memb, (wrapper_descriptor, getset_descriptor))
+                    ):
                         classMembers[name] = memb
 
                 # filter out weird class members introduced by 'abc'
