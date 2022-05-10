@@ -509,7 +509,7 @@ class SerializationContext:
                     wrapper_descriptor = type(object.__repr__)
 
                     if (
-                        name not in ("__dict__", '__slotnames__') 
+                        name not in ("__dict__", '__slotnames__')
                         and not isinstance(memb, (wrapper_descriptor, getset_descriptor))
                     ):
                         classMembers[name] = memb
