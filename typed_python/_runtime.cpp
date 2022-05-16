@@ -2409,7 +2409,7 @@ extern "C" {
             ret = PyFloat_AsDouble(retObj);
         }
         else if (PyLong_Check(retObj)) {
-             ret = (double)PyLong_AsLong(retObj);
+             ret = PyLong_AsDouble(retObj);
         }
         else {
             PyObjectHolder floatObj(PyObject_CallMethod(retObj, "__float__", NULL));
@@ -2446,7 +2446,7 @@ extern "C" {
             ret = PyFloat_AsDouble(retObj);
         }
         else if (PyLong_Check(retObj)) {
-            ret = (double)PyLong_AsLong(retObj);
+            ret = PyLong_AsDouble(retObj);
         }
         else {
             PyObjectHolder floatObj(PyObject_CallMethod(retObj, "__float__", NULL));
@@ -2497,7 +2497,7 @@ extern "C" {
             ret = PyFloat_AsDouble(retObj);
         }
         else if (PyLong_Check(retObj)) {
-             ret = (double)PyLong_AsLong(retObj);
+             ret = PyLong_AsDouble(retObj);
         }
         else {
             PyObjectHolder floatObj(PyObject_CallMethod(retObj, "__float__", NULL));

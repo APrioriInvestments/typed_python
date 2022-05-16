@@ -98,9 +98,7 @@ def expandWithBlockIntoTryCatch(ast):
             x,
             "Subscript",
             value=x,
-            slice=python_ast.Slice.Index(
-                value=makeExpr(ast, 'Num', n=python_ast.NumericConstant.Int(value=index))
-            ),
+            slice=makeExpr(ast, 'Num', n=python_ast.NumericConstant.Int(value=index)),
             ctx=python_ast.ExprContext.Load()
         )
 

@@ -1,4 +1,4 @@
-#   Copyright 2017-2020 typed_python Authors
+#   Copyright 2017-2022 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import sys
 from typed_python import sha_hash
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
@@ -183,9 +184,21 @@ def strRangeEndswithTuple(s, suffixtuple, start, end):
     return False
 
 
+IS_38_OR_LOWER = sys.version_info.minor <= 8
+
+
 def strReplace(s, old, new, maxCount):
-    if maxCount == 0 or (maxCount >= 0 and len(s) == 0 and len(old) == 0):
-        return s
+    if IS_38_OR_LOWER:
+        # versions 3.8 and lower have a bug where b''.replace(b'', b'SOMETHING', 1) returns
+        # the empty string.
+        if maxCount == 0 or (maxCount >= 0 and len(s) == 0 and len(old) == 0):
+            return s
+    else:
+        if maxCount == 0:
+            return s
+
+        if maxCount >= 0 and len(s) == 0 and len(old) == 0:
+            return new
 
     accumulator = ListOf(str)()
 

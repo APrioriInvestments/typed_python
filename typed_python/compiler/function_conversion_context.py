@@ -1,4 +1,4 @@
-#   Copyright 2017-2020 typed_python Authors
+#   Copyright 2017-2022 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -1182,9 +1182,7 @@ class FunctionConversionContext(ConversionContextBase):
             if slicing is None:
                 return expr_context.finalize(None), False
 
-            # we are assuming this is an index. We ought to be checking this
-            # and doing something else if it's a Slice or an Ellipsis or whatnot
-            index = expr_context.convert_expression_ast(expression.slice.value)
+            index = expr_context.convert_expression_ast(expression.slice)
 
             if slicing is None:
                 return expr_context.finalize(None), False
@@ -1228,15 +1226,13 @@ class FunctionConversionContext(ConversionContextBase):
             return True
 
         if target.matches.Subscript and target.ctx.matches.Store:
-            assert target.slice.matches.Index
-
             slicing = subcontext.convert_expression_ast(target.value)
             if slicing is None:
                 return False
 
             # we are assuming this is an index. We ought to be checking this
             # and doing something else if it's a Slice or an Ellipsis or whatnot
-            index = subcontext.convert_expression_ast(target.slice.value)
+            index = subcontext.convert_expression_ast(target.slice)
 
             if index is None:
                 return False

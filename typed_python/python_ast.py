@@ -34,7 +34,6 @@ Expr = Forward("Expr")
 Arg = Forward("Arg")
 NumericConstant = Forward("NumericConstant")
 ExprContext = Forward("ExprContext")
-Slice = Forward("Slice")
 BooleanOp = Forward("BooleanOp")
 BinaryOp = Forward("BinaryOp")
 UnaryOp = Forward("UnaryOp")
@@ -601,7 +600,7 @@ Expr = Expr.define(Alternative(
     },
     Subscript={
         "value": Expr,
-        "slice": Slice,
+        "slice": Expr,
         "ctx": ExprContext,
         'line_number': int,
         'col_offset': int,
@@ -674,6 +673,14 @@ Expr = Expr.define(Alternative(
         'col_offset': int,
         'filename': str
     },
+    Slice={
+        "lower": OneOf(Expr, None),
+        "upper": OneOf(Expr, None),
+        "step": OneOf(Expr, None),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
     __str__=ExpressionStr
 ))
 
@@ -703,24 +710,6 @@ ExprContext = ExprContext.define(Alternative(
     AugLoad={},
     AugStore={},
     Param={}
-))
-
-Slice = Slice.define(Alternative(
-    "Slice",
-    Ellipsis={},
-    Slice={
-        "lower": OneOf(Expr, None),
-        "upper": OneOf(Expr, None),
-        "step": OneOf(Expr, None)
-    },
-    ExtSlice={"dims": TupleOf(Slice)},
-    Index={"value": Expr},
-    __str__=lambda self: (
-        "..." if self.matches.Ellipsis else
-        f"{self.lower}:{self.upper}:{self.step}" if self.matches.Slice else
-        ",".join(str(x) for x in self.dims) if self.matches.ExtSlice else
-        str(self.value) if self.matches.Index else ""
-    )
 ))
 
 BooleanOp = BooleanOp.define(Alternative(
@@ -828,7 +817,8 @@ Keyword = Keyword.define(Alternative(
     "Keyword",
     Item={
         "arg": OneOf(None, str),
-        "value": Expr
+        "value": Expr,
+        **({'line_number': int, 'col_offset': int, 'filename': str} if sys.version_info.minor >= 9 else {})
     }
 ))
 
@@ -881,6 +871,14 @@ def createPythonAstString(s, **kwds):
 
 def makeNameConstant(value, **kwds):
     return Expr.Num(n=numericConverters[type(value)](value), **kwds)
+
+
+def makeEllipsis(*args):
+    return Expr.Constant(value=...)
+
+
+def makeExtSlice(dims):
+    return Expr.Tuple(elts=dims)
 
 
 # map Python AST types to our syntax-tree types (defined `ove)
@@ -949,10 +947,10 @@ converters = {
     ast.AugLoad: ExprContext.AugLoad,
     ast.AugStore: ExprContext.AugStore,
     ast.Param: ExprContext.Param,
-    ast.Ellipsis: Slice.Ellipsis,
-    ast.Slice: Slice.Slice,
-    ast.ExtSlice: Slice.ExtSlice,
-    ast.Index: Slice.Index,
+    ast.Ellipsis: makeEllipsis,
+    ast.Slice: Expr.Slice,
+    ast.ExtSlice: makeExtSlice,
+    ast.Index: lambda value: value,
     ast.And: BooleanOp.And,
     ast.Or: BooleanOp.Or,
     ast.Add: BinaryOp.Add,
@@ -990,7 +988,7 @@ converters = {
     ast.keyword: Keyword.Item,
     ast.alias: Alias.Item,
     ast.withitem: WithItem.Item,
-    **({'ast.type_ignore': TypeIgnore.Item} if sys.version_info.minor >= 8 else {})
+    **({'ast.type_ignore': TypeIgnore.Item} if sys.version_info.minor >= 8 else {}),
 }
 
 # most converters map to an alternative type
@@ -1013,6 +1011,30 @@ def convertAlgebraicToPyAst(pyAst):
         res.col_offset = pyAst.col_offset
 
     return res
+
+
+def convertAlgebraicToSlice(pyAst):
+    if sys.version_info.minor >= 9:
+        return convertAlgebraicToPyAst(pyAst)
+    else:
+        if pyAst.matches.Slice:
+            args = {}
+
+            if pyAst.lower is not None:
+                args['lower'] = convertAlgebraicToPyAst(pyAst.lower)
+
+            if pyAst.upper is not None:
+                args['upper'] = convertAlgebraicToPyAst(pyAst.upper)
+
+            if pyAst.step is not None:
+                args['step'] = convertAlgebraicToPyAst(pyAst.step)
+
+            return ast.Slice(**args)
+
+        if pyAst.matches.Tuple:
+            return ast.ExtSlice(*[convertAlgebraicToPyAst(x) for x in pyAst.elts])
+
+        return ast.Index(convertAlgebraicToPyAst(pyAst))
 
 
 def convertAlgebraicToPyAst_(pyAst):
@@ -1038,6 +1060,18 @@ def convertAlgebraicToPyAst_(pyAst):
         if pyAst.n.matches.Unknown:
             raise Exception(f"Unknown constant: {pyAst.filename}:{pyAst.line_number}")
         return ast.Num(n=pyAst.n.value)
+
+    if type(pyAst) is Expr.Subscript:
+        res = ast.Subscript(
+            value=convertAlgebraicToPyAst(pyAst.value),
+            slice=convertAlgebraicToSlice(pyAst.slice),
+            ctx=convertAlgebraicToPyAst(pyAst.ctx),
+        )
+
+        res.lineno = pyAst.line_number
+        res.col_offset = pyAst.col_offset
+
+        return res
 
     if type(pyAst) is Expr.Constant:
         return reverseConverters[type(pyAst)](

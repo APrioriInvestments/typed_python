@@ -1640,13 +1640,7 @@ class ExpressionConversionContext:
             if val is None:
                 return None
 
-            if ast.slice.matches.Index:
-                index = self.convert_expression_ast(ast.slice.value)
-                if index is None:
-                    return None
-
-                return val.convert_getitem(index)
-            elif ast.slice.matches.Slice:
+            if ast.slice.matches.Slice:
                 if ast.slice.lower is None:
                     lower = None
                 else:
@@ -1669,16 +1663,10 @@ class ExpressionConversionContext:
                         return None
 
                 return val.convert_getslice(lower, upper, step)
-            elif ast.slice.matches.ExtSlice:
+            elif ast.slice.matches.Tuple:
                 args = []
-                for dim in ast.slice.dims:
-                    if dim.matches.Index:
-                        index = self.convert_expression_ast(ast.slice.value)
-                        if index is None:
-                            return None
-
-                        args.append(index)
-                    elif dim.matches.Slice:
+                for dim in ast.slice.elts:
+                    if dim.matches.Slice:
                         if dim.lower is None:
                             lower = self.constant(None)
                         else:
@@ -1703,6 +1691,12 @@ class ExpressionConversionContext:
                         args.append(
                             SliceWrapper().convert_call(self, None, [lower, upper, step], {})
                         )
+                    else:
+                        index = self.convert_expression_ast(ast.slice)
+                        if index is None:
+                            return None
+
+                        args.append(index)
 
                 tupType = Tuple(*[x.expr_type.typeRepresentation for x in args])
 
@@ -1720,7 +1714,11 @@ class ExpressionConversionContext:
 
                 return val.convert_getitem(index)
             else:
-                assert False, type(ast.slice)
+                index = self.convert_expression_ast(ast.slice)
+                if index is None:
+                    return None
+
+                return val.convert_getitem(index)
 
         if ast.matches.Call:
             lhs = self.convert_expression_ast(ast.func)

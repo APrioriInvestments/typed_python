@@ -8,8 +8,10 @@ COMMIT ?= $(shell git rev-parse HEAD)
 
 PWD = $(shell pwd)
 
+PYTHON_VERSION = $(shell python3 -c 'import sys; print("3_" + str(sys.version_info.minor))')
+
 # Path to virtual environment(s)
-VIRTUAL_ENV ?= .venv
+VIRTUAL_ENV ?= .venv_$(PYTHON_VERSION)
 NODE_ENV ?= .nodeenv
 
 TP_SRC_PATH ?= typed_python

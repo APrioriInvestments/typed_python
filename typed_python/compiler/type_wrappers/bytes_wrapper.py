@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import sys
 from typed_python import sha_hash
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 from typed_python.compiler.conversion_level import ConversionLevel
@@ -79,6 +80,9 @@ def bytesJoinIterable(sep, iterable):
     return sep.join(items)
 
 
+IS_38_OR_LOWER = sys.version_info.minor <= 8
+
+
 def bytes_replace(x: bytes, old: bytes, new: bytes, maxCount: int) -> bytes:
     """Given a bytes object, replaces old subsequence with new subsequence at most maxCount times.
 
@@ -94,8 +98,17 @@ def bytes_replace(x: bytes, old: bytes, new: bytes, maxCount: int) -> bytes:
     Returns:
         Adjusted bytes object with replacement(s).
     """
-    if maxCount == 0 or (maxCount >= 0 and len(x) == 0 and len(old) == 0):
-        return x
+    if IS_38_OR_LOWER:
+        # versions 3.8 and lower have a bug where b''.replace(b'', b'SOMETHING', 1) returns
+        # the empty string.
+        if maxCount == 0 or (maxCount >= 0 and len(x) == 0 and len(old) == 0):
+            return x
+    else:
+        if maxCount == 0:
+            return x
+
+        if maxCount >= 0 and len(x) == 0 and len(old) == 0:
+            return new
 
     accumulator = ListOf(bytes)()
 

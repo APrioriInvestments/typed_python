@@ -1054,8 +1054,12 @@ PyTypeObject* PyInstance::allTypesBaseType() {
 
             #if PY_MINOR_VERSION >= 8
             .tp_vectorcall = 0,
+            #endif
+
+            #if PY_MINOR_VERSION == 8
             .tp_print = 0,
             #endif
+
         };
 
         PyType_Ready(result);
@@ -1133,8 +1137,12 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
             .tp_version_tag = 0,                        // unsigned int
             .tp_finalize = 0,                           // destructor
 
+
             #if PY_MINOR_VERSION >= 8
             .tp_vectorcall = 0,
+            #endif
+
+            #if PY_MINOR_VERSION == 8
             .tp_print = 0,
             #endif
             },
@@ -1254,8 +1262,12 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_version_tag = 0,                        // unsigned int
             .tp_finalize = 0,                           // destructor
 
+
             #if PY_MINOR_VERSION >= 8
             .tp_vectorcall = 0,
+            #endif
+
+            #if PY_MINOR_VERSION == 8
             .tp_print = 0,
             #endif
             },

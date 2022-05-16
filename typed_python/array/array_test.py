@@ -164,7 +164,7 @@ def test_matrix_speed():
     # we don't actually get two full cores, so we have to have a wider
     # threshold. On my desktop I get ~ 1.0 for the tpSlowdown and 2.0
     # for the numpy slowdown because of the GIL.
-    SLOWDOWN_THRESHOLD = 1.8 if os.environ.get('TRAVIS_CI', None) else 1.2
+    SLOWDOWN_THRESHOLD = 1.8 if os.environ.get('TRAVIS_CI', None) else 1.5
 
     assert numpySlowdown > 1.8, numpySlowdown
     assert tpSlowdown < SLOWDOWN_THRESHOLD, tpSlowdown
