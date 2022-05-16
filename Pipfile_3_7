@@ -14,8 +14,8 @@ pytest-cov = "*"
 
 [packages]
 sortedcontainers = "*"
-llvmlite = "==0.36.0"
-numpy = "<1.20"
+llvmlite = "*"
+numpy = "*"
 psutil = "*"
 pytz = "*"
 typed_python = {editable = true, path = "."}

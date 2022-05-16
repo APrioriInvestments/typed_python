@@ -1,8 +1,7 @@
 [build-system]
-# require numpy 1.20 to support python 3.6
 requires = [
     "setuptools",
     "wheel",
-    "numpy < 1.20",
+    'oldest-supported-numpy',
 ]
 # build-backend = "setuptools.build_meta:__legacy__"

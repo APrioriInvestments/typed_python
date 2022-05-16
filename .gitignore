@@ -23,6 +23,7 @@ object_database/web/content/dist
 /.coverage*
 /.tox
 /.env*
+/.test_venv
 /dist/
 /pip-wheel-metadata/
 /testcert.cert

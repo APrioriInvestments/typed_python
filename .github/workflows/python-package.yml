@@ -55,6 +55,10 @@ jobs:
         echo "**** INSTALL PIPENV"
         pip install pipenv
 
+        echo "**** SETTING PIPFILE"
+        export PYTHON_VERSION=`python3 -c 'import sys; print("3_" + str(sys.version_info.minor))'`
+        export PIPENV_PIPFILE="Pipfile_$PYTHON_VERSION"
+        echo "PIPFILE IS $PIPENV_PIPFILE"
         echo "**** PIPENV LOCK"
         pipenv lock --dev --requirements > dev-reqs.txt
         echo "**** dev-reqs.txt"
