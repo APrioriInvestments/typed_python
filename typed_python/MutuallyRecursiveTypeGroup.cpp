@@ -134,7 +134,7 @@ void visitCompilerVisibleTypesAndPyobjects(
         }
 
         if (!PyDict_Check(d)) {
-            onErr();
+            onErr(std::string("not a dict: ") + d->ob_type->tp_name);
             return;
         }
 
@@ -161,7 +161,7 @@ void visitCompilerVisibleTypesAndPyobjects(
             PyObject* val = PyDict_GetItem(d, nameAndO.second);
             if (!val) {
                 PyErr_Clear();
-                onErr();
+                onErr("dict getitem empty");
             } else {
                 namedVisitor(nameAndO.first, val);
             }
@@ -195,6 +195,25 @@ void visitCompilerVisibleTypesAndPyobjects(
 
         return;
     }
+
+    auto visitDictOrTuple = [&](PyObject* t) {
+        if (!t) {
+            hashVisit(ShaHash(0));
+            return;
+        }
+
+        if (PyDict_Check(t)) {
+            visitDict(t);
+            return;
+        }
+
+        if (PyTuple_Check(t)) {
+            visitTuple(t);
+            return;
+        }
+
+        onErr("not a dict or tuple");
+    };
 
     static PyObject* osModule = ::osModule();
     static PyObject* environType = PyObject_GetAttrString(osModule, "_Environ");
@@ -293,7 +312,12 @@ void visitCompilerVisibleTypesAndPyobjects(
         // whenever we instantiate code in a new location
         // visit(co->co_filename)
         visit(co->co_name);
-        visit(co->co_lnotab);
+
+#       if PY_MINOR_VERSION >= 10
+            visit(co->co_linetable);
+#       else
+            visit(co->co_lnotab);
+#       endif
         return;
     }
 
@@ -317,10 +341,9 @@ void visitCompilerVisibleTypesAndPyobjects(
 
         visit(f->func_name);
         visit(f->func_code);
-
-        visitDict(f->func_annotations);
+        visitDictOrTuple(f->func_annotations);
         visitTuple(f->func_defaults);
-        visitDict(f->func_kwdefaults);
+        visitDictOrTuple(f->func_kwdefaults);
 
         hashVisit(ShaHash(1));
 
@@ -373,7 +396,7 @@ void visitCompilerVisibleTypesAndPyobjects(
         PyObjectStealer funcObj(PyObject_GetAttrString(obj.pyobj(), "__func__"));
 
         if (!funcObj) {
-            onErr();
+            onErr("not a func obj");
         } else {
             visit((PyObject*)funcObj);
         }
@@ -435,7 +458,6 @@ void visitCompilerVisibleTypesAndPyobjects(
             hashVisit(ShaHash(12));
 
             visit((PyObject*)obj.pyobj()->ob_type);
-
             visitDict(dict, true);
             return;
         }
@@ -494,7 +516,7 @@ void MutuallyRecursiveTypeGroup::visibleFrom(TypeOrPyobj root, std::vector<TypeO
         [&](const std::string& s) {},
         [&](TypeOrPyobj t) { outReachable.push_back(t); },
         [&](const std::string& s, TypeOrPyobj t) { outReachable.push_back(t); },
-        [&]() {}
+        [&](const std::string& err) {}
     );
 }
 
@@ -759,7 +781,7 @@ std::pair<TypeOrPyobj, bool> computeRoot(const std::set<TypeOrPyobj>& types) {
                         newHash += t.identityHash();
                     }
                 },
-                [&]() {}
+                [&](const std::string& err) {}
             );
 
             newHashes[t] = newHash;
@@ -820,7 +842,7 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
                 [&](const std::string& s) {},
                 [&](TypeOrPyobj t) { std::cout << "      -> " << t.name() << "\n"; },
                 [&](const std::string& s, TypeOrPyobj t) { std::cout << "      -> " << t.name() << "\n"; },
-                [&]() {}
+                [&](const std::string& err) {}
             );
         }
 
@@ -833,7 +855,7 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
             [&](const std::string& s) {},
             [&](TypeOrPyobj t) { visit(t); },
             [&](const std::string& s, TypeOrPyobj t) { visit(t); },
-            [&]() {}
+            [&](const std::string& err) {}
         );
     };
 
@@ -966,7 +988,7 @@ public:
                     mGroupOutboundEdges.back()->push_back(o);
                 }
             },
-            [&]() {}
+            [&](const std::string& err) {}
         );
     }
 
@@ -1148,7 +1170,7 @@ ShaHash MutuallyRecursiveTypeGroup::pyObjectShaHashByVisiting(PyObject* obj, Mut
         [&](std::string name, PyObject* o) {
             res += ShaHash(name) + pyObjectShaHash(o, groupHead);
         },
-        [&]() {
+        [&](const std::string& err) {
             res += ShaHash::poison();
         }
     );

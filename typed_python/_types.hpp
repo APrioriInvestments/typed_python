@@ -60,6 +60,11 @@ typedef struct {
     PyObject *prop_set;
     PyObject *prop_del;
     PyObject *prop_doc;
+
+    #if PY_MINOR_VERSION >= 10
+    PyObject *prop_name;
+    #endif
+
     int getter_doc;
 } JustLikeAPropertyObject;
 

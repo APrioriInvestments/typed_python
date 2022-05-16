@@ -1,0 +1,21 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+autopep8 = "*"
+beautifulsoup4 = "*"
+flake8 = "*"
+pytest = "*"
+pre-commit = "*"
+flaky = "*"
+pytest-cov = "*"
+
+[packages]
+sortedcontainers = "*"
+llvmlite = "==0.36.0"
+numpy = "<1.20"
+psutil = "*"
+pytz = "*"
+typed_python = {editable = true, path = "."}

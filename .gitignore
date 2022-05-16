@@ -18,11 +18,11 @@ object_database/web/content/dist
 
 # leading slash means only match at repo-root level
 /.python-version
-/.venv
+/.venv*
 /.eggs
 /.coverage*
 /.tox
-/.env
+/.env*
 /dist/
 /pip-wheel-metadata/
 /testcert.cert

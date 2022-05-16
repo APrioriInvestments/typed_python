@@ -1047,7 +1047,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                 PyFunction_GetCode(funcObj),
                 PyFunction_GetGlobals(funcObj),
                 PyFunction_GetDefaults(funcObj),
-                PyFunction_GetAnnotations(funcObj),
+                ((PyFunctionObject*)(PyObject*)funcObj)->func_annotations,
                 globalsInCells,
                 closureVarnames,
                 closureBindings,

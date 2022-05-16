@@ -296,4 +296,13 @@ PyTypeObject PyType_ModuleRepresentation = {
     .tp_del = 0,
     .tp_version_tag = 0,
     .tp_finalize = 0,
+
+    #if PY_MINOR_VERSION >= 8
+    .tp_vectorcall = 0,
+    #endif
+
+    #if PY_MINOR_VERSION == 8
+    .tp_print = 0,
+    #endif
+
 };

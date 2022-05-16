@@ -9,20 +9,46 @@ from typed_python.compiler.type_wrappers.runtime_functions import externalCallTa
 import typed_python.compiler.native_ast as native_ast
 
 
-libdirPath = os.path.dirname(numpy.__file__)
-
-
-# search for lapack_lite or 'blas' in the numpy installation
+# search for lapack_lite or 'blas' in the numpy or scipy installation
 def searchForLapackLib():
-    for subdir in os.listdir(libdirPath):
-        dpath = os.path.join(libdirPath, subdir)
-        if 'lapack_lite' in subdir or 'blas' in subdir:
-            return dpath
+    try:
+        import scipy.linalg._fblas as fblas
+        return fblas.__file__
+    except Exception:
+        pass
 
-        if os.path.isdir(dpath):
-            for possibleLib in os.listdir(dpath):
-                if 'lapack_lite' in possibleLib or 'blas' in possibleLib:
-                    return os.path.join(dpath, possibleLib)
+    libdirs = [os.path.dirname(numpy.__file__)]
+
+    for libdirPath in libdirs:
+        for substrToFind in ['blas', 'lapack_lite']:
+            for subdir in os.listdir(libdirPath):
+                dpath = os.path.join(libdirPath, subdir)
+                if substrToFind in subdir:
+                    if isValidLapack(dpath):
+                        return dpath
+
+                if os.path.isdir(dpath):
+                    for possibleLib in os.listdir(dpath):
+                        if substrToFind in possibleLib:
+                            dpath = os.path.join(dpath, possibleLib)
+
+                            if isValidLapack(dpath):
+                                return dpath
+
+
+def isValidLapack(blasLibPath):
+    if 'cython' in blasLibPath:
+        return False
+
+    blas = ctypes.CDLL(blasLibPath, mode=ctypes.RTLD_GLOBAL)
+
+    # verify we can get 'daxpy_', which means we found a real blas.
+    try:
+        blas.daxpy_
+        blas.dgemm_
+        return True
+    except Exception:
+        return False
 
 
 blasLibPath = searchForLapackLib()

@@ -385,6 +385,10 @@ public:
                 decref(dest->prop_del);
                 decref(dest->prop_doc);
 
+                #if PY_MINOR_VERSION >= 10
+                decref(dest->prop_name);
+                #endif
+
                 mObjectMemo[obj] = res;
 
                 if (source->prop_get) {
@@ -410,6 +414,14 @@ public:
                 } else {
                     dest->prop_doc = nullptr;
                 }
+
+                #if PY_MINOR_VERSION >= 10
+                if (source->prop_name) {
+                    dest->prop_name = incref(copy(source->prop_name).pyobj());
+                } else {
+                    dest->prop_name = nullptr;
+                }
+                #endif
 
                 dest->getter_doc = source->getter_doc;
 

@@ -1,0 +1,16 @@
+# brief shell script to activate the python-version-specific
+# virtual environments that are built by the makefile.
+#
+# usage: in a bash shell, type
+#
+#    make install # if you havn't already done so
+#    . .activate
+#
+# and you'll get popped into a virtualenv appropriate for your installed version of python
+
+PYTHON_VERSION=`python3 -c 'import sys; print("3_" + str(sys.version_info.minor))'`
+
+echo "Using python environment .venv_$PYTHON_VERSION"
+
+. .venv_$PYTHON_VERSION/bin/activate
+. .env_$PYTHON_VERSION

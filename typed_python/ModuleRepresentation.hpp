@@ -382,6 +382,13 @@ public:
                     reachable.insert(source->prop_doc);
                 }
 
+                #if PY_MINOR_VERSION >= 10
+                    if (source->prop_name) {
+                        reachable.insert(source->prop_name);
+                    }
+                #endif
+
+
             } else if (o->ob_type == &PyStaticMethod_Type || o->ob_type == &PyClassMethod_Type) {
                 JustLikeAClassOrStaticmethod* source = (JustLikeAClassOrStaticmethod*)o;
 

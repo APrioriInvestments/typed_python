@@ -557,7 +557,7 @@ class SerializationContext:
                     inst.co_filename if self.encodeLineInformationForCode else "",
                     inst.co_name,
                     inst.co_firstlineno if self.encodeLineInformationForCode else 0,
-                    inst.co_lnotab
+                    inst.co_lnotab if sys.version_info.minor < 10 else inst.co_linetable
                 ) + (
                     () if sys.version_info.minor < 8 or inst.co_posonlyargcount == 0 else
                     (inst.co_posonlyargcount,)

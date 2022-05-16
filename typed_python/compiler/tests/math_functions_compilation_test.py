@@ -876,7 +876,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
             return math.factorial(x)
 
         compiled = Entrypoint(f_factorial)
-        cases = ListOf(T2)([12, 50, 50.0, "string"])
+        cases = ListOf(T2)([12, 50, "string"])
         for v in cases:
             r1 = callOrExceptType(f_factorial, v)
             r2 = callOrExceptType(compiled, v)

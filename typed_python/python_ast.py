@@ -826,7 +826,12 @@ Alias = Alias.define(Alternative(
     "Alias",
     Item={
         "name": str,
-        "asname": OneOf(str, None)
+        "asname": OneOf(str, None),
+        **({
+            'line_number': int,
+            'col_offset': int,
+            'filename': str
+        } if sys.version_info.minor >= 10 else {})
     }
 ))
 
