@@ -158,7 +158,7 @@ def computeVariablesAssignmentCounts(astNode, includeImports=True):
     return assignmentCounts
 
 
-def computeVariablesReadByClosures(astNode):
+def computeVariablesReadByClosures(astNode, isInsideClassDef=False):
     """Determine the set of variables that are read from by deffed functions and lambdas."""
     closureVars = set()
 
@@ -169,7 +169,15 @@ def computeVariablesReadByClosures(astNode):
             # in each place.
 
             if x.matches.FunctionDef:
-                closureVars.update(computeReadVariables(x))
+                closureVars.update(computeReadVariables(x, isInsideClassDef))
+                return False
+
+            if x.matches.ClassDef:
+                closureVars.update(computeVariablesReadByClosures(x.bases))
+                closureVars.update(computeVariablesReadByClosures(x.keywords))
+                closureVars.update(computeVariablesReadByClosures(x.decorator_list))
+                for smt in x.body:
+                    closureVars.update(computeReadVariables(x.body, True))
                 return False
 
             assertValidStatement(x)
@@ -364,7 +372,7 @@ def computeMentionedConstants(astNode):
     return constants
 
 
-def computeReadVariables(astNode):
+def computeReadVariables(astNode, isInsideClassDef=False):
     """Return a set of variable names that are read from by this ast node or children.
 
     This doesn't have any masking behavior. E.g. something like
@@ -374,6 +382,10 @@ def computeReadVariables(astNode):
 
     reads 'x' despite the fact that it is not 'free' in 'x' because it reads from the slot
     that contains 'x'
+
+    Args:
+        astNode - the python_ast.Expr or Statement we're computing on.
+        isInsideClassDef - true if this is a Statement within a 'class' definition
     """
     variables = set()
 
@@ -428,7 +440,10 @@ def computeReadVariables(astNode):
                     .difference(
                         computeAssignedVariables(x.body)
                         .union(computeFunctionArgVariables(x.args))
-                        .union(set([x.name]))  # take out the function's name itself
+                        # take out the function's name itself if we're defining
+                        # a function anywhere where it might call itself recursively
+                        # directly (e.g. not in a classdef)
+                        .union(set([x.name] if not isInsideClassDef else []))
                     )
                 )
                 variables.update(computeReadVariables(x.decorator_list))
@@ -449,7 +464,8 @@ def computeReadVariables(astNode):
                 variables.update(computeReadVariables(x.bases))
                 variables.update(computeReadVariables(x.keywords))
                 variables.update(computeReadVariables(x.decorator_list))
-                variables.update(computeReadVariables(x.body))
+                for smt in x.body:
+                    variables.update(computeReadVariables(smt, True))
                 return False
 
             assertValidStatement(x)

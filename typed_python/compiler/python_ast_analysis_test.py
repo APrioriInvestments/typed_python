@@ -100,6 +100,18 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.assertEqual(sorted(readByClosures), ["x", "y", "z"])
 
+    def test_func_def_masking_self(self):
+        def f():
+            class C:
+                def func(self):
+                    return func()  # noqa
+
+        pyast = python_ast.convertFunctionToAlgebraicPyAst(f)
+
+        readByClosures = python_ast_analysis.computeVariablesReadByClosures(pyast.body)
+
+        self.assertEqual(sorted(readByClosures), ["func"])
+
     def test_multi_assignment_shows_up(self):
         def f():
             x, y = (1, 2)  # noqa
