@@ -1037,7 +1037,7 @@ def convertAlgebraicToSlice(pyAst):
             return ast.Slice(**args)
 
         if pyAst.matches.Tuple:
-            return ast.ExtSlice(*[convertAlgebraicToPyAst(x) for x in pyAst.elts])
+            return ast.ExtSlice(dims=[convertAlgebraicToPyAst(x) for x in pyAst.elts])
 
         return ast.Index(convertAlgebraicToPyAst(pyAst))
 
