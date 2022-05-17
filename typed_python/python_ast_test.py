@@ -53,6 +53,7 @@ class TestPythonAst(unittest.TestCase):
         self.reverseParseCheck(lambda x: (x, None))
         self.reverseParseCheck(lambda x: x.asdf)
         self.reverseParseCheck(lambda x: x(10))
+        self.reverseParseCheck(lambda x: x[:10])
 
         def f(x):
             try:

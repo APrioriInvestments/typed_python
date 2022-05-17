@@ -1097,7 +1097,10 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
         for f in tree._fields:
             # type_comment was introduced in 3.8, but we don't need it
             if f != "type_comment":
-                args[f] = convertPyAstToAlgebraic(getattr(tree, f), fname, keepLineInformation)
+                if hasattr(tree, f):
+                    args[f] = convertPyAstToAlgebraic(getattr(tree, f), fname, keepLineInformation)
+                else:
+                    args[f] = None
 
         try:
             if keepLineInformation:
