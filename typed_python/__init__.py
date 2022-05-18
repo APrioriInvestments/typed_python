@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-__version__ = "0.2.4"
+__version__ = "0.2.6"
 
 # incremented every time the way we serialize a fully-typed
 # TP object changes. Consumers who only serialize fully-typed
@@ -26,7 +26,7 @@ __fully_typed_serialization_version__ = 1
 # or look them up in a codebase. Clients that serialize 'object' and 'type'
 # and who want a way to check that they are reading the correct protocol
 # can check this version.
-__untyped_serialization_version__ = 4
+__untyped_serialization_version__ = 5
 
 from typed_python.internals import (
     Member, Final, Function, UndefinedBehaviorException,
