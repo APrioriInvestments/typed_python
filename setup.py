@@ -62,7 +62,7 @@ INSTALL_REQUIRES = [line.strip() for line in open('requirements.txt')]
 
 setuptools.setup(
     name='typed_python',
-    version='0.2.4',
+    version='0.2.5',
     description='opt-in strong typing at runtime for python, plus a compiler.',
     author='Braxton Mckee',
     author_email='braxton.mckee@gmail.com',
@@ -70,7 +70,6 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     cmdclass={'build_ext': TypedPythonBuildExtension},
     ext_modules=ext_modules,
-    # setup_requires=['numpy'],  # replaced by build-system:requires in pyproject.toml
     install_requires=INSTALL_REQUIRES,
 
     # https://pypi.org/classifiers/
