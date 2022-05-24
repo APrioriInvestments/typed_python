@@ -218,3 +218,17 @@ class TestTupleOfCompilation(unittest.TestCase):
             return TupleOf(int)(aList)
 
         assert len(makeT([])) == 0
+
+    def test_slice_list_of_compiled(self):
+        @Entrypoint
+        def sliceIt(aLst: ListOf(int), x: int):
+            return aLst[:x]
+
+        assert sliceIt((1, 2, 3), 1) == [1]
+
+    def test_slice_tuple_of_compiled(self):
+        @Entrypoint
+        def sliceIt(aTup: TupleOf(int), x: int):
+            return aTup[:x]
+
+        assert sliceIt((1, 2, 3), 1) == (1,)

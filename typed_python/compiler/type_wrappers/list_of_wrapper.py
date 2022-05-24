@@ -37,85 +37,6 @@ def list_of_extend(aList, extendWith):
             aList.append(thing)
 
 
-def min(a, b):
-    return a if a < b else b
-
-
-def max(a, b):
-    return b if a < b else a
-
-
-def list_of_slice(aList, start, stop, step):
-    if step is None:
-        return list_of_slice(aList, start, stop, 1)
-    if step == 0:
-        raise ValueError("slice step cannot be zero")
-    if step > 0:
-        if start is None:
-            return list_of_slice(aList, 0, stop, step)
-
-        if stop is None:
-            return list_of_slice(aList, start, len(aList), step)
-
-        if start < 0:
-            start += len(aList)
-        if stop < 0:
-            stop += len(aList)
-
-        start = max(0, start)
-        stop = min(len(aList), stop)
-
-        outList = type(aList)()
-
-        count = max(0, (stop - start + (step - 1)) // step)
-
-        outList.reserve(count)
-        outList.setSizeUnsafe(count)
-
-        writeP = outList.pointerUnsafe(0)
-        readP = aList.pointerUnsafe(start)
-
-        i = start
-        while i < stop:
-            writeP.initialize(readP.get())
-            writeP += 1
-            i += step
-            readP += step
-
-        return outList
-    else:
-        if start is None:
-            return list_of_slice(aList, len(aList) - 1, stop, step)
-        if stop is None:
-            return list_of_slice(aList, start, -1 - len(aList), step)
-
-        if start < 0:
-            start += len(aList)
-        if stop < 0:
-            stop += len(aList)
-
-        start = min(len(aList) - 1, start)
-        stop = max(-1, stop)
-
-        outList = type(aList)()
-        count = max(0, (start - stop + (-step - 1)) // (-step))
-
-        outList.reserve(count)
-        outList.setSizeUnsafe(count)
-
-        writeP = outList.pointerUnsafe(0)
-        readP = aList.pointerUnsafe(start)
-
-        i = start
-        while i > stop:
-            writeP.initialize(readP.get())
-            writeP += 1
-            i += step
-            readP += step
-
-        return outList
-
-
 class ListOfWrapper(TupleOrListOfWrapper):
     is_pod = False
     is_empty = False
@@ -446,18 +367,6 @@ class ListOfWrapper(TupleOrListOfWrapper):
             >> out.nonref_expr.ElementPtrIntegers(0, 4).store(
                 runtime_functions.malloc.call(self.underlyingWrapperType.getBytecount())
             )  # data
-        )
-
-    def convert_getslice(self, context, instance, lower, upper, step):
-        return context.call_py_function(
-            list_of_slice,
-            (
-                instance,
-                lower or context.constant(None),
-                upper or context.constant(None),
-                step or context.constant(None)
-            ),
-            {}
         )
 
     def convert_setitem(self, context, expr, index, item):

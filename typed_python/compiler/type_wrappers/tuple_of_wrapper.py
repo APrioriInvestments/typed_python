@@ -110,6 +110,14 @@ def tuple_of_hash(instance):
     return val
 
 
+def min(a, b):
+    return a if a < b else b
+
+
+def max(a, b):
+    return b if a < b else a
+
+
 class PreReservedTupleOrList(CompilableBuiltin):
     def __init__(self, tupleType):
         super().__init__()
@@ -208,6 +216,75 @@ def concatenate_tuple_or_list(l, r):
         result.setSizeUnsafe(ix)
 
     return result
+
+
+def list_or_tupleof_of_slice(aList, start, stop, step):
+    if step is None:
+        return list_or_tupleof_of_slice(aList, start, stop, 1)
+    if step == 0:
+        raise ValueError("slice step cannot be zero")
+    if step > 0:
+        if start is None:
+            return list_or_tupleof_of_slice(aList, 0, stop, step)
+
+        if stop is None:
+            return list_or_tupleof_of_slice(aList, start, len(aList), step)
+
+        if start < 0:
+            start += len(aList)
+        if stop < 0:
+            stop += len(aList)
+
+        start = max(0, start)
+        stop = min(len(aList), stop)
+
+        count = max(0, (stop - start + (step - 1)) // step)
+
+        outLstOrTup = PreReservedTupleOrList(type(aList))(count)
+
+        outLstOrTup.setSizeUnsafe(count)
+
+        writeP = outLstOrTup.pointerUnsafe(0)
+        readP = aList.pointerUnsafe(start)
+
+        i = start
+        while i < stop:
+            writeP.initialize(readP.get())
+            writeP += 1
+            i += step
+            readP += step
+
+        return outLstOrTup
+    else:
+        if start is None:
+            return list_or_tupleof_of_slice(aList, len(aList) - 1, stop, step)
+        if stop is None:
+            return list_or_tupleof_of_slice(aList, start, -1 - len(aList), step)
+
+        if start < 0:
+            start += len(aList)
+        if stop < 0:
+            stop += len(aList)
+
+        start = min(len(aList) - 1, start)
+        stop = max(-1, stop)
+
+        count = max(0, (start - stop + (-step - 1)) // (-step))
+
+        outLstOrTup = PreReservedTupleOrList(type(aList))(count)
+        outLstOrTup.setSizeUnsafe(count)
+
+        writeP = outLstOrTup.pointerUnsafe(0)
+        readP = aList.pointerUnsafe(start)
+
+        i = start
+        while i > stop:
+            writeP.initialize(readP.get())
+            writeP += 1
+            i += step
+            readP += step
+
+        return outLstOrTup
 
 
 class TupleOrListOfWrapper(RefcountedWrapper):
@@ -363,6 +440,18 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
     def convert_hash(self, context, expr):
         return context.call_py_function(tuple_of_hash, (expr,), {})
+
+    def convert_getslice(self, context, instance, lower, upper, step):
+        return context.call_py_function(
+            list_or_tupleof_of_slice,
+            (
+                instance,
+                lower or context.constant(None),
+                upper or context.constant(None),
+                step or context.constant(None)
+            ),
+            {}
+        )
 
     def convert_getitem(self, context, expr, item):
         if item is None or expr is None:
