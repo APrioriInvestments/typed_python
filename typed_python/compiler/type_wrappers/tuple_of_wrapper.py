@@ -218,6 +218,24 @@ def concatenate_tuple_or_list(l, r):
     return result
 
 
+def concatenate_tuple_or_list_reversed(l, r):
+    result = PreReservedTupleOrList(type(r))(len(l) + len(r))
+
+    ix = 0
+
+    for item in l:
+        result._initializeItemUnsafe(ix, item)
+        ix += 1
+        result.setSizeUnsafe(ix)
+
+    for item in r:
+        result._initializeItemUnsafe(ix, item)
+        ix += 1
+        result.setSizeUnsafe(ix)
+
+    return result
+
+
 def list_or_tupleof_of_slice(aList, start, stop, step):
     if step is None:
         return list_or_tupleof_of_slice(aList, start, stop, 1)
@@ -338,7 +356,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         )
 
     def convert_bin_op(self, context, left, op, right, inplace):
-        if issubclass(right.expr_type.typeRepresentation, (TupleOf, ListOf)):
+        if issubclass(right.expr_type.typeRepresentation, (TupleOf, ListOf, Tuple, NamedTuple)):
             if op.matches.Add:
                 return context.call_py_function(concatenate_tuple_or_list, (left, right), {})
 
@@ -359,6 +377,10 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_bin_op_reverse(self, context, right, op, left, inplace):
+        if issubclass(right.expr_type.typeRepresentation, (TupleOf, ListOf, Tuple, NamedTuple)):
+            if op.matches.Add:
+                return context.call_py_function(concatenate_tuple_or_list_reversed, (left, right), {})
+
         if op.matches.In or op.matches.NotIn:
             left = left.convert_to_type(self.typeRepresentation.ElementType, ConversionLevel.Implicit)
 

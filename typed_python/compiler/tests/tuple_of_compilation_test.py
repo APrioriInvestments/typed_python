@@ -232,3 +232,28 @@ class TestTupleOfCompilation(unittest.TestCase):
             return aTup[:x]
 
         assert sliceIt((1, 2, 3), 1) == (1,)
+
+    def test_add_untyped_tuple(self):
+        @Entrypoint
+        def addIt(aTup: TupleOf(int), x: int):
+            return aTup + (x,)
+
+        @Entrypoint
+        def addItLst(aTup: TupleOf(int), x: int):
+            return aTup + [x]
+
+        assert addIt((1, 2), 3) == (1, 2, 3)
+        assert addItLst((1, 2), 3) == (1, 2, 3)
+
+    def test_add_untyped_tuple_reversed(self):
+        @Entrypoint
+        def addIt(aTup: TupleOf(int), x: int):
+            return (x,) + aTup
+
+        @Entrypoint
+        def addItLst(aTup: TupleOf(int), x: int):
+            return [x] + aTup
+
+        assert addIt((1, 2), 3) == (3, 1, 2)
+        assert addItLst((1, 2), 3) == (3, 1, 2)
+

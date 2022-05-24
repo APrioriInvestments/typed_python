@@ -787,3 +787,15 @@ class TestListOfCompilation(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             aList[0] = "hi"
+
+    def test_add_untyped_tuple(self):
+        @Entrypoint
+        def addIt(aTup: ListOf(int), x: int):
+            return aTup + (x,)
+
+        @Entrypoint
+        def addItLst(aTup: ListOf(int), x: int):
+            return aTup + [x]
+
+        assert addIt((1, 2), 3) == [1, 2, 3]
+        assert addItLst((1, 2), 3) == [1, 2, 3]
