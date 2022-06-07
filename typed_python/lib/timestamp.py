@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Class, Final, Member, NamedTuple
+from typed_python import Class, Final, Member, NamedTuple, Held
 from typed_python.compiler.runtime import Entrypoint
 
 TimeTuple = NamedTuple(tm_year=int, tm_mon=int, tm_mday=int, tm_hour=int, tm_min=int, tm_sec=int)
@@ -29,8 +29,13 @@ def offset_to_seconds(utc_offset: str) -> int:
     return seconds
 
 
+@Held
 class Timestamp(Class, Final):
     ts = Member(float)
+
+    @staticmethod
+    def make(ts):
+        return Timestamp(ts=ts)
 
     def __int__(self):
         return int(self.ts)
@@ -40,10 +45,6 @@ class Timestamp(Class, Final):
 
     def __str__(self):
         return self.isoformat()
-
-    @Entrypoint
-    def __init__(self, ts: float) -> None:
-        self.ts = ts
 
     @Entrypoint
     def timetuple(self, utc_offset: str = DEFAULT_UTC_OFFSET) -> TimeTuple:
