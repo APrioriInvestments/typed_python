@@ -66,6 +66,37 @@ python semantics is its treament of integers. For performance and memory reasons
 this won't be a problem, but if you attempt to place an integer larger than 64 bits into a
 `typed_python` container, you'll see the integer get cast down to 64 bits.
 
+### Timestamp
+
+`typed_python` provides the Timestamp type that wraps useful datetime functionality around a
+unix timestamp.
+
+For e.g, you can create a Timestamp from a unixtime with the following:
+
+```
+ts1 = Timestamp.make(1654615145)
+ts2 = Timestamp(ts=1654615145)
+```
+
+You can also create Timestamps from datestrings. The parser supports ISO 8601 along with variety
+of non-iso formats. E.g:
+```
+  ts1 = Timestamp.parse("2022-01-05T10:11:12+00:15")
+  ts2 = Timestamp.parse("2022-01-05T10:11:12NYC")
+  ts3 = Timestamp.parse("January 1, 2022")
+  ts4 = Timestamp.parse("January/1/2022")
+  ts5 = Timestamp.parse("Jan-1-2022")
+```
+
+You can format Timestamps as strings using standard time format directives. E.g:
+
+```
+timestamp = Timestamp.make(1654615145)
+print(timestamp.format(utc_offset=144000))  # 2022-06-09T07:19:05
+print(timestamp.format(format="%Y-%m-%d"))  # 2022-06-09
+```
+
+
 ### Object
 
 In some cases, you may have types that need to hold regular python objects. For these cases, you may
