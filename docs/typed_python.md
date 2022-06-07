@@ -64,6 +64,18 @@ python semantics is its treament of integers. For performance and memory reasons
 this won't be a problem, but if you attempt to place an integer larger than 64 bits into a
 `typed_python` container, you'll see the integer get cast down to 64 bits.
 
+### Timestamp
+
+`typed_python` provides the Timestamp type that wraps useful datetime functionality around a
+unix timestamp.
+
+For e.g, you could get a GMT-4:00 datestring from a timestamp with the following code.
+
+```
+timestamp = Timestamp(1654615145)
+print(timestamp.isoformat('-04:00'))
+```
+
 ### Object
 
 In some cases, you may have types that need to hold regular python objects. For these cases, you may

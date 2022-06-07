@@ -17,29 +17,30 @@
 
 #include <Python.h>
 #include <frameobject.h>
-#include <numpy/arrayobject.h>
+#include <iostream>
 #include <map>
 #include <memory>
-#include <vector>
+#include <numpy/arrayobject.h>
 #include <string>
-#include <iostream>
+#include <tuple>
 #include <unordered_set>
+#include <vector>
 
 #include "AllTypes.hpp"
-#include "NullSerializationContext.hpp"
-#include "util.hpp"
-#include "PyInstance.hpp"
-#include "PyFunctionInstance.hpp"
-#include "SerializationBuffer.hpp"
 #include "DeserializationBuffer.hpp"
-#include "PythonSerializationContext.hpp"
-#include "UnicodeProps.hpp"
-#include "PyTemporaryReferenceTracer.hpp"
-#include "PySlab.hpp"
+#include "NullSerializationContext.hpp"
+#include "PyFunctionInstance.hpp"
+#include "PyInstance.hpp"
 #include "PyModuleRepresentation.hpp"
+#include "PySlab.hpp"
+#include "PyTemporaryReferenceTracer.hpp"
+#include "PythonSerializationContext.hpp"
+#include "SerializationBuffer.hpp"
+#include "UnicodeProps.hpp"
 #include "_types.hpp"
+#include "util.hpp"
 
-PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
+PyObject* MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
     std::vector<Type*> types;
 
     if (!unpackTupleToTypes(args, types)) {
@@ -57,12 +58,10 @@ PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTupl
 
     return incref(
         (PyObject*)PyInstance::typeObj(
-            isTuple ? (TupleOrListOfType*)TupleOfType::Make(types[0]) : (TupleOrListOfType*)ListOfType::Make(types[0])
-            )
-        );
+            isTuple ? (TupleOrListOfType*)TupleOfType::Make(types[0]) : (TupleOrListOfType*)ListOfType::Make(types[0])));
 }
 
-PyObject *MakePointerToType(PyObject* nullValue, PyObject* args) {
+PyObject* MakePointerToType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "PointerTo takes 1 positional argument.");
         return NULL;
@@ -80,7 +79,7 @@ PyObject *MakePointerToType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(PointerTo::Make(t)));
 }
 
-PyObject *MakeRefToType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeRefToType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "RefTo takes 1 positional argument.");
         return NULL;
@@ -95,12 +94,10 @@ PyObject *MakeRefToType(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    return translateExceptionToPyObject([&]{
-        return incref((PyObject*)PyInstance::typeObj(RefTo::Make(t)));
-    });
+    return translateExceptionToPyObject([&] { return incref((PyObject*)PyInstance::typeObj(RefTo::Make(t))); });
 }
 
-PyObject *MakeSubclassOfType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeSubclassOfType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "SubclassOf takes 1 positional argument.");
         return NULL;
@@ -120,12 +117,10 @@ PyObject *MakeSubclassOfType(PyObject* nullValue, PyObject* args) {
         return MakeValueType(nullValue, args);
     }
 
-    return translateExceptionToPyObject([&]{
-        return incref((PyObject*)PyInstance::typeObj(SubclassOfType::Make(t)));
-    });
+    return translateExceptionToPyObject([&] { return incref((PyObject*)PyInstance::typeObj(SubclassOfType::Make(t))); });
 }
 
-PyObject *MakeTypedCellType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeTypedCellType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "TypedCell takes 1 positional argument.");
         return NULL;
@@ -143,15 +138,15 @@ PyObject *MakeTypedCellType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(TypedCellType::Make(t)));
 }
 
-PyObject *MakeTupleOfType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeTupleOfType(PyObject* nullValue, PyObject* args) {
     return MakeTupleOrListOfType(nullValue, args, true);
 }
 
-PyObject *MakeListOfType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeListOfType(PyObject* nullValue, PyObject* args) {
     return MakeTupleOrListOfType(nullValue, args, false);
 }
 
-PyObject *MakeTupleType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeTupleType(PyObject* nullValue, PyObject* args) {
     std::vector<Type*> types;
     if (!unpackTupleToTypes(args, types)) {
         return NULL;
@@ -160,10 +155,10 @@ PyObject *MakeTupleType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(Tuple::Make(types)));
 }
 
-PyObject *MakeConstDictType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeConstDictType(PyObject* nullValue, PyObject* args) {
     std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
-        PyObjectHolder item(PyTuple_GetItem(args,k));
+        PyObjectHolder item(PyTuple_GetItem(args, k));
         types.push_back(PyInstance::unwrapTypeArgToTypePtr(item));
         if (not types.back()) {
             return NULL;
@@ -176,14 +171,13 @@ PyObject *MakeConstDictType(PyObject* nullValue, PyObject* args) {
     }
 
     PyObject* typeObj = (PyObject*)PyInstance::typeObj(
-        ConstDictType::Make(types[0],types[1])
-        );
+        ConstDictType::Make(types[0], types[1]));
 
     return incref(typeObj);
 }
 
 PyObject* MakeSetType(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args)!=1) {
+    if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "Set takes 1 positional arguments");
         return NULL;
     }
@@ -197,10 +191,10 @@ PyObject* MakeSetType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(setT));
 }
 
-PyObject *MakeDictType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeDictType(PyObject* nullValue, PyObject* args) {
     std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
-        PyObjectHolder item(PyTuple_GetItem(args,k));
+        PyObjectHolder item(PyTuple_GetItem(args, k));
         types.push_back(PyInstance::unwrapTypeArgToTypePtr(item));
         if (not types.back()) {
             return NULL;
@@ -214,15 +208,13 @@ PyObject *MakeDictType(PyObject* nullValue, PyObject* args) {
 
     return incref(
         (PyObject*)PyInstance::typeObj(
-            DictType::Make(types[0],types[1])
-            )
-        );
+            DictType::Make(types[0], types[1])));
 }
 
-PyObject *MakeOneOfType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeOneOfType(PyObject* nullValue, PyObject* args) {
     std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
-        PyObjectHolder item(PyTuple_GetItem(args,k));
+        PyObjectHolder item(PyTuple_GetItem(args, k));
 
         Type* t = PyInstance::tryUnwrapPyInstanceToType(item);
 
@@ -230,10 +222,9 @@ PyObject *MakeOneOfType(PyObject* nullValue, PyObject* args) {
             types.push_back(t);
         } else {
             PyErr_Format(PyExc_TypeError,
-                "Type arguments must be types or simple values (like ints, strings, etc.), not %S. "
-                "If you need a more complex value (such as a type object itself), wrap it in 'Value'.",
-                (PyObject*)item
-            );
+                         "Type arguments must be types or simple values (like ints, strings, etc.), not %S. "
+                         "If you need a more complex value (such as a type object itself), wrap it in 'Value'.",
+                         (PyObject*)item);
 
             return NULL;
         }
@@ -244,13 +235,13 @@ PyObject *MakeOneOfType(PyObject* nullValue, PyObject* args) {
     return incref(typeObj);
 }
 
-PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+PyObject* MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     if (args && PyTuple_Check(args) && PyTuple_Size(args)) {
         PyErr_SetString(PyExc_TypeError, "NamedTuple takes no positional arguments.");
         return NULL;
     }
 
-    std::vector<std::pair<std::string, Type*> > namesAndTypes;
+    std::vector<std::pair<std::string, Type*>> namesAndTypes;
 
     if (kwargs) {
         PyObject *key, *value;
@@ -265,9 +256,7 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
             namesAndTypes.push_back(
                 std::make_pair(
                     PyUnicode_AsUTF8(key),
-                    PyInstance::unwrapTypeArgToTypePtr(value)
-                    )
-                );
+                    PyInstance::unwrapTypeArgToTypePtr(value)));
 
             if (not namesAndTypes.back().second) {
                 return NULL;
@@ -276,16 +265,16 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
     }
 
     if (PY_MINOR_VERSION <= 5) {
-        //we cannot rely on the ordering of 'kwargs' here because of the python version, so
-        //we sort it. this will be a problem for anyone running some processes using different
-        //python versions that share python code.
+        // we cannot rely on the ordering of 'kwargs' here because of the python version, so
+        // we sort it. this will be a problem for anyone running some processes using different
+        // python versions that share python code.
         std::sort(namesAndTypes.begin(), namesAndTypes.end());
     }
 
     std::vector<std::string> names;
     std::vector<Type*> types;
 
-    for (auto p: namesAndTypes) {
+    for (auto p : namesAndTypes) {
         names.push_back(p.first);
         types.push_back(p.second);
     }
@@ -293,63 +282,62 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
     return incref((PyObject*)PyInstance::typeObj(NamedTuple::Make(types, names)));
 }
 
-
-PyObject *MakePyCellType(PyObject* nullValue, PyObject* args) {
+PyObject* MakePyCellType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::PyCellType::Make()));
 }
-PyObject *MakeBoolType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeBoolType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::Bool::Make()));
 }
-PyObject *MakeInt8Type(PyObject* nullValue, PyObject* args) {
+PyObject* MakeInt8Type(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::Int8::Make()));
 }
-PyObject *MakeInt16Type(PyObject* nullValue, PyObject* args) {
+PyObject* MakeInt16Type(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::Int16::Make()));
 }
-PyObject *MakeInt32Type(PyObject* nullValue, PyObject* args) {
+PyObject* MakeInt32Type(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::Int32::Make()));
 }
-PyObject *MakeInt64Type(PyObject* nullValue, PyObject* args) {
+PyObject* MakeInt64Type(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::Int64::Make()));
 }
-PyObject *MakeFloat32Type(PyObject* nullValue, PyObject* args) {
+PyObject* MakeFloat32Type(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::Float32::Make()));
 }
-PyObject *MakeFloat64Type(PyObject* nullValue, PyObject* args) {
+PyObject* MakeFloat64Type(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::Float64::Make()));
 }
-PyObject *MakeUInt8Type(PyObject* nullValue, PyObject* args) {
+PyObject* MakeUInt8Type(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::UInt8::Make()));
 }
-PyObject *MakeUInt16Type(PyObject* nullValue, PyObject* args) {
+PyObject* MakeUInt16Type(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::UInt16::Make()));
 }
-PyObject *MakeUInt32Type(PyObject* nullValue, PyObject* args) {
+PyObject* MakeUInt32Type(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::UInt32::Make()));
 }
-PyObject *MakeUInt64Type(PyObject* nullValue, PyObject* args) {
+PyObject* MakeUInt64Type(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::UInt64::Make()));
 }
-PyObject *MakeStringType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeStringType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::StringType::Make()));
 }
-PyObject *MakeBytesType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeBytesType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::BytesType::Make()));
 }
-PyObject *MakeEmbeddedMessageType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeEmbeddedMessageType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::EmbeddedMessageType::Make()));
 }
-PyObject *MakeNoneType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeNoneType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::NoneType::Make()));
 }
 
-PyObject *getVTablePointer(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1 || !PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0))) {
+PyObject* getVTablePointer(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1 || !PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args, 0))) {
         PyErr_SetString(PyExc_TypeError, "getVTablePointer takes 1 positional argument (a type)");
         return NULL;
     }
 
-    Type* type = PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0));
+    Type* type = PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args, 0));
 
     if (type->getTypeCategory() != Type::TypeCategory::catClass) {
         PyErr_Format(PyExc_TypeError, "Expected a Class, not %s", type->name().c_str());
@@ -359,9 +347,8 @@ PyObject *getVTablePointer(PyObject* nullValue, PyObject* args) {
     return PyLong_FromLong((size_t)((Class*)type)->getHeldClass()->getVTable());
 }
 
-PyObject *allocateClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObject* kwargs)
-{
-    static const char *kwlist[] = {"classType", "methodName", "retType", "argTupleType", "kwargTupleType", NULL};
+PyObject* allocateClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"classType", "methodName", "retType", "argTupleType", "kwargTupleType", NULL};
 
     PyObject* pyClassType;
     const char* methodName;
@@ -403,13 +390,11 @@ PyObject *allocateClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObj
             )
         );
 
-        return PyLong_FromLong(dispatchSlot);
-    });
+        return PyLong_FromLong(dispatchSlot); });
 }
 
-PyObject *getNextUnlinkedClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObject* kwargs)
-{
-    static const char *kwlist[] = {NULL};
+PyObject* getNextUnlinkedClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {NULL};
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
         return NULL;
@@ -430,12 +415,11 @@ PyObject *getNextUnlinkedClassMethodDispatch(PyObject* nullValue, PyObject* args
             PyInstance::typeObj(dispatchAndSlot.first->getInterfaceClass()->getClassType()),
             PyInstance::typeObj(dispatchAndSlot.first->getImplementingClass()->getClassType()),
             PyLong_FromLong(dispatchAndSlot.second)
-        );
-    });
+        ); });
 }
 
-PyObject *getCodeGlobalDotAccesses(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
-    static const char *kwlist[] = {"codeObject", NULL};
+PyObject* getCodeGlobalDotAccesses(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"codeObject", NULL};
 
     PyObject* pyCodeObject;
 
@@ -467,14 +451,11 @@ PyObject *getCodeGlobalDotAccesses(PyObject* nullValue, PyObject* args, PyObject
             PyList_Append(res, lst);
         }
 
-        return res;
-    });
+        return res; });
 }
 
-
-PyObject *getClassMethodDispatchSignature(PyObject* nullValue, PyObject* args, PyObject* kwargs)
-{
-    static const char *kwlist[] = {"interfaceClass", "implementingClass", "slot", NULL};
+PyObject* getClassMethodDispatchSignature(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"interfaceClass", "implementingClass", "slot", NULL};
 
     PyObject* pyInterfaceClass;
     PyObject* pyImplementingClass;
@@ -509,13 +490,11 @@ PyObject *getClassMethodDispatchSignature(PyObject* nullValue, PyObject* args, P
             PyInstance::typeObj(std::get<0>(sig.second)),
             PyInstance::typeObj(std::get<1>(sig.second)),
             PyInstance::typeObj(std::get<2>(sig.second))
-        );
-    });
+        ); });
 }
 
-PyObject *installClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObject* kwargs)
-{
-    static const char *kwlist[] = {"interfaceClass", "implementingClass", "slot", "funcPtr", NULL};
+PyObject* installClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"interfaceClass", "implementingClass", "slot", "funcPtr", NULL};
 
     PyObject* pyInterfaceClass;
     PyObject* pyImplementingClass;
@@ -545,12 +524,11 @@ PyObject *installClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObje
 
         cdt->define(slot, (untyped_function_ptr)funcPtr);
 
-        return incref(Py_None);
-    });
+        return incref(Py_None); });
 }
 
-PyObject *prepareArgumentToBePassedToCompiler(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
-    static const char *kwlist[] = {"obj", NULL};
+PyObject* prepareArgumentToBePassedToCompiler(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"obj", NULL};
 
     PyObject* obj;
 
@@ -558,14 +536,11 @@ PyObject *prepareArgumentToBePassedToCompiler(PyObject* nullValue, PyObject* arg
         return NULL;
     }
 
-    return translateExceptionToPyObject([&]() {
-        return PyFunctionInstance::prepareArgumentToBePassedToCompiler(obj);
-    });
+    return translateExceptionToPyObject([&]() { return PyFunctionInstance::prepareArgumentToBePassedToCompiler(obj); });
 }
 
-PyObject *getDispatchIndexForType(PyObject* nullValue, PyObject* args, PyObject* kwargs)
-{
-    static const char *kwlist[] = {"interfaceClass", "implementingClass", NULL};
+PyObject* getDispatchIndexForType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"interfaceClass", "implementingClass", NULL};
 
     PyObject* pyInterfaceClass;
     PyObject* pyImplementingClass;
@@ -589,13 +564,11 @@ PyObject *getDispatchIndexForType(PyObject* nullValue, PyObject* args, PyObject*
         HeldClass* heldInterface = ((Class*)interfaceClass)->getHeldClass();
         HeldClass* heldImplementing = ((Class*)implementingClass)->getHeldClass();
 
-        return PyLong_FromLong(heldImplementing->getMroIndex(heldInterface));
-    });
+        return PyLong_FromLong(heldImplementing->getMroIndex(heldInterface)); });
 }
 
-PyObject* initializeGlobalStatics(PyObject* nullValue, PyObject* args, PyObject* kwargs)
-{
-    static const char *kwlist[] = {NULL};
+PyObject* initializeGlobalStatics(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {NULL};
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
         return NULL;
@@ -615,9 +588,8 @@ PyObject* initializeGlobalStatics(PyObject* nullValue, PyObject* args, PyObject*
     return incref(Py_None);
 }
 
-PyObject* isValidArithmeticConversion(PyObject* nullValue, PyObject* args, PyObject* kwargs)
-{
-    static const char *kwlist[] = {"fromType", "toType", "conversionLevel", NULL};
+PyObject* isValidArithmeticConversion(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"fromType", "toType", "conversionLevel", NULL};
 
     PyObject* fromTypeObj;
     PyObject* toTypeObj;
@@ -643,13 +615,11 @@ PyObject* isValidArithmeticConversion(PyObject* nullValue, PyObject* args, PyObj
             fromType,
             toType,
             intToConversionLevel(conversionLevel)
-        ) ? Py_True : Py_False);
-    });
+        ) ? Py_True : Py_False); });
 }
 
-PyObject* isValidArithmeticUpcast(PyObject* nullValue, PyObject* args, PyObject* kwargs)
-{
-    static const char *kwlist[] = {"fromType", "toType", NULL};
+PyObject* isValidArithmeticUpcast(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"fromType", "toType", NULL};
 
     PyObject* fromTypeObj;
     PyObject* toTypeObj;
@@ -670,21 +640,17 @@ PyObject* isValidArithmeticUpcast(PyObject* nullValue, PyObject* args, PyObject*
             throw std::runtime_error("Expected 'toType' to be an arithmetic type");
         }
 
-        return incref(RegisterTypeProperties::isValidUpcast(fromType, toType) ? Py_True : Py_False);
-    });
+        return incref(RegisterTypeProperties::isValidUpcast(fromType, toType) ? Py_True : Py_False); });
 }
 
 PyDoc_STRVAR(
     classGetDispatchIndex_doc,
     "classGetDispatchIndex(visibleClass, concreteClass) -> int\n\n"
     "Return the dispatch index used by an instance of 'concreteClass' masquerading\n"
-    "as an instance of 'visibleClass'.\n"
-);
+    "as an instance of 'visibleClass'.\n");
 
-
-PyObject* classGetDispatchIndex(PyObject* nullValue, PyObject* args, PyObject* kwargs)
-{
-    static const char *kwlist[] = {"visibleClass", "concreteClass", NULL};
+PyObject* classGetDispatchIndex(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"visibleClass", "concreteClass", NULL};
 
     PyObject* visibleClass;
     PyObject* concreteClass;
@@ -712,13 +678,11 @@ PyObject* classGetDispatchIndex(PyObject* nullValue, PyObject* args, PyObject* k
             return PyLong_FromLong(index);
         }
 
-        throw std::runtime_error(visibleType->name() + " is not a superclass of " + concreteType->name());
-    });
+        throw std::runtime_error(visibleType->name() + " is not a superclass of " + concreteType->name()); });
 }
 
-PyObject *installClassDestructor(PyObject* nullValue, PyObject* args, PyObject* kwargs)
-{
-    static const char *kwlist[] = {"implementingClass", "funcPtr", NULL};
+PyObject* installClassDestructor(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"implementingClass", "funcPtr", NULL};
 
     PyObject* pyImplementingClass;
     size_t funcPtr;
@@ -738,17 +702,16 @@ PyObject *installClassDestructor(PyObject* nullValue, PyObject* args, PyObject* 
 
         heldImplementing->getVTable()->installDestructor((destructor_fun_type)funcPtr);
 
-        return incref(Py_None);
-    });
+        return incref(Py_None); });
 }
 
-PyObject *MakeTypeFor(PyObject* nullValue, PyObject* args) {
+PyObject* MakeTypeFor(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "TypeFor takes 1 positional argument");
         return NULL;
     }
 
-    PyObjectHolder arg(PyTuple_GetItem(args,0));
+    PyObjectHolder arg(PyTuple_GetItem(args, 0));
 
     if (arg == Py_None) {
         return incref((PyObject*)Py_None->ob_type);
@@ -764,8 +727,7 @@ PyObject *MakeTypeFor(PyObject* nullValue, PyObject* args) {
         arg == Py_None->ob_type ||
         arg == &PyBool_Type ||
         arg == &PyBytes_Type ||
-        arg == &PyUnicode_Type
-    ) {
+        arg == &PyUnicode_Type) {
         return incref(arg);
     }
 
@@ -779,13 +741,13 @@ PyObject *MakeTypeFor(PyObject* nullValue, PyObject* args) {
     return NULL;
 }
 
-PyObject *MakeValueType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeValueType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "Value takes 1 positional argument");
         return NULL;
     }
 
-    PyObjectHolder arg(PyTuple_GetItem(args,0));
+    PyObjectHolder arg(PyTuple_GetItem(args, 0));
 
     Type* type = PyInstance::tryUnwrapPyInstanceToValueType(arg, true);
 
@@ -797,14 +759,14 @@ PyObject *MakeValueType(PyObject* nullValue, PyObject* args) {
     return NULL;
 }
 
-PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "BoundMethod takes 2 arguments");
         return NULL;
     }
 
-    PyObjectHolder a0(PyTuple_GetItem(args,0));
-    PyObjectHolder a1(PyTuple_GetItem(args,1));
+    PyObjectHolder a0(PyTuple_GetItem(args, 0));
+    PyObjectHolder a1(PyTuple_GetItem(args, 1));
 
     Type* t0 = PyInstance::unwrapTypeArgToTypePtr(a0);
 
@@ -818,21 +780,20 @@ PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(resType));
 }
 
-PyObject *MakeAlternativeMatcherType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeAlternativeMatcherType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "AlternativeMatcher takes one argument");
         return NULL;
     }
 
-    PyObjectHolder a0(PyTuple_GetItem(args,0));
+    PyObjectHolder a0(PyTuple_GetItem(args, 0));
 
     Type* t0 = PyInstance::unwrapTypeArgToTypePtr(a0);
 
     if (!t0->isAlternative() && !t0->isConcreteAlternative()) {
         PyErr_SetString(
             PyExc_TypeError,
-            "Expected first argument to be an alternative or concrete alternative"
-        );
+            "Expected first argument to be an alternative or concrete alternative");
 
         return NULL;
     }
@@ -842,7 +803,7 @@ PyObject *MakeAlternativeMatcherType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(resType));
 }
 
-PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeFunctionType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 6 && PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "Function takes 2 or 6 arguments");
         return NULL;
@@ -954,7 +915,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                     return NULL;
                 }
 
-                val = PyTuple_GetItem(k2,0);
+                val = PyTuple_GetItem(k2, 0);
             }
 
             if (val) {
@@ -966,8 +927,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                 argT,
                 val,
                 k3 == Py_True,
-                k4 == Py_True
-                ));
+                k4 == Py_True));
         }
 
         std::string moduleName = "<unknown>";
@@ -1031,13 +991,10 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
 
                     globalsInCells[closureVarnames[ix]] = incref(cell);
                 }
-            }
-            else {
+            } else {
                 for (long ix = 0; ix < PyTuple_Size(closure); ix++) {
                     closureVarTypes.push_back(PyCellType::Make());
-                    closureBindings[closureVarnames[ix]] = (
-                        ClosureVariableBinding() + 0 + ix + ClosureVariableBindingStep::AccessCell()
-                    );
+                    closureBindings[closureVarnames[ix]] = (ClosureVariableBinding() + 0 + ix + ClosureVariableBindingStep::AccessCell());
                 }
             }
         }
@@ -1054,29 +1011,22 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                 rType,
                 rSignature,
                 argList,
-                nullptr
-            )
-        );
+                nullptr));
 
         resType = Function::Make(
             PyUnicode_AsUTF8(nameObj),
             PyUnicode_AsUTF8(qualnameObj),
             moduleName,
             overloads,
-            Tuple::Make({
-                assumeClosureGlobal ?
-                    NamedTuple::Make({}, {}) :
-                    NamedTuple::Make(closureVarTypes, closureVarnames)
-                }),
+            Tuple::Make({assumeClosureGlobal ? NamedTuple::Make({}, {}) : NamedTuple::Make(closureVarTypes, closureVarnames)}),
             false,
-            false
-        );
+            false);
     }
 
     return incref((PyObject*)PyInstance::typeObj(resType));
 }
 
-PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
+PyObject* MakeClassType(PyObject* nullValue, PyObject* args) {
     int expected_args = 9;
 
     if (PyTuple_Size(args) != expected_args) {
@@ -1084,7 +1034,7 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    PyObjectHolder nameArg(PyTuple_GetItem(args,0));
+    PyObjectHolder nameArg(PyTuple_GetItem(args, 0));
 
     if (!PyUnicode_Check(nameArg)) {
         PyErr_SetString(PyExc_TypeError, "Class needs a string in the first argument");
@@ -1144,18 +1094,18 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
 
     std::vector<Type*> bases;
     std::vector<MemberDefinition> members;
-    std::vector<std::pair<std::string, Type*> > memberFunctions;
-    std::vector<std::pair<std::string, Type*> > staticFunctions;
-    std::vector<std::pair<std::string, Type*> > propertyFunctions;
-    std::vector<std::pair<std::string, PyObject*> > classMembers;
-    std::vector<std::pair<std::string, Type*> > classMethods;
+    std::vector<std::pair<std::string, Type*>> memberFunctions;
+    std::vector<std::pair<std::string, Type*>> staticFunctions;
+    std::vector<std::pair<std::string, Type*>> propertyFunctions;
+    std::vector<std::pair<std::string, PyObject*>> classMembers;
+    std::vector<std::pair<std::string, Type*>> classMethods;
 
     if (!unpackTupleToTypes(basesTuple, bases)) {
         return NULL;
     }
     std::vector<Class*> baseClasses;
 
-    for (auto t: bases) {
+    for (auto t : bases) {
         if (t->getTypeCategory() != Type::TypeCategory::catClass) {
             PyErr_SetString(PyExc_TypeError, "Classes must descend from other Class types");
             return NULL;
@@ -1187,52 +1137,56 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     std::map<std::string, Function*> classMethodFuncs;
     std::map<std::string, Function*> propertyFuncs;
 
-    for (auto mf: memberFunctions) {
+    for (auto mf : memberFunctions) {
         if (mf.second->getTypeCategory() != Type::TypeCategory::catFunction) {
             PyErr_Format(PyExc_TypeError, "Class member %s is not a function.", mf.first.c_str());
             return NULL;
         }
         if (memberFuncs.find(mf.first) != memberFuncs.end()) {
             PyErr_Format(PyExc_TypeError, "Class member %s repeated. This should have"
-                                    " been compressed as an overload.", mf.first.c_str());
+                                          " been compressed as an overload.",
+                         mf.first.c_str());
             return NULL;
         }
         memberFuncs[mf.first] = (Function*)mf.second;
     }
-    for (auto pf: propertyFunctions) {
+    for (auto pf : propertyFunctions) {
         if (pf.second->getTypeCategory() != Type::TypeCategory::catFunction) {
             PyErr_Format(PyExc_TypeError, "Class member %s is not a function.", pf.first.c_str());
             return NULL;
         }
         if (propertyFuncs.find(pf.first) != propertyFuncs.end()) {
             PyErr_Format(PyExc_TypeError, "Class member %s repeated. This should have"
-                                    " been compressed as an overload.", pf.first.c_str());
+                                          " been compressed as an overload.",
+                         pf.first.c_str());
             return NULL;
         }
         propertyFuncs[pf.first] = (Function*)pf.second;
     }
 
-    for (auto mf: staticFunctions) {
+    for (auto mf : staticFunctions) {
         if (mf.second->getTypeCategory() != Type::TypeCategory::catFunction) {
             PyErr_Format(PyExc_TypeError, "Class member %s is not a function.", mf.first.c_str());
             return NULL;
         }
         if (staticFuncs.find(mf.first) != staticFuncs.end()) {
             PyErr_Format(PyExc_TypeError, "Class member %s repeated. This should have"
-                                    " been compressed as an overload.", mf.first.c_str());
+                                          " been compressed as an overload.",
+                         mf.first.c_str());
             return NULL;
         }
         staticFuncs[mf.first] = (Function*)mf.second;
     }
 
-    for (auto mf: classMethods) {
+    for (auto mf : classMethods) {
         if (mf.second->getTypeCategory() != Type::TypeCategory::catFunction) {
             PyErr_Format(PyExc_TypeError, "Class method %s is not a function.", mf.first.c_str());
             return NULL;
         }
         if (classMethodFuncs.find(mf.first) != classMethodFuncs.end()) {
             PyErr_Format(PyExc_TypeError, "Class method %s repeated. This should have"
-                                    " been compressed as an overload.", mf.first.c_str());
+                                          " been compressed as an overload.",
+                         mf.first.c_str());
             return NULL;
         }
         classMethodFuncs[mf.first] = (Function*)mf.second;
@@ -1240,31 +1194,26 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
 
     std::map<std::string, PyObject*> clsMembers;
 
-    for (auto mf: classMembers) {
+    for (auto mf : classMembers) {
         clsMembers[mf.first] = mf.second;
     }
 
-    return translateExceptionToPyObject([&]() {
-        return incref(
-            (PyObject*)PyInstance::typeObj(
-                Class::Make(
-                    name,
-                    baseClasses,
-                    final == Py_True,
-                    members,
-                    memberFuncs,
-                    staticFuncs,
-                    propertyFuncs,
-                    clsMembers,
-                    classMethodFuncs,
-                    // this is the first time this class exists,
-                    // so we need the constructor to rebuild the
-                    // function objects with apprioriated methodOf
-                    true
-                )
-            )
-        );
-    });
+    return translateExceptionToPyObject([&]() { return incref(
+                                                    (PyObject*)PyInstance::typeObj(
+                                                        Class::Make(
+                                                            name,
+                                                            baseClasses,
+                                                            final == Py_True,
+                                                            members,
+                                                            memberFuncs,
+                                                            staticFuncs,
+                                                            propertyFuncs,
+                                                            clsMembers,
+                                                            classMethodFuncs,
+                                                            // this is the first time this class exists,
+                                                            // so we need the constructor to rebuild the
+                                                            // function objects with apprioriated methodOf
+                                                            true))); });
 }
 
 PyDoc_STRVAR(
@@ -1273,9 +1222,8 @@ PyDoc_STRVAR(
     "Determines whether instances of sourceT can be converted to destT without\n"
     "modification of data or change of identity.\n\nFor instance, int converts trivially\n"
     "to Oneof(int, float), but not to float or str. Subclasses can convert to any base class\n"
-    "and Value types can convert to the type of the value."
-);
-PyObject *canConvertToTrivially(PyObject* nullValue, PyObject* args) {
+    "and Value types can convert to the type of the value.");
+PyObject* canConvertToTrivially(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "canConvertToTrivially takes 2 positional arguments");
         return NULL;
@@ -1306,7 +1254,6 @@ PyObject *canConvertToTrivially(PyObject* nullValue, PyObject* args) {
     return incref(Py_False);
 }
 
-
 PyObject* convertObjectToTypeAtLevel(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() {
         static const char *kwlist[] = {"toConvert", "toType", "levelAsInt", NULL};
@@ -1330,8 +1277,7 @@ PyObject* convertObjectToTypeAtLevel(PyObject* nullValue, PyObject* args, PyObje
             PyInstance::copyConstructFromPythonInstance(t, p, object, intToConversionLevel(level));
         });
 
-        return PyInstance::extractPythonObject(result);
-    });
+        return PyInstance::extractPythonObject(result); });
 }
 
 PyObject* couldConvertObjectToTypeAtLevel(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
@@ -1353,11 +1299,10 @@ PyObject* couldConvertObjectToTypeAtLevel(PyObject* nullValue, PyObject* args, P
             throw PythonExceptionSet();
         }
 
-        return PyInstance::pyValCouldBeOfType(t, object, intToConversionLevel(level)) ? incref(Py_True) : incref(Py_False);
-    });
+        return PyInstance::pyValCouldBeOfType(t, object, intToConversionLevel(level)) ? incref(Py_True) : incref(Py_False); });
 }
 
-PyObject *pyInstanceHeldObjectAddress(PyObject* nullValue, PyObject* args) {
+PyObject* pyInstanceHeldObjectAddress(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "pyInstanceHeldObjectAddress takes a PyInstance");
         return NULL;
@@ -1371,15 +1316,14 @@ PyObject *pyInstanceHeldObjectAddress(PyObject* nullValue, PyObject* args) {
         PyErr_Format(
             PyExc_TypeError,
             "pyInstanceHeldObjectAddress takes a PyInstance",
-            (PyObject*)a1
-            );
+            (PyObject*)a1);
         return NULL;
     }
 
     return PyLong_FromLong((size_t)((PyInstance*)a1)->dataPtr());
 }
 
-PyObject *pointerTo(PyObject* nullValue, PyObject* args) {
+PyObject* pointerTo(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "pointerTo takes a single class instance as an argument");
         return NULL;
@@ -1393,8 +1337,7 @@ PyObject *pointerTo(PyObject* nullValue, PyObject* args) {
         PyErr_Format(
             PyExc_TypeError,
             "first argument to pointerTo '%S' must be a Class or HeldClass",
-            (PyObject*)a1
-            );
+            (PyObject*)a1);
         return NULL;
     }
 
@@ -1404,8 +1347,7 @@ PyObject *pointerTo(PyObject* nullValue, PyObject* args) {
     if (actualType->isRefTo()) {
         ptrType = PointerTo::Make(((RefTo*)actualType)->getEltType());
         ptrValue = *(void**)((PyInstance*)(PyObject*)a1)->dataPtr();
-    } else
-    if (actualType->isClass()) {
+    } else if (actualType->isClass()) {
         Class* clsType = (Class*)actualType;
         Class::layout* layout = clsType->instanceToLayout(((PyInstance*)(PyObject*)a1)->dataPtr());
 
@@ -1421,7 +1363,7 @@ PyObject *pointerTo(PyObject* nullValue, PyObject* args) {
     return PyInstance::extractPythonObject((instance_ptr)&ptrValue, ptrType);
 }
 
-PyObject *refTo(PyObject* nullValue, PyObject* args) {
+PyObject* refTo(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "refTo takes a single class instance as an argument");
         return NULL;
@@ -1435,8 +1377,7 @@ PyObject *refTo(PyObject* nullValue, PyObject* args) {
         PyErr_Format(
             PyExc_TypeError,
             "first argument to refTo '%S' must be a Class, HeldClass, or existing RefTo",
-            (PyObject*)a1
-            );
+            (PyObject*)a1);
         return NULL;
     }
 
@@ -1446,8 +1387,7 @@ PyObject *refTo(PyObject* nullValue, PyObject* args) {
     if (actualType->isRefTo()) {
         refType = (RefTo*)actualType;
         ptrValue = *(void**)((PyInstance*)(PyObject*)a1)->dataPtr();
-    } else
-    if (actualType->isClass()) {
+    } else if (actualType->isClass()) {
         Class* clsType = (Class*)actualType;
         Class::layout* layout = clsType->instanceToLayout(((PyInstance*)(PyObject*)a1)->dataPtr());
 
@@ -1463,7 +1403,7 @@ PyObject *refTo(PyObject* nullValue, PyObject* args) {
     return PyInstance::extractPythonObject((instance_ptr)&ptrValue, refType);
 }
 
-PyObject *copyRefTo(PyObject* nullValue, PyObject* args) {
+PyObject* copyRefTo(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "copy takes a single RefTo instance as an argument");
         return NULL;
@@ -1477,8 +1417,7 @@ PyObject *copyRefTo(PyObject* nullValue, PyObject* args) {
         PyErr_Format(
             PyExc_TypeError,
             "first argument to copy '%S' must be a RefTo",
-            (PyObject*)a1
-            );
+            (PyObject*)a1);
         return NULL;
     }
 
@@ -1488,14 +1427,10 @@ PyObject *copyRefTo(PyObject* nullValue, PyObject* args) {
     HeldClass* heldCls = (HeldClass*)refTo->getEltType();
     Class* cls = heldCls->getClassType();
 
-    return PyInstance::initialize(cls, [&](instance_ptr data) {
-        cls->constructorInitializingHeld(data, [&](instance_ptr heldClsData) {
-            heldCls->copy_constructor(heldClsData, reffedHeldClassData);
-        });
-    });
+    return PyInstance::initialize(cls, [&](instance_ptr data) { cls->constructorInitializingHeld(data, [&](instance_ptr heldClsData) { heldCls->copy_constructor(heldClsData, reffedHeldClassData); }); });
 }
 
-PyObject *refcount(PyObject* nullValue, PyObject* args) {
+PyObject* refcount(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "refcount takes 1 positional argument");
         return NULL;
@@ -1506,24 +1441,21 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
     Type* actualType = PyInstance::extractTypeFrom(a1->ob_type);
     instance_ptr data = ((PyInstance*)(PyObject*)a1)->dataPtr();
 
-    if (!actualType || (
-            !actualType->isTupleOf() &&
-            !actualType->isListOf() &&
-            !actualType->isClass() &&
-            !actualType->isConstDict() &&
-            !actualType->isDict() &&
-            !actualType->isSet() &&
-            !actualType->isAlternative() &&
-            !actualType->isConcreteAlternative() &&
-            !actualType->isPythonObjectOfType() &&
-            !actualType->isTypedCell()
-            )) {
+    if (!actualType || (!actualType->isTupleOf() &&
+                        !actualType->isListOf() &&
+                        !actualType->isClass() &&
+                        !actualType->isConstDict() &&
+                        !actualType->isDict() &&
+                        !actualType->isSet() &&
+                        !actualType->isAlternative() &&
+                        !actualType->isConcreteAlternative() &&
+                        !actualType->isPythonObjectOfType() &&
+                        !actualType->isTypedCell())) {
         PyErr_Format(
             PyExc_TypeError,
             "first argument to refcount '%S' not a permitted Type: %S",
             (PyObject*)a1,
-            (PyObject*)a1->ob_type
-            );
+            (PyObject*)a1->ob_type);
         return NULL;
     }
 
@@ -1531,32 +1463,23 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
 
     if (actualType->isTupleOf()) {
         outRefcount = ((::TupleOfType*)actualType)->refcount(data);
-    }
-    else if (actualType->isListOf()) {
+    } else if (actualType->isListOf()) {
         outRefcount = ((::ListOfType*)actualType)->refcount(data);
-    }
-    else if (actualType->isClass()) {
+    } else if (actualType->isClass()) {
         outRefcount = ((::Class*)actualType)->refcount(data);
-    }
-    else if (actualType->isConstDict()) {
+    } else if (actualType->isConstDict()) {
         outRefcount = ((::ConstDictType*)actualType)->refcount(data);
-    }
-    else if (actualType->isSet()) {
+    } else if (actualType->isSet()) {
         outRefcount = ((::SetType*)actualType)->refcount(data);
-    }
-    else if (actualType->isDict()) {
+    } else if (actualType->isDict()) {
         outRefcount = ((::DictType*)actualType)->refcount(data);
-    }
-    else if (actualType->isAlternative()) {
+    } else if (actualType->isAlternative()) {
         outRefcount = ((::Alternative*)actualType)->refcount(data);
-    }
-    else if (actualType->isConcreteAlternative()) {
+    } else if (actualType->isConcreteAlternative()) {
         outRefcount = ((::ConcreteAlternative*)actualType)->refcount(data);
-    }
-    else if (actualType->isPythonObjectOfType()) {
+    } else if (actualType->isPythonObjectOfType()) {
         outRefcount = ((::PythonObjectOfType*)actualType)->refcount(data);
-    }
-    else if (actualType->isTypedCell()) {
+    } else if (actualType->isTypedCell()) {
         outRefcount = ((::TypedCellType*)actualType)->refcount(data);
     }
 
@@ -1566,8 +1489,7 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
 PyDoc_STRVAR(
     totalBytesAllocatedInSlabs_doc,
     "totalBytesAllocatedInSlabs() -> int\n\n"
-    "returns the total number of bytes currently allocated in living Slab objects.\n"
-);
+    "returns the total number of bytes currently allocated in living Slab objects.\n");
 
 PyObject* totalBytesAllocatedInSlabs(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 0) {
@@ -1581,8 +1503,7 @@ PyObject* totalBytesAllocatedInSlabs(PyObject* nullValue, PyObject* args) {
 PyDoc_STRVAR(
     totalBytesAllocatedOnFreeStore_doc,
     "totalBytesAllocatedOnFreeStore() -> int\n\n"
-    "returns the total number of bytes allocated by typed_python objects not in slabs.\n"
-);
+    "returns the total number of bytes allocated by typed_python objects not in slabs.\n");
 
 PyObject* totalBytesAllocatedOnFreeStore(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 0) {
@@ -1594,19 +1515,18 @@ PyObject* totalBytesAllocatedOnFreeStore(PyObject* nullValue, PyObject* args) {
 }
 
 PyDoc_STRVAR(deepcopy_doc,
-    "deepcopy(o, typeMap=None)\n\n"
-    "Make a 'deep copy' of the object graph starting at 'o'. The deepcopier\n"
-    "looks inside of standard python objects with '__dict__', tuples, sets,\n"
-    "dicts, lists, and typed_python instances.  It shallow copies functions,\n"
-    "types, modules, and anything without a standard __dict__.\n\n"
-    "If 'typeMap' is provided, it must be a dict from Type to callable.  Any\n"
-    "instance of a type in the map will be passed through the callable instead\n"
-    "of being deepcopied.  It must preserve the type if the object is used\n"
-    "in a typed context.\n"
-);
+             "deepcopy(o, typeMap=None)\n\n"
+             "Make a 'deep copy' of the object graph starting at 'o'. The deepcopier\n"
+             "looks inside of standard python objects with '__dict__', tuples, sets,\n"
+             "dicts, lists, and typed_python instances.  It shallow copies functions,\n"
+             "types, modules, and anything without a standard __dict__.\n\n"
+             "If 'typeMap' is provided, it must be a dict from Type to callable.  Any\n"
+             "instance of a type in the map will be passed through the callable instead\n"
+             "of being deepcopied.  It must preserve the type if the object is used\n"
+             "in a typed context.\n");
 
 PyObject* deepcopy(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
-    static const char *kwlist[] = {"arg", "typeMap", NULL};
+    static const char* kwlist[] = {"arg", "typeMap", NULL};
 
     PyObject* arg;
     PyObject* typeMap = nullptr;
@@ -1654,24 +1574,22 @@ PyObject* deepcopy(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
         } catch(...) {
             context.slab->decref();
             throw;
-        }
-    });
+        } });
 }
 
 PyDoc_STRVAR(deepcopyContiguous_doc,
-    "deepcopyContiguous(o, trackInternalTypes=False)\n\n"
-    "Make a 'deep copy' of the object graph starting at 'o', placing the new\n"
-    "objects in a 'Slab', which is a contiguously allocated block of memory.\n"
-    "The deepcopier looks inside of standard python objects with '__dict__',\n"
-    "tuples, sets, dicts, lists, and typed_python instances.  It shallow copies\n"
-    "functions, types, modules, and anything without a standard __dict__.\n\n"
-    "If 'trackInternalTypes' is True, the the resulting Slab object tracks\n"
-    "details on the types of the objects allocated inside of it for diagnostic\n"
-    "purposes. See typed_python.Slab for details."
-);
+             "deepcopyContiguous(o, trackInternalTypes=False)\n\n"
+             "Make a 'deep copy' of the object graph starting at 'o', placing the new\n"
+             "objects in a 'Slab', which is a contiguously allocated block of memory.\n"
+             "The deepcopier looks inside of standard python objects with '__dict__',\n"
+             "tuples, sets, dicts, lists, and typed_python instances.  It shallow copies\n"
+             "functions, types, modules, and anything without a standard __dict__.\n\n"
+             "If 'trackInternalTypes' is True, the the resulting Slab object tracks\n"
+             "details on the types of the objects allocated inside of it for diagnostic\n"
+             "purposes. See typed_python.Slab for details.");
 
 PyObject* deepcopyContiguous(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
-    static const char *kwlist[] = {"arg", "trackInternalTypes", "tag", NULL};
+    static const char* kwlist[] = {"arg", "trackInternalTypes", "tag", NULL};
 
     PyObject* arg;
     PyObject* tag = nullptr;
@@ -1703,26 +1621,24 @@ PyObject* deepcopyContiguous(PyObject* nullValue, PyObject* args, PyObject* kwar
         }
         slab->decref();
         return res;
-    } catch(PythonExceptionSet& e) {
+    } catch (PythonExceptionSet& e) {
         slab->decref();
         return NULL;
-    } catch(std::exception& e) {
+    } catch (std::exception& e) {
         slab->decref();
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
     }
 }
 
-
 PyDoc_STRVAR(
     getAllSlabs_doc,
     "getAllSlabs() -> [Slab]\n\n"
     "returns a list of Slab objects for all currently alive Slabs.\n\n"
     "Note that this could segfault if a slab gets deleted right as you call\n"
-    "this function, so this should be used only for diagnostic purposes."
-);
+    "this function, so this should be used only for diagnostic purposes.");
 
-PyObject *getAllSlabs(PyObject* nullValue, PyObject* args) {
+PyObject* getAllSlabs(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 0) {
         PyErr_SetString(PyExc_TypeError, "getAllSlabs takes 0 arguments");
         return NULL;
@@ -1732,7 +1648,7 @@ PyObject *getAllSlabs(PyObject* nullValue, PyObject* args) {
 
     PyObjectStealer pySlabList(PyList_New(0));
 
-    for (auto slabPtr: Slab::aliveSlabs()) {
+    for (auto slabPtr : Slab::aliveSlabs()) {
         PyObjectStealer pySlabPtr(PySlab::newPySlab(slabPtr));
         PyList_Append(pySlabList, pySlabPtr);
     }
@@ -1740,16 +1656,14 @@ PyObject *getAllSlabs(PyObject* nullValue, PyObject* args) {
     return incref(pySlabList);
 }
 
-
 PyDoc_STRVAR(
     deepBytecountAndSlabs_doc,
     "deepBytecountAndSlabs(o) -> (int, Slab)\n\n"
     "Returns the bytecount of all non-slab allocations reachable from 'o',\n"
     "as well as a list of all the Slab objects reachable from 'o'.\n\n"
     "Use this to determine how many bytes in your graph are not in slabs\n"
-    "or to check if you can reach the same Slab from multiple places.\n"
-);
-PyObject *deepBytecountAndSlabs(PyObject* nullValue, PyObject* args) {
+    "or to check if you can reach the same Slab from multiple places.\n");
+PyObject* deepBytecountAndSlabs(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "deepBytecountAndSlabs takes 1 argument");
         return NULL;
@@ -1780,8 +1694,7 @@ PyObject *deepBytecountAndSlabs(PyObject* nullValue, PyObject* args) {
             PyList_Append(pySlabList, pySlabPtr);
         }
 
-        return PyTuple_Pack(2, (PyObject*)szAsLong, (PyObject*)pySlabList);
-    });
+        return PyTuple_Pack(2, (PyObject*)szAsLong, (PyObject*)pySlabList); });
 }
 
 PyDoc_STRVAR(
@@ -1790,10 +1703,9 @@ PyDoc_STRVAR(
     "Determine how many bytes of data would be required to represent 'o'\n"
     "and all the objects beneath it. We use the same rules for reachablility\n"
     "as we do for 'deepcopy' and 'deepcopyContiguous'. This predicts\n"
-    "the size of the resulting Slab if you call deepcopyContiguous(o)."
-);
+    "the size of the resulting Slab if you call deepcopyContiguous(o).");
 
-PyObject *deepBytecount(PyObject* nullValue, PyObject* args) {
+PyObject* deepBytecount(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "deepBytecount takes 1 argument");
         return NULL;
@@ -1816,8 +1728,7 @@ PyObject *deepBytecount(PyObject* nullValue, PyObject* args) {
             sz = actualType->deepBytecount(((PyInstance*)arg)->dataPtr(), seen, nullptr);
         }
 
-        return PyLong_FromLong(sz);
-    });
+        return PyLong_FromLong(sz); });
 }
 
 /**
@@ -1828,7 +1739,7 @@ PyObject *deepBytecount(PyObject* nullValue, PyObject* args) {
     @param a2: Instance
     @param a3: Serialization Context (optional)
 */
-PyObject *serialize(PyObject* nullValue, PyObject* args) {
+PyObject* serialize(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2 && PyTuple_Size(args) != 3) {
         PyErr_SetString(PyExc_TypeError, "serialize takes 2 or 3 positional arguments");
         return NULL;
@@ -1844,8 +1755,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
         PyErr_Format(
             PyExc_TypeError,
             "first argument to serialize must be a type object, not %S",
-            (PyObject*)a1
-            );
+            (PyObject*)a1);
         return NULL;
     }
 
@@ -1862,23 +1772,21 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
     } catch (std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
-    } catch(PythonExceptionSet& e) {
+    } catch (PythonExceptionSet& e) {
         return NULL;
     }
 
     SerializationBuffer b(*context);
 
-    try{
+    try {
         if (actualType == serializeType) {
-            //the simple case
+            // the simple case
             PyEnsureGilReleased releaseTheGil;
 
             actualType->serialize(((PyInstance*)(PyObject*)a2)->dataPtr(), b, 0);
         } else {
-            //try to construct a 'serialize type' from the argument and then serialize that
-            Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
-                PyInstance::copyConstructFromPythonInstance(serializeType, p, a2, ConversionLevel::New);
-            });
+            // try to construct a 'serialize type' from the argument and then serialize that
+            Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) { PyInstance::copyConstructFromPythonInstance(serializeType, p, a2, ConversionLevel::New); });
 
             PyEnsureGilReleased releaseTheGil;
 
@@ -1889,14 +1797,14 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
     } catch (std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
-    } catch(PythonExceptionSet& e) {
+    } catch (PythonExceptionSet& e) {
         return NULL;
     }
 
     return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
 }
 
-PyObject *setPropertyGetSetDel(PyObject* nullValue, PyObject* args) {
+PyObject* setPropertyGetSetDel(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 4) {
         PyErr_SetString(PyExc_TypeError, "setPropertyGetSetDel takes 2 positional arguments");
         return NULL;
@@ -1922,13 +1830,13 @@ PyObject *setPropertyGetSetDel(PyObject* nullValue, PyObject* args) {
 }
 
 // a struct to let us access the md_dict of a module object.
-typedef struct {
+typedef struct
+{
     PyObject_HEAD
-    PyObject *md_dict;
+        PyObject* md_dict;
 } ModuleObjectDictMember;
 
-
-PyObject *setMethodObjectInternals(PyObject* nullValue, PyObject* args) {
+PyObject* setMethodObjectInternals(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 3) {
         PyErr_SetString(PyExc_TypeError, "setMethodObjectInternals takes 3 positional arguments");
         return NULL;
@@ -1949,7 +1857,7 @@ PyObject *setMethodObjectInternals(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
-PyObject *setClassOrStaticmethod(PyObject* nullValue, PyObject* args) {
+PyObject* setClassOrStaticmethod(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "setClassOrStaticmethod takes 2 positional arguments");
         return NULL;
@@ -1966,7 +1874,7 @@ PyObject *setClassOrStaticmethod(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
-PyObject *setModuleDict(PyObject* nullValue, PyObject* args) {
+PyObject* setModuleDict(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "setModuleDict takes 2 positional arguments");
         return NULL;
@@ -1992,7 +1900,7 @@ PyObject *setModuleDict(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
-PyObject *setFunctionClosure(PyObject* nullValue, PyObject* args) {
+PyObject* setFunctionClosure(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "setFunctionClosure takes 2 positional arguments");
         return NULL;
@@ -2003,7 +1911,7 @@ PyObject *setFunctionClosure(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
-PyObject *setFunctionGlobals(PyObject* nullValue, PyObject* args) {
+PyObject* setFunctionGlobals(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "setFunctionGlobals takes 2 positional arguments");
         return NULL;
@@ -2027,7 +1935,7 @@ PyObject *setFunctionGlobals(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
-PyObject *setPyCellContents(PyObject* nullValue, PyObject* args) {
+PyObject* setPyCellContents(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "setPyCellContents takes 2 positional arguments");
         return NULL;
@@ -2043,7 +1951,7 @@ PyObject *setPyCellContents(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
-PyObject *createPyCell(PyObject* nullValue, PyObject* args) {
+PyObject* createPyCell(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "createPyCell takes 1 positional argument");
         return NULL;
@@ -2052,7 +1960,7 @@ PyObject *createPyCell(PyObject* nullValue, PyObject* args) {
     return PyCell_New(PyTuple_GetItem(args, 0));
 }
 
-PyObject *identityHash(PyObject* nullValue, PyObject* args) {
+PyObject* identityHash(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "identityHash takes 1 positional argument");
         return NULL;
@@ -2069,8 +1977,7 @@ PyObject *identityHash(PyObject* nullValue, PyObject* args) {
             hash = MutuallyRecursiveTypeGroup::pyObjectShaHash(a1, nullptr);
         }
 
-        return PyBytes_FromStringAndSize((const char*)&hash, sizeof(ShaHash));
-    });
+        return PyBytes_FromStringAndSize((const char*)&hash, sizeof(ShaHash)); });
 }
 
 /**
@@ -2081,7 +1988,7 @@ PyObject *identityHash(PyObject* nullValue, PyObject* args) {
     @param a2: Instance
     @param a3: Serialization Context (optional)
 */
-PyObject *serializeStream(PyObject* nullValue, PyObject* args) {
+PyObject* serializeStream(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2 && PyTuple_Size(args) != 3) {
         PyErr_SetString(PyExc_TypeError, "serialize takes 2 or 3 positional arguments");
         return NULL;
@@ -2097,8 +2004,7 @@ PyObject *serializeStream(PyObject* nullValue, PyObject* args) {
         PyErr_Format(
             PyExc_TypeError,
             "first argument to serializeStream must be a type object, not %S",
-            (PyObject*)a1
-            );
+            (PyObject*)a1);
         return NULL;
     }
 
@@ -2108,22 +2014,22 @@ PyObject *serializeStream(PyObject* nullValue, PyObject* args) {
 
     std::shared_ptr<SerializationContext> context(new NullSerializationContext());
 
-    try{
+    try {
         if (a3 && a3 != Py_None) {
             context.reset(new PythonSerializationContext(a3));
         }
     } catch (std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
-    } catch(PythonExceptionSet& e) {
+    } catch (PythonExceptionSet& e) {
         return NULL;
     }
 
     SerializationBuffer b(*context);
 
-    try{
+    try {
         if (actualType && (actualType->getTypeCategory() == Type::TypeCategory::catListOf ||
-                actualType->getTypeCategory() == Type::TypeCategory::catTupleOf)) {
+                           actualType->getTypeCategory() == Type::TypeCategory::catTupleOf)) {
             if (((TupleOrListOfType*)actualType)->getEltType() == serializeType) {
                 PyEnsureGilReleased releaseTheGil;
 
@@ -2135,12 +2041,10 @@ PyObject *serializeStream(PyObject* nullValue, PyObject* args) {
             }
         }
 
-        //try to construct a 'serialize type' from the argument and then serialize that
+        // try to construct a 'serialize type' from the argument and then serialize that
         TupleOfType* serializeTupleType = TupleOfType::Make(serializeType);
 
-        Instance i = Instance::createAndInitialize(serializeTupleType, [&](instance_ptr p) {
-            PyInstance::copyConstructFromPythonInstance(serializeTupleType, p, a2, ConversionLevel::New);
-        });
+        Instance i = Instance::createAndInitialize(serializeTupleType, [&](instance_ptr p) { PyInstance::copyConstructFromPythonInstance(serializeTupleType, p, a2, ConversionLevel::New); });
 
         {
             PyEnsureGilReleased releaseTheGil;
@@ -2153,12 +2057,12 @@ PyObject *serializeStream(PyObject* nullValue, PyObject* args) {
     } catch (std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
-    } catch(PythonExceptionSet& e) {
+    } catch (PythonExceptionSet& e) {
         return NULL;
     }
 }
 
-PyObject *deserialize(PyObject* nullValue, PyObject* args) {
+PyObject* deserialize(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2 && PyTuple_Size(args) != 3) {
         PyErr_SetString(PyExc_TypeError, "deserialize takes 2 or 3 positional arguments");
         return NULL;
@@ -2194,11 +2098,10 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
             serializeType->deserialize(p, buf, fieldAndWireType.second);
         });
 
-        return PyInstance::extractPythonObject(i.data(), i.type());
-    });
+        return PyInstance::extractPythonObject(i.data(), i.type()); });
 }
 
-PyObject *decodeSerializedObject(PyObject* nullValue, PyObject* args) {
+PyObject* decodeSerializedObject(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "validateSerializedObject takes 1 bytes argument");
         return NULL;
@@ -2214,7 +2117,7 @@ PyObject *decodeSerializedObject(PyObject* nullValue, PyObject* args) {
 
     DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a1), PyBytes_GET_SIZE((PyObject*)a1), *context);
 
-    std::function<PyObject* (size_t)> decode = [&](size_t wireType) {
+    std::function<PyObject*(size_t)> decode = [&](size_t wireType) {
         if (wireType == WireType::VARINT) {
             return PyLong_FromLong(buf.readSignedVarint());
         }
@@ -2232,9 +2135,7 @@ PyObject *decodeSerializedObject(PyObject* nullValue, PyObject* args) {
         }
         if (wireType == WireType::BYTES) {
             size_t count = buf.readUnsignedVarint();
-            return buf.read_bytes_fun(count, [&](uint8_t* bytes) {
-                return PyBytes_FromStringAndSize((const char*)bytes, count);
-            });
+            return buf.read_bytes_fun(count, [&](uint8_t* bytes) { return PyBytes_FromStringAndSize((const char*)bytes, count); });
         }
         if (wireType == WireType::SINGLE) {
             auto fieldAndWire = buf.readFieldNumberAndWireType();
@@ -2261,7 +2162,7 @@ PyObject *decodeSerializedObject(PyObject* nullValue, PyObject* args) {
 
                 PyObjectStealer key(PyLong_FromLong(fieldAndWire.first));
                 //(PyObject*) are because this is a variadic function and doesn't cast the pointers
-                //correctly
+                // correctly
                 PyObjectStealer tup(PyTuple_Pack(2, (PyObject*)key, (PyObject*)res));
                 PyList_Append(result, tup);
             }
@@ -2269,7 +2170,7 @@ PyObject *decodeSerializedObject(PyObject* nullValue, PyObject* args) {
         throw std::runtime_error("Invalid wire type encountered.");
     };
 
-    return translateExceptionToPyObject([&](){
+    return translateExceptionToPyObject([&]() {
         auto msg = buf.readFieldNumberAndWireType();
 
         PyObjectStealer res(decode(msg.second));
@@ -2289,11 +2190,10 @@ PyObject *decodeSerializedObject(PyObject* nullValue, PyObject* args) {
             return incref(resDict);
         }
 
-        return incref(res);
-    });
+        return incref(res); });
 }
 
-PyObject *validateSerializedObject(PyObject* nullValue, PyObject* args) {
+PyObject* validateSerializedObject(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "validateSerializedObject takes 1 bytes argument");
         return NULL;
@@ -2309,7 +2209,7 @@ PyObject *validateSerializedObject(PyObject* nullValue, PyObject* args) {
 
     DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a1), PyBytes_GET_SIZE((PyObject*)a1), *context);
 
-    return translateExceptionToPyObject([&](){
+    return translateExceptionToPyObject([&]() {
         try {
             buf.readMessageAndDiscard();
 
@@ -2326,11 +2226,10 @@ PyObject *validateSerializedObject(PyObject* nullValue, PyObject* args) {
             );
         } catch(std::exception& e) {
             return PyUnicode_FromString(e.what());
-        }
-    });
+        } });
 }
 
-PyObject *validateSerializedObjectStream(PyObject* nullValue, PyObject* args) {
+PyObject* validateSerializedObjectStream(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "validateSerializedObjectStream takes 1 bytes argument");
         return NULL;
@@ -2346,7 +2245,7 @@ PyObject *validateSerializedObjectStream(PyObject* nullValue, PyObject* args) {
 
     DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a1), PyBytes_GET_SIZE((PyObject*)a1), *context);
 
-    return translateExceptionToPyObject([&](){
+    return translateExceptionToPyObject([&]() {
         try {
             while (!buf.isDone()) {
                 buf.readMessageAndDiscard();
@@ -2355,11 +2254,10 @@ PyObject *validateSerializedObjectStream(PyObject* nullValue, PyObject* args) {
             return incref(Py_None);
         } catch(std::exception& e) {
             return PyUnicode_FromString(e.what());
-        }
-    });
+        } });
 }
 
-PyObject *deserializeStream(PyObject* nullValue, PyObject* args) {
+PyObject* deserializeStream(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2 && PyTuple_Size(args) != 3) {
         PyErr_SetString(PyExc_TypeError, "deserialize takes 2 or 3 positional arguments");
         return NULL;
@@ -2405,19 +2303,18 @@ PyObject *deserializeStream(PyObject* nullValue, PyObject* args) {
                 serializeType->deserialize(tupElt, buf, fieldAndWireType.second);
 
                 return true;
-            });
-        });
+            }); });
 
         return PyInstance::extractPythonObject(i.data(), i.type());
-    } catch(std::exception& e) {
+    } catch (std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
-    } catch(PythonExceptionSet& e) {
+    } catch (PythonExceptionSet& e) {
         return NULL;
     }
 }
 
-PyObject *allForwardTypesResolved(PyObject* nullValue, PyObject* args) {
+PyObject* allForwardTypesResolved(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "allForwardTypesResolved takes 1 positional argument");
         return NULL;
@@ -2429,15 +2326,14 @@ PyObject *allForwardTypesResolved(PyObject* nullValue, PyObject* args) {
     if (!t) {
         PyErr_SetString(
             PyExc_TypeError,
-            "first argument to 'allForwardTypesResolved' must be a type object"
-        );
+            "first argument to 'allForwardTypesResolved' must be a type object");
         return NULL;
     }
 
     return incref(t->resolved() ? Py_True : Py_False);
 }
 
-PyObject *isSimple(PyObject* nullValue, PyObject* args) {
+PyObject* isSimple(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "isSimple takes 1 positional argument");
         return NULL;
@@ -2454,7 +2350,7 @@ PyObject *isSimple(PyObject* nullValue, PyObject* args) {
     return incref(t->isSimple() ? Py_True : Py_False);
 }
 
-PyObject *isPOD(PyObject* nullValue, PyObject* args) {
+PyObject* isPOD(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "isPOD takes 1 positional argument");
         return NULL;
@@ -2471,7 +2367,7 @@ PyObject *isPOD(PyObject* nullValue, PyObject* args) {
     return incref(t->isPOD() ? Py_True : Py_False);
 }
 
-PyObject *is_default_constructible(PyObject* nullValue, PyObject* args) {
+PyObject* is_default_constructible(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "is_default_constructible takes 1 positional argument");
         return NULL;
@@ -2488,7 +2384,7 @@ PyObject *is_default_constructible(PyObject* nullValue, PyObject* args) {
     return incref(t->is_default_constructible() ? Py_True : Py_False);
 }
 
-PyObject *all_alternatives_empty(PyObject* nullValue, PyObject* args) {
+PyObject* all_alternatives_empty(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "all_alternatives_empty takes 1 positional argument");
         return NULL;
@@ -2504,11 +2400,9 @@ PyObject *all_alternatives_empty(PyObject* nullValue, PyObject* args) {
 
     if (t->getTypeCategory() == Type::TypeCategory::catAlternative) {
         return incref(((Alternative*)t)->all_alternatives_empty() ? Py_True : Py_False);
-    }
-    else if (t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+    } else if (t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
         return incref(((ConcreteAlternative*)t)->getAlternative()->all_alternatives_empty() ? Py_True : Py_False);
-    }
-    else {
+    } else {
         PyErr_SetString(PyExc_TypeError, "first argument to 'all_alternatives_empty' must be an Alternative or ConcreteAlternative");
         return NULL;
     }
@@ -2516,7 +2410,7 @@ PyObject *all_alternatives_empty(PyObject* nullValue, PyObject* args) {
     return incref(((Alternative*)t)->all_alternatives_empty() ? Py_True : Py_False);
 }
 
-PyObject *wantsToDefaultConstruct(PyObject* nullValue, PyObject* args) {
+PyObject* wantsToDefaultConstruct(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "wantsToDefaultConstruct takes 1 positional argument");
         return NULL;
@@ -2533,7 +2427,7 @@ PyObject *wantsToDefaultConstruct(PyObject* nullValue, PyObject* args) {
     return incref(HeldClass::wantsToDefaultConstruct(t) ? Py_True : Py_False);
 }
 
-PyObject *bytecount(PyObject* nullValue, PyObject* args) {
+PyObject* bytecount(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "bytecount takes 1 positional argument");
         return NULL;
@@ -2550,7 +2444,7 @@ PyObject *bytecount(PyObject* nullValue, PyObject* args) {
     return PyLong_FromLong(t->bytecount());
 }
 
-PyObject *typesAreEquivalent(PyObject* nullValue, PyObject* args) {
+PyObject* typesAreEquivalent(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "typesAreEquivalent takes 3 positional arguments");
         return NULL;
@@ -2575,21 +2469,21 @@ PyObject *typesAreEquivalent(PyObject* nullValue, PyObject* args) {
     return Type::typesEquivalent(t1, t2) ? incref(Py_True) : incref(Py_False);
 }
 
-PyObject *disableNativeDispatch(PyObject* nullValue, PyObject* args) {
+PyObject* disableNativeDispatch(PyObject* nullValue, PyObject* args) {
     native_dispatch_disabled++;
     return incref(Py_None);
 }
 
-PyObject *enableNativeDispatch(PyObject* nullValue, PyObject* args) {
+PyObject* enableNativeDispatch(PyObject* nullValue, PyObject* args) {
     native_dispatch_disabled--;
     return incref(Py_None);
 }
 
-PyObject *isDispatchEnabled(PyObject* nullValue, PyObject* args) {
+PyObject* isDispatchEnabled(PyObject* nullValue, PyObject* args) {
     return incref(native_dispatch_disabled ? Py_False : Py_True);
 }
 
-PyObject *installNativeFunctionPointer(PyObject* nullValue, PyObject* args) {
+PyObject* installNativeFunctionPointer(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 5) {
         PyErr_SetString(PyExc_TypeError, "installNativeFunctionPointer takes 5 positional arguments");
         return NULL;
@@ -2617,7 +2511,6 @@ PyObject *installNativeFunctionPointer(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-
     Type* returnType = PyInstance::unwrapTypeArgToTypePtr(a4);
 
     if (!returnType) {
@@ -2641,12 +2534,12 @@ PyObject *installNativeFunctionPointer(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    f->addCompiledSpecialization(index,(compiled_code_entrypoint)ptr, returnType, argTypes);
+    f->addCompiledSpecialization(index, (compiled_code_entrypoint)ptr, returnType, argTypes);
 
     return incref(Py_None);
 }
 
-PyObject *touchCompiledSpecializations(PyObject* nullValue, PyObject* args) {
+PyObject* touchCompiledSpecializations(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "touchCompiledSpecializations takes 2 positional arguments");
         return NULL;
@@ -2680,7 +2573,7 @@ PyObject *touchCompiledSpecializations(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
-PyObject *isRecursive(PyObject* nullValue, PyObject* args) {
+PyObject* isRecursive(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "isRecursive takes 1 positional argument");
         return NULL;
@@ -2705,11 +2598,10 @@ PyObject *isRecursive(PyObject* nullValue, PyObject* args) {
             return incref(Py_False);
         }
 
-        return incref(group->getIndexToObject().size() > 1 ? Py_True : Py_False);
-    });
+        return incref(group->getIndexToObject().size() > 1 ? Py_True : Py_False); });
 }
 
-PyObject *typesAndObjectsVisibleToCompilerFrom(PyObject* nullValue, PyObject* args) {
+PyObject* typesAndObjectsVisibleToCompilerFrom(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "typesAndObjectsVisibleToCompilerFrom takes 1 positional argument");
         return NULL;
@@ -2737,11 +2629,10 @@ PyObject *typesAndObjectsVisibleToCompilerFrom(PyObject* nullValue, PyObject* ar
             );
         }
 
-        return incref(res);
-    });
+        return incref(res); });
 }
 
-PyObject *recursiveTypeGroupHash(PyObject* nullValue, PyObject* args) {
+PyObject* recursiveTypeGroupHash(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "recursiveTypeGroupHash takes 1 positional argument");
         return NULL;
@@ -2766,11 +2657,10 @@ PyObject *recursiveTypeGroupHash(PyObject* nullValue, PyObject* args) {
             return incref(Py_None);
         }
 
-        return PyUnicode_FromString(group->hash().digestAsHexString().c_str());
-    });
+        return PyUnicode_FromString(group->hash().digestAsHexString().c_str()); });
 }
 
-PyObject *recursiveTypeGroupDeepRepr(PyObject* nullValue, PyObject* args) {
+PyObject* recursiveTypeGroupDeepRepr(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "recursiveTypeGroupDeepRepr takes 1 positional argument");
         return NULL;
@@ -2795,11 +2685,10 @@ PyObject *recursiveTypeGroupDeepRepr(PyObject* nullValue, PyObject* args) {
             return incref(Py_None);
         }
 
-        return PyUnicode_FromString(group->repr(true).c_str());
-    });
+        return PyUnicode_FromString(group->repr(true).c_str()); });
 }
 
-PyObject *recursiveTypeGroup(PyObject* nullValue, PyObject* args) {
+PyObject* recursiveTypeGroup(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "recursiveTypeGroup takes 1 positional argument");
         return NULL;
@@ -2835,11 +2724,10 @@ PyObject *recursiveTypeGroup(PyObject* nullValue, PyObject* args) {
             );
         }
 
-        return incref(res);
-    });
+        return incref(res); });
 }
 
-PyObject *referencedTypes(PyObject* nullValue, PyObject* args) {
+PyObject* referencedTypes(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "referencedTypes takes 1 positional argument");
         return NULL;
@@ -2863,11 +2751,10 @@ PyObject *referencedTypes(PyObject* nullValue, PyObject* args) {
             );
         });
 
-        return incref(res);
-    });
+        return incref(res); });
 }
 
-PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
+PyObject* isBinaryCompatible(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "isBinaryCompatible takes 2 positional arguments");
         return NULL;
@@ -2890,44 +2777,42 @@ PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
     return incref(t1->isBinaryCompatibleWith(t2) ? Py_True : Py_False);
 }
 
-PyObject *MakeForward(PyObject* nullValue, PyObject* args) {
+PyObject* MakeForward(PyObject* nullValue, PyObject* args) {
     int num_args = PyTuple_Size(args);
 
-    PyThreadState * ts = PyThreadState_Get();
+    PyThreadState* ts = PyThreadState_Get();
     std::string moduleName;
     PyObject* pyModuleName;
 
     if (ts->frame && ts->frame->f_globals &&
-            (pyModuleName = PyDict_GetItemString(ts->frame->f_globals, "__name__"))) {
+        (pyModuleName = PyDict_GetItemString(ts->frame->f_globals, "__name__"))) {
         if (PyUnicode_Check(pyModuleName)) {
             moduleName = PyUnicode_AsUTF8(pyModuleName);
         }
     }
 
-    if (num_args > 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
+    if (num_args > 1 || !PyUnicode_Check(PyTuple_GetItem(args, 0))) {
         PyErr_SetString(PyExc_TypeError, "Forward takes a zero or one string positional arguments.");
         return NULL;
     }
 
     if (num_args == 1) {
-        std::string name = PyUnicode_AsUTF8(PyTuple_GetItem(args,0));
+        std::string name = PyUnicode_AsUTF8(PyTuple_GetItem(args, 0));
 
         if (moduleName.size()) {
             name = moduleName + "." + name;
         }
 
         return incref((PyObject*)PyInstance::typeObj(
-            ::Forward::Make(name)
-            ));
+            ::Forward::Make(name)));
     } else {
         return incref((PyObject*)PyInstance::typeObj(
-            ::Forward::Make()
-            ));
+            ::Forward::Make()));
     }
 }
 
 PyObject* buildPyFunctionObject(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
-    static const char *kwlist[] = {"code", "globals", "closure", NULL};
+    static const char* kwlist[] = {"code", "globals", "closure", NULL};
 
     PyObject* pyCode;
     PyObject* pyGlobals;
@@ -2965,19 +2850,18 @@ PyObject* buildPyFunctionObject(PyObject* nullValue, PyObject* args, PyObject* k
             throw PythonExceptionSet();
         }
 
-        return result;
-    });
+        return result; });
 }
 
-PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
-    if (PyTuple_Size(args) != 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
+PyObject* MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    if (PyTuple_Size(args) != 1 || !PyUnicode_Check(PyTuple_GetItem(args, 0))) {
         PyErr_SetString(PyExc_TypeError, "Alternative takes a single string positional argument.");
         return NULL;
     }
 
-    std::string name = PyUnicode_AsUTF8(PyTuple_GetItem(args,0));
+    std::string name = PyUnicode_AsUTF8(PyTuple_GetItem(args, 0));
 
-    std::vector<std::pair<std::string, NamedTuple*> > definitions;
+    std::vector<std::pair<std::string, NamedTuple*>> definitions;
 
     std::map<std::string, Function*> functions;
 
@@ -2993,11 +2877,10 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
             functions[fieldName] = PyFunctionInstance::convertPythonObjectToFunctionType(key, value, true, false);
 
             if (functions[fieldName] == nullptr) {
-                //error code is already set
+                // error code is already set
                 return nullptr;
             }
-        }
-        else {
+        } else {
             if (!PyDict_Check(value)) {
                 PyErr_SetString(PyExc_TypeError, "Alternative members must be initialized with dicts.");
                 return NULL;
@@ -3018,36 +2901,35 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
 
     static_assert(PY_MAJOR_VERSION >= 3, "typed_python is a python3 project only");
 
-    PyThreadState * ts = PyThreadState_Get();
+    PyThreadState* ts = PyThreadState_Get();
     std::string moduleName;
     PyObject* pyModuleName;
 
     if (ts->frame && ts->frame->f_globals &&
-            (pyModuleName = PyDict_GetItemString(ts->frame->f_globals, "__name__"))) {
+        (pyModuleName = PyDict_GetItemString(ts->frame->f_globals, "__name__"))) {
         if (PyUnicode_Check(pyModuleName)) {
             moduleName = PyUnicode_AsUTF8(pyModuleName);
         }
     }
 
     if (PY_MINOR_VERSION <= 5) {
-        //we cannot rely on the ordering of 'kwargs' here because of the python version, so
-        //we sort it. this will be a problem for anyone running some processes using different
-        //python versions that share python code.
+        // we cannot rely on the ordering of 'kwargs' here because of the python version, so
+        // we sort it. this will be a problem for anyone running some processes using different
+        // python versions that share python code.
         std::sort(definitions.begin(), definitions.end());
     }
 
     return incref((PyObject*)PyInstance::typeObj(
-        ::Alternative::Make(name, moduleName, definitions, functions)
-    ));
+        ::Alternative::Make(name, moduleName, definitions, functions)));
 }
 
-PyObject *getTypePointer(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1 || !PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0))) {
+PyObject* getTypePointer(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1 || !PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args, 0))) {
         PyErr_SetString(PyExc_TypeError, "getTypePointer takes 1 positional argument (a type)");
         return NULL;
     }
 
-    Type* type = PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0));
+    Type* type = PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args, 0));
 
     return PyLong_FromLong((uint64_t)type);
 }
@@ -3058,6 +2940,91 @@ PyObject* gilReleaseThreadLoop(PyObject* null, PyObject* args, PyObject* kwargs)
     PyEnsureGilReleased::gilReleaseThreadLoop();
 
     return incref(Py_None);
+}
+
+PyDoc_STRVAR(secondsfromcivil_doc,
+             "secondsfromcivil(year, month, day, hour minute, second, ms, us, ns) -> long\n\n"
+             "Determine the number of seconds between the unix epoch and the provided date\n\n"
+             "and all the objects beneath it. We use the same rules for reachablility\n");
+static PyObject* secondsfromcivil(PyObject* self, PyObject* args) {
+
+    long year, month, day, hour, minute, second, ms, us, ns;
+    if (!PyArg_ParseTuple(args, "lllllllll",
+                          &year,
+                          &month,
+                          &day,
+                          &hour,
+                          &minute,
+                          &second,
+                          &ms,
+                          &us,
+                          &ns)) {
+        return NULL;
+    }
+
+    // This  implements the low level days_from_civil algorithm described here
+    // http://howardhinnant.github.io/date_algorithms.html#days_from_days
+
+    year -= month <= 2;
+    long era = (year >= 0 ? year : year - 399) / 400;
+    long yoe = (year - era * 400);
+    long doy = (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + day - 1;
+    long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    long days = era * 146097 + doe - 719468;
+    long ts = (days * 86400) + (hour * 3600) + (minute * 60) + second + (ms / 1000) + (us / 1000000) + (ns / 1000000000);
+
+    return PyFloat_FromDouble(ts);
+}
+
+PyDoc_STRVAR(civilfromdays_doc,
+             "civilfromdays(year, month, day, hour minute, second, ms, us, ns) -> long\n\n"
+             "Determine the number of seconds between the unix epoch and the provided date\n\n");
+static PyObject* civilfromdays(PyObject* self, PyObject* args) {
+    double arg;
+    if (!PyArg_ParseTuple(args, "d", &arg)) {
+        return NULL;
+    }
+
+    long ts = long(arg);
+
+    // This method implements the low level civil_from_days algorithm described here
+    // http://howardhinnant.github.io/date_algorithms.html#civil_from_days
+
+    long z = ts / 86400 + 719468;
+    long era = (z >= 0 ? z : z - 146096) / 146097;
+    unsigned doe = static_cast<unsigned>(z - era * 146097);
+    unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    int y = static_cast<int>(yoe) + era * 400;
+    unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    unsigned mp = (5 * doy + 2) / 153;
+    unsigned d = doy - (153 * mp + 2) / 5 + 1;
+    unsigned m = mp + (mp < 10 ? 3 : -9);
+    y += (m <= 2);
+
+    unsigned h = static_cast<int>(ts / 3600) % 24;
+    unsigned min = static_cast<int>((ts / (3600 / 60))) % 60;
+    unsigned s = static_cast<int>((ts / (3600 / 60 / 60)) % (60));
+
+    double ms = (arg - static_cast<long>(arg)) * 1000;
+    double us = (ms - static_cast<long>(ms)) * 1000;
+    double ns = (us - static_cast<long>(us)) * 1000;
+
+    long days = ts / 86400;
+    unsigned weekday = days >= -4 ? (days + 4) % 7 : (days + 5) % 7 + 6;
+
+    PyObject* tup = PyTuple_New(11);
+    PyTuple_SetItem(tup, 0, PyLong_FromLong(y));
+    PyTuple_SetItem(tup, 1, PyLong_FromLong(m));
+    PyTuple_SetItem(tup, 2, PyLong_FromLong(d));
+    PyTuple_SetItem(tup, 3, PyLong_FromLong(h));
+    PyTuple_SetItem(tup, 4, PyLong_FromLong(min));
+    PyTuple_SetItem(tup, 5, PyLong_FromLong(s));
+    PyTuple_SetItem(tup, 6, PyLong_FromLong(static_cast<long>(ms)));
+    PyTuple_SetItem(tup, 7, PyLong_FromLong(static_cast<long>(us)));
+    PyTuple_SetItem(tup, 8, PyLong_FromLong(static_cast<long>(ns)));
+    PyTuple_SetItem(tup, 9, PyLong_FromLong(weekday));
+    PyTuple_SetItem(tup, 10, PyLong_FromLong(doy));
+    return tup;
 }
 
 static PyMethodDef module_methods[] = {
@@ -3131,8 +3098,10 @@ static PyMethodDef module_methods[] = {
     {"isValidArithmeticConversion", (PyCFunction)isValidArithmeticConversion, METH_VARARGS | METH_KEYWORDS, NULL},
     {"gilReleaseThreadLoop", (PyCFunction)gilReleaseThreadLoop, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setModuleDict", (PyCFunction)setModuleDict, METH_VARARGS | METH_KEYWORDS, NULL},
-    {NULL, NULL}
-};
+    {"civilfromdays", (PyCFunction)civilfromdays, METH_VARARGS | METH_KEYWORDS, civilfromdays_doc},
+    {"secondsfromcivil", (PyCFunction)secondsfromcivil, METH_VARARGS | METH_KEYWORDS, secondsfromcivil_doc},
+
+    {NULL, NULL}};
 
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
@@ -3143,28 +3112,26 @@ static struct PyModuleDef moduledef = {
     .m_slots = NULL,
     .m_traverse = NULL,
     .m_clear = NULL,
-    .m_free = NULL
-};
+    .m_free = NULL};
 
 void updateTypeRepForType(Type* type, PyTypeObject* pyType) {
-    //deliberately leak the name.
+    // deliberately leak the name.
     pyType->tp_name = (new std::string(type->nameWithModule()))->c_str();
 
     PyInstance::mirrorTypeInformationIntoPyType(type, pyType);
 }
 
 PyMODINIT_FUNC
-PyInit__types(void)
-{
+PyInit__types(void) {
     // initialize unicode property table, for StringType
     initialize_uprops();
 
-    //initialize numpy. This is only OK because all the .cpp files get
-    //glommed together in a single file. If we were to change that behavior,
-    //then additional steps must be taken as per the API documentation.
+    // initialize numpy. This is only OK because all the .cpp files get
+    // glommed together in a single file. If we were to change that behavior,
+    // then additional steps must be taken as per the API documentation.
     import_array();
 
-    PyObject *module = PyModule_Create(&moduledef);
+    PyObject* module = PyModule_Create(&moduledef);
 
     PyModule_AddObject(module, "Type", (PyObject*)incref(PyInstance::allTypesBaseType()));
     PyModule_AddObject(module, "ListOf", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catListOf)));
