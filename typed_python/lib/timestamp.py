@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Class, Final, Member, NamedTuple
+from typed_python import Class, Final, Member, NamedTuple, Held
 from typed_python.compiler.runtime import Entrypoint
 
 TimeTuple = NamedTuple(tm_year=int, tm_mon=int, tm_mday=int, tm_hour=int, tm_min=int, tm_sec=int)
@@ -21,15 +21,21 @@ DEFAULT_UTC_OFFSET = '+00:00'
 
 
 def offset_to_seconds(utc_offset: str) -> int:
-    utc_offset = ''.join(utc_offset.split(':'))
-    hrs = int(utc_offset[0:3])
-    mins = int(utc_offset[3:5])
+    segments = utc_offset.split(':')
+    hrs = int(segments[0])
+    mins = int(segments[1])
 
-    return hrs * 3600 + (mins * 60 if hrs > 0 else mins * -60)
+    seconds = hrs * 3600 + (mins * 60 if hrs > 0 else mins * -60)
+    return seconds
 
 
+@Held
 class Timestamp(Class, Final):
     ts = Member(float)
+
+    @staticmethod
+    def make(ts):
+        return Timestamp(ts=ts)
 
     def __int__(self):
         return int(self.ts)
@@ -41,13 +47,10 @@ class Timestamp(Class, Final):
         return self.isoformat()
 
     @Entrypoint
-    def __init__(self, ts: float) -> None:
-        self.ts = ts
-
-    @Entrypoint
     def timetuple(self, utc_offset: str = DEFAULT_UTC_OFFSET) -> TimeTuple:
         # Implements the low level civil_from_days algorithm described here
         # http://howardhinnant.github.io/date_algorithms.html#civil_from_days
+
         utc_offset = DEFAULT_UTC_OFFSET if not utc_offset else utc_offset
 
         ts = self.ts + offset_to_seconds(utc_offset)
