@@ -15,18 +15,16 @@
 from typed_python import Class, Final, Member, NamedTuple, Held
 from typed_python.compiler.runtime import Entrypoint
 
-TimeTuple = NamedTuple(tm_year=int, tm_mon=int, tm_mday=int, tm_hour=int, tm_min=int, tm_sec=int)
+Date = NamedTuple(tm_year=int, tm_mon=int, tm_mday=int, tm_hour=int, tm_min=int, tm_sec=int, tm_ms=int)
 
-DEFAULT_UTC_OFFSET = '+00:00'
+DEFAULT_UTC_OFFSET = 0
 
 
-def offset_to_seconds(utc_offset: str) -> int:
-    segments = utc_offset.split(':')
-    hrs = int(segments[0])
-    mins = int(segments[1])
-
-    seconds = hrs * 3600 + (mins * 60 if hrs > 0 else mins * -60)
-    return seconds
+def string_offset_to_seconds(utc_offset: str) -> int:
+    offset = ''.join(utc_offset.split(':'))
+    hrs = int(offset[0:3])
+    mins = int(offset[3:5])
+    return hrs * 3600 + (mins * 60 if hrs > 0 else mins * -60)
 
 
 @Held
@@ -47,13 +45,11 @@ class Timestamp(Class, Final):
         return self.isoformat()
 
     @Entrypoint
-    def timetuple(self, utc_offset: str = DEFAULT_UTC_OFFSET) -> TimeTuple:
+    def date(self, utc_offset: int = DEFAULT_UTC_OFFSET) -> Date:
         # Implements the low level civil_from_days algorithm described here
         # http://howardhinnant.github.io/date_algorithms.html#civil_from_days
-
-        utc_offset = DEFAULT_UTC_OFFSET if not utc_offset else utc_offset
-
-        ts = self.ts + offset_to_seconds(utc_offset)
+        utc_offset = DEFAULT_UTC_OFFSET if utc_offset is None else utc_offset
+        ts = self.ts + utc_offset
         z = ts // 86400 + 719468
         era = (z if z >= 0 else z - 146096) // 146097
         doe = z - era * 146097
@@ -69,9 +65,38 @@ class Timestamp(Class, Final):
         min = (ts // (3600 / 60)) % 60
         s = (ts // (3600 / 60 / 60)) % (60)
 
-        return TimeTuple(tm_year=y, tm_mon=m, tm_mday=d, tm_hour=h, tm_min=min, tm_sec=s)
+        return Date(tm_year=y, tm_mon=m, tm_mday=d, tm_hour=h, tm_min=min, tm_sec=s)
 
     @Entrypoint
-    def isoformat(self, utc_offset: str = DEFAULT_UTC_OFFSET) -> str:
-        tup = self.timetuple(utc_offset)
-        return f"{tup.tm_year}-{tup.tm_mon:02d}-{tup.tm_mday:02d}T{tup.tm_hour:02d}:{tup.tm_min:02d}:{tup.tm_sec:02d}"
+    def _date(self, utc_offset: str = DEFAULT_UTC_OFFSET, fmt: str = "%Y-%m-%d %H:%M:%S") -> Date:
+        return self.date(string_offset_to_seconds(utc_offset))
+
+    @Entrypoint
+    def strfrtime(self, utc_offset: int = DEFAULT_UTC_OFFSET, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+        # %Y-%m-%d %H:%M:%S"
+        date = self.date(utc_offset)
+        return f"{date.tm_year}-{date.tm_mon:02d}-{date.tm_mday:02d}T{date.tm_hour:02d}:{date.tm_min:02d}:{date.tm_sec:02d}"
+
+    @Entrypoint
+    def _strfrtime(self, utc_offset: str = DEFAULT_UTC_OFFSET) -> str:
+        date = self.date(utc_offset)
+        return f"{date.tm_year}-{date.tm_mon:02d}-{date.tm_mday:02d}T{date.tm_hour:02d}:{date.tm_min:02d}:{date.tm_sec:02d}"
+
+    @Entrypoint
+    @staticmethod
+    def fromdate(year=0, mon=0, day=0, hr=0, min=0, sec=0, msec=0):
+        # Implements the low level days_from_civil algorithm described here
+        # http://howardhinnant.github.io/date_algorithms.html#civil_from_days
+        year -= mon <= 2
+        era = (year if year >= 0 else year - 399) // 400
+        yoe = (year - era * 400)
+        doy = (153 * ( mon - 3 if mon > 2 else mon + 9) + 2) // 5 + day - 1
+        doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
+        days = era * 146097 + doe - 719468
+
+        ts = (days * 86400) + (hr * 3600) + (min * 60) + sec + (msec // 1000)
+        return Timestamp(ts=ts)
+
+    @Entrypoint
+    def timefrstr(self, fmt: str = "%Y-%m-%d %H:%M:%S") -> None:
+        return self.make(0)
