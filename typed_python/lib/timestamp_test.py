@@ -13,12 +13,12 @@ class TestTimestamp(unittest.TestCase):
         dt_tuple = datetime.fromtimestamp(unixtime, tz=timezone.utc).timetuple()
         date = timestamp.date()
 
-        assert dt_tuple.tm_year == date.tm_year
-        assert dt_tuple.tm_mon == date.tm_mon
-        assert dt_tuple.tm_mday == date.tm_mday
-        assert dt_tuple.tm_hour == date.tm_hour
-        assert dt_tuple.tm_min == date.tm_min
-        assert dt_tuple.tm_sec == date.tm_sec
+        assert dt_tuple.tm_year == date.year
+        assert dt_tuple.tm_mon == date.month
+        assert dt_tuple.tm_mday == date.day
+        assert dt_tuple.tm_hour == date.hour
+        assert dt_tuple.tm_min == date.minute
+        assert dt_tuple.tm_sec == date.second
 
     def test_date_string_offset(self):
         unixtime = time.time()
@@ -26,12 +26,12 @@ class TestTimestamp(unittest.TestCase):
         dt_tuple = datetime.fromtimestamp(unixtime, tz=timezone.utc).timetuple()
         date = timestamp.date('+00:00')
 
-        assert dt_tuple.tm_year == date.tm_year
-        assert dt_tuple.tm_mon == date.tm_mon
-        assert dt_tuple.tm_mday == date.tm_mday
-        assert dt_tuple.tm_hour == date.tm_hour
-        assert dt_tuple.tm_min == date.tm_min
-        assert dt_tuple.tm_sec == date.tm_sec
+        assert dt_tuple.tm_year == date.year
+        assert dt_tuple.tm_mon == date.month
+        assert dt_tuple.tm_mday == date.day
+        assert dt_tuple.tm_hour == date.hour
+        assert dt_tuple.tm_min == date.minute
+        assert dt_tuple.tm_sec == date.second
 
     def test_date_with_numeric_utc_offset_localtime(self):
         unixtime = time.time()
@@ -41,12 +41,12 @@ class TestTimestamp(unittest.TestCase):
         utc_offset = time.localtime().tm_gmtoff
         date = timestamp.date(utc_offset)
 
-        assert dt_tuple.tm_year == date.tm_year
-        assert dt_tuple.tm_mon == date.tm_mon
-        assert dt_tuple.tm_mday == date.tm_mday
-        assert dt_tuple.tm_hour == date.tm_hour
-        assert dt_tuple.tm_min == date.tm_min
-        assert dt_tuple.tm_sec == date.tm_sec
+        assert dt_tuple.tm_year == date.year
+        assert dt_tuple.tm_mon == date.month
+        assert dt_tuple.tm_mday == date.day
+        assert dt_tuple.tm_hour == date.hour
+        assert dt_tuple.tm_min == date.minute
+        assert dt_tuple.tm_sec == date.second
 
     def test_date_with_numeric_utc_offset(self):
         tz = pytz.timezone('America/New_York')
@@ -58,12 +58,12 @@ class TestTimestamp(unittest.TestCase):
         timestamp = Timestamp.make(unixtime)
         date = timestamp.date(ny_now.utcoffset().total_seconds())
 
-        assert ny_dt_tuple.tm_year == date.tm_year
-        assert ny_dt_tuple.tm_mon == date.tm_mon
-        assert ny_dt_tuple.tm_mday == date.tm_mday
-        assert ny_dt_tuple.tm_hour == date.tm_hour
-        assert ny_dt_tuple.tm_min == date.tm_min
-        assert ny_dt_tuple.tm_sec == date.tm_sec
+        assert ny_dt_tuple.tm_year == date.year
+        assert ny_dt_tuple.tm_mon == date.month
+        assert ny_dt_tuple.tm_mday == date.day
+        assert ny_dt_tuple.tm_hour == date.hour
+        assert ny_dt_tuple.tm_min == date.minute
+        assert ny_dt_tuple.tm_sec == date.second
 
     def test_date_with_string_utc_offset_localtime(self):
         unixtime = time.time()
@@ -73,12 +73,12 @@ class TestTimestamp(unittest.TestCase):
 
         date = timestamp.date(time.strftime("%z"))
 
-        assert dt_tuple.tm_year == date.tm_year
-        assert dt_tuple.tm_mon == date.tm_mon
-        assert dt_tuple.tm_mday == date.tm_mday
-        assert dt_tuple.tm_hour == date.tm_hour
-        assert dt_tuple.tm_min == date.tm_min
-        assert dt_tuple.tm_sec == date.tm_sec
+        assert dt_tuple.tm_year == date.year
+        assert dt_tuple.tm_mon == date.month
+        assert dt_tuple.tm_mday == date.day
+        assert dt_tuple.tm_hour == date.hour
+        assert dt_tuple.tm_min == date.minute
+        assert dt_tuple.tm_sec == date.second
 
     def test_date_default_offset(self):
         unixtime = time.time()
@@ -86,12 +86,12 @@ class TestTimestamp(unittest.TestCase):
         dt_tuple = datetime.fromtimestamp(unixtime, tz=timezone.utc).timetuple()
         date = timestamp.date()
 
-        assert dt_tuple.tm_year == date.tm_year
-        assert dt_tuple.tm_mon == date.tm_mon
-        assert dt_tuple.tm_mday == date.tm_mday
-        assert dt_tuple.tm_hour == date.tm_hour
-        assert dt_tuple.tm_min == date.tm_min
-        assert dt_tuple.tm_sec == date.tm_sec
+        assert dt_tuple.tm_year == date.year
+        assert dt_tuple.tm_mon == date.month
+        assert dt_tuple.tm_mday == date.day
+        assert dt_tuple.tm_hour == date.hour
+        assert dt_tuple.tm_min == date.minute
+        assert dt_tuple.tm_sec == date.second
 
     def test_timetuple_with_offset(self):
         unixtime = time.time()
@@ -99,30 +99,30 @@ class TestTimestamp(unittest.TestCase):
         dt_tuple = datetime.fromtimestamp(unixtime, tz=timezone.utc).timetuple()
         date = timestamp.date()
 
-        assert dt_tuple.tm_year == date.tm_year
-        assert dt_tuple.tm_mon == date.tm_mon
-        assert dt_tuple.tm_mday == date.tm_mday
-        assert dt_tuple.tm_hour == date.tm_hour
-        assert dt_tuple.tm_min == date.tm_min
-        assert dt_tuple.tm_sec == date.tm_sec
+        assert dt_tuple.tm_year == date.year
+        assert dt_tuple.tm_mon == date.month
+        assert dt_tuple.tm_mday == date.day
+        assert dt_tuple.tm_hour == date.hour
+        assert dt_tuple.tm_min == date.minute
+        assert dt_tuple.tm_sec == date.second
 
-    def test_strfrtime(self):
+    def test_to_string(self):
         unixtime = time.time()
         timestamp = Timestamp.make(unixtime)
         dt = datetime.fromtimestamp(unixtime)
 
-        assert dt.isoformat(timespec='seconds') == timestamp.strfrtime('-04:00')
+        assert dt.isoformat(timespec='seconds') == timestamp.to_string(time.localtime().tm_gmtoff, format="%Y-%m-%dT%H:%M:%S")
 
-    def test_fromdate(self):
+    def test_from_date(self):
         unixtime = time.time()
         dt_tuple = datetime.fromtimestamp(unixtime, tz=timezone.utc).timetuple()
 
-        timestamp = Timestamp.fromdate(year=dt_tuple.tm_year,
-                                       mon=dt_tuple.tm_mon,
-                                       day=dt_tuple.tm_mday,
-                                       hr=dt_tuple.tm_hour,
-                                       min=dt_tuple.tm_min,
-                                       sec=dt_tuple.tm_sec)
+        timestamp = Timestamp.from_date(year=dt_tuple.tm_year,
+                                        month=dt_tuple.tm_mon,
+                                        day=dt_tuple.tm_mday,
+                                        hour=dt_tuple.tm_hour,
+                                        minute=dt_tuple.tm_min,
+                                        second=dt_tuple.tm_sec)
 
         assert int(unixtime) == int(timestamp)
 

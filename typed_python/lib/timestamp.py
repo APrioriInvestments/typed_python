@@ -1,4 +1,8 @@
-#   Copyright 2017-2020 typed_python Authors
+from typed_python.compiler.runtime import Entrypoint
+from typed_python import Class, Final, Member, NamedTuple, Held
+from calendar import day_abbr, day_name, month_abbr, month_name
+
+# Copyright 2017-2020 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -12,10 +16,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Class, Final, Member, NamedTuple, Held
-from typed_python.compiler.runtime import Entrypoint
 
-Date = NamedTuple(tm_year=int, tm_mon=int, tm_mday=int, tm_hour=int, tm_min=int, tm_sec=int, tm_ms=int)
+Date = NamedTuple(year=int, month=int, day=int, hour=int, minute=int, second=int, ms=int, weekday=int)
 
 DEFAULT_UTC_OFFSET = 0
 
@@ -42,7 +44,7 @@ class Timestamp(Class, Final):
         return self.ts
 
     def __str__(self):
-        return self.isoformat()
+        return self.to_string()
 
     @Entrypoint
     def date(self, utc_offset: int = DEFAULT_UTC_OFFSET) -> Date:
@@ -65,37 +67,63 @@ class Timestamp(Class, Final):
         min = (ts // (3600 / 60)) % 60
         s = (ts // (3600 / 60 / 60)) % (60)
 
-        return Date(tm_year=y, tm_mon=m, tm_mday=d, tm_hour=h, tm_min=min, tm_sec=s)
+        days = ts // 86400
 
-    @Entrypoint
-    def _date(self, utc_offset: str = DEFAULT_UTC_OFFSET, fmt: str = "%Y-%m-%d %H:%M:%S") -> Date:
+        weekday = (days + 4) % 7 if days >= -4 else (days + 5) % 7 + 6
+
+        return Date(year=y, month=m, day=d, hour=h, minute=min, weekday=weekday, second=s)
+
+    @Entrypoint  # noqa : F811
+    def date(self, utc_offset: str = DEFAULT_UTC_OFFSET, fmt: str = "%Y-%m-%d %H:%M:%S") -> Date:
         return self.date(string_offset_to_seconds(utc_offset))
 
     @Entrypoint
-    def strfrtime(self, utc_offset: int = DEFAULT_UTC_OFFSET, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
-        # %Y-%m-%d %H:%M:%S"
+    def to_string(self, utc_offset: int = DEFAULT_UTC_OFFSET, format: str = "%Y-%m-%d %H:%M:%S") -> str:
         date = self.date(utc_offset)
-        return f"{date.tm_year}-{date.tm_mon:02d}-{date.tm_mday:02d}T{date.tm_hour:02d}:{date.tm_min:02d}:{date.tm_sec:02d}"
+        # reduce .replace calls for default format
+        if format is None or format == "%Y-%m-%d %H:%M:%S":
+            return f"{date.year}-{date.month:02d}-{date.day:02d} {date.hour:02d}:{date.minute:02d}:{date.second:02d}"
 
-    @Entrypoint
-    def _strfrtime(self, utc_offset: str = DEFAULT_UTC_OFFSET) -> str:
-        date = self.date(utc_offset)
-        return f"{date.tm_year}-{date.tm_mon:02d}-{date.tm_mday:02d}T{date.tm_hour:02d}:{date.tm_min:02d}:{date.tm_sec:02d}"
+        return (
+            format
+            .replace("%Y", str(date.year))
+            .replace("%y", str(date.year % 100))
+            .replace("%b", str(month_abbr[date.month]))
+            .replace("%B", str(month_name[date.month]))
+            .replace("%a", str(day_abbr[date.weekday - 1]))
+            .replace("%A", str(day_name[date.weekday - 1]))
+            .replace('%m', f'{date.month:02d}')
+            .replace('%d', f'{date.day:02d}')
+            .replace('%H', f'{date.hour:02d}')
+            .replace('%M', f'{date.minute:02d}')
+            .replace('%S', f'{date.second:02d}')
+        )
+
+    @Entrypoint  # noqa : F811
+    def to_string(self, utc_offset: str = DEFAULT_UTC_OFFSET, format: str = "%Y-%m-%d %H:%M:%S") -> str:
+        date = self.date(utc_offset, format)
+        return f"{date.year}-{date.month:02d}-{date.day:02d} {date.hour:02d}:{date.minute:02d}:{date.second:02d}"
 
     @Entrypoint
     @staticmethod
-    def fromdate(year=0, mon=0, day=0, hr=0, min=0, sec=0, msec=0):
+    def from_date(year=0, month=0, day=0, hour=0, minute=0, second=0, ms=0, us=0, ns=0):
         # Implements the low level days_from_civil algorithm described here
         # http://howardhinnant.github.io/date_algorithms.html#civil_from_days
-        year -= mon <= 2
+        year -= month <= 2
         era = (year if year >= 0 else year - 399) // 400
         yoe = (year - era * 400)
-        doy = (153 * ( mon - 3 if mon > 2 else mon + 9) + 2) // 5 + day - 1
+        doy = (153 * ( month - 3 if month > 2 else month + 9) + 2) // 5 + day - 1
         doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
         days = era * 146097 + doe - 719468
 
-        ts = (days * 86400) + (hr * 3600) + (min * 60) + sec + (msec // 1000)
+        ts = (days * 86400) + (hour * 3600) + (minute * 60) + second + (ms // 1000) + (us / 1000000) + (ns / 1000000000)
         return Timestamp(ts=ts)
+
+    @Entrypoint  # noqa : F811
+    @staticmethod
+    def from_date(date_str: str, format: str):
+        # parse a datestring and return a timestamp
+        return 0
 
     @Entrypoint
     def timefrstr(self, fmt: str = "%Y-%m-%d %H:%M:%S") -> None:
