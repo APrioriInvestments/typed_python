@@ -48,8 +48,18 @@ class Timestamp(Class, Final):
 
     @Entrypoint
     def date(self, utc_offset: int = DEFAULT_UTC_OFFSET) -> Date:
-        # Implements the low level civil_from_days algorithm described here
-        # http://howardhinnant.github.io/date_algorithms.html#civil_from_days
+        '''
+        Creates a Date tuple from this timestamp representing a date
+        Parameters:
+            utc_offset (int): The offset fromt UTC in seconds
+
+        Returns:
+            date (Date): a Date tuple. E.g. Date(year=2022, month=6, day=1, hour=5, minute=45, second=30, ms=1, us=4, ns=33)
+
+
+        This method implements the low level civil_from_days algorithm described here
+        http://howardhinnant.github.io/date_algorithms.html#civil_from_days
+        '''
         utc_offset = DEFAULT_UTC_OFFSET if utc_offset is None else utc_offset
         ts = self.ts + utc_offset
         z = ts // 86400 + 719468
@@ -67,19 +77,37 @@ class Timestamp(Class, Final):
         min = (ts // (3600 / 60)) % 60
         s = (ts // (3600 / 60 / 60)) % (60)
 
+        # http://howardhinnant.github.io/date_algorithms.html#weekday_from_days
         days = ts // 86400
-
         weekday = (days + 4) % 7 if days >= -4 else (days + 5) % 7 + 6
 
         return Date(year=y, month=m, day=d, hour=h, minute=min, weekday=weekday, second=s)
 
     @Entrypoint  # noqa : F811
-    def date(self, utc_offset: str = DEFAULT_UTC_OFFSET, fmt: str = "%Y-%m-%d %H:%M:%S") -> Date:
+    def date(self, utc_offset: str = DEFAULT_UTC_OFFSET) -> Date:
+        '''
+        Creates a Date tuple from this timestamp representing a date
+        Parameters:
+            utc_offset (string): The offset from UTC as a string. E.g. '+0200' or '+02:00'
+
+        Returns:
+            date (Date): a Date tuple. E.g. Date(year=2022, month=6, day=1, hour=5, minute=45, second=30, ms=1, us=4, ns=33)
+        '''
         return self.date(string_offset_to_seconds(utc_offset))
 
     @Entrypoint
     def to_string(self, utc_offset: int = DEFAULT_UTC_OFFSET, format: str = "%Y-%m-%d %H:%M:%S") -> str:
+        '''
+        Converts a Timestamp to a string in a given format
+        Parameters:
+            utc_offset (int): The offset from UTC in seconds
+            format (str): A string specifying formatting directives. E.g. '%Y-%m-%d %H:%M:%S'
+        Returns:
+            date_str(str): A string represening the date in the specified format. E.g. "Mon January 2, 2021"
+        '''
+        # Note: we'll probably want to replace this with a better performing c module.
         date = self.date(utc_offset)
+
         # reduce .replace calls for default format
         if format is None or format == "%Y-%m-%d %H:%M:%S":
             return f"{date.year}-{date.month:02d}-{date.day:02d} {date.hour:02d}:{date.minute:02d}:{date.second:02d}"
@@ -101,14 +129,38 @@ class Timestamp(Class, Final):
 
     @Entrypoint  # noqa : F811
     def to_string(self, utc_offset: str = DEFAULT_UTC_OFFSET, format: str = "%Y-%m-%d %H:%M:%S") -> str:
+        '''
+        Converts a Timestamp to a string in a given format
+        Parameters:
+            utc_offset (string): The offset from UTC as a string. E.g. '+0200' or '+02:00'
+            format (str): A string specifying formatting directives. E.g. '%Y-%m-%d %H:%M:%S'
+        Returns:
+            date_str(str): A string represening the date in the specified format. E.g. "Mon January 2, 2021"
+        '''
         date = self.date(utc_offset, format)
         return f"{date.year}-{date.month:02d}-{date.day:02d} {date.hour:02d}:{date.minute:02d}:{date.second:02d}"
 
     @Entrypoint
     @staticmethod
     def from_date(year=0, month=0, day=0, hour=0, minute=0, second=0, ms=0, us=0, ns=0):
-        # Implements the low level days_from_civil algorithm described here
-        # http://howardhinnant.github.io/date_algorithms.html#civil_from_days
+        '''
+        Creates a Timestamp from date values.
+        Parameters:
+            year (int): The year
+            month (int): The month. January: 1, February: 2, ....
+            day (int): The day
+            hour (int): The hour (0-23)
+            minute (int): The minute
+            second (int): The second
+            ms (int): The millisecond
+            us (int): The microsecond
+            ns(int): The nanosecond
+        Returns:
+            timestamp (Timestamp): A Timestamp
+
+        Implements the low level days_from_civil algorithm described here
+        http://howardhinnant.github.io/date_algorithms.html#civil_from_days
+        '''
         year -= month <= 2
         era = (year if year >= 0 else year - 399) // 400
         yoe = (year - era * 400)
@@ -123,8 +175,6 @@ class Timestamp(Class, Final):
     @staticmethod
     def from_date(date_str: str, format: str):
         # parse a datestring and return a timestamp
-        return 0
-
-    @Entrypoint
-    def timefrstr(self, fmt: str = "%Y-%m-%d %H:%M:%S") -> None:
-        return self.make(0)
+        # should  not reinvent the wheel
+        # consider https://github.com/closeio/ciso8601
+        raise NotImplementedError
