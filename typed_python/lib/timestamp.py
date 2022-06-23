@@ -176,7 +176,6 @@ class Timestamp(Class, Final):
     @staticmethod
     def parse(date_str: str, format: str = "%Y-%m-%d %H:%M:%S"):
         # doesn't do sub seconds
-
         # consider https://github.com/closeio/ciso8601
         time_struct = strptime(date_str, format)
         return Timestamp.from_date(year=time_struct.tm_year,
