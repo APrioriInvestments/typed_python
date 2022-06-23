@@ -123,8 +123,15 @@ class TestTimestamp(unittest.TestCase):
                                         hour=dt_tuple.tm_hour,
                                         minute=dt_tuple.tm_min,
                                         second=dt_tuple.tm_sec)
-
         assert int(unixtime) == int(timestamp)
+
+    def test_parse(self):
+        unixtime = time.time()
+        timestamp = Timestamp.make(unixtime)
+        dt = datetime.fromtimestamp(unixtime, tz=timezone.utc).timetuple()
+        date_str = f"{dt.tm_year}-{dt.tm_mon:02d}-{dt.tm_mday:02d} {dt.tm_hour:02d}:{dt.tm_min:02d}:{dt.tm_sec:02d}"
+        parsed_timestamp = Timestamp.parse(date_str, "%Y-%m-%d %H:%M:%S")
+        assert((int(timestamp) == int(parsed_timestamp)))
 
     def test_timestamp_is_held_class(self):
         """ This is a temporary test intended to exhibit the Held class semantics.

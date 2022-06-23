@@ -1,6 +1,7 @@
 from typed_python.compiler.runtime import Entrypoint
 from typed_python import Class, Final, Member, NamedTuple, Held
 from calendar import day_abbr, day_name, month_abbr, month_name
+from time import strptime
 
 # Copyright 2017-2020 typed_python Authors
 #
@@ -173,8 +174,14 @@ class Timestamp(Class, Final):
 
     @Entrypoint  # noqa : F811
     @staticmethod
-    def from_date(date_str: str, format: str):
-        # parse a datestring and return a timestamp
-        # should  not reinvent the wheel
+    def parse(date_str: str, format: str = "%Y-%m-%d %H:%M:%S"):
+        # doesn't do sub seconds
+
         # consider https://github.com/closeio/ciso8601
-        raise NotImplementedError
+        time_struct = strptime(date_str, format)
+        return Timestamp.from_date(year=time_struct.tm_year,
+                                   month=time_struct.tm_mon,
+                                   day=time_struct.tm_mday,
+                                   hour=time_struct.tm_hour,
+                                   minute=time_struct.tm_min,
+                                   second=time_struct.tm_sec)
