@@ -64,9 +64,10 @@ def buildCodeObject(
         raise Exception(
             "tried to deserialize a code object from a future version "
             "of python that uses positional-only arguments."
+
         )
 
-    codeObj = types.CodeType(
+    codeObj = _types.buildCodeObject(
         co_argcount,
         *([] if sys.version_info.minor < 8 else [co_posonlyargcount]),
         co_kwonlyargcount,
@@ -77,12 +78,12 @@ def buildCodeObject(
         co_consts,
         co_names,
         co_varnames,
+        co_freevars,
+        co_cellvars,
         co_filename,
         co_name,
         co_firstlineno,
         co_lnotab,
-        co_freevars,
-        co_cellvars,
     )
 
     cacheAstForCode(codeObj, ast)

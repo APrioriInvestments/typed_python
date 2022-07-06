@@ -2926,6 +2926,159 @@ PyObject *MakeForward(PyObject* nullValue, PyObject* args) {
     }
 }
 
+/*********
+calls PyCode_New and faithfully maintains the identities of tuples passed in.
+
+this has signature
+    PyCode_New(
+        int argcount,
+        int kwonlyargcount,
+        int nlocals,
+        int stacksize,
+        int flags,
+        PyObject *code,
+        PyObject *consts,
+        PyObject *names,
+        PyObject *varnames,
+        PyObject *freevars,
+        PyObject *cellvars,
+        PyObject *filename,
+        PyObject *name,
+        int firstlineno,
+        PyObject *lnotab
+    )
+
+you may also call, after 3.8, PyCode_NewWithPosOnlyArgs which has signature
+
+PyCodeObject* PyCode_NewWithPosOnlyArgs(
+    int argcount,
+    int posonlyargcount,
+    int kwonlyargcount,
+    int nlocals,
+    int stacksize,
+    int flags,
+    PyObject *code,
+    PyObject *consts,
+    PyObject *names,
+    PyObject *varnames,
+    PyObject *freevars,
+    PyObject *cellvars,
+    PyObject *filename,
+    PyObject *name,
+    int firstlineno,
+    PyObject *lnotab
+)
+********/
+PyObject* buildCodeObject(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    static const char *kwlist[] = {
+        "co_argcount",
+#   if PY_MINOR_VERSION >= 8
+        "co_posonlyargcount",
+#   endif
+        "co_kwonlyargcount",
+        "co_nlocals",
+        "co_stacksize",
+        "co_flags",
+        "co_code",
+        "co_consts",
+        "co_names",
+        "co_varnames",
+        "co_freevars",
+        "co_cellvars",
+        "co_filename",
+        "co_name",
+        "co_firstlineno",
+        "co_lnotab",
+        NULL
+    };
+
+    static const char* operatorList = (
+        PY_MINOR_VERSION < 8 ? "iiiiiOOOOOOOOiO" : "iiiiiiOOOOOOOOiO"
+    );
+
+    int co_argcount;
+
+#   if PY_MINOR_VERSION >= 8
+    int co_posonlyargcount;
+#   endif
+
+    int co_kwonlyargcount;
+    int co_nlocals;
+    int co_stacksize;
+    int co_flags;
+    PyObject* co_code;
+    PyObject* co_consts;
+    PyObject* co_names;
+    PyObject* co_varnames;
+    PyObject* co_filename;
+    PyObject* co_name;
+    int co_firstlineno;
+    PyObject* co_lnotab;
+    PyObject* co_freevars;
+    PyObject* co_cellvars;
+
+    return translateExceptionToPyObject([&]() {
+        if (!PyArg_ParseTupleAndKeywords(
+            args,
+            kwargs,
+            operatorList,
+            (char**)kwlist,
+            &co_argcount,
+        #   if PY_MINOR_VERSION >= 8
+            &co_posonlyargcount,
+        #   endif
+            &co_kwonlyargcount,
+            &co_nlocals,
+            &co_stacksize,
+            &co_flags,
+            &co_code,
+            &co_consts,
+            &co_names,
+            &co_varnames,
+            &co_freevars,
+            &co_cellvars,
+            &co_filename,
+            &co_name,
+            &co_firstlineno,
+            &co_lnotab
+        ))
+        {
+            throw PythonExceptionSet();
+        }
+
+#if PY_MINOR_VERSION < 8
+        PyCodeObject* result = PyCode_New(
+#else
+        PyCodeObject* result = PyCode_NewWithPosOnlyArgs(
+#endif
+            co_argcount,
+        #   if PY_MINOR_VERSION >= 8
+            co_posonlyargcount,
+        #   endif
+            co_kwonlyargcount,
+            co_nlocals,
+            co_stacksize,
+            co_flags,
+            co_code,
+            co_consts,
+            co_names,
+            co_varnames,
+            co_freevars,
+            co_cellvars,
+            co_filename,
+            co_name,
+            co_firstlineno,
+            co_lnotab
+        );
+
+        if (!result) {
+            throw PythonExceptionSet();
+        }
+
+        return (PyObject*)result;
+    });
+}
+
 PyObject* buildPyFunctionObject(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     static const char *kwlist[] = {"code", "globals", "closure", NULL};
 
@@ -3079,6 +3232,7 @@ static PyMethodDef module_methods[] = {
     {"serializeStream", (PyCFunction)serializeStream, METH_VARARGS, NULL},
     {"deserializeStream", (PyCFunction)deserializeStream, METH_VARARGS, NULL},
     {"is_default_constructible", (PyCFunction)is_default_constructible, METH_VARARGS, NULL},
+    {"buildCodeObject", (PyCFunction)buildCodeObject, METH_VARARGS | METH_KEYWORDS, NULL},
     {"buildPyFunctionObject", (PyCFunction)buildPyFunctionObject, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isPOD", (PyCFunction)isPOD, METH_VARARGS, NULL},
     {"isSimple", (PyCFunction)isSimple, METH_VARARGS, NULL},
