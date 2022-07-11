@@ -111,8 +111,6 @@ class Timestamp(Class, Final):
             date_str(str): A string represening the date in the specified format. E.g. "Mon January 2, 2021"
         '''
         date = self.date(utc_offset, format)
-        print("hhh")
-        print(date)
         return f"{date.year}-{date.month:02d}-{date.day:02d} {date.hour:02d}:{date.minute:02d}:{date.second:02d}"
 
     @ Entrypoint
