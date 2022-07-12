@@ -3269,6 +3269,8 @@ class TypesTests(unittest.TestCase):
                     max_line_len = 80
                     if a in ['__index__']:  # Ignore some builtin docstrings with overlong lines.
                         continue
+                    if not hasattr(m, '__typed_python_category__'):
+                        continue
                     for l in docstring.splitlines():
                         if len(l) > max_line_len:
                             print(f"docstring line too long {len(l)} > {max_line_len} for '{T}.{a}':\n{l}")
