@@ -302,7 +302,7 @@ public:
     static PyObject* initializePythonRepresentation(Type* eltType, const init_func& f) {
         Instance instance(eltType, f);
 
-        return extractPythonObject(instance.data(), instance.type());
+        return extractPythonObject(instance.data(), instance.type(), false);
     }
 
     //initialize a PyInstance for 'eltType'. For ints, floats, etc, with

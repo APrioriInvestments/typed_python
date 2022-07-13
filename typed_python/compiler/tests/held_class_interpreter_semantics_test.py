@@ -4,7 +4,7 @@ import sys
 import time
 from flaky import flaky
 
-from typed_python import Class, Final, ListOf, Held, Member, PointerTo, pointerTo
+from typed_python import Class, Final, ListOf, Held, Member, PointerTo, pointerTo, Function
 from typed_python.test_util import currentMemUsageMb
 
 
@@ -22,6 +22,20 @@ class H(Class, Final):
 
 
 class TestHeldClassInterpreterSemantics(unittest.TestCase):
+    def test_can_return_held_class_from_typed_function(self):
+        @Function
+        def f(x, y) -> H:
+            return H(x=x, y=y)
+
+        res = f(10, 20)
+        res2 = f(12, 22)
+
+        assert res.x == 10
+        assert res.y == 20
+
+        assert res2.x == 12
+        assert res2.y == 22
+
     def test_list_of_held_class_item_type(self):
         assert sys.gettrace() is None
 
