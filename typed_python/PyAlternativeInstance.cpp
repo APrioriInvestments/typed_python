@@ -166,7 +166,7 @@ PyObject* PyAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const
         return extractPythonObject(
             heldT->eltPtr(heldData, ix),
             heldT->getTypes()[ix]
-            );
+        );
     }
 
     return PyInstance::tp_getattr_concrete(pyAttrName, attrName);

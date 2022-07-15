@@ -19,6 +19,11 @@
 #include "PyInstance.hpp"
 #include <unordered_map>
 
+enum class TraceAction {
+    ConvertTemporaryReference,
+    Decref
+};
+
 class PyTemporaryReferenceTracer {
 public:
     PyTemporaryReferenceTracer() :
@@ -27,7 +32,7 @@ public:
         priorTraceFuncArg(nullptr)
     {}
 
-    std::unordered_map<PyFrameObject*, std::vector<PyObject*> > frameToHandles;
+    std::unordered_map<PyFrameObject*, std::vector<std::pair<PyObject*, TraceAction> > > frameToHandles;
 
     // the most recent frame we touched that has nothing in it
     PyFrameObject* mostRecentEmptyFrame;
@@ -43,4 +48,12 @@ public:
     // the next time we have an instruction in 'frame', trigger 'o' to become
     // a non-temporary reference
     static void traceObject(PyObject* o, PyFrameObject* frame);
+
+    static void traceObject(PyObject* o);
+
+    static void installGlobalTraceHandlerIfNecessary();
+
+    static void keepaliveForCurrentInstruction(PyObject* o);
+
+    static void keepaliveForCurrentInstruction(PyObject* o, PyFrameObject* frame);
 };

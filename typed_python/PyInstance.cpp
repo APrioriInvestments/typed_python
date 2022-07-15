@@ -120,7 +120,7 @@ PyMethodDef* PyInstance::typeMethodsConcrete(Type* t) {
 void PyInstance::tp_dealloc(PyObject* self) {
     PyInstance* wrapper = (PyInstance*)self;
 
-    wrapper->mContainingInstance.~Instance();
+    wrapper->teardown();
 
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
@@ -277,14 +277,9 @@ PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType, bool
             // this allows us to mimic the behavior of the compiler when we're
             // using these objects: by default, we never get naked reftos anywhere
             // we can find them.
+
             PyObject* res = PyInstance::initializeTemporaryRef(eltType, data);
-
-            PyThreadState *tstate = PyThreadState_GET();
-            PyFrameObject *f = tstate->frame;
-
-            if (f) {
-                PyTemporaryReferenceTracer::traceObject(res, f);
-            }
+            PyTemporaryReferenceTracer::traceObject(res);
 
             return res;
         }
@@ -315,8 +310,8 @@ PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType, bool
     });
 }
 
-PyObject* PyInstance::extractPythonObject(const Instance& instance) {
-    return extractPythonObject(instance.data(), instance.type());
+PyObject* PyInstance::extractPythonObject(const Instance& instance, bool createTemporaryRef) {
+    return extractPythonObject(instance.data(), instance.type(), createTemporaryRef);
 }
 
 PyObject* PyInstance::extractPythonObjectConcrete(Type* eltType, instance_ptr data) {

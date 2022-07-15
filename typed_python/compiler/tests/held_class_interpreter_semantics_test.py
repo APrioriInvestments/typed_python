@@ -10,8 +10,8 @@ from typed_python.test_util import currentMemUsageMb
 
 @Held
 class H(Class, Final):
-    x = Member(int)
-    y = Member(float)
+    x = Member(int, nonempty=True)
+    y = Member(float, nonempty=True)
 
     def f(self):
         return self.x + self.y
@@ -35,6 +35,15 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert res2.x == 12
         assert res2.y == 22
+
+    def test_construct_and_call_method(self):
+        # note that we can't just call this at the root of the function
+        # because pytest keeps all the temporary variables alive, which obviates
+        # the point of the test
+        def runTest():
+            return H(x=10, y=20).f()
+
+        assert runTest() == 30
 
     def test_list_of_held_class_item_type(self):
         assert sys.gettrace() is None
@@ -109,6 +118,31 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert isinstance(x, H)
         assert isinstance(y, H)
+
+    def testReturnRefFromFunction(self):
+        def runTest():
+            def f(l):
+                return g(l)
+
+            def g(l):
+                return pointerTo(l[0])
+
+            aList = ListOf(H)([H(x=10,y=20)])
+
+            f(aList)[0].x = 20
+
+            assert aList[0].x == 20
+
+        runTest()
+
+    def testCallBoundMethodOnLeakedTemporaryCrashes(self):
+        with self.assertRaisesRegex(Exception, "would have crashed"):
+            def runTest():
+                hFunc = H(x=10, y=20).f
+
+                hFunc()
+
+            runTest()
 
     def test_refs_passed_to_functions(self):
         aList = ListOf(H)()

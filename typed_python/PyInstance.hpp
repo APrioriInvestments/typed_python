@@ -78,14 +78,39 @@ public:
     // we may be a temporary ref to a type
     instance_ptr mTemporaryRefTo;
 
+    PyObject* mKeepalive;
+
     // initialize our fields after we have called 'tp_alloc'
     void initializeEmpty() {
         mIteratorFlag = -1;
         mIteratorOffset = -1;
         mContainerSize = -1;
         mTemporaryRefTo = nullptr;
+        mKeepalive = nullptr;
 
         new (&mContainingInstance) Instance();
+    }
+
+    // called when this python object is destroyed. Gives us a chance to do cleanup actions
+    void teardown() {
+        mContainingInstance.~Instance();
+
+        if (mKeepalive) {
+            Py_DECREF(mKeepalive);
+            mKeepalive = nullptr;
+        }
+    }
+
+    void setKeepalive(PyObject* toKeepAlive) {
+        if (toKeepAlive) {
+            Py_INCREF(toKeepAlive);
+        }
+
+        if (mKeepalive) {
+            Py_DECREF(mKeepalive);
+        }
+
+        mKeepalive = toKeepAlive;
     }
 
     void resolveTemporaryReference();
@@ -347,8 +372,8 @@ public:
         mContainingInstance = Instance(type, i);
     }
 
-    static PyObject* fromInstance(const Instance& instance) {
-        return extractPythonObject(instance.data(), instance.type());
+    static PyObject* fromInstance(const Instance& instance, bool createTemporaryRef=true) {
+        return extractPythonObject(instance.data(), instance.type(), createTemporaryRef);
     }
 
     PyInstance* duplicate() {
@@ -403,7 +428,7 @@ public:
     //instances.
     static PyObject* extractPythonObject(instance_ptr data, Type* eltType, bool createTemporaryRef=true);
 
-    static PyObject* extractPythonObject(const Instance& instance);
+    static PyObject* extractPythonObject(const Instance& instance, bool createTemporaryRef=true);
 
     //if we have a python representation that we want to use for this object, override and return not-NULL.
     //otherwise, this version takes over and returns a PyInstance wrapper for the object

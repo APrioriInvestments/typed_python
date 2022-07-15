@@ -564,9 +564,19 @@ PyObject* PyClassInstance::tpGetattrGeneric(
                 throw std::runtime_error("BoundMethod of HeldClass should take a RefTo");
             }
 
-            return PyInstance::initializePythonRepresentation(method, [&](instance_ptr methodData) {
+            PyObject* res = PyInstance::initializePythonRepresentation(method, [&](instance_ptr methodData) {
                 method->copy_constructor(methodData, (instance_ptr)&heldData);
             });
+
+            // the function reference holds 'self' as a RefTo. If 'self' is a temporary that
+            // doesn't exist in a variable (say, it was returned as a new object from a
+            // function) then this refto could end up pointing at the wrong data.
+            ((PyInstance*)res)->setKeepalive(self);
+
+            // ensure that self is kept alive for the duration of the instruction.
+            PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(self);
+
+            return res;
         }
     }
 

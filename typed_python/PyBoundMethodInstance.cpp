@@ -22,6 +22,17 @@ BoundMethod* PyBoundMethodInstance::type() {
 }
 
 PyObject* PyBoundMethodInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
+    if (mKeepalive) {
+        if (mKeepalive->ob_refcnt == 1) {
+            PyErr_Format(
+                PyExc_RuntimeError,
+                "BoundMethod pointing at HeldClass 'self' would have crashed in compiled code."
+            );
+
+            return NULL;
+        }
+    }
+
     Function* f = type()->getFunction();
     Type* firstArgType = type()->getFirstArgType();
 

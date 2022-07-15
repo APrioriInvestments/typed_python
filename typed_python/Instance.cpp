@@ -84,6 +84,12 @@ Instance::Instance(instance_ptr p, Type* t) : mLayout(nullptr) {
 Instance::~Instance() {
     if (mLayout && mLayout->refcount.fetch_sub(1) == 1) {
         mLayout->type->destroy(mLayout->data);
+
+        if (mLayout->type->bytecount() >= 8) {
+            // write a terminator so that we can see that this memory was destroyed.
+            ((uint64_t*)mLayout->data)[0] = 0xdeadbeef;
+        }
+
         tp_free(mLayout);
     }
 }

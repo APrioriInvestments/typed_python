@@ -69,6 +69,8 @@ class TestHeldClassCompilation(unittest.TestCase):
         c = C()
 
         self.checkCompiler(lambda c: type(c.h1), c)
+        self.checkCompiler(lambda c: c.h1.x, c)
+        self.checkCompiler(lambda c: c.h1.y, c)
         self.checkCompiler(lambda c: c.h1, c)
         self.checkCompiler(lambda c: type(c.h1.x), c)
         self.checkCompiler(lambda c: c.h1.x, c)

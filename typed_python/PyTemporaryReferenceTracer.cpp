@@ -17,7 +17,7 @@
 #include "PyTemporaryReferenceTracer.hpp"
 
 
-int PyTemporaryReferenceTracer::globalTraceFun(PyObject* obj, PyFrameObject* frame, int what, PyObject* arg) {
+int PyTemporaryReferenceTracer::globalTraceFun(PyObject* dummyObj, PyFrameObject* frame, int what, PyObject* arg) {
     if (frame != globalTracer.mostRecentEmptyFrame) {
         auto it = globalTracer.frameToHandles.find(frame);
 
@@ -26,9 +26,12 @@ int PyTemporaryReferenceTracer::globalTraceFun(PyObject* obj, PyFrameObject* fra
         } else {
             globalTracer.mostRecentEmptyFrame = nullptr;
 
-            for (auto obj: it->second) {
-                ((PyInstance*)obj)->resolveTemporaryReference();
-                decref(obj);
+            for (auto objAndAction: it->second) {
+                if (objAndAction.second == TraceAction::ConvertTemporaryReference) {
+                    ((PyInstance*)objAndAction.first)->resolveTemporaryReference();
+                }
+
+                decref(objAndAction.first);
             }
 
             globalTracer.frameToHandles.erase(it);
@@ -54,16 +57,8 @@ int PyTemporaryReferenceTracer::globalTraceFun(PyObject* obj, PyFrameObject* fra
     return res;
 }
 
-
-void PyTemporaryReferenceTracer::traceObject(PyObject* o, PyFrameObject* f) {
-    // mark that we're going to trace
-    globalTracer.frameToHandles[f].push_back(incref(o));
-
-    // reset the
-    if (globalTracer.mostRecentEmptyFrame == f) {
-        globalTracer.mostRecentEmptyFrame = nullptr;
-    }
-
+void PyTemporaryReferenceTracer::installGlobalTraceHandlerIfNecessary() {
+    // ensure that the global trace handler is installed
     PyThreadState *tstate = PyThreadState_GET();
 
     // this swallows the reference we're holding on 'tracer' into the function itself
@@ -74,5 +69,46 @@ void PyTemporaryReferenceTracer::traceObject(PyObject* o, PyFrameObject* f) {
         PyEval_SetTrace(PyTemporaryReferenceTracer::globalTraceFun, nullptr);
     }
 }
+
+void PyTemporaryReferenceTracer::traceObject(PyObject* o, PyFrameObject* f) {
+    // mark that we're going to trace
+    globalTracer.frameToHandles[f].push_back(std::make_pair(incref(o), TraceAction::ConvertTemporaryReference));
+
+    if (globalTracer.mostRecentEmptyFrame == f) {
+        globalTracer.mostRecentEmptyFrame = nullptr;
+    }
+
+    installGlobalTraceHandlerIfNecessary();
+}
+
+void PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(PyObject* o, PyFrameObject* f) {
+    // mark that we're going to trace
+    globalTracer.frameToHandles[f].push_back(std::make_pair(incref(o), TraceAction::Decref));
+
+    if (globalTracer.mostRecentEmptyFrame == f) {
+        globalTracer.mostRecentEmptyFrame = nullptr;
+    }
+
+    installGlobalTraceHandlerIfNecessary();
+}
+
+void PyTemporaryReferenceTracer::traceObject(PyObject* o) {
+    PyThreadState *tstate = PyThreadState_GET();
+    PyFrameObject *f = tstate->frame;
+
+    if (f) {
+        PyTemporaryReferenceTracer::traceObject(o, f);
+    }
+}
+
+void PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(PyObject* o) {
+    PyThreadState *tstate = PyThreadState_GET();
+    PyFrameObject *f = tstate->frame;
+
+    if (f) {
+        PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(o, f);
+    }
+}
+
 
 PyTemporaryReferenceTracer PyTemporaryReferenceTracer::globalTracer;
