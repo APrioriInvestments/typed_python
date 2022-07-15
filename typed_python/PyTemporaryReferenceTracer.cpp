@@ -16,25 +16,68 @@
 
 #include "PyTemporaryReferenceTracer.hpp"
 
+bool PyTemporaryReferenceTracer::isLineNewStatement(PyObject* code, int line) {
+    auto it = codeObjectToExpressionLines.find(code);
+
+    if (it != codeObjectToExpressionLines.end()) {
+        return it->second.find(line) != it->second.end();
+    }
+
+    // this permanently memoizes this code object in this global object
+    // this should be OK because there are (usually) a small and finite number of
+    // code objects in a given program.
+    incref(code);
+    auto& lineNumbers = codeObjectToExpressionLines[code];
+
+    static PyObject* internals = internalsModule();
+
+    PyObjectStealer res(
+        PyObject_CallMethod(internals, "extractCodeObjectNewStatementLineNumbers", "O", code, NULL)
+    );
+
+    if (!res) {
+        PyErr_Clear();
+    } else {
+        iterate((PyObject*)res, [&](PyObject* lineNo) {
+            if (PyLong_Check(lineNo)) {
+                lineNumbers.insert(PyLong_AsLong(lineNo));
+            }
+        });
+    }
+
+    return lineNumbers.find(line) != lineNumbers.end();
+}
+
 
 int PyTemporaryReferenceTracer::globalTraceFun(PyObject* dummyObj, PyFrameObject* frame, int what, PyObject* arg) {
     if (frame != globalTracer.mostRecentEmptyFrame) {
-        auto it = globalTracer.frameToHandles.find(frame);
+        bool shouldProcess = true;
 
-        if (it == globalTracer.frameToHandles.end()) {
-            globalTracer.mostRecentEmptyFrame = frame;
-        } else {
-            globalTracer.mostRecentEmptyFrame = nullptr;
+        if (what == PyTrace_LINE) {
+            shouldProcess = globalTracer.isLineNewStatement(
+                (PyObject*)frame->f_code,
+                frame->f_lineno
+            );
+        }
 
-            for (auto objAndAction: it->second) {
-                if (objAndAction.second == TraceAction::ConvertTemporaryReference) {
-                    ((PyInstance*)objAndAction.first)->resolveTemporaryReference();
+        if (shouldProcess) {
+            auto it = globalTracer.frameToHandles.find(frame);
+
+            if (it == globalTracer.frameToHandles.end()) {
+                globalTracer.mostRecentEmptyFrame = frame;
+            } else {
+                globalTracer.mostRecentEmptyFrame = nullptr;
+
+                for (auto objAndAction: it->second) {
+                    if (objAndAction.second == TraceAction::ConvertTemporaryReference) {
+                        ((PyInstance*)objAndAction.first)->resolveTemporaryReference();
+                    }
+
+                    decref(objAndAction.first);
                 }
 
-                decref(objAndAction.first);
+                globalTracer.frameToHandles.erase(it);
             }
-
-            globalTracer.frameToHandles.erase(it);
         }
     }
 

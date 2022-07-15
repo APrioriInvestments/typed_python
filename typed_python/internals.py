@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2022 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -622,3 +622,25 @@ def Held(T):
         raise Exception(f"{T} is not a Class")
 
     return T.HeldClass
+
+
+def extractCodeObjectNewStatementLineNumbers(codeObject):
+    """Return the subset of the line numbers on which codeObject has new statements."""
+    from typed_python.python_ast import convertFunctionToAlgebraicPyAst
+
+    try:
+        ast = convertFunctionToAlgebraicPyAst(codeObject)
+
+        res = set()
+
+        if ast.matches.FunctionDef:
+            for statement in ast.body:
+                res.add(statement.line_number)
+
+        return res
+    except Exception:
+        # nasty to swallow the exception like this. At least we report it...
+        import traceback
+        traceback.print_exc()
+
+        return []

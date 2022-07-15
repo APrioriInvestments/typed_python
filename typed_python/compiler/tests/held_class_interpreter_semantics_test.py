@@ -16,6 +16,9 @@ class H(Class, Final):
     def f(self):
         return self.x + self.y
 
+    def addToX(self, y):
+        return self.x + y
+
     def increment(self):
         self.x += 1
         self.y += 1
@@ -44,6 +47,26 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
             return H(x=10, y=20).f()
 
         assert runTest() == 30
+
+    def test_construct_and_call_method_multiline(self):
+        def runTest():
+            return H(x=10, y=20).addToX(
+                # this is deliberately on another line
+                10
+            )
+
+        assert runTest() == 20
+
+    def test_can_assign_to_held_class_in_list(self):
+        def runTest():
+            aList = ListOf(H)()
+            aList.resize(1)
+
+            aList[0].increment()
+
+            assert aList[0].x == 1
+
+        runTest()
 
     def test_list_of_held_class_item_type(self):
         assert sys.gettrace() is None

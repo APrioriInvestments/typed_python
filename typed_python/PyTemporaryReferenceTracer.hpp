@@ -34,12 +34,16 @@ public:
 
     std::unordered_map<PyFrameObject*, std::vector<std::pair<PyObject*, TraceAction> > > frameToHandles;
 
+    std::unordered_map<PyObject*, std::set<int> > codeObjectToExpressionLines;
+
     // the most recent frame we touched that has nothing in it
     PyFrameObject* mostRecentEmptyFrame;
 
     Py_tracefunc priorTraceFunc;
 
     PyObject* priorTraceFuncArg;
+
+    bool isLineNewStatement(PyObject* code, int line);
 
     static PyTemporaryReferenceTracer globalTracer;
 
