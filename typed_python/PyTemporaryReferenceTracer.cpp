@@ -50,33 +50,47 @@ bool PyTemporaryReferenceTracer::isLineNewStatement(PyObject* code, int line) {
 
 
 int PyTemporaryReferenceTracer::globalTraceFun(PyObject* dummyObj, PyFrameObject* frame, int what, PyObject* arg) {
-    if (frame != globalTracer.mostRecentEmptyFrame) {
-        bool shouldProcess = true;
+    if (frame != globalTracer.mostRecentEmptyFrame &&
+        globalTracer.frameToActions.find(frame) != globalTracer.frameToActions.end()) {
+        // always process exception and return statements
+        bool forceProcess = (
+            what == PyTrace_EXCEPTION ||
+            what == PyTrace_RETURN
+        );
 
-        if (what == PyTrace_LINE) {
-            shouldProcess = globalTracer.isLineNewStatement(
-                (PyObject*)frame->f_code,
-                frame->f_lineno
-            );
-        }
+        // we process any statement on a line that's a new statement
+        bool shouldProcess = globalTracer.isLineNewStatement(
+            (PyObject*)frame->f_code,
+            PyFrame_GetLineNumber(frame)
+        );
 
-        if (shouldProcess) {
-            auto it = globalTracer.frameToHandles.find(frame);
+        if (shouldProcess || forceProcess) {
+            auto it = globalTracer.frameToActions.find(frame);
 
-            if (it == globalTracer.frameToHandles.end()) {
+            if (it == globalTracer.frameToActions.end()) {
                 globalTracer.mostRecentEmptyFrame = frame;
             } else {
                 globalTracer.mostRecentEmptyFrame = nullptr;
 
-                for (auto objAndAction: it->second) {
-                    if (objAndAction.second == TraceAction::ConvertTemporaryReference) {
-                        ((PyInstance*)objAndAction.first)->resolveTemporaryReference();
-                    }
+                std::vector<FrameAction> persistingActions;
 
-                    decref(objAndAction.first);
+                for (auto& frameAction: it->second) {
+                    if (frameAction.lineNumber != PyFrame_GetLineNumber(frame) || forceProcess) {
+                        if (frameAction.action == TraceAction::ConvertTemporaryReference) {
+                            ((PyInstance*)frameAction.obj)->resolveTemporaryReference();
+                        }
+
+                        decref(frameAction.obj);
+                    } else {
+                        persistingActions.push_back(frameAction);
+                    }
                 }
 
-                globalTracer.frameToHandles.erase(it);
+                if (persistingActions.size()) {
+                    it->second = persistingActions;
+                } else {
+                    globalTracer.frameToActions.erase(it);
+                }
             }
         }
     }
@@ -88,7 +102,7 @@ int PyTemporaryReferenceTracer::globalTraceFun(PyObject* dummyObj, PyFrameObject
         );
     }
 
-    if (globalTracer.frameToHandles.size() == 0) {
+    if (globalTracer.frameToActions.size() == 0) {
         // uninstall ourself
         PyEval_SetTrace(globalTracer.priorTraceFunc, globalTracer.priorTraceFuncArg);
         decref(globalTracer.priorTraceFuncArg);
@@ -115,7 +129,13 @@ void PyTemporaryReferenceTracer::installGlobalTraceHandlerIfNecessary() {
 
 void PyTemporaryReferenceTracer::traceObject(PyObject* o, PyFrameObject* f) {
     // mark that we're going to trace
-    globalTracer.frameToHandles[f].push_back(std::make_pair(incref(o), TraceAction::ConvertTemporaryReference));
+    globalTracer.frameToActions[f].push_back(
+        FrameAction(
+            incref(o),
+            TraceAction::ConvertTemporaryReference,
+            PyFrame_GetLineNumber(f)
+        )
+    );
 
     if (globalTracer.mostRecentEmptyFrame == f) {
         globalTracer.mostRecentEmptyFrame = nullptr;
@@ -126,7 +146,13 @@ void PyTemporaryReferenceTracer::traceObject(PyObject* o, PyFrameObject* f) {
 
 void PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(PyObject* o, PyFrameObject* f) {
     // mark that we're going to trace
-    globalTracer.frameToHandles[f].push_back(std::make_pair(incref(o), TraceAction::Decref));
+    globalTracer.frameToActions[f].push_back(
+        FrameAction(
+            incref(o),
+            TraceAction::Decref,
+            PyFrame_GetLineNumber(f)
+        )
+    );
 
     if (globalTracer.mostRecentEmptyFrame == f) {
         globalTracer.mostRecentEmptyFrame = nullptr;

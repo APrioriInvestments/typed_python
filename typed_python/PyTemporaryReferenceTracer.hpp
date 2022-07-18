@@ -32,7 +32,24 @@ public:
         priorTraceFuncArg(nullptr)
     {}
 
-    std::unordered_map<PyFrameObject*, std::vector<std::pair<PyObject*, TraceAction> > > frameToHandles;
+    // perform an action on the first instruction where a
+    // frame goes out of scope or where it is no longer on the
+    // given line number
+    class FrameAction {
+    public:
+        FrameAction(PyObject* inO, TraceAction inA, int inLine) :
+            obj(inO),
+            action(inA),
+            lineNumber(inLine)
+        {
+        }
+
+        PyObject* obj;
+        TraceAction action;
+        int lineNumber;
+    };
+
+    std::unordered_map<PyFrameObject*, std::vector<FrameAction> > frameToActions;
 
     std::unordered_map<PyObject*, std::set<int> > codeObjectToExpressionLines;
 

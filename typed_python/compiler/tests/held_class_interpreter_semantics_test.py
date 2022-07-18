@@ -50,12 +50,20 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
     def test_construct_and_call_method_multiline(self):
         def runTest():
+            res = H(x=10, y=20).addToX(
+                # this is deliberately on another line
+                10
+            )
+            return res
+
+        def runTest2():
             return H(x=10, y=20).addToX(
                 # this is deliberately on another line
                 10
             )
 
         assert runTest() == 20
+        assert runTest2() == 20
 
     def test_can_assign_to_held_class_in_list(self):
         def runTest():

@@ -3204,6 +3204,12 @@ PyObject *getTypePointer(PyObject* nullValue, PyObject* args) {
 
     return PyLong_FromLong((uint64_t)type);
 }
+PyObject* _temporaryReferenceTracerActive(PyObject* null, PyObject* args, PyObject* kwargs) {
+    return incref(
+        PyTemporaryReferenceTracer::globalTracer.frameToActions.size() ?
+        Py_True : Py_False
+    );
+}
 
 PyObject* gilReleaseThreadLoop(PyObject* null, PyObject* args, PyObject* kwargs) {
     PyEnsureGilReleased releaseTheGil;
@@ -3283,6 +3289,7 @@ static PyMethodDef module_methods[] = {
     {"couldConvertObjectToTypeAtLevel", (PyCFunction)couldConvertObjectToTypeAtLevel, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isValidArithmeticUpcast", (PyCFunction)isValidArithmeticUpcast, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isValidArithmeticConversion", (PyCFunction)isValidArithmeticConversion, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"_temporaryReferenceTracerActive", (PyCFunction)_temporaryReferenceTracerActive, METH_VARARGS | METH_KEYWORDS, NULL},
     {"gilReleaseThreadLoop", (PyCFunction)gilReleaseThreadLoop, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setModuleDict", (PyCFunction)setModuleDict, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}

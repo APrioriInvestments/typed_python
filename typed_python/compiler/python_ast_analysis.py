@@ -200,6 +200,33 @@ def computeVariablesReadByClosures(astNode, isInsideClassDef=False):
     return closureVars
 
 
+def extractLineNumbersWithStatements(astNode):
+    res = set()
+
+    def visit(x):
+        if isinstance(x, Statement):
+            if x.matches.FunctionDef or x.matches.ClassDef or x.matches.AsyncFunctionDef:
+                return False
+
+            res.add(x.line_number)
+
+        if isinstance(x, Expr):
+            if (
+                x.matches.Lambda
+                or x.matches.ListComp
+                or x.matches.SetComp
+                or x.matches.DictComp
+                or x.matches.GeneratorExp
+            ):
+                return False
+
+        return True
+
+    visitPyAstChildren(astNode, visit)
+
+    return res
+
+
 def extractFunctionDefsInOrder(astNode):
     res = []
 

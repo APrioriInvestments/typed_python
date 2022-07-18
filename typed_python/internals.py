@@ -627,6 +627,7 @@ def Held(T):
 def extractCodeObjectNewStatementLineNumbers(codeObject):
     """Return the subset of the line numbers on which codeObject has new statements."""
     from typed_python.python_ast import convertFunctionToAlgebraicPyAst
+    from typed_python.compiler.python_ast_analysis import extractLineNumbersWithStatements
 
     try:
         ast = convertFunctionToAlgebraicPyAst(codeObject)
@@ -634,8 +635,7 @@ def extractCodeObjectNewStatementLineNumbers(codeObject):
         res = set()
 
         if ast.matches.FunctionDef:
-            for statement in ast.body:
-                res.add(statement.line_number)
+            res = extractLineNumbersWithStatements(ast.body)
 
         return res
     except Exception:

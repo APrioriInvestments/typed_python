@@ -786,7 +786,7 @@ Arguments = Arguments.define(Alternative(
         "args": TupleOf(Arg),
         "vararg": OneOf(Arg, None),
         "kwonlyargs": TupleOf(Arg),
-        "kw_defaults": TupleOf(Expr),
+        "kw_defaults": TupleOf(OneOf(None, Expr)),
         "kwarg": OneOf(Arg, None),
         "defaults": TupleOf(Expr),
     },

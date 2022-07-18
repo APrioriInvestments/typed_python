@@ -1,6 +1,7 @@
 import unittest
 import time
-
+import sys
+from typed_python import _types
 from typed_python import Class, Final, ListOf, Held, Member, Entrypoint, Forward
 
 
@@ -88,6 +89,8 @@ class TestHeldClassCompilation(unittest.TestCase):
         self.checkCompiler(lambda c: c.h1.typeOfSelf(), c)
 
     def test_compile_list_of_held_class(self):
+        assert not _types._temporaryReferenceTracerActive()
+
         class H(Class, Final):
             x = Member(int, nonempty=True)
             y = Member(float, nonempty=True)
@@ -123,6 +126,14 @@ class TestHeldClassCompilation(unittest.TestCase):
 
         incrementAllRange(aList)
 
+        def testIt(x):
+            assert _types._temporaryReferenceTracerActive()
+            return x
+
+        testIt(aList[0].increment)
+
+        assert not _types._temporaryReferenceTracerActive()
+
         self.assertEqual(getitem(aList, 0).x, 1)
         self.assertEqual(getitem(aList, 5).x, 1)
 
@@ -137,6 +148,8 @@ class TestHeldClassCompilation(unittest.TestCase):
                 i.increment()
 
         incrementViaIterator(aList)
+
+        assert not _types._temporaryReferenceTracerActive()
 
         self.assertEqual(getitem(aList, 0).x, 2)
         self.assertEqual(getitem(aList, 5).x, 2)
