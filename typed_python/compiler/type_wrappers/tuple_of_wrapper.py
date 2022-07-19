@@ -27,7 +27,7 @@ from typed_python.compiler.typed_expression import TypedExpression
 
 from typed_python import Int32, TupleOf, ListOf, Tuple, NamedTuple, Class, Final, Member, pointerTo, PointerTo
 
-from typed_python.compiler.type_wrappers.util import min
+from typed_python.compiler.type_wrappers.util import min, max
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -108,14 +108,6 @@ def tuple_of_hash(instance):
     instance._hash_cache = val
 
     return val
-
-
-def min(a, b):
-    return a if a < b else b
-
-
-def max(a, b):
-    return b if a < b else a
 
 
 class PreReservedTupleOrList(CompilableBuiltin):

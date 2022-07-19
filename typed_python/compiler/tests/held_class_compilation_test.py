@@ -1,6 +1,5 @@
 import unittest
 import time
-import sys
 from typed_python import _types
 from typed_python import Class, Final, ListOf, Held, Member, Entrypoint, Forward
 

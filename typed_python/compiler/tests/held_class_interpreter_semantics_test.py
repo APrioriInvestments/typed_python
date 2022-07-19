@@ -158,7 +158,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
             def g(l):
                 return pointerTo(l[0])
 
-            aList = ListOf(H)([H(x=10,y=20)])
+            aList = ListOf(H)([H(x=10, y=20)])
 
             f(aList)[0].x = 20
 

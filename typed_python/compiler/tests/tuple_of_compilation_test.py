@@ -256,4 +256,3 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         assert addIt((1, 2), 3) == (3, 1, 2)
         assert addItLst((1, 2), 3) == (3, 1, 2)
-
