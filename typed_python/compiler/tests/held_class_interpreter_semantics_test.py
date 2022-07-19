@@ -166,6 +166,15 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         runTest()
 
+    def testPassHeldClassToTypedArg(self):
+        @Function
+        def f(h: H):
+            h.x = 100
+
+        h = H()
+        f(h)
+        assert h.x == 100
+
     def testCallBoundMethodOnLeakedTemporaryCrashes(self):
         with self.assertRaisesRegex(Exception, "would have crashed"):
             def runTest():

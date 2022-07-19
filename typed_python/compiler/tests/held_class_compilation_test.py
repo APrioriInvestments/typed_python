@@ -16,6 +16,11 @@ class H(Class, Final):
         self.x += 1
         self.y += 1
 
+    @Entrypoint
+    def entrypointedIncrement(self):
+        self.x += 1
+        self.y += 1
+
 
 Complex = Forward("Complex")
 
@@ -49,6 +54,37 @@ class TestHeldClassCompilation(unittest.TestCase):
         compiledOutput = Entrypoint(f)(*args, **kwargs)
 
         self.assertEqual(compiledOutput, interpretedOutput)
+
+    def test_held_class_entrypointed_methods(self):
+        h1 = H()
+        h2 = H()
+
+        h1.entrypointedIncrement()
+        h2.increment()
+
+        assert h1.x == h2.x
+
+    def test_pass_held_to_function_with_signature(self):
+        @Entrypoint
+        def f(h: H):
+            h.x = 100
+
+        @Entrypoint
+        def g():
+            h = H()
+            f(h)
+            return h
+
+        assert g().x == 100
+
+    def test_pass_held_by_ref_across_entrypoint(self):
+        @Entrypoint
+        def g(h):
+            h.x = 100
+
+        h = H()
+        g(h)
+        assert h.x == 100
 
     def test_compile_held_class(self):
         @Held

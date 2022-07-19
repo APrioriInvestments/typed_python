@@ -92,6 +92,10 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
     def _can_convert_from_type(self, otherType, explicit):
         return False
 
+    def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        print("Converting held class ", self, " to ", targetVal)
+        return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
+
     def bytesOfInitBitsForInstance(self, instance):
         return native_ast.const_uint64_expr(self.bytesOfInitBits)
 

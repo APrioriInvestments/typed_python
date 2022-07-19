@@ -47,6 +47,12 @@ public:
 
     void coerceToType(py_obj_ptr& ptr, Type* target, ConversionLevel level) {
         try {
+            Type* actualType = PyInstance::extractTypeFrom(ptr->ob_type);
+            if (actualType == target) {
+                // nothing to do!
+                return;
+            }
+
             PyObject* coerced = PyInstance::initializePythonRepresentation(
                 target,
                 [&](instance_ptr data) {
@@ -328,6 +334,17 @@ public:
     std::pair<Instance, bool> extractArgWithType(int argIx, Type* argType) const {
         if (mArgs[argIx].getIsNormalArg()) {
             try {
+                Type* actualType = PyInstance::extractTypeFrom(mSingleValueArgs[argIx]->ob_type);
+                if (actualType == argType) {
+                    // nothing to do!
+                    PyInstance* argAsPyInstance = ((PyInstance*)mSingleValueArgs[argIx]);
+
+                    return std::make_pair(
+                        argAsPyInstance->mContainingInstance,
+                        true
+                    );
+                }
+
                 return std::make_pair(
                     Instance::createAndInitialize(argType, [&](instance_ptr p) {
                         PyInstance::copyConstructFromPythonInstance(
