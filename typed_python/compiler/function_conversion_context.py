@@ -51,7 +51,8 @@ CONTROL_FLOW_BREAK = 2
 CONTROL_FLOW_CONTINUE = 3
 CONTROL_FLOW_RETURN = 4
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+def typeWrapper(t): return typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
 # storage for mutually recursive function types

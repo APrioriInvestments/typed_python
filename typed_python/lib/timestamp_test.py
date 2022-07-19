@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typed_python import ListOf
 import pytz
 
-
 class TestTimestamp(unittest.TestCase):
     def test_date_no_offset(self):
         unixtime = time.time()
