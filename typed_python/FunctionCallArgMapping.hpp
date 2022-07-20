@@ -31,6 +31,50 @@ class FunctionCallArgMapping {
     FunctionCallArgMapping& operator=(const FunctionCallArgMapping&) = delete;
 
 public:
+    class FunctionArg {
+    public:
+        FunctionArg() :
+            mInstance(),
+            mValid(false),
+            mRawPtr(nullptr)
+        {
+        }
+
+        FunctionArg(instance_ptr inData) :
+            mInstance(),
+            mValid(true),
+            mRawPtr(inData)
+        {
+        }
+
+        FunctionArg(Instance i) :
+            mInstance(i),
+            mValid(true),
+            mRawPtr(nullptr)
+        {
+        }
+
+        bool isValid() const {
+            return mValid;
+        }
+
+        instance_ptr dataPtr() const {
+            if (mRawPtr) {
+                return mRawPtr;
+            }
+
+            return mInstance.data();
+        }
+
+    private:
+        bool mValid;
+
+        Instance mInstance;
+
+        instance_ptr mRawPtr;
+    };
+
+
     FunctionCallArgMapping(const Function::Overload& overload) :
             mArgs(overload.getArgs()),
             mCurrentArgumentIx(0),
@@ -331,7 +375,7 @@ public:
         return res;
     }
 
-    std::pair<Instance, bool> extractArgWithType(int argIx, Type* argType) const {
+    FunctionArg extractArgWithType(int argIx, Type* argType) const {
         if (mArgs[argIx].getIsNormalArg()) {
             try {
                 Type* actualType = PyInstance::extractTypeFrom(mSingleValueArgs[argIx]->ob_type);
@@ -339,28 +383,30 @@ public:
                     // nothing to do!
                     PyInstance* argAsPyInstance = ((PyInstance*)mSingleValueArgs[argIx]);
 
-                    return std::make_pair(
-                        argAsPyInstance->mContainingInstance,
-                        true
+                    if (argAsPyInstance->mTemporaryRefTo) {
+                        return FunctionArg(argAsPyInstance->mTemporaryRefTo);
+                    }
+
+                    return FunctionArg(
+                        argAsPyInstance->mContainingInstance
                     );
                 }
 
-                return std::make_pair(
+                return FunctionArg(
                     Instance::createAndInitialize(argType, [&](instance_ptr p) {
                         PyInstance::copyConstructFromPythonInstance(
                             argType, p, mSingleValueArgs[argIx], ConversionLevel::Signature
                         );
-                    }),
-                    true
+                    })
                 );
             } catch(PythonExceptionSet& s) {
                 // failed to convert, but keep going
                 PyErr_Clear();
-                return std::pair<Instance, bool>(Instance(), false);
+                return FunctionArg();
             }
             catch(...) {
                 // not a valid conversion
-                return std::pair<Instance, bool>(Instance(), false);
+                return FunctionArg();
             }
         } else if (mArgs[argIx].getIsStarArg()) {
             if (argType->getTypeCategory() != Type::TypeCategory::catTuple) {
@@ -370,11 +416,11 @@ public:
             Tuple* tup = (Tuple*)argType;
 
             if (mStarArgValues.size() != tup->getTypes().size()) {
-                return std::pair<Instance, bool>(Instance(), false);
+                return FunctionArg();
             }
 
             try {
-                return std::make_pair(
+                return FunctionArg(
                     Instance::createAndInitialize(tup, [&](instance_ptr p) {
                         tup->constructor(p, [&](instance_ptr subElt, int tupArg) {
                             PyInstance::copyConstructFromPythonInstance(
@@ -382,17 +428,16 @@ public:
                                 ConversionLevel::Signature
                             );
                         });
-                    }),
-                    true
+                    })
                 );
             } catch(PythonExceptionSet& s) {
                 // failed to convert, but keep going
                 PyErr_Clear();
-                return std::pair<Instance, bool>(Instance(), false);
+                return FunctionArg();
             }
             catch(...) {
                 // not a valid conversion
-                return std::pair<Instance, bool>(Instance(), false);
+                return FunctionArg();
             }
         } else if (mArgs[argIx].getIsKwarg()) {
             if (argType->getTypeCategory() != Type::TypeCategory::catNamedTuple) {
@@ -402,17 +447,17 @@ public:
             NamedTuple* tup = (NamedTuple*)argType;
 
             if (mKwargValues.size() != tup->getTypes().size()) {
-                return std::pair<Instance, bool>(Instance(), false);
+                return FunctionArg();
             }
 
             for (long k = 0; k < mKwargValues.size(); k++) {
                 if (mKwargValues[k].first != tup->getNames()[k]) {
-                    return std::pair<Instance, bool>(Instance(), false);
+                    return FunctionArg();
                 }
             }
 
             try {
-                return std::make_pair(
+                return FunctionArg(
                     Instance::createAndInitialize(tup, [&](instance_ptr p) {
                         tup->constructor(p, [&](instance_ptr subElt, int tupArg) {
                             PyInstance::copyConstructFromPythonInstance(
@@ -422,17 +467,16 @@ public:
                                 ConversionLevel::Signature
                             );
                         });
-                    }),
-                    true
+                    })
                 );
             } catch(PythonExceptionSet& s) {
                 // failed to convert, but keep going
                 PyErr_Clear();
-                return std::pair<Instance, bool>(Instance(), false);
+                return FunctionArg();
             }
             catch(...) {
                 // not a valid conversion
-                return std::pair<Instance, bool>(Instance(), false);
+                return FunctionArg();
             }
         }
 

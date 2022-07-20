@@ -1,13 +1,13 @@
 import unittest
 import time
 from typed_python import _types
-from typed_python import Class, Final, ListOf, Held, Member, Entrypoint, Forward
+from typed_python import Class, Final, ListOf, Held, Member, Entrypoint, Forward, pointerTo
 
 
 @Held
 class H(Class, Final):
-    x = Member(int)
-    y = Member(float)
+    x = Member(int, nonempty=True)
+    y = Member(float, nonempty=True)
 
     def f(self):
         return self.x + self.y
@@ -20,6 +20,14 @@ class H(Class, Final):
     def entrypointedIncrement(self):
         self.x += 1
         self.y += 1
+
+    @Entrypoint
+    def getX(self):
+        return self.x
+
+    @Entrypoint
+    def pointerToSelf(self):
+        return pointerTo(self)
 
 
 Complex = Forward("Complex")
@@ -55,14 +63,43 @@ class TestHeldClassCompilation(unittest.TestCase):
 
         self.assertEqual(compiledOutput, interpretedOutput)
 
+    def test_held_class_pointer_to_self(self):
+        @Entrypoint
+        def callPointerTo(h):
+            return pointerTo(h)
+
+        h = H(x=2, y=3)
+
+        assert callPointerTo(h) == pointerTo(h)
+        assert h.pointerToSelf() == pointerTo(h)
+
     def test_held_class_entrypointed_methods(self):
-        h1 = H()
-        h2 = H()
+        h1 = H(x=2, y=3)
+        h2 = H(x=2, y=3)
 
         h1.entrypointedIncrement()
         h2.increment()
 
         assert h1.x == h2.x
+        assert h1.getX() == h1.x
+
+    def test_stringify_held_class(self):
+        h = H(x=2, y=3)
+
+        @Entrypoint
+        def callStr(h):
+            return str(h)
+
+        assert str(h) == callStr(h)
+
+    def test_pointer_to_held_class_compiles(self):
+        h = H(x=2, y=3)
+
+        @Entrypoint
+        def getPtr(h):
+            return pointerTo(h)
+
+        assert pointerTo(h) == getPtr(h)
 
     def test_pass_held_to_function_with_signature(self):
         @Entrypoint

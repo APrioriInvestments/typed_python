@@ -20,7 +20,7 @@ from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin impo
     ClassOrAlternativeWrapperMixin
 )
 
-from typed_python import _types, RefTo
+from typed_python import _types, RefTo, PointerTo
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -40,6 +40,7 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
         self.heldClassType = t
         self.classType = t.Class
         self.refToType = RefTo(t)
+        self.ptrToType = PointerTo(t)
 
         self.classTypeWrapper = typeWrapper(t.Class)
         self.nameToIndex = self.classTypeWrapper.nameToIndex
@@ -57,6 +58,10 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
             element_type=native_ast.UInt8,
             count=_types.bytecount(self.heldClassType)
         )
+
+    def convert_pointerTo(self, context, instance):
+        assert instance.isReference
+        return instance.changeType(self.ptrToType, isReferenceOverride=False)
 
     def fieldGuaranteedInitialized(self, ix):
         if self.classType.ClassMembers[
@@ -87,13 +92,12 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
         return super().convert_attribute(context, pointerInstance, attribute)
 
     def _can_convert_to_type(self, otherType, explicit):
-        return False
+        return super()._can_convert_to_type(otherType, explicit)
 
     def _can_convert_from_type(self, otherType, explicit):
-        return False
+        return super()._can_convert_from_type(otherType, explicit)
 
     def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
-        print("Converting held class ", self, " to ", targetVal)
         return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
     def bytesOfInitBitsForInstance(self, instance):

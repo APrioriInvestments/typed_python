@@ -366,6 +366,19 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(callRepr(ClassWithReprAndStr()), "repr")
         self.assertEqual(callStr(ClassWithReprAndStr()), "str")
 
+    def test_class_str_without_override(self):
+        class NoStr(Class):
+            x = Member(int)
+            y = Member(float)
+
+        @Entrypoint
+        def callStr(x):
+            return str(x)
+
+        n = NoStr()
+
+        assert str(n) == callStr(n)
+
     def test_compiled_class_subclass_layout(self):
         class BaseClass(Class):
             x = Member(int)

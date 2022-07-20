@@ -514,7 +514,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
         throw std::runtime_error("Malformed function specialization: missing a return type.");
     }
 
-    std::vector<Instance> instances;
+    std::vector<FunctionCallArgMapping::FunctionArg> mappingArgs;
 
     // first, see if we can short-circuit
     for (long k = 0; k < overload.getArgs().size(); k++) {
@@ -532,10 +532,10 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
         auto arg = overload.getArgs()[k];
         Type* argType = specialization.getArgTypes()[k];
 
-        std::pair<Instance, bool> res = mapper.extractArgWithType(k, argType);
+        FunctionCallArgMapping::FunctionArg res = mapper.extractArgWithType(k, argType);
 
-        if (res.second) {
-            instances.push_back(res.first);
+        if (res.isValid()) {
+            mappingArgs.push_back(res);
         } else {
             return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
         }
@@ -552,8 +552,8 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
             args.push_back(closureCells.back().data());
         }
 
-        for (auto& i: instances) {
-            args.push_back(i.data());
+        for (auto& i: mappingArgs) {
+            args.push_back(i.dataPtr());
         }
 
         auto functionPtr = specialization.getFuncPtr();
