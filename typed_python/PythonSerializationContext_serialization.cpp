@@ -284,7 +284,7 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
 void PythonSerializationContext::serializePythonObjectRepresentation(PyObject* representation, SerializationBuffer& b, size_t fieldNumber) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    if (!PyTuple_Check(representation) || PyTuple_Size(representation) < 2 
+    if (!PyTuple_Check(representation) || PyTuple_Size(representation) < 2
             || PyTuple_Size(representation) > 6) {
         throw std::runtime_error("representationFor should return None or a tuple with 2 to 6 things");
     }
@@ -492,7 +492,7 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                     }
 
                     if (representation != Py_None) {
-                        if (!PyTuple_Check(representation) || PyTuple_Size(representation) < 2 
+                        if (!PyTuple_Check(representation) || PyTuple_Size(representation) < 2
                                 || PyTuple_Size(representation) > 6) {
                             throw std::runtime_error("representationFor should return None or a tuple with 2 to 6 things");
                         }
@@ -630,13 +630,15 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
             // then HeldClass objects, ordered with all bases before
             // their children (so that when we deserialize, any base classes
             // are no longer forwards)
-            std::map<HeldClass*, int> heldClasses;
+            std::map<HeldClass*, std::set<int> > heldClasses;
             for (auto& indexAndObj: group->getIndexToObject()) {
                 if (
                     indexAndObj.second.typeOrPyobjAsType() &&
                     indexAndObj.second.typeOrPyobjAsType()->isHeldClass()
                 ) {
-                    heldClasses[(HeldClass*)indexAndObj.second.typeOrPyobjAsType()] = indexAndObj.first;
+                    heldClasses[(HeldClass*)indexAndObj.second.typeOrPyobjAsType()].insert(
+                        indexAndObj.first
+                    );
                 }
             }
 
@@ -657,7 +659,9 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                 }
 
                 // now we can write this object.
-                writeObjectBody(heldClasses[cls], cls);
+                for (auto index: heldClasses[cls]) {
+                    writeObjectBody(index, cls);
+                }
             };
 
             for (auto classAndIndex: heldClasses) {

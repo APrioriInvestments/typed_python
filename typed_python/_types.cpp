@@ -2770,9 +2770,9 @@ PyObject *recursiveTypeGroupHash(PyObject* nullValue, PyObject* args) {
     });
 }
 
-PyObject *recursiveTypeGroupDeepRepr(PyObject* nullValue, PyObject* args) {
+PyObject *recursiveTypeGroupReprDeepFlag(PyObject* nullValue, PyObject* args, bool deep) {
     if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "recursiveTypeGroupDeepRepr takes 1 positional argument");
+        PyErr_SetString(PyExc_TypeError, "recursiveTypeGroupRepr takes 1 positional argument");
         return NULL;
     }
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
@@ -2795,9 +2795,19 @@ PyObject *recursiveTypeGroupDeepRepr(PyObject* nullValue, PyObject* args) {
             return incref(Py_None);
         }
 
-        return PyUnicode_FromString(group->repr(true).c_str());
+        return PyUnicode_FromString(group->repr(deep).c_str());
     });
 }
+
+PyObject *recursiveTypeGroupRepr(PyObject* nullValue, PyObject* args) {
+    return recursiveTypeGroupReprDeepFlag(nullValue, args, false);
+}
+
+
+PyObject *recursiveTypeGroupDeepRepr(PyObject* nullValue, PyObject* args) {
+    return recursiveTypeGroupReprDeepFlag(nullValue, args, true);
+}
+
 
 PyObject *recursiveTypeGroup(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
@@ -3247,6 +3257,7 @@ static PyMethodDef module_methods[] = {
     {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
     {"allForwardTypesResolved", (PyCFunction)allForwardTypesResolved, METH_VARARGS, NULL},
     {"recursiveTypeGroup", (PyCFunction)recursiveTypeGroup, METH_VARARGS, NULL},
+    {"recursiveTypeGroupRepr", (PyCFunction)recursiveTypeGroupRepr, METH_VARARGS, NULL},
     {"recursiveTypeGroupDeepRepr", (PyCFunction)recursiveTypeGroupDeepRepr, METH_VARARGS, NULL},
     {"recursiveTypeGroupHash", (PyCFunction)recursiveTypeGroupHash, METH_VARARGS, NULL},
     {"typesAndObjectsVisibleToCompilerFrom", (PyCFunction)typesAndObjectsVisibleToCompilerFrom, METH_VARARGS, NULL},

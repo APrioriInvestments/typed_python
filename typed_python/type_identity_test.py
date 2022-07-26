@@ -63,6 +63,19 @@ def returnSerializedValue(filesToWrite, expression, printComments=False):
     )
 
 
+def test_class_and_held_class_in_group():
+    class C(Class):
+        pass
+
+    H = C.HeldClass
+
+    assert H in recursiveTypeGroup(H)
+    assert C in recursiveTypeGroup(H)
+
+    assert H in recursiveTypeGroup(C)
+    assert C in recursiveTypeGroup(C)
+
+
 def test_identity_of_register_types():
     assert isinstance(identityHash(UInt64), bytes)
     assert len(identityHash(UInt64)) == 20

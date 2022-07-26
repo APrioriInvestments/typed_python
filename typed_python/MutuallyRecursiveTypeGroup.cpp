@@ -181,11 +181,26 @@ void visitCompilerVisibleTypesAndPyobjects(
     };
 
     if (obj.type()) {
+        Type* objType = obj.type();
+
         hashVisit(ShaHash(1));
 
-        obj.type()->visitReferencedTypes(visit);
-        obj.type()->visitCompilerVisiblePythonObjects(visit);
-        obj.type()->visitCompilerVisibleInstances([&](Instance i) {
+        objType->visitReferencedTypes(visit);
+
+        // ensure that held and non-held versions of Class are
+        // always visible to each other.
+        if (objType->isHeldClass()) {
+            Type* t = ((HeldClass*)objType)->getClassType();
+            visit(t);
+        }
+
+        if (objType->isClass()) {
+            Type* t = ((Class*)objType)->getHeldClass();
+            visit(t);
+        }
+
+        objType->visitCompilerVisiblePythonObjects(visit);
+        objType->visitCompilerVisibleInstances([&](Instance i) {
             visit(i.type());
 
             if (i.type()->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {

@@ -2691,6 +2691,39 @@ class TypesSerializationTest(unittest.TestCase):
         assert C.anF() is C
         assert C.anF.overloads[0].methodOf.Class is C
 
+    def test_held_class_serialized_externally(self):
+        def makeC():
+            with tempfile.TemporaryDirectory() as tempdir:
+                path = os.path.join(tempdir, "asdf.py")
+
+                CONTENTS = (
+                    "from typed_python import Entrypoint, ListOf, Class, Held, Final\n"
+                    "@Held\n"
+                    "class C(Class, Final):\n"
+                    "    @staticmethod\n"
+                    "    def make():\n"
+                    "        return C()\n"
+                )
+
+                with open(path, "w") as f:
+                    f.write(CONTENTS)
+
+                globals = {'__file__': path}
+
+                exec(
+                    compile(CONTENTS, path, "exec"),
+                    globals
+                )
+
+                s = SerializationContext()
+                return s.serialize(globals['C'])
+
+        serializedC = callFunctionInFreshProcess(makeC, ())
+
+        C = SerializationContext().deserialize(serializedC)
+
+        assert type(C.make()) is C
+
     def test_serialization_independent_of_whether_function_is_hashed(self):
         s = SerializationContext().withoutLineInfoEncoded().withoutCompression()
 

@@ -202,7 +202,6 @@ void PyInstance::copyConstructFromPythonInstanceConcrete(Type* eltType, instance
         aNewName = typeName;
     }
 
-    std::string verb;
     if (level == ConversionLevel::Signature) {
         throw std::logic_error("Object of type " + std::string(pyRepresentation->ob_type->tp_name) + " is not " + typeName);
     }
