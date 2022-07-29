@@ -87,6 +87,42 @@ bool HeldClass::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, b
 }
 
 void HeldClass::repr(instance_ptr self, ReprAccumulator& stream, bool isStr, bool isClassNotHeldClass) {
+    auto it = getMemberFunctions().find(isStr ? "__str__" : "__repr__");
+
+    if (it != getMemberFunctions().end()) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObjectStealer selfAsPyObj(PyInstance::extractPythonObject(self, this));
+
+        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
+            it->second,
+            nullptr,
+            selfAsPyObj
+        );
+
+        if (res.first) {
+            if (!res.second) {
+                throw PythonExceptionSet();
+            }
+            if (!PyUnicode_Check(res.second)) {
+                decref(res.second);
+                throw std::runtime_error(
+                    stream.isStrCall() ? "__str__ returned a non-string" : "__repr__ returned a non-string"
+                    );
+            }
+
+            stream << PyUnicode_AsUTF8(res.second);
+            decref(res.second);
+
+            return;
+        }
+
+        throw std::runtime_error(
+            stream.isStrCall() ? "Found a __str__ method but failed to call it with 'self'"
+                : "Found a __repr__ method but failed to call it with 'self'"
+            );
+    }
+
     PushReprState isNew(stream, self);
 
     std::string name = isClassNotHeldClass ? getClassType()->name() : m_name;

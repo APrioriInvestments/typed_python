@@ -29,6 +29,12 @@ class H(Class, Final):
     def pointerToSelf(self):
         return pointerTo(self)
 
+    def __repr__(self):
+        return "ReprForH"
+
+    def __str__(self):
+        return "StrForH"
+
 
 Complex = Forward("Complex")
 
@@ -72,6 +78,14 @@ class TestHeldClassCompilation(unittest.TestCase):
 
         assert callPointerTo(h) == pointerTo(h)
         assert h.pointerToSelf() == pointerTo(h)
+
+    def test_held_class_repr(self):
+        assert repr(H()) == "ReprForH"
+        self.checkCompiler(lambda x: repr(x), H())
+
+    def test_held_class_str(self):
+        assert str(H()) == "StrForH"
+        self.checkCompiler(lambda x: str(x), H())
 
     def test_held_class_entrypointed_methods(self):
         h1 = H(x=2, y=3)

@@ -157,7 +157,6 @@ void Class::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
             );
     }
 
-
     layout& l = *instanceToLayout(self);
     m_heldClass->repr(l.data, stream, isStr, true /* isClassNotHeldClass */);
 }

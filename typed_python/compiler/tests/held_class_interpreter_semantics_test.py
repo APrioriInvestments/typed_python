@@ -25,6 +25,14 @@ class H(Class, Final):
 
 
 class TestHeldClassInterpreterSemantics(unittest.TestCase):
+    def test_held_class_str(self):
+        @Held
+        class H(Class):
+            def __str__(self):
+                return "HI"
+
+        assert str(H()) == "HI"
+
     def test_can_return_held_class_from_typed_function(self):
         @Function
         def f(x, y) -> H:
