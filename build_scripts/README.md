@@ -10,8 +10,6 @@ Using [Manylinux](https://github.com/pypa/manylinux) we can make typed_python mo
 This process should create a `./wheels` directory under the typed_python repo root with
 4 wheels for python 3.7-3.10 built for linux x86_64.
 
-To build arm64 wheels, just do `run_build.sh aarch64`.
-
 ## Release to pypi
 
 1. pip install twine
