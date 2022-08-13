@@ -18,7 +18,7 @@
 
 bool isCanonicalName(std::string name) {
     // this is the list of standard library modules in python 3.8
-    static std::set<string> canonicalPythonModuleNames({
+    static std::set<std::string> canonicalPythonModuleNames({
         "abc", "aifc", "antigravity", "argparse", "ast", "asynchat", "asyncio", "asyncore",
         "base64", "bdb", "binhex", "bisect", "_bootlocale", "bz2", "calendar", "cgi", "cgitb",
         "chunk", "cmd", "codecs", "codeop", "code", "collections", "_collections_abc",
@@ -71,7 +71,7 @@ bool isCanonicalName(std::string name) {
 // is this a special name in a dict, module, or class that we shouldn't hash?
 // we do want to hash methods like __init__
 bool isSpecialIgnorableName(const std::string& name) {
-    static std::set<string> canonicalMagicMethods({
+    static std::set<std::string> canonicalMagicMethods({
         "__abs__", "__add__", "__and__", "__bool__",
         "__bytes__", "__call__", "__contains__", "__del__",
         "__delattr__", "__eq__", "__float__", "__floordiv__",

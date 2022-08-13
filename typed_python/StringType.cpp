@@ -17,7 +17,6 @@
 #include "AllTypes.hpp"
 #include  <iostream>
 #include "UnicodeProps.hpp"
-using namespace std;
 
 StringType::layout* StringType::upgradeCodePoints(layout* lhs, int32_t newBytesPerCodepoint) {
     if (!lhs) {
