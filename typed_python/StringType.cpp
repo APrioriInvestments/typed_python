@@ -1444,13 +1444,13 @@ char StringType::cmpStatic(layout* left, layout* right) {
 }
 
 char StringType::cmpStatic(layout* left, uint8_t* right_data, int right_pointcount, int right_bytes_per_codepoint) {
-    if ( !left && !right ) {
+    if ( !left && !right_data ) {
         return 0;
     }
-    if ( !left && right ) {
+    if ( !left && right_data ) {
         return -1;
     }
-    if ( left && !right ) {
+    if ( left && !right_data ) {
         return 1;
     }
 
