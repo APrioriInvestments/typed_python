@@ -27,6 +27,7 @@ PyDoc_STRVAR(ConstDictType_doc,
     );
 
 class ConstDictType : public Type {
+public:
     class layout {
     public:
         std::atomic<int64_t> refcount;
@@ -38,8 +39,6 @@ class ConstDictType : public Type {
     };
 
     typedef layout* layout_ptr;
-
-public:
 
     ConstDictType(Type* key, Type* value) :
             Type(TypeCategory::catConstDict),
