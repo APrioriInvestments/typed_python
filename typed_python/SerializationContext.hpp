@@ -35,4 +35,5 @@ public:
     virtual Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType) const = 0;
 
     virtual bool isCompressionEnabled() const = 0;
+    virtual bool isLineInfoSuppressed() const = 0;
 };

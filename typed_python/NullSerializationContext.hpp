@@ -40,4 +40,7 @@ public:
     virtual bool isCompressionEnabled() const {
         return false;
     }
+    virtual bool isLineInfoSuppressed() const {
+        return false;
+    }
 };

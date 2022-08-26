@@ -46,6 +46,14 @@ void PythonSerializationContext::setFlags() {
     }
 
     mSerializeHashSequence = ((PyObject*)serializeHashSequence) == Py_True;
+
+    PyObjectStealer encodeLineInformationForCode(PyObject_GetAttrString(mContextObj, "encodeLineInformationForCode"));
+
+    if (!encodeLineInformationForCode) {
+        throw PythonExceptionSet();
+    }
+
+    mSuppressLineInfo = ((PyObject*)encodeLineInformationForCode) == Py_False;
 }
 
 std::string PythonSerializationContext::getNameForPyObj(PyObject* o) const {

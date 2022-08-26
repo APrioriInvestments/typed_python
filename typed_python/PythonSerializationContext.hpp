@@ -93,6 +93,10 @@ public:
     bool isCompressionEnabled() const {
         return mCompressionEnabled;
     }
+    
+    bool isLineInfoSuppressed() const {
+        return mSuppressLineInfo;
+    }
 
     // should we serialize an integer in the order of the
     // hash sequence rather than the hash itself?
@@ -184,6 +188,8 @@ private:
     PyObject* mContextObj;
 
     bool mCompressionEnabled;
+
+    bool mSuppressLineInfo;
 
     bool mInternalizeTypeGroups;
 

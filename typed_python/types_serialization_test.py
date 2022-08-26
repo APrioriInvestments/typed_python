@@ -45,12 +45,12 @@ from typed_python import (
     Dict, Set, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject,
     Forward, Final, Function, Entrypoint, TypeFunction, PointerTo,
-    SubclassOf
+    SubclassOf, NotCompiled
 )
 
 from typed_python._types import (
     refcount, isRecursive, identityHash, buildPyFunctionObject,
-    setFunctionClosure, typesAreEquivalent, recursiveTypeGroupDeepRepr
+    setFunctionClosure, typesAreEquivalent, recursiveTypeGroupDeepRepr,
 )
 
 module_level_testfun = dummy_test_module.testfunction
@@ -2735,6 +2735,61 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert s1 == s2
 
+    def test_serialization_has_no_filename_reference(self):
+        def makeF(modulename):
+            with tempfile.TemporaryDirectory() as tempdir:
+                path = os.path.join(tempdir, modulename + ".py")
+
+                CONTENTS = (
+                    "def f(x):\n"
+                    "    return x\n"
+                )
+
+                with open(path, "w") as f:
+                    f.write(CONTENTS)
+
+                globals = {'__file__': path}
+
+                exec(
+                    compile(CONTENTS, path, "exec"),
+                    globals
+                )
+
+                s = SerializationContext()
+                return s.serialize(globals['f'])
+
+        f1 = SerializationContext().deserialize(callFunctionInFreshProcess(makeF, ('asdf',)))
+        f2 = SerializationContext().deserialize(callFunctionInFreshProcess(makeF, ('asdf2',)))
+
+        def checkSame(f1, f2):
+            s = SerializationContext().withoutCompression()
+            s2 = SerializationContext().withoutCompression().withoutLineInfoEncoded().withSerializeHashSequence()
+
+            assert s.serialize(f1) != s.serialize(f2)
+
+            if s2.serialize(f1) != s2.serialize(f2):
+                decoded1 = decodeSerializedObject(s2.serialize(f1))
+                decoded2 = decodeSerializedObject(s2.serialize(f2))
+
+                decoded1Print = pprint.PrettyPrinter(indent=2).pformat(decoded1).split("\n")
+                decoded2Print = pprint.PrettyPrinter(indent=2).pformat(decoded2).split("\n")
+
+                for i in range(len(decoded1Print)):
+                    if decoded1Print[i] != decoded2Print[i]:
+                        for j in range(max(0, i-5), i):
+                            print(decoded1Print[j])
+                        print("******************************** DIFFERENCE *******************")
+                        print(decoded1Print[i])
+                        print(decoded2Print[i])
+                        print("***************************************************************")
+                        break
+
+            assert s2.serialize(f1) == s2.serialize(f2)
+
+        checkSame(f1, f2)
+        checkSame(Entrypoint(f1), Entrypoint(f2))
+        checkSame(NotCompiled(f1), NotCompiled(f2))
+
     def test_serialize_anonymous_class_with_defaults_and_nonempty(self):
         class C1(Class):
             x1 = Member(int, default_value=10, nonempty=True)
@@ -2821,3 +2876,43 @@ class TypesSerializationTest(unittest.TestCase):
         from typed_python.lib.pmap import ensureThreads
         sc = SerializationContext()
         assert sc.nameForObject(type(ensureThreads)) is not None
+
+    def test_pmap_of_notcompiled_serialized_externally(self):
+        def makeC():
+            with tempfile.TemporaryDirectory() as tempdir:
+                path = os.path.join(tempdir, "asdf.py")
+
+                CONTENTS = (
+                    "from typed_python import NotCompiled\n"
+                    "@NotCompiled\n"
+                    "def f(x) -> str:\n"
+                    "    return str(x)\n"
+                )
+
+                with open(path, "w") as f:
+                    f.write(CONTENTS)
+
+                globals = {'__file__': path}
+
+                exec(
+                    compile(CONTENTS, path, "exec"),
+                    globals
+                )
+
+                s = SerializationContext()
+                return s.serialize(globals['f'])
+
+        serializedF = callFunctionInFreshProcess(makeC, ())
+
+        f = SerializationContext().deserialize(serializedF)
+
+        assert f(2) == "2"
+
+        from typed_python.lib.pmap import pmap
+
+        args = ListOf(int)(range(1000000))
+
+        t0 = time.time()
+        while time.time() - t0 < 10.0:
+            print("DO!")
+            pmap(args, f, str, minGranularity=10000)

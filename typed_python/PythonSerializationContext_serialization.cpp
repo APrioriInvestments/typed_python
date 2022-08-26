@@ -824,7 +824,14 @@ void PythonSerializationContext::serializeNativeTypeInner(
         serializeNativeType(ftype->getClosureType(), b, 1);
         b.writeStringObject(2, ftype->name());
         b.writeStringObject(3, ftype->qualname());
-        b.writeStringObject(4, ftype->moduleName());
+        b.writeStringObject(
+            4, 
+            // if we're suppressing line info then we also don't want to write
+            // module names. Otherwise, it's impossible to get sha hashes of 
+            // code that gets relocated across file boundaries.
+            b.getContext().isLineInfoSuppressed() ? std::string("") : ftype->moduleName()
+        );
+
         b.writeUnsignedVarintObject(5, ftype->isEntrypoint() ? 1 : 0);
         b.writeUnsignedVarintObject(6, ftype->isNocompile() ? 1 : 0);
 
