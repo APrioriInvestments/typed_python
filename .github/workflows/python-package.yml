@@ -51,9 +51,9 @@ jobs:
     - name: Install dependencies
       run: |
         echo "**** UPGRADE PIP"
-        pip install --upgrade pip
+        pip install --upgrade pip==21.2.4 pip-tools wheel
         echo "**** INSTALL PIPENV"
-        pip install pipenv
+        pip install pipenv==2022.7.24
 
         echo "**** SETTING PIPFILE"
         export PYTHON_VERSION=`python3 -c 'import sys; print("3_" + str(sys.version_info.minor))'`
