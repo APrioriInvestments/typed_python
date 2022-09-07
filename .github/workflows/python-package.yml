@@ -60,7 +60,7 @@ jobs:
         export PIPENV_PIPFILE="Pipfile_$PYTHON_VERSION"
         echo "PIPFILE IS $PIPENV_PIPFILE"
         echo "**** PIPENV LOCK"
-        pipenv lock --dev --requirements > dev-reqs.txt
+        pipenv requirements --dev > dev-reqs.txt
         echo "**** dev-reqs.txt"
         cat dev-reqs.txt
         echo "**** pip install requirements"
