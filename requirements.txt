@@ -1,4 +1,4 @@
-llvmlite
+llvmlite==0.38
 numpy
 psutil
 pytz
