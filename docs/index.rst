@@ -7,17 +7,26 @@
 Welcome to typed_python's documentation!
 ========================================
 
+
+
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1
+   :caption: For Users
 
    introduction.md
    intro_2.md
-   modules
 
-This is some stub documentation, which will one day be an API reference + a User Guide/Zoo + Developer's Guide.
+.. toctree::
+   :maxdepth: 1
+   :caption: For Developers
 
+   installation.md
 
+.. toctree::
+   :maxdepth: 3
+   :caption: API documentation
+
+   api/typed_python
 
 
 Indices and tables
