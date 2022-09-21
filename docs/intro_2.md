@@ -1,4 +1,4 @@
-## Typed Python
+# Typed Python
 
 `typed_python` is a library for describing strongly and semi-strongly typed
 data-structures in Python. `typed_python` types look and feel like their
@@ -18,6 +18,8 @@ multithreading.
 It's important to note that `typed_python` is a Python module, not a separate
 Python implementation. This means you can use it as much or as little as you
 want in a project without affecting other code.
+
+## Type Annotations
 
 ### Container Types
 
