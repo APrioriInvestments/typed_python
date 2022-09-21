@@ -8,12 +8,21 @@ SPHINXOPTS    ?=
 SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = .
 BUILDDIR      = _build
+APIBUILDDIR    = api
+MODULEDIR     = ../typed_python
 
 # Put it first so that "make" without argument is like "make help".
 help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-.PHONY: help Makefile
+.PHONY: help clean apidocs Makefile
+
+apidocs:
+	@sphinx-apidoc -fo "$(APIBUILDDIR)" "$(MODULEDIR)"
+
+clean:
+	-rm -rf "$(BUILDDIR)"/*
+	-rm -rf "$(APIBUILDDIR)"/*
 
 show:
 	@echo "Showing generated html"
@@ -21,9 +30,5 @@ show:
 
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-
-# make sure to rebuild API reference with
-#sphinx-apidoc -o . ../typed_python -f
-# if required
 %: Makefile
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
