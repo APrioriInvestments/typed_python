@@ -1,6 +1,8 @@
-## Development ##
+# Installation
+
+## Development
 There are several methods for building and setting up a development environment.
-  
+
 ### Manual Method ###
 1. Create a new virtualenv with Python 3.6 (`virtualenv --python=<path-to-py3> venv`) and source it
 2. Install requirements via pip. For the moment there are two options:
@@ -8,15 +10,15 @@ There are several methods for building and setting up a development environment.
    * Install using Pipenv (which reads from the Pipfile)
 3. Build nativepython libraries using `python setup.py build`
 4. Append the root of this repository to your `PYTHONPATH`
-  
-### Pipenv Method ###
+
+## Pipenv Method ###
 This method is simple, and can take care of virtual environment creation and installation for you.
 1. (Optional) Create a new virtualenv with Python 3.6 (`virtualenv --python=<path-to-py3> venv`) and source it. If you choose to use Pipenv alone, it will create an appropriate virtualenv for you.
 2. Run `pipenv install --dev --deploy`
-  
+
 ### Makefile Method ###
 The included Makefile in this repository contains recipes for building, installing, and testing. For the moment, it is explicitly linked to a specific Python interpreter, so if you are using, say, an interpreter called `python3.6` (as opposed to `python3`), you will need to change the `PYTHON` variable at the top of the Makefile.
-  
+
 You can also customize the name and location of any built virtual environments with the `VIRTUAL_ENV` variable.
 
 
@@ -51,4 +53,3 @@ Before building the modules in this repository, you will need to make sure that 
   ```
 * Pipenv ([see this link](https://pipenv.readthedocs.io/en/latest/install/#installing-pipenv))
 * Redis Server (`redis-server`)
-
