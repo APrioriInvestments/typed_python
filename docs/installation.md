@@ -11,7 +11,7 @@ There are several methods for building and setting up a development environment.
 3. Build nativepython libraries using `python setup.py build`
 4. Append the root of this repository to your `PYTHONPATH`
 
-## Pipenv Method ###
+### Pipenv Method ###
 This method is simple, and can take care of virtual environment creation and installation for you.
 1. (Optional) Create a new virtualenv with Python 3.6 (`virtualenv --python=<path-to-py3> venv`) and source it. If you choose to use Pipenv alone, it will create an appropriate virtualenv for you.
 2. Run `pipenv install --dev --deploy`
