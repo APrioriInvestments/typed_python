@@ -21,6 +21,7 @@ Welcome to typed_python's documentation!
    :caption: For Developers
 
    installation.md
+   contributing.md
 
 .. toctree::
    :maxdepth: 3
