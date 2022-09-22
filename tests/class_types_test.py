@@ -91,7 +91,7 @@ class ClassWithComplexDispatch(Class):
 class NativeClassTypesTests(unittest.TestCase):
     def test_class_name(self):
         assert ClassWithInit.__name__ == 'ClassWithInit'
-        assert ClassWithInit.__module__ == 'typed_python.class_types_test'
+        assert ClassWithInit.__module__ == 'class_types_test'
         assert ClassWithInit.__qualname__ == 'ClassWithInit'
 
     def test_member_default_value(self):
