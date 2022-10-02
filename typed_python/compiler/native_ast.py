@@ -426,9 +426,14 @@ def expr_str(self):
             "rethrow with %s:\n" % self.varname + indent(str(self.handler)).rstrip()
         )
     if self.matches.ApplyIntermediates:
-        return (
-            "apply intermediates:\n" + "\n".join(str(x) for x in self.intermediates) + "\nto " + str(self.base)
-        )
+        expr = self.base
+        for i in reversed(self.intermediates):
+            if i.matches.Terminal or i.matches.Effect or i.matches.StackSlot:
+                expr = i.expr >> expr if str(expr) != 'void' else i.expr
+            elif i.matches.Simple:
+                expr = Expression.Let(var=i.name, val=i.expr, within=expr)
+
+        return str(expr)
 
     assert False, type(self)
 
