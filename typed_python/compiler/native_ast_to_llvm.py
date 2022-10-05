@@ -16,6 +16,7 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.module_definition import ModuleDefinition
 from typed_python.compiler.global_variable_definition import GlobalVariableDefinition
 import llvmlite.ir
+import logging
 import os
 
 llvm_i8ptr = llvmlite.ir.IntType(8).as_pointer()
@@ -658,8 +659,11 @@ class FunctionConverter:
                     var_arg=target.varargs
                 )
 
-                assert target.name not in self.converter._function_definitions, target.name
-
+                try:
+                    assert target.name not in self.converter._function_definitions, target.name
+                except AssertionError as e:
+                    logging.getLogger('TP_compiler').error(str(e))
+                    raise AssertionError() from e
                 self.external_function_references[target.name] = (
                     llvmlite.ir.Function(self.module, func_type, target.name)
                 )

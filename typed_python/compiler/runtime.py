@@ -11,7 +11,9 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-
+import atexit
+import logging
+import logging.handlers
 import threading
 import os
 import time
@@ -19,6 +21,8 @@ import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
 import typed_python.compiler.llvm_compiler as llvm_compiler
 import typed_python
+import sys
+
 from typed_python.compiler.runtime_lock import runtimeLock
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.compiler_cache import CompilerCache
@@ -35,6 +39,16 @@ _singletonLock = threading.RLock()
 typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
 
 _resultTypeCache = {}
+
+
+# NB: this should be removed once logging.shutdown handles MemoryHandlers correctly (fixed in GitHub as of 08/2022)
+def _close_all_memory_handlers():
+    for handler in logging.getLogger('TP_compiler').handlers:
+        if isinstance(handler, logging.handlers.MemoryHandler):
+            handler.close()
+
+
+atexit.register(_close_all_memory_handlers)
 
 
 class RuntimeEventVisitor:
@@ -185,6 +199,20 @@ class Runtime:
                 self.llvm_compiler.mark_llvm_codegen_verbose()
         else:
             self.verbosityLevel = 0
+        # set up a logger that tracks compiler events, storing them in memory and
+        # flushing to stdout if an error message is encountered.
+        LOGGING_LEVEL = logging.DEBUG
+        BUFFER_SIZE = 100_000  # the number of records to store (each record should be ~100-1000 bytes)
+        self.logger = logging.getLogger('TP_compiler')
+        formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s',
+                                      datefmt='%m/%d/%Y %I:%M:%S %p')
+        streamHandler = logging.StreamHandler(sys.stderr)
+        streamHandler.setFormatter(formatter)
+        memoryHandler = logging.handlers.MemoryHandler(BUFFER_SIZE, target=streamHandler, flushOnClose=False)
+        self.logger.addHandler(memoryHandler)
+        self.logger.setLevel(LOGGING_LEVEL)
+        self.logger.propagate = False
+        self.logger.info('Runtime object initialised.')
 
     def addEventVisitor(self, visitor: RuntimeEventVisitor):
         self.converter.addVisitor(visitor)
