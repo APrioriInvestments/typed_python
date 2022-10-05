@@ -276,6 +276,7 @@ class PythonToNativeConverter:
     def _loadFromCompilerCache(self, linkName):
         if self.compilerCache:
             if self.compilerCache.hasSymbol(linkName):
+                logging.getLogger('TP_compiler').info('loading %s from cache', linkName)
                 callTargetsAndTypes = self.compilerCache.loadForSymbol(linkName)
 
                 if callTargetsAndTypes is not None:

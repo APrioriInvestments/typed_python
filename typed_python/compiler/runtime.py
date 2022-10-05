@@ -205,7 +205,7 @@ class Runtime:
         BUFFER_SIZE = 100_000  # the number of records to store (each record should be ~100-1000 bytes)
         self.logger = logging.getLogger('TP_compiler')
         formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s',
-                                      datefmt='%m/%d/%Y %I:%M:%S %p')
+                                      datefmt='%H:%M:%S')
         streamHandler = logging.StreamHandler(sys.stderr)
         streamHandler.setFormatter(formatter)
         memoryHandler = logging.handlers.MemoryHandler(BUFFER_SIZE, target=streamHandler, flushOnClose=False)
@@ -461,6 +461,7 @@ def Entrypoint(pyFunc):
         if not callable(typedFunc):
             raise Exception(f"Can only compile functions, not {typedFunc}")
 
+        logging.getLogger('TP_compiler').info('compiling function %s.%s', typedFunc.__module__, typedFunc.__name__)
         typedFunc = Function(typedFunc)
 
     typedFunc = typedFunc.withEntrypoint(True)

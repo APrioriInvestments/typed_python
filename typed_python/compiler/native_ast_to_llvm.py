@@ -633,6 +633,10 @@ class FunctionConverter:
         return self.builder.bitcast(exception_ptr, llvm_i8ptr)
 
     def namedCallTargetToLLVM(self, target):
+
+        logging.getLogger('TP_compiler').info('namedCallTargetToLLVM called with %s target %s',
+                                              'external' if target.external else 'internal',
+                                              target.name)
         if target.external:
             if target.name not in self.external_function_references:
                 func_type = llvmlite.ir.FunctionType(
@@ -652,6 +656,8 @@ class FunctionConverter:
         elif target.name in self.converter._externallyDefinedFunctionTypes:
             # this function is defined in a shared object that we've loaded from a prior
             # invocation
+            logging.getLogger('TP_compiler').info('target %s is in _externallyDefinedFunctionTypes', target.name)
+
             if target.name not in self.external_function_references:
                 func_type = llvmlite.ir.FunctionType(
                     type_to_llvm_type(target.output_type),
@@ -1506,6 +1512,9 @@ class Converter:
 
     def markExternal(self, functionNameToType):
         """Provide type signatures for a set of external functions."""
+        # logging.getLogger('TP_compiler').info('%s added to FunctionConverter._externallyDefinedFunctionTypes', functionNameToType)
+        for key in functionNameToType.keys():
+            logging.getLogger('TP_compiler').info('%s added to FunctionConverter._externallyDefinedFunctionTypes', key)
         self._externallyDefinedFunctionTypes.update(functionNameToType)
 
     def canBeInlined(self, name):
@@ -1514,7 +1523,7 @@ class Converter:
     def totalFunctionComplexity(self, name):
         """Return the total number of instructions contained in a function.
 
-        The function must already have been defined in a prior parss. We use this
+        The function must already have been defined in a prior pass. We use this
         information to decide which functions to repeat in new module definitions.
         """
         if name in self._function_complexity:
