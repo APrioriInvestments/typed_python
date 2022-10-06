@@ -656,7 +656,7 @@ class FunctionConverter:
         elif target.name in self.converter._externallyDefinedFunctionTypes:
             # this function is defined in a shared object that we've loaded from a prior
             # invocation
-            logging.getLogger('TP_compiler').info('target %s is in _externallyDefinedFunctionTypes', target.name)
+            logging.getLogger('TP_compiler').warn('target %s is in _externallyDefinedFunctionTypes', target.name)
 
             if target.name not in self.external_function_references:
                 func_type = llvmlite.ir.FunctionType(
@@ -664,12 +664,17 @@ class FunctionConverter:
                     [type_to_llvm_type(x) for x in target.arg_types],
                     var_arg=target.varargs
                 )
+                logging.getLogger('TP_compiler').critical('convert function definitions: %s',
+                                                          str(list(self.converter._function_definitions)))
 
                 try:
                     assert target.name not in self.converter._function_definitions, target.name
                 except AssertionError as e:
                     logging.getLogger('TP_compiler').error(str(e))
                     raise AssertionError() from e
+
+                logging.getLogger('TP_compiler').critical('past assert statement')
+
                 self.external_function_references[target.name] = (
                     llvmlite.ir.Function(self.module, func_type, target.name)
                 )

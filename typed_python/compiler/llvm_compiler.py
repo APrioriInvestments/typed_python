@@ -12,6 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import logging
+
 import llvmlite.binding as llvm
 import llvmlite.ir
 import typed_python.compiler.native_ast as native_ast
@@ -113,6 +115,10 @@ class Compiler:
         """Add native definitions and return a BinarySharedObject representing the compiled code."""
         module = self.converter.add_functions(functions)
 
+        for key in functions:
+            if 'decref_str' in key:
+                logging.getLogger('TP_compiler').critical('decref_str will be added to function_definitions and fail the assert.')
+
         try:
             mod = llvm.parse_assembly(module.moduleText)
             mod.verify()
@@ -149,6 +155,10 @@ class Compiler:
 
         # module is a ModuleDefinition object
         module = self.converter.add_functions(functions)
+
+        for key in functions:
+            if 'decref_str' in key:
+                logging.getLogger('TP_compiler').critical('decref_str will be added to function_definitions and fail the assert.')
 
         try:
             mod = llvm.parse_assembly(module.moduleText)
