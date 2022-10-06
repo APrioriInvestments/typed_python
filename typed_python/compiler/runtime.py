@@ -461,7 +461,6 @@ def Entrypoint(pyFunc):
         if not callable(typedFunc):
             raise Exception(f"Can only compile functions, not {typedFunc}")
 
-        logging.getLogger('TP_compiler').info('compiling function %s.%s', typedFunc.__module__, typedFunc.__name__)
         typedFunc = Function(typedFunc)
 
     typedFunc = typedFunc.withEntrypoint(True)

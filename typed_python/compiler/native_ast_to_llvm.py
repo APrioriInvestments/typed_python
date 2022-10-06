@@ -633,10 +633,6 @@ class FunctionConverter:
         return self.builder.bitcast(exception_ptr, llvm_i8ptr)
 
     def namedCallTargetToLLVM(self, target):
-
-        logging.getLogger('TP_compiler').info('namedCallTargetToLLVM called with %s target %s',
-                                              'external' if target.external else 'internal',
-                                              target.name)
         if target.external:
             if target.name not in self.external_function_references:
                 func_type = llvmlite.ir.FunctionType(
