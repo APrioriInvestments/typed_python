@@ -12,6 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import threading
+import time
 import types
 import logging
 
@@ -33,6 +35,7 @@ from typed_python.compiler.type_wrappers.python_typed_function_wrapper import (
     PythonTypedFunctionWrapper, CannotBeDetermined, NoReturnTypeSpecified
 )
 from typed_python.compiler.typed_call_target import TypedCallTarget
+from typed_python.compiler.native_ast_to_llvm import log_file
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
@@ -268,7 +271,9 @@ class PythonToNativeConverter:
             return False
 
         self._allDefinedNames.add(linkName)
-
+        log_file['compiler_cache']['allDefinedNames'].append((time.time(),
+                                                              threading.get_native_id(),
+                                                              linkName))
         self._loadFromCompilerCache(linkName)
 
         return True
@@ -276,16 +281,39 @@ class PythonToNativeConverter:
     def _loadFromCompilerCache(self, linkName):
         if self.compilerCache:
             if self.compilerCache.hasSymbol(linkName):
-                logging.getLogger('TP_compiler').info('loading %s from cache', linkName)
                 callTargetsAndTypes = self.compilerCache.loadForSymbol(linkName)
-
+                log_file["compiler_cache"]["load"].append(
+                    (time.time(), threading.get_native_id(), linkName)
+                )
                 if callTargetsAndTypes is not None:
                     newTypedCallTargets, newNativeFunctionTypes = callTargetsAndTypes
+                    for key in newNativeFunctionTypes.keys():
+                        log_file["compiler_cache"]["load"].append(
+                            (time.time(), threading.get_native_id(), key)
+                        )
 
+                    log_file["bug_test"].append(
+                        (
+                            time.time(),
+                            threading.get_native_id(),
+                            {
+                                "definedNames": list(self._allDefinedNames),
+                                "markExternal": list(newNativeFunctionTypes.keys()),
+                                "cachedNames": list(self._allCachedNames),
+                            },
+                        )
+                    )
                     self._targets.update(newTypedCallTargets)
                     self.llvmCompiler.markExternal(newNativeFunctionTypes)
-
                     self._allDefinedNames.update(newNativeFunctionTypes)
+                    for key in newNativeFunctionTypes.keys():
+                        log_file["compiler_cache"]["allDefinedNames"].append(
+                            (time.time(), threading.get_native_id(), key)
+                        )
+                        log_file["compiler_cache"]["allCachedNames"].append(
+                            (time.time(), threading.get_native_id(), key)
+                        )
+
                     self._allCachedNames.update(newNativeFunctionTypes)
 
     def defineNonPythonFunction(self, name, identityTuple, context):
@@ -299,7 +327,6 @@ class PythonToNativeConverter:
         """
         identity = self.hashObjectToIdentity(identityTuple).hexdigest
         linkName = self.identityHashToLinkerName(name, identity, "runtime.")
-
         self.defineLinkName(identity, linkName)
 
         if self._currentlyConverting is not None:
@@ -492,7 +519,9 @@ class PythonToNativeConverter:
         self._link_name_for_identity[identifier] = linkName
         self._identity_for_link_name[linkName] = identifier
         self._allDefinedNames.add(linkName)
-
+        log_file['compiler_cache']['allDefinedNames'].append((time.time(),
+                                                              threading.get_native_id(),
+                                                              linkName))
         self._definitions[linkName] = definition
         self._new_native_functions.add(linkName)
 
@@ -528,6 +557,9 @@ class PythonToNativeConverter:
                         if name in self._targets:
                             self._targets.pop(name)
                         self._allDefinedNames.discard(name)
+                        log_file['compiler_cache']['allDefinedNames'].append((time.time(),
+                                                                              threading.get_native_id(),
+                                                                              linkName + '_DISCARD'))
                         ln = self._link_name_for_identity.pop(i)
                         self._identity_for_link_name.pop(ln)
 

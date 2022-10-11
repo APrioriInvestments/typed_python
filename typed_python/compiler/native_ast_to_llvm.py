@@ -15,10 +15,11 @@
 import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.module_definition import ModuleDefinition
 from typed_python.compiler.global_variable_definition import GlobalVariableDefinition
+from typed_python import SerializationContext
 import llvmlite.ir
-import logging
 import os
-
+import time
+import threading
 llvm_i8ptr = llvmlite.ir.IntType(8).as_pointer()
 llvm_i8 = llvmlite.ir.IntType(8)
 llvm_i32 = llvmlite.ir.IntType(32)
@@ -33,6 +34,30 @@ pointer_size = 8
 
 
 CROSS_MODULE_INLINE_COMPLEXITY = 40
+
+
+# temporary log_file (should live somewhere better)
+log_file = {
+    "history": {
+        "externallyDefinedFunctionTypes": [],
+        "function_definitions": [],
+        "namedCallTargetToLLVM": [],
+        "external_function_references": [],
+        "entryPoint": [],
+    },
+    "end_state": {
+        "externallyDefinedFunctionTypes": [],
+        "function_definitions": [],
+        "external_function_references": [],
+        "namedCallTargetToLLVM": [],
+    },
+    "compiler_cache": {
+        "allDefinedNames": [],
+        "allCachedNames": [],
+        "load": [],
+    },
+    "bug_test": [],
+}
 
 
 def llvmBool(i):
@@ -633,6 +658,9 @@ class FunctionConverter:
         return self.builder.bitcast(exception_ptr, llvm_i8ptr)
 
     def namedCallTargetToLLVM(self, target):
+        log_file['history']['namedCallTargetToLLVM'].append((time.time(),
+                                                             threading.get_native_id(),
+                                                             {'name': target.name, 'external': target.external}))
         if target.external:
             if target.name not in self.external_function_references:
                 func_type = llvmlite.ir.FunctionType(
@@ -644,15 +672,21 @@ class FunctionConverter:
                 if target.intrinsic:
                     self.external_function_references[target.name] = \
                         self.module.declare_intrinsic(target.name, fnty=func_type)
+                    log_file['history']['external_function_references'].append((time.time(),
+                                                                                threading.get_native_id(),
+                                                                                target.name))
+
                 else:
                     self.external_function_references[target.name] = \
                         llvmlite.ir.Function(self.module, func_type, target.name)
+                    log_file['history']['external_function_references'].append((time.time(),
+                                                                                threading.get_native_id(),
+                                                                                target.name))
 
             func = self.external_function_references[target.name]
         elif target.name in self.converter._externallyDefinedFunctionTypes:
             # this function is defined in a shared object that we've loaded from a prior
             # invocation
-            logging.getLogger('TP_compiler').warn('target %s is in _externallyDefinedFunctionTypes', target.name)
 
             if target.name not in self.external_function_references:
                 func_type = llvmlite.ir.FunctionType(
@@ -660,20 +694,39 @@ class FunctionConverter:
                     [type_to_llvm_type(x) for x in target.arg_types],
                     var_arg=target.varargs
                 )
-                logging.getLogger('TP_compiler').critical('convert function definitions: %s',
-                                                          str(list(self.converter._function_definitions)))
 
                 try:
                     assert target.name not in self.converter._function_definitions, target.name
                 except AssertionError as e:
-                    logging.getLogger('TP_compiler').error(str(e))
-                    raise AssertionError() from e
+                    print('assertion failed, dumping logfile to disk.')
+                    # Grab the contents of the three relevant vars
+                    log_file['end_state']['externallyDefinedFunctionTypes'] = [time.time(),
+                                                                               threading.get_native_id(),
+                                                                               tuple(self.converter._externallyDefinedFunctionTypes.keys())
+                                                                               ]
+                    log_file['end_state']['function_definitions'] = [time.time(),
+                                                                     threading.get_native_id(),
+                                                                     tuple(self.converter._function_definitions.keys())]
+                    log_file['end_state']['external_function_references'] = [time.time(),
+                                                                             threading.get_native_id(),
+                                                                             tuple(self.external_function_references.keys())]
+                    log_file['end_state']['namedCallTargetToLLVM'] = [time.time(),
+                                                                      threading.get_native_id(),
+                                                                      {'name': target.name, 'external': target.external}]
 
-                logging.getLogger('TP_compiler').critical('past assert statement')
+                    log_bytes = SerializationContext().serialize(log_file)
+                    # looks for $TEST_OUTPUT_DIR, uses current directory if no such variable set.
+                    output_path = os.path.join(os.environ.get('TEST_OUTPUT_DIR', '.'), 'logfile.bytes')
+                    with open(output_path, 'wb') as out_file:
+                        out_file.write(log_bytes)
+                    raise AssertionError() from e
 
                 self.external_function_references[target.name] = (
                     llvmlite.ir.Function(self.module, func_type, target.name)
                 )
+                log_file['history']['external_function_references'].append((time.time(),
+                                                                            threading.get_native_id(),
+                                                                            target.name))
 
             func = self.external_function_references[target.name]
         else:
@@ -690,7 +743,9 @@ class FunctionConverter:
                     if target.name not in self.external_function_references:
                         self.external_function_references[target.name] = \
                             llvmlite.ir.Function(self.module, func.function_type, func.name)
-
+                        log_file['history']['external_function_references'].append((time.time(),
+                                                                                    threading.get_native_id(),
+                                                                                    target.name))
                     func = self.external_function_references[target.name]
 
         return TypedLLVMValue(
@@ -1498,10 +1553,12 @@ class Converter:
         self._modules = {}
         self._functions_by_name = {}
         self._function_definitions = {}
+        log_file['history']['function_definitions'].append((time.time(), threading.get_native_id(), ('CLEAR')))
 
         # a map from function name to function type for functions that
         # are defined in external shared objects and linked in to this one.
         self._externallyDefinedFunctionTypes = {}
+        log_file['history']["externallyDefinedFunctionTypes"].append((time.time(), threading.get_native_id(), ('CLEAR')))
 
         # total number of instructions in each function, by name
         self._function_complexity = {}
@@ -1513,9 +1570,9 @@ class Converter:
 
     def markExternal(self, functionNameToType):
         """Provide type signatures for a set of external functions."""
-        # logging.getLogger('TP_compiler').info('%s added to FunctionConverter._externallyDefinedFunctionTypes', functionNameToType)
-        for key in functionNameToType.keys():
-            logging.getLogger('TP_compiler').info('%s added to FunctionConverter._externallyDefinedFunctionTypes', key)
+        log_file['history']["externallyDefinedFunctionTypes"].append((time.time(),
+                                                                      threading.get_native_id(),
+                                                                      tuple(functionNameToType.keys())))
         self._externallyDefinedFunctionTypes.update(functionNameToType)
 
     def canBeInlined(self, name):
@@ -1594,6 +1651,7 @@ class Converter:
             self._functions_by_name[name] = llvmlite.ir.Function(module, func_type, name)
 
             self._functions_by_name[name].linkage = 'external'
+            log_file['history']['function_definitions'].append((time.time(), threading.get_native_id(), name))
             self._function_definitions[name] = function
 
         if self.verbose:
