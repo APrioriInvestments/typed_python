@@ -23,7 +23,9 @@
 
 class MutuallyRecursiveTypeGroup {
 public:
-    MutuallyRecursiveTypeGroup() : mAnyPyObjectsIncorrectlyOrdered(false)
+    MutuallyRecursiveTypeGroup() :
+        mAnyPyObjectsIncorrectlyOrdered(false),
+        mIsCurrentlyHashing(false)
     {}
 
     MutuallyRecursiveTypeGroup(ShaHash hash);
@@ -125,6 +127,8 @@ private:
     static std::map<ShaHash, PyObject*> mHashToObject;
 
     void computeHash();
+
+    bool mIsCurrentlyHashing;
 
     ShaHash mHash;
 

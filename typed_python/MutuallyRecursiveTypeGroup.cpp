@@ -929,34 +929,51 @@ void MutuallyRecursiveTypeGroup::computeHash() {
         return;
     }
 
-    // we are a recursive group head. We want to compute the hash
-    // of all of our constituents where, when each of them looks at
-    // other types within _our_ group, we simply hash in a placeholder
-    // for the position.
-    ShaHash wholeGroupHash;
-
-    for (auto idAndType: mIndexToObject) {
-        Type* t = idAndType.second.type();
-
-        if (t) {
-            // this actually walks the type and computes a sha-hash based on
-            // what's inside the type one layer down.
-            wholeGroupHash += t->computeIdentityHash(this);
-
-            if (t->isRecursive()) {
-                wholeGroupHash += ShaHash(t->name());
-            }
-        } else {
-            wholeGroupHash += computePyObjectShaHash(idAndType.second.pyobj(), this);
-        }
+    if (mIsCurrentlyHashing) {
+        throw std::runtime_error(
+            "Somehow we are already computing the hash of this MRTG. "
+            "This means that when we computed the group's constituents, we missed "
+            "a link between elements of this group and elements of a calling group."
+        );
     }
 
-    mHash = wholeGroupHash;
+    try {
+        // mark that we're currently hashing.
+        mIsCurrentlyHashing = true;
 
-    PyEnsureGilAcquired getTheGil;
+        // we are a recursive group head. We want to compute the hash
+        // of all of our constituents where, when each of them looks at
+        // other types within _our_ group, we simply hash in a placeholder
+        // for the position.
+        ShaHash wholeGroupHash;
 
-    if (mHashToGroup.find(mHash) == mHashToGroup.end()) {
-        mHashToGroup[mHash] = this;
+        for (auto idAndType: mIndexToObject) {
+            Type* t = idAndType.second.type();
+
+            if (t) {
+                // this actually walks the type and computes a sha-hash based on
+                // what's inside the type one layer down.
+                wholeGroupHash += t->computeIdentityHash(this);
+
+                if (t->isRecursive()) {
+                    wholeGroupHash += ShaHash(t->name());
+                }
+            } else {
+                wholeGroupHash += computePyObjectShaHash(idAndType.second.pyobj(), this);
+            }
+        }
+
+        mHash = wholeGroupHash;
+        mIsCurrentlyHashing = false;
+
+        PyEnsureGilAcquired getTheGil;
+
+        if (mHashToGroup.find(mHash) == mHashToGroup.end()) {
+            mHashToGroup[mHash] = this;
+        }
+    } catch(...) {
+        mIsCurrentlyHashing = false;
+        throw;
     }
 }
 
