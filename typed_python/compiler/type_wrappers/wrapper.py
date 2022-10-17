@@ -172,7 +172,7 @@ class Wrapper:
     def convert_intiter_value(self, context, instance, valueInstance):
         """If this type supports intiter, compute the value of the iterator.
 
-        This function will return a TypedExpression, or NOne if it set an exception."""
+        This function will return a TypedExpression, or None if it set an exception."""
         raise NotImplementedError()
 
     def convert_fastnext(self, context, expr):

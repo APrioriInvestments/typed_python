@@ -858,6 +858,16 @@ class TestBytesCompilation(unittest.TestCase):
                     with self.assertRaises(TypeError):
                         Entrypoint(f)(v, w, 'X')
 
+    def test_bytes_to_int(self):
+        @Entrypoint
+        def bytesToInt(x: bytes):
+            try:
+                return float(x)
+            except Exception:
+                return 0
+
+        assert bytesToInt(b'') == 0
+
     def test_bytes_tabs(self):
         def f_expandtabs(x, t):
             return x.expandtabs(t)
