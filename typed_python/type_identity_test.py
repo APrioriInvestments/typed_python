@@ -1,4 +1,4 @@
-#   Copyright 2020 typed_python Authors
+#   Copyright 2022 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 from typed_python.test_util import evaluateExprInFreshProcess
+import pytest
 from typed_python import (
     UInt64, UInt32,
     ListOf, TupleOf, Tuple, NamedTuple, Dict, OneOf, Forward, identityHash,
@@ -27,7 +28,8 @@ from typed_python.hash import Hash
 from typed_python._types import (
     prepareArgumentToBePassedToCompiler,
     recursiveTypeGroup,
-    getCodeGlobalDotAccesses
+    getCodeGlobalDotAccesses,
+    typesAndObjectsVisibleToCompilerFrom
 )
 
 
@@ -61,6 +63,18 @@ def returnSerializedValue(filesToWrite, expression, printComments=False):
         f"SerializationContext({{}}).serialize({expression})",
         printComments=printComments
     )
+
+
+def test_object_graph_instability_is_noticed():
+    class C:
+        pass
+
+    typesAndObjectsVisibleToCompilerFrom(C)
+
+    C.f = staticmethod(lambda: 10)
+
+    with pytest.raises(Exception):
+        typesAndObjectsVisibleToCompilerFrom(C)
 
 
 def test_class_and_held_class_in_group():

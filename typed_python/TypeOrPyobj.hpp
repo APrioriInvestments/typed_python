@@ -84,7 +84,7 @@ public:
     ShaHash identityHash();
 
     // warning - this calls 'repr', which may alter the object
-    std::string name();
+    std::string name() const;
 
     bool operator==(const PyObject* o) const {
         return mPyObj == o;
@@ -151,3 +151,15 @@ private:
     Type* mType;
     PyObject* mPyObj;
 };
+
+namespace std {
+    template <>
+    struct hash<TypeOrPyobj> {
+        size_t operator()(const TypeOrPyobj& k) const {
+            if (k.isType()) {
+                return hash<void*>()((void*)k.type());
+            }
+            return hash<void*>()((void*)k.pyobj());
+        }
+    };
+}

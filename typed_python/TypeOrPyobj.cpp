@@ -48,7 +48,7 @@ ShaHash TypeOrPyobj::identityHash() {
     return MutuallyRecursiveTypeGroup::pyObjectShaHash(mPyObj, nullptr);
 }
 
-std::string TypeOrPyobj::name() {
+std::string TypeOrPyobj::name() const {
     if (mType) {
         return "<Type " + mType->name() + " of cat " + Type::categoryToString(mType->getTypeCategory()) + ">";
     }
