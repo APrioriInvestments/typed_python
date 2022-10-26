@@ -50,7 +50,7 @@ bool DeserializationBuffer::decompress() {
             size_t bytesWritten = 1024 * 1024;
             size_t bytesRead = bytesToDecompress - bytesDecompressed;
 
-            LZ4F_decompress(
+            size_t res = LZ4F_decompress(
                 compressionContext,
                 compressionBuffer,
                 &bytesWritten,
@@ -58,6 +58,13 @@ bool DeserializationBuffer::decompress() {
                 &bytesRead,
                 nullptr
             );
+
+            if (LZ4F_isError(res)) {
+                throw std::runtime_error(
+                  std::string("Error decompressing data using LZ4: ")
+                    + LZ4F_getErrorName(res)
+                );
+            }
 
             if (m_read_head_offset) {
                 m_decompressed_buffer.erase(

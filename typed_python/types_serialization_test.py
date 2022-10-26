@@ -1749,6 +1749,16 @@ class TypesSerializationTest(unittest.TestCase):
         sc = SerializationContext()
         sc.deserialize(sc.serialize(X1))
 
+    def test_compression_has_checksum(self):
+        sc = SerializationContext().withCompression()
+        data = ListOf(float)(range(100))
+
+        serDat = bytearray(sc.serialize(data))
+        serDat[200] += 1
+
+        with self.assertRaisesRegex(Exception, "blockChecksum"):
+            sc.deserialize(bytes(serDat))
+
     def test_serialize_mutually_recursive_unnamed_forwards_tuples(self):
         X1 = Forward("X1")
         X2 = Forward("X2")

@@ -29,9 +29,15 @@ void SerializationBuffer::compress() {
         return;
     }
 
+    LZ4F_preferences_t lz4Prefs;
+    memset(&lz4Prefs, 0, sizeof(lz4Prefs));
+
+    lz4Prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+    lz4Prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
+
     //replace the data we have here with a block of 4 bytes of size of compressed data and
     //then the data stream
-    size_t bytesRequired = LZ4F_compressFrameBound(m_size - m_last_compression_point, nullptr);
+    size_t bytesRequired = LZ4F_compressFrameBound(m_size - m_last_compression_point, &lz4Prefs);
 
     void* compressedBytes = malloc(bytesRequired);
 
@@ -45,8 +51,15 @@ void SerializationBuffer::compress() {
             bytesRequired,
             m_buffer + m_last_compression_point,
             m_size - m_last_compression_point,
-            nullptr
+            &lz4Prefs
         );
+
+        if (LZ4F_isError(compressedBytecount)) {
+            throw std::runtime_error(
+              std::string("Error compressing data using LZ4: ")
+                + LZ4F_getErrorName(compressedBytecount)
+            );
+        }
     }
 
     m_size = m_last_compression_point;
