@@ -466,6 +466,8 @@ void MutuallyRecursiveTypeGroup::computeHash() {
     }
 
     if (mIsCurrentlyHashing) {
+        CompilerVisibleObjectVisitor::singleton().checkForInstability();
+
         throw std::runtime_error(
             "Somehow we are already computing the hash of this MRTG. "
             "This means that when we computed the group's constituents, we missed "

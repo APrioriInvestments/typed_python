@@ -29,7 +29,9 @@ from typed_python._types import (
     prepareArgumentToBePassedToCompiler,
     recursiveTypeGroup,
     getCodeGlobalDotAccesses,
-    typesAndObjectsVisibleToCompilerFrom
+    typesAndObjectsVisibleToCompilerFrom,
+    checkForHashInstability,
+    resetCompilerVisibleObjectHashCache
 )
 
 
@@ -75,6 +77,21 @@ def test_object_graph_instability_is_noticed():
 
     with pytest.raises(Exception):
         typesAndObjectsVisibleToCompilerFrom(C)
+
+    resetCompilerVisibleObjectHashCache()
+
+
+def test_object_graph_instability_is_noticed_globally():
+    class C:
+        pass
+
+    typesAndObjectsVisibleToCompilerFrom(C)
+
+    C.f = staticmethod(lambda: 10)
+
+    assert "staticmethod" in checkForHashInstability()
+
+    resetCompilerVisibleObjectHashCache()
 
 
 def test_class_and_held_class_in_group():

@@ -38,6 +38,7 @@
 #include "PySlab.hpp"
 #include "PyModuleRepresentation.hpp"
 #include "_types.hpp"
+#include "CompilerVisibleObjectVisitor.hpp"
 
 PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
     std::vector<Type*> types;
@@ -2709,6 +2710,46 @@ PyObject *isRecursive(PyObject* nullValue, PyObject* args) {
     });
 }
 
+PyDoc_STRVAR(
+    resetCompilerVisibleObjectHashCache_doc,
+    "resetCompilerVisibleObjectHashCache() -> None\n\n"
+    "Reset the list of objects the identity hasher has seen. This is used in test to allow\n"
+    "us to inject a fault and then verify we detect it, and not leave that fault lying around."
+);
+
+PyObject *resetCompilerVisibleObjectHashCache(PyObject* nullValue, PyObject* args) {
+    return translateExceptionToPyObject([&]() {
+        CompilerVisibleObjectVisitor::singleton().resetCache();
+
+        return incref(Py_None);
+    });
+}
+
+PyDoc_STRVAR(
+    checkForHashInstability_doc,
+    "checkForHashInstability() -> OneOf(None, str)\n\n"
+    "Walk every object that's been seen by the MutuallyRecursiveTypeGroup framework and verify\n"
+    "that the exact sequence of objects visible to it have not changed. If they have, return\n"
+    "a string detailing which objects changed and how (which could be very large).\n\n"
+    "During normal execution, this should always return None. However, if anything visible to\n"
+    "the compiler, such as a method on a class, or the identity of a module-level variable \n"
+    "changes, this function will find it. If such errors go undetected, it can cause various\n"
+    "errors, including multiple copies of the same type (since the hash is not stable) or \n"
+    "errors while computing hashes because the assumptions of the hasher are violated."
+);
+
+PyObject *checkForHashInstability(PyObject* nullValue, PyObject* args) {
+    return translateExceptionToPyObject([&]() {
+        try {
+            CompilerVisibleObjectVisitor::singleton().checkForInstability();
+
+            return incref(Py_None);
+        } catch(std::runtime_error& err) {
+            return PyUnicode_FromString(err.what());
+        }
+    });
+}
+
 PyObject *typesAndObjectsVisibleToCompilerFrom(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "typesAndObjectsVisibleToCompilerFrom takes 1 positional argument");
@@ -3260,6 +3301,8 @@ static PyMethodDef module_methods[] = {
     {"recursiveTypeGroupRepr", (PyCFunction)recursiveTypeGroupRepr, METH_VARARGS, NULL},
     {"recursiveTypeGroupDeepRepr", (PyCFunction)recursiveTypeGroupDeepRepr, METH_VARARGS, NULL},
     {"recursiveTypeGroupHash", (PyCFunction)recursiveTypeGroupHash, METH_VARARGS, NULL},
+    {"checkForHashInstability", (PyCFunction)checkForHashInstability, METH_VARARGS, checkForHashInstability_doc},
+    {"resetCompilerVisibleObjectHashCache", (PyCFunction)resetCompilerVisibleObjectHashCache, METH_VARARGS, resetCompilerVisibleObjectHashCache_doc},
     {"typesAndObjectsVisibleToCompilerFrom", (PyCFunction)typesAndObjectsVisibleToCompilerFrom, METH_VARARGS, NULL},
     {"isRecursive", (PyCFunction)isRecursive, METH_VARARGS, NULL},
     {"referencedTypes", (PyCFunction)referencedTypes, METH_VARARGS, NULL},

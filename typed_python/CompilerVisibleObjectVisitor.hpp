@@ -287,6 +287,10 @@ public:
         return records;
     }
 
+    void resetCache() {
+        mPastVisits.clear();
+    }
+
     void checkForInstability() {
         std::vector<TypeOrPyobj> unstable;
 
