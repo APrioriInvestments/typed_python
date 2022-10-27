@@ -18,7 +18,7 @@ from typed_python import (
     UInt64, UInt32,
     ListOf, TupleOf, Tuple, NamedTuple, Dict, OneOf, Forward, identityHash,
     Entrypoint, Class, Member, Final, TypeFunction, SerializationContext,
-    Function
+    Function, NotCompiled
 )
 
 import typed_python
@@ -92,6 +92,24 @@ def test_object_graph_instability_is_noticed_globally():
     assert "staticmethod" in checkForHashInstability()
 
     resetCompilerVisibleObjectHashCache()
+
+
+def test_identity_of_function_with_annotation():
+    def f(x: int):
+        pass
+
+    @Entrypoint
+    def g(x: int):
+        return f(x)
+
+    identityHash(f)
+    identityHash(NotCompiled(f))
+
+    hashInstability = checkForHashInstability()
+
+    if hashInstability is not None:
+        print(hashInstability)
+        raise Exception("hash instability found")
 
 
 def test_class_and_held_class_in_group():

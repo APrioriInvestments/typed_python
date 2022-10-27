@@ -594,10 +594,10 @@ private:
             }
 
             instanceVisit(f->func_name);
-            instanceVisit(f->func_code);
-            visitDictOrTuple(f->func_annotations);
-            visitTuple(f->func_defaults);
-            visitDictOrTuple(f->func_kwdefaults);
+            instanceVisit(PyFunction_GetCode((PyObject*)f));
+            visitDictOrTuple(PyFunction_GetAnnotations((PyObject*)f));
+            visitTuple(PyFunction_GetDefaults((PyObject*)f));
+            visitDictOrTuple(PyFunction_GetKwDefaults((PyObject*)f));
 
             hashVisit(ShaHash(1));
 
