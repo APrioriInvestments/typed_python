@@ -12,16 +12,17 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python.test_util import evaluateExprInFreshProcess
+import threading
 import pytest
+
+import typed_python
+from typed_python.test_util import evaluateExprInFreshProcess
 from typed_python import (
     UInt64, UInt32,
     ListOf, TupleOf, Tuple, NamedTuple, Dict, OneOf, Forward, identityHash,
     Entrypoint, Class, Member, Final, TypeFunction, SerializationContext,
     Function, NotCompiled
 )
-
-import typed_python
 
 from typed_python.hash import Hash
 
@@ -110,6 +111,33 @@ def test_identity_of_function_with_annotation():
     if hashInstability is not None:
         print(hashInstability)
         raise Exception("hash instability found")
+
+
+moduleLevelThreadLocal = threading.local()
+
+
+@NotCompiled
+def functionAccessingModuleLevelThreadLocal():
+    return hasattr(moduleLevelThreadLocal, "anything")
+
+
+def test_identity_of_function_accessing_thread_local():
+    print(typesAndObjectsVisibleToCompilerFrom(type(functionAccessingModuleLevelThreadLocal)))
+
+    identityHash(functionAccessingModuleLevelThreadLocal)
+    moduleLevelThreadLocal.anything = True
+    identityHash(functionAccessingModuleLevelThreadLocal)
+
+    hashInstability = checkForHashInstability()
+
+    if hashInstability is not None:
+        print(hashInstability)
+        raise Exception("hash instability found")
+
+
+def test_identity_of_method_descriptors():
+    assert identityHash(ListOf(int).append) != identityHash(ListOf(float).append)
+    assert identityHash(ListOf(int).append) != identityHash(ListOf(int).extend)
 
 
 def test_class_and_held_class_in_group():

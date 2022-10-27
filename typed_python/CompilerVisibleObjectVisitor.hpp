@@ -703,20 +703,19 @@ private:
             return;
         }
 
-        // we do want to visit the internals of arbitrary objects, because
-        // the compiler will attempt to do so as well.
-        if (PyObject_HasAttrString(obj.pyobj(), "__dict__")) {
-            PyObjectStealer dict(PyObject_GetAttrString(obj.pyobj(), "__dict__"));
-
-            if (dict) {
-                hashVisit(ShaHash(12));
-
-                instanceVisit((PyObject*)obj.pyobj()->ob_type);
-                visitDict(dict, true);
-                return;
-            }
+        if (obj.pyobj()->ob_type == &PyClassMethodDescr_Type
+            || obj.pyobj()->ob_type == &PyMethodDescr_Type) {
+            // the compiler looks at the type and the name of a given method descriptor
+            instanceVisit(PyDescr_TYPE(obj.pyobj()));
+            instanceVisit(PyDescr_NAME(obj.pyobj()));
+            return;
         }
 
+        // we don't visit the internals of arbitrary objects - by default, the compiler
+        // won't do this because they are mutable.
+
+        // we do visit the type, since the compiler may infer something about the type
+        // of the instance and we assume that type objects are stable.
         instanceVisit((PyObject*)obj.pyobj()->ob_type);
     }
 

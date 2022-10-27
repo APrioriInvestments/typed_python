@@ -47,6 +47,16 @@ public:
         incref(mPyObj);
     }
 
+    TypeOrPyobj(PyTypeObject* o) :
+        mType(nullptr),
+        mPyObj((PyObject*)o)
+    {
+        if (!mPyObj) {
+            throw std::runtime_error("Can't construct a TypeOrPyobj with a null PyObject");
+        }
+        incref(mPyObj);
+    }
+
     ~TypeOrPyobj() {
         if (mPyObj) {
             decref(mPyObj);

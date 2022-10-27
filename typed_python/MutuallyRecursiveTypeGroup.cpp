@@ -978,11 +978,8 @@ ShaHash MutuallyRecursiveTypeGroup::computePyObjectShaHashConstant(PyObject* h) 
     }
 
     if (h->ob_type == &PyProperty_Type
-        || h->ob_type == &PyProperty_Type
-        || h->ob_type == &PyClassMethodDescr_Type
         || h->ob_type == &PyGetSetDescr_Type
         || h->ob_type == &PyMemberDescr_Type
-        || h->ob_type == &PyMethodDescr_Type
         || h->ob_type == &PyWrapperDescr_Type
         || h->ob_type == &PyDictProxy_Type
         || h->ob_type == &_PyMethodWrapper_Type
@@ -1032,11 +1029,8 @@ bool MutuallyRecursiveTypeGroup::isSimpleConstant(PyObject* h) {
         || h == (PyObject*)&PyFunction_Type
         || PyFloat_Check(h)
         || h->ob_type == &PyProperty_Type
-        || h->ob_type == &PyProperty_Type
-        || h->ob_type == &PyClassMethodDescr_Type
         || h->ob_type == &PyGetSetDescr_Type
         || h->ob_type == &PyMemberDescr_Type
-        || h->ob_type == &PyMethodDescr_Type
         || h->ob_type == &PyWrapperDescr_Type
         || h->ob_type == &PyDictProxy_Type
         || h->ob_type == &_PyMethodWrapper_Type
