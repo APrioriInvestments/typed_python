@@ -38,6 +38,18 @@ def TfLevelMethod(T):
     return A
 
 
+@TypeFunction
+def RegularPythonClass(T):
+    class RegularPythonClass:
+        def __init__(self):
+            self.T = T
+
+        def methodName(self):
+            pass
+
+    return RegularPythonClass
+
+
 class TypeFunctionTest(unittest.TestCase):
     def test_basic(self):
         @TypeFunction
@@ -372,3 +384,8 @@ class TypeFunctionTest(unittest.TestCase):
 
         assert issubclass(Temp(int), Temp)
         assert issubclass(Temp, TypeFunction)
+
+    def test_serialize_regular_class_output(self):
+        C = RegularPythonClass(int)
+
+        assert b'methodName' not in SerializationContext().withoutCompression().serialize(C)

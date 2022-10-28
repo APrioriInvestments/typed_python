@@ -488,10 +488,19 @@ class SerializationContext:
             return (threading.RLock, ())
 
         if isinstance(inst, type):
-            # only serialize Class and Alternative objects from type functions.
+            # only serialize Class, Alternative, named tuple subclass, and actual python class
+            # objects from type functions.
+
             # otherwise, we'll end up changing how we serialize things like 'int',
             # if they ever make their way into a type function.
-            if getattr(inst, '__typed_python_category__', None) in ('Class', 'Alternative'):
+
+            # note that we need to ensure that type functions don't make two classes and
+            # return only one of them.
+            if (
+                getattr(inst, '__typed_python_category__', None) in ('Class', 'Alternative')
+                or not issubclass(inst, Type)
+                or (issubclass(inst, NamedTuple) and inst.__bases__[0] != NamedTuple)
+            ):
                 funcArgsAndKwargs = isTypeFunctionType(inst)
 
                 if funcArgsAndKwargs is not None:

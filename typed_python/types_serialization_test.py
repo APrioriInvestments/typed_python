@@ -1888,6 +1888,11 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertIs(m1, m2)
 
+    def test_serialize_frozenset(self):
+        sc = SerializationContext()
+
+        assert sc.nameForObject(frozenset) is not None
+
     def test_serialize_entrypointed_modulelevel_functions(self):
         sc = SerializationContext()
 
