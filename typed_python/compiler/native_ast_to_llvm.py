@@ -565,7 +565,7 @@ class FunctionConverter:
             )
 
             actual_exception = self.builder.call(
-                self.external_function_references["__cxa_begin_catch"],
+                self.external_function_references["tp_cxa_begin_catch"],
                 [self.builder.extract_value(res, 0)]
             )
 
@@ -579,7 +579,7 @@ class FunctionConverter:
             self.builder.store(result, self.exception_slot)
 
             self.builder.call(
-                self.external_function_references["__cxa_end_catch"],
+                self.external_function_references["tp_cxa_end_catch"],
                 [self.builder.extract_value(res, 0)]
             )
 
@@ -619,7 +619,7 @@ class FunctionConverter:
     def generate_exception_and_store_value(self, llvm_pointer_val):
         exception_ptr = self.builder.bitcast(
             self.builder.call(
-                self.external_function_references["__cxa_allocate_exception"],
+                self.external_function_references["tp_cxa_allocate_exception"],
                 [llvmI64(pointer_size)],
                 name="alloc_e"
             ),
@@ -696,7 +696,7 @@ class FunctionConverter:
         exception_ptr = self.generate_exception_and_store_value(llvm_pointer_val)
 
         self.builder.call(
-            self.external_function_references["__cxa_throw"],
+            self.external_function_references["tp_cxa_throw"],
             [exception_ptr] + [llvmlite.ir.Constant(llvm_i8ptr, None)] * 2
         )
 
@@ -1474,11 +1474,11 @@ def populate_needed_externals(external_function_references, module):
                 ),
                 fname
         )
-    define("__cxa_allocate_exception", llvm_i8ptr, [llvm_i64])
-    define("__cxa_throw", llvm_void, [llvm_i8ptr, llvm_i8ptr, llvm_i8ptr])
-    define("__cxa_end_catch", llvm_i8ptr, [llvm_i8ptr])
-    define("__cxa_begin_catch", llvm_i8ptr, [llvm_i8ptr])
-    define("__gxx_personality_v0", llvm_i32, [], vararg=True)
+    define("tp_cxa_allocate_exception", llvm_i8ptr, [llvm_i64])
+    define("tp_cxa_throw", llvm_void, [llvm_i8ptr, llvm_i8ptr, llvm_i8ptr])
+    define("tp_cxa_end_catch", llvm_i8ptr, [llvm_i8ptr])
+    define("tp_cxa_begin_catch", llvm_i8ptr, [llvm_i8ptr])
+    define("tp_gxx_personality_v0", llvm_void, [])
 
 
 class Converter:
@@ -1607,7 +1607,7 @@ class Converter:
             for name in sorted(names_to_definitions):
                 definition = names_to_definitions.pop(name)
                 func = self._functions_by_name[name]
-                func.attributes.personality = external_function_references["__gxx_personality_v0"]
+                func.attributes.personality = external_function_references["tp_gxx_personality_v0"]
 
                 # for a in func.args:
                 #     if a.type.is_pointer:

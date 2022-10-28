@@ -21,7 +21,6 @@ from typed_python.compiler.loaded_module import LoadedModule
 from typed_python.compiler.native_function_pointer import NativeFunctionPointer
 from typed_python.compiler.binary_shared_object import BinarySharedObject
 
-import sys
 import ctypes
 from typed_python import _types
 
@@ -33,12 +32,6 @@ target_triple = llvm.get_process_triple()
 target = llvm.Target.from_triple(target_triple)
 target_machine = target.create_target_machine()
 target_machine_shared_object = target.create_target_machine(reloc='pic', codemodel='default')
-
-# we need to load the appropriate libstdc++ so that we can get __cxa_begin_catch and friends
-if sys.platform == "darwin":
-    ctypes.CDLL("libstdc++.dylib", mode=ctypes.RTLD_GLOBAL)
-else:
-    ctypes.CDLL("libstdc++.so.6", mode=ctypes.RTLD_GLOBAL)
 
 ctypes.CDLL(_types.__file__, mode=ctypes.RTLD_GLOBAL)
 

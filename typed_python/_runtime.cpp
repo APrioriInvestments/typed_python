@@ -52,6 +52,38 @@ PyObject* getRuntimeSingleton() {
 // Note: extern C identifiers are distinguished only up to 32 characters
 // nativepython_runtime_12345678901
 extern "C" {
+    /******************************
+    these are exception-handling routines. rather than trying to find the c++ standard library
+    and linking to them in the python llvm wrapper, we can just passthrough to them directly
+    from here, since we're definitely linked into them anyways.
+    *******************************/
+
+    //forward declarations
+    void* __cxa_allocate_exception(long unsigned int i);
+    void __cxa_throw(void* a, void* b, void (*c)(void*));
+    void __cxa_end_catch();
+    void* __cxa_begin_catch(void* a);
+    void __gxx_personality_v0();
+
+    void* tp_cxa_allocate_exception(int64_t i) {
+        return __cxa_allocate_exception(i);
+    }
+    void tp_cxa_throw(void* a, void* b, void (*c)(void*)) {
+        __cxa_throw(a, b, c);
+    }
+    void* tp_cxa_end_catch(void* a) {
+        __cxa_end_catch();
+        return (void*)nullptr;
+    }
+    void* tp_cxa_begin_catch(void* a) {
+        return __cxa_begin_catch(a);
+    }
+
+    void tp_gxx_personality_v0() {
+        __gxx_personality_v0();
+    }
+    /******************************/
+
     void np_compileClassDispatch(ClassDispatchTable* classDispatchTable, int slot) {
         PyEnsureGilAcquired getTheGil;
 
