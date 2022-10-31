@@ -161,7 +161,11 @@ std::string MutuallyRecursiveTypeGroup::repr(bool deep) {
 
         std::string levelPrefix(level, ' ');
 
-        s << levelPrefix << "group with hash " << group->hash().digestAsHexString() << ":\n";
+        if (group->mIsCurrentlyHashing) {
+            s << levelPrefix << "hashing group @ " << (void*)group << "\n";
+        } else {
+            s << levelPrefix << "group with hash " << group->hash().digestAsHexString() << ":\n";
+        }
 
         // sort lexically and then by level, so that
         // we can tell what's going on when we have a discrepancy
@@ -188,16 +192,25 @@ std::string MutuallyRecursiveTypeGroup::repr(bool deep) {
                             subgroup = v.typeOrPyobjAsType()->getRecursiveTypeGroup();
                             ixInSubgroup = v.typeOrPyobjAsType()->getRecursiveTypeGroupIndex();
                         } else {
-                            std::tie(subgroup, ixInSubgroup) = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(
-                                v.typeOrPyobjAsObject()
-                            );
+                            std::tie(subgroup, ixInSubgroup) =
+                                MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(
+                                    v.typeOrPyobjAsObject()
+                                );
                         }
 
                         if (seen.find(subgroup) == seen.end()) {
                             dump(subgroup, level + 2);
                         } else {
-                            s << levelPrefix << "  " << "group with hash " << group->hash().digestAsHexString()
-                                << " item " << ixInSubgroup << "\n";
+                            if (group->mIsCurrentlyHashing) {
+                                s   << levelPrefix << "  "
+                                    << "hashing group @ " << (void*)group
+                                    << " item " << ixInSubgroup << "\n";
+                            } else {
+                                s   << levelPrefix << "  "
+                                    << "group with hash "
+                                    << group->hash().digestAsHexString()
+                                    << " item " << ixInSubgroup << "\n";
+                            }
                         }
                     }
                 }
@@ -465,19 +478,34 @@ void MutuallyRecursiveTypeGroup::computeHash() {
         return;
     }
 
-    if (mIsCurrentlyHashing) {
+    PyEnsureGilAcquired getTheGil;
+
+    thread_local static std::unordered_set<MutuallyRecursiveTypeGroup*> hashingGroupsSet;
+    thread_local static std::vector<MutuallyRecursiveTypeGroup*> hashingGroups;
+
+    if (hashingGroupsSet.find(this) != hashingGroupsSet.end()) {
         CompilerVisibleObjectVisitor::singleton().checkForInstability();
 
-        throw std::runtime_error(
-            "Somehow we are already computing the hash of this MRTG. "
+        std::ostringstream errMsg;
+
+        errMsg << "Somehow we are already computing the hash of this MRTG. "
             "This means that when we computed the group's constituents, we missed "
-            "a link between elements of this group and elements of a calling group."
-        );
+            "a link between elements of this group and elements of a calling group.\n\n";
+
+        for (auto group: hashingGroups) {
+            errMsg << group->repr(false) << "\n\n";
+        }
+
+        errMsg << this->repr(false) << "\n";
+
+        throw std::runtime_error(errMsg.str());
     }
 
     try {
         // mark that we're currently hashing.
         mIsCurrentlyHashing = true;
+        hashingGroups.push_back(this);
+        hashingGroupsSet.insert(this);
 
         // we are a recursive group head. We want to compute the hash
         // of all of our constituents where, when each of them looks at
@@ -504,13 +532,16 @@ void MutuallyRecursiveTypeGroup::computeHash() {
         mHash = wholeGroupHash;
         mIsCurrentlyHashing = false;
 
-        PyEnsureGilAcquired getTheGil;
+        hashingGroups.pop_back();
+        hashingGroupsSet.erase(this);
 
         if (mHashToGroup.find(mHash) == mHashToGroup.end()) {
             mHashToGroup[mHash] = this;
         }
     } catch(...) {
         mIsCurrentlyHashing = false;
+        hashingGroups.pop_back();
+        hashingGroupsSet.erase(this);
         throw;
     }
 }
