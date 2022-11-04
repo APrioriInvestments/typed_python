@@ -323,7 +323,7 @@ class PythonToNativeConverter:
         if self._currentlyConverting is None:
             # force the function to resolve immediately
             self._resolveAllInflightFunctions()
-            self._installInflightFunctions(name)
+            self._installInflightFunctions()
             self._inflight_function_conversions.clear()
 
         return self._targets.get(linkName)
@@ -819,7 +819,7 @@ class PythonToNativeConverter:
         if isRoot:
             try:
                 self._resolveAllInflightFunctions()
-                self._installInflightFunctions(name)
+                self._installInflightFunctions()
                 return self._targets[name]
             finally:
                 self._inflight_function_conversions.clear()
@@ -835,7 +835,7 @@ class PythonToNativeConverter:
             else:
                 return None
 
-    def _installInflightFunctions(self, name):
+    def _installInflightFunctions(self):
         if VALIDATE_FUNCTION_DEFINITIONS_STABLE:
             # this should always be true, but its expensive so we have it off by default
             for identifier, functionConverter in self._inflight_function_conversions.items():
