@@ -69,12 +69,7 @@ public:
         Type* inType,
         const Instance& inDefaultValue,
         bool nonempty
-    ) :
-        mName(inName),
-        mType(inType),
-        mDefaultValue(inDefaultValue),
-        mIsNonempty(nonempty)
-    {}
+    );
 
     const std::string& getName() const {
         return mName;
@@ -92,6 +87,10 @@ public:
         return mDefaultValue;
     }
 
+    const TypeOrPyobj& getDefaultValueTopo() const {
+        return mDefaultValueAsPyobj;
+    }
+
     bool getIsNonempty() const {
         return mIsNonempty;
     }
@@ -100,6 +99,7 @@ private:
     std::string mName;
     Type* mType;
     Instance mDefaultValue;
+    TypeOrPyobj mDefaultValueAsPyobj;
     bool mIsNonempty;
 };
 
@@ -380,59 +380,49 @@ public:
         }
     }
 
-    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-        ShaHash res = ShaHash(1, m_typeCategory) + ShaHash(m_name);
-
-        res += ShaHash(0);
-        for (auto b: m_bases) {
-            res += b->identityHash(groupHead);
-        }
-
-        res += ShaHash(1);
-        for (auto tup: m_own_members) {
-            res += ShaHash(tup.getName());
-            res += ShaHash(tup.getType()->identityHash(groupHead));
-            res += MutuallyRecursiveTypeGroup::tpInstanceShaHash(tup.getDefaultValue(), groupHead);
-            res += ShaHash(tup.getIsNonempty());
-        }
-
-        res += ShaHash(2);
-        for (auto nameAndFun: m_own_memberFunctions) {
-            res += ShaHash(nameAndFun.first);
-            res += nameAndFun.second->identityHash(groupHead);
-        }
-
-        res += ShaHash(3);
-        for (auto nameAndFun: m_own_staticFunctions) {
-            res += ShaHash(nameAndFun.first);
-            res += nameAndFun.second->identityHash(groupHead);
-        }
-
-        res += ShaHash(4);
-        for (auto nameAndFun: m_own_propertyFunctions) {
-            res += ShaHash(nameAndFun.first);
-            res += nameAndFun.second->identityHash(groupHead);
-        }
-
-        res += ShaHash(5);
-        for (auto nameAndFun: m_own_classMembers) {
-            res += ShaHash(nameAndFun.first);
-            res += MutuallyRecursiveTypeGroup::pyObjectShaHash(nameAndFun.second, groupHead);
-        }
-
-        res += ShaHash(6);
-        for (auto nameAndFun: m_own_classMethods) {
-            res += ShaHash(nameAndFun.first);
-            res += nameAndFun.second->identityHash(groupHead);
-        }
-
-        return res;
-    }
-
     template<class visitor_type>
-    void _visitCompilerVisibleInstances(const visitor_type& visitor) {
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(1, m_typeCategory));
+        v.visitName(m_name);
+
+        v.visitTopo(getClassType());
+
+        v.visitHash(ShaHash(m_bases.size()));
+        for (auto b: m_bases) {
+            v.visitTopo(b);
+        }
+
+        v.visitHash(ShaHash(m_own_members.size()));
         for (auto tup: m_own_members) {
-            visitor(tup.getDefaultValue());
+            v.visitHash(ShaHash(tup.getName()));
+            v.visitTopo(tup.getType());
+            v.visitTopo(tup.getDefaultValueTopo());
+            v.visitHash(ShaHash(tup.getIsNonempty()));
+        }
+
+        v.visitHash(ShaHash(2));
+        for (auto nameAndFun: m_own_memberFunctions) {
+            v.visitNamedTopo(nameAndFun.first, nameAndFun.second);
+        }
+
+        v.visitHash(ShaHash(3));
+        for (auto nameAndFun: m_own_staticFunctions) {
+            v.visitNamedTopo(nameAndFun.first, nameAndFun.second);
+        }
+
+        v.visitHash(ShaHash(4));
+        for (auto nameAndFun: m_own_propertyFunctions) {
+            v.visitNamedTopo(nameAndFun.first, nameAndFun.second);
+        }
+
+        v.visitHash(ShaHash(5));
+        for (auto nameAndFun: m_own_classMembers) {
+            v.visitNamedTopo(nameAndFun.first, nameAndFun.second);
+        }
+
+        v.visitHash(ShaHash(6));
+        for (auto nameAndFun: m_own_classMethods) {
+            v.visitNamedTopo(nameAndFun.first, nameAndFun.second);
         }
     }
 
@@ -498,13 +488,6 @@ public:
             Type* t = o.second;
             visitor(t);
             assert(t == o.second);
-        }
-    }
-
-    template<class visitor_type>
-    void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
-        for (auto nameAndFun: m_own_classMembers) {
-            visitor(nameAndFun.second);
         }
     }
 

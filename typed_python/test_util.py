@@ -93,7 +93,7 @@ def instantiateFiles(filesToWrite, tf):
             )
 
 
-def callFunctionInFreshProcess(func, argTup, compilerCacheDir=None):
+def callFunctionInFreshProcess(func, argTup, compilerCacheDir=None, showStdout=False, extraEnvs={}):
     """Return the value of a function evaluated on some arguments in a subprocess.
 
     We use this to test the semantics of anonymous functions and classes in a process
@@ -112,13 +112,15 @@ def callFunctionInFreshProcess(func, argTup, compilerCacheDir=None):
         if compilerCacheDir:
             env["TP_COMPILER_CACHE"] = compilerCacheDir
 
+        env.update(extraEnvs)
+
         sc = SerializationContext()
 
         with open(os.path.join(tf, "input"), "wb") as f:
             f.write(sc.serialize((func, argTup)))
 
         try:
-            subprocess.check_output(
+            output = subprocess.check_output(
                 [
                     sys.executable,
                     "-u",
@@ -135,7 +137,15 @@ def callFunctionInFreshProcess(func, argTup, compilerCacheDir=None):
                 stderr=subprocess.PIPE
             )
         except subprocess.CalledProcessError as e:
-            raise Exception("Subprocess failed:\n\n" + e.stdout.decode("ASCII") + "\n\nerr=\n" + e.stderr.decode("ASCII"))
+            raise Exception(
+                "Subprocess failed:\n\n"
+                + e.stdout.decode("ASCII")
+                + "\n\nerr=\n"
+                + e.stderr.decode("ASCII")
+            )
+
+        if showStdout:
+            print(output.decode("ASCII"))
 
         with open(os.path.join(tf, "output"), "rb") as f:
             result = sc.deserialize(f.read())

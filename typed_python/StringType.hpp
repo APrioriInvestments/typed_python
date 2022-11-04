@@ -45,6 +45,11 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(1, m_typeCategory));
+    }
+
     static int64_t bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int64_t length);
 
     //decode a utf8 string. note that 'length' is the number of codepoints, not the number of bytes

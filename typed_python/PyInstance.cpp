@@ -945,16 +945,37 @@ Type* PyInstance::rootNativeType(PyTypeObject* typeObj) {
 }
 
 // static
-Type* PyInstance::extractTypeFrom(PyTypeObject* typeObj) {
+Type* PyInstance::extractTypeFrom(PyTypeObject* typeObj, bool includePrimitives) {
     if (isSubclassOfNativeType(typeObj)) {
         return PythonSubclass::Make(rootNativeType(typeObj), typeObj);
     }
 
     if (isNativeType(typeObj)) {
         return ((NativeTypeWrapper*)typeObj)->mType;
-    } else {
-        return nullptr;
     }
+
+    if (includePrimitives) {
+        if (typeObj == &PyLong_Type) {
+            return Int64::Make();
+        }
+        if (typeObj == &PyFloat_Type) {
+            return Float64::Make();
+        }
+        if (typeObj == Py_None->ob_type) {
+            return NoneType::Make();
+        }
+        if (typeObj == &PyBool_Type) {
+            return Bool::Make();
+        }
+        if (typeObj == &PyBytes_Type) {
+            return BytesType::Make();
+        }
+        if (typeObj == &PyUnicode_Type) {
+            return StringType::Make();
+        }
+    }
+
+    return nullptr;
 }
 
 std::pair<Type*, instance_ptr> PyInstance::extractTypeAndPtrFrom(PyObject* obj) {

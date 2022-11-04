@@ -16,6 +16,20 @@
 
 #include "AllTypes.hpp"
 
+MemberDefinition::MemberDefinition(
+    const std::string& inName,
+    Type* inType,
+    const Instance& inDefaultValue,
+    bool nonempty
+) :
+    mName(inName),
+    mType(inType),
+    mDefaultValue(inDefaultValue),
+    mIsNonempty(nonempty)
+{
+    mDefaultValueAsPyobj = PyInstance::extractPythonObject(mDefaultValue);
+}
+
 bool HeldClass::isBinaryCompatibleWithConcrete(Type* other) {
     if (other->getTypeCategory() != m_typeCategory) {
         return false;

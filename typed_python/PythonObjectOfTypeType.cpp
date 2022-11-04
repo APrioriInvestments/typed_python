@@ -161,13 +161,13 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
     }
 
     if (PyLong_CheckExact(o) ||
-        PyFloat_CheckExact(o) || 
-        o == Py_None || 
-        o == Py_True || 
-        o == Py_False || 
-        PyUnicode_CheckExact(o) || 
-        PyBytes_CheckExact(o) || 
-        PyComplex_CheckExact(o)        
+        PyFloat_CheckExact(o) ||
+        o == Py_None ||
+        o == Py_True ||
+        o == Py_False ||
+        PyUnicode_CheckExact(o) ||
+        PyBytes_CheckExact(o) ||
+        PyComplex_CheckExact(o)
     ) {
         // don't duplicate primitives
         return incref(o);
@@ -201,8 +201,8 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
             return incref(o);
         }
 
-        if (!PyTuple_Check(reduceRes) 
-                || PyTuple_Size(reduceRes) < 2 
+        if (!PyTuple_Check(reduceRes)
+                || PyTuple_Size(reduceRes) < 2
                 || PyTuple_Size(reduceRes) > 6) {
             PyObjectStealer repr(PyObject_Repr(o));
             if (!repr) {
@@ -260,7 +260,7 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
             );
         }
 
-        // now implement the standard pickle protocol on the 
+        // now implement the standard pickle protocol on the
         // remaining arguments. Recall that the 3rd tuple element is the 'state'
         // the 4th and 5th are iterators of elements, and the 6th is a state setter
         if (remainingArgs.size() == 4 && remainingArgs[3] != Py_None) {
@@ -297,12 +297,12 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
                 if (!PyDict_Check(remainingArgs[0])) {
                     throw std::runtime_error("remainingArgs[0] is not a dict!");
                 }
-                
+
                 PyObjectStealer updateResult(
                     PyObject_CallMethod(
-                        (PyObject*)dict, 
-                        "update", 
-                        "(O)", 
+                        (PyObject*)dict,
+                        "update",
+                        "(O)",
                         (PyObject*)remainingArgs[0]
                     )
                 );
@@ -313,9 +313,9 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
             } else {
                 PyObjectStealer setStateRes(
                     PyObject_CallMethod(
-                        (PyObject*)value, 
-                        "__setstate__", 
-                        "(O)", 
+                        (PyObject*)value,
+                        "__setstate__",
+                        "(O)",
                         (PyObject*)remainingArgs[0]
                     )
                 );
@@ -328,8 +328,8 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
         if (remainingArgs.size() > 1 && remainingArgs[1] != Py_None) {
             PyObjectStealer extendRes(
                 PyObject_CallMethod(
-                    (PyObject*)value, 
-                    "extend", 
+                    (PyObject*)value,
+                    "extend",
                     "(O)",
                     (PyObject*)remainingArgs[1]
                 )
@@ -346,17 +346,17 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
                 static PyObject* one = PyLong_FromLong(1);
 
                 PyObjectStealer getItem0(PyObject_GetItem(kvPair, zero));
-                
+
                 if (!getItem0) {
                     throw PythonExceptionSet();
                 }
-                
+
                 PyObjectStealer getItem1(PyObject_GetItem(kvPair, one));
 
                 if (!getItem1) {
                     throw PythonExceptionSet();
                 }
-                
+
                 if (PyObject_SetItem((PyObject*)value, getItem0, getItem1) == -1) {
                     throw PythonExceptionSet();
                 }

@@ -403,7 +403,7 @@ class TypesTests(unittest.TestCase):
             def f(self):
                 return self.x + 2
 
-        XorX2 = OneOf(X, X2)
+        XorX2 = OneOf(X2, X)
 
         self.assertTrue(isinstance(XorX2(X()), X))
         self.assertTrue(isinstance(XorX2(X2()), X2))
@@ -1553,10 +1553,10 @@ class TypesTests(unittest.TestCase):
 
             values = producer.all()
 
-            for v1 in values:
-                for v2 in values:
-                    if hash(v1) != hash(v2) and v1 == v2:
-                        print(v1, v2, type(v1), type(v2))
+            # for v1 in values:
+            #     for v2 in values:
+            #         if hash(v1) != hash(v2) and v1 == v2:
+            #             print(v1, v2, type(v1), type(v2))
 
             for v1 in values:
                 for v2 in values:
@@ -3189,7 +3189,6 @@ class TypesTests(unittest.TestCase):
 
         for t1 in things:
             for t2 in things:
-                print(t1, t2)
                 # lists and tuples are not themselves comparable
                 if ("List" in str(type(t1))) != ("List" in str(type(t2))):
                     with self.assertRaises(TypeError):

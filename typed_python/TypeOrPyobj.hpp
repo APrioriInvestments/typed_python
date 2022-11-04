@@ -21,6 +21,10 @@
 
 class Type;
 
+// holds a reference to a Type* or a PyObject*. This interns any PyObjects it ever sees,
+// assuming that they're part of the 'type graph', so that we don't need to inc/decref them
+// all the time, so be careful. If you pass a PyObject* that wraps a Type*, you'll get the Type*
+// back, not the PyObject, so be careful.
 class TypeOrPyobj {
 public:
     TypeOrPyobj() :
@@ -28,70 +32,31 @@ public:
         mPyObj(nullptr)
     {}
 
-    TypeOrPyobj(Type* t) :
-        mType(t),
-        mPyObj(nullptr)
-    {
-        if (!mType) {
-            throw std::runtime_error("Can't construct a TypeOrPyobj with a null Type");
-        }
-    }
+    TypeOrPyobj(Type* t);
 
-    TypeOrPyobj(PyObject* o) :
-        mType(nullptr),
-        mPyObj(o)
-    {
-        if (!mPyObj) {
-            throw std::runtime_error("Can't construct a TypeOrPyobj with a null PyObject");
-        }
-        incref(mPyObj);
-    }
+    TypeOrPyobj(PyObject* o);
 
-    TypeOrPyobj(PyTypeObject* o) :
-        mType(nullptr),
-        mPyObj((PyObject*)o)
-    {
-        if (!mPyObj) {
-            throw std::runtime_error("Can't construct a TypeOrPyobj with a null PyObject");
-        }
-        incref(mPyObj);
-    }
+    TypeOrPyobj(PyTypeObject* o);
 
     ~TypeOrPyobj() {
-        if (mPyObj) {
-            decref(mPyObj);
-        }
     }
+
+    // produce a TypeOrPyobj but don't internalize it. This means that
+    // the reference could go bad at some point, so don't store this unless
+    // the incref is permanent.
+    static TypeOrPyobj withoutIntern(PyObject* o);
 
     TypeOrPyobj(const TypeOrPyobj& other) {
         mType = other.mType;
         mPyObj = other.mPyObj;
-        if (mPyObj) {
-            incref(mPyObj);
-        }
-    }
-
-    static TypeOrPyobj steal(PyObject* o) {
-        TypeOrPyobj res;
-        res.mPyObj = o;
-        return res;
     }
 
     TypeOrPyobj& operator=(const TypeOrPyobj& other) {
-        if (other.mPyObj) {
-            incref(other.mPyObj);
-        }
-        if (mPyObj) {
-            decref(mPyObj);
-        }
-
         mType = other.mType;
         mPyObj = other.mPyObj;
 
         return *this;
     }
-
-    ShaHash identityHash();
 
     // warning - this calls 'repr', which may alter the object
     std::string name() const;
@@ -138,28 +103,15 @@ public:
         return mPyObj;
     }
 
-    // return type(), or check if pyobj is a Type and if so unwrap it.
-    Type* typeOrPyobjAsType() const;
-
-    // return pyobj(), or convert the Type to its pyobj and return that.
-    PyObject* typeOrPyobjAsObject() const;
-
-    // make sure that if we're a type object, we have the type in the Type slot
-    TypeOrPyobj canonical() const {
-        if (mType) {
-            return *this;
-        }
-
-        if (typeOrPyobjAsType()) {
-            return TypeOrPyobj(typeOrPyobjAsType());
-        }
-
-        return *this;
-    }
+    static std::string pyObjectSortName(PyObject* o);
 
 private:
+    void unwrapForward();
+
     Type* mType;
     PyObject* mPyObj;
+
+    static std::unordered_set<PyObject*> sInternedPyObjects;
 };
 
 namespace std {

@@ -32,7 +32,7 @@ from typed_python._types import (
     getCodeGlobalDotAccesses,
     typesAndObjectsVisibleToCompilerFrom,
     checkForHashInstability,
-    resetCompilerVisibleObjectHashCache
+    resetCompilerVisibleObjectHashCache,
 )
 
 
@@ -66,6 +66,11 @@ def returnSerializedValue(filesToWrite, expression, printComments=False):
         f"SerializationContext({{}}).serialize({expression})",
         printComments=printComments
     )
+
+
+def test_identities_of_basic_types_different():
+    assert identityHash(int) != identityHash(float)
+    assert identityHash(TupleOf(int)) != identityHash(TupleOf(float))
 
 
 def test_object_graph_instability_is_noticed():

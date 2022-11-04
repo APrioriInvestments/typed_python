@@ -187,8 +187,10 @@ public:
 
     bool checkInitializationFlag(instance_ptr self, int64_t ix) const;
 
-    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-        return ShaHash(1, m_typeCategory) + m_heldClass->identityHash(groupHead);
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(1, m_typeCategory));
+        v.visitTopo(m_heldClass);
     }
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);

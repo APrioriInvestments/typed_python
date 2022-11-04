@@ -616,16 +616,17 @@ public:
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}
 
-    // visit the set of PyObject* that can be seen from this type if you
-    // were the compiler.
-    template<class visitor_type>
-    void _visitCompilerVisiblePythonObjects(const visitor_type& v) {}
-
-    template<class visitor_type>
-    void _visitCompilerVisibleInstances(const visitor_type& v) {}
-
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& v) {}
+
+    // visit the internals of the type in a stable order. Two types that are different
+    // should have different visit orders - all data must be hashed into this.
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        throw std::runtime_error(
+            "No _visitCompilerVisibleInternals implemented for " + name()
+        );
+    }
 
     // call subtype.constructor
     void constructor(instance_ptr self);
@@ -668,16 +669,9 @@ public:
     }
 
     template<class visitor_type>
-    void visitCompilerVisiblePythonObjects(const visitor_type& v) {
+    void visitCompilerVisibleInternals(const visitor_type& v) {
         this->check([&](auto& subtype) {
-            subtype._visitCompilerVisiblePythonObjects(v);
-        });
-    }
-
-    template<class visitor_type>
-    void visitCompilerVisibleInstances(const visitor_type& v) {
-        this->check([&](auto& subtype) {
-            subtype._visitCompilerVisibleInstances(v);
+            subtype._visitCompilerVisibleInternals(v);
         });
     }
 
@@ -785,7 +779,7 @@ public:
     *****/
     MutuallyRecursiveTypeGroup* getRecursiveTypeGroup() {
         if (!mTypeGroup) {
-            MutuallyRecursiveTypeGroup::constructRecursiveTypeGroup(this);
+            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(this);
 
             if (!mTypeGroup) {
                 throw std::runtime_error("Somehow, this type is not in a type group!");
@@ -820,38 +814,15 @@ public:
         type that's in our group. This gives us a unique signature for the group. The
         final hash is then that hash plus our id within the group.
     ******/
-    ShaHash identityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-        // check if we're being asked for our identity during the computation of our own
-        // group's hash, in which case we can't recurse, and we just use our position
-        // in the group.
-        if (groupHead && groupHead == getRecursiveTypeGroup()) {
-            return ShaHash(3, mRecursiveTypeGroupIndex);
-        }
-
+    ShaHash identityHash() {
         // if we've never initialized our hash
         if (mIdentityHash == ShaHash()) {
-            PyEnsureGilAcquired getTheGil;
+            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(this);
 
-            ShaHash groupHash = getRecursiveTypeGroup()->hash();
-
-            mIdentityHash = (
-                ShaHash(2)
-                + groupHash
-                + ShaHash(mRecursiveTypeGroupIndex)
-            );
-
-            MutuallyRecursiveTypeGroup::installTypeHash(this);
+            mIdentityHash = MutuallyRecursiveTypeGroup::shaHash(this);
         }
 
         return mIdentityHash;
-    }
-
-    // compute our identity hash by unfolding exactly one level. only the
-    // type group should use this function.
-    ShaHash computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-        return this->check([&](auto& subtype) {
-            return subtype._computeIdentityHash(groupHead);
-        });
     }
 
     void setRecursiveTypeGroup(MutuallyRecursiveTypeGroup* group, int32_t index) {
@@ -863,21 +834,12 @@ public:
         return mRecursiveTypeGroupIndex;
     }
 
-    // subtype-specific calculation
-    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-        return ShaHash(1, m_typeCategory);
-    }
-
     int64_t getRecursiveForwardIndex() {
         if (!m_is_recursive_forward) {
             return -1;
         }
 
         return m_recursive_forward_index;
-    }
-
-    int64_t getGlobalTypeIndex() const {
-        return m_global_type_index;
     }
 
 protected:
@@ -894,8 +856,7 @@ protected:
             m_is_recursive_forward(false),
             m_recursive_forward_index(-1),
             mTypeGroup(nullptr),
-            mRecursiveTypeGroupIndex(-1),
-            m_global_type_index(getNextGlobalTypeIndex())
+            mRecursiveTypeGroupIndex(-1)
         {}
 
     TypeCategory m_typeCategory;
@@ -915,18 +876,6 @@ protected:
     PyTypeObject* mTypeRep;
 
     Type* m_base;
-
-    // the order in which we produced this type in the program
-    int64_t m_global_type_index;
-
-    static int64_t getNextGlobalTypeIndex() {
-        static int64_t ix = 0;
-
-        // this is guarded by the GIL, so we don't need any extra locking
-        ix++;
-
-        return ix;
-    }
 
     // 'simple' types are those that have no reference to the python interpreter
     bool m_is_simple;

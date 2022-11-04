@@ -132,16 +132,9 @@ public:
     }
 
     template<class visitor_type>
-    void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
-        visitor((PyObject*)mPyTypePtr);
-    }
-
-    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-        ShaHash res(1, m_typeCategory);
-
-        res += MutuallyRecursiveTypeGroup::pyObjectShaHash((PyObject*)mPyTypePtr, groupHead);
-
-        return res;
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(1, m_typeCategory));
+        v.visitTopo((PyObject*)mPyTypePtr);
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other) {

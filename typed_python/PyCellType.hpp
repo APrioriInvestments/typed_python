@@ -37,6 +37,11 @@ public:
     }
 
     template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(1, m_typeCategory));
+    }
+
+    template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
     }
 

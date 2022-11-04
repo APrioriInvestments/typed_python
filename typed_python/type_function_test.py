@@ -17,7 +17,7 @@ from typed_python import (
     Forward, ListOf, Final, isCompiled, Entrypoint, NotCompiled, Dict
 )
 from typed_python.compiler.runtime import Runtime, RuntimeEventVisitor
-
+import os
 import unittest
 
 
@@ -48,6 +48,30 @@ def RegularPythonClass(T):
             pass
 
     return RegularPythonClass
+
+
+@TypeFunction
+def IntLevelClass(i):
+    if i == 0:
+        class C(Class, Final):
+            I = i
+
+            def thisIsAMethod(self):
+                pass
+
+            def next(self):
+                return self
+    else:
+        class C(Class, Final):
+            I = i
+
+            def thisIsAMethod(self):
+                pass
+
+            def next(self):
+                return IntLevelClass(i - 1)()
+
+    return C
 
 
 class TypeFunctionTest(unittest.TestCase):
@@ -313,6 +337,10 @@ class TypeFunctionTest(unittest.TestCase):
         assert instantiateAndCall(C3) == 20.0
 
     def test_call_type_function_with_constant(self):
+        # if the cache is on, this won't work
+        if os.getenv("TP_COMPILER_CACHE"):
+            return
+
         class Visitor(RuntimeEventVisitor):
             """Base class for a Visitor that gets to see what's going on in the runtime.
 
@@ -351,25 +379,21 @@ class TypeFunctionTest(unittest.TestCase):
 
         assert vis.variableTypes['T'] is not object
 
+    def test_serialize_type_function_results(self):
+        # confirm that when we serialize a TF Class we don't serialize the contents of the
+        # class!
+        sc = SerializationContext().withoutCompression()
+        assert b'thisIsAMethod' not in sc.serialize(IntLevelClass(10))
+
     def test_compiled_type_function_sees_through_constants(self):
-        @TypeFunction
-        def IntLevelClass(i):
-            if i == 0:
-                class C(Class, Final):
-                    def next(self):
-                        return self
-            else:
-                class C(Class, Final):
-                    def next(self):
-                        return IntLevelClass(i - 1)()
-
-            return C
-
         @Entrypoint
         def callNext(c):
             return c.next()
 
-        assert callNext.resultTypeFor(IntLevelClass(10)).typeRepresentation is IntLevelClass(9)
+        compilerInferredNextType = callNext.resultTypeFor(IntLevelClass(10)).typeRepresentation
+        intendedType = IntLevelClass(9)
+
+        assert compilerInferredNextType is intendedType
 
     def test_type_functions_are_classes(self):
         @TypeFunction

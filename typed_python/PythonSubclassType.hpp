@@ -52,17 +52,12 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
-    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-        return (
-            ShaHash(1, m_typeCategory)
-            + m_base->identityHash(groupHead)
-            + MutuallyRecursiveTypeGroup::pyObjectShaHash((PyObject*)mTypeRep, groupHead)
-        );
-    }
-
     template<class visitor_type>
-    void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
-        visitor((PyObject*)mTypeRep);
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(1, m_typeCategory));
+        v.visitName(m_name);
+        v.visitTopo(m_base);
+        v.visitTopo((PyObject*)mTypeRep);
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);

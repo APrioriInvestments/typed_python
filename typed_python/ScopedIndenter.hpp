@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2022 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -14,17 +14,28 @@
    limitations under the License.
 ******************************************************************************/
 
-#include "AllTypes.hpp"
+#pragma once
 
+#include <string>
 
-Value::Value(const Instance& instance) :
-    Type(TypeCategory::catValue),
-    mInstance(instance)
-{
-    m_size = 0;
-    m_is_default_constructible = true;
-    m_name = mInstance.repr();
-    m_doc = Value_doc;
-    mValueAsPyobj = PyInstance::extractPythonObject(mInstance);
-    endOfConstructorInitialization(); // finish initializing the type object.
-}
+// use to print indented log/debug messages. The static thread-local lets you keep track
+// of how many stack frames there are above you
+
+class ScopedIndenter {
+public:
+    ScopedIndenter() {
+        get()++;
+    }
+    ~ScopedIndenter() {
+        get()--;
+    }
+
+    int& get() {
+        static thread_local int i = 0;
+        return i;
+    }
+
+    std::string prefix() {
+        return std::string(get() * 4, ' ');
+    }
+};

@@ -39,14 +39,14 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
-    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-        ShaHash newHash = ShaHash(1, m_typeCategory);
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(1, m_typeCategory));
+        v.visitHash(ShaHash(m_types.size()));
 
         for (auto t: m_types) {
-            newHash += t->identityHash(groupHead);
+            v.visitTopo(t);
         }
-
-        return newHash;
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);

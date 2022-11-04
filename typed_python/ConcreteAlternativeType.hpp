@@ -71,7 +71,12 @@ public:
         assert(t == m_alternative);
     }
 
-    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr);
+
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(1, m_typeCategory) + ShaHash(m_which));
+        v.visitTopo(m_alternative);
+    }
 
     bool _updateAfterForwardTypesChanged();
 

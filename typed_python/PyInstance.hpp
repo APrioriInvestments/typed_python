@@ -571,7 +571,10 @@ public:
 
     static bool isNativeType(PyTypeObject* typeObj);
 
-    static Type* extractTypeFrom(PyTypeObject* typeObj);
+    // if typeObj is a typed_python type or a subclass of one, return the
+    // Type* representing it. If 'includePrimitives', then also map things like
+    // float and int, which happen to have both PyTypeObject* and Type* representations
+    static Type* extractTypeFrom(PyTypeObject* typeObj, bool includePrimitives=false);
 
     // if 'obj' is a PyInstance, return its type and data ptrs, after unwrapping
     // any 'RefTo' classes, which is the standard behavior for most classes,

@@ -157,7 +157,23 @@ public:
 
     bool _updateAfterForwardTypesChanged();
 
-    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr);
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(1, m_typeCategory));
+        v.visitName(m_name);
+        v.visitHash(ShaHash(m_subtypes.size()));
+
+        for (auto& subtype_pair: m_subtypes) {
+            v.visitNamedTopo(subtype_pair.first, subtype_pair.second);
+        }
+
+        v.visitHash(ShaHash(m_methods.size()));
+
+        for (auto nameAndMethod: m_methods) {
+            v.visitNamedTopo(nameAndMethod.first, nameAndMethod.second);
+        }
+    }
+
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
     static bool cmpStatic(Alternative* altT, instance_ptr left, instance_ptr right, int64_t pyComparisonOp);

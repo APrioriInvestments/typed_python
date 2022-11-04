@@ -57,21 +57,23 @@ public:
         mIndexedFieldToAccess(elementAccess)
     {}
 
-    ShaHash identityHash(MutuallyRecursiveTypeGroup* groupHead=nullptr) {
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
         if (isFunction()) {
-            return ShaHash(1) + getFunction()->identityHash(groupHead);
-        }
+            v.visitHash(ShaHash(1));
+            v.visitTopo(getFunction());
+        } else
         if (isNamedField()) {
-            return ShaHash(2) + ShaHash(getNamedField());
-        }
+            v.visitHash(ShaHash(2) + ShaHash(getNamedField()));
+        } else
         if (isIndexedField()) {
-            return ShaHash(3) + ShaHash(getIndexedField());
-        }
+            v.visitHash(ShaHash(3) + ShaHash(getIndexedField()));
+        } else
         if (isCellAccess()) {
-            return ShaHash(4);
+            v.visitHash(ShaHash(4));
+        } else {
+            v.visitErr("Invalid ClosureVariableBindingStep found");
         }
-
-        return ShaHash::poison();
     }
 
     static ClosureVariableBindingStep AccessCell() {
@@ -247,12 +249,13 @@ public:
     ClosureVariableBinding(const ClosureVariableBinding& other) : mSteps(other.mSteps)
     {}
 
-    ShaHash identityHash(MutuallyRecursiveTypeGroup* groupHead=nullptr) {
-        ShaHash res;
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(mSteps->size()));
+
         for (auto step: *mSteps) {
-            res += step.identityHash(groupHead);
+            step._visitCompilerVisibleInternals(v);
         }
-        return res;
     }
 
     ClosureVariableBinding& operator=(const ClosureVariableBinding& other) {
@@ -498,24 +501,24 @@ public:
             return FunctionArg(name, typeFilterOrNull, defaultValue, isStarArg, isKwarg);
         }
 
-        ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-            ShaHash res(m_name);
-
+        template<class visitor_type>
+        void _visitCompilerVisibleInternals(const visitor_type& v) {
+            v.visitName(m_name);
             if (m_defaultValue) {
-                res += MutuallyRecursiveTypeGroup::pyObjectShaHash(m_defaultValue, groupHead);
+                v.visitTopo((PyObject*)m_defaultValue);
             } else {
-                res += ShaHash(1);
+                v.visitHash(ShaHash());
             }
 
             if (m_typeFilter) {
-                res += m_typeFilter->identityHash(groupHead);
+                v.visitTopo(m_typeFilter);
             } else {
-                res += ShaHash(1);
+                v.visitHash(ShaHash());
             }
 
-            res += ShaHash((m_isStarArg ? 2 : 1) + (m_isKwarg ? 10: 11));
-
-            return res;
+            v.visitHash(
+                ShaHash((m_isStarArg ? 2 : 1) + (m_isKwarg ? 10: 11))
+            );
         }
 
     private:
@@ -790,55 +793,94 @@ public:
         }
 
         template<class visitor_type>
-        void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
-            visitor(mFunctionCode);
+        void _visitCompilerVisibleInternals(const visitor_type& visitor) {
+            visitor.visitTopo(mFunctionCode);
 
-            // visit the interior elements of
             if (mFunctionAnnotations) {
+                visitor.visitHash(ShaHash(2));
+
                 if (PyDict_CheckExact(mFunctionAnnotations)) {
                     PyObject *key, *value;
                     Py_ssize_t pos = 0;
 
                     while (PyDict_Next(mFunctionAnnotations, &pos, &key, &value)) {
-                        visitor(value);
+                        visitor.visitTopo(key);
+                        visitor.visitTopo(value);
                     }
-                } else {
-                    visitor(mFunctionAnnotations);
                 }
+
+                visitor.visitHash(ShaHash(2));
             }
 
+
             if (mSignatureFunction) {
-                visitor(mSignatureFunction);
+                visitor.visitHash(ShaHash(1));
+                visitor.visitTopo(mSignatureFunction);
+            } else {
+                visitor.visitHash(ShaHash(0));
             }
 
             if (mFunctionDefaults) {
+                visitor.visitHash(ShaHash(2));
+
                 if (PyDict_CheckExact(mFunctionDefaults)) {
                     PyObject *key, *value;
                     Py_ssize_t pos = 0;
 
                     while (PyDict_Next(mFunctionDefaults, &pos, &key, &value)) {
-                        visitor(value);
+                        visitor.visitTopo(key);
+                        visitor.visitTopo(value);
                     }
-                } else {
-                    visitor(mFunctionDefaults);
                 }
+
+                visitor.visitHash(ShaHash(2));
             }
 
+            visitor.visitHash(ShaHash(mFunctionGlobalsInCells.size()));
+
             for (auto nameAndGlobal: mFunctionGlobalsInCells) {
-                PyObject* cell = nameAndGlobal.second;
-                if (!PyCell_Check(cell)) {
+                if (!PyCell_Check(nameAndGlobal.second)) {
                     throw std::runtime_error(
                         "A global in mFunctionGlobalsInCells is somehow not a cell"
                     );
                 }
 
-                visitor(cell);
+                visitor.visitNamedTopo(nameAndGlobal.first, nameAndGlobal.second);
             }
 
+            if (mReturnType) {
+                visitor.visitTopo(mReturnType);
+            } else {
+                visitor.visitHash(ShaHash());
+            }
+
+            if (mMethodOf) {
+                visitor.visitTopo(mMethodOf);
+            } else {
+                visitor.visitHash(ShaHash());
+            }
+
+            visitor.visitHash(ShaHash(mClosureBindings.size()));
+            for (auto nameAndClosure: mClosureBindings) {
+                visitor.visitName(nameAndClosure.first);
+                nameAndClosure.second._visitCompilerVisibleInternals(visitor);
+            }
+
+            visitor.visitHash(ShaHash(mArgs.size()));
+
+            for (auto a: mArgs) {
+                a._visitCompilerVisibleInternals(visitor);
+            }
+
+            visitor.visitHash(ShaHash(1));
+
             _visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
-                visitor(val);
+                visitor.visitNamedTopo(name, val);
             });
+
+            visitor.visitHash(ShaHash(1));
         }
+
 
         template<class visitor_type>
         static void visitCompilerVisibleGlobals(
@@ -1379,57 +1421,6 @@ public:
             }
         }
 
-        ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-            ShaHash res = (
-                mReturnType ? mReturnType->identityHash(groupHead) : ShaHash()
-            );
-
-            if (mMethodOf) {
-                res += mMethodOf->identityHash(groupHead);
-            } else {
-                res += ShaHash();
-            }
-
-            for (auto nameAndClosure: mClosureBindings) {
-                res += ShaHash(nameAndClosure.first) + nameAndClosure.second.identityHash(groupHead);
-            }
-
-            res += MutuallyRecursiveTypeGroup::pyObjectShaHash(mFunctionCode, groupHead);
-
-            res += ShaHash(mArgs.size());
-
-            for (auto a: mArgs) {
-                res += a._computeIdentityHash(groupHead);
-            }
-
-            res += ShaHash(1);
-
-            _visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
-                res += ShaHash(name);
-                res += MutuallyRecursiveTypeGroup::pyObjectShaHash(val, groupHead);
-            });
-
-            res += ShaHash(1);
-
-            for (auto nameAndGlobal: mFunctionGlobalsInCells) {
-                res += ShaHash(nameAndGlobal.first);
-
-                PyObject* cell = nameAndGlobal.second;
-                if (!PyCell_Check(cell)) {
-                    throw std::runtime_error(
-                        "A global in mFunctionGlobalsInCells is somehow not a cell"
-                    );
-                }
-
-                res += MutuallyRecursiveTypeGroup::pyObjectShaHash(
-                    cell,
-                    groupHead
-                );
-            }
-
-            return res;
-        }
-
     private:
         PyObject* mFunctionCode;
 
@@ -1519,8 +1510,9 @@ public:
         return false;
     }
 
-    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-        ShaHash res = (
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(
             ShaHash(1, m_typeCategory)
             + ShaHash(m_name)
             + ShaHash(mRootName)
@@ -1528,14 +1520,14 @@ public:
             + ShaHash(mModulename)
             + ShaHash(mIsNocompile ? 2 : 1)
             + ShaHash(mIsEntrypoint ? 2 : 1)
-            + mClosureType->identityHash(groupHead)
         );
+        v.visitTopo(mClosureType);
+
+        v.visitHash(ShaHash(mOverloads.size()));
 
         for (auto o: mOverloads) {
-            res += o._computeIdentityHash(groupHead);
+            o._visitCompilerVisibleInternals(v);
         }
-
-        return res;
     }
 
     static Function* Make(std::string inName, std::string qualname, std::string moduleName, const std::vector<Overload>& overloads, Type* closureType, bool isEntrypoint, bool isNocompile) {
@@ -1567,13 +1559,6 @@ public:
             o._visitReferencedTypes(visitor);
         }
         visitor(mClosureType);
-    }
-
-    template<class visitor_type>
-    void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
-        for (auto& o: mOverloads) {
-            o._visitCompilerVisiblePythonObjects(visitor);
-        }
     }
 
     static Function* merge(Function* f1, Function* f2) {

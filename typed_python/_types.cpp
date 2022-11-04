@@ -2061,14 +2061,10 @@ PyObject *identityHash(PyObject* nullValue, PyObject* args) {
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
 
     ShaHash hash;
-    Type* typeArg = nullptr;
 
     return translateExceptionToPyObject([&]() {
-        if (PyType_Check(a1) && (typeArg = PyInstance::extractTypeFrom(a1))) {
-            hash = typeArg->identityHash();
-        } else {
-            hash = MutuallyRecursiveTypeGroup::pyObjectShaHash(a1, nullptr);
-        }
+        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)a1);
+        hash = MutuallyRecursiveTypeGroup::shaHash((PyObject*)a1);
 
         return PyBytes_FromStringAndSize((const char*)&hash, sizeof(ShaHash));
     });
@@ -2691,16 +2687,8 @@ PyObject *isRecursive(PyObject* nullValue, PyObject* args) {
     MutuallyRecursiveTypeGroup* group = nullptr;
 
     return translateExceptionToPyObject([&]() {
-        if (PyType_Check(a1)) {
-            Type* typeArg = PyInstance::extractTypeFrom(a1);
-            if (typeArg) {
-                group = typeArg->getRecursiveTypeGroup();
-            }
-        }
-
-        if (!group) {
-            group = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(a1).first;
-        }
+        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)a1);
+        group = MutuallyRecursiveTypeGroup::groupAndIndexFor((PyObject*)a1).first;
 
         if (!group) {
             return incref(Py_False);
@@ -2750,6 +2738,22 @@ PyObject *checkForHashInstability(PyObject* nullValue, PyObject* args) {
     });
 }
 
+PyObject *typeWalkRecord(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "typeWalkRecord takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    return translateExceptionToPyObject([&]() {
+        TypeOrPyobj obj((PyObject*)a1);
+
+        return PyUnicode_FromString(
+            ("Walk of " + obj.name() + ":\n\n" + CompilerVisibleObjectVisitor::recordWalkAsString(obj)).c_str()
+        );
+    });
+}
+
 PyObject *typesAndObjectsVisibleToCompilerFrom(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "typesAndObjectsVisibleToCompilerFrom takes 1 positional argument");
@@ -2759,13 +2763,8 @@ PyObject *typesAndObjectsVisibleToCompilerFrom(PyObject* nullValue, PyObject* ar
 
     return translateExceptionToPyObject([&]() {
         std::vector<TypeOrPyobj> visible;
-        Type* typeArg = nullptr;
 
-        if (PyType_Check(a1) && (typeArg=PyInstance::extractTypeFrom(a1))) {
-            MutuallyRecursiveTypeGroup::visibleFrom(typeArg, visible);
-        } else {
-            MutuallyRecursiveTypeGroup::visibleFrom((PyObject*)a1, visible);
-        }
+        MutuallyRecursiveTypeGroup::visibleFrom((PyObject*)a1, visible);
 
         PyObjectStealer res(PyList_New(0));
 
@@ -2800,7 +2799,8 @@ PyObject *recursiveTypeGroupHash(PyObject* nullValue, PyObject* args) {
         }
 
         if (!group) {
-            group = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(a1).first;
+            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)a1);
+            group = MutuallyRecursiveTypeGroup::groupAndIndexFor((PyObject*)a1).first;
         }
 
         if (!group) {
@@ -2821,16 +2821,8 @@ PyObject *recursiveTypeGroupReprDeepFlag(PyObject* nullValue, PyObject* args, bo
     MutuallyRecursiveTypeGroup* group = nullptr;
 
     return translateExceptionToPyObject([&]() {
-        if (PyType_Check(a1)) {
-            Type* typeArg = PyInstance::extractTypeFrom(a1);
-            if (typeArg) {
-                group = typeArg->getRecursiveTypeGroup();
-            }
-        }
-
-        if (!group) {
-            group = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(a1).first;
-        }
+        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)a1);
+        group = MutuallyRecursiveTypeGroup::groupAndIndexFor((PyObject*)a1).first;
 
         if (!group) {
             return incref(Py_None);
@@ -2860,16 +2852,8 @@ PyObject *recursiveTypeGroup(PyObject* nullValue, PyObject* args) {
     MutuallyRecursiveTypeGroup* group = nullptr;
 
     return translateExceptionToPyObject([&]() {
-        if (PyType_Check(a1)) {
-            Type* typeArg = PyInstance::extractTypeFrom(a1);
-            if (typeArg) {
-                group = typeArg->getRecursiveTypeGroup();
-            }
-        }
-
-        if (!group) {
-            group = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(a1).first;
-        }
+        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)a1);
+        group = MutuallyRecursiveTypeGroup::groupAndIndexFor((PyObject*)a1).first;
 
         if (!group) {
             return incref(Py_None);
@@ -3303,6 +3287,7 @@ static PyMethodDef module_methods[] = {
     {"recursiveTypeGroupHash", (PyCFunction)recursiveTypeGroupHash, METH_VARARGS, NULL},
     {"checkForHashInstability", (PyCFunction)checkForHashInstability, METH_VARARGS, checkForHashInstability_doc},
     {"resetCompilerVisibleObjectHashCache", (PyCFunction)resetCompilerVisibleObjectHashCache, METH_VARARGS, resetCompilerVisibleObjectHashCache_doc},
+    {"typeWalkRecord", (PyCFunction)typeWalkRecord, METH_VARARGS, NULL},
     {"typesAndObjectsVisibleToCompilerFrom", (PyCFunction)typesAndObjectsVisibleToCompilerFrom, METH_VARARGS, NULL},
     {"isRecursive", (PyCFunction)isRecursive, METH_VARARGS, NULL},
     {"referencedTypes", (PyCFunction)referencedTypes, METH_VARARGS, NULL},

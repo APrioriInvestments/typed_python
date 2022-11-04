@@ -30,15 +30,6 @@ void PythonSerializationContext::setFlags() {
 
     mCompressionEnabled = ((PyObject*)compressionEnabled) == Py_True;
 
-
-    PyObjectStealer internalizeTypeGroups(PyObject_GetAttrString(mContextObj, "internalizeTypeGroups"));
-
-    if (!internalizeTypeGroups) {
-        throw PythonExceptionSet();
-    }
-
-    mInternalizeTypeGroups = ((PyObject*)internalizeTypeGroups) == Py_True;
-
     PyObjectStealer serializeHashSequence(PyObject_GetAttrString(mContextObj, "serializeHashSequence"));
 
     if (!serializeHashSequence) {

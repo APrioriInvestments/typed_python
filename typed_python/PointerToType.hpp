@@ -53,8 +53,10 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
-    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead = nullptr) {
-        return ShaHash(1, m_typeCategory) + m_element_type->identityHash(groupHead);
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(1, m_typeCategory));
+        v.visitTopo(m_element_type);
     }
 
     void _updateTypeMemosAfterForwardResolution() {

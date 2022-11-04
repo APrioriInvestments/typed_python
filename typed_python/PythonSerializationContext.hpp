@@ -93,7 +93,7 @@ public:
     bool isCompressionEnabled() const {
         return mCompressionEnabled;
     }
-    
+
     bool isLineInfoSuppressed() const {
         return mSuppressLineInfo;
     }
@@ -106,7 +106,7 @@ public:
 
     virtual void serializePythonObject(PyObject* o, SerializationBuffer& b, size_t fieldNumber) const;
 
-    void serializePythonObjectNamedOrAsObj(PyObject* o, SerializationBuffer& b) const;
+    void serializePythonObjectByNameOrRepresentation(PyObject* o, SerializationBuffer& b) const;
 
     void serializePythonObjectRepresentation(PyObject* o, SerializationBuffer& b, size_t fieldNumber) const;
 
@@ -190,8 +190,6 @@ private:
     bool mCompressionEnabled;
 
     bool mSuppressLineInfo;
-
-    bool mInternalizeTypeGroups;
 
     bool mSerializeHashSequence;
 };

@@ -17,58 +17,145 @@
 #include "MutuallyRecursiveTypeGroup.hpp"
 #include "TypeOrPyobj.hpp"
 
-// return type(), or check if pyobj is a Type and if so unwrap it.
-Type* TypeOrPyobj::typeOrPyobjAsType() const {
-    if (mType) {
-        return mType;
+TypeOrPyobj::TypeOrPyobj(Type* t) :
+    mType(t),
+    mPyObj(nullptr)
+{
+    if (!mType) {
+        throw std::runtime_error("Can't construct a TypeOrPyobj with a null Type");
     }
-
-    if (!mPyObj || !PyType_Check(mPyObj)) {
-        return nullptr;
-    }
-
-    return PyInstance::extractTypeFrom((PyTypeObject*)mPyObj);
 }
 
-  // return pyobj(), or convert the Type to its pyobj and return that.
-PyObject* TypeOrPyobj::typeOrPyobjAsObject() const {
-    if (mType) {
-        return (PyObject*)PyInstance::typeObj(mType);
+TypeOrPyobj::TypeOrPyobj(PyObject* o) :
+    mType(nullptr),
+    mPyObj(o)
+{
+    PyEnsureGilAcquired getTheGil;
+
+    if (PyType_Check(mPyObj)) {
+        mType = PyInstance::extractTypeFrom((PyTypeObject*)mPyObj, true);
+        if (mType) {
+            mPyObj = nullptr;
+            return;
+        }
     }
 
-    return mPyObj;
+    if (!mPyObj) {
+        throw std::runtime_error("Can't construct a TypeOrPyobj with a null PyObject");
+    }
+
+    if (sInternedPyObjects.find(mPyObj) == sInternedPyObjects.end()) {
+        sInternedPyObjects.insert(mPyObj);
+        incref(mPyObj);
+    }
 }
 
+TypeOrPyobj::TypeOrPyobj(PyTypeObject* o) :
+    mType(nullptr),
+    mPyObj((PyObject*)o)
+{
+    PyEnsureGilAcquired getTheGil;
 
-ShaHash TypeOrPyobj::identityHash() {
+    mType = PyInstance::extractTypeFrom(o, true);
     if (mType) {
-        return mType->identityHash();
+        mPyObj = nullptr;
+        return;
     }
 
-    return MutuallyRecursiveTypeGroup::pyObjectShaHash(mPyObj, nullptr);
+    if (!mPyObj) {
+        throw std::runtime_error("Can't construct a TypeOrPyobj with a null PyObject");
+    }
+
+    if (sInternedPyObjects.find(mPyObj) == sInternedPyObjects.end()) {
+        sInternedPyObjects.insert(mPyObj);
+        incref(mPyObj);
+    }
+}
+
+TypeOrPyobj TypeOrPyobj::withoutIntern(PyObject* o) {
+    TypeOrPyobj obj;
+
+    obj.mPyObj = o;
+
+    if (PyType_Check(o)) {
+        obj.mType = PyInstance::extractTypeFrom((PyTypeObject*)o, true);
+        if (obj.mType) {
+            obj.mPyObj = nullptr;
+            return obj;
+        }
+    }
+
+    return obj;
 }
 
 std::string TypeOrPyobj::name() const {
     if (mType) {
-        return "<Type " + mType->name() + " of cat " + Type::categoryToString(mType->getTypeCategory()) + ">";
+        std::ostringstream s;
+        s << "<Type " << mType->name() + " of cat " + Type::categoryToString(mType->getTypeCategory()) + "@" << (void*)mType << ">";
+        return s.str();
     }
 
     if (mPyObj) {
-        std::string lexical = MutuallyRecursiveTypeGroup::pyObjectSortName(mPyObj);
+        std::ostringstream s;
+
+        std::string lexical = pyObjectSortName(mPyObj);
+
         if (lexical != "<UNNAMED>") {
-            return "<PyObj named " + lexical + ">";
+            s << "<PyObj named " << lexical << "@" << (void*)mPyObj << ">";
+            return s.str();
         }
 
         PyObjectStealer repr(PyObject_Repr(mPyObj));
 
+        s << "<PyObj of type " << mPyObj->ob_type->tp_name;
+
         if (repr) {
-            return "<PyObj of type " + std::string(mPyObj->ob_type->tp_name) +
-                " with repr " + std::string(PyUnicode_AsUTF8(repr)).substr(0, 150) + ">";
-            decref(repr);
+            s << " with repr " << std::string(PyUnicode_AsUTF8(repr)).substr(0, 200);
         }
 
-        return "<PyObj of type " + std::string(mPyObj->ob_type->tp_name) + ">";
+        s << "@" << (void*)mPyObj << ">";
+
+        return s.str();
     }
 
     throw std::runtime_error("Invalid TypeOrPyobj encountered.");
 }
+
+std::string TypeOrPyobj::pyObjectSortName(PyObject* o) {
+    PyEnsureGilAcquired getTheGil;
+
+    if (PyObject_HasAttrString(o, "__module__") && PyObject_HasAttrString(o, "__name__")) {
+        std::string modulename, clsname;
+
+        PyObjectStealer moduleName(PyObject_GetAttrString(o, "__module__"));
+        if (!moduleName) {
+            PyErr_Clear();
+        } else {
+            if (PyUnicode_Check(moduleName)) {
+                modulename = std::string(PyUnicode_AsUTF8(moduleName));
+            }
+        }
+
+        PyObjectStealer clsName(PyObject_GetAttrString(o, "__name__"));
+        if (!clsName) {
+            PyErr_Clear();
+        } else {
+            if (PyUnicode_Check(clsName)) {
+                modulename = std::string(PyUnicode_AsUTF8(clsName));
+            }
+        }
+
+        if (clsname.size()) {
+            if (modulename.size()) {
+                return modulename + "|" + clsname;
+            }
+
+            return clsname;
+        }
+    }
+
+    return "<UNNAMED>";
+}
+
+// static
+std::unordered_set<PyObject*> TypeOrPyobj::sInternedPyObjects;

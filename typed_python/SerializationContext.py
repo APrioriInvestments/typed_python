@@ -121,7 +121,6 @@ class SerializationContext:
         compressionEnabled=True,
         encodeLineInformationForCode=True,
         objectToNameOverride=None,
-        internalizeTypeGroups=True,
         serializeFunctionGlobalsAsIs=False,
         serializeHashSequence=False
     ):
@@ -135,7 +134,6 @@ class SerializationContext:
         )
         self.compressionEnabled = compressionEnabled
         self.encodeLineInformationForCode = encodeLineInformationForCode
-        self.internalizeTypeGroups = internalizeTypeGroups
         self.serializeFunctionGlobalsAsIs = serializeFunctionGlobalsAsIs
         self.serializeHashSequence = serializeHashSequence
 
@@ -170,27 +168,7 @@ class SerializationContext:
             compressionEnabled=self.compressionEnabled,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups,
             serializeFunctionGlobalsAsIs=True,
-            serializeHashSequence=self.serializeHashSequence
-        )
-
-    def withoutInternalizingTypeGroups(self):
-        """Make sure we fully deserialize types.
-
-        This means we don't place them into the main type memo
-        by identityHash, which is really only useful for testing.
-        """
-        if not self.internalizeTypeGroups:
-            return self
-
-        return SerializationContext(
-            nameToObjectOverride=self.nameToObjectOverride,
-            compressionEnabled=self.compressionEnabled,
-            encodeLineInformationForCode=self.encodeLineInformationForCode,
-            objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=False,
-            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
             serializeHashSequence=self.serializeHashSequence
         )
 
@@ -203,7 +181,6 @@ class SerializationContext:
             compressionEnabled=self.compressionEnabled,
             encodeLineInformationForCode=False,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
             serializeHashSequence=self.serializeHashSequence
         )
@@ -217,7 +194,6 @@ class SerializationContext:
             compressionEnabled=False,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
             serializeHashSequence=self.serializeHashSequence
         )
@@ -231,7 +207,6 @@ class SerializationContext:
             compressionEnabled=True,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
             serializeHashSequence=self.serializeHashSequence
         )
@@ -245,7 +220,6 @@ class SerializationContext:
             compressionEnabled=self.compressionEnabled,
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
-            internalizeTypeGroups=self.internalizeTypeGroups,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
             serializeHashSequence=True
         )
@@ -451,25 +425,61 @@ class SerializationContext:
     def deserialize(self, bytes, serializeType=object):
         return deserialize(serializeType, bytes, self)
 
+    def factoryFor(self, inst):
+        """If this object can be produced using a factory without any state, return a tuple
+
+            (factory, args)
+
+        which we will use to reconstruct the object.
+        """
+        # practially speaking, we only use this pathway for TypeFunctions.
+
+        # only serialize Class, Alternative, named tuple subclass, and actual python class
+        # objects from type functions.
+
+        # otherwise, we'll end up changing how we serialize things like 'int',
+        # if they ever make their way into a type function.
+
+        # note that we need to ensure that type functions don't make two classes and
+        # return only one of them.
+        if isinstance(inst, type):
+            if (
+                getattr(inst, '__typed_python_category__', None) in ('Class', 'Alternative')
+                or not issubclass(inst, Type)
+                or (issubclass(inst, NamedTuple) and inst.__bases__[0] != NamedTuple)
+            ):
+                funcArgsAndKwargs = isTypeFunctionType(inst)
+
+                if funcArgsAndKwargs is not None:
+                    typeFunc = funcArgsAndKwargs[0]
+
+                    # we can't use this methodology for type funcs that are not named because
+                    # they have a memo inside them
+                    if self.nameForObject(typeFunc) is not None:
+                        return (reconstructTypeFunctionType, funcArgsAndKwargs)
+
     def representationFor(self, inst):
         ''' Return the representation of a given instance or None.
 
-            For certain types, we want to special-case how they are serialized.
-            For those types, we return a representation object and for other
-            types we return None.
+        For certain types, we want to special-case how they are serialized.
+        For those types, we return a representation object and for other
+        types we return None.
 
-            The representation consists of a tuple (factory, args, representation).
+        The representation consists of a tuple (factory, args, representation).
 
-            During reconstruction, we call factory(*args) to produce an emnpty
-            'skeleton' object, and then call `setInstanceStateFromRepresentation`
-            with the resulting object and the 'representation'. The values returned
-            for  'factory' and 'args' may not have circular dependencies with the current
-            object - we deserialize those first, call factory(*args) to get the
-            resulting object, and that object gets returned to any objects inside of
-            'representation' that have references to the original object.
+        During reconstruction, we call factory(*args) to produce an emnpty
+        'skeleton' object, and then call `setInstanceStateFromRepresentation`
+        with the resulting object and the 'representation'. The values returned
+        for  'factory' and 'args' may not have circular dependencies with the current
+        object - we deserialize those first, call factory(*args) to get the
+        resulting object, and that object gets returned to any objects inside of
+        'representation' that have references to the original object.
 
-            @param inst: an instance to be serialized
-            @return a representation object or None
+        Args:
+            inst - an instance to be serialized
+
+        Returns:
+            a representation tuple, or None
         '''
         if type(inst) in (tuple, list, dict, set, str, int, bool, float):
             return None

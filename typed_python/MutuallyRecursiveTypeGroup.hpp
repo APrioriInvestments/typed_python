@@ -21,118 +21,133 @@
 #include <map>
 #include <unordered_map>
 
+
+class MutuallyRecursiveTypeGroupSearch;
+
+
+// represents a group of Type* and PyObject* instances that can 'see' each other according
+// to the compiler. These instances need to be serialized and hashed as a group.  The hash
+// of the instances depends on the hash of the group, and the hash of the group depends on
+// the set of instances contained inside of it.
 class MutuallyRecursiveTypeGroup {
 public:
-    MutuallyRecursiveTypeGroup() :
-        mAnyPyObjectsIncorrectlyOrdered(false),
-        mIsCurrentlyHashing(false)
-    {}
+    //return an empty 'builder' group. Builder groups can be built up and then
+    //installed into the graph. You're not guaranteed that your copy of the builder group
+    //is the one we take, since (a) there could be two threads trying to build this particular
+    //MRTG, or (b) you could be deserializing data from a version of your codebase where
+    //the code has changed but the types are stable and you still want to deserialize objects
+    //even though the hashes in the core data will have changed.
 
-    MutuallyRecursiveTypeGroup(ShaHash hash);
+    //Regardless, you're guaranteed that after you finalize this group, there will be only
+    //one copy of the types or singleton objects it contains. The types you put in may be
+    //discarded, so don't keep a reference to them.
+    static MutuallyRecursiveTypeGroup* DeserializerGroup(ShaHash intendedHash);
 
-    ShaHash hash() {
-        if (mHash == ShaHash()) {
-            computeHash();
-        }
-
-        return mHash;
+    bool isDeserializerGroup() const {
+        return mIsDeserializerGroup;
     }
 
-    void computeHashAndInstall();
+    void finalizeDeserializerGroup();
 
-    // indicate that when we deserialize 'sourceHash', we are going to get the group
-    // mapped to 'destHash'.
-    static void installSourceToDestHashLookup(ShaHash sourceHash, ShaHash destHash);
+    // assuming we're a builder group, set the value of one of our objects. These need
+    // not be the final versions of the objects.
+    void setIndexToObject(int32_t index, TypeOrPyobj obj);
 
-    // if 'sourceHash' was marked to go to 'destHash', return 'destHash'. otherwise
-    // return sourceHash.
-    static ShaHash sourceToDestHashLookup(ShaHash sourceHash);
+    // is this object in this group? If this is a native type, we'll unpack it and check that.
+    // returns -1 if its not.
+    int32_t indexOfObjectInThisGroup(TypeOrPyobj o);
+
+    ShaHash hash() const {
+        return mHash;
+    }
 
     const std::map<int32_t, TypeOrPyobj>& getIndexToObject() const {
         return mIndexToObject;
     }
 
-    void setIndexToObject(int32_t index, TypeOrPyobj obj) {
-        auto it = mIndexToObject.find(index);
-        if (it != mIndexToObject.end()) {
-            it->second = obj;
-        } else {
-            mIndexToObject.insert({index, obj});
-        }
-    }
-
     std::string repr(bool deep=false);
 
-    static ShaHash pyObjectShaHash(PyObject* h, MutuallyRecursiveTypeGroup* groupHead);
-
-    static ShaHash tpInstanceShaHash(Instance h, MutuallyRecursiveTypeGroup* groupHead);
-
-    static ShaHash tpInstanceShaHash(Type* t, uint8_t* data, MutuallyRecursiveTypeGroup* groupHead);
-
-    static void constructRecursiveTypeGroup(TypeOrPyobj root);
-
-    static ShaHash pyCodeObjectShaHash(PyCodeObject* co, MutuallyRecursiveTypeGroup* groupHead);
-
-    static std::string pyObjectSortName(PyObject* o);
-
+    // if we have an official MRTG for this hash, return it.
     static MutuallyRecursiveTypeGroup* getGroupFromHash(ShaHash h);
 
-    static std::pair<MutuallyRecursiveTypeGroup*, int> pyObjectGroupHeadAndIndex(
-        PyObject* o,
-        bool constructIfNotInGroup=true
-    );
+    // if we have an MRTG with this 'intended' hash, return that.
+    static MutuallyRecursiveTypeGroup* getGroupFromIntendedHash(ShaHash h);
 
-    // is this object in this group? If this is a native type, we'll unpack it and check that.
-    // returns -1 if its not.
-    int32_t indexOfObjectInThisGroup(PyObject* o);
+    // construct an MRTG on this. After this call, this object will be in the type memo
+    // and calls to 'groupAndIndexFor' and shaHash will succeed
+    static void ensureRecursiveTypeGroup(TypeOrPyobj root);
 
-    int32_t indexOfObjectInThisGroup(TypeOrPyobj o);
+    // return the current group head, assuming one has been created. If you haven't called
+    // ensureRecursiveTypeGroup, you may get a nullptr for the group. Note that creating
+    // a TypeOrPyobj will leak a reference to 'o', so don't do it on any old object.
+    static std::pair<MutuallyRecursiveTypeGroup*, int> groupAndIndexFor(TypeOrPyobj o);
 
-    static bool pyObjectGloballyIdentifiable(PyObject* h);
+    // lookup an object without increffing it
+    static std::pair<MutuallyRecursiveTypeGroup*, int> groupAndIndexFor(PyObject* o);
 
-    static ShaHash computePyObjectShaHashConstant(PyObject* h);
+    // return the current sha-hash for this object, or ShaHash() if its not in a type
+    // group yet.
+    static ShaHash shaHash(TypeOrPyobj t);
 
-    static bool isSimpleConstant(PyObject* h);
-
+    // ensure this object is in a type group and then return the set of reachable instances
     static void visibleFrom(TypeOrPyobj root, std::vector<TypeOrPyobj>& outReachable);
 
-    static void buildCompilerRecursiveGroup(const std::set<TypeOrPyobj>& types);
+private:
+    MutuallyRecursiveTypeGroup();
+
+    MutuallyRecursiveTypeGroup(ShaHash hash);
+
+    static ShaHash shaHashOfSimplePyObjectConstant(PyObject* h);
 
     static bool objectIsUnassigned(TypeOrPyobj obj);
 
-    // find a type by hash if we have it. return null if we don't.
-    static Type* lookupType(const ShaHash& h);
+    ShaHash computeTopoHash(TypeOrPyobj t);
 
-    // find an object by hash if we have it. return null if we don't.
-    static PyObject* lookupObject(const ShaHash& h);
+    void _computeHashAndInstall();
+
+    static void buildCompilerRecursiveGroup(const std::set<TypeOrPyobj>& types);
 
     static void installTypeHash(Type* t);
-private:
+
     static ShaHash pyObjectShaHashByVisiting(PyObject* obj, MutuallyRecursiveTypeGroup* groupHead);
 
-    static ShaHash computePyObjectShaHash(PyObject* h, MutuallyRecursiveTypeGroup* groupHead);
+    // given a collection of TypeOrPyobj, figure out which one is the 'root' for the group
+    // this must be stable regardless of the ordering.
+    static std::pair<TypeOrPyobj, bool> computeRoot(const std::set<TypeOrPyobj>& types);
+
+    // static mutex that guards all the relevant data structures. Changes to all static
+    // structures below must be made while holding the mutex. You may not hold the mutex
+    // and call back into any python code of any kind, since that can produce deadlocks.
+    static std::recursive_mutex mMutex;
 
     // for each python object that's in a type group, the group and index within the group
-    static std::unordered_map<PyObject*, std::pair<MutuallyRecursiveTypeGroup*, int> > mPythonObjectTypeGroups;
+    static std::unordered_map<TypeOrPyobj, std::pair<MutuallyRecursiveTypeGroup*, int> > mTypeGroups;
+
+    static std::map<ShaHash, MutuallyRecursiveTypeGroup*> mIntendedHashToGroup;
 
     static std::map<ShaHash, MutuallyRecursiveTypeGroup*> mHashToGroup;
 
-    // for each python object where we have a hash
-    static std::unordered_map<PyObject*, ShaHash> mPythonObjectShaHashes;
-
-    static std::map<ShaHash, Type*> mHashToType;
-
-    static std::map<ShaHash, ShaHash> mSourceToDestHashLookup;
-
-    static std::map<ShaHash, PyObject*> mHashToObject;
-
     void computeHash();
 
-    bool mIsCurrentlyHashing;
+    // is this a builder group? If so, we can modify it and types may be forwards
+    // if not, we can't modify it and it may or may not be officially installed.
+    bool mIsDeserializerGroup;
 
+    // the sha hash of this group within this codebase
     ShaHash mHash;
+
+    // the sha-hash of this group within the codebase from which it originated.
+    // if this is not equal to mHash, then this group was a builder group that didn't
+    // match, and will not be the official group for any type. It may, however, be
+    // returned by the memo for this same 'intended' hash so that we don't need to
+    // actually do the work of fully deserializing the relevant types.
+    ShaHash mIntendedHash;
 
     std::map<int32_t, TypeOrPyobj> mIndexToObject;
 
+    std::unordered_map<TypeOrPyobj, int32_t> mObjectToIndex;
+
     bool mAnyPyObjectsIncorrectlyOrdered;
+
+    friend class MutuallyRecursiveTypeGroupSearch;
 };

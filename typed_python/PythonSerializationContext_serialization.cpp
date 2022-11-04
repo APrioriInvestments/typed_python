@@ -18,10 +18,19 @@
 #include "AllTypes.hpp"
 #include "PyInstance.hpp"
 #include "MutuallyRecursiveTypeGroup.hpp"
+#include "ScopedIndenter.hpp"
+
+#define TP_VERBOSE_SERIALIZE 0
 
 // virtual
+// serialize a python object.  This function should work in any context.
 void PythonSerializationContext::serializePythonObject(PyObject* o, SerializationBuffer& b, size_t fieldNumber) const {
     PyEnsureGilAcquired acquireTheGil;
+
+#   if TP_VERBOSE_SERIALIZE
+    ScopedIndenter s;
+    std::cout << s.prefix() << "serializePythonObject " << TypeOrPyobj::withoutIntern(o).name() << "\n";
+#   endif
 
     b.writeBeginCompound(fieldNumber);
 
@@ -32,27 +41,34 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
     // because otherwise we'd create a dependency during serialization on _whether_ the
     // group was already created, which would introduce a nondeterminism into serilization
     // based on the compiler state
-    if (PyCell_Check(o) || PyFunction_Check(o)) {
-        auto groupAndIndex = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(o, false);
+    auto groupAndIndex = MutuallyRecursiveTypeGroup::groupAndIndexFor(o);
 
-        // if we have a group, check whether we've already memoized this group in the stream
-        // this prevents us from initiating the serialization of a new group here.
-        if (groupAndIndex.first && b.isAlreadyCached(groupAndIndex.first)) {
-            //see if the object has a name. If so, we always want to use that.
-            PyObjectStealer typeName(PyObject_CallMethod(mContextObj, "nameForObject", "(O)", o));
-            if (!typeName) {
-                throw PythonExceptionSet();
-            }
+    // if we have a group, check whether we've already memoized this group in the stream
+    // this prevents us from initiating the serialization of a new group here.
+    if (groupAndIndex.first && b.isAlreadyCached(groupAndIndex.first)) {
+        //see if the object has a name. If so, we always want to use that.
+        std::string name = getNameForPyObj(o);
 
-            if (typeName == Py_None) {
-                b.writeBeginCompound(FieldNumbers::RECURSIVE_OBJECT);
-                serializeMutuallyRecursiveTypeGroup(groupAndIndex.first, b, 0);
-                b.writeUnsignedVarintObject(1, groupAndIndex.second);
-                b.writeEndCompound();
-                b.writeEndCompound();
-                return;
-            }
+        if (name.size()) {
+            // we shouldn't have a name, because if we do we should have serialized
+            // the MRTG by the name of one of its elements.
+            throw std::runtime_error("This group should be serialized by name already");
         }
+
+        b.writeBeginCompound(FieldNumbers::RECURSIVE_OBJECT);
+        serializeMutuallyRecursiveTypeGroup(groupAndIndex.first, b, 0);
+
+#       if TP_VERBOSE_SERIALIZE
+        ScopedIndenter s;
+        std::cout << s.prefix() << TypeOrPyobj::withoutIntern(o).name() << " is "
+            << groupAndIndex.second << " in "
+            << groupAndIndex.first->hash().digestAsHexString() << "\n";
+#       endif
+
+        b.writeUnsignedVarintObject(1, groupAndIndex.second);
+        b.writeEndCompound();
+        b.writeEndCompound();
+        return;
     }
 
     Type* t = PyInstance::extractTypeFrom(o->ob_type);
@@ -84,9 +100,6 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
         } else
         if (PyFloat_CheckExact(o)) {
             b.writeRegisterType(FieldNumbers::FLOAT, PyFloat_AsDouble(o));
-        } else
-        if (PyComplex_CheckExact(o)) {
-            throw std::runtime_error(std::string("`complex` objects cannot be serialized yet"));
         } else
         if (PyBytes_CheckExact(o)) {
             b.writeBeginBytes(FieldNumbers::BYTES, PyBytes_GET_SIZE(o));
@@ -140,13 +153,13 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
             if (nativeType) {
                 serializeNativeType(nativeType, b, FieldNumbers::NATIVE_TYPE);
             } else {
-                serializePythonObjectNamedOrAsObj(o, b);
+                serializePythonObjectByNameOrRepresentation(o, b);
             }
         } else
         if (PyCell_Check(o)) {
             serializePyCell(o, b);
         } else {
-            serializePythonObjectNamedOrAsObj(o, b);
+            serializePythonObjectByNameOrRepresentation(o, b);
         }
     }
 
@@ -196,7 +209,7 @@ void PythonSerializationContext::serializePyFrozenSet(PyObject* o, Serialization
     serializeIterable(o, b, FieldNumbers::FROZENSET);
 }
 
-void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, SerializationBuffer& b) const {
+void PythonSerializationContext::serializePythonObjectByNameOrRepresentation(PyObject* o, SerializationBuffer& b) const {
     PyEnsureGilAcquired acquireTheGil;
 
     if (b.isAlreadyCached(o)) {
@@ -205,18 +218,11 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
     }
 
     //see if the object has a name
-    PyObjectStealer typeName(PyObject_CallMethod(mContextObj, "nameForObject", "(O)", o));
-    if (!typeName) {
-        throw PythonExceptionSet();
-    }
+    std::string typeName(getNameForPyObj(o));
 
-    if (typeName != Py_None) {
-        if (!PyUnicode_Check(typeName)) {
-            throw std::runtime_error(std::string("nameForObject returned a non-string"));
-        }
-
+    if (typeName.size()) {
         b.writeUnsignedVarintObject(FieldNumbers::MEMO, b.cachePointer(o).first);
-        b.writeStringObject(FieldNumbers::OBJECT_NAME, std::string(PyUnicode_AsUTF8(typeName)));
+        b.writeStringObject(FieldNumbers::OBJECT_NAME, typeName);
         return;
     }
 
@@ -245,12 +251,23 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
         return;
     }
 
-    // we don't write a memo here
     if (PyType_Check(o)) {
-        auto groupAndIndex = MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(o);
+        // if its a Type object, this is the place to put it into a mutually recursive type
+        // group
+        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(o);
+        auto groupAndIndex = MutuallyRecursiveTypeGroup::groupAndIndexFor(o);
 
         b.writeBeginCompound(FieldNumbers::RECURSIVE_OBJECT);
         serializeMutuallyRecursiveTypeGroup(groupAndIndex.first, b, 0);
+
+#       if TP_VERBOSE_SERIALIZE
+        ScopedIndenter s;
+        std::cout << s.prefix() << TypeOrPyobj::withoutIntern(o).name()
+            << " is " << groupAndIndex.second << " in "
+            << groupAndIndex.first->hash().digestAsHexString() << "\n";
+#       endif
+
+
         b.writeUnsignedVarintObject(1, groupAndIndex.second);
         b.writeEndCompound();
         return;
@@ -322,8 +339,16 @@ bool isSimpleType(Type* t) {
         cat == Type::TypeCategory::catPyCell;
 }
 
+// serialize a native type. It should work in any context.
 void PythonSerializationContext::serializeNativeType(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const {
     PyEnsureGilAcquired getTheGil;
+
+
+#   if TP_VERBOSE_SERIALIZE
+    ScopedIndenter s;
+    std::cout << s.prefix() << "serializeNativeType " <<
+        nativeType->name() << " of cat " << nativeType->getTypeCategoryString() << "\n";
+#   endif
 
     b.writeBeginCompound(fieldNumber);
 
@@ -346,24 +371,19 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
         b.writeUnsignedVarintObject(0, 2);
         b.writeStringObject(1, name);
     } else {
-        //give the plugin a chance to convert the instance to something else
-        PyObjectStealer representation(
-            PyObject_CallMethod(mContextObj, "representationFor", "(O)", (PyObject*)PyInstance::typeObj(nativeType))
-        );
+        // this is a member of a recursive type group. This will populate the type group
+        // and trigger it.
+        b.writeUnsignedVarintObject(0, 4);
+        serializeMutuallyRecursiveTypeGroup(nativeType->getRecursiveTypeGroup(), b, 1);
+        b.writeUnsignedVarintObject(2, nativeType->getRecursiveTypeGroupIndex());
 
-        if (!representation) {
-            throw PythonExceptionSet();
-        }
-
-        if (representation != Py_None) {
-            b.writeUnsignedVarintObject(0, 3);
-            serializePythonObjectRepresentation(representation, b, 1);
-        } else {
-            // this is a member of a recursive type group
-            b.writeUnsignedVarintObject(0, 4);
-            serializeMutuallyRecursiveTypeGroup(nativeType->getRecursiveTypeGroup(), b, 1);
-            b.writeUnsignedVarintObject(2, nativeType->getRecursiveTypeGroupIndex());
-        }
+#       if TP_VERBOSE_SERIALIZE
+        std::cout << s.prefix() << "serializeNativeType: "
+            << TypeOrPyobj(nativeType).name() << " is "
+            << nativeType->getRecursiveTypeGroupIndex()
+            << " in " << nativeType->getRecursiveTypeGroup()->hash().digestAsHexString()
+            << "\n";
+#       endif
     }
 
     b.writeEndCompound();
@@ -384,6 +404,8 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
         uint32_t id;
         bool isNew;
 
+        // as of this moment, all references to objects in the mutually recursive type group
+        // will now reference this object, instead of dumping internals.
         std::tie(id, isNew) = b.cachePointer(group, nullptr);
 
         // write the memo first
@@ -395,6 +417,10 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
             return;
         }
 
+#       if TP_VERBOSE_SERIALIZE
+        ScopedIndenter s;
+        std::cout << s.prefix() << "Serializing fresh MRTG: " << group->hash().digestAsHexString() << "\n";
+#       endif
         // group hash
         if (shouldSerializeHashSequence()) {
             b.writeUnsignedVarintObject(1, b.getGroupCounter(group));
@@ -407,11 +433,11 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
         for (auto& indexAndObj: group->getIndexToObject()) {
             std::string name;
 
-            if (indexAndObj.second.typeOrPyobjAsType()) {
-                name = getNameForPyObj((PyObject*)PyInstance::typeObj(indexAndObj.second.typeOrPyobjAsType()));
-            } else {
-                name = getNameForPyObj(indexAndObj.second.pyobj());
-            }
+            TypeOrPyobj obj = indexAndObj.second;
+
+            name = getNameForPyObj(
+                obj.pyobj() ? obj.pyobj() : (PyObject*)PyInstance::typeObj(obj.type())
+            );
 
             if (name.size()) {
                 // field '5' indicates that this is a mutually recursive type group
@@ -422,12 +448,44 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                 b.writeEndCompound();
                 return;
             }
+
+            // see if this object is represented by a perfect factory
+            PyObjectStealer factory(
+                PyObject_CallMethod(
+                    mContextObj, "factoryFor", "(O)",
+                    obj.pyobj() ? obj.pyobj() : (PyObject*)PyInstance::typeObj(obj.type())
+                )
+            );
+
+            if (!factory) {
+                throw PythonExceptionSet();
+            }
+
+            if (factory != Py_None) {
+                if (!PyTuple_CheckExact(factory) || PyTuple_Size(factory) != 2) {
+                    throw std::runtime_error(
+                        "factoryFor(" + obj.name() + ") returned an invalid tuple"
+                    );
+                }
+
+                // field '6' indicates that this is a mutually recursive type group
+                // identified by one of its objects being a 'factory' object.
+                // We can skip writing the rest of the group since the other side will
+                // have the same representation.
+                serializePythonObject(factory, b, 6);
+                b.writeEndCompound();
+                return;
+            }
         }
 
         std::map<int32_t, PyObjectHolder> indicesWrittenAsObjectAndRep;
         std::set<int32_t> indicesWrittenAsExternalObjectAndDict;
         std::set<int32_t> indicesWrittenAsInternalObjectAndDict;
 
+
+#       if TP_VERBOSE_SERIALIZE
+        std::cout << s.prefix() << "Serializing headers\n";
+#       endif
         // for each item in the group, enough information to allocate it
         // as a forward:
         //      0 if its a native type,
@@ -460,6 +518,11 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
 
                 TypeOrPyobj obj = group->getIndexToObject().find(index)->second;
 
+#               if TP_VERBOSE_SERIALIZE
+                ScopedIndenter s;
+                std::cout << s.prefix() << "Serializing header " << index << ": " << obj.name() << "\n";
+#               endif
+
                 // check whether this is a type object and if so, check all the bases
                 if (obj.pyobj() && PyType_Check(obj.pyobj())) {
                     PyTypeObject* typeObj = (PyTypeObject*)obj.pyobj();
@@ -476,66 +539,84 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
 
                 b.writeBeginCompound(index);
 
-                if (obj.typeOrPyobjAsType()) {
-                    // it's a type object. write it as a native type and serialize its inner pieces.
-                    b.writeUnsignedVarintObject(0, 0);
-                    b.writeStringObject(1, obj.typeOrPyobjAsType()->name());
-                    b.writeUnsignedVarintObject(2, obj.typeOrPyobjAsType()->getTypeCategory());
-                } else {
-                    //give the plugin a chance to convert the instance to something else
-                    PyObjectStealer representation(
-                        PyObject_CallMethod(mContextObj, "representationFor", "(O)", obj.pyobj())
-                    );
+                PyObjectHolder representation;
 
-                    if (!representation) {
-                        throw PythonExceptionSet();
+                // give the plugin a chance to convert the instance to something else.
+                if (obj.type() && (obj.type()->isPythonObjectOfType() || obj.type()->isValue())) {
+                    // however - we have to be careful _NOT_ to serialize PythonObjectOfType
+                    // this way - we always want to serialize that as a type itself. This is
+                    // because we'll marshall the Type* back as the actual class when we pass
+                    // it to python, and may unpack the object itself.
+                    representation.set(Py_None);
+                } else {
+                    representation.steal(
+                        PyObject_CallMethod(
+                            mContextObj, "representationFor", "(O)",
+                            obj.pyobj() ? obj.pyobj() : (PyObject*)PyInstance::typeObj(obj.type())
+                        )
+                    );
+                }
+
+                if (!representation) {
+                    throw PythonExceptionSet();
+                }
+
+                if (representation != Py_None) {
+#                   if TP_VERBOSE_SERIALIZE
+                    ScopedIndenter s;
+                    std::cout << s.prefix() << "representation of " << TypeOrPyobj::withoutIntern(representation).name() << "\n";
+#                   endif
+
+                    if (!PyTuple_Check(representation) || PyTuple_Size(representation) < 2
+                            || PyTuple_Size(representation) > 6) {
+                        throw std::runtime_error("representationFor should return None or a tuple with 2 to 6 things");
+                    }
+                    if (!PyTuple_Check(PyTuple_GetItem(representation, 1))) {
+                        throw std::runtime_error("representationFor second arguments should be a tuple");
                     }
 
-                    if (representation != Py_None) {
-                        if (!PyTuple_Check(representation) || PyTuple_Size(representation) < 2
-                                || PyTuple_Size(representation) > 6) {
-                            throw std::runtime_error("representationFor should return None or a tuple with 2 to 6 things");
-                        }
-                        if (!PyTuple_Check(PyTuple_GetItem(representation, 1))) {
-                            throw std::runtime_error("representationFor second arguments should be a tuple");
-                        }
+                    // indicate that this is a 'representation' object
+                    b.writeUnsignedVarintObject(0, 2);
 
-                        // indicate that this is a 'representation' object
-                        b.writeUnsignedVarintObject(0, 2);
+                    // and serialize the first two parts of the representation, which are
+                    // the object factory and its arguments. we'll include the state later.
+                    serializePythonObject(PyTuple_GetItem(representation, 0), b, 1);
+                    serializePythonObject(PyTuple_GetItem(representation, 1), b, 2);
 
-                        // and serialize the first two parts of the representation, which are
-                        // the object factory and its arguments. we'll include the state later.
-                        serializePythonObject(PyTuple_GetItem(representation, 0), b, 1);
-                        serializePythonObject(PyTuple_GetItem(representation, 1), b, 2);
+                    indicesWrittenAsObjectAndRep[index].steal(
+                        PyTuple_GetSlice(representation, 2, PyTuple_Size(representation))
+                    );
+                } else
+                if (obj.type()) {
+                    // it's a type object. write it as a native type and serialize its inner pieces.
+                    b.writeUnsignedVarintObject(0, 0);
 
-                        indicesWrittenAsObjectAndRep[index].steal(
-                            PyTuple_GetSlice(representation, 2, PyTuple_Size(representation))
-                        );
-                    } else
-                    if (PyTuple_Check(obj.pyobj())) {
-                        b.writeUnsignedVarintObject(0, 5);
-                        b.writeUnsignedVarintObject(1, PyTuple_Size(obj.pyobj()));
+                    b.writeStringObject(1, obj.type()->name());
+                    b.writeUnsignedVarintObject(2, obj.type()->getTypeCategory());
+                } else
+                if (PyTuple_Check(obj.pyobj())) {
+                    b.writeUnsignedVarintObject(0, 5);
+                    b.writeUnsignedVarintObject(1, PyTuple_Size(obj.pyobj()));
+                    indicesWrittenAsExternalObjectAndDict.insert(index);
+                } else {
+                    // we're going to serialize this as a regular python object with
+                    // a dict. we need to serialize the type object first.
+
+                    // it's either a native type, or not.
+                    // and it's either in our group or not.
+
+                    int32_t indexInThisGroup = group->indexOfObjectInThisGroup(
+                        (PyObject*)obj.pyobj()->ob_type
+                    );
+
+                    if (indexInThisGroup == -1) {
                         indicesWrittenAsExternalObjectAndDict.insert(index);
+                        b.writeUnsignedVarintObject(0, 3);
+                        serializePythonObject((PyObject*)obj.pyobj()->ob_type, b, 1);
                     } else {
-                        // we're going to serialize this as a regular python object with
-                        // a dict. we need to serialize the type object first.
-
-                        // it's either a native type, or not.
-                        // and it's either in our group or not.
-
-                        int32_t indexInThisGroup = group->indexOfObjectInThisGroup(
-                            (PyObject*)obj.pyobj()->ob_type
-                        );
-
-                        if (indexInThisGroup == -1) {
-                            indicesWrittenAsExternalObjectAndDict.insert(index);
-                            b.writeUnsignedVarintObject(0, 3);
-                            serializePythonObject((PyObject*)obj.pyobj()->ob_type, b, 1);
-                        } else {
-                            indicesWrittenAsInternalObjectAndDict.insert(index);
-                            b.writeUnsignedVarintObject(0, 4);
-                            b.writeUnsignedVarintObject(1, indexInThisGroup);
-                        }
+                        indicesWrittenAsInternalObjectAndDict.insert(index);
+                        b.writeUnsignedVarintObject(0, 4);
+                        b.writeUnsignedVarintObject(1, indexInThisGroup);
                     }
                 }
 
@@ -548,11 +629,21 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
 
         b.writeEndCompound();
 
+#       if TP_VERBOSE_SERIALIZE
+        std::cout << s.prefix() << "serializing bodies\n";
+#       endif
+
         // then the object bodies. we have to write native types first, so that
         // they can be instantiated fully, then objects and dictionaries. otherwise,
         // we end up with uninstantiated forwards leaking into our object graph
         b.writeBeginCompound(3);
             auto writeObjectBody = [&](int index, TypeOrPyobj obj) {
+
+#               if TP_VERBOSE_SERIALIZE
+                ScopedIndenter s;
+                std::cout << s.prefix() << "serializing body " << index << ": " << obj.name() << "\n";
+#               endif
+
                 if (indicesWrittenAsObjectAndRep.find(index) != indicesWrittenAsObjectAndRep.end()) {
                     // write the context
                     serializePythonObject(
@@ -575,7 +666,15 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                         serializePythonObject(PyCell_Get(obj.pyobj()), b, index);
                     } else
                     if (PyTuple_Check(obj.pyobj())) {
-                        serializePythonObject(obj.pyobj(), b, index);
+                        // note that we have to write out the tuple elements themselves,
+                        // not the tuple, since the tuple is actually a part of the
+                        // recursive type group.
+                        b.writeBeginCompound(index);
+                        long tupSize = PyTuple_Size(obj.pyobj());
+                        for (long k = 0; k < tupSize; k++) {
+                            serializePythonObject(PyTuple_GetItem(obj.pyobj(), k), b, k);
+                        }
+                        b.writeEndCompound();
                     } else {
                         // write the context
                         PyObjectStealer objDict(PyObject_GenericGetDict(obj.pyobj(), nullptr));
@@ -602,26 +701,16 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                         serializePythonObject(objDict, b, index);
                     }
                 } else {
-                    Type* toSerialize = obj.typeOrPyobjAsType();
-                    if (toSerialize->isForward()) {
-                        Forward* f = (Forward*)toSerialize;
-                        if (f->getTarget()) {
-                            // we already indicated that this is a forward,
-                            // so we just want to serialize the type of the inner
-                            // which should be another MRTG reference
-                            serializeNativeType(f->getTarget(), b, index);
-                        }
-                    } else {
-                        serializeNativeTypeInner(toSerialize, b, index);
-                    }
+                    Type* toSerialize = obj.type();
+                    serializeNativeTypeInner(toSerialize, b, index);
                 }
             };
 
             // write functions first
             for (auto& indexAndObj: group->getIndexToObject()) {
                 if (
-                    indexAndObj.second.typeOrPyobjAsType() &&
-                    indexAndObj.second.typeOrPyobjAsType()->isFunction()
+                    indexAndObj.second.type() &&
+                    indexAndObj.second.type()->isFunction()
                 ) {
                     writeObjectBody(indexAndObj.first, indexAndObj.second);
                 }
@@ -633,10 +722,10 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
             std::map<HeldClass*, std::set<int> > heldClasses;
             for (auto& indexAndObj: group->getIndexToObject()) {
                 if (
-                    indexAndObj.second.typeOrPyobjAsType() &&
-                    indexAndObj.second.typeOrPyobjAsType()->isHeldClass()
+                    indexAndObj.second.type() &&
+                    indexAndObj.second.type()->isHeldClass()
                 ) {
-                    heldClasses[(HeldClass*)indexAndObj.second.typeOrPyobjAsType()].insert(
+                    heldClasses[(HeldClass*)indexAndObj.second.type()].insert(
                         indexAndObj.first
                     );
                 }
@@ -669,11 +758,12 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
             }
 
 
-            // everything else
+            // native types that are not function/held class/forward
             for (auto& indexAndObj: group->getIndexToObject()) {
-                if (indexAndObj.second.typeOrPyobjAsType()
-                        && !indexAndObj.second.typeOrPyobjAsType()->isFunction()
-                        && !indexAndObj.second.typeOrPyobjAsType()->isHeldClass()
+                if (indexAndObj.second.type()
+                        && !indexAndObj.second.type()->isFunction()
+                        && !indexAndObj.second.type()->isHeldClass()
+                        && !indexAndObj.second.type()->isForward()
                     ) {
                     writeObjectBody(indexAndObj.first, indexAndObj.second);
                 }
@@ -681,28 +771,41 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
 
             // write out python objects that are types
             for (auto& indexAndObj: group->getIndexToObject()) {
-                if (!indexAndObj.second.typeOrPyobjAsType() &&
+                if (!indexAndObj.second.type() &&
                         PyType_Check(indexAndObj.second.pyobj())) {
                     writeObjectBody(indexAndObj.first, indexAndObj.second);
                 }
             }
 
-            // write out the remainder (python objects that are not types)
+            // write out python objects that are not types
             for (auto& indexAndObj: group->getIndexToObject()) {
-                if (!indexAndObj.second.typeOrPyobjAsType() &&
+                if (!indexAndObj.second.type() &&
                         !PyType_Check(indexAndObj.second.pyobj())) {
+                    writeObjectBody(indexAndObj.first, indexAndObj.second);
+                }
+            }
+
+            // forward types, which we have to resolve last.
+            for (auto& indexAndObj: group->getIndexToObject()) {
+                if (indexAndObj.second.type()
+                        && indexAndObj.second.type()->isForward()
+                    ) {
                     writeObjectBody(indexAndObj.first, indexAndObj.second);
                 }
             }
 
         b.writeEndCompound();
 
+#       if TP_VERBOSE_SERIALIZE
+        std::cout << s.prefix() << "Serializing used globals\n";
+#       endif
+
         b.writeBeginCompound(4);
 
             for (auto& indexAndObj: group->getIndexToObject()) {
-                if (indexAndObj.second.typeOrPyobjAsType() && indexAndObj.second.typeOrPyobjAsType()->isFunction()) {
+                if (indexAndObj.second.type() && indexAndObj.second.type()->isFunction()) {
                     // we need to serialize the 'globals' dict of each function object
-                    Function* f = (Function*)indexAndObj.second.typeOrPyobjAsType();
+                    Function* f = (Function*)indexAndObj.second.type();
 
                     b.writeBeginCompound(indexAndObj.first);
 
@@ -733,20 +836,18 @@ void PythonSerializationContext::serializeNativeTypeInner(
         return;
     }
 
+#   if TP_VERBOSE_SERIALIZE
+    ScopedIndenter s;
+    std::cout << s.prefix() << "serializeNativeTypeInner "
+        << nativeType->name() << " of cat " << nativeType->getTypeCategoryString() << "\n";
+#   endif
+
     PyEnsureGilAcquired acquireTheGil;
 
-    PyObjectStealer nameForObject(PyObject_CallMethod(mContextObj, "nameForObject", "(O)", PyInstance::typeObj(nativeType)));
+    std::string nameForObject = getNameForPyObj((PyObject*)PyInstance::typeObj(nativeType));
 
-    if (!nameForObject) {
-        throw PythonExceptionSet();
-    }
-
-    if (nameForObject != Py_None) {
-        if (!PyUnicode_Check(nameForObject)) {
-            throw std::runtime_error("nameForObject returned something other than None or a string.");
-        }
-
-        b.writeStringObject(0, std::string(PyUnicode_AsUTF8(nameForObject)));
+    if (nameForObject.size()) {
+        b.writeStringObject(0, nameForObject);
         b.writeEndCompound();
         return;
     }
@@ -825,9 +926,9 @@ void PythonSerializationContext::serializeNativeTypeInner(
         b.writeStringObject(2, ftype->name());
         b.writeStringObject(3, ftype->qualname());
         b.writeStringObject(
-            4, 
+            4,
             // if we're suppressing line info then we also don't want to write
-            // module names. Otherwise, it's impossible to get sha hashes of 
+            // module names. Otherwise, it's impossible to get sha hashes of
             // code that gets relocated across file boundaries.
             b.getContext().isLineInfoSuppressed() ? std::string("") : ftype->moduleName()
         );
@@ -840,7 +941,11 @@ void PythonSerializationContext::serializeNativeTypeInner(
             overload.serialize(*this, b, whichIndex++);
         }
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catForward) {
-        throw std::runtime_error("We shouldn't be serializing forwards directly");
+        b.writeStringObject(1, nativeType->name());
+
+        if (((Forward*)nativeType)->getTarget()) {
+            serializeNativeType(((Forward*)nativeType)->getTarget(), b, 2);
+        }
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catClass) {
         serializeNativeType(((Class*)nativeType)->getHeldClass(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catHeldClass) {

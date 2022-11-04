@@ -50,7 +50,7 @@ from typed_python import (
 
 from typed_python._types import (
     refcount, isRecursive, identityHash, buildPyFunctionObject,
-    setFunctionClosure, typesAreEquivalent, recursiveTypeGroupDeepRepr,
+    setFunctionClosure, typesAreEquivalent, recursiveTypeGroupDeepRepr
 )
 
 module_level_testfun = dummy_test_module.testfunction
@@ -1958,18 +1958,17 @@ class TypesSerializationTest(unittest.TestCase):
         sc.deserialize(sc.serialize(C))
 
     def test_serialize_cell_type(self):
-        sc = SerializationContext().withoutInternalizingTypeGroups()
+        sc = SerializationContext()
 
         def f():
             return sc
 
-        cellType = type(f.__closure__[0])
+        def getCellType():
+            return type(f.__closure__[0])
 
-        assert sc.deserialize(sc.serialize(cellType)) is cellType
+        assert callFunctionInFreshProcess(getCellType, ()) is getCellType()
 
-    def test_serialize_self_referencing_class(self):
-        sc = SerializationContext().withoutCompression().withoutInternalizingTypeGroups()
-
+    def test_serialize_self_referencing_class_basic(self):
         def g(x):
             return 10
 
@@ -1986,22 +1985,12 @@ class TypesSerializationTest(unittest.TestCase):
 
             return C_
 
-        C1 = C(int)
-        C2 = sc.deserialize(sc.serialize(C1))
+        c = callFunctionInFreshProcess(C(int), ())
 
-        c1 = C1()
-        c2 = C2()
-
-        assert c2.g() == 10
-        assert c2.s() is C2
-
-        # this should dispatch but we can't assume which compiled version
-        # of the code we'll get, so we cant check identity of C2
-        assert c1.g() == 10
+        assert c.g() == 10
+        assert c.s() is type(c)
 
     def test_serialize_self_referencing_class_through_tuple(self):
-        sc = SerializationContext().withoutCompression().withoutInternalizingTypeGroups()
-
         def g(x):
             return 10
 
@@ -2016,26 +2005,16 @@ class TypesSerializationTest(unittest.TestCase):
                 def g(self):
                     return g(10)
 
-            # this fails because when we serliaze mutually recursive python objects
-            # we don't understand all the kinds of objects we can walk
             tup = (C_, 10)
 
             return C_
 
-        C1 = C(int)
-        C2 = sc.deserialize(sc.serialize(C1))
-
-        c1 = C1()
-        c2 = C2()
-
-        assert c2.g() == 10
-        assert c2.s() is C2
-
-        assert c1.g() == 10
-        assert c1.s() is C1
+        c = callFunctionInFreshProcess(C(int), ())
+        assert c.g() == 10
+        assert c.s() is type(c)
 
     def test_names_of_builtin_alternatives(self):
-        sc = SerializationContext().withoutCompression().withoutInternalizingTypeGroups()
+        sc = SerializationContext().withoutCompression()
 
         assert sc.nameForObject(Expression) is not None
         assert sc.nameForObject(Expression.Load) is not None
@@ -2082,23 +2061,24 @@ class TypesSerializationTest(unittest.TestCase):
         assert sc.deserialize(sc.serialize(lst)) == lst
 
     def test_can_serialize_nested_function_references(self):
-        sc = SerializationContext().withoutInternalizingTypeGroups()
-
         def lenProxy(x):
             return len(x)
 
-        otherGlobals = {'__builtins__': __builtins__}
+        def makeLenProxyWeirdGlobals():
+            otherGlobals = {'__builtins__': __builtins__}
 
-        lenProxyWithNonstandardGlobals = buildPyFunctionObject(
-            lenProxy.__code__,
-            otherGlobals,
-            ()
-        )
+            return buildPyFunctionObject(
+                lenProxy.__code__,
+                otherGlobals,
+                ()
+            )
+
+        lenProxyWithNonstandardGlobals = makeLenProxyWeirdGlobals()
 
         assert lenProxy("asdf") == 4
         assert lenProxyWithNonstandardGlobals("asdf") == 4
 
-        lenProxyDeserialized = sc.deserialize(sc.serialize(lenProxyWithNonstandardGlobals))
+        lenProxyDeserialized = callFunctionInFreshProcess(makeLenProxyWeirdGlobals, ())
 
         assert lenProxyDeserialized("asdf") == 4
 
@@ -2137,18 +2117,20 @@ class TypesSerializationTest(unittest.TestCase):
         check(types.ModuleType)
 
     def test_serialize_self_referential_class(self):
-        class SeesItself:
-            @staticmethod
-            def factory(kwargs):
-                return lambda a, b, c: SeesItself(a, b, c)
+        def makeSeesItself():
+            class SeesItself:
+                @staticmethod
+                def factory(kwargs):
+                    return lambda a, b, c: SeesItself(a, b, c)
 
-            @property
-            def seeItself(self, a, b, c, d):
-                return SeesItself
+                def seeItself(self, a, b, c, d):
+                    return SeesItself
 
-        c = SerializationContext().withoutInternalizingTypeGroups()
+            return SeesItself
 
-        c.deserialize(c.serialize(SeesItself))
+        SeesItself = callFunctionInFreshProcess(makeSeesItself, ())
+
+        assert SeesItself.seeItself(1, 2, 3, 4, 5) is SeesItself
 
     def test_serialize_anonymous_module(self):
         with tempfile.TemporaryDirectory() as tf:
@@ -2198,7 +2180,25 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert callFunctionInFreshProcess(Cls().f, ()) is Cls
 
-    def test_can_deserialize_untyped_forward_class_methods(self):
+    def test_serialization_preserves_forward_structure_in_classes(self):
+        def getCls():
+            Cls = Forward("Cls")
+
+            @Cls.define
+            class Cls:
+                # recall that regular classes ignore their annotations
+                def f(self) -> Cls:
+                    return "HI"
+
+            return Cls
+
+        Cls = callFunctionInFreshProcess(getCls, (), showStdout=True)
+        assert Cls.f.__annotations__['return'].__typed_python_category__ == 'Forward'
+
+        Cls2 = getCls()
+        assert Cls2.f.__annotations__['return'].__typed_python_category__ == 'Forward'
+
+    def test_can_deserialize_untyped_forward_class_methods_1(self):
         Cls = Forward("Cls")
 
         @Cls.define
@@ -2208,6 +2208,20 @@ class TypesSerializationTest(unittest.TestCase):
                 return "HI"
 
         assert callFunctionInFreshProcess(Cls, ()).f() == "HI"
+
+    def test_can_deserialize_untyped_forward_class_methods_2(self):
+        def getCls():
+            Cls = Forward("Cls")
+
+            @Cls.define
+            class Cls:
+                # recall that regular classes ignore their annotations
+                def f(self) -> Cls:
+                    return "HI"
+
+            return Cls
+
+        callFunctionInFreshProcess(getCls, ())
 
     def test_can_deserialize_forward_class_methods_tp_class(self):
         Cls = Forward("Cls")
@@ -2610,21 +2624,26 @@ class TypesSerializationTest(unittest.TestCase):
         assert f(10) == 10
 
     def test_can_serialize_classes_with_methods_and_custom_globals(self):
-        def f(self):
-            return x  # noqa
+        def serializeIt():
+            def f(self):
+                return x  # noqa
 
-        f = Function(createFunctionWithLocalsAndGlobals(f.__code__, {'x': 10}))
+            f = Function(createFunctionWithLocalsAndGlobals(f.__code__, {'x': 10}))
 
-        class Base(Class):
-            def func(self):
-                pass
+            class Base(Class):
+                def func(self):
+                    pass
 
-        class Child(Base):
-            func = f
+            class Child(Base):
+                func = f
 
-        s = SerializationContext().withoutInternalizingTypeGroups().withFunctionGlobalsAsIs()
+            s = SerializationContext().withFunctionGlobalsAsIs()
 
-        Child2 = s.deserialize(s.serialize(Child))
+            return s.serialize(Child)
+
+        Child2 = SerializationContext().deserialize(
+            callFunctionInFreshProcess(serializeIt, ())
+        )
 
         assert Child2().func() == 10
 
@@ -2931,3 +2950,19 @@ class TypesSerializationTest(unittest.TestCase):
         while time.time() - t0 < 10.0:
             print("DO!")
             pmap(args, f, str, minGranularity=10000)
+
+    def test_serialize_pyobj_in_MRTG(self):
+        def getX():
+            class C:
+                def f(self):
+                    return x
+
+            x = (C, C)
+
+            return x
+
+        x = callFunctionInFreshProcess(getX, (), showStdout=True)
+
+        print(x)
+        # TODO: make this True
+        # assert x[0].f.__closure__[0].cell_contents is x

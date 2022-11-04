@@ -115,7 +115,7 @@ bool isSpecialIgnorableName(const std::string& name) {
 
 class VisitRecord {
 public:
-    enum class kind { Hash=0, String=1, Instance=2, NameValuePair=3, Error=4 };
+    enum class kind { Hash=0, String=1, Topo=2, NameValuePair=3, Error=4 };
 
     VisitRecord() : mKind(kind::Error) {}
 
@@ -128,12 +128,12 @@ public:
         mName(name), mKind(kind::String)
     {}
 
-    VisitRecord(std::string name, TypeOrPyobj instance)
-        : mName(name), mInstance(instance), mKind(kind::NameValuePair)
+    VisitRecord(std::string name, TypeOrPyobj topo)
+        : mName(name), mTopo(topo), mKind(kind::NameValuePair)
     {}
 
-    VisitRecord(TypeOrPyobj instance)
-        : mInstance(instance), mKind(kind::Instance)
+    VisitRecord(TypeOrPyobj topo)
+        : mTopo(topo), mKind(kind::Topo)
     {}
 
     static VisitRecord Err(std::string err) {
@@ -151,8 +151,8 @@ public:
             return mHash == other.mHash;
         }
 
-        if (mKind == kind::Instance) {
-            return mInstance == other.mInstance;
+        if (mKind == kind::Topo) {
+            return mTopo == other.mTopo;
         }
 
         if (mKind == kind::String) {
@@ -160,7 +160,7 @@ public:
         }
 
         if (mKind == kind::NameValuePair) {
-            return mName == other.mName && mInstance == other.mInstance;
+            return mName == other.mName && mTopo == other.mTopo;
         }
 
         if (mKind == kind::Error) {
@@ -178,8 +178,8 @@ public:
         return mName;
     }
 
-    TypeOrPyobj instance() const {
-        return mInstance;
+    TypeOrPyobj topo() const {
+        return mTopo;
     }
 
     ShaHash hash() const {
@@ -201,11 +201,11 @@ public:
         if (mKind == kind::Hash) {
             return "Hash(" + mHash.digestAsHexString() + ")";
         }
-        if (mKind == kind::Instance) {
-            return "Instance(" + mInstance.name() + ")";
+        if (mKind == kind::Topo) {
+            return "Topo(" + mTopo.name() + ")";
         }
         if (mKind == kind::NameValuePair) {
-            return "NameValuePair(" + mName + "=" + mInstance.name() + ")";
+            return "NameValuePair(" + mName + "=" + mTopo.name() + ")";
         }
 
         return "<Unknown>";
@@ -216,8 +216,56 @@ private:
     std::string mName;
     std::string mErr;
     ShaHash mHash;
-    TypeOrPyobj mInstance;
+    TypeOrPyobj mTopo;
 };
+
+
+template<class visitor_1, class visitor_2, class visitor_3, class visitor_4, class visitor_5>
+class LambdaVisitor {
+public:
+    LambdaVisitor(
+        const visitor_1& hashVisit,
+        const visitor_2& nameVisit,
+        const visitor_3& topoVisitor,
+        const visitor_4& namedVisitor,
+        const visitor_5& onErr
+    ):
+        mHashVisit(hashVisit),
+        mNameVisit(nameVisit),
+        mTopoVisitor(topoVisitor),
+        mNamedVisitor(namedVisitor),
+        mOnErr(onErr)
+    {}
+
+    void visitHash(ShaHash h) const {
+        mHashVisit(h);
+    }
+
+    void visitName(std::string name) const {
+        mNameVisit(name);
+    }
+
+    void visitTopo(TypeOrPyobj topo) const {
+        mTopoVisitor(topo);
+    }
+
+    void visitNamedTopo(std::string name, TypeOrPyobj instance) const {
+        mNamedVisitor(name, instance);
+    }
+
+    void visitErr(std::string err) const {
+        mOnErr(err);
+    }
+
+private:
+    const visitor_1& mHashVisit;
+    const visitor_2& mNameVisit;
+    const visitor_3& mTopoVisitor;
+    const visitor_4& mNamedVisitor;
+    const visitor_5& mOnErr;
+};
+
+
 
 
 class CompilerVisibleObjectVisitor {
@@ -240,8 +288,9 @@ public:
         object:
             hashVisit(ShaHash): used to visit a single hash-hash
             nameVisit(string): used to visit a string (say, the name of a function)
-            visit(TypeOrPyobj): looks at the actual instances
+            topoVisitor(TypeOrPyobj): looks at the actual instances
             namedVisitor(string, TypeOrPyobj): looks at (name, TypeOrPyobj) pairs (for walking dicts)
+            tpInstanceVisitor(Instance): look at visible instances
             onErr(): gets called if something odd happens (missing or badly typed member)
     ********/
     template<class visitor_1, class visitor_2, class visitor_3, class visitor_4, class visitor_5>
@@ -249,9 +298,22 @@ public:
         TypeOrPyobj obj,
         const visitor_1& hashVisit,
         const visitor_2& nameVisit,
-        const visitor_3& instanceVisit,
+        const visitor_3& topoVisitor,
         const visitor_4& namedVisitor,
         const visitor_5& onErr
+    ) {
+        visit(
+            obj,
+            LambdaVisitor<visitor_1, visitor_2, visitor_3, visitor_4, visitor_5>(
+                hashVisit, nameVisit, topoVisitor, namedVisitor, onErr
+            )
+        );
+    }
+
+    template<class visitor_type>
+    void visit(
+        TypeOrPyobj obj,
+        const visitor_type& visitor
     ) {
         std::vector<VisitRecord> records = recordWalk(obj);
 
@@ -269,7 +331,17 @@ public:
             }
         }
 
-        walk(obj, hashVisit, nameVisit, instanceVisit, namedVisitor, onErr);
+        walk(obj, visitor);
+    }
+
+    static std::string recordWalkAsString(TypeOrPyobj obj) {
+        std::ostringstream s;
+
+        for (auto& record: recordWalk(obj)) {
+            s << record.toString() << "\n";
+        }
+
+        return s.str();
     }
 
     static std::vector<VisitRecord> recordWalk(TypeOrPyobj obj) {
@@ -356,24 +428,148 @@ public:
         return lines;
     }
 
+    // is this a 'globally identifiable' py object, where we can just use its name to find it,
+    // and where we are guaranteed that it won't change between invocations of the program?
+    static bool isPyObjectGloballyIdentifiableAndStable(PyObject* h) {
+        if (isPyObjectGloballyIdentifiable(h)) {
+            std::string moduleName = std::string(PyUnicode_AsUTF8(PyObject_GetAttrString(h, "__module__")));
+            std::string clsName = std::string(PyUnicode_AsUTF8(PyObject_GetAttrString(h, "__name__")));
+
+            if (isCanonicalName(moduleName) || h->ob_type == &PyCFunction_Type) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // is this a 'globally identifiable' py object, where we can just use its name.
+    static bool isPyObjectGloballyIdentifiable(PyObject* h) {
+        PyEnsureGilAcquired getTheGil;
+
+        static PyObject* sysModule = PyImport_ImportModule("sys");
+        static PyObject* sysModuleModules = PyObject_GetAttrString(sysModule, "modules");
+
+        if (PyObject_HasAttrString(h, "__module__") && PyObject_HasAttrString(h, "__name__")) {
+            PyObjectStealer moduleName(PyObject_GetAttrString(h, "__module__"));
+            if (!moduleName) {
+                PyErr_Clear();
+                return false;
+            }
+
+            PyObjectStealer clsName(PyObject_GetAttrString(h, "__name__"));
+            if (!clsName) {
+                PyErr_Clear();
+                return false;
+            }
+
+            if (!PyUnicode_Check(moduleName) || !PyUnicode_Check(clsName)) {
+                return false;
+            }
+
+            PyObjectStealer moduleObject(PyObject_GetItem(sysModuleModules, moduleName));
+
+            if (!moduleObject) {
+                PyErr_Clear();
+                return false;
+            }
+
+            PyObjectStealer obj(PyObject_GetAttr(moduleObject, clsName));
+
+            if (!obj) {
+                PyErr_Clear();
+                return false;
+            }
+            if ((PyObject*)obj == h) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // is this a 'simple' py object which we wouldn't want to step into?
+    static bool isSimpleConstant(PyObject* h) {
+        // TODO: can we figure out how to do this without holding the GIL? None of the objects
+        // in question should get deleted ever...
+        PyEnsureGilAcquired getTheGil;
+
+        static PyObject* builtinsModule = ::builtinsModule();
+        static PyObject* builtinsModuleDict = PyObject_GetAttrString(builtinsModule, "__dict__");
+
+        // handle basic constants
+        return (
+               h == Py_None
+            || h == Py_True
+            || h == Py_False
+            || PyLong_Check(h)
+            || PyBytes_Check(h)
+            || PyUnicode_Check(h)
+            || h == builtinsModule
+            || h == builtinsModuleDict
+            || h == (PyObject*)PyDict_Type.tp_base
+            || h == (PyObject*)&PyType_Type
+            || h == (PyObject*)&PyDict_Type
+            || h == (PyObject*)&PyList_Type
+            || h == (PyObject*)&PySet_Type
+            || h == (PyObject*)&PyLong_Type
+            || h == (PyObject*)&PyUnicode_Type
+            || h == (PyObject*)&PyFloat_Type
+            || h == (PyObject*)&PyBytes_Type
+            || h == (PyObject*)&PyBool_Type
+            || h == (PyObject*)Py_None->ob_type
+            || h == (PyObject*)&PyProperty_Type
+            || h == (PyObject*)&PyClassMethodDescr_Type
+            || h == (PyObject*)&PyGetSetDescr_Type
+            || h == (PyObject*)&PyMemberDescr_Type
+            || h == (PyObject*)&PyMethodDescr_Type
+            || h == (PyObject*)&PyWrapperDescr_Type
+            || h == (PyObject*)&PyDictProxy_Type
+            || h == (PyObject*)&_PyMethodWrapper_Type
+            || h == (PyObject*)&PyCFunction_Type
+            || h == (PyObject*)&PyFunction_Type
+            || PyFloat_Check(h)
+            || h->ob_type == &PyProperty_Type
+            || h->ob_type == &PyGetSetDescr_Type
+            || h->ob_type == &PyMemberDescr_Type
+            || h->ob_type == &PyWrapperDescr_Type
+            || h->ob_type == &PyDictProxy_Type
+            || h->ob_type == &_PyMethodWrapper_Type
+        );
+    }
+
 private:
     template<class visitor_1, class visitor_2, class visitor_3, class visitor_4, class visitor_5>
     static void walk(
         TypeOrPyobj obj,
         const visitor_1& hashVisit,
         const visitor_2& nameVisit,
-        const visitor_3& instanceVisit,
+        const visitor_3& topoVisitor,
         const visitor_4& namedVisitor,
         const visitor_5& onErr
     ) {
+        walk(obj,
+            LambdaVisitor<visitor_1, visitor_2, visitor_3, visitor_4, visitor_5>(
+                hashVisit, nameVisit, topoVisitor, namedVisitor, onErr
+            )
+        );
+    }
+
+    template<class visitor_type>
+    static void walk(
+        TypeOrPyobj obj,
+        const visitor_type& visitor
+    ) {
+        PyEnsureGilAcquired getTheGil;
+
         auto visitDict = [&](PyObject* d, bool ignoreSpecialNames=false) {
             if (!d) {
-                hashVisit(0);
+                visitor.visitHash(0);
                 return;
             }
 
             if (!PyDict_Check(d)) {
-                onErr(std::string("not a dict: ") + d->ob_type->tp_name);
+                visitor.visitErr(std::string("not a dict: ") + d->ob_type->tp_name);
                 return;
             }
 
@@ -394,65 +590,34 @@ private:
                 }
             });
 
-            hashVisit(ShaHash(names.size()));
+            visitor.visitHash(ShaHash(names.size()));
 
             for (auto nameAndO: names) {
                 PyObject* val = PyDict_GetItem(d, nameAndO.second);
                 if (!val) {
                     PyErr_Clear();
-                    onErr("dict getitem empty");
+                    visitor.visitErr("dict getitem empty");
                 } else {
-                    namedVisitor(nameAndO.first, val);
+                    visitor.visitNamedTopo(nameAndO.first, val);
                 }
             }
         };
 
         auto visitTuple = [&](PyObject* t) {
             if (!t) {
-                hashVisit(ShaHash(0));
+                visitor.visitHash(ShaHash(0));
                 return;
             }
 
-            hashVisit(ShaHash(PyTuple_Size(t)));
+            visitor.visitHash(ShaHash(PyTuple_Size(t)));
             for (long k = 0; k < PyTuple_Size(t); k++) {
-                instanceVisit(PyTuple_GetItem(t, k));
+                visitor.visitTopo(PyTuple_GetItem(t, k));
             }
         };
 
-        if (obj.type()) {
-            Type* objType = obj.type();
-
-            hashVisit(ShaHash(1));
-
-            objType->visitReferencedTypes(instanceVisit);
-
-            // ensure that held and non-held versions of Class are
-            // always visible to each other.
-            if (objType->isHeldClass()) {
-                Type* t = ((HeldClass*)objType)->getClassType();
-                instanceVisit(t);
-            }
-
-            if (objType->isClass()) {
-                Type* t = ((Class*)objType)->getHeldClass();
-                instanceVisit(t);
-            }
-
-            objType->visitCompilerVisiblePythonObjects(instanceVisit);
-            objType->visitCompilerVisibleInstances([&](Instance i) {
-                instanceVisit(i.type());
-
-                if (i.type()->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
-                    return instanceVisit(i.cast<PythonObjectOfType::layout_type*>()->pyObj);
-                }
-            });
-
-            return;
-        }
-
         auto visitDictOrTuple = [&](PyObject* t) {
             if (!t) {
-                hashVisit(ShaHash(0));
+                visitor.visitHash(ShaHash(0));
                 return;
             }
 
@@ -466,27 +631,37 @@ private:
                 return;
             }
 
-            onErr("not a dict or tuple");
+            visitor.visitErr("not a dict or tuple");
         };
+
+        if (obj.type()) {
+            Type* objType = obj.type();
+
+            visitor.visitHash(ShaHash(1));
+
+            objType->visitCompilerVisibleInternals(visitor);
+
+            return;
+        }
 
         static PyObject* osModule = ::osModule();
         static PyObject* environType = PyObject_GetAttrString(osModule, "_Environ");
 
         if (obj.pyobj()->ob_type == (PyTypeObject*)environType) {
             // don't ever hash the environment.
-            hashVisit(ShaHash(13));
+            visitor.visitHash(ShaHash(13));
             return;
         }
 
         // don't visit into constants
-        if (MutuallyRecursiveTypeGroup::computePyObjectShaHashConstant(obj.pyobj()) != ShaHash()) {
+        if (isSimpleConstant(obj.pyobj())) {
             return;
         }
 
         Type* argType = PyInstance::extractTypeFrom(obj.pyobj()->ob_type);
         if (argType) {
-            hashVisit(ShaHash(2));
-            instanceVisit(argType);
+            visitor.visitHash(ShaHash(2));
+            visitor.visitTopo(argType);
             return;
         }
 
@@ -507,8 +682,8 @@ private:
 
                             //exclude modules that shouldn't change underneath us.
                             if (isCanonicalName(moduleName)) {
-                                hashVisit(ShaHash(12));
-                                nameVisit(moduleName);
+                                visitor.visitHash(ShaHash(12));
+                                visitor.visitName(moduleName);
                                 return;
                             }
                         }
@@ -524,22 +699,20 @@ private:
         // this might be a named object. Let's see if its name actually resolves it correctly,
         // in which case we can hash its name (and its contents if the compiler could see
         // through it)
-        if (MutuallyRecursiveTypeGroup::pyObjectGloballyIdentifiable(obj.pyobj())) {
+        if (isPyObjectGloballyIdentifiableAndStable(obj.pyobj())) {
             std::string moduleName = std::string(PyUnicode_AsUTF8(PyObject_GetAttrString(obj.pyobj(), "__module__")));
             std::string clsName = std::string(PyUnicode_AsUTF8(PyObject_GetAttrString(obj.pyobj(), "__name__")));
 
-            if (isCanonicalName(moduleName) || obj.pyobj()->ob_type == &PyCFunction_Type) {
-                hashVisit(ShaHash(2));
-                nameVisit(moduleName + "|" + clsName);
-                return;
-            }
+            visitor.visitHash(ShaHash(2));
+            visitor.visitName(moduleName + "|" + clsName);
+            return;
         }
 
         if (PyType_Check(obj.pyobj())) {
             argType = PyInstance::extractTypeFrom((PyTypeObject*)obj.pyobj());
             if (argType) {
-                hashVisit(ShaHash(3));
-                instanceVisit(argType);
+                visitor.visitHash(ShaHash(3));
+                visitor.visitTopo(argType);
                 return;
             }
         }
@@ -547,59 +720,59 @@ private:
         if (PyCode_Check(obj.pyobj())) {
             PyCodeObject* co = (PyCodeObject*)obj.pyobj();
 
-            hashVisit(ShaHash(4));
-            hashVisit(ShaHash(co->co_argcount));
-            hashVisit(co->co_kwonlyargcount);
-            hashVisit(co->co_nlocals);
-            hashVisit(co->co_stacksize);
+            visitor.visitHash(ShaHash(4));
+            visitor.visitHash(ShaHash(co->co_argcount));
+            visitor.visitHash(co->co_kwonlyargcount);
+            visitor.visitHash(co->co_nlocals);
+            visitor.visitHash(co->co_stacksize);
             // don't serialize the 'co_flags' field because it's not actually stable
             // and it doesn't contain any semantic information not available elsewhere.
-            // hashVisit(co->co_flags);
-            hashVisit(co->co_firstlineno);
-            hashVisit(ShaHash::SHA1(PyBytes_AsString(co->co_code), PyBytes_GET_SIZE(co->co_code)));
-            instanceVisit(co->co_consts);
-            instanceVisit(co->co_names);
-            instanceVisit(co->co_varnames);
-            instanceVisit(co->co_freevars);
-            instanceVisit(co->co_cellvars);
+            // visitor.visitHash(co->co_flags);
+            visitor.visitHash(co->co_firstlineno);
+            visitor.visitHash(ShaHash::SHA1(PyBytes_AsString(co->co_code), PyBytes_GET_SIZE(co->co_code)));
+            visitTuple(co->co_consts);
+            visitTuple(co->co_names);
+            visitTuple(co->co_varnames);
+            visitTuple(co->co_freevars);
+            visitTuple(co->co_cellvars);
             // we ignore this, because otherwise, we'd have the hash change
             // whenever we instantiate code in a new location
             // visit(co->co_filename)
-            instanceVisit(co->co_name);
+            visitor.visitTopo(co->co_name);
 
     #       if PY_MINOR_VERSION >= 10
-                instanceVisit(co->co_linetable);
+                visitor.visitTopo(co->co_linetable);
     #       else
-                instanceVisit(co->co_lnotab);
+                visitor.visitTopo(co->co_lnotab);
     #       endif
             return;
         }
 
         if (PyFunction_Check(obj.pyobj())) {
-            hashVisit(ShaHash(5));
+            visitor.visitHash(ShaHash(5));
 
             PyFunctionObject* f = (PyFunctionObject*)obj.pyobj();
 
             if (f->func_closure) {
-                hashVisit(ShaHash(PyTuple_Size(f->func_closure)));
+                visitor.visitHash(ShaHash(PyTuple_Size(f->func_closure)));
 
                 for (long k = 0; k < PyTuple_Size(f->func_closure); k++) {
                     PyObject* o = PyTuple_GetItem(f->func_closure, k);
                     if (o && PyCell_Check(o)) {
-                        instanceVisit(o);
+                        visitor.visitTopo(o);
                     }
                 }
             } else {
-                hashVisit(ShaHash(0));
+                visitor.visitHash(ShaHash(0));
             }
 
-            instanceVisit(f->func_name);
-            instanceVisit(PyFunction_GetCode((PyObject*)f));
+            visitor.visitTopo(f->func_name);
+            visitor.visitTopo(PyFunction_GetCode((PyObject*)f));
             visitDictOrTuple(PyFunction_GetAnnotations((PyObject*)f));
             visitTuple(PyFunction_GetDefaults((PyObject*)f));
             visitDictOrTuple(PyFunction_GetKwDefaults((PyObject*)f));
 
-            hashVisit(ShaHash(1));
+            visitor.visitHash(ShaHash(1));
 
             if (f->func_globals && PyDict_Check(f->func_globals)) {
 
@@ -608,7 +781,7 @@ private:
                 Function::Overload::visitCompilerVisibleGlobals(
                     [&](std::string name, PyObject* val) {
                         if (!isSpecialIgnorableName(name)) {
-                            namedVisitor(name, val);
+                            visitor.visitNamedTopo(name, val);
                         }
                     },
                     (PyCodeObject*)f->func_code,
@@ -616,54 +789,57 @@ private:
                 );
             }
 
-            hashVisit(ShaHash(0));
+            visitor.visitHash(ShaHash(0));
             return;
         }
 
         if (PyType_Check(obj.pyobj())) {
-            hashVisit(ShaHash(6));
+            visitor.visitHash(ShaHash(6));
 
             PyTypeObject* tp = (PyTypeObject*)obj.pyobj();
 
-            hashVisit(ShaHash(0));
+            visitor.visitHash(ShaHash(0));
             if (tp->tp_dict) {
                 visitDict(tp->tp_dict, true);
             }
-            hashVisit(ShaHash(0));
+            visitor.visitHash(ShaHash(0));
 
             if (tp->tp_bases) {
-                iterate(tp->tp_bases, instanceVisit);
+                iterate(
+                    tp->tp_bases,
+                    [&](PyObject* t) { visitor.visitTopo(t); }
+                );
             }
 
-            hashVisit(ShaHash(0));
+            visitor.visitHash(ShaHash(0));
 
             return;
         }
 
         if (obj.pyobj()->ob_type == &PyStaticMethod_Type || obj.pyobj()->ob_type == &PyClassMethod_Type) {
             if (obj.pyobj()->ob_type == &PyStaticMethod_Type) {
-                hashVisit(ShaHash(7));
+                visitor.visitHash(ShaHash(7));
             } else {
-                hashVisit(ShaHash(8));
+                visitor.visitHash(ShaHash(8));
             }
 
             PyObjectStealer funcObj(PyObject_GetAttrString(obj.pyobj(), "__func__"));
 
             if (!funcObj) {
-                onErr("not a func obj");
+                visitor.visitErr("not a func obj");
             } else {
-                instanceVisit((PyObject*)funcObj);
+                visitor.visitTopo((PyObject*)funcObj);
             }
 
             return;
         }
 
         if (PyTuple_Check(obj.pyobj())) {
-            hashVisit(ShaHash(9));
-            hashVisit(ShaHash(PyTuple_Size(obj.pyobj())));
+            visitor.visitHash(ShaHash(9));
+            visitor.visitHash(ShaHash(PyTuple_Size(obj.pyobj())));
 
             for (long k = 0; k < PyTuple_Size(obj.pyobj()); k++) {
-                instanceVisit(PyTuple_GetItem(obj.pyobj(), k));
+                visitor.visitTopo(PyTuple_GetItem(obj.pyobj(), k));
             }
 
             return;
@@ -686,19 +862,19 @@ private:
             || obj.pyobj()->ob_type == (PyTypeObject*)weakKeyDictType
             || obj.pyobj()->ob_type == (PyTypeObject*)weakValueDictType
         ) {
-            hashVisit(ShaHash(10));
-            instanceVisit((PyObject*)obj.pyobj()->ob_type);
+            visitor.visitHash(ShaHash(10));
+            visitor.visitTopo((PyObject*)obj.pyobj()->ob_type);
             return;
         }
 
         if (PyCell_Check(obj.pyobj())) {
-            hashVisit(ShaHash(11));
+            visitor.visitHash(ShaHash(11));
 
             if (PyCell_Get(obj.pyobj())) {
-                hashVisit(ShaHash(1));
-                instanceVisit(PyCell_Get(obj.pyobj()));
+                visitor.visitHash(ShaHash(1));
+                visitor.visitTopo(PyCell_Get(obj.pyobj()));
             } else {
-                hashVisit(ShaHash(0));
+                visitor.visitHash(ShaHash(0));
             }
             return;
         }
@@ -706,8 +882,8 @@ private:
         if (obj.pyobj()->ob_type == &PyClassMethodDescr_Type
             || obj.pyobj()->ob_type == &PyMethodDescr_Type) {
             // the compiler looks at the type and the name of a given method descriptor
-            instanceVisit(PyDescr_TYPE(obj.pyobj()));
-            instanceVisit(PyDescr_NAME(obj.pyobj()));
+            visitor.visitTopo(PyDescr_TYPE(obj.pyobj()));
+            visitor.visitTopo(PyDescr_NAME(obj.pyobj()));
             return;
         }
 
@@ -716,7 +892,7 @@ private:
 
         // we do visit the type, since the compiler may infer something about the type
         // of the instance and we assume that type objects are stable.
-        instanceVisit((PyObject*)obj.pyobj()->ob_type);
+        visitor.visitTopo((PyObject*)obj.pyobj()->ob_type);
     }
 
     std::unordered_map<TypeOrPyobj, std::vector<VisitRecord> > mPastVisits;

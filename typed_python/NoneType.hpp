@@ -43,6 +43,10 @@ public:
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& v) {}
 
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(1, m_typeCategory));
+    }
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);

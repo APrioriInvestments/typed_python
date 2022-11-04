@@ -32,10 +32,6 @@ bool ConcreteAlternative::isBinaryCompatibleWithConcrete(Type* other) {
     return false;
 }
 
-ShaHash ConcreteAlternative::_computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead) {
-    return ShaHash(1, m_typeCategory) + ShaHash(m_which) + m_alternative->identityHash(groupHead);
-}
-
 bool ConcreteAlternative::_updateAfterForwardTypesChanged() {
     if (m_which < 0 || m_which >= m_alternative->subtypes().size()) {
       throw std::runtime_error(

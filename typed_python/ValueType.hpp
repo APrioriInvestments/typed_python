@@ -45,18 +45,10 @@ public:
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
-    ShaHash _computeIdentityHash(MutuallyRecursiveTypeGroup* groupHead=nullptr) {
-        return ShaHash(m_typeCategory) + MutuallyRecursiveTypeGroup::tpInstanceShaHash(mInstance, groupHead);
-    }
-
     template<class visitor_type>
-    void _visitCompilerVisiblePythonObjects(const visitor_type& visitor) {
-
-    }
-
-    template<class visitor_type>
-    void _visitCompilerVisibleInstances(const visitor_type& visitor) {
-        visitor(mInstance);
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(ShaHash(1, m_typeCategory));
+        v.visitTopo(mValueAsPyobj);
     }
 
     typed_python_hash_type hash(instance_ptr left) {
@@ -119,24 +111,9 @@ public:
         return it->second;
     }
 
-    static Type* MakeInt64(int64_t i);
-    static Type* MakeFloat64(double i);
-    static Type* MakeBool(bool i);
-    static Type* MakeBytes(char* data, size_t count);
-    static Type* MakeString(size_t bytesPerCodepoint, size_t count, char* data);
-
 private:
-    Value(Instance instance) :
-            Type(TypeCategory::catValue),
-            mInstance(instance)
-    {
-        m_size = 0;
-        m_is_default_constructible = true;
-        m_name = mInstance.repr();
-        m_doc = Value_doc;
-
-        endOfConstructorInitialization(); // finish initializing the type object.
-    }
+    Value(const Instance& instance);
 
     Instance mInstance;
+    PyObject* mValueAsPyobj;
 };

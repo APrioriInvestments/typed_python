@@ -608,12 +608,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             groupHash = ShaHash::fromDigest(b.readStringObject());
             hasGroupHash = true;
 
-            if (mInternalizeTypeGroups) {
-                groupHash = MutuallyRecursiveTypeGroup::sourceToDestHashLookup(groupHash);
-                // check if a group exists with this hash. If so, we'll consume our objects
-                // but we'll just drop them on the floor because we don't really need them.
-                outGroup = MutuallyRecursiveTypeGroup::getGroupFromHash(groupHash);
-            }
+            outGroup = MutuallyRecursiveTypeGroup::getGroupFromIntendedHash(groupHash);
 
             if (memo != -1 && outGroup) {
                 b.addCachedPointer(memo, (void*)outGroup, nullptr);
@@ -625,7 +620,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             }
 
             if (!outGroup) {
-                outGroup = new MutuallyRecursiveTypeGroup();
+                outGroup = MutuallyRecursiveTypeGroup::DeserializerGroup(groupHash);
 
                 if (memo != -1) {
                     b.addCachedPointer(memo, (void*)outGroup, nullptr);
@@ -857,6 +852,27 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                         } else {
                             Instance i(nt, [&](instance_ptr toDrop) { nt->deserialize(toDrop, b, subWireType); });
                         }
+                    } else
+                    if (pyType == &PyTuple_Type) {
+                        long expectedFieldNum = 0;
+                        PyObject* inst = indicesWithSerializedBodies[indexInGroup];
+
+                        b.consumeCompoundMessage(subWireType, [&](size_t subSubFieldNumber, size_t subSubWireType) {
+                            PyObjectStealer state(deserializePythonObject(b, subSubWireType));
+
+                            if (subSubFieldNumber != expectedFieldNum) {
+                                throw std::runtime_error("Corrupt tuple body");
+                            }
+
+                            expectedFieldNum++;
+                            if (actuallyBuildGroup) {
+                                if (subSubFieldNumber >= PyTuple_Size(inst)) {
+                                    throw std::runtime_error("Corrupt tuple body");
+                                }
+
+                                PyTuple_SET_ITEM(inst, subSubFieldNumber, incref(state));
+                            }
+                        });
                     } else {
                         PyObjectStealer state(deserializePythonObject(b, subWireType));
                         if (!state) {
@@ -866,32 +882,16 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                             PyObject* inst = indicesWithSerializedBodies[indexInGroup];
 
                             if (!inst) {
-                                throw std::runtime_error("Somehow indicesWithSerializedBodies[indexInGroup] is empty");
+                                throw std::runtime_error(
+                                    "Somehow indicesWithSerializedBodies[indexInGroup] is empty"
+                                );
                             }
 
                             if (PyCell_Check(inst)) {
                                 PyCell_Set(inst, state);
                             } else
                             if (PyTuple_Check(inst)) {
-                                if (!PyTuple_Check((PyObject*)state)) {
-                                    throw std::runtime_error("Somehow we deserialized something other than a tuple");
-                                }
-                                if (PyTuple_Size((PyObject*)state) != PyTuple_Size(inst)) {
-                                    throw std::runtime_error("Somehow our deserialized tuple had the wrong size");
-                                }
-
-                                for (long k = 0; k < PyTuple_Size((PyObject*)state); k++) {
-                                    //recall that setitem steals a reference
-                                    PyObject* inItem = PyTuple_GetItem((PyObject*)state, k);
-                                    if (!inItem) {
-                                        throw std::runtime_error(
-                                            "Somehow our deserialized tuple  for " +
-                                            format(indexInGroup) + " has a null value"
-                                        );
-                                    }
-
-                                    PyTuple_SET_ITEM(inst, k, incref(inItem));
-                                }
+                                throw std::runtime_error("Unreachable");
                             } else {
                                 if (!PyDict_Check(state)) {
                                     throw std::runtime_error(
@@ -909,25 +909,28 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                     }
                 } else
                 if (indicesOfNativeTypes.find(indexInGroup) != indicesOfNativeTypes.end()) {
-                    if (indicesOfNativeTypeCategories[indexInGroup] == Type::TypeCategory::catForward) {
-                        Type* t = deserializeNativeType(b, subWireType);
-                        if (actuallyBuildGroup) {
-                            ((Forward*)indicesOfNativeTypes[indexInGroup])->define(t);
+                    Type* t = deserializeNativeTypeInner(b, subWireType, actuallyBuildGroup);
+
+                    if (actuallyBuildGroup) {
+                        if (!t) {
+                            throw std::runtime_error("Somehow, deserializeNativeTypeInner didn't return a type.");
                         }
-                    } else {
-                        Type* t = deserializeNativeTypeInner(b, subWireType, actuallyBuildGroup);
 
-                        if (actuallyBuildGroup) {
-                            if (!t) {
-                                throw std::runtime_error("Somehow, deserializeNativeTypeInner didn't return a type.");
-                            }
+                        if (!indicesOfNativeTypes[indexInGroup]) {
+                            throw std::runtime_error("indicesOfNativeTypes[indexInGroup] is somehow none");
+                        }
+                        if (!indicesOfNativeTypes[indexInGroup]->isForward()) {
+                            throw std::runtime_error("indicesOfNativeTypes[indexInGroup] was already resolved");
+                        }
 
-                            if (!indicesOfNativeTypes[indexInGroup]) {
-                                throw std::runtime_error("indicesOfNativeTypes[indexInGroup] is somehow none");
-                            }
-                            if (!indicesOfNativeTypes[indexInGroup]->isForward()) {
-                                throw std::runtime_error("indicesOfNativeTypes[indexInGroup] was already resolved");
-                            }
+                        if (t->isForward()) {
+                            // we actually deserialized a forward here! this means everyone
+                            // else is expecting this actual instance to be a forward, so we
+                            // don't want to swap it out
+                            ((Forward*)indicesOfNativeTypes[indexInGroup])->define(
+                                ((Forward*)t)->getTarget()
+                            );
+                        } else {
                             ((Forward*)indicesOfNativeTypes[indexInGroup])->define(t);
                             indicesOfNativeTypes[indexInGroup] = t;
 
@@ -997,20 +1000,49 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                 );
             }
 
-            MutuallyRecursiveTypeGroup* group = nullptr;
+            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)namedObj);
 
-            if (PyType_Check(namedObj)) {
-                Type* typeArg = PyInstance::extractTypeFrom(namedObj);
-                if (typeArg) {
-                    group = typeArg->getRecursiveTypeGroup();
+            MutuallyRecursiveTypeGroup* group = (
+                MutuallyRecursiveTypeGroup::groupAndIndexFor((PyObject*)namedObj).first
+            );
+
+            if (!outGroup) {
+                outGroup = group;
+                if (memo != -1) {
+                    b.addCachedPointer(memo, (void*)outGroup, nullptr);
                 }
             }
+        } else
+        if (fieldNumber == 6) {
+            // field 5 indicates that this is a mutually recursive type group
+            // identified by a perfect factory
+            PyObjectStealer factoryAndArgs(deserializePythonObject(b, wireType));
 
-            if (!group) {
-                group = (
-                    MutuallyRecursiveTypeGroup::pyObjectGroupHeadAndIndex(namedObj).first
-                );
+            if (!factoryAndArgs) {
+                throw PythonExceptionSet();
             }
+
+            if (!PyTuple_Check(factoryAndArgs) || PyTuple_Size(factoryAndArgs) != 2) {
+                throw std::runtime_error("Corrupt factoryAndArgs for MRTG found");
+            }
+
+            PyObjectStealer instance(
+                PyObject_Call(
+                    PyTuple_GetItem(factoryAndArgs, 0),
+                    PyTuple_GetItem(factoryAndArgs, 1),
+                    NULL
+                )
+            );
+
+            if (!instance) {
+                throw PythonExceptionSet();
+            }
+
+            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)instance);
+
+            MutuallyRecursiveTypeGroup* group = (
+                MutuallyRecursiveTypeGroup::groupAndIndexFor((PyObject*)instance).first
+            );
 
             if (!outGroup) {
                 outGroup = group;
@@ -1042,17 +1074,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
     }
 
     if (actuallyBuildGroup) {
-        outGroup->computeHashAndInstall();
-
-        if (outGroup->hash() != groupHash) {
-            // make sure that next time we deserialize this group
-            // we get the same one. Just because we have different internal
-            // hashes doesn't mean we should duplicate the types.
-            MutuallyRecursiveTypeGroup::installSourceToDestHashLookup(
-                groupHash,
-                outGroup->hash()
-            );
-        }
+        outGroup->finalizeDeserializerGroup();
     }
 
     return outGroup;
@@ -1225,19 +1247,12 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             nativeType = PythonObjectOfType::Make(namedObj);
         }
 
-        if (nativeType->getTypeCategory() == Type::TypeCategory::catForward) {
-            Type* target = ((Forward*)nativeType)->getTarget();
-            if (target) {
-                nativeType = target;
-            }
-        }
-
         return nativeType;
     }
 
     if (kind == 3) {
         if (!typeFromRep) {
-            throw std::runtime_error("We expected a named type from a type representation");
+            throw std::runtime_error("We expected a type from a type representation");
         }
 
         if (!PyType_Check(typeFromRep)) {
@@ -1267,20 +1282,23 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             throw std::runtime_error("Corrupt native type: index " + format(indexInGroup) + " doesn't exist in group");
         }
 
-        if (!it->second.typeOrPyobjAsType())  {
-            throw std::runtime_error("Corrupt native type: indexed group item is not a Type");
+        if (it->second.type())  {
+            return it->second.type();
         }
 
-        Type* resultType = it->second.typeOrPyobjAsType();
+        if (PyType_Check(it->second.pyobj())) {
+            Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)it->second.pyobj());
 
-        if (resultType->getTypeCategory() == Type::TypeCategory::catForward) {
-            Type* target = ((Forward*)resultType)->getTarget();
-            if (target) {
-                resultType = target;
+            if (nativeType) {
+                return nativeType;
             }
         }
 
-        return resultType;
+        throw std::runtime_error(
+            "Corrupt native type: indexed group item " + format(indexInGroup) + " is not a Type: its "
+            + it->second.name()
+            + "\n\nThe group we're pulling from is:\n\n" + group->repr()
+        );
     }
 
     throw std::runtime_error("Unreachable");
@@ -1317,7 +1335,7 @@ PyObject* PythonSerializationContext::deserializeRecursiveObject(Deserialization
     }
 
     if (!it->second.pyobj())  {
-        throw std::runtime_error("Corrupt native pyobj: indexed group item is not a Type");
+        return incref((PyObject*)PyInstance::typeObj(it->second.type()));
     }
 
     return incref(it->second.pyobj());
@@ -1567,7 +1585,11 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
         );
     }
     else if (category == Type::TypeCategory::catForward) {
-        throw std::runtime_error("We shouldn't be deserializing forwards directly.");
+        if (names.size() != 1 || types.size() != 1) {
+            throw std::runtime_error("Corrupt Forward");
+        }
+        resultType = Forward::Make(names[0]);
+        ((Forward*)resultType)->define(types[0]);
     }
     else if (category == Type::TypeCategory::catHeldClass) {
         if (names.size() != 1) {
@@ -1798,6 +1820,8 @@ inline PyObject* PythonSerializationContext::deserializeIndexable(
     PyObjectHolder res;
     int64_t count = -1;
 
+    int64_t writtenValues = 0;
+
     b.consumeCompoundMessageWithImpliedFieldNumbers(inWireType, [&](size_t fieldNumber, size_t wireType) {
         if (fieldNumber == 0) {
             assertWireTypesEqual(wireType, WireType::VARINT);
@@ -1814,13 +1838,22 @@ inline PyObject* PythonSerializationContext::deserializeIndexable(
             }
             PyObjectHolder elt;
             elt.steal(deserializePythonObject(b, wireType));
+
             if (fieldNumber < 1 || fieldNumber > count) {
                 throw std::runtime_error("Corrupt record number.");
             }
-
+            writtenValues += 1;
             set_item_and_steal_ref_fn((PyObject*)res, fieldNumber - 1, elt.extract());
         }
     });
+
+    if (count < 0) {
+        throw std::runtime_error("Failed in deserializeIndexable - never got a count");
+    }
+
+    if (writtenValues != count) {
+        throw std::runtime_error("Failed in deserializeIndexable - wrong number of elements");
+    }
 
     return incref(res);
 }
