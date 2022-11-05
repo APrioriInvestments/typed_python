@@ -46,15 +46,6 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
     // if we have a group, check whether we've already memoized this group in the stream
     // this prevents us from initiating the serialization of a new group here.
     if (groupAndIndex.first && b.isAlreadyCached(groupAndIndex.first)) {
-        //see if the object has a name. If so, we always want to use that.
-        std::string name = getNameForPyObj(o);
-
-        if (name.size()) {
-            // we shouldn't have a name, because if we do we should have serialized
-            // the MRTG by the name of one of its elements.
-            throw std::runtime_error("This group should be serialized by name already");
-        }
-
         b.writeBeginCompound(FieldNumbers::RECURSIVE_OBJECT);
         serializeMutuallyRecursiveTypeGroup(groupAndIndex.first, b, 0);
 
