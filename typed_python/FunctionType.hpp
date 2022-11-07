@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2020 typed_python Authors
+   Copyright 2017-2022 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@
 #include "TypedCellType.hpp"
 #include "ReprAccumulator.hpp"
 #include "Format.hpp"
+#include "SpecialModuleNames.hpp"
+#include "PyInstance.hpp"
 
 class Function;
 
@@ -778,12 +780,42 @@ public:
 
         template<class visitor_type>
         void _visitReferencedTypes(const visitor_type& visitor) {
+            // we need to keep mArgs and mReturnType in sync with
+            // mAnnotations, so if we change one of our types we
+            // need to update the resulting dictionary as well.
             if (mReturnType) {
+                Type* retType = mReturnType;
+
                 visitor(mReturnType);
+
+                if (mReturnType != retType
+                    && mFunctionAnnotations
+                    && PyDict_Check(mFunctionAnnotations)
+                ) {
+                    PyDict_SetItemString(
+                        mFunctionAnnotations,
+                        "return",
+                        (PyObject*)PyInstance::typeObj(mReturnType)
+                    );
+                }
             }
             for (auto& a: mArgs) {
+                Type* typeFilter = a.getTypeFilter();
+
                 a._visitReferencedTypes(visitor);
+
+                if (a.getTypeFilter() != typeFilter
+                    && mFunctionAnnotations
+                    && PyDict_Check(mFunctionAnnotations)
+                ) {
+                    PyDict_SetItemString(
+                        mFunctionAnnotations,
+                        a.getName().c_str(),
+                        (PyObject*)PyInstance::typeObj(a.getTypeFilter())
+                    );
+                }
             }
+
             for (auto& varnameAndBinding: mClosureBindings) {
                 varnameAndBinding.second._visitReferencedTypes(visitor);
             }
@@ -811,7 +843,6 @@ public:
 
                 visitor.visitHash(ShaHash(2));
             }
-
 
             if (mSignatureFunction) {
                 visitor.visitHash(ShaHash(1));
@@ -897,15 +928,22 @@ public:
                 std::string curName;
 
                 for (PyObject* name: sequence) {
+                    std::string nameStr = PyUnicode_AsUTF8(name);
+
+                    if (isSpecialIgnorableName(nameStr)) {
+                        break;
+                    }
+
                     if (!curObj) {
-                        curName = PyUnicode_AsUTF8(name);
+                        curName = nameStr;
                     } else {
-                        curName = curName + "." + PyUnicode_AsUTF8(name);
+                        curName = curName + "." + nameStr;
                     }
 
                     if (!curObj) {
                         // this is a lookup in the global dict
                         curObj.set(PyDict_GetItem(globals, name));
+
                         if (!curObj) {
                             // this is an invalid global lookup, which is OK. no need to hash anything.
                             PyErr_Clear();
@@ -923,14 +961,15 @@ public:
                                 return;
                             }
                         } else {
-                            visitor(curName, (PyObject*)curObj);
-                            return;
+                            break;
                         }
                     }
                 }
 
                 // also visit at the end of the sequence
-                visitor(curName, (PyObject*)curObj);
+                if (curObj) {
+                    visitor(curName, (PyObject*)curObj);
+                }
             };
 
             for (auto& sequence: dotAccesses) {

@@ -50,7 +50,8 @@ from typed_python import (
 
 from typed_python._types import (
     refcount, isRecursive, identityHash, buildPyFunctionObject,
-    setFunctionClosure, typesAreEquivalent, recursiveTypeGroupDeepRepr
+    setFunctionClosure, typesAreEquivalent, recursiveTypeGroupDeepRepr,
+    recursiveTypeGroupRepr
 )
 
 module_level_testfun = dummy_test_module.testfunction
@@ -1967,6 +1968,39 @@ class TypesSerializationTest(unittest.TestCase):
             return type(f.__closure__[0])
 
         assert callFunctionInFreshProcess(getCellType, ()) is getCellType()
+
+    def test_self_visible_base_class_forward_resolved(self):
+        Base = Forward("Base")
+
+        @Base.define
+        class Base(Class):
+            def f(self, other: Base) -> Base:
+                return Base()
+
+        assert 'Forward' not in recursiveTypeGroupRepr(Base)
+
+    def test_serialize_classes_with_visible_base_class(self):
+        def getOptimizer():
+            Base = Forward("Base")
+
+            @Base.define
+            class Base(Class):
+                def __add__(self, other: Base) -> Base:
+                    return Child(bases=[self, other])
+
+
+            class Child(Base, Final):
+                bases = Member(ListOf(Base))
+
+                def __add__(self, other: Base) -> Base:
+                    return Child(bases=self.bases + [other])
+
+            return Base, Child
+
+        Base, Child = callFunctionInFreshProcess(getOptimizer, ())
+
+        assert isinstance(Base() + Base() + Base(), Base)
+        assert isinstance(Base() + Base() + Base(), Child)
 
     def test_serialize_self_referencing_class_basic(self):
         def g(x):

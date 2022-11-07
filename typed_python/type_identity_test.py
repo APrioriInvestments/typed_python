@@ -33,6 +33,7 @@ from typed_python._types import (
     typesAndObjectsVisibleToCompilerFrom,
     checkForHashInstability,
     resetCompilerVisibleObjectHashCache,
+    typeWalkRecord
 )
 
 
@@ -44,6 +45,14 @@ def fModuleLevel(x):
 @Entrypoint
 def gModuleLevel(x):
     return fModuleLevel(x)
+
+
+def looksAtFilename():
+    return __file__
+
+
+def looksAtFilename2():
+    return typed_python.type_identity_test.__file__
 
 
 def checkHash(filesToWrite, expression):
@@ -66,6 +75,18 @@ def returnSerializedValue(filesToWrite, expression, printComments=False):
         f"SerializationContext({{}}).serialize({expression})",
         printComments=printComments
     )
+
+
+def test_identity_ignores_function_file_accesses():
+    # make sure these functions succeed
+    assert looksAtFilename()
+    assert looksAtFilename2()
+
+    walk1 = typeWalkRecord(looksAtFilename)
+    walk2 = typeWalkRecord(looksAtFilename2)
+
+    assert '__file__' not in walk1
+    assert '__file__' not in walk2
 
 
 def test_identities_of_basic_types_different():
