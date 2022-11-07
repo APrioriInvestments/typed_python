@@ -619,7 +619,6 @@ ShaHash MutuallyRecursiveTypeGroup::computeTopoHash(TypeOrPyobj toHash) {
 
         if (!groupAndIx.first || groupAndIx.second == -1) {
             CompilerVisibleObjectVisitor::singleton().checkForInstability();
-            asm("int3");
 
             throw std::runtime_error(
                 "All reachable objects should be in this group or hashed already. "
@@ -773,7 +772,6 @@ void MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(TypeOrPyobj root) {
     static thread_local int count = 0;
     count++;
     if (count > 1) {
-        asm("int3");
         throw std::runtime_error(
             "There should be only one group algo running at once. Somehow, "
             "our reference to " + root.name() + " wasn't captured correctly."
