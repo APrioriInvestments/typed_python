@@ -363,8 +363,7 @@ public:
     static bool isPyObjectGloballyIdentifiable(PyObject* h) {
         PyEnsureGilAcquired getTheGil;
 
-        static PyObject* sysModule = PyImport_ImportModule("sys");
-        static PyObject* sysModuleModules = PyObject_GetAttrString(sysModule, "modules");
+        PyObject* sysModuleModules = staticPythonInstance("sys", "modules");
 
         if (PyObject_HasAttrString(h, "__module__") && PyObject_HasAttrString(h, "__name__")) {
             PyObjectStealer moduleName(PyObject_GetAttrString(h, "__module__"));
@@ -410,8 +409,8 @@ public:
         // in question should get deleted ever...
         PyEnsureGilAcquired getTheGil;
 
-        static PyObject* builtinsModule = ::builtinsModule();
-        static PyObject* builtinsModuleDict = PyObject_GetAttrString(builtinsModule, "__dict__");
+        PyObject* builtinsModule = staticPythonInstance("builtins", "");
+        PyObject* builtinsModuleDict = staticPythonInstance("builtins", "__dict__");
 
         // handle basic constants
         return (
@@ -560,8 +559,7 @@ private:
             return;
         }
 
-        static PyObject* osModule = ::osModule();
-        static PyObject* environType = PyObject_GetAttrString(osModule, "_Environ");
+        PyObject* environType = staticPythonInstance("os", "_Environ");
 
         if (obj.pyobj()->ob_type == (PyTypeObject*)environType) {
             // don't ever hash the environment.
@@ -583,8 +581,7 @@ private:
 
         // don't walk into canonical modules
         if (PyModule_Check(obj.pyobj())) {
-            static PyObject* sysModule = ::sysModule();
-            static PyObject* sysModuleModules = PyObject_GetAttrString(sysModule, "modules");
+            PyObject* sysModuleModules = staticPythonInstance("sys", "modules");
 
             PyObjectStealer name(PyObject_GetAttrString(obj.pyobj(), "__name__"));
             if (name) {
@@ -761,11 +758,9 @@ private:
             return;
         }
 
-        static PyObject* weakrefModule = ::weakrefModule();
-        static PyObject* weakSetType = PyObject_GetAttrString(weakrefModule, "WeakSet");
-        static PyObject* weakKeyDictType = PyObject_GetAttrString(weakrefModule, "WeakKeyDictionary");
-        static PyObject* weakValueDictType = PyObject_GetAttrString(weakrefModule, "WeakValueDictionary");
-
+        PyObject* weakSetType = staticPythonInstance("weakref", "WeakSet");
+        PyObject* weakKeyDictType = staticPythonInstance("weakref", "WeakKeyDictionary");
+        PyObject* weakValueDictType = staticPythonInstance("weakref", "WeakValueDictionary");
 
         if (
             // dict, set and list are all mutable - we can't rely on their contents,

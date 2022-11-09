@@ -629,8 +629,6 @@ public:
 
     static PyBufferProcs* bufferProcs();
 
-    static PyObject* getInternalModuleMember(const char* name);
-
     static PyTypeObject* allTypesBaseType();
 
     static PyTypeObject* typeCategoryBaseType(Type::TypeCategory category);

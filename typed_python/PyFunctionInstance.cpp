@@ -436,27 +436,9 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(
             }
         }
 
-        static PyObject* runtimeModule = ::runtimeModule();
-
-        if (!runtimeModule) {
-            throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime");
-        }
-
-        PyObject* runtimeClass = PyObject_GetAttrString(runtimeModule, "Runtime");
-
-        if (!runtimeClass) {
-            throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime.Runtime");
-        }
-
-        PyObject* singleton = PyObject_CallMethod(runtimeClass, "singleton", "");
-
-        if (!singleton) {
-            if (PyErr_Occurred()) {
-                PyErr_Clear();
-            }
-
-            throw std::runtime_error("Internal error: couldn't call typed_python.compiler.runtime.Runtime.singleton");
-        }
+        PyObject* singleton = staticPythonInstance(
+            "typed_python.compiler.runtime", "Runtime.singleton()"
+        );
 
         PyObjectStealer arguments(mapper.extractFunctionArgumentValues());
 
@@ -575,29 +557,9 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
 
 // static
 PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
-    static PyObject* internalsModule = ::internalsModule();
-
-    if (!internalsModule) {
-        throw std::runtime_error("Internal error: couldn't find typed_python.internals");
-    }
-
-    static PyObject* funcOverload = PyObject_GetAttrString(internalsModule, "FunctionOverload");
-
-    if (!funcOverload) {
-        throw std::runtime_error("Internal error: couldn't find typed_python.internals.FunctionOverload");
-    }
-
-    static PyObject* closureVariableCellLookupSingleton = PyObject_GetAttrString(internalsModule, "CellAccess");
-
-    if (!closureVariableCellLookupSingleton) {
-        throw std::runtime_error("Internal error: couldn't find typed_python.internals.CellAccess");
-    }
-
-    static PyObject* funcOverloadArg = PyObject_GetAttrString(internalsModule, "FunctionOverloadArg");
-
-    if (!funcOverloadArg) {
-        throw std::runtime_error("Internal error: couldn't find typed_python.internals.FunctionOverloadArg");
-    }
+    PyObject* funcOverload = staticPythonInstance("typed_python.internals", "FunctionOverload");
+    PyObject* closureVariableCellLookupSingleton = staticPythonInstance("typed_python.internals", "CellAccess");
+    PyObject* funcOverloadArg = staticPythonInstance("typed_python.internals", "FunctionOverloadArg");
 
     PyObjectStealer overloadTuple(PyTuple_New(f->getOverloads().size()));
 
@@ -1011,27 +973,9 @@ PyObject* PyFunctionInstance::overload(PyObject* funcObj, PyObject* args, PyObje
 
 /* static */
 PyObject* PyFunctionInstance::resultTypeFor(PyObject* funcObj, PyObject* args, PyObject* kwargs) {
-    static PyObject* runtimeModule = ::runtimeModule();
-
-    if (!runtimeModule) {
-        throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime");
-    }
-
-    static PyObject* runtimeClass = PyObject_GetAttrString(runtimeModule, "Runtime");
-
-    if (!runtimeClass) {
-        throw std::runtime_error("Internal error: couldn't find typed_python.compiler.runtime.Runtime");
-    }
-
-    static PyObject* singleton = PyObject_CallMethod(runtimeClass, "singleton", "");
-
-    if (!singleton) {
-        if (PyErr_Occurred()) {
-            PyErr_Clear();
-        }
-
-        throw std::runtime_error("Internal error: couldn't call typed_python.compiler.runtime.Runtime.singleton");
-    }
+    PyObject* singleton = staticPythonInstance(
+        "typed_python.compiler.runtime", "Runtime.singleton()"
+    );
 
     if (!kwargs) {
         static PyObject* emptyDict = PyDict_New();
@@ -1178,19 +1122,7 @@ Function* PyFunctionInstance::convertPythonObjectToFunctionType(
         return memo_it->second;
     }
 
-    static PyObject* internalsModule = ::internalsModule();
-
-    if (!internalsModule) {
-        PyErr_SetString(PyExc_TypeError, "Internal error: couldn't find typed_python.internals");
-        return nullptr;
-    }
-
-    static PyObject* makeFunctionType = PyObject_GetAttrString(internalsModule, "makeFunctionType");
-
-    if (!makeFunctionType) {
-        PyErr_SetString(PyExc_TypeError, "Internal error: couldn't find typed_python.internals.makeFunctionType");
-        return nullptr;
-    }
+    PyObject* makeFunctionType = staticPythonInstance("typed_python.internals", "makeFunctionType");
 
     PyObjectStealer args(PyTuple_Pack(2, name, funcObj));
     PyObjectStealer kwargs(PyDict_New());

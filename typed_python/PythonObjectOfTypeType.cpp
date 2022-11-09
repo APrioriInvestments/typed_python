@@ -532,15 +532,17 @@ PythonObjectOfType* PythonObjectOfType::Make(PyTypeObject* pyType, PyObject* giv
 }
 
 PythonObjectOfType* PythonObjectOfType::AnyPyObject() {
-    static PyObject* module = internalsModule();
-    static PyObject* t = PyObject_GetAttrString(module, "object");
+    PyTypeObject* t = (PyTypeObject*)staticPythonInstance(
+        "typed_python.internals", "object"
+    );
 
     return Make((PyTypeObject*)t);
 }
 
 PythonObjectOfType* PythonObjectOfType::AnyPyType() {
-    static PyObject* module = internalsModule();
-    static PyObject* t = PyObject_GetAttrString(module, "type");
+    PyTypeObject* t = (PyTypeObject*)staticPythonInstance(
+        "typed_python.internals", "type"
+    );
 
     return Make((PyTypeObject*)t);
 }

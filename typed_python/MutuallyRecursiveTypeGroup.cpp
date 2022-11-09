@@ -886,8 +886,8 @@ ShaHash MutuallyRecursiveTypeGroup::shaHashOfSimplePyObjectConstant(PyObject* h)
         return ShaHash(100, 6) + ShaHash::SHA1(c, s);
     }
 
-    static PyObject* builtinsModule = ::builtinsModule();
-    static PyObject* builtinsModuleDict = PyObject_GetAttrString(builtinsModule, "__dict__");
+    PyObject* builtinsModule = staticPythonInstance("builtins", "");
+    PyObject* builtinsModuleDict = staticPythonInstance("builtins", "__dict__");
 
     if (h == builtinsModule) {
         return ShaHash(100, 8);

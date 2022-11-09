@@ -14,39 +14,9 @@
 #include <pythread.h>
 
 PyObject* getRuntimeSingleton() {
-    assertHoldingTheGil();
-
-    static PyObject* pyRuntimeModule = runtimeModule();
-
-    if (!pyRuntimeModule) {
-        if (!PyErr_Occurred()) {
-            PyErr_Format(PyExc_RuntimeError, "Internal error: couldn't find typed_python.compiler.runtime");
-        }
-        throw PythonExceptionSet();
-    }
-
-    static PyObject* runtimeClass = PyObject_GetAttrString(pyRuntimeModule, "Runtime");
-
-    if (!runtimeClass) {
-        if (!PyErr_Occurred()) {
-            PyErr_Format(PyExc_RuntimeError, "Internal error: couldn't find typed_python.compiler.runtime.Runtime");
-        }
-        throw PythonExceptionSet();
-    }
-
-    static PyObject* singleton = PyObject_CallMethod(runtimeClass, "singleton", "");
-
-    if (!singleton) {
-        if (!PyErr_Occurred()) {
-            PyErr_Format(
-                PyExc_RuntimeError,
-                "Internal error: couldn't call typed_python.compiler.runtime.Runtime.singleton"
-            );
-        }
-        throw PythonExceptionSet();
-    }
-
-    return singleton;
+    return staticPythonInstance(
+        "typed_python.compiler.runtime", "Runtime.singleton()"
+    );
 }
 
 // Note: extern C identifiers are distinguished only up to 32 characters
@@ -1247,9 +1217,7 @@ extern "C" {
     PythonObjectOfType::layout_type* np_builtin_pyobj_by_name(const char* utf8_name) {
         PyEnsureGilAcquired getTheGil;
 
-        static PyObject* module = builtinsModule();
-
-        return PythonObjectOfType::createLayout(PyObject_GetAttrString(module, utf8_name));
+        return PythonObjectOfType::createLayout(PyObject_GetAttrString(builtinsModule(), utf8_name));
     }
 
     PythonObjectOfType::layout_type* nativepython_runtime_get_pyobj_None() {
@@ -2715,9 +2683,7 @@ extern "C" {
     void np_raise_exception_fastpath(const char* message, const char* exceptionTypeName) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* module = builtinsModule();
-
-        PyObject* excType = PyObject_GetAttrString(module, exceptionTypeName);
+        PyObject* excType = PyObject_GetAttrString(builtinsModule(), exceptionTypeName);
         if (!excType) {
             return;
         }

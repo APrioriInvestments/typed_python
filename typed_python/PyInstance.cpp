@@ -89,16 +89,12 @@ instance_ptr PyInstance::dataPtr() {
 
 //static
 PyObject* PyInstance::undefinedBehaviorException() {
-    static PyObject* module = ::internalsModule();
-    static PyObject* t = PyObject_GetAttrString(module, "UndefinedBehaviorException");
-    return t;
+    return staticPythonInstance("typed_python.internals", "UndefinedBehaviorException");
 }
 
 //static
 PyObject* PyInstance::nonTypesAcceptedAsTypes() {
-    static PyObject* module = ::internalsModule();
-    static PyObject* t = PyObject_GetAttrString(module, "_nonTypesAcceptedAsTypes");
-    return t;
+    return staticPythonInstance("typed_python.internals", "_nonTypesAcceptedAsTypes");
 }
 
 // static
@@ -989,24 +985,6 @@ std::pair<Type*, instance_ptr> PyInstance::extractTypeAndPtrFrom(PyObject* obj) 
 }
 
 
-PyObject* PyInstance::getInternalModuleMember(const char* name) {
-    static PyObject* internalsModule = ::internalsModule();
-
-    if (!internalsModule) {
-        PyErr_SetString(PyExc_TypeError, "Internal error: couldn't find typed_python.internals");
-        return nullptr;
-    }
-
-    PyObject* result = PyObject_GetAttrString(internalsModule, name);
-
-    if (!result) {
-        PyErr_Format(PyExc_TypeError, "Internal error: couldn't find typed_python.internals.%s", name);
-        return nullptr;
-    }
-
-    return result;
-}
-
 //construct the base class that all actual type instances of a given TypeCategory descend from
 PyTypeObject* PyInstance::allTypesBaseType() {
     auto allocateBaseType = [&]() {
@@ -1165,7 +1143,9 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
         };
 
         if (category == Type::TypeCategory::catClass) {
-            static PyTypeObject* classMetaclass = (PyTypeObject*)getInternalModuleMember("ClassMetaclass");
+            PyTypeObject* classMetaclass = (PyTypeObject*)staticPythonInstance(
+                "typed_python.internals", "ClassMetaclass"
+            );
             ((PyObject*)&types[category]->typeObj)->ob_type = incref(classMetaclass);
         }
 
@@ -1300,7 +1280,9 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
     // if we are an instance of 'Class', we must explicitly set our Metaclass to internals.ClassMetaclass,
     // so that when other classes inherit from us they also inherit our metaclass.
     if (inType->getTypeCategory() == Type::TypeCategory::catClass) {
-        static PyTypeObject* classMetaclass = (PyTypeObject*)getInternalModuleMember("ClassMetaclass");
+        PyTypeObject* classMetaclass = (PyTypeObject*)staticPythonInstance(
+            "typed_python.internals", "ClassMetaclass"
+        );
         ((PyObject*)&types[inType]->typeObj)->ob_type = incref(classMetaclass);
     }
 

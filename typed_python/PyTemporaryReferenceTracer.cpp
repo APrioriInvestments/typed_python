@@ -29,7 +29,7 @@ bool PyTemporaryReferenceTracer::isLineNewStatement(PyObject* code, int line) {
     incref(code);
     auto& lineNumbers = codeObjectToExpressionLines[code];
 
-    static PyObject* internals = internalsModule();
+    PyObject* internals = internalsModule();
 
     PyObjectStealer res(
         PyObject_CallMethod(internals, "extractCodeObjectNewStatementLineNumbers", "O", code, NULL)

@@ -390,37 +390,36 @@ std::string qualname_to_name(std::string n) {
 }
 
 
+// grab a value out of a python module and index into it with a sequence of
+// member operations. () will mean 'call'.
+// For instance, 'typed_python.compiler.runtime', 'Runtime.singleton()' will import
+// the runtime module and then grab the singleton.
+// this gets memoized so it won't change after the first call.
+PyObject* staticPythonInstance(std::string module, std::string member);
+
 inline PyObject* internalsModule() {
-    static PyObject* module = PyImport_ImportModule("typed_python.internals");
-    return module;
+    return staticPythonInstance("typed_python.internals", "");
 }
 
-
 inline PyObject* runtimeModule() {
-    static PyObject* module = PyImport_ImportModule("typed_python.compiler.runtime");
-    return module;
+    return staticPythonInstance("typed_python.compiler.runtime", "");
 }
 
 inline PyObject* builtinsModule() {
-    static PyObject* module = PyImport_ImportModule("builtins");
-    return module;
+    return staticPythonInstance("builtins", "");
 }
 
 inline PyObject* sysModule() {
-    static PyObject* module = PyImport_ImportModule("sys");
-    return module;
+    return staticPythonInstance("sys", "");
 }
 
 inline PyObject* weakrefModule() {
-    static PyObject* module = PyImport_ImportModule("weakref");
-    return module;
+    return staticPythonInstance("weakref", "");
 }
 
 inline PyObject* osModule() {
-    static PyObject* module = PyImport_ImportModule("os");
-    return module;
+    return staticPythonInstance("os", "");
 }
-
 
 inline bool startsWith(std::string name, std::string prefix) {
     if (name.size() < prefix.size()) {
@@ -429,4 +428,3 @@ inline bool startsWith(std::string name, std::string prefix) {
 
     return name.substr(0, prefix.size()) == prefix;
 }
-

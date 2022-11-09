@@ -79,7 +79,7 @@ bool unpackTupleToStringAndTypes(PyObject* tuple, std::vector<std::pair<std::str
 }
 
 bool unpackTupleToMemberDefinition(
-    PyObject* tuple, 
+    PyObject* tuple,
     std::vector<MemberDefinition>& out
 ) {
     std::set<std::string> memberNames;
@@ -160,4 +160,75 @@ bool unpackTupleToStringAndObjects(PyObject* tuple, std::vector<std::pair<std::s
     }
 
     return true;
+}
+
+PyObject* staticPythonInstance(std::string module, std::string member) {
+    typedef std::pair<std::string, std::string> key_type;
+
+    static std::map<key_type, PyObject*> cache;
+    static std::mutex mutex;
+
+    key_type key(module, member);
+
+    // see if this is in our memo
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+
+        auto it = cache.find(key);
+
+        if (it != cache.end()) {
+            return it->second;
+        }
+    }
+
+    // nope - we have to call into python and get it
+    PyEnsureGilAcquired getTheGil;
+
+    PyObject* val = PyImport_ImportModule(module.c_str());
+
+    if (!val) {
+        throw PythonExceptionSet();
+    }
+
+    size_t curOffset = 0;
+
+    while (curOffset < member.size()) {
+        size_t dot = member.find('.', curOffset);
+        if (dot == std::string::npos) {
+            dot = member.size();
+        }
+
+        std::string memberName = member.substr(curOffset, dot - curOffset);
+
+        bool call = false;
+        if (memberName.size() > 2 && memberName.substr(memberName.size() - 2) == "()") {
+            call = true;
+            memberName = memberName.substr(0, memberName.size() - 2);
+        }
+
+        val = PyObject_GetAttrString(
+            val,
+            memberName.c_str()
+        );
+
+        if (!val) {
+            throw PythonExceptionSet();
+        }
+
+        if (call) {
+            val = PyObject_CallFunction(val, "");
+
+            if (!val) {
+                throw PythonExceptionSet();
+            }
+        }
+
+        curOffset = dot + 1;
+    }
+
+    std::lock_guard<std::mutex> lock(mutex);
+
+    cache[key] = val;
+
+    return val;
 }
