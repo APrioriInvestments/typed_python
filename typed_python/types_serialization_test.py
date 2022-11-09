@@ -1988,7 +1988,6 @@ class TypesSerializationTest(unittest.TestCase):
                 def __add__(self, other: Base) -> Base:
                     return Child(bases=[self, other])
 
-
             class Child(Base, Final):
                 bases = Member(ListOf(Base))
 
