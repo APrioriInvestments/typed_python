@@ -336,7 +336,12 @@ class SerializationContext:
                         if moduleName in _badModuleCache or not allowImport:
                             return None
 
-                        module = importlib.import_module(moduleName)
+                        module = None
+
+                # make sure not to import the module under lock
+                if module is None:
+                    module = importlib.import_module(moduleName)
+
             except ModuleNotFoundError:
                 _badModuleCache.add(moduleName)
                 return None
@@ -402,10 +407,12 @@ class SerializationContext:
                     if not allowImport:
                         return None
 
-                # make sure to import outside of the lock
-                # otherwise we can deadlock since importing
-                # may trigger compilation
-            module = importlib.import_module(moduleName)
+                    module = None
+            # make sure to import outside of the lock
+            # otherwise we can deadlock since importing
+            # may trigger compilation
+            if module is None:
+                module = importlib.import_module(moduleName)
 
             return getattr(module, objName, None)
         except ModuleNotFoundError:
