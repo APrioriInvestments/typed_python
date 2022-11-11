@@ -15,14 +15,18 @@
 import types
 import logging
 
-from typed_python.hash import Hash
+from sortedcontainers import SortedSet
 from types import ModuleType
+from typing import Optional, Dict
+
 import typed_python.python_ast as python_ast
 import typed_python._types as _types
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
+
+from typed_python.compiler.compiler_cache import CompilerCache
+from typed_python.compiler.llvm_compiler import Compiler
 from typed_python.compiler.native_function_pointer import NativeFunctionPointer
-from sortedcontainers import SortedSet
 from typed_python.compiler.directed_graph import DirectedGraph
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
@@ -33,16 +37,18 @@ from typed_python.compiler.type_wrappers.python_typed_function_wrapper import (
     PythonTypedFunctionWrapper, CannotBeDetermined, NoReturnTypeSpecified
 )
 from typed_python.compiler.typed_call_target import TypedCallTarget
+from typed_python.hash import Hash
 
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+__all__ = ['PythonToNativeConverter']
 
+type_wrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 VALIDATE_FUNCTION_DEFINITIONS_STABLE = False
 
 
 class FunctionDependencyGraph:
     def __init__(self):
-        self._dependencies = DirectedGraph()
+        self.dependency_graph = DirectedGraph()
 
         # the search depth in the dependency to find 'identity'
         # the _first_ time we ever saw it. We prefer to update
@@ -56,13 +62,13 @@ class FunctionDependencyGraph:
         # (priority, node) pairs that need to recompute
         self._dirty_inflight_functions_with_order = SortedSet(key=lambda pair: pair[0])
 
-    def dropNode(self, node):
-        self._dependencies.dropNode(node, False)
+    def drop_node(self, node):
+        self.dependency_graph.dropNode(node, False)
         if node in self._identity_levels:
             del self._identity_levels[node]
         self._dirty_inflight_functions.discard(node)
 
-    def getNextDirtyNode(self):
+    def get_next_dirty_node(self):
         while self._dirty_inflight_functions_with_order:
             priority, identity = self._dirty_inflight_functions_with_order.pop()
 
@@ -71,33 +77,33 @@ class FunctionDependencyGraph:
 
                 return identity
 
-    def addRoot(self, identity):
+    def add_root(self, identity):
         if identity not in self._identity_levels:
             self._identity_levels[identity] = 0
-            self.markDirty(identity)
+            self.mark_dirty(identity)
 
-    def addEdge(self, caller, callee):
+    def add_edge(self, caller, callee):
         if caller not in self._identity_levels:
             raise Exception(f"unknown identity {caller} found in the graph")
 
         if callee not in self._identity_levels:
             self._identity_levels[callee] = self._identity_levels[caller] + 1
 
-            self.markDirty(callee, isNew=True)
+            self.mark_dirty(callee, isNew=True)
 
-        self._dependencies.addEdge(caller, callee)
+        self.dependency_graph.addEdge(caller, callee)
 
-    def getNamesDependedOn(self, caller):
-        return self._dependencies.outgoing(caller)
+    def get_names_depended_on(self, caller):
+        return self.dependency_graph.outgoing(caller)
 
-    def markDirtyWithLowPriority(self, callee):
+    def mark_dirty_with_low_priority(self, callee):
         # mark this dirty, but call it back after new functions.
         self._dirty_inflight_functions.add(callee)
 
         level = self._identity_levels[callee]
         self._dirty_inflight_functions_with_order.add((-1000000 + level, callee))
 
-    def markDirty(self, callee, isNew=False):
+    def mark_dirty(self, callee, isNew=False):
         self._dirty_inflight_functions.add(callee)
 
         if isNew:
@@ -109,26 +115,47 @@ class FunctionDependencyGraph:
 
         self._dirty_inflight_functions_with_order.add((level, callee))
 
-    def functionReturnSignatureChanged(self, identity):
-        for caller in self._dependencies.incoming(identity):
-            self.markDirty(caller)
+    def function_return_signature_changed(self, identity):
+        for caller in self.dependency_graph.incoming(identity):
+            self.mark_dirty(caller)
 
 
 class PythonToNativeConverter:
-    def __init__(self, llvmCompiler, compilerCache):
-        object.__init__(self)
+    """
+    Short description
 
-        self.llvmCompiler = llvmCompiler
-        self.compilerCache = compilerCache
+    Long description
 
+    Attributes:
+        llvm_compiler: The WHAT?
+        compiler_cache: The WHAT?
+        all_defined_names: ?
+        all_cached_names:
+        _link_name_for_identity: ?
+        _identity_for_link_name: ?
+        _definitions: ?
+        _targets: ?
+        _inflight_definitions: ?
+        _inflight_function_conversions: ?
+        _identifier_to_pyfunc: ?
+        _times_calculated: ?
+        _new_native_functions:
+        _visitors:
+        _currentlyConverting:
+
+    """
+    def __init__(self, llvm_compiler: Compiler, compiler_cache: CompilerCache):
+        self.llvm_compiler = llvm_compiler
+        self.compiler_cache = compiler_cache
         # if True, then insert additional code to check for undefined behavior.
-        self.generateDebugChecks = False
+        self.generate_debug_checks = False
 
         # all link names for which we have a definition.
-        self._allDefinedNames = set()
+        self._all_defined_names = set()
 
-        # all names we loaded from the cache
-        self._allCachedNames = set()
+        # all names we loaded from the cache (not necessarily every function loaded in the cache,
+        # only those dependencies of a function we have called _loadFromCompilerCache on).
+        self._all_cached_names = set()
 
         self._link_name_for_identity = {}
         self._identity_for_link_name = {}
@@ -147,172 +174,172 @@ class PythonToNativeConverter:
         # the identity of the function we're currently evaluating.
         # we use this to track which functions need to get rebuilt when
         # other functions change types.
-        self._currentlyConverting = None
+        self._currently_converting = None
 
         self._dependencies = FunctionDependencyGraph()
 
-    def isCurrentlyConverting(self):
+    def is_currently_converting(self) -> bool:
         return len(self._inflight_function_conversions) > 0
 
-    def getDefinitionCount(self):
+    def get_definition_count(self) -> int:
+        """Used by runtime"""
         return len(self._definitions)
 
-    def addVisitor(self, visitor):
+    def add_visitor(self, visitor) -> None:
+        """placeholder - used by runtime. what is visitor?"""
         self._visitors.append(visitor)
 
-    def removeVisitor(self, visitor):
+    def remove_visitor(self, visitor) -> None:
+        """placeholder - used by runtime"""
         self._visitors.remove(visitor)
 
-    def identityToName(self, identity):
-        """Convert a function identity to the link-time name for the function.
-
-        Args:
-            identity - an identity tuple that uniquely identifies the function
-
-        Returns:
-            name - the linker name of the native function this represents, or None
-                if the identity is unknown
+    def build_and_link_new_module(self) -> None:
         """
-        return self._link_name_for_identity.get(identity)
+        grabs all in-flight function definitions (from _inflight_function_conversions) and generates a module.
 
-    def buildAndLinkNewModule(self):
-        targets = self.extract_new_function_definitions()
+        placeholder - explain what's afoot.
+
+        """
+        targets = self._extract_new_function_definitions()
 
         if not targets:
             return
 
-        if self.compilerCache is None:
-            loadedModule = self.llvmCompiler.buildModule(targets)
-            loadedModule.linkGlobalVariables()
+        if self.compiler_cache is None:
+            # todo - what is loadedModule doing? what is stored?
+            loaded_module = self.llvm_compiler.buildModule(targets)
+            loaded_module.linkGlobalVariables()
             return
 
         # get a set of function names that we depend on
-        externallyUsed = set()
+        externally_used = set()
 
         for funcName in targets:
             ident = self._identity_for_link_name.get(funcName)
             if ident is not None:
-                for dep in self._dependencies.getNamesDependedOn(ident):
+                for dep in self._dependencies.get_names_depended_on(ident):
                     depLN = self._link_name_for_identity.get(dep)
                     if depLN not in targets:
-                        externallyUsed.add(depLN)
+                        externally_used.add(depLN)
 
-        binary = self.llvmCompiler.buildSharedObject(targets)
+        binary = self.llvm_compiler.buildSharedObject(targets)
 
-        self.compilerCache.addModule(
+        self.compiler_cache.addModule(
             binary,
             {name: self._targets[name] for name in targets if name in self._targets},
-            externallyUsed
+            externally_used
         )
 
-    def extract_new_function_definitions(self):
-        """Return a list of all new function definitions from the last conversion."""
+    def _extract_new_function_definitions(self) -> Dict:  # TODO what kind?
+        """Return a list of all new function definitions since the last conversion."""
         res = {}
 
         for u in self._new_native_functions:
             res[u] = self._definitions[u]
 
         self._new_native_functions = set()
-
         return res
 
-    def identityHashToLinkerName(self, name, identityHash, prefix="tp."):
+    def _identity_hash_to_linker_name(self, name: str, identity_hash: str, prefix: str = "tp.") -> str:
         assert isinstance(name, str)
-        assert isinstance(identityHash, str)
+        assert isinstance(identity_hash, str)
         assert isinstance(prefix, str)
 
-        return prefix + name + "." + identityHash
+        return prefix + name + "." + identity_hash
 
-    def createConversionContext(
+    def _create_conversion_context(
         self,
         identity,
-        funcName,
-        funcCode,
-        funcGlobals,
-        funcGlobalsRaw,
-        closureVars,
+        func_name,
+        func_code,
+        func_globals,
+        func_globals_raw,
+        closure_vars,
         input_types,
         output_type,
-        conversionType
+        conversion_type
     ):
-        ConverterType = conversionType or FunctionConversionContext
+        """placeholder"""
+        ConverterType = conversion_type or FunctionConversionContext
 
-        pyast = self._code_to_ast(funcCode)
+        pyast = self._code_to_ast(func_code)
 
         return ConverterType(
             self,
-            funcName,
+            func_name,
             identity,
             input_types,
             output_type,
-            closureVars,
-            funcGlobals,
-            funcGlobalsRaw,
+            closure_vars,
+            func_globals,
+            func_globals_raw,
             pyast.args,
             pyast,
         )
 
-    def defineLinkName(self, identity, linkName):
+    def _define_link_name(self, identity, link_name: str) -> bool:
+        """placeholder"""
         if identity in self._link_name_for_identity:
-            if self._link_name_for_identity[identity] != linkName:
+            if self._link_name_for_identity[identity] != link_name:
                 raise Exception(
                     f"For identity {identity}:\n\n"
-                    f"{self._link_name_for_identity[identity]}\n\n!=\n\n{linkName}"
+                    f"{self._link_name_for_identity[identity]}\n\n!=\n\n{link_name}"
                 )
-            assert self._identity_for_link_name[linkName] == identity
+            assert self._identity_for_link_name[link_name] == identity
         else:
-            self._link_name_for_identity[identity] = linkName
-            self._identity_for_link_name[linkName] = identity
+            self._link_name_for_identity[identity] = link_name
+            self._identity_for_link_name[link_name] = identity
 
-        if linkName in self._allDefinedNames:
+        if link_name in self._all_defined_names:
             return False
 
-        self._allDefinedNames.add(linkName)
+        self._all_defined_names.add(link_name)
 
-        self._loadFromCompilerCache(linkName)
+        self._load_from_compiler_cache(link_name)
 
         return True
 
-    def _loadFromCompilerCache(self, linkName):
-        if self.compilerCache:
-            if self.compilerCache.hasSymbol(linkName):
-                callTargetsAndTypes = self.compilerCache.loadForSymbol(linkName)
+    def _load_from_compiler_cache(self, link_name: str) -> None:
+        """placeholder"""
+        if self.compiler_cache:
+            if self.compiler_cache.hasSymbol(link_name):
+                callTargetsAndTypes = self.compiler_cache.loadForSymbol(link_name)
 
                 if callTargetsAndTypes is not None:
                     newTypedCallTargets, newNativeFunctionTypes = callTargetsAndTypes
 
                     self._targets.update(newTypedCallTargets)
-                    self.llvmCompiler.markExternal(newNativeFunctionTypes)
+                    self.llvm_compiler.markExternal(newNativeFunctionTypes)
 
-                    self._allDefinedNames.update(newNativeFunctionTypes)
-                    self._allCachedNames.update(newNativeFunctionTypes)
+                    self._all_defined_names.update(newNativeFunctionTypes)
+                    self._all_cached_names.update(newNativeFunctionTypes)
 
-    def defineNonPythonFunction(self, name, identityTuple, context):
+    def define_non_python_function(self, name, identity_tuple, context) -> Optional[TypedCallTarget]:
         """Define a non-python generating function (if we haven't defined it before already)
 
             name - the name to actually give the function.
-            identityTuple - a unique (sha)hashable tuple
-            context - a FunctionConvertsionContext lookalike
+            identity_tuple - a unique (sha)hashable tuple
+            context - a FunctionConversionContext lookalike
 
         returns a TypedCallTarget, or None if it's not known yet
         """
-        identity = self.hashObjectToIdentity(identityTuple).hexdigest
-        linkName = self.identityHashToLinkerName(name, identity, "runtime.")
+        identity = self.hash_object_to_identity(identity_tuple).hexdigest
+        link_name = self._identity_hash_to_linker_name(name, identity, "runtime.")
 
-        self.defineLinkName(identity, linkName)
+        self._define_link_name(identity, link_name)
 
-        if self._currentlyConverting is not None:
-            self._dependencies.addEdge(self._currentlyConverting, identity)
+        if self._currently_converting is not None:
+            self._dependencies.add_edge(self._currently_converting, identity)
         else:
-            self._dependencies.addRoot(identity)
+            self._dependencies.add_root(identity)
 
-        if linkName in self._targets:
-            return self._targets.get(linkName)
+        if link_name in self._targets:
+            return self._targets.get(link_name)
 
         self._inflight_function_conversions[identity] = context
 
         if context.knownOutputType() is not None or context.alwaysRaises():
-            self._targets[linkName] = self.getTypedCallTarget(
+            self._targets[link_name] = self._get_typed_call_target(
                 name,
                 context.getInputTypes(),
                 context.knownOutputType(),
@@ -320,48 +347,49 @@ class PythonToNativeConverter:
                 functionMetadata=context.functionMetadata
             )
 
-        if self._currentlyConverting is None:
+        if self._currently_converting is None:
             # force the function to resolve immediately
-            self._resolveAllInflightFunctions()
-            self._installInflightFunctions()
+            self._resolve_all_inflight_functions()
+            self._install_inflight_functions()
             self._inflight_function_conversions.clear()
 
-        return self._targets.get(linkName)
+        return self._targets.get(link_name)
 
-    def defineNativeFunction(self, name, identity, input_types, output_type, generatingFunction):
+    def define_native_function(self, name, identity, input_types, output_type, generating_function):
         """Define a native function if we haven't defined it before already.
 
             name - the name to actually give the function.
             identity - a tuple consisting of strings, ints, type wrappers, and tuples of same
             input_types - list of Wrapper objects for the incoming types
             output_type - Wrapper object for the output type.
-            generatingFunction - a function producing a native_function_definition.
+            generating_function - a function producing a native_function_definition.
                 It should accept an expression_conversion_context, an expression for the output
                 if it's not pass-by-value (or None if it is), and a bunch of TypedExpressions
                 and produce code that always ends in a terminal expression, (or if it's pass by value,
                 flows off the end of the function)
 
-        returns a TypedCallTarget. 'generatingFunction' may call this recursively if it wants.
+        returns a TypedCallTarget. 'generating_function' may call this recursively if it wants.
         """
-        output_type = typeWrapper(output_type)
-        input_types = [typeWrapper(x) for x in input_types]
+        output_type = type_wrapper(output_type)
+        input_types = [type_wrapper(x) for x in input_types]
 
         identity = (
             Hash.from_integer(2) +
-            self.hashObjectToIdentity(identity) +
-            self.hashObjectToIdentity(output_type) +
-            self.hashObjectToIdentity(input_types)
+            self.hash_object_to_identity(identity) +
+            self.hash_object_to_identity(output_type) +
+            self.hash_object_to_identity(input_types)
         ).hexdigest
 
-        return self.defineNonPythonFunction(
+        return self.define_non_python_function(
             name,
             identity,
             NativeFunctionConversionContext(
-                self, input_types, output_type, generatingFunction, identity
+                self, input_types, output_type, generating_function, identity
             )
         )
 
-    def getTypedCallTarget(self, name, input_types, output_type, alwaysRaises=False, functionMetadata=None):
+    def _get_typed_call_target(self, name, input_types, output_type, alwaysRaises=False, functionMetadata=None) -> TypedCallTarget:
+        """placeholder"""
         native_input_types = [a.getNativePassingType() for a in input_types if not a.is_empty]
         if output_type is None:
             native_output_type = native_ast.Type.Void()
@@ -392,7 +420,7 @@ class PythonToNativeConverter:
     def _code_to_ast(self, f):
         return python_ast.convertFunctionToAlgebraicPyAst(f)
 
-    def demasqueradeCallTargetOutput(self, callTarget: TypedCallTarget):
+    def demasquerade_call_target_output(self, call_target):
         """Ensure we are returning the correct 'interpreterType' from callTarget.
 
         In some cases, we may return a 'masquerade' type in compiled code. This is fine
@@ -402,30 +430,30 @@ class PythonToNativeConverter:
         Returns:
             a new TypedCallTarget where the output type has the right return type.
         """
-        if callTarget.output_type is None:
-            return callTarget
+        if call_target.output_type is None:
+            return call_target
 
-        if callTarget.output_type.interpreterTypeRepresentation == callTarget.output_type.typeRepresentation:
-            return callTarget
+        if call_target.output_type.interpreterTypeRepresentation == call_target.output_type.typeRepresentation:
+            return call_target
 
         def generator(context, out, *args):
             assert out is not None, "we should have an output because no masquerade types are pass-by-value"
 
-            res = context.call_typed_call_target(callTarget, args)
+            res = context.call_typed_call_target(call_target, args)
 
             out.convert_copy_initialize(res.convert_masquerade_to_untyped())
 
-        res = self.defineNativeFunction(
-            "demasquerade_" + callTarget.name,
-            ("demasquerade", callTarget.name),
-            callTarget.input_types,
-            typeWrapper(callTarget.output_type.interpreterTypeRepresentation),
+        res = self.define_native_function(
+            "demasquerade_" + call_target.name,
+            ("demasquerade", call_target.name),
+            call_target.input_types,
+            type_wrapper(call_target.output_type.interpreterTypeRepresentation),
             generator
         )
 
         return res
 
-    def generateCallConverter(self, callTarget: TypedCallTarget):
+    def generate_call_converter(self, call_target: TypedCallTarget) -> str:
         """Given a call target that's optimized for llvm-level dispatch (with individual
         arguments packed into registers), produce a (native) call-target that
         we can dispatch to from our C extension, where arguments are packed into
@@ -443,39 +471,40 @@ class PythonToNativeConverter:
         Returns:
             the linker name of the defined native function
         """
-        identifier = "call_converter_" + callTarget.name
-        linkName = callTarget.name + ".dispatch"
+        identifier = "call_converter_" + call_target.name
+        link_name = call_target.name + ".dispatch"
 
-        if linkName in self._allDefinedNames:
-            return linkName
+        # consider something better
+        if link_name in self._all_defined_names:
+            return link_name
 
-        self._loadFromCompilerCache(linkName)
-        if linkName in self._allDefinedNames:
-            return linkName
+        self._load_from_compiler_cache(link_name)
+        if link_name in self._all_defined_names:
+            return link_name
 
         args = []
-        for i in range(len(callTarget.input_types)):
-            if not callTarget.input_types[i].is_empty:
-                argtype = callTarget.input_types[i].getNativeLayoutType()
+        for i in range(len(call_target.input_types)):
+            if not call_target.input_types[i].is_empty:
+                argtype = call_target.input_types[i].getNativeLayoutType()
 
                 untypedPtr = native_ast.var('input').ElementPtrIntegers(i).load()
 
-                if callTarget.input_types[i].is_pass_by_ref:
+                if call_target.input_types[i].is_pass_by_ref:
                     # we've been handed a pointer, and it's already a pointer
                     args.append(untypedPtr.cast(argtype.pointer()))
                 else:
                     args.append(untypedPtr.cast(argtype.pointer()).load())
 
-        if callTarget.output_type is not None and callTarget.output_type.is_pass_by_ref:
-            body = callTarget.call(
-                native_ast.var('return').cast(callTarget.output_type.getNativeLayoutType().pointer()),
+        if call_target.output_type is not None and call_target.output_type.is_pass_by_ref:
+            body = call_target.call(
+                native_ast.var('return').cast(call_target.output_type.getNativeLayoutType().pointer()),
                 *args
             )
         else:
-            body = callTarget.call(*args)
+            body = call_target.call(*args)
 
-            if not (callTarget.output_type is None or callTarget.output_type.is_empty):
-                body = native_ast.var('return').cast(callTarget.output_type.getNativeLayoutType().pointer()).store(body)
+            if not (call_target.output_type is None or call_target.output_type.is_empty):
+                body = native_ast.var('return').cast(call_target.output_type.getNativeLayoutType().pointer()).store(body)
 
         body = native_ast.FunctionBody.Internal(body=body)
 
@@ -488,165 +517,171 @@ class PythonToNativeConverter:
             output_type=native_ast.Type.Void()
         )
 
-        self._link_name_for_identity[identifier] = linkName
-        self._identity_for_link_name[linkName] = identifier
-        self._allDefinedNames.add(linkName)
+        self._link_name_for_identity[identifier] = link_name
+        self._identity_for_link_name[link_name] = identifier
+        self._all_defined_names.add(link_name)
 
-        self._definitions[linkName] = definition
-        self._new_native_functions.add(linkName)
+        self._definitions[link_name] = definition
+        self._new_native_functions.add(link_name)
 
-        return linkName
+        return link_name
 
-    def _resolveAllInflightFunctions(self):
+    def _resolve_all_inflight_functions(self):
+        """placeholder"""
         while True:
-            identity = self._dependencies.getNextDirtyNode()
+            identity = self._dependencies.get_next_dirty_node()
             if not identity:
                 return
 
-            linkName = self._link_name_for_identity[identity]
-            if linkName in self._allCachedNames:
+            link_name = self._link_name_for_identity[identity]
+            if link_name in self._all_cached_names:
                 continue
 
-            functionConverter = self._inflight_function_conversions[identity]
+            function_converter = self._inflight_function_conversions[identity]
 
-            hasDefinitionBeforeConversion = identity in self._inflight_definitions
+            has_definition_before_conversion = identity in self._inflight_definitions
 
             try:
-                self._currentlyConverting = identity
+                self._currently_converting = identity
 
                 self._times_calculated[identity] = self._times_calculated.get(identity, 0) + 1
 
-                nativeFunction, actual_output_type = functionConverter.convertToNativeFunction()
+                native_function, actual_output_type = function_converter.convertToNativeFunction()
 
-                if nativeFunction is not None:
-                    self._inflight_definitions[identity] = (nativeFunction, actual_output_type)
+                if native_function is not None:
+                    self._inflight_definitions[identity] = (native_function, actual_output_type)
             except Exception:
                 for i in self._inflight_function_conversions:
                     if i in self._link_name_for_identity:
                         name = self._link_name_for_identity[i]
                         if name in self._targets:
                             self._targets.pop(name)
-                        self._allDefinedNames.discard(name)
+                        self._all_defined_names.discard(name)
                         ln = self._link_name_for_identity.pop(i)
                         self._identity_for_link_name.pop(ln)
 
-                    self._dependencies.dropNode(i)
+                    self._dependencies.drop_node(i)
 
                 self._inflight_function_conversions.clear()
                 self._inflight_definitions.clear()
                 raise
             finally:
-                self._currentlyConverting = None
+                self._currently_converting = None
 
-            dirtyUpstream = False
+            dirty_upstream = False
 
             # figure out whether we ought to recalculate all the upstream nodes of this
             # node. we do that if we get a definition and we didn't have one before, or if
             # our type stability changed
-            if nativeFunction is not None:
-                if not hasDefinitionBeforeConversion:
-                    dirtyUpstream = True
+            if native_function is not None:
+                if not has_definition_before_conversion:
+                    dirty_upstream = True
 
-                if functionConverter.typesAreUnstable():
-                    functionConverter.resetTypeInstabilityFlag()
-                    self._dependencies.markDirtyWithLowPriority(identity)
-                    dirtyUpstream = True
+                if function_converter.typesAreUnstable():
+                    function_converter.resetTypeInstabilityFlag()
+                    self._dependencies.mark_dirty_with_low_priority(identity)
+                    dirty_upstream = True
 
                 name = self._link_name_for_identity[identity]
 
-                self._targets[name] = self.getTypedCallTarget(
+                self._targets[name] = self._get_typed_call_target(
                     name,
-                    functionConverter._input_types,
+                    function_converter._input_types,
                     actual_output_type,
-                    alwaysRaises=functionConverter.alwaysRaises(),
-                    functionMetadata=functionConverter.functionMetadata
+                    alwaysRaises=function_converter.alwaysRaises(),
+                    functionMetadata=function_converter.functionMetadata
                 )
 
-            if dirtyUpstream:
-                self._dependencies.functionReturnSignatureChanged(identity)
+            if dirty_upstream:
+                self._dependencies.function_return_signature_changed(identity)
 
-    def compileSingleClassDispatch(self, interfaceClass, implementingClass, slotIndex):
-        name, retType, argTypeTuple, kwargTypeTuple = _types.getClassMethodDispatchSignature(interfaceClass, implementingClass, slotIndex)
+    def compile_single_class_dispatch(self, interface_class, implementing_class, slot_index):
+        """placeholder"""
+        name, ret_type, arg_type_tuple, kwarg_type_tuple = _types.getClassMethodDispatchSignature(interface_class,
+                                                                                                  implementing_class,
+                                                                                                  slot_index)
 
         # we are compiling the function 'name' in 'implementingClass' to be installed when
         # viewing an instance of 'implementingClass' as 'interfaceClass' that's function
         # 'name' called with signature '(*argTypeTuple, **kwargTypeTuple) -> retType'
-        typedCallTarget = ClassWrapper.compileVirtualMethodInstantiation(
+        typed_call_target = ClassWrapper.compileVirtualMethodInstantiation(
             self,
-            interfaceClass,
-            implementingClass,
+            interface_class,
+            implementing_class,
             name,
-            retType,
-            argTypeTuple,
-            kwargTypeTuple
+            ret_type,
+            arg_type_tuple,
+            kwarg_type_tuple
         )
 
-        assert typedCallTarget is not None
+        assert typed_call_target is not None
 
-        self.buildAndLinkNewModule()
+        self.build_and_link_new_module()
 
-        fp = self.functionPointerByName(typedCallTarget.name)
+        fp = self.function_pointer_by_name(typed_call_target.name)
 
         if fp is None:
-            raise Exception(f"Couldn't find a function pointer for {typedCallTarget.name}")
+            raise Exception(f"Couldn't find a function pointer for {typed_call_target.name}")
 
-        _types.installClassMethodDispatch(interfaceClass, implementingClass, slotIndex, fp.fp)
+        _types.installClassMethodDispatch(interface_class, implementing_class, slot_index, fp.fp)
 
-    def compileClassDestructor(self, cls):
-        typedCallTarget = typeWrapper(cls).compileDestructor(self)
+    def compile_class_destructor(self, cls):
+        """placeholder"""
+        typedCallTarget = type_wrapper(cls).compileDestructor(self)
 
         assert typedCallTarget is not None
 
-        self.buildAndLinkNewModule()
+        self.build_and_link_new_module()
 
-        fp = self.functionPointerByName(typedCallTarget.name)
+        fp = self.function_pointer_by_name(typedCallTarget.name)
 
         _types.installClassDestructor(cls, fp.fp)
 
-    def functionPointerByName(self, linkerName) -> NativeFunctionPointer:
+    def function_pointer_by_name(self, link_name) -> NativeFunctionPointer:
         """Find a NativeFunctionPointer for a given link-time name.
 
         Args:
-            linkerName (str) - the name of the compiled symbol we want
+            link_name (str) - the name of the compiled symbol we want
 
         Returns:
             a NativeFunctionPointer or None
         """
-        if self.compilerCache is None:
+        if self.compiler_cache is None:
             # the llvm compiler holds it all
-            return self.llvmCompiler.function_pointer_by_name(linkerName)
+            return self.llvm_compiler.function_pointer_by_name(link_name)
         else:
             # the llvm compiler is just building shared objects, but the
             # compiler cache has all the pointers.
-            return self.compilerCache.function_pointer_by_name(linkerName)
+            return self.compiler_cache.function_pointer_by_name(link_name)
 
-    def convertTypedFunctionCall(self, functionType, overloadIx, inputWrappers, assertIsRoot=False):
-        overload = functionType.overloads[overloadIx]
+    def convert_typed_function_call(self, function_type, overload_index, input_wrappers, assert_is_root=False):
+        """placeholder"""
+        overload = function_type.overloads[overload_index]
 
-        realizedInputWrappers = []
+        realized_input_wrappers = []
 
-        closureType = functionType.ClosureType
+        closure_type = function_type.ClosureType
 
-        for closureVarName, closureVarPath in overload.closureVarLookups.items():
-            realizedInputWrappers.append(
-                typeWrapper(
-                    PythonTypedFunctionWrapper.closurePathToCellType(closureVarPath, closureType)
+        for closure_var_name, closure_var_path in overload.closureVarLookups.items():
+            realized_input_wrappers.append(
+                type_wrapper(
+                    PythonTypedFunctionWrapper.closurePathToCellType(closure_var_path, closure_type)
                 )
             )
 
-        realizedInputWrappers.extend(inputWrappers)
+        realized_input_wrappers.extend(input_wrappers)
 
-        returnType = PythonTypedFunctionWrapper.computeFunctionOverloadReturnType(
+        return_type = PythonTypedFunctionWrapper.computeFunctionOverloadReturnType(
             overload,
-            inputWrappers,
+            input_wrappers,
             {}
         )
 
-        if returnType is CannotBeDetermined:
-            returnType = object
+        if return_type is CannotBeDetermined:
+            return_type = object
 
-        if returnType is NoReturnTypeSpecified:
-            returnType = None
+        if return_type is NoReturnTypeSpecified:
+            return_type = None
 
         return self.convert(
             overload.name,
@@ -655,12 +690,13 @@ class PythonToNativeConverter:
             overload.functionGlobals,
             overload.funcGlobalsInCells,
             list(overload.closureVarLookups),
-            realizedInputWrappers,
-            returnType,
-            assertIsRoot=assertIsRoot
+            realized_input_wrappers,
+            return_type,
+            assert_is_root=assert_is_root
         )
 
-    def hashObjectToIdentity(self, hashable, isModuleVal=False):
+    def hash_object_to_identity(self, hashable, is_module_val=False):
+        """placeholder"""
         if isinstance(hashable, Hash):
             return hashable
 
@@ -673,14 +709,14 @@ class PythonToNativeConverter:
         if hashable is None:
             return Hash.from_integer(1) + Hash.from_integer(0)
 
-        if isinstance(hashable, (dict, list)) and isModuleVal:
+        if isinstance(hashable, (dict, list)) and is_module_val:
             # don't look into dicts and lists at module level
             return Hash.from_integer(2)
 
         if isinstance(hashable, (tuple, list)):
             res = Hash.from_integer(len(hashable))
             for t in hashable:
-                res += self.hashObjectToIdentity(t, isModuleVal)
+                res += self.hash_object_to_identity(t, is_module_val)
             return res
 
         if isinstance(hashable, Wrapper):
@@ -688,7 +724,7 @@ class PythonToNativeConverter:
 
         return Hash(_types.identityHash(hashable))
 
-    def hashGlobals(self, funcGlobals, code, funcGlobalsFromCells):
+    def _hash_globals(self, func_globals, code, func_globals_from_cells):
         """Hash a given piece of code's accesses to funcGlobals.
 
         We're trying to make sure that if we have a reference to module 'x'
@@ -698,40 +734,41 @@ class PythonToNativeConverter:
 
         res = Hash.from_integer(0)
 
-        for dotSeq in _types.getCodeGlobalDotAccesses(code):
-            res += self.hashDotSeq(dotSeq, funcGlobals)
+        for dot_seq in _types.getCodeGlobalDotAccesses(code):
+            res += self._hash_dot_seq(dot_seq, func_globals)
 
-        for globalName in funcGlobalsFromCells:
-            res += self.hashDotSeq([globalName], funcGlobals)
+        for global_name in func_globals_from_cells:
+            res += self._hash_dot_seq([global_name], func_globals)
 
         return res
 
-    def hashDotSeq(self, dotSeq, funcGlobals):
-        if not dotSeq or dotSeq[0] not in funcGlobals:
+    def _hash_dot_seq(self, dot_seq, func_globals):
+        """placeholder"""
+        if not dot_seq or dot_seq[0] not in func_globals:
             return Hash.from_integer(0)
 
-        item = funcGlobals[dotSeq[0]]
+        item = func_globals[dot_seq[0]]
 
-        if not isinstance(item, ModuleType) or len(dotSeq) == 1:
-            return Hash.from_string(dotSeq[0]) + self.hashObjectToIdentity(item, True)
+        if not isinstance(item, ModuleType) or len(dot_seq) == 1:
+            return Hash.from_string(dot_seq[0]) + self.hash_object_to_identity(item, True)
 
-        if not hasattr(item, dotSeq[1]):
+        if not hasattr(item, dot_seq[1]):
             return Hash.from_integer(0)
 
-        return Hash.from_string(dotSeq[0] + "." + dotSeq[1]) + self.hashObjectToIdentity(getattr(item, dotSeq[1]), True)
+        return Hash.from_string(dot_seq[0] + "." + dot_seq[1]) + self.hash_object_to_identity(getattr(item, dot_seq[1]), True)
 
     def convert(
         self,
-        funcName,
-        funcCode,
-        funcGlobals,
-        funcGlobalsRaw,
-        funcGlobalsFromCells,
-        closureVars,
+        func_name,
+        func_code,
+        func_globals,
+        func_globals_raw,
+        func_globals_from_cells,
+        closure_vars,
         input_types,
         output_type,
-        assertIsRoot=False,
-        conversionType=None
+        assert_is_root=False,
+        conversion_type=None
     ):
         """Convert a single pure python function using args of 'input_types'.
 
@@ -739,87 +776,91 @@ class PythonToNativeConverter:
         the tightest output type possible.
 
         Args:
-            funcName - the name of the function
-            funcCode - a Code object representing the code to compile
-            funcGlobals - the globals object from the relevant function
-            funcGlobalsRaw - the original globals object (with no merging or filtering done)
+            func_name - the name of the function
+            func_code - a Code object representing the code to compile
+            func_globals - the globals object from the relevant function
+            func_globals_raw - the original globals object (with no merging or filtering done)
                 which we use to figure out the location of global variables that are not in cells.
-            funcGlobalsFromCells - a list of the names that are globals that are actually accessed
+            func_globals_from_cells - a list of the names that are globals that are actually accessed
                 as cells.
+            closure_vars - TODO
             input_types - a type for each free variable in the function closure, and
                 then again for each input argument
             output_type - the output type of the function, if known. if this is None,
                 then we use type inference to produce the tightest type we can.
                 If not None, then we will produce this type or throw an exception.
-            assertIsRoot - if True, then assert that no other functions are using
+            assert_is_root - if True, then assert that no other functions are using
                 the converter right now.
-            conversionType - if None, this is a normal function conversion. Otherwise,
+            conversion_type - if None, this is a normal function conversion. Otherwise,
                 this must be a subclass of FunctionConversionContext
+
+        Returns:
+            TODO what?
         """
-        assert isinstance(funcName, str)
-        assert isinstance(funcCode, types.CodeType)
-        assert isinstance(funcGlobals, dict)
+        assert isinstance(func_name, str)
+        assert isinstance(func_code, types.CodeType)
+        assert isinstance(func_globals, dict)
 
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
-        identityHash = (
+        identity_hash = (
             Hash.from_integer(1)
-            + self.hashObjectToIdentity((
-                funcCode,
-                funcName,
+            + self.hash_object_to_identity((
+                func_code,
+                func_name,
                 input_types,
                 output_type,
-                closureVars,
-                conversionType
+                closure_vars,
+                conversion_type
             )) +
-            self.hashGlobals(funcGlobals, funcCode, funcGlobalsFromCells)
+            self._hash_globals(func_globals, func_code, func_globals_from_cells)
         )
 
-        assert not identityHash.isPoison()
+        assert not identity_hash.isPoison()
 
-        identity = identityHash.hexdigest
+        identity = identity_hash.hexdigest
 
-        name = self.identityHashToLinkerName(funcName, identity)
+        name = self._identity_hash_to_linker_name(func_name, identity)
 
-        self.defineLinkName(identity, name)
+        self._define_link_name(identity, name)
 
         if identity not in self._identifier_to_pyfunc:
             self._identifier_to_pyfunc[identity] = (
-                funcName, funcCode, funcGlobals, closureVars, input_types, output_type, conversionType
+                func_name, func_code, func_globals, closure_vars, input_types, output_type, conversion_type
             )
 
-        isRoot = len(self._inflight_function_conversions) == 0
+        is_root = len(self._inflight_function_conversions) == 0
 
-        if assertIsRoot:
-            assert isRoot
+        if assert_is_root:
+            assert is_root
 
-        if self._currentlyConverting is not None:
-            self._dependencies.addEdge(self._currentlyConverting, identity)
+        if self._currently_converting is not None:
+            self._dependencies.add_edge(self._currently_converting, identity)
         else:
-            self._dependencies.addRoot(identity)
+            self._dependencies.add_root(identity)
 
         if name in self._targets:
             return self._targets[name]
 
         if identity not in self._inflight_function_conversions:
-            functionConverter = self.createConversionContext(
+            function_converter = self._create_conversion_context(
                 identity,
-                funcName,
-                funcCode,
-                funcGlobals,
-                funcGlobalsRaw,
-                closureVars,
+                func_name,
+                func_code,
+                func_globals,
+                func_globals_raw,
+                closure_vars,
                 input_types,
                 output_type,
-                conversionType
+                conversion_type
             )
 
-            self._inflight_function_conversions[identity] = functionConverter
+            self._inflight_function_conversions[identity] = function_converter
 
-        if isRoot:
+        if is_root:
             try:
-                self._resolveAllInflightFunctions()
-                self._installInflightFunctions()
+                self._resolve_all_inflight_functions()
+                self._install_inflight_functions()
                 return self._targets[name]
             finally:
                 self._inflight_function_conversions.clear()
@@ -835,43 +876,44 @@ class PythonToNativeConverter:
             else:
                 return None
 
-    def _installInflightFunctions(self):
+    def _install_inflight_functions(self):
+        """placeholder"""
         if VALIDATE_FUNCTION_DEFINITIONS_STABLE:
             # this should always be true, but its expensive so we have it off by default
-            for identifier, functionConverter in self._inflight_function_conversions.items():
+            for identifier, function_converter in self._inflight_function_conversions.items():
                 try:
-                    self._currentlyConverting = identifier
+                    self._currently_converting = identifier
 
-                    nativeFunction, actual_output_type = functionConverter.convertToNativeFunction()
+                    native_function, actual_output_type = function_converter.convertToNativeFunction()
 
-                    assert nativeFunction == self._inflight_definitions[identifier]
+                    assert native_function == self._inflight_definitions[identifier]
                 finally:
-                    self._currentlyConverting = None
+                    self._currently_converting = None
 
-        for identifier, functionConverter in self._inflight_function_conversions.items():
+        for identifier, function_converter in self._inflight_function_conversions.items():
             if identifier in self._identifier_to_pyfunc:
                 for v in self._visitors:
 
-                    funcName, funcCode, funcGlobals, closureVars, input_types, output_type, conversionType = (
+                    func_name, func_code, func_globals, closure_vars, input_types, output_type, conversion_type = (
                         self._identifier_to_pyfunc[identifier]
                     )
 
-                    nativeFunction, actual_output_type = self._inflight_definitions.get(identifier)
+                    native_function, actual_output_type = self._inflight_definitions.get(identifier)
 
                     try:
                         v.onNewFunction(
                             identifier,
-                            functionConverter,
-                            nativeFunction,
-                            funcName,
-                            funcCode,
-                            funcGlobals,
-                            closureVars,
+                            function_converter,
+                            native_function,
+                            func_name,
+                            func_code,
+                            func_globals,
+                            closure_vars,
                             input_types,
-                            functionConverter._varname_to_type.get(FunctionOutput),
-                            functionConverter._varname_to_type.get(FunctionYield),
-                            {k: v.typeRepresentation for k, v in functionConverter._varname_to_type.items() if isinstance(k, str)},
-                            conversionType
+                            function_converter._varname_to_type.get(FunctionOutput),
+                            function_converter._varname_to_type.get(FunctionYield),
+                            {k: v.typeRepresentation for k, v in function_converter._varname_to_type.items() if isinstance(k, str)},
+                            conversion_type
                         )
                     except Exception:
                         logging.exception("event handler %s threw an unexpected exception", v.onNewFunction)
@@ -879,12 +921,12 @@ class PythonToNativeConverter:
             if identifier not in self._inflight_definitions:
                 raise Exception(
                     f"Expected a definition for {identifier} depended on by:\n"
-                    + "\n".join("    " + str(i) for i in self._dependencies._dependencies.incoming(identifier))
+                    + "\n".join("    " + str(i) for i in self._dependencies.dependency_graph.incoming(identifier))
                 )
 
-            nativeFunction, actual_output_type = self._inflight_definitions.get(identifier)
+            native_function, actual_output_type = self._inflight_definitions.get(identifier)
 
             name = self._link_name_for_identity[identifier]
 
-            self._definitions[name] = nativeFunction
+            self._definitions[name] = native_function
             self._new_native_functions.add(name)

@@ -187,10 +187,10 @@ class Runtime:
             self.verbosityLevel = 0
 
     def addEventVisitor(self, visitor: RuntimeEventVisitor):
-        self.converter.addVisitor(visitor)
+        self.converter.add_visitor(visitor)
 
     def removeEventVisitor(self, visitor: RuntimeEventVisitor):
-        self.converter.removeVisitor(visitor)
+        self.converter.remove_visitor(visitor)
 
     @staticmethod
     def passingTypeForValue(arg):
@@ -269,7 +269,7 @@ class Runtime:
             t0 = time.time()
             t1 = None
             t2 = None
-            defCount = self.converter.getDefinitionCount()
+            defCount = self.converter.get_definition_count()
 
             with self.lock:
                 inputWrappers = []
@@ -285,24 +285,24 @@ class Runtime:
 
                 self.timesCompiled += 1
 
-                callTarget = self.converter.convertTypedFunctionCall(
+                callTarget = self.converter.convert_typed_function_call(
                     functionType,
                     overloadIx,
                     inputWrappers,
-                    assertIsRoot=True
+                    assert_is_root=True
                 )
 
-                callTarget = self.converter.demasqueradeCallTargetOutput(callTarget)
+                callTarget = self.converter.demasquerade_call_target_output(callTarget)
 
                 assert callTarget is not None
 
-                wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
+                wrappingCallTargetName = self.converter.generate_call_converter(callTarget)
 
                 t1 = time.time()
-                self.converter.buildAndLinkNewModule()
+                self.converter.build_and_link_new_module()
                 t2 = time.time()
 
-                fp = self.converter.functionPointerByName(wrappingCallTargetName)
+                fp = self.converter.function_pointer_by_name(wrappingCallTargetName)
 
                 overload._installNativePointer(
                     fp.fp,
@@ -317,18 +317,18 @@ class Runtime:
                     f"typed_python runtime spent {time.time()-t0:.3f} seconds "
                     + (f"({t2 - t1:.3f})" if t2 is not None else "")
                     + " adding " +
-                    f"{self.converter.getDefinitionCount() - defCount} functions."
+                    f"{self.converter.get_definition_count() - defCount} functions."
                 )
 
     def compileClassDispatch(self, interfaceClass, implementingClass, slotIndex):
         with self.lock:
-            self.converter.compileSingleClassDispatch(interfaceClass, implementingClass, slotIndex)
+            self.converter.compile_single_class_dispatch(interfaceClass, implementingClass, slotIndex)
 
         return True
 
     def compileClassDestructor(self, cls):
         with self.lock:
-            self.converter.compileClassDestructor(cls)
+            self.converter.compile_class_destructor(cls)
 
         return True
 

@@ -351,7 +351,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             list(overload.closureVarLookups),
             [typeWrapper(self.closurePathToCellType(path, closureType)) for path in overload.closureVarLookups.values()],
             None,
-            conversionType=ConvertionContextType
+            conversion_type=ConvertionContextType
         )
 
         if not singleConvertedOverload:
@@ -636,7 +636,7 @@ class PythonTypedFunctionWrapper(Wrapper):
 
         argNames = [None for _ in argTypes] + list(kwargTypes)
 
-        return converter.defineNativeFunction(
+        return converter.define_native_function(
             f'implement_function.{self}{argTypes}.{kwargTypes}->{returnType}',
             ('implement_function.', self, returnType, self, tuple(argTypes), tuple(kwargTypes.items())),
             ([self] if provideClosureArgument else []) + list(argTypes) + list(kwargTypes.values()),
@@ -812,7 +812,7 @@ class PythonTypedFunctionWrapper(Wrapper):
 
         overloadIndex = overload.index
 
-        testSingleOverloadForm = context.converter.defineNativeFunction(
+        testSingleOverloadForm = context.converter.define_native_function(
             f'check_can_call_overload.{self}.{overloadIndex}.{conversionLevel.LEVEL}.{argTypes}.{kwargTypes}',
             ('check_can_call_overload', self, overloadIndex, conversionLevel.LEVEL,
                 tuple(argTypes), tuple(kwargTypes.items())),
@@ -905,7 +905,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                     elif overloadRetType is NoReturnTypeSpecified:
                         overloadRetType = returnType.typeRepresentation
 
-                    testSingleOverloadForm = context.converter.defineNativeFunction(
+                    testSingleOverloadForm = context.converter.define_native_function(
                         f'implement_overload.{self}.{overloadIndex}.{conversionLevel.LEVEL}.{argTypes}.{kwargTypes}->{overloadRetType}',
                         ('implement_overload', self, overloadIndex, conversionLevel.LEVEL,
                          overloadRetType, tuple(argTypes), tuple(kwargTypes.items())),

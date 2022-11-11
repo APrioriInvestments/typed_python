@@ -119,7 +119,7 @@ class ExpressionConversionContext:
         # the first argument indicates whether this is an instance or type-level dispatch
         assert argTupleType.ElementTypes[0].Value in ('type', 'instance')
 
-        identHash = self.converter.hashObjectToIdentity(
+        identHash = self.converter.hash_object_to_identity(
             (clsType, methodName, retType, argTupleType, kwargTupleType)
         )
 
@@ -1470,7 +1470,7 @@ class ExpressionConversionContext:
         return None
 
     def expressionAsFunctionCall(self, name, args, generatingFunction, identity, outputType=None, alwaysRaises=False):
-        callTarget = self.converter.defineNonPythonFunction(
+        callTarget = self.converter.define_non_python_function(
             name,
             ("expression", identity),
             typed_python.compiler.function_conversion_context.ExpressionFunctionConversionContext(

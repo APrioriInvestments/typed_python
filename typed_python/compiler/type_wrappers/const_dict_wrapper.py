@@ -190,7 +190,7 @@ class ConstDictWrapperBase(RefcountedWrapper):
             return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
         else:
             return (
-                context.converter.defineNativeFunction(
+                context.converter.define_native_function(
                     "destructor_" + str(self.constDictType),
                     ('destructor', self),
                     [self],

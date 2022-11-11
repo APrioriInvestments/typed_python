@@ -159,7 +159,7 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
         return context.push(
             self,
             lambda new_class:
-                context.converter.defineNativeFunction(
+                context.converter.define_native_function(
                     'construct(' + self.typeRepresentation.__name__ + ")("
                     + ",".join([
                         (argNames[i] + '=' if argNames[i] is not None else "") +

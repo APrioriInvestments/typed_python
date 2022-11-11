@@ -464,7 +464,7 @@ class TupleWrapper(Wrapper):
 
                 return context.constant(True)
             else:
-                native = context.converter.defineNativeFunction(
+                native = context.converter.define_native_function(
                     f'type_convert({sourceVal.expr_type} -> {targetVal.expr_type}, conversionLevel={conversionLevel.LEVEL})',
                     ('type_convert', sourceVal.expr_type, targetVal.expr_type, conversionLevel.LEVEL),
                     [self.typeRepresentation, sourceVal.expr_type],

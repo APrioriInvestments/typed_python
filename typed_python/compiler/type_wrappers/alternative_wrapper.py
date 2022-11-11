@@ -238,7 +238,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
 
     def on_refcount_zero(self, context, instance):
         return (
-            context.converter.defineNativeFunction(
+            context.converter.define_native_function(
                 "destructor_" + str(self.typeRepresentation),
                 ('destructor', self),
                 [self],
@@ -415,7 +415,7 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
         return context.push(
             self,
             lambda new_alt:
-                context.converter.defineNativeFunction(
+                context.converter.define_native_function(
                     'construct(' + str(self) + ")",
                     ('util', self, 'construct'),
                     tupletype.ElementTypes,
