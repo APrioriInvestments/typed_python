@@ -1138,7 +1138,7 @@ class ExpressionConversionContext:
                 funcGlobals[f.__code__.co_freevars[i]] = f.__closure__[i].cell_contents
                 globalsInCells.append(f.__code__.co_freevars[i])
 
-        call_target = self.functionContext.converter.convert(
+        call_target = self.functionContext.converter.convert_python_to_native(
             f.__name__,
             f.__code__,
             funcGlobals,
@@ -1182,7 +1182,7 @@ class ExpressionConversionContext:
         else:
             returnType = typeWrapper(overload.returnType) if overload.returnType is not None else None
 
-        call_target = self.functionContext.converter.convert(
+        call_target = self.functionContext.converter.convert_python_to_native(
             overload.name,
             overload.functionCode,
             overload.realizedGlobals,

@@ -342,7 +342,7 @@ class PythonTypedFunctionWrapper(Wrapper):
         # import this wrapper. Note that we have to import it here to break the import cycles.
         # there's definitely a better way to organize this code.
 
-        singleConvertedOverload = context.functionContext.converter.convert(
+        singleConvertedOverload = context.functionContext.converter.convert_python_to_native(
             overload.name,
             overload.functionCode,
             overload.realizedGlobals,
@@ -506,7 +506,7 @@ class PythonTypedFunctionWrapper(Wrapper):
 
             # just one overload will do. We can just instantiate this particular function
             # with a signature that comes from the method overload signature itself.
-            singleConvertedOverload = context.functionContext.converter.convert(
+            singleConvertedOverload = context.functionContext.converter.convert_python_to_native(
                 overload.name,
                 overload.functionCode,
                 overload.realizedGlobals,
@@ -729,7 +729,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                             kwargTypes
                         )
 
-                        callTarget = converter.convert(
+                        callTarget = converter.convert_python_to_native(
                             o.name,
                             o.functionCode,
                             o.realizedGlobals,
