@@ -27,24 +27,111 @@ class Type;
 class SerializationContext;
 class Bytes;
 
+// represents a single block of data that we can compress after the fact
+// in parallel. blocks should be around 1 mb in size.
+class SerializationBufferBlock {
+public:
+    SerializationBufferBlock() :
+        m_size(0),
+        m_reserved(0),
+        m_buffer(nullptr),
+        m_compressed(false)
+    {
+    }
+
+    ~SerializationBufferBlock() {
+        if (m_buffer) {
+            free(m_buffer);
+        }
+    }
+
+    uint8_t* buffer() const {
+        return m_buffer;
+    }
+
+    size_t size() const {
+        return m_size;
+    }
+
+    bool isCompressed() const {
+        return m_compressed;
+    }
+
+    void markCompressed() {
+        m_compressed = true;
+    }
+
+    bool oversized() const {
+        return m_size > 1024 * 1024;
+    }
+
+    size_t capacity() {
+        return m_reserved - m_size;
+    }
+
+    template< class T>
+    void write(T i) {
+        ensure(sizeof(i));
+        *(T*)(m_buffer+m_size) = i;
+        m_size += sizeof(i);
+    }
+
+    template<class callback>
+    void initialize_bytes(size_t bytecount, const callback& c) {
+        ensure(bytecount);
+
+        uint8_t* bytes = m_buffer + m_size;
+
+        c(bytes);
+
+        m_size += bytecount;
+    }
+
+    //nakedly write bytes into the stream
+    void write_bytes(uint8_t* ptr, size_t bytecount) {
+        ensure(bytecount);
+        memcpy(m_buffer + m_size, ptr, bytecount);
+        m_size += bytecount;
+    }
+
+    void ensure(size_t bytecount) {
+        if (m_size + bytecount > m_reserved) {
+            reserve((m_size + bytecount + 1024) * 1.5);
+        }
+    }
+
+    void reserve(size_t new_reserved) {
+        if (new_reserved < m_reserved) {
+            throw std::runtime_error("Can't make reserved size smaller");
+        }
+
+        m_reserved = new_reserved;
+        m_buffer = (uint8_t*)::realloc(m_buffer, m_reserved);
+    }
+
+    void compress();
+
+private:
+    size_t m_size;
+    size_t m_reserved;
+    uint8_t* m_buffer;
+
+    bool m_compressed;
+};
+
 class SerializationBuffer {
 public:
     SerializationBuffer(const SerializationContext& context) :
-            m_context(context),
-            m_wants_compress(context.isCompressionEnabled()),
-            m_buffer(nullptr),
-            m_size(0),
-            m_reserved(0),
-            m_last_compression_point(0)
+        m_context(context),
+        m_wants_compress(context.isCompressionEnabled())
     {
+        m_top_block = new SerializationBufferBlock();
+
+        m_blocks.push_back(std::shared_ptr<SerializationBufferBlock>(m_top_block));
     }
 
     ~SerializationBuffer() {
         PyEnsureGilAcquired acquireTheGil;
-
-        if (m_buffer) {
-            ::free(m_buffer);
-        }
 
         for (auto& typeAndList: m_pointersNeedingDecref) {
             if (typeAndList.first) {
@@ -177,54 +264,68 @@ public:
         write_bytes((uint8_t*)&s[0], s.size());
     }
 
-    uint8_t* buffer() const {
-        return m_buffer;
+    uint8_t* buffer() {
+        consolidate();
+
+        if (m_blocks.size() == 0) {
+            return nullptr;
+        }
+
+        return m_blocks[0]->buffer();
     }
 
-    size_t size() const {
-        return m_size;
+    void copyInto(uint8_t* ptr) {
+        for (auto b: m_blocks) {
+            if (b->size()) {
+                memcpy(ptr, b->buffer(), b->size());
+                ptr += b->size();
+            }
+        }
+    }
+
+    size_t size() {
+        size_t res = 0;
+        for (auto& bPtr: m_blocks) {
+            res += bPtr->size();
+        }
+        return res;
     }
 
     //nakedly write bytes into the stream
-    void write_bytes(uint8_t* ptr, size_t bytecount, bool allowCompression = true) {
-        ensure(bytecount, allowCompression);
-        memcpy(m_buffer+m_size, ptr, bytecount);
-        m_size += bytecount;
+    void write_bytes(uint8_t* ptr, size_t bytecount) {
+        if (m_top_block->isCompressed() || m_top_block->oversized()) {
+            m_top_block = new SerializationBufferBlock();
+            m_blocks.push_back(
+                std::shared_ptr<SerializationBufferBlock>(
+                    m_top_block
+                )
+            );
+        }
+
+        m_top_block->write_bytes(ptr, bytecount);
     }
 
-    uint8_t* prepare_bytes(size_t bytecount, bool allowCompression = true) {
-        ensure(bytecount, allowCompression);
+    // allocate some memory and call 'c' with a uint8_t* pointing at it
+    // to initialize it.
+    template<class callback>
+    void initialize_bytes(size_t bytecount, const callback& c) {
+        if (m_top_block->isCompressed() || m_top_block->oversized()) {
+            m_top_block = new SerializationBufferBlock();
+            m_blocks.push_back(
+                std::shared_ptr<SerializationBufferBlock>(
+                    m_top_block
+                )
+            );
+        }
 
-        uint8_t* bytes = m_buffer + m_size;
-
-        m_size += bytecount;
-
-        return bytes;
+        m_top_block->initialize_bytes(bytecount, c);
     }
 
     void write_byte(uint8_t byte) {
         write<uint8_t>(byte);
     }
 
-    void ensure(size_t t, bool allowCompression=true) {
-        if (m_size + t > m_reserved) {
-            reserve(m_size + t + 1024 * 128);
-
-            //compress every meg or so
-            if (m_wants_compress && allowCompression && m_size - m_last_compression_point > 1024 * 1024) {
-                compress();
-            }
-        }
-    }
-
-    void reserve(size_t new_reserved) {
-        if (new_reserved < m_reserved) {
-            throw std::runtime_error("Can't make reserved size smaller");
-        }
-
-        m_reserved = new_reserved;
-        m_buffer = (uint8_t*)::realloc(m_buffer, m_reserved);
-    }
+    void consolidate();
 
     const SerializationContext& getContext() const {
         return m_context;
@@ -304,17 +405,24 @@ public:
 
     void finalize() {
         if (m_wants_compress) {
-            compress();
+            for (auto b: m_blocks) {
+                b->compress();
+            }
         }
     }
 
-    void compress();
-
     template< class T>
     void write(T i) {
-        ensure(sizeof(i));
-        *(T*)(m_buffer+m_size) = i;
-        m_size += sizeof(i);
+        if (m_top_block->isCompressed() || m_top_block->oversized()) {
+            m_top_block = new SerializationBufferBlock();
+            m_blocks.push_back(
+                std::shared_ptr<SerializationBufferBlock>(
+                    m_top_block
+                )
+            );
+        }
+
+        m_top_block->write(i);
     }
 
     void startSerializing(Type* nativeType) {
@@ -348,10 +456,12 @@ private:
 
     bool m_wants_compress;
 
-    uint8_t* m_buffer;
     size_t m_size;
-    size_t m_reserved;
-    size_t m_last_compression_point;
+
+    // the
+    SerializationBufferBlock* m_top_block;
+
+    std::vector<std::shared_ptr<SerializationBufferBlock > > m_blocks;
 
     std::map<void*, int32_t> m_idToPointerCache;
 

@@ -394,6 +394,22 @@ public:
     }
 
     template<class buf_t>
+    void serializeMulti(instance_ptr left, size_t count, size_t stride, buf_t& buffer, size_t fieldNumber) {
+        assertForwardsResolvedSufficientlyToInstantiate();
+
+        return this->check([&](auto& subtype) {
+            return subtype.serializeMultiConcrete(left, count, stride, buffer, fieldNumber);
+        });
+    }
+
+    template<class buf_t>
+    void serializeMultiConcrete(instance_ptr left, size_t count, size_t stride, buf_t& buffer, size_t fieldNumber) {
+        for (long k = 0; k < count; k++) {
+            serialize(left + stride * k, buffer, fieldNumber);
+        }
+    }
+
+    template<class buf_t>
     void deserialize(instance_ptr left, buf_t& buffer, size_t wireType) {
         assertForwardsResolvedSufficientlyToInstantiate();
 

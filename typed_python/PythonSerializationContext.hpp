@@ -83,6 +83,7 @@ public:
     PythonSerializationContext(PyObject* typeSetObj) :
             mContextObj(typeSetObj),
             mCompressionEnabled(false),
+            mSerializePodListsInline(false),
             mSerializeHashSequence(false)
     {
         setFlags();
@@ -96,6 +97,10 @@ public:
 
     bool isLineInfoSuppressed() const {
         return mSuppressLineInfo;
+    }
+
+    bool serializePodListsInline() const {
+        return mSerializePodListsInline;
     }
 
     // should we serialize an integer in the order of the
@@ -188,6 +193,8 @@ private:
     PyObject* mContextObj;
 
     bool mCompressionEnabled;
+
+    bool mSerializePodListsInline;
 
     bool mSuppressLineInfo;
 

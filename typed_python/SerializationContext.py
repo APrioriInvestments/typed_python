@@ -122,7 +122,8 @@ class SerializationContext:
         encodeLineInformationForCode=True,
         objectToNameOverride=None,
         serializeFunctionGlobalsAsIs=False,
-        serializeHashSequence=False
+        serializeHashSequence=False,
+        serializePodListsInline=False
     ):
         super().__init__()
 
@@ -136,6 +137,7 @@ class SerializationContext:
         self.encodeLineInformationForCode = encodeLineInformationForCode
         self.serializeFunctionGlobalsAsIs = serializeFunctionGlobalsAsIs
         self.serializeHashSequence = serializeHashSequence
+        self.serializePodListsInline = serializePodListsInline
 
     def addNamedObject(self, name, obj):
         self.nameToObjectOverride[name] = obj
@@ -169,7 +171,8 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             serializeFunctionGlobalsAsIs=True,
-            serializeHashSequence=self.serializeHashSequence
+            serializeHashSequence=self.serializeHashSequence,
+            serializePodListsInline=self.serializePodListsInline
         )
 
     def withoutLineInfoEncoded(self):
@@ -182,7 +185,8 @@ class SerializationContext:
             encodeLineInformationForCode=False,
             objectToNameOverride=self.objectToNameOverride,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
-            serializeHashSequence=self.serializeHashSequence
+            serializeHashSequence=self.serializeHashSequence,
+            serializePodListsInline=self.serializePodListsInline
         )
 
     def withoutCompression(self):
@@ -195,7 +199,8 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
-            serializeHashSequence=self.serializeHashSequence
+            serializeHashSequence=self.serializeHashSequence,
+            serializePodListsInline=self.serializePodListsInline
         )
 
     def withCompression(self):
@@ -208,7 +213,8 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
-            serializeHashSequence=self.serializeHashSequence
+            serializeHashSequence=self.serializeHashSequence,
+            serializePodListsInline=self.serializePodListsInline
         )
 
     def withSerializeHashSequence(self):
@@ -221,7 +227,22 @@ class SerializationContext:
             encodeLineInformationForCode=self.encodeLineInformationForCode,
             objectToNameOverride=self.objectToNameOverride,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
-            serializeHashSequence=True
+            serializeHashSequence=True,
+            serializePodListsInline=self.serializePodListsInline
+        )
+
+    def withSerializePodListsInline(self):
+        if self.serializePodListsInline:
+            return self
+
+        return SerializationContext(
+            nameToObjectOverride=self.nameToObjectOverride,
+            compressionEnabled=self.compressionEnabled,
+            encodeLineInformationForCode=self.encodeLineInformationForCode,
+            objectToNameOverride=self.objectToNameOverride,
+            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
+            serializeHashSequence=self.serializeHashSequence,
+            serializePodListsInline=True
         )
 
     def nameForObject(self, t):

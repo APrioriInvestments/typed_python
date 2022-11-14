@@ -220,8 +220,10 @@ public:
             try {
                 allocator(eltPtr(self, k), k);
             } catch(...) {
-                for (long k2 = k-1; k2 >= 0; k2--) {
-                    m_element_type->destroy(eltPtr(self,k2));
+                if (!m_element_type->isPOD()) {
+                    for (long k2 = k-1; k2 >= 0; k2--) {
+                        m_element_type->destroy(eltPtr(self,k2));
+                    }
                 }
                 tp_free(self->data);
                 tp_free(self);
@@ -260,8 +262,10 @@ public:
                     reserve(selfPtr, self->reserved * 1.25 + 1);
                 }
             } catch(...) {
-                for (long k2 = (long)self->count-1; k2 >= 0; k2--) {
-                    m_element_type->destroy(eltPtr(self,k2));
+                if (!m_element_type->isPOD()) {
+                    for (long k2 = (long)self->count-1; k2 >= 0; k2--) {
+                        m_element_type->destroy(eltPtr(self,k2));
+                    }
                 }
                 tp_free(self->data);
                 tp_free(self);
@@ -366,11 +370,22 @@ public:
         buffer.writeUnsignedVarintObject(0, id);
         buffer.writeUnsignedVarintObject(0, ct);
 
-        m_element_type->check([&](auto& concrete_type) {
-            for (long k = 0; k < ct; k++) {
-                concrete_type.serialize(this->eltPtr(self,k), buffer, 0);
-            }
-        });
+        if (m_element_type->isPOD() && buffer.getContext().serializePodListsInline()) {
+            buffer.write_bytes(
+                this->eltPtr(self, 0),
+                m_element_type->bytecount() * ct
+            );
+        } else {
+            m_element_type->check([&](auto& concrete_type) {
+                concrete_type.serializeMulti(
+                    this->eltPtr(self, 0),
+                    ct,
+                    m_element_type->bytecount(),
+                    buffer,
+                    0
+                );
+            });
+        }
 
         buffer.writeEndCompound();
     }
@@ -397,22 +412,34 @@ public:
             (*(layout**)self)->refcount++;
             buffer.addCachedPointer(id, *((layout**)self), this);
         } else {
-            constructor(self, ct, [&](instance_ptr tgt, int k) {
-                if (k == 0) {
-                    buffer.addCachedPointer(id, *((layout**)self), this);
-                    (*(layout**)self)->refcount++;
-                }
+            if (m_element_type->isPOD() && buffer.getContext().serializePodListsInline()) {
+                constructor(self, ct, [&](instance_ptr tgt, int k) {});
 
-                auto fieldAndWire = buffer.readFieldNumberAndWireType();
-                if (fieldAndWire.first) {
-                    throw std::runtime_error("Corrupt data (count)");
-                }
-                if (fieldAndWire.second == WireType::END_COMPOUND) {
-                    throw std::runtime_error("Corrupt data (count)");
-                }
+                buffer.addCachedPointer(id, *((layout**)self), this);
+                (*(layout**)self)->refcount++;
 
-                m_element_type->deserialize(tgt, buffer, fieldAndWire.second);
-            });
+                buffer.read_bytes(
+                    this->eltPtr(self, 0),
+                    m_element_type->bytecount() * ct
+                );
+            } else {
+                constructor(self, ct, [&](instance_ptr tgt, int k) {
+                    if (k == 0) {
+                        buffer.addCachedPointer(id, *((layout**)self), this);
+                        (*(layout**)self)->refcount++;
+                    }
+
+                    auto fieldAndWire = buffer.readFieldNumberAndWireType();
+                    if (fieldAndWire.first) {
+                        throw std::runtime_error("Corrupt data (count)");
+                    }
+                    if (fieldAndWire.second == WireType::END_COMPOUND) {
+                        throw std::runtime_error("Corrupt data (count)");
+                    }
+
+                    m_element_type->deserialize(tgt, buffer, fieldAndWire.second);
+                });
+            }
         }
 
         buffer.finishCompoundMessage(wireType);
@@ -457,7 +484,6 @@ public:
 
         buffer.writeEndCompound();
     }
-
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {

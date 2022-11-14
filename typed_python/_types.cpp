@@ -1894,7 +1894,10 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
+    PyObject* bytes = PyBytes_FromStringAndSize(NULL, b.size());
+    b.copyInto((uint8_t*)PyBytes_AS_STRING(bytes));
+
+    return bytes;
 }
 
 PyObject *setPropertyGetSetDel(PyObject* nullValue, PyObject* args) {

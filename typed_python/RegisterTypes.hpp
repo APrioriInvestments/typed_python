@@ -263,6 +263,13 @@ public:
         buffer.writeRegisterType(fieldNumber, *(T*)self);
     }
 
+    template<class buf_t>
+    void serializeMultiConcrete(instance_ptr left, size_t count, size_t stride, buf_t& buffer, size_t fieldNumber) {
+        for (long k = 0; k < count; k++) {
+            buffer.writeRegisterType(fieldNumber, *(T*)(left + k * stride));
+        }
+    }
+
     size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         return 0;
     }

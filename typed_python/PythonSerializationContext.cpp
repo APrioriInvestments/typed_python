@@ -38,6 +38,14 @@ void PythonSerializationContext::setFlags() {
 
     mSerializeHashSequence = ((PyObject*)serializeHashSequence) == Py_True;
 
+    PyObjectStealer serializePodListsInline(PyObject_GetAttrString(mContextObj, "serializePodListsInline"));
+
+    if (!serializePodListsInline) {
+        throw PythonExceptionSet();
+    }
+
+    mSerializePodListsInline = ((PyObject*)serializePodListsInline) == Py_True;
+
     PyObjectStealer encodeLineInformationForCode(PyObject_GetAttrString(mContextObj, "encodeLineInformationForCode"));
 
     if (!encodeLineInformationForCode) {

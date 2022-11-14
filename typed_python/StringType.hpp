@@ -210,19 +210,25 @@ public:
 
             buffer.writeBeginBytes(fieldNumber, bytecount);
 
-            encodeUtf8((uint8_t*)eltPtr(self, 0), count(self), buffer.prepare_bytes(bytecount));
+            buffer.initialize_bytes(bytecount, [&](uint8_t* bytes) {
+                encodeUtf8((uint8_t*)eltPtr(self, 0), count(self), bytes);
+            });
         } else if (bytes_per_codepoint(self) == 2) {
             size_t bytecount = countUtf8BytesRequiredFor((uint16_t*)eltPtr(self, 0), count(self));
 
             buffer.writeBeginBytes(fieldNumber, bytecount);
 
-            encodeUtf8((uint16_t*)eltPtr(self, 0), count(self), buffer.prepare_bytes(bytecount));
+            buffer.initialize_bytes(bytecount, [&](uint8_t* bytes) {
+                encodeUtf8((uint16_t*)eltPtr(self, 0), count(self), bytes);
+            });
         } else if (bytes_per_codepoint(self) == 4) {
             size_t bytecount = countUtf8BytesRequiredFor((uint32_t*)eltPtr(self, 0), count(self));
 
             buffer.writeBeginBytes(fieldNumber, bytecount);
 
-            encodeUtf8((uint32_t*)eltPtr(self, 0), count(self), buffer.prepare_bytes(bytecount));
+            buffer.initialize_bytes(bytecount, [&](uint8_t* bytes) {
+                encodeUtf8((uint32_t*)eltPtr(self, 0), count(self), bytes);
+            });
         } else {
             throw std::runtime_error("corrupt bytes-per-codepoint");
         }

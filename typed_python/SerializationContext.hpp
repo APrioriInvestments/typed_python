@@ -34,6 +34,7 @@ public:
     virtual void serializeNativeType(Type* o, SerializationBuffer& b, size_t fieldNumber) const = 0;
     virtual Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType) const = 0;
 
+    virtual bool serializePodListsInline() const = 0;
     virtual bool isCompressionEnabled() const = 0;
     virtual bool isLineInfoSuppressed() const = 0;
 };

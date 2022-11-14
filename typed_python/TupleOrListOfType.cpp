@@ -223,7 +223,9 @@ void TupleOrListOfType::destroy(instance_ptr selfPtr) {
     }
 
     if (self->refcount.fetch_sub(1) == 1) {
-        m_element_type->destroy(self->count, [&](int64_t k) {return eltPtr(self,k);});
+        if (!m_element_type->isPOD()) {
+            m_element_type->destroy(self->count, [&](int64_t k) {return eltPtr(self,k);});
+        }
         tp_free(self->data);
         tp_free(self);
     }
