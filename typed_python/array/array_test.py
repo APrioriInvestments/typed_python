@@ -294,3 +294,26 @@ def test_assign_matrix_row():
 
     m.transpose()[4] = m.transpose()[3]
     assert m.get(4, 4) == m.get(3, 4)
+
+
+def test_matrix_product_with_transpose():
+    def checkEqual(a, b):
+        assert l1norm(a - b) < 1e-10
+
+    identity = Matrix(float).identity(3)
+    v = Matrix(float).make(3, 1, lambda i, j: i)
+
+    fromTranspose = v.transpose()
+    checkEqual(fromTranspose @ identity, v.transpose())
+
+    fromMake = Matrix(float).make(1, 3, lambda i, j: j)
+    checkEqual(fromMake @ identity, v.transpose())
+
+    # More than 1-d
+    v = Matrix(float).make(3, 2, lambda i, j: i)
+
+    fromTranspose = v.transpose()
+    checkEqual(fromTranspose @ identity, v.transpose())
+
+    fromMake = Matrix(float).make(2, 3, lambda i, j: j)
+    checkEqual(fromMake @ identity, v.transpose())

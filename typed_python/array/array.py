@@ -331,6 +331,8 @@ def Matrix(T):
         dimensions = 2
 
         def __init__(self, vals, offset, stride, shape):
+            # assert not (stride == (1, 1) and shape == (3, 1))
+
             self._vals = ListOf(T)(vals)
             self._offset = offset
             self._stride = stride
@@ -530,8 +532,22 @@ def Matrix(T):
 
         @Entrypoint
         def clone(self):
+            """Return a copy of the matrix in 'canonical' form.
+
+            This means the data is laid out in column-major form with a second-dim
+            stride of 1.
+            """
             newVals = self.toList()
             return Matrix(T)(newVals, 0, Tuple(int, int)((self._shape[1], 1)), self._shape)
+
+        def isCanonical(self):
+            """Is this matrix in 'canonical' form (column major)."""
+            return self._stride[0] == self._shape[1] and self._stride[1] == 1
+
+        def getCanonicalForm(self):
+            if self.isCanonical():
+                return self
+            return self.clone()
 
         @staticmethod
         def full(rows: int, columns: int, value: T):
@@ -619,11 +635,13 @@ def Matrix(T):
                 destPtr += destStride
 
         def transpose(self):
+            stride = Tuple(int, int)((self._stride[1], self._stride[0]))
+
             return Matrix(T)(
                 self._vals,
                 self._offset,
-                Tuple(int, int)((self._stride[1], self._stride[0])),
-                Tuple(int, int)((self._shape[1], self._shape[0]))
+                stride,
+                Tuple(int, int)((self._shape[1], self._shape[0])),
             )
 
         def diagonal(self):
@@ -644,11 +662,8 @@ def Matrix(T):
             if self._shape[1] != other._shape[0]:
                 raise Exception("Size mismatch")
 
-            if self._stride[1] != 1:
-                self = self.clone()
-
-            if other._stride[1] != 1:
-                other = other.clone()
+            self = self.getCanonicalForm()
+            other = other.getCanonicalForm()
 
             result = Matrix(T).zeros(self._shape[0], other._shape[1])
 
@@ -680,7 +695,7 @@ def Matrix(T):
             if self._shape[0] == 0:
                 raise Exception("Can't invert an empty matrix")
 
-            selfT = self.transpose().clone()
+            selfT = self.transpose().getCanonicalForm()
 
             ipiv = ListOf(Int32)()
             ipiv.resize(selfT._shape[1])
@@ -733,8 +748,7 @@ def Matrix(T):
 
         def __matmul__(self, other: Array(T)):  # noqa
             # ensures that this is a simply-strided (row-major) matrix
-            if self._stride[1] != 1:
-                self = self.clone()
+            self = self.getCanonicalForm()
 
             result = ListOf(T)()
             result.resize(self._shape[0])
@@ -759,8 +773,7 @@ def Matrix(T):
             return Array(T)(result)
 
         def __rmatmul__(self, other: Array(T)):
-            if self._stride[1] != 1:
-                self = self.clone()
+            self = self.getCanonicalForm()
 
             result = ListOf(T)()
             result.resize(self._shape[1])
