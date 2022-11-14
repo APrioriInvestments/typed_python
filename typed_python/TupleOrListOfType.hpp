@@ -288,6 +288,271 @@ public:
 
     void reverse(instance_ptr self);
 
+    enum class int_block_type {
+        sequence=1,
+        int8=2,
+        int16=3,
+        int32=4,
+        int64=5,
+    };
+
+    /* if (count > 2 && ptr[2] - ptr[1] == ptr[1] - ptr[0]) {
+                long sep = ptr[1] - ptr[0];
+                long topPt = 3;
+                while (topPt < count && topPt < 256 && ptr[topPt] - ptr[topPt - 1] == sep) {
+                    topPt++;
+                }
+
+                buffer.write<uint8_t>(kind::sequence);
+                buffer.write<uint8_t>(topPt);
+                buffer.write<in64_t>(ptr[0]);
+                buffer.write<in64_t>(ptr[1]);
+
+                count -= topPt;
+                ptr += topPt;
+            } else */
+
+    // try to serialize a block of integers that fit into the limits of "T"
+    template<class buf_t, class T>
+    bool trySerializeIntListBlock(int64_t* &ptr, size_t &count, buf_t& buffer, int_block_type blockType, T* nullPtr) {
+        if (ptr[0] >= std::numeric_limits<T>::min()
+                    && ptr[0] <= std::numeric_limits<T>::max()) {
+            long topPt = 1;
+            while (topPt < count
+                    && topPt < std::numeric_limits<uint8_t>::max()
+                    && ptr[topPt] >= std::numeric_limits<T>::min()
+                    && ptr[topPt] <= std::numeric_limits<T>::max()) {
+                topPt++;
+            }
+
+            buffer.writeBeginBytes(
+                (uint8_t)blockType,
+                topPt * sizeof(T)
+            );
+            buffer.initialize_bytes(topPt * sizeof(T), [&](uint8_t* output) {
+                for (long k = 0; k < topPt; k++) {
+                    ((T*)output)[k] = ptr[k];
+                }
+            });
+
+            count -= topPt;
+            ptr += topPt;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    template<class buf_t>
+    void serializeIntList(int64_t* ptr, size_t count, buf_t& buffer) {
+        // serialize integers in blocks. each block is either
+        //  - a bunch of integers encoded the normal way but with a
+        //    possibly reduced bit-size (often we use 8 byte integers
+        //    to compress a lot of 2 or 4 byte integers
+        //  - a block of integers with a constant difference between them
+
+        while (count > 0) {
+            if (    trySerializeIntListBlock(ptr, count, buffer, int_block_type::int8, (int8_t*)nullptr)
+                ||  trySerializeIntListBlock(ptr, count, buffer, int_block_type::int16, (int16_t*)nullptr)
+                ||  trySerializeIntListBlock(ptr, count, buffer, int_block_type::int32, (int32_t*)nullptr)
+                ||  trySerializeIntListBlock(ptr, count, buffer, int_block_type::int64, (int64_t*)nullptr)
+            ) {
+                // we serialized somehow...
+            } else {
+                throw std::runtime_error("unreachable code during serializeIntList");
+            }
+        }
+    }
+
+    template<class buf_t, class T>
+    size_t deserializeIntListBlock(int64_t* ptr, size_t bytecount, buf_t& buffer, T* nullPtr) {
+        size_t count = bytecount / sizeof(T);
+
+        buffer.read_bytes_fun(bytecount,  [&](uint8_t* dataPtr) {
+            for (long k = 0; k < count; k++) {
+                ptr[k] = ((T*)dataPtr)[k];
+            }
+        });
+
+        return count;
+    }
+
+    template<class buf_t>
+    void deserializeIntList(int64_t* ptr, size_t count, buf_t& buffer) {
+        while (count) {
+            auto fieldAndWireType = buffer.readFieldNumberAndWireType();
+            int_block_type kind = (int_block_type)fieldAndWireType.first;
+
+            size_t bytecount = buffer.readUnsignedVarint();
+            size_t valuesRead;
+
+            if (kind == int_block_type::int8) {
+                valuesRead = deserializeIntListBlock(ptr, bytecount, buffer, (int8_t*)nullptr);
+            }
+            else if (kind == int_block_type::int16) {
+                valuesRead = deserializeIntListBlock(ptr, bytecount, buffer, (int16_t*)nullptr);
+            }
+            else if (kind == int_block_type::int32) {
+                valuesRead = deserializeIntListBlock(ptr, bytecount, buffer, (int32_t*)nullptr);
+            }
+            else if (kind == int_block_type::int64) {
+                valuesRead = deserializeIntListBlock(ptr, bytecount, buffer, (int64_t*)nullptr);
+            } else {
+                throw std::runtime_error("unreachable code during deserializeIntList");
+            }
+
+            count -= valuesRead;
+            ptr += valuesRead;
+        }
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        size_t ct = count(self);
+
+        if (ct == 0 && isTupleOf()) {
+            buffer.writeEmpty(fieldNumber);
+            return;
+        }
+
+        // list-of needs a memo. TupleOf doesn't.
+        if (isListOf()) {
+            uint32_t id;
+            bool isNew;
+            std::tie(id, isNew) = buffer.cachePointer(*(void**)self, this);
+
+            if (!isNew) {
+                buffer.writeBeginSingle(fieldNumber);
+                buffer.writeUnsignedVarintObject(0, id);
+                return;
+            }
+
+            buffer.writeBeginCompound(fieldNumber);
+            buffer.writeUnsignedVarintObject(0, id);
+        } else {
+            buffer.writeBeginCompound(fieldNumber);
+        }
+
+        buffer.writeUnsignedVarintObject(0, ct);
+
+        if (m_element_type->isPOD() && buffer.getContext().serializePodListsInline()) {
+            if (m_element_type->getTypeCategory() == TypeCategory::catInt64) {
+                serializeIntList(
+                    (int64_t*)this->eltPtr(self, 0),
+                    ct,
+                    buffer
+                );
+            } else {
+                buffer.writeBeginBytes(0, m_element_type->bytecount() * ct);
+
+                buffer.write_bytes(
+                    this->eltPtr(self, 0),
+                    m_element_type->bytecount() * ct
+                );
+            }
+        } else {
+            m_element_type->check([&](auto& concrete_type) {
+                concrete_type.serializeMulti(
+                    this->eltPtr(self, 0),
+                    ct,
+                    m_element_type->bytecount(),
+                    buffer,
+                    0
+                );
+            });
+        }
+
+        buffer.writeEndCompound();
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        if (wireType == WireType::EMPTY && isTupleOf()) {
+            *(layout**)self = nullptr;
+            return;
+        }
+
+        assertNonemptyCompoundWireType(wireType);
+
+        // list-of needs a memo. TupleOf doesn't.
+        size_t id = 0;
+        if (isListOf()) {
+            id = buffer.readUnsignedVarintObject();
+
+            void* ptr = buffer.lookupCachedPointer(id);
+
+            if (ptr) {
+                ((layout**)self)[0] = (layout*)ptr;
+                ((layout**)self)[0]->refcount++;
+                buffer.finishCompoundMessage(wireType);
+                return;
+            }
+        }
+
+        size_t ct = buffer.readUnsignedVarintObject();
+
+        if (ct == 0) {
+            constructor(self);
+
+            if (isListOf()) {
+                (*(layout**)self)->refcount++;
+                buffer.addCachedPointer(id, *((layout**)self), this);
+            }
+        } else {
+            if (m_element_type->isPOD() && buffer.getContext().serializePodListsInline()) {
+                constructor(self, ct, [&](instance_ptr tgt, int k) {});
+
+                if (isListOf()) {
+                    (*(layout**)self)->refcount++;
+                    buffer.addCachedPointer(id, *((layout**)self), this);
+                }
+                if (m_element_type->getTypeCategory() == TypeCategory::catInt64) {
+                    deserializeIntList(
+                        (int64_t*)this->eltPtr(self, 0),
+                        ct,
+                        buffer
+                    );
+                } else {
+                    auto fnAndWt = buffer.readFieldNumberAndWireType();
+                    size_t bytecount = buffer.readUnsignedVarint();
+
+                    if (fnAndWt.second != WireType::BYTES) {
+                        throw std::runtime_error("Corrupt data (expected BYTES)");
+                    }
+
+                    if (bytecount != m_element_type->bytecount() * ct) {
+                        throw std::runtime_error("Corrupt data (bytecount doesn't match)");
+                    }
+
+                    buffer.read_bytes(
+                        this->eltPtr(self, 0),
+                        m_element_type->bytecount() * ct
+                    );
+                }
+            } else {
+                constructor(self, ct, [&](instance_ptr tgt, int k) {
+                    if (k == 0 && isListOf()) {
+                        buffer.addCachedPointer(id, *((layout**)self), this);
+                        (*(layout**)self)->refcount++;
+                    }
+
+                    auto fieldAndWire = buffer.readFieldNumberAndWireType();
+                    if (fieldAndWire.first) {
+                        throw std::runtime_error("Corrupt data (count)");
+                    }
+                    if (fieldAndWire.second == WireType::END_COMPOUND) {
+                        throw std::runtime_error("Corrupt data (count)");
+                    }
+
+                    m_element_type->deserialize(tgt, buffer, fieldAndWire.second);
+                });
+            }
+        }
+
+        buffer.finishCompoundMessage(wireType);
+    }
+
 protected:
     Type* m_element_type;
 
@@ -351,99 +616,6 @@ public:
             throw;
         }
     }
-
-    template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
-        size_t ct = count(self);
-
-        uint32_t id;
-        bool isNew;
-        std::tie(id, isNew) = buffer.cachePointer(*(void**)self, this);
-
-        if (!isNew) {
-            buffer.writeBeginSingle(fieldNumber);
-            buffer.writeUnsignedVarintObject(0, id);
-            return;
-        }
-
-        buffer.writeBeginCompound(fieldNumber);
-        buffer.writeUnsignedVarintObject(0, id);
-        buffer.writeUnsignedVarintObject(0, ct);
-
-        if (m_element_type->isPOD() && buffer.getContext().serializePodListsInline()) {
-            buffer.write_bytes(
-                this->eltPtr(self, 0),
-                m_element_type->bytecount() * ct
-            );
-        } else {
-            m_element_type->check([&](auto& concrete_type) {
-                concrete_type.serializeMulti(
-                    this->eltPtr(self, 0),
-                    ct,
-                    m_element_type->bytecount(),
-                    buffer,
-                    0
-                );
-            });
-        }
-
-        buffer.writeEndCompound();
-    }
-
-    template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
-        assertNonemptyCompoundWireType(wireType);
-
-        size_t id = buffer.readUnsignedVarintObject();
-
-        void* ptr = buffer.lookupCachedPointer(id);
-
-        if (ptr) {
-            ((layout**)self)[0] = (layout*)ptr;
-            ((layout**)self)[0]->refcount++;
-            buffer.finishCompoundMessage(wireType);
-            return;
-        }
-
-        size_t ct = buffer.readUnsignedVarintObject();
-
-        if (ct == 0) {
-            constructor(self);
-            (*(layout**)self)->refcount++;
-            buffer.addCachedPointer(id, *((layout**)self), this);
-        } else {
-            if (m_element_type->isPOD() && buffer.getContext().serializePodListsInline()) {
-                constructor(self, ct, [&](instance_ptr tgt, int k) {});
-
-                buffer.addCachedPointer(id, *((layout**)self), this);
-                (*(layout**)self)->refcount++;
-
-                buffer.read_bytes(
-                    this->eltPtr(self, 0),
-                    m_element_type->bytecount() * ct
-                );
-            } else {
-                constructor(self, ct, [&](instance_ptr tgt, int k) {
-                    if (k == 0) {
-                        buffer.addCachedPointer(id, *((layout**)self), this);
-                        (*(layout**)self)->refcount++;
-                    }
-
-                    auto fieldAndWire = buffer.readFieldNumberAndWireType();
-                    if (fieldAndWire.first) {
-                        throw std::runtime_error("Corrupt data (count)");
-                    }
-                    if (fieldAndWire.second == WireType::END_COMPOUND) {
-                        throw std::runtime_error("Corrupt data (count)");
-                    }
-
-                    m_element_type->deserialize(tgt, buffer, fieldAndWire.second);
-                });
-            }
-        }
-
-        buffer.finishCompoundMessage(wireType);
-    }
 };
 
 PyDoc_STRVAR(TupleOf_doc,
@@ -461,54 +633,6 @@ public:
 
     void _updateTypeMemosAfterForwardResolution() {
         TupleOfType::Make(m_element_type, this);
-    }
-
-    template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
-        size_t ct = count(self);
-
-        if (ct == 0) {
-            buffer.writeEmpty(fieldNumber);
-            return;
-        }
-
-        buffer.writeBeginCompound(fieldNumber);
-
-        buffer.writeUnsignedVarintObject(0, ct);
-
-        m_element_type->check([&](auto& concrete_type) {
-            for (long k = 0; k < ct; k++) {
-                concrete_type.serialize(this->eltPtr(self,k), buffer, 0);
-            }
-        });
-
-        buffer.writeEndCompound();
-    }
-
-    template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
-        if (wireType == WireType::EMPTY) {
-            *(layout**)self = nullptr;
-            return;
-        }
-
-        assertNonemptyCompoundWireType(wireType);
-
-        size_t ct = buffer.readUnsignedVarintObject();
-
-        constructor(self, ct, [&](instance_ptr tgt, int k) {
-            auto fieldAndWire = buffer.readFieldNumberAndWireType();
-            if (fieldAndWire.first) {
-                throw std::runtime_error("Corrupt data (count)");
-            }
-            if (fieldAndWire.second == WireType::END_COMPOUND) {
-                throw std::runtime_error("Corrupt data (count)");
-            }
-
-            m_element_type->deserialize(tgt, buffer, fieldAndWire.second);
-        });
-
-        buffer.finishCompoundMessage(wireType);
     }
 
     // get a memoized TupleOfType. If 'knownType', then install this type

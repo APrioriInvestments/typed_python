@@ -350,6 +350,20 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assert_is_copy(obj, ping_pong(obj, ser_ctx))
 
+    def test_serialize_lists_with_compression(self):
+        def check_idempotence(x):
+            s = SerializationContext().withSerializePodListsInline()
+
+            assert x == s.deserialize(s.serialize(x))
+
+            # make sure its a valid 'encoded serialized object'
+            assert decodeSerializedObject(s.serialize(x))
+
+        check_idempotence(ListOf(int)([1, 2, 3]))
+        check_idempotence(ListOf(int)([1, 2, 3] * 1000))
+        check_idempotence(ListOf(int)([1, 2, 3] * 1000 + [11111111111111] + [1, 2, 3] * 1000))
+        check_idempotence(ListOf(float)(range(100)))
+
     def test_serialize_core_python_objects(self):
         self.check_idempotence(0)
         self.check_idempotence(10)

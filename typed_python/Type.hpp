@@ -249,6 +249,19 @@ public:
         );
     }
 
+    bool isInteger() const {
+        return (
+               m_typeCategory == catUInt8
+            || m_typeCategory == catUInt16
+            || m_typeCategory == catUInt32
+            || m_typeCategory == catUInt64
+            || m_typeCategory == catInt8
+            || m_typeCategory == catInt16
+            || m_typeCategory == catInt32
+            || m_typeCategory == catInt64
+        );
+    }
+
     bool isRecursive() {
         return getRecursiveTypeGroupMembers().size() != 1;
     }

@@ -372,6 +372,15 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
         self.assertEqual(serialize(T, 1), SINGLE(0) + VARINT(1) + signedVarint(1))
         self.assertEqual(serialize(T, 1.5), SINGLE(0) + BITS_64(2) + floatToBits(1.5))
         self.assertEqual(serialize(T, "HI"), SINGLE(0) + EMPTY(3))
+
+        self.assertEqual(
+            serialize(T, (1,)),
+            SINGLE(0) + BEGIN_COMPOUND(4) + (
+                VARINT(0) + unsignedVarint(1) +
+                VARINT(0) + signedVarint(1)
+            ) + END_COMPOUND()
+        )
+
         self.assertEqual(
             serialize(T, (1, 2, 123)),
             SINGLE(0) + BEGIN_COMPOUND(4) + (
