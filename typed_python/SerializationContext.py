@@ -123,7 +123,8 @@ class SerializationContext:
         objectToNameOverride=None,
         serializeFunctionGlobalsAsIs=False,
         serializeHashSequence=False,
-        serializePodListsInline=False
+        serializePodListsInline=False,
+        compressUsingThreads=True
     ):
         super().__init__()
 
@@ -138,6 +139,7 @@ class SerializationContext:
         self.serializeFunctionGlobalsAsIs = serializeFunctionGlobalsAsIs
         self.serializeHashSequence = serializeHashSequence
         self.serializePodListsInline = serializePodListsInline
+        self.compressUsingThreads = compressUsingThreads
 
     def addNamedObject(self, name, obj):
         self.nameToObjectOverride[name] = obj
@@ -172,7 +174,8 @@ class SerializationContext:
             objectToNameOverride=self.objectToNameOverride,
             serializeFunctionGlobalsAsIs=True,
             serializeHashSequence=self.serializeHashSequence,
-            serializePodListsInline=self.serializePodListsInline
+            serializePodListsInline=self.serializePodListsInline,
+            compressUsingThreads=self.compressUsingThreads
         )
 
     def withoutLineInfoEncoded(self):
@@ -186,7 +189,8 @@ class SerializationContext:
             objectToNameOverride=self.objectToNameOverride,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
             serializeHashSequence=self.serializeHashSequence,
-            serializePodListsInline=self.serializePodListsInline
+            serializePodListsInline=self.serializePodListsInline,
+            compressUsingThreads=self.compressUsingThreads
         )
 
     def withoutCompression(self):
@@ -200,7 +204,8 @@ class SerializationContext:
             objectToNameOverride=self.objectToNameOverride,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
             serializeHashSequence=self.serializeHashSequence,
-            serializePodListsInline=self.serializePodListsInline
+            serializePodListsInline=self.serializePodListsInline,
+            compressUsingThreads=self.compressUsingThreads
         )
 
     def withCompression(self):
@@ -214,7 +219,8 @@ class SerializationContext:
             objectToNameOverride=self.objectToNameOverride,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
             serializeHashSequence=self.serializeHashSequence,
-            serializePodListsInline=self.serializePodListsInline
+            serializePodListsInline=self.serializePodListsInline,
+            compressUsingThreads=self.compressUsingThreads
         )
 
     def withSerializeHashSequence(self):
@@ -228,7 +234,8 @@ class SerializationContext:
             objectToNameOverride=self.objectToNameOverride,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
             serializeHashSequence=True,
-            serializePodListsInline=self.serializePodListsInline
+            serializePodListsInline=self.serializePodListsInline,
+            compressUsingThreads=self.compressUsingThreads
         )
 
     def withSerializePodListsInline(self):
@@ -242,7 +249,23 @@ class SerializationContext:
             objectToNameOverride=self.objectToNameOverride,
             serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
             serializeHashSequence=self.serializeHashSequence,
-            serializePodListsInline=True
+            serializePodListsInline=True,
+            compressUsingThreads=self.compressUsingThreads
+        )
+
+    def withoutCompressUsingThreads(self):
+        if not self.compressUsingThreads:
+            return self
+
+        return SerializationContext(
+            nameToObjectOverride=self.nameToObjectOverride,
+            compressionEnabled=self.compressionEnabled,
+            encodeLineInformationForCode=self.encodeLineInformationForCode,
+            objectToNameOverride=self.objectToNameOverride,
+            serializeFunctionGlobalsAsIs=self.serializeFunctionGlobalsAsIs,
+            serializeHashSequence=self.serializeHashSequence,
+            serializePodListsInline=self.serializePodListsInline,
+            compressUsingThreads=False
         )
 
     def nameForObject(self, t):

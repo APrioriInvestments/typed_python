@@ -46,6 +46,14 @@ void PythonSerializationContext::setFlags() {
 
     mSerializePodListsInline = ((PyObject*)serializePodListsInline) == Py_True;
 
+    PyObjectStealer compressUsingThreads(PyObject_GetAttrString(mContextObj, "compressUsingThreads"));
+
+    if (!compressUsingThreads) {
+        throw PythonExceptionSet();
+    }
+
+    mCompressUsingThreads = ((PyObject*)compressUsingThreads) == Py_True;
+
     PyObjectStealer encodeLineInformationForCode(PyObject_GetAttrString(mContextObj, "encodeLineInformationForCode"));
 
     if (!encodeLineInformationForCode) {

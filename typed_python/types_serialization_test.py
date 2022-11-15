@@ -364,6 +364,37 @@ class TypesSerializationTest(unittest.TestCase):
         check_idempotence(ListOf(int)([1, 2, 3] * 1000 + [11111111111111] + [1, 2, 3] * 1000))
         check_idempotence(ListOf(float)(range(100)))
 
+    def test_serialize_lists_compression_and_threads(self):
+        someFloats = ListOf(float)(range(1000000))
+        for _ in range(6):
+            someFloats = someFloats + someFloats
+            print(len(someFloats))
+
+        s1 = SerializationContext().withSerializePodListsInline()
+        s2 = SerializationContext().withSerializePodListsInline().withoutCompressUsingThreads()
+        s3 = SerializationContext().withSerializePodListsInline().withoutCompression()
+
+        assert someFloats == s1.deserialize(s1.serialize(someFloats))
+        assert someFloats == s2.deserialize(s2.serialize(someFloats))
+        assert someFloats == s3.deserialize(s3.serialize(someFloats))
+
+        t0 = time.time()
+        size1 = len(s1.serialize(someFloats))
+        t1 = time.time()
+        size2 = len(s2.serialize(someFloats))
+        t2 = time.time()
+        size3 = len(s3.serialize(someFloats))
+        t3 = time.time()
+
+        threadTime = t1 - t0
+        normalTime = t2 - t1
+        nocompressTime = t3 - t2
+
+        print("threadTime is ", threadTime, int(size1 / 1024 / 1024))
+        print("normalTime is ", normalTime, int(size2 / 1024 / 1024))
+        print("nocompress is ", nocompressTime, int(size3 / 1024 / 1024))
+        print("speedup is ", normalTime / threadTime)
+
     def test_serialize_core_python_objects(self):
         self.check_idempotence(0)
         self.check_idempotence(10)

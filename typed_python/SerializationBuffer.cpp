@@ -44,8 +44,6 @@ void SerializationBufferBlock::compress() {
     size_t compressedBytecount;
 
     {
-        PyEnsureGilReleased releaseTheGil;
-
         compressedBytecount = LZ4F_compressFrame(
             compressedBytes,
             bytesRequired,
@@ -76,11 +74,17 @@ void SerializationBufferBlock::compress() {
 }
 
 void SerializationBuffer::consolidate() {
+    if (m_is_consolidated) {
+        return;
+    }
+
     if (m_wants_compress) {
         for (auto blockPtr: m_blocks) {
-            blockPtr->compress();
+            waitForCompression(blockPtr);
         }
     }
+
+    m_is_consolidated = true;
 
     if (m_blocks.size() == 1) {
         return;
@@ -110,3 +114,99 @@ void SerializationBuffer::consolidate() {
         )
     );
 }
+
+std::shared_ptr<SerializationBufferBlock> SerializationBuffer::getNextCompressTask() {
+    std::unique_lock<std::mutex> lock(s_compress_thread_mutex);
+
+    while (true) {
+        if (s_waiting_compress_blocks.size()) {
+            std::shared_ptr<SerializationBufferBlock> res =
+                *s_waiting_compress_blocks.begin();
+
+            s_working_compress_blocks.insert(res);
+            s_waiting_compress_blocks.erase(res);
+
+            return res;
+        }
+
+        s_has_work->wait(lock);
+    }
+}
+
+void SerializationBuffer::compressionThread() {
+    while (true) {
+        std::shared_ptr<SerializationBufferBlock> task = getNextCompressTask();
+
+        task->compress();
+
+        std::unique_lock<std::mutex> lock(s_compress_thread_mutex);
+
+        s_working_compress_blocks.erase(task);
+
+        s_has_work->notify_all();
+    }
+}
+
+void SerializationBuffer::waitForCompression(std::shared_ptr<SerializationBufferBlock> block) {
+    if (!m_compress_using_threads) {
+        PyEnsureGilReleased releaseTheGil;
+        block->compress();
+        return;
+    }
+
+    {
+        std::unique_lock<std::mutex> lock(s_compress_thread_mutex);
+
+        while (true) {
+            if (
+                s_waiting_compress_blocks.find(block) == s_waiting_compress_blocks.end()
+                && s_working_compress_blocks.find(block) == s_working_compress_blocks.end()
+            ) {
+                // we're done
+                return;
+            }
+
+            s_has_work->wait(lock);
+        }
+    }
+}
+
+void SerializationBuffer::markForCompression(std::shared_ptr<SerializationBufferBlock> block) {
+    if (!m_compress_using_threads) {
+        return;
+    }
+
+    {
+        std::unique_lock<std::mutex> lock(s_compress_thread_mutex);
+
+        if (!s_compress_threads.size()) {
+            for (long i = 0; i < 4; i++) {
+                s_compress_threads.push_back(
+                    new std::thread(SerializationBuffer::compressionThread)
+                );
+            }
+
+            s_has_work = new std::condition_variable();
+        }
+
+        s_waiting_compress_blocks.insert(block);
+        s_has_work->notify_all();
+    }
+}
+
+// static
+std::mutex SerializationBuffer::s_compress_thread_mutex;
+
+// static
+std::condition_variable* SerializationBuffer::s_has_work;
+
+// static
+std::vector<std::thread*> SerializationBuffer::s_compress_threads;
+
+// static
+std::unordered_set<std::shared_ptr<SerializationBufferBlock> > SerializationBuffer::s_waiting_compress_blocks;
+
+// static
+std::unordered_set<std::shared_ptr<SerializationBufferBlock> > SerializationBuffer::s_working_compress_blocks;
+
+

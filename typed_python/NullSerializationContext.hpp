@@ -37,6 +37,9 @@ public:
     }
 
 
+    virtual bool compressUsingThreads() const {
+        return false;
+    }
     virtual bool serializePodListsInline() const {
         return false;
     }

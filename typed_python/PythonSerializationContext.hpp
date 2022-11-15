@@ -84,7 +84,8 @@ public:
             mContextObj(typeSetObj),
             mCompressionEnabled(false),
             mSerializePodListsInline(false),
-            mSerializeHashSequence(false)
+            mSerializeHashSequence(false),
+            mCompressUsingThreads(false)
     {
         setFlags();
     }
@@ -97,6 +98,10 @@ public:
 
     bool isLineInfoSuppressed() const {
         return mSuppressLineInfo;
+    }
+
+    bool compressUsingThreads() const {
+        return mCompressUsingThreads;
     }
 
     bool serializePodListsInline() const {
@@ -195,6 +200,8 @@ private:
     bool mCompressionEnabled;
 
     bool mSerializePodListsInline;
+
+    bool mCompressUsingThreads;
 
     bool mSuppressLineInfo;
 

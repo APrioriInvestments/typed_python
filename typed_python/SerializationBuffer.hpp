@@ -20,6 +20,8 @@
 #include <stdlib.h>
 #include <map>
 #include <set>
+#include <thread>
+#include <condition_variable>
 #include "Type.hpp"
 #include "WireType.hpp"
 
@@ -115,7 +117,6 @@ private:
     size_t m_size;
     size_t m_reserved;
     uint8_t* m_buffer;
-
     bool m_compressed;
 };
 
@@ -123,10 +124,11 @@ class SerializationBuffer {
 public:
     SerializationBuffer(const SerializationContext& context) :
         m_context(context),
-        m_wants_compress(context.isCompressionEnabled())
+        m_wants_compress(context.isCompressionEnabled()),
+        m_compress_using_threads(context.compressUsingThreads()),
+        m_is_consolidated(false)
     {
         m_top_block = new SerializationBufferBlock();
-
         m_blocks.push_back(std::shared_ptr<SerializationBufferBlock>(m_top_block));
     }
 
@@ -265,7 +267,9 @@ public:
     }
 
     uint8_t* buffer() {
-        consolidate();
+        if (!m_is_consolidated) {
+            consolidate();
+        }
 
         if (m_blocks.size() == 0) {
             return nullptr;
@@ -293,14 +297,14 @@ public:
 
     //nakedly write bytes into the stream
     void write_bytes(uint8_t* ptr, size_t bytecount) {
-        if (m_top_block->isCompressed() || m_top_block->oversized()) {
-            m_top_block = new SerializationBufferBlock();
-            m_blocks.push_back(
-                std::shared_ptr<SerializationBufferBlock>(
-                    m_top_block
-                )
-            );
+        while (bytecount > 1024 * 1024) {
+            write_bytes(ptr, 1024 * 1024);
+
+            ptr += 1024 * 1024;
+            bytecount -= 1024 * 1024;
         }
+
+        checkTopBlock();
 
         m_top_block->write_bytes(ptr, bytecount);
     }
@@ -309,14 +313,7 @@ public:
     // to initialize it.
     template<class callback>
     void initialize_bytes(size_t bytecount, const callback& c) {
-        if (m_top_block->isCompressed() || m_top_block->oversized()) {
-            m_top_block = new SerializationBufferBlock();
-            m_blocks.push_back(
-                std::shared_ptr<SerializationBufferBlock>(
-                    m_top_block
-                )
-            );
-        }
+        checkTopBlock();
 
         m_top_block->initialize_bytes(bytecount, c);
     }
@@ -405,24 +402,35 @@ public:
 
     void finalize() {
         if (m_wants_compress) {
+            markForCompression(m_blocks.back());
+
             for (auto b: m_blocks) {
-                b->compress();
+                waitForCompression(b);
             }
         }
     }
 
     template< class T>
     void write(T i) {
-        if (m_top_block->isCompressed() || m_top_block->oversized()) {
+        checkTopBlock();
+
+        m_top_block->write(i);
+    }
+
+    void checkTopBlock() {
+        if (m_top_block->oversized()) {
             m_top_block = new SerializationBufferBlock();
+
+            if (m_wants_compress) {
+                markForCompression(m_blocks.back());
+            }
+
             m_blocks.push_back(
                 std::shared_ptr<SerializationBufferBlock>(
                     m_top_block
                 )
             );
         }
-
-        m_top_block->write(i);
     }
 
     void startSerializing(Type* nativeType) {
@@ -456,6 +464,10 @@ private:
 
     bool m_wants_compress;
 
+    bool m_compress_using_threads;
+
+    bool m_is_consolidated;
+
     size_t m_size;
 
     // the
@@ -472,6 +484,18 @@ private:
     std::set<Type*> m_types_being_serialized;
 
     std::unordered_map<MutuallyRecursiveTypeGroup*, int> m_group_counter;
+
+    static void compressionThread();
+    static std::shared_ptr<SerializationBufferBlock> getNextCompressTask();
+
+    void markForCompression(std::shared_ptr<SerializationBufferBlock> block);
+    void waitForCompression(std::shared_ptr<SerializationBufferBlock> block);
+
+    static std::mutex s_compress_thread_mutex;
+    static std::condition_variable* s_has_work;
+    static std::vector<std::thread*> s_compress_threads;
+    static std::unordered_set<std::shared_ptr<SerializationBufferBlock> > s_waiting_compress_blocks;
+    static std::unordered_set<std::shared_ptr<SerializationBufferBlock> > s_working_compress_blocks;
 };
 
 class MarkTypeBeingSerialized {
