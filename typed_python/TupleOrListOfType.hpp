@@ -17,6 +17,7 @@
 #pragma once
 
 #include "Type.hpp"
+#include "Format.hpp"
 
 class TupleOrListOfType : public Type {
 public:
@@ -436,7 +437,7 @@ public:
 
         buffer.writeUnsignedVarintObject(0, ct);
 
-        if (m_element_type->isPOD() && buffer.getContext().serializePodListsInline()) {
+        if (ct && m_element_type->isPOD() && buffer.getContext().serializePodListsInline()) {
             if (m_element_type->getTypeCategory() == TypeCategory::catInt64) {
                 serializeIntList(
                     (int64_t*)this->eltPtr(self, 0),
@@ -485,7 +486,12 @@ public:
             if (ptr) {
                 ((layout**)self)[0] = (layout*)ptr;
                 ((layout**)self)[0]->refcount++;
-                buffer.finishCompoundMessage(wireType);
+                try {
+                    buffer.finishCompoundMessage(wireType);
+                } catch(...) {
+                    throw std::runtime_error("1. Failed finishing: " + name());
+                }
+
                 return;
             }
         }
@@ -550,7 +556,13 @@ public:
             }
         }
 
-        buffer.finishCompoundMessage(wireType);
+        try {
+            buffer.finishCompoundMessage(wireType);
+        }
+        catch(...) {
+            throw std::runtime_error("2. Failed finishing: " + name() + ": " + format(ct));
+        }
+
     }
 
 protected:

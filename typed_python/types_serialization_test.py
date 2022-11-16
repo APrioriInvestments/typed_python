@@ -364,6 +364,12 @@ class TypesSerializationTest(unittest.TestCase):
         check_idempotence(ListOf(int)([1, 2, 3] * 1000 + [11111111111111] + [1, 2, 3] * 1000))
         check_idempotence(ListOf(float)(range(100)))
 
+        aList = ListOf(float)(range(100))
+        check_idempotence((aList, aList))
+
+        aList.resize(0)
+        check_idempotence((aList, aList))
+
     def test_serialize_lists_compression_and_threads(self):
         someFloats = ListOf(float)(range(1000000))
         for _ in range(6):
