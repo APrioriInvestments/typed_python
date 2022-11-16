@@ -264,7 +264,6 @@ class Runtime:
         overload = functionType.overloads[overloadIx]
 
         assert len(arguments) == len(overload.args)
-
         try:
             t0 = time.time()
             t1 = None
@@ -349,7 +348,6 @@ class Runtime:
         # walk over the closure of funcObj and figure out the appropriate types
         # of each cell.
         funcObj = _types.prepareArgumentToBePassedToCompiler(funcObj)
-
         argTypes = [typeWrapper(a) for a in argTypes]
         kwargTypes = {k: typeWrapper(v) for k, v in kwargTypes.items()}
 

@@ -17,7 +17,7 @@ import logging
 
 from sortedcontainers import SortedSet
 from types import ModuleType
-from typing import Optional, Dict
+from typing import Optional, Dict, Type, List, Set, Tuple, Union
 
 import typed_python.python_ast as python_ast
 import typed_python._types as _types
@@ -39,6 +39,7 @@ from typed_python.compiler.type_wrappers.python_typed_function_wrapper import (
 )
 from typed_python.compiler.typed_call_target import TypedCallTarget
 from typed_python.hash import Hash
+from typed_python.internals import ClassMetaclass
 
 __all__ = ['PythonToNativeConverter']
 
@@ -146,59 +147,31 @@ class PythonToNativeConverter:
     build_and_link_new_module,
     then function_pointer_by_name.
 
+
     x = understanding
 
     'identity' is the hexdigest of the function hash
     'link_name' is the symbol name, prefix + func_name + hash
 
     Attributes:
-        x   llvm_compiler: The WHAT?
-        x   compiler_cache: The WHAT?
-            generate_debug_checks: ?
-            all_defined_names: ?
-            all_cached_names:
-            _link_name_for_identity: ?
-            _identity_for_link_name: ?
-            _definitions: definition blablabla
-            _targets: ?
-            _inflight_definitions: ?
-            _inflight_function_conversions: ?
-            _identifier_to_pyfunc: ?
-            _times_calculated: ?
-            _new_native_functions:
-        x   _visitors: A list of context managers which run on each new function installed with
-                _install_inflight_functions, giving info on e.g. compilation counts.
-            _currently_converting:
-
-
-    Methods:
-        x   __init__
-            is_currently_converting
-            get_definition_count
-        x   add_visitor
-        x   remove_visitor
-            build_and_link_new_module
-            _extract_new_function_definitions
-            _identity_hash_to_linker_name
-            _create_conversion_context
-        x   _define_link_name
-        x   _load_from_compiler_cache
-            define_non_python_function
-            define_native_function
-            _get_typed_call_target
-            _code_to_ast
-            demasquerade_call_target_output
-            generate_call_converter
-            _resolve_all_inflight_functions
-            compile_single_class_dispatch
-            compile_class_destructor
-            function_pointer_by_name
-            convert_typed_function_call
-            hash_object_to_identity
-            _hash_globals
-            _hash_dot_seq
-            convert
-            _install_inflight_functions
+        llvm_compiler: The WHAT?
+        compiler_cache: The WHAT?
+        generate_debug_checks: ?
+        _all_defined_names: ?
+        _all_cached_names:
+        _link_name_for_identity: ?
+        _identity_for_link_name: ?
+        _definitions: definition blablabla
+        _targets: ?
+        _inflight_definitions: ?
+        _inflight_function_conversions: ?
+        _identifier_to_pyfunc: ?
+        _times_calculated: ?
+        _new_native_functions:
+       _visitors: A list of context managers which run on each new function installed with
+            _install_inflight_functions, giving info on e.g. compilation counts.
+        _currently_converting:
+        _dependencies: A directed graph in which nodes are function hashes and edges are a dependence.
     """
     def __init__(self, llvm_compiler: Compiler, compiler_cache: CompilerCache):
         self.llvm_compiler = llvm_compiler
@@ -207,18 +180,21 @@ class PythonToNativeConverter:
         self.generate_debug_checks = False
 
         # all link names for which we have a definition.
-        self._all_defined_names = set()
+        self._all_defined_names: Set[str] = set()
 
         # all names we loaded from the cache (not necessarily every function loaded in the cache,
         # only those dependencies of a function we have called _loadFromCompilerCache on).
-        self._all_cached_names = set()
+        self._all_cached_names: Set[str] = set()
 
-        self._link_name_for_identity = {}
-        self._identity_for_link_name = {}
+        self._link_name_for_identity: Dict[str, str] = {}
+        self._identity_for_link_name: Dict[str, str] = {}
+        # a mapping from link_name to native-level function definition
         self._definitions: Dict[str, native_ast.Function] = {}
-        self._targets = {}
-        self._inflight_definitions = {}
-        self._inflight_function_conversions = {}
+        # how is this different from _definitions?
+        self._targets: Dict[str, TypedCallTarget] = {}
+        # NB i don't think the Wrapper is ever actually used.
+        self._inflight_definitions: Dict[str, Tuple[native_ast.Function, Type[Wrapper]]] = {}
+        self._inflight_function_conversions: Dict[str, FunctionConversionContext] = {}
         self._identifier_to_pyfunc = {}
         self._times_calculated = {}
 
@@ -234,8 +210,25 @@ class PythonToNativeConverter:
 
         self._dependencies = FunctionDependencyGraph()
 
-    def convert_typed_function_call(self, function_type, overload_index, input_wrappers, assert_is_root=False):
-        """placeholder"""
+    def convert_typed_function_call(self,
+                                    function_type,
+                                    overload_index: int,
+                                    input_wrappers: List[Type[Wrapper]],
+                                    assert_is_root=False) -> TypedCallTarget:
+        """Does what?
+
+        Args:
+            function_type: Normally a subclass of typed_python._types.Function? sometimes not a class at all?
+            overload_index: The index of function_type.overloads to access, corresponding to a specific set of input argument types
+            input_wrappers: The input wrappers? TODO not always a Wrapper, sometimes just a type?!
+            assert_is_root: If True, then assert that no other functions are using
+                the converter right now.
+
+        Trash! TODO fix
+
+        Returns:
+            bla
+        """
         overload = function_type.overloads[overload_index]
 
         realized_input_wrappers = []
@@ -277,9 +270,9 @@ class PythonToNativeConverter:
 
     def convert_python_to_native(
         self,
-        func_name,
-        func_code,
-        func_globals,
+        func_name: str,
+        func_code: types.CodeType,
+        func_globals: Dict,
         func_globals_raw,
         func_globals_from_cells,
         closure_vars,
@@ -287,33 +280,33 @@ class PythonToNativeConverter:
         output_type,
         assert_is_root=False,
         conversion_type=None
-    ):
+    ) -> TypedCallTarget:
         """Convert a single pure python function using args of 'input_types'.
 
         It will return no more than 'output_type'. if output_type is None we produce
         the tightest output type possible.
 
         Args:
-            func_name - the name of the function
-            func_code - a Code object representing the code to compile
-            func_globals - the globals object from the relevant function
-            func_globals_raw - the original globals object (with no merging or filtering done)
+            func_name: the name of the function
+            func_code: a Code object representing the code to compile
+            func_globals: the globals object from the relevant function
+            func_globals_raw: the original globals object (with no merging or filtering done)
                 which we use to figure out the location of global variables that are not in cells.
-            func_globals_from_cells - a list of the names that are globals that are actually accessed
+            func_globals_from_cells: a list of the names that are globals that are actually accessed
                 as cells.
-            closure_vars - TODO
-            input_types - a type for each free variable in the function closure, and
+            closure_vars: TODO
+            input_types: a type for each free variable in the function closure, and
                 then again for each input argument
-            output_type - the output type of the function, if known. if this is None,
+            output_type: the output type of the function, if known. if this is None,
                 then we use type inference to produce the tightest type we can.
                 If not None, then we will produce this type or throw an exception.
-            assert_is_root - if True, then assert that no other functions are using
+            assert_is_root: if True, then assert that no other functions are using
                 the converter right now.
-            conversion_type - if None, this is a normal function conversion. Otherwise,
+            conversion_type: if None, this is a normal function conversion. Otherwise,
                 this must be a subclass of FunctionConversionContext
 
         Returns:
-            TODO what?
+            A TypedCallTarget TODO doing what?
         """
         assert isinstance(func_name, str)
         assert isinstance(func_code, types.CodeType)
@@ -372,7 +365,6 @@ class PythonToNativeConverter:
                 output_type,
                 conversion_type
             )
-
             self._inflight_function_conversions[identity] = function_converter
 
         if is_root:
@@ -394,13 +386,15 @@ class PythonToNativeConverter:
             else:
                 return None
 
-    def demasquerade_call_target_output(self, call_target):
+    def demasquerade_call_target_output(self, call_target: TypedCallTarget) -> TypedCallTarget:
         """Ensure we are returning the correct 'interpreterType' from callTarget.
 
         In some cases, we may return a 'masquerade' type in compiled code. This is fine
         for other compiled code, but the interpreter needs us to transform the result back
         to the right interpreter type. For instance, we may be returning a *args tuple.
 
+        Args:
+            call_target: the input TypedCallTarget to be demasqueraded (or returned unchanged).
         Returns:
             a new TypedCallTarget where the output type has the right return type.
         """
@@ -440,7 +434,7 @@ class PythonToNativeConverter:
         where X is the union of A1, A2, etc.
 
         Args:
-            callTarget - a TypedCallTarget giving the function we need
+            callTarget: a TypedCallTarget giving the function we need
                 to generate an alternative entrypoint for
         Returns:
             the linker name of the defined native function
@@ -492,6 +486,8 @@ class PythonToNativeConverter:
         )
 
         self._link_name_for_identity[identifier] = link_name
+
+        assert type(identifier) == type(link_name) == str
         self._identity_for_link_name[link_name] = identifier
         self._all_defined_names.add(link_name)
 
@@ -501,11 +497,12 @@ class PythonToNativeConverter:
         return link_name
 
     def build_and_link_new_module(self) -> None:
-        """
-        grabs all in-flight function definitions (from _inflight_function_conversions) and generates a module.
+        """Pull all in-flight conversions and compile as a module.
 
-        placeholder - explain what's afoot.
-
+        This grabs all new functions, where the python->native conversion has been completed,
+        and collates these + their dependencies and global variables into a module, performing the
+        native -> llvm conversion. The list of in-flight functions is cleared once parsed to avoid
+        double-compilation.
         """
         targets = self._extract_new_function_definitions()
 
@@ -537,14 +534,16 @@ class PythonToNativeConverter:
             externally_used
         )
 
-    def define_non_python_function(self, name, identity_tuple, context) -> Optional[TypedCallTarget]:
+    def define_non_python_function(self, name: str, identity_tuple: Tuple, context) -> Optional[TypedCallTarget]:
         """Define a non-python generating function (if we haven't defined it before already)
 
-            name - the name to actually give the function.
-            identity_tuple - a unique (sha)hashable tuple
-            context - a FunctionConversionContext lookalike
+        Args:
+            name: the name to actually give the function.
+            identity_tuple: a unique (sha)hashable tuple
+            context: a FunctionConversionContext lookalike
 
-        returns a TypedCallTarget, or None if it's not known yet
+        Returns:
+            A TypedCallTarget, or None if it's not known yet
         """
         identity = self.hash_object_to_identity(identity_tuple).hexdigest
         link_name = self._identity_hash_to_linker_name(name, identity, "runtime.")
@@ -578,21 +577,30 @@ class PythonToNativeConverter:
 
         return self._targets.get(link_name)
 
-    def define_native_function(self, name, identity, input_types, output_type, generating_function):
+    def define_native_function(self,
+                               name: str,
+                               identity: Tuple,
+                               input_types,
+                               output_type,
+                               generating_function) -> Optional[TypedCallTarget]:
         """Define a native function if we haven't defined it before already.
 
-            name - the name to actually give the function.
-            identity - a tuple consisting of strings, ints, type wrappers, and tuples of same
-            input_types - list of Wrapper objects for the incoming types
-            output_type - Wrapper object for the output type.
-            generating_function - a function producing a native_function_definition.
+        Args:
+            name: the name to actually give the function.
+            identity: a tuple consisting of strings, ints, type wrappers, and tuples of same
+            input_types: list of Wrapper objects for the incoming types (TODO not always true! sometimes it is a type!)
+            output_type: Wrapper object for the output type. (TODO as above, plus sometimes None)
+            generating_function: a function producing a native_function_definition.
                 It should accept an expression_conversion_context, an expression for the output
                 if it's not pass-by-value (or None if it is), and a bunch of TypedExpressions
                 and produce code that always ends in a terminal expression, (or if it's pass by value,
                 flows off the end of the function)
 
-        returns a TypedCallTarget. 'generating_function' may call this recursively if it wants.
+        Returns:
+            A TypedCallTarget. `generating_function` may call this recursively if it wants. TODO can this be None?
+                define_non_python_function can return None. But the tests in pytest never have it doing so.
         """
+
         output_type = type_wrapper(output_type)
         input_types = [type_wrapper(x) for x in input_types]
 
@@ -602,7 +610,6 @@ class PythonToNativeConverter:
             self.hash_object_to_identity(output_type) +
             self.hash_object_to_identity(input_types)
         ).hexdigest
-
         return self.define_non_python_function(
             name,
             identity,
@@ -611,8 +618,11 @@ class PythonToNativeConverter:
             )
         )
 
-    def compile_single_class_dispatch(self, interface_class, implementing_class, slot_index):
-        """placeholder"""
+    def compile_single_class_dispatch(self, interface_class: ClassMetaclass, implementing_class: ClassMetaclass, slot_index: int):
+        """TODO what do you do?
+
+        Runs build_and_link_new_module to generate LLVM code.
+        """
         name, ret_type, arg_type_tuple, kwarg_type_tuple = _types.getClassMethodDispatchSignature(interface_class,
                                                                                                   implementing_class,
                                                                                                   slot_index)
@@ -642,7 +652,7 @@ class PythonToNativeConverter:
         _types.installClassMethodDispatch(interface_class, implementing_class, slot_index, fp.fp)
 
     def compile_class_destructor(self, cls):
-        """placeholder"""
+        """Generate a destructor for class `cls`, then hand off to the native->llvm compiler."""
         typedCallTarget = type_wrapper(cls).compileDestructor(self)
 
         assert typedCallTarget is not None
@@ -653,11 +663,11 @@ class PythonToNativeConverter:
 
         _types.installClassDestructor(cls, fp.fp)
 
-    def function_pointer_by_name(self, link_name) -> NativeFunctionPointer:
+    def function_pointer_by_name(self, link_name: str) -> Optional[NativeFunctionPointer]:
         """Find a NativeFunctionPointer for a given link-time name.
 
         Args:
-            link_name (str) - the name of the compiled symbol we want
+            link_name: the name of the compiled symbol we want
 
         Returns:
             a NativeFunctionPointer or None
@@ -670,8 +680,7 @@ class PythonToNativeConverter:
             # compiler cache has all the pointers.
             return self.compiler_cache.function_pointer_by_name(link_name)
 
-    def hash_object_to_identity(self, hashable, is_module_val=False):
-        """placeholder"""
+    def hash_object_to_identity(self, hashable, is_module_val=False) -> Hash:
         if isinstance(hashable, Hash):
             return hashable
 
@@ -700,6 +709,7 @@ class PythonToNativeConverter:
         return Hash(_types.identityHash(hashable))
 
     def is_currently_converting(self) -> bool:
+        """Return True if there are inflight function conversions."""
         return len(self._inflight_function_conversions) > 0
 
     def get_definition_count(self) -> int:
@@ -759,23 +769,42 @@ class PythonToNativeConverter:
 
                     self._targets.update(newTypedCallTargets)
                     self.llvm_compiler.markExternal(newNativeFunctionTypes)
-
                     self._all_defined_names.update(newNativeFunctionTypes)
                     self._all_cached_names.update(newNativeFunctionTypes)
 
     def _create_conversion_context(
         self,
-        identity,
-        func_name,
-        func_code,
-        func_globals,
-        func_globals_raw,
-        closure_vars,
-        input_types,
-        output_type,
-        conversion_type
+        identity: str,
+        func_name: str,
+        func_code: types.CodeType,
+        func_globals: Dict,
+        func_globals_raw: Dict,
+        closure_vars: List[str],
+        input_types,  # as before, its not always a Wrapper, sometimes its just a type.
+        output_type,  # TODO check
+        conversion_type: Optional[Type[FunctionConversionContext]]
     ):
-        """placeholder"""
+        """TODO placeholder
+
+        Usage: in convert_python_to_native.
+
+        Args:
+            identity: the function + arguments hash.
+            func_name: the name of the function
+            func_code: a Code object representing the code to compile
+            func_globals: the globals object from the relevant function
+            func_globals_raw: the original globals object (with no merging or filtering done)
+                which we use to figure out the location of global variables that are not in cells.
+            closure_vars: a list of strings giving the names of closure variables
+            input_types: a Wrapper for each free variable in the function closure, and
+                then again for each input argument.
+            output_type: the output type of the function, if known. if this is None,
+                then we use type inference to produce the tightest type we can.
+                If not None, then we will produce this type or throw an exception.
+            conversion_type: If provided, must be a subclass of FunctionConversionContext.
+
+        """
+
         ConverterType = conversion_type or FunctionConversionContext
 
         pyast = self._code_to_ast(func_code)
@@ -794,7 +823,7 @@ class PythonToNativeConverter:
         )
 
     def _resolve_all_inflight_functions(self):
-        """placeholder"""
+        """TODO placeholder"""
         while True:
             identity = self._dependencies.get_next_dirty_node()
             if not identity:
@@ -828,7 +857,6 @@ class PythonToNativeConverter:
                         self._identity_for_link_name.pop(ln)
 
                     self._dependencies.drop_node(i)
-
                 self._inflight_function_conversions.clear()
                 self._inflight_definitions.clear()
                 raise
@@ -913,8 +941,8 @@ class PythonToNativeConverter:
             native_function, actual_output_type = self._inflight_definitions.get(identifier)
 
             name = self._link_name_for_identity[identifier]
-
             self._definitions[name] = native_function
+            self._all_defined_names.add(name)
             self._new_native_functions.add(name)
 
     def _get_typed_call_target(self, name, input_types, output_type, alwaysRaises=False, functionMetadata=None) -> TypedCallTarget:
@@ -946,14 +974,17 @@ class PythonToNativeConverter:
 
         return res
 
-    def _extract_new_function_definitions(self) -> Dict:  # TODO what kind?
-        """Return a list of all new function definitions since the last conversion."""
+    def _extract_new_function_definitions(self) -> Dict[str, native_ast.Function]:
+        """Return a list of all new function definitions since the last time this function was run."""
         res = {}
 
         for u in self._new_native_functions:
             res[u] = self._definitions[u]
 
         self._new_native_functions = set()
+        for key, val in res.items():
+            assert type(val) == native_ast.Function
+            assert type(key) == str
         return res
 
     def _identity_hash_to_linker_name(self, name: str, identity_hash: str, prefix: str = "tp.") -> str:
@@ -963,8 +994,9 @@ class PythonToNativeConverter:
 
         return prefix + name + "." + identity_hash
 
-    def _code_to_ast(self, f):
-        return python_ast.convertFunctionToAlgebraicPyAst(f)
+    def _code_to_ast(self, f: Union[types.CodeType, types.FunctionType]):
+        ast_f = python_ast.convertFunctionToAlgebraicPyAst(f)
+        return ast_f
 
     def _hash_globals(self, func_globals, code, func_globals_from_cells):
         """Hash a given piece of code's accesses to funcGlobals.
