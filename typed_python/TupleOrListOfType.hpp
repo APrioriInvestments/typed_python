@@ -435,17 +435,18 @@ public:
             buffer.writeBeginCompound(fieldNumber);
         }
 
-        buffer.writeUnsignedVarintObject(0, ct);
 
         if (ct && m_element_type->isPOD() && buffer.getContext().serializePodListsInline()) {
             if (m_element_type->getTypeCategory() == TypeCategory::catInt64) {
+                buffer.writeUnsignedVarintObject(1, ct);
+
                 serializeIntList(
                     (int64_t*)this->eltPtr(self, 0),
                     ct,
                     buffer
                 );
             } else {
-                buffer.writeBeginBytes(0, m_element_type->bytecount() * ct);
+                buffer.writeBeginBytes(2, m_element_type->bytecount() * ct);
 
                 buffer.write_bytes(
                     this->eltPtr(self, 0),
@@ -453,6 +454,8 @@ public:
                 );
             }
         } else {
+            buffer.writeUnsignedVarintObject(0, ct);
+
             m_element_type->check([&](auto& concrete_type) {
                 concrete_type.serializeMulti(
                     this->eltPtr(self, 0),
@@ -496,47 +499,23 @@ public:
             }
         }
 
-        size_t ct = buffer.readUnsignedVarintObject();
+        auto fieldnumAndWireType = buffer.readFieldNumberAndWireType();
+        size_t fieldnum = fieldnumAndWireType.first;
+        size_t ct = buffer.readUnsignedVarint();
 
         if (ct == 0) {
             constructor(self);
+
+            if (fieldnum != 0) {
+                throw std::runtime_error("Corrupt field num - empty list/tuple count should be 0");
+            }
 
             if (isListOf()) {
                 (*(layout**)self)->refcount++;
                 buffer.addCachedPointer(id, *((layout**)self), this);
             }
         } else {
-            if (m_element_type->isPOD() && buffer.getContext().serializePodListsInline()) {
-                constructor(self, ct, [&](instance_ptr tgt, int k) {});
-
-                if (isListOf()) {
-                    (*(layout**)self)->refcount++;
-                    buffer.addCachedPointer(id, *((layout**)self), this);
-                }
-                if (m_element_type->getTypeCategory() == TypeCategory::catInt64) {
-                    deserializeIntList(
-                        (int64_t*)this->eltPtr(self, 0),
-                        ct,
-                        buffer
-                    );
-                } else {
-                    auto fnAndWt = buffer.readFieldNumberAndWireType();
-                    size_t bytecount = buffer.readUnsignedVarint();
-
-                    if (fnAndWt.second != WireType::BYTES) {
-                        throw std::runtime_error("Corrupt data (expected BYTES)");
-                    }
-
-                    if (bytecount != m_element_type->bytecount() * ct) {
-                        throw std::runtime_error("Corrupt data (bytecount doesn't match)");
-                    }
-
-                    buffer.read_bytes(
-                        this->eltPtr(self, 0),
-                        m_element_type->bytecount() * ct
-                    );
-                }
-            } else {
+            if (fieldnum == 0) {
                 constructor(self, ct, [&](instance_ptr tgt, int k) {
                     if (k == 0 && isListOf()) {
                         buffer.addCachedPointer(id, *((layout**)self), this);
@@ -553,6 +532,48 @@ public:
 
                     m_element_type->deserialize(tgt, buffer, fieldAndWire.second);
                 });
+            } else
+            if (fieldnum == 1) {
+                if (m_element_type->getTypeCategory() != TypeCategory::catInt64) {
+                    throw std::runtime_error(
+                        "Compressed intArray data data makes no sense for " + m_element_type->name()
+                    );
+                }
+                constructor(self, ct, [&](instance_ptr tgt, int k) {});
+
+                if (isListOf()) {
+                    (*(layout**)self)->refcount++;
+                    buffer.addCachedPointer(id, *((layout**)self), this);
+                }
+
+                deserializeIntList(
+                    (int64_t*)this->eltPtr(self, 0),
+                    ct,
+                    buffer
+                );
+            } else
+            if (fieldnum == 2) {
+                if (!m_element_type->isPOD()) {
+                    throw std::runtime_error(
+                        "Compressed POD data makes no sense for " + m_element_type->name()
+                    );
+                }
+
+                size_t eltCount = ct / m_element_type->bytecount();
+                if (eltCount * m_element_type->bytecount() != ct) {
+                    throw std::runtime_error("Invalid inline POD data - not a proper multiple");
+                }
+
+                constructor(self, eltCount, [&](instance_ptr tgt, int k) {});
+
+                if (isListOf()) {
+                    (*(layout**)self)->refcount++;
+                    buffer.addCachedPointer(id, *((layout**)self), this);
+                }
+
+                buffer.read_bytes(this->eltPtr(self, 0), ct);
+            } else {
+                throw std::runtime_error("Corrupt fieldnum for tuple/listof body");
             }
         }
 

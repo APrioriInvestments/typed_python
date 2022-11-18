@@ -401,6 +401,16 @@ class TypesSerializationTest(unittest.TestCase):
         print("nocompress is ", nocompressTime, int(size3 / 1024 / 1024))
         print("speedup is ", normalTime / threadTime)
 
+    def test_can_deserialize_pod_lists_with_any_context(self):
+        someFloats = ListOf(float)(range(1000))
+        someInts = ListOf(int)(range(1000))
+
+        s1 = SerializationContext().withSerializePodListsInline()
+        s2 = SerializationContext()
+
+        assert s2.deserialize(s1.serialize(someFloats)) == someFloats
+        assert s2.deserialize(s1.serialize(someInts)) == someInts
+
     def test_serialize_core_python_objects(self):
         self.check_idempotence(0)
         self.check_idempotence(10)
