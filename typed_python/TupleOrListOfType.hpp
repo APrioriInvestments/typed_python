@@ -297,22 +297,6 @@ public:
         int64=5,
     };
 
-    /* if (count > 2 && ptr[2] - ptr[1] == ptr[1] - ptr[0]) {
-                long sep = ptr[1] - ptr[0];
-                long topPt = 3;
-                while (topPt < count && topPt < 256 && ptr[topPt] - ptr[topPt - 1] == sep) {
-                    topPt++;
-                }
-
-                buffer.write<uint8_t>(kind::sequence);
-                buffer.write<uint8_t>(topPt);
-                buffer.write<in64_t>(ptr[0]);
-                buffer.write<in64_t>(ptr[1]);
-
-                count -= topPt;
-                ptr += topPt;
-            } else */
-
     // try to serialize a block of integers that fit into the limits of "T"
     template<class buf_t, class T>
     bool trySerializeIntListBlock(int64_t* &ptr, size_t &count, buf_t& buffer, int_block_type blockType, T* nullPtr) {
@@ -435,7 +419,6 @@ public:
             buffer.writeBeginCompound(fieldNumber);
         }
 
-
         if (ct && m_element_type->isPOD() && buffer.getContext().serializePodListsInline()) {
             if (m_element_type->getTypeCategory() == TypeCategory::catInt64) {
                 buffer.writeUnsignedVarintObject(1, ct);
@@ -456,15 +439,13 @@ public:
         } else {
             buffer.writeUnsignedVarintObject(0, ct);
 
-            m_element_type->check([&](auto& concrete_type) {
-                concrete_type.serializeMulti(
-                    this->eltPtr(self, 0),
-                    ct,
-                    m_element_type->bytecount(),
-                    buffer,
-                    0
-                );
-            });
+            m_element_type->serializeMulti(
+                this->eltPtr(self, 0),
+                ct,
+                m_element_type->bytecount(),
+                buffer,
+                0
+            );
         }
 
         buffer.writeEndCompound();

@@ -17,6 +17,7 @@
 #pragma once
 
 #include <stdexcept>
+#include "Format.hpp"
 
 //every message in our serialization format starts with a 3-bit wire type
 //plus a field-number or a count (shifted by 3 bits) encoded as a varint.
@@ -36,12 +37,12 @@ public:
 
 inline void assertWireTypesEqual(size_t found, size_t expected) {
     if (found != expected) {
-        throw std::runtime_error("Invalid wire type encountered.");
+        throw std::runtime_error("Invalid wire type encountered: " + format(found) + " != " + format(expected));
     }
 }
 
 inline void assertNonemptyCompoundWireType(size_t found) {
     if (found != WireType::BEGIN_COMPOUND && found != WireType::SINGLE) {
-        throw std::runtime_error("Invalid wire type encountered.");
+        throw std::runtime_error("Invalid wire type encountered: " + format(found) + " != 6 or 5");
     }
 }

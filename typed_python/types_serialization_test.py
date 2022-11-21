@@ -352,12 +352,15 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serialize_lists_with_compression(self):
         def check_idempotence(x):
-            s = SerializationContext().withSerializePodListsInline()
+            s1 = SerializationContext().withoutCompression()
+            s2 = SerializationContext().withoutCompression().withSerializePodListsInline()
 
-            assert x == s.deserialize(s.serialize(x))
+            assert x == s1.deserialize(s1.serialize(x))
+            assert x == s2.deserialize(s2.serialize(x))
 
             # make sure its a valid 'encoded serialized object'
-            assert decodeSerializedObject(s.serialize(x))
+            assert decodeSerializedObject(s1.serialize(x))
+            assert decodeSerializedObject(s2.serialize(x))
 
         check_idempotence(ListOf(int)([1, 2, 3]))
         check_idempotence(ListOf(int)([1, 2, 3] * 1000))

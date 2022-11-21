@@ -2266,7 +2266,8 @@ PyObject *decodeSerializedObject(PyObject* nullValue, PyObject* args) {
                 PyList_Append(result, tup);
             }
         }
-        throw std::runtime_error("Invalid wire type encountered.");
+
+        throw std::runtime_error("Invalid wire type encountered: " + format(wireType));
     };
 
     return translateExceptionToPyObject([&](){
