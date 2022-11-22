@@ -16,7 +16,9 @@ import logging
 
 from types import FunctionType
 from typed_python.compiler.runtime_lock import runtimeLock
-from typed_python._types import Forward, ListOf, TupleOf, Dict, ConstDict, Class
+from typed_python._types import (
+    Forward, ListOf, TupleOf, Dict, ConstDict, Class, identityHash
+)
 import typed_python
 
 
@@ -99,7 +101,7 @@ def makeTypeFunction(f):
         args = tuple(mapArg(a) for a in args)
         kwargs = tuple(sorted([(k, mapArg(v)) for k, v in kwargs.items()]))
 
-        key = (args, kwargs)
+        key = identityHash((args, kwargs))
 
         if key in _memoForKey:
             res = _memoForKey[key]
@@ -121,7 +123,7 @@ def makeTypeFunction(f):
             forward = Forward(nameFor(args, kwargs))
 
             _memoForKey[key] = forward
-            _type_to_typefunction[forward] = (TypeFunction_, key)
+            _type_to_typefunction[forward] = (TypeFunction_, (args, kwargs))
 
             try:
                 resultType = f(*args, **dict(kwargs))
@@ -131,7 +133,7 @@ def makeTypeFunction(f):
                 _type_to_typefunction.pop(forward)
 
                 if resultType not in _type_to_typefunction:
-                    _type_to_typefunction[resultType] = (TypeFunction_, key)
+                    _type_to_typefunction[resultType] = (TypeFunction_, (args, kwargs))
 
                 _memoForKey[key] = resultType
 
