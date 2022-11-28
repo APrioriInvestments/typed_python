@@ -93,7 +93,7 @@ def instantiateFiles(filesToWrite, tf):
             )
 
 
-def callFunctionInFreshProcess(func, argTup, compilerCacheDir=None, showStdout=False, extraEnvs={}):
+def callFunctionInFreshProcess(func, argTup=(), compilerCacheDir=None, showStdout=False, extraEnvs={}):
     """Return the value of a function evaluated on some arguments in a subprocess.
 
     We use this to test the semantics of anonymous functions and classes in a process

@@ -450,6 +450,34 @@ class TypesSerializationTest(unittest.TestCase):
         self.check_idempotence(TupleOf(int))
         self.check_idempotence(TupleOf(int)([0x08]))
 
+    def test_can_dispatch_to_instances_of_different_but_identical_classes(self):
+        @TypeFunction
+        def C(T):
+            class C(Class, Final):
+                @Entrypoint
+                def f(self, x: T) -> T:
+                    return x
+
+                @Entrypoint
+                def g(self, x: int) -> int:
+                    return x
+
+            return C
+
+        def makeRecursiveList(T):
+            L = Forward("RecursiveList(T)")
+            return L.define(ListOf(OneOf(T, L)))
+
+        L1 = makeRecursiveList(int)
+        L2 = makeRecursiveList(int)
+
+        assert identityHash(L1) == identityHash(L2)
+        assert L1 is not L2
+
+        # verify we can call both classes with the L1 type
+        C(L1)().f(L1())
+        C(L2)().f(L1())
+
     def test_serialize_python_dict(self):
         d = {1: 2, 3: '4', '5': 6, 7.0: b'8'}
         self.check_idempotence(d)

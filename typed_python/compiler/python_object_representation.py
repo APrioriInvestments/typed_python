@@ -79,7 +79,7 @@ from typed_python import (
     ListOf, isCompiled,
     typeKnownToCompiler,
     localVariableTypesKnownToCompiler,
-    pointerTo, refTo
+    pointerTo, refTo, identityHash
 )
 
 # the type of bound C methods on types.
@@ -92,10 +92,12 @@ def typedPythonTypeToTypeWrapper(t):
     if isinstance(t, Wrapper):
         return t
 
-    if t not in _type_to_type_wrapper_cache:
-        _type_to_type_wrapper_cache[t] = _typedPythonTypeToTypeWrapper(t)
+    ident = identityHash(t)
 
-    return _type_to_type_wrapper_cache[t]
+    if ident not in _type_to_type_wrapper_cache:
+        _type_to_type_wrapper_cache[ident] = _typedPythonTypeToTypeWrapper(t)
+
+    return _type_to_type_wrapper_cache[ident]
 
 
 _concreteWrappers = {

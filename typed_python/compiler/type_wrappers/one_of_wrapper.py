@@ -45,10 +45,13 @@ class OneOfWrapper(Wrapper):
             name='OneOfLayout'
         )
 
-        self._is_pod = all(typeWrapper(possibility).is_pod for possibility in t.Types)
+        self._is_pod = None
 
     @property
     def is_pod(self):
+        if self._is_pod is None:
+            self._is_pod = all(typeWrapper(possibility).is_pod for possibility in self.typeRepresentation.Types)
+
         return self._is_pod
 
     def getNativeLayoutType(self):
