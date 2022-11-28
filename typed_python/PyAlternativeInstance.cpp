@@ -90,7 +90,7 @@ void PyConcreteAlternativeInstance::constructFromPythonArgumentsConcrete(Concret
             PyObjectHolder arg(PyTuple_GetItem(args, 0));
             Type* argType = extractTypeFrom(arg->ob_type);
 
-            if (argType && alt == argType) {
+            if (argType && Type::typesEquivalent(alt, argType)) {
                 //it's already the right kind of instance, so we can copy-through the underlying element
                 alt->elementType()->copy_constructor(p, alt->eltPtr(((PyInstance*)(PyObject*)arg)->dataPtr()));
                 return;

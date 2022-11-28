@@ -92,7 +92,7 @@ public:
     void coerceToType(py_obj_ptr& ptr, Type* target, ConversionLevel level) {
         try {
             Type* actualType = PyInstance::extractTypeFrom(ptr->ob_type);
-            if (actualType == target) {
+            if (Type::typesEquivalent(actualType, target)) {
                 // nothing to do!
                 return;
             }
@@ -379,7 +379,7 @@ public:
         if (mArgs[argIx].getIsNormalArg()) {
             try {
                 Type* actualType = PyInstance::extractTypeFrom(mSingleValueArgs[argIx]->ob_type);
-                if (actualType == argType) {
+                if (Type::typesEquivalent(actualType, argType)) {
                     // nothing to do!
                     PyInstance* argAsPyInstance = ((PyInstance*)mSingleValueArgs[argIx]);
 

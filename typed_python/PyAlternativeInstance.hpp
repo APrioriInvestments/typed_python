@@ -34,7 +34,10 @@ public:
         Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
         if (argType && argType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative &&
-                ((ConcreteAlternative*)argType)->getAlternative() == type) {
+                Type::typesEquivalent(
+                    ((ConcreteAlternative*)argType)->getAlternative(),
+                    type
+                )) {
             return true;
         }
 
@@ -84,7 +87,10 @@ public:
     static bool compare_to_python_concrete(ConcreteAlternative* altT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level) {
-        return extractTypeFrom(pyRepresentation->ob_type) == type;
+        return Type::typesEquivalent(
+            extractTypeFrom(pyRepresentation->ob_type),
+            type
+        );
     }
 
     static void mirrorTypeInformationIntoPyTypeConcrete(ConcreteAlternative* alt, PyTypeObject* pyType);
