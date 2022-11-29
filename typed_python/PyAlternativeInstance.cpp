@@ -120,8 +120,13 @@ void PyConcreteAlternativeInstance::constructFromPythonArgumentsConcrete(Concret
 void PyAlternativeInstance::copyConstructFromPythonInstanceConcrete(Alternative* altType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
     std::pair<Type*, instance_ptr> typeAndPtr = extractTypeAndPtrFrom(pyRepresentation);
 
-    if (typeAndPtr.first && typeAndPtr.first->getTypeCategory() == Type::TypeCategory::catConcreteAlternative &&
-            ((ConcreteAlternative*)typeAndPtr.first)->getAlternative() == altType) {
+    if (typeAndPtr.first
+        && typeAndPtr.first->getTypeCategory() == Type::TypeCategory::catConcreteAlternative
+        && Type::typesEquivalent(
+            ((ConcreteAlternative*)typeAndPtr.first)->getAlternative(),
+            altType
+        )
+    ) {
         altType->copy_constructor(tgt, typeAndPtr.second);
         return;
     }
@@ -514,8 +519,10 @@ bool PyConcreteAlternativeInstance::compare_to_python_concrete(ConcreteAlternati
 
     Type* otherT = extractTypeFrom(other->ob_type);
     if (otherT && otherT->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
-        if (((ConcreteAlternative *)otherT)->getAlternative() == altT->getAlternative())
-        {
+        if (Type::typesEquivalent(
+            ((ConcreteAlternative *)otherT)->getAlternative(),
+            altT->getAlternative()
+        )) {
             PyConcreteAlternativeInstance* altInstance = (PyConcreteAlternativeInstance*)other;
             return altT->cmp(self, altInstance->dataPtr(), pyComparisonOp, false);
         }

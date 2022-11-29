@@ -14,7 +14,7 @@
 
 from typed_python import (
     TypeFunction, Int16, UInt64, Float32, Alternative, Forward,
-    Dict, ConstDict, ListOf, Compiled, OneOf
+    Dict, ConstDict, ListOf, Compiled, OneOf, identityHash
 )
 import typed_python._types as _types
 from typed_python import Entrypoint
@@ -36,6 +36,14 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         assert setIt(Dict(int, Simple)(), 10).matches.A
         assert setIt(Dict(int, Complex)(), 10).matches.A
+
+    def test_similar_alternatives_comparable(self):
+        Simple1 = Alternative("Simple", A={}, B={}, C={})
+        Simple2 = Alternative("Simple", A={}, B={}, C={})
+
+        assert identityHash(Simple1) == identityHash(Simple2)
+
+        assert Simple1.A() == Simple2.A()
 
     def test_simple_alternative_passing(self):
         Simple = Alternative("Simple", A={}, B={}, C={})
