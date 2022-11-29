@@ -19,23 +19,17 @@ from typed_python.hash import Hash
 from types import ModuleType
 import typed_python.python_ast as python_ast
 import typed_python._types as _types
-import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.native_function_pointer import NativeFunctionPointer
 from sortedcontainers import SortedSet
+from typed_python.compiler.compiler_input import CompilerInput
 from typed_python.compiler.directed_graph import DirectedGraph
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
 from typed_python.compiler.function_conversion_context import FunctionConversionContext, FunctionOutput, FunctionYield
 from typed_python.compiler.native_function_conversion_context import NativeFunctionConversionContext
-from typed_python.compiler.type_wrappers.python_typed_function_wrapper import (
-    PythonTypedFunctionWrapper, CannotBeDetermined, NoReturnTypeSpecified
-)
 from typed_python.compiler.typed_call_target import TypedCallTarget
-
-typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
-
 
 VALIDATE_FUNCTION_DEFINITIONS_STABLE = False
 
@@ -343,8 +337,8 @@ class PythonToNativeConverter:
 
         returns a TypedCallTarget. 'generatingFunction' may call this recursively if it wants.
         """
-        output_type = typeWrapper(output_type)
-        input_types = [typeWrapper(x) for x in input_types]
+        output_type = typedPythonTypeToTypeWrapper(output_type)
+        input_types = [typedPythonTypeToTypeWrapper(x) for x in input_types]
 
         identity = (
             Hash.from_integer(2) +
@@ -419,7 +413,7 @@ class PythonToNativeConverter:
             "demasquerade_" + callTarget.name,
             ("demasquerade", callTarget.name),
             callTarget.input_types,
-            typeWrapper(callTarget.output_type.interpreterTypeRepresentation),
+            typedPythonTypeToTypeWrapper(callTarget.output_type.interpreterTypeRepresentation),
             generator
         )
 
@@ -593,7 +587,7 @@ class PythonToNativeConverter:
         _types.installClassMethodDispatch(interfaceClass, implementingClass, slotIndex, fp.fp)
 
     def compileClassDestructor(self, cls):
-        typedCallTarget = typeWrapper(cls).compileDestructor(self)
+        typedCallTarget = typedPythonTypeToTypeWrapper(cls).compileDestructor(self)
 
         assert typedCallTarget is not None
 
@@ -620,43 +614,21 @@ class PythonToNativeConverter:
             # compiler cache has all the pointers.
             return self.compilerCache.function_pointer_by_name(linkerName)
 
-    def convertTypedFunctionCall(self, functionType, overloadIx, inputWrappers, assertIsRoot=False):
-        overload = functionType.overloads[overloadIx]
+    def convertTypedFunctionCall(self, compiler_input: CompilerInput, assertIsRoot=False):
+        """Expand the input wrappers using the closure types, find the return type, and convert."""
+        compiler_input.expand_input_wrappers()
 
-        realizedInputWrappers = []
-
-        closureType = functionType.ClosureType
-
-        for closureVarName, closureVarPath in overload.closureVarLookups.items():
-            realizedInputWrappers.append(
-                typeWrapper(
-                    PythonTypedFunctionWrapper.closurePathToCellType(closureVarPath, closureType)
-                )
-            )
-
-        realizedInputWrappers.extend(inputWrappers)
-
-        returnType = PythonTypedFunctionWrapper.computeFunctionOverloadReturnType(
-            overload,
-            inputWrappers,
-            {}
-        )
-
-        if returnType is CannotBeDetermined:
-            returnType = object
-
-        if returnType is NoReturnTypeSpecified:
-            returnType = None
+        compiler_input.compute_return_type()
 
         return self.convert(
-            overload.name,
-            overload.functionCode,
-            overload.realizedGlobals,
-            overload.functionGlobals,
-            overload.funcGlobalsInCells,
-            list(overload.closureVarLookups),
-            realizedInputWrappers,
-            returnType,
+            compiler_input.name,
+            compiler_input.functionCode,
+            compiler_input.realizedGlobals,
+            compiler_input.functionGlobals,
+            compiler_input.funcGlobalsInCells,
+            list(compiler_input.closureVarLookups),
+            compiler_input.realized_input_wrappers,
+            compiler_input.return_type,
             assertIsRoot=assertIsRoot
         )
 

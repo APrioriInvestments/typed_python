@@ -1,8 +1,8 @@
 import typed_python
+
+from typed_python.compiler.compiler_input import CompilerInput
 from typed_python.compiler.type_wrappers.type_sets import SubclassOf, Either
-
-
-typeWrapper = lambda t: typed_python.compiler.python_to_native_converter.typedPythonTypeToTypeWrapper(t)
+from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
 
 
 class TypeOf:
@@ -47,8 +47,8 @@ class TypeOf:
     def resultTypeForCall(self, argTypes, kwargTypes):
         funcObj = typed_python._types.prepareArgumentToBePassedToCompiler(self.F)
 
-        argTypes = [typeWrapper(a) for a in argTypes]
-        kwargTypes = {k: typeWrapper(v) for k, v in kwargTypes.items()}
+        argTypes = [typedPythonTypeToTypeWrapper(a) for a in argTypes]
+        kwargTypes = {k: typedPythonTypeToTypeWrapper(v) for k, v in kwargTypes.items()}
 
         overload = funcObj.overloads[0]
 
@@ -61,10 +61,10 @@ class TypeOf:
 
         converter = typed_python.compiler.runtime.Runtime.singleton().converter
 
+        compiler_input = CompilerInput(funcObj, overload_index=0, input_wrappers=argumentSignature)
+
         callTarget = converter.convertTypedFunctionCall(
-            type(funcObj),
-            0,
-            argumentSignature,
+            compiler_input,
             assertIsRoot=False
         )
 

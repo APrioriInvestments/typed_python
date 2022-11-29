@@ -22,6 +22,7 @@ import typed_python
 from typed_python.compiler.runtime_lock import runtimeLock
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.compiler_cache import CompilerCache
+from typed_python.compiler.compiler_input import CompilerInput
 from typed_python.type_function import TypeFunction
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
@@ -261,9 +262,11 @@ class Runtime:
             None if it is not possible to match this overload with these arguments or
             a TypedCallTarget.
         """
-        overload = functionType.overloads[overloadIx]
 
-        assert len(arguments) == len(overload.args)
+        # generate the parcel of code corresponding to an input to the compiler
+        compiler_input = CompilerInput(functionType, overloadIx)
+
+        assert len(arguments) == len(compiler_input.args)
 
         try:
             t0 = time.time()
@@ -276,19 +279,20 @@ class Runtime:
 
                 for i in range(len(arguments)):
                     inputWrappers.append(
-                        self.pickSpecializationTypeFor(overload.args[i], arguments[i], argumentsAreTypes)
+                        self.pickSpecializationTypeFor(compiler_input.args[i], arguments[i], argumentsAreTypes)
                     )
 
                 if any(x is None for x in inputWrappers):
                     # this signature is unmatchable with these arguments.
                     return None
 
+                # generate the input packet.
+                compiler_input.input_wrappers = inputWrappers
+
                 self.timesCompiled += 1
 
                 callTarget = self.converter.convertTypedFunctionCall(
-                    functionType,
-                    overloadIx,
-                    inputWrappers,
+                    compiler_input,
                     assertIsRoot=True
                 )
 
@@ -304,7 +308,7 @@ class Runtime:
 
                 fp = self.converter.functionPointerByName(wrappingCallTargetName)
 
-                overload._installNativePointer(
+                compiler_input.install_native_pointer(
                     fp.fp,
                     callTarget.output_type.typeRepresentation if callTarget.output_type is not None else type(None),
                     [i.typeRepresentation for i in callTarget.input_types]
