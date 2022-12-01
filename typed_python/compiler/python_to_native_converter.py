@@ -615,7 +615,6 @@ class PythonToNativeConverter:
             return self.compilerCache.function_pointer_by_name(linkerName)
 
     def convertTypedFunctionCall(self, compiler_input: CompilerInput, assertIsRoot=False):
-        """Expand the input wrappers using the closure types, find the return type, and convert."""
         return self.convert(
             compiler_input.name,
             compiler_input.functionCode,

@@ -1,6 +1,8 @@
 import types
 
 import typed_python
+
+from typing import List
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import (
     PythonTypedFunctionWrapper,
@@ -15,6 +17,7 @@ from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrappe
 )
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python import Function, Value
+from typed_python.internals import FunctionOverloadArg
 from typed_python.type_function import TypeFunction
 
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
@@ -82,7 +85,7 @@ class CompilerInput:
     def closureVarLookups(self):
         return self._overload.closureVarLookups
 
-    def _compute_realized_input_wrappers(self) -> None:
+    def _compute_realized_input_wrappers(self) -> List:
         """
         Extend the list of wrappers (representing the input args) using the free variables in
         the function closure.
@@ -97,7 +100,7 @@ class CompilerInput:
         res.extend(self._input_wrappers)
         return res
 
-    def _compute_return_type(self) -> None:
+    def _compute_return_type(self):
         """Determine the return type, if possible."""
         res = PythonTypedFunctionWrapper.computeFunctionOverloadReturnType(
             self._overload, self._input_wrappers, {}
@@ -116,10 +119,11 @@ class CompilerInput:
 
     @staticmethod
     def make(functionType, overloadIx, arguments, argumentsAreTypes):
+        """Generate a CompilerInput packet for a given overload + input argument."""
         overload = functionType.overloads[overloadIx]
 
         if len(arguments) != len(overload.args):
-            raise Exception(
+            raise ValueError(
                 "CompilerInput mismatch: overload has %s args, but we were given "
                 "%s arguments" % (len(overload.args), len(arguments))
             )
@@ -127,7 +131,7 @@ class CompilerInput:
         inputWrappers = []
 
         for i in range(len(arguments)):
-            specialization = pickSpecializationTypeFor(
+            specialization = pick_specialization_type_for(
                 overload.args[i], arguments[i], argumentsAreTypes
             )
 
@@ -139,15 +143,15 @@ class CompilerInput:
         return CompilerInput(overload, functionType.ClosureType, inputWrappers)
 
 
-def pickSpecializationTypeFor(overloadArg, argValue, argumentsAreTypes):
+def pick_specialization_type_for(overloadArg: FunctionOverloadArg, argValue, argumentsAreTypes):
     """Compute the typeWrapper we'll use for this particular argument based on 'argValue'.
 
     Args:
-        overloadArg - the internals.FunctionOverloadArg instance representing this argument.
+        overloadArg: the internals.FunctionOverloadArg instance representing this argument.
             This tells us whether we're dealing with a normal positional/keyword argument or
             a *arg / **kwarg, where the typeFilter applies to the items of the tuple but
             not the tuple itself.
-        argValue - the value being passed for this argument. If 'argumentsAreTypes' is true,
+        argValue: the value being passed for this argument. If 'argumentsAreTypes' is true,
             then this is the actual type, not the value.
 
     Returns:

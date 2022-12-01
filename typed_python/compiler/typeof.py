@@ -61,7 +61,11 @@ class TypeOf:
 
         converter = typed_python.compiler.runtime.Runtime.singleton().converter
 
-        compiler_input = CompilerInput(funcObj, overload_index=0, input_wrappers=argumentSignature)
+        compiler_input = CompilerInput.make(funcObj,
+                                            overloadIx=0,
+                                            arguments=argumentSignature,
+                                            argumentsAreTypes=True
+                                            )
 
         callTarget = converter.convertTypedFunctionCall(
             compiler_input,
