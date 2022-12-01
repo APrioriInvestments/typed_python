@@ -616,10 +616,6 @@ class PythonToNativeConverter:
 
     def convertTypedFunctionCall(self, compiler_input: CompilerInput, assertIsRoot=False):
         """Expand the input wrappers using the closure types, find the return type, and convert."""
-        compiler_input.expand_input_wrappers()
-
-        compiler_input.compute_return_type()
-
         return self.convert(
             compiler_input.name,
             compiler_input.functionCode,
