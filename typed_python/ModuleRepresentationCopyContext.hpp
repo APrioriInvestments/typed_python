@@ -30,16 +30,38 @@ public:
         std::unordered_map<PyObjectHandle, PyObjectHandle>& inObjectMemo,
         const std::unordered_set<PyObjectHandle>& inInternalObjects,
         PyObject* inSourceModule,
-        PyObject* inDestModule
+        PyObject* inDestModule,
+        std::map<PyObjectHandle, size_t>& inSourceInternalObjectIdentities,
+        std::map<PyObjectHandle, size_t>& inDestInternalObjectIdentities,
+        std::map<size_t, PyObjectHandle>& inDestIdentityToInternalObject
     ) : mObjectMemo(inObjectMemo),
         mInternalObjects(inInternalObjects),
         mSourceModule(inSourceModule),
-        mDestModule(inDestModule)
+        mDestModule(inDestModule),
+        mSourceInternalObjectIdentities(inSourceInternalObjectIdentities),
+        mDestInternalObjectIdentities(inDestInternalObjectIdentities),
+        mDestIdentityToInternalObject(inDestIdentityToInternalObject)
     {
     }
 
     void setMemo(PyObjectHandle key, Type* valueType) {
-        mObjectMemo[key] = PyObjectHandle(valueType);
+        setMemo(key, PyObjectHandle(valueType));
+    }
+
+    void setMemo(PyObjectHandle key, PyObject* obj) {
+        return setMemo(key, PyObjectHandle(obj));
+    }
+
+    void setMemo(PyObjectHandle key, PyObjectHandle obj) {
+        auto sourceOidIt = mSourceInternalObjectIdentities.find(key);
+        if (sourceOidIt != mSourceInternalObjectIdentities.end()) {
+            // this object has a source ID, and we need to make sure in our dest that
+            // its properly represented
+            mDestInternalObjectIdentities[obj] = sourceOidIt->second;
+            mDestIdentityToInternalObject[sourceOidIt->second] = obj;
+        }
+
+        mObjectMemo[key] = obj;
     }
 
     Type* copyType(Type* t) {
@@ -153,6 +175,24 @@ public:
         // don't duplicate anything that's not internal to our graph
         if (mInternalObjects.find(obj) == mInternalObjects.end()) {
             return obj;
+        }
+
+        // check if this object has an identity because it was defined in
+        // a prior module. If so, we want to make sure that we only end up with
+        // one copy of this object - we could be copying in from multiple modules
+        // and they could each have their own copy of this object.
+        auto sourceObjIdIt = mSourceInternalObjectIdentities.find(obj);
+        if (sourceObjIdIt != mSourceInternalObjectIdentities.end()) {
+            size_t objectIdentity = sourceObjIdIt->second;
+
+            auto it = mDestIdentityToInternalObject.find(objectIdentity);
+
+            if (it != mDestIdentityToInternalObject.end()) {
+                // this unique object id was already copied into our dest module
+                // and we only want that object - lets not deepcopy it
+                mObjectMemo[obj] = it->second;
+                return mObjectMemo[obj];
+            }
         }
 
         if (obj.typeObj()) {
@@ -323,7 +363,7 @@ public:
             if (PyDict_Check(o)) {
                 PyObject* res = PyDict_New();
 
-                mObjectMemo[obj] = res;
+                setMemo(obj, res);
 
                 PyObject *key, *value;
                 Py_ssize_t pos = 0;
@@ -345,7 +385,7 @@ public:
 
                 PyObject* res = PyTuple_New(PyTuple_Size(o));
 
-                mObjectMemo[obj] = res;
+                setMemo(obj, res);
 
                 for (long k = 0; k < PyTuple_Size(o); k++) {
                     //PyTuple_SET_ITEM steals a reference
@@ -355,7 +395,7 @@ public:
                 return PyObjectHandle::steal(res);
             } else if (PyList_Check(o)) {
                 PyObject* res = PyList_New(PyList_Size(o));
-                mObjectMemo[obj] = res;
+                setMemo(obj, res);
 
                 for (long k = 0; k < PyList_Size(o); k++) {
                     // steals a reference to 'val', so we have to incref
@@ -365,7 +405,7 @@ public:
                 return PyObjectHandle::steal(res);
             } else if (PySet_Check(o)) {
                 PyObject* res = PySet_New(nullptr);
-                mObjectMemo[obj] = res;
+                setMemo(obj, res);
 
                 iterate(o, [&](PyObject* o2) {
                     PySet_Add(res, copy(o2).pyobj());
@@ -389,7 +429,7 @@ public:
                 decref(dest->prop_name);
                 #endif
 
-                mObjectMemo[obj] = res;
+                setMemo(obj, res);
 
                 if (source->prop_get) {
                     dest->prop_get = incref(copy(source->prop_get).pyobj());
@@ -437,7 +477,7 @@ public:
                 decref(dest->cm_callable);
                 decref(dest->cm_dict);
 
-                mObjectMemo[obj] = res;
+                setMemo(obj, res);
 
                 if (source->cm_callable) {
                     dest->cm_callable = incref(copy(source->cm_callable).pyobj());
@@ -458,7 +498,7 @@ public:
                     copy(PyFunction_GetGlobals(o)).pyobj()
                 );
 
-                mObjectMemo[obj] = res;
+                setMemo(obj, res);
 
                 if (PyFunction_GetClosure(o)) {
                     PyFunction_SetClosure(res, copy(PyFunction_GetClosure(o)).pyobj());
@@ -496,7 +536,7 @@ public:
                 return PyObjectHandle::steal(res);
             } else if (PyCell_Check(o)) {
                 PyObject* res = PyCell_New(nullptr);
-                mObjectMemo[obj] = res;
+                setMemo(obj, res);
 
                 if (PyCell_GET(o)) {
                     PyCell_Set(res, copy(PyCell_GET(o)).pyobj());
@@ -528,7 +568,7 @@ public:
 
                     PyObject* res = PyObject_CallObject((PyObject*)&PyType_Type, (PyObject*)tpNewArgs);
 
-                    mObjectMemo[obj] = res;
+                    setMemo(obj, res);
 
                     if (!res) {
                         throw PythonExceptionSet();
@@ -581,7 +621,7 @@ public:
                     );
                 }
 
-                mObjectMemo[obj] = res;
+                setMemo(obj, res);
 
                 PyObjectHandle otherDict = copy((PyObject*)dict);
 
@@ -603,4 +643,7 @@ private:
     const std::unordered_set<PyObjectHandle>& mInternalObjects;
     PyObject* mSourceModule;
     PyObject* mDestModule;
+    std::map<PyObjectHandle, size_t>& mSourceInternalObjectIdentities;
+    std::map<PyObjectHandle, size_t>& mDestInternalObjectIdentities;
+    std::map<size_t, PyObjectHandle>& mDestIdentityToInternalObject;
 };

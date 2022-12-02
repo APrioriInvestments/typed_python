@@ -497,6 +497,24 @@ class TestModuleRepresentation(unittest.TestCase):
 
             assert issubclass(Child, Base)
 
+    def test_defining_subclass_referenced_in_base_class(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(mr, "class Base:\n\tdef f(self):\n\t\tpass", td)
+
+            mr2 = ModuleRepresentation("module")
+            mr.copyInto(mr2, ['Base'])
+
+            evaluateInto(mr2, "class Child(Base):\n\tpass", td)
+
+            mr3 = ModuleRepresentation("module")
+
+            mr2.copyInto(mr3, ['Child'])
+            mr.copyInto(mr3, ['Base'])
+
+            assert issubclass(mr3.getDict()['Child'], mr3.getDict()['Base'])
+
     def test_copying_classes_with_methods_is_transitive(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")

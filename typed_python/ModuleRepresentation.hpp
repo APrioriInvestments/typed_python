@@ -194,6 +194,15 @@ public:
             } else {
                 mInternalObjects[key].insert(o);
 
+                // mark this as a new unique internally visible object. we've never seen
+                // it before and we want to make sure that if we see it through
+                if (mInternalObjectIdentities.find(o) == mInternalObjectIdentities.end()) {
+                    mInternalObjectIdentities[o] = allocateIdentity();
+                    mIdentityToInternalObject[
+                        mInternalObjectIdentities[o]
+                    ] = o;
+                }
+
                 if (o.pyobj() && PyFunction_Check(o.pyobj())) {
                     std::set<std::string> names;
 
@@ -433,7 +442,10 @@ public:
                     objectMemo,
                     mInternalObjects[name],
                     mModuleObject,
-                    other.mModuleObject
+                    other.mModuleObject,
+                    mInternalObjectIdentities,
+                    other.mInternalObjectIdentities,
+                    other.mIdentityToInternalObject
                 );
 
                 PyDict_SetItemString(
@@ -454,10 +466,21 @@ public:
             std::unordered_map<PyObjectHandle, PyObjectHandle>& objectMemo,
             const std::unordered_set<PyObjectHandle>& internalObjects,
             PyObject* sourceModule,
-            PyObject* destModule
+            PyObject* destModule,
+            std::map<PyObjectHandle, size_t>& sourceInternalObjectIdentities,
+            std::map<PyObjectHandle, size_t>& destInternalObjectIdentities,
+            std::map<size_t, PyObjectHandle>& destIdentityToInternalObject
         )
     {
-        ModuleRepresentationCopyContext ctx(objectMemo, internalObjects, sourceModule, destModule);
+        ModuleRepresentationCopyContext ctx(
+            objectMemo,
+            internalObjects,
+            sourceModule,
+            destModule,
+            sourceInternalObjectIdentities,
+            destInternalObjectIdentities,
+            destIdentityToInternalObject
+        );
 
         return ctx.copy(obj);
     }
@@ -528,6 +551,16 @@ public:
         return it->second;
     }
 
+    static size_t allocateIdentity() {
+        // implicitly locked by the GIL so we don't need to worry that multiple threads
+        // are incrementing the counter at the same time.
+        static size_t counter = 0;
+
+        counter++;
+
+        return counter;
+    }
+
     PyObjectHolder mModuleObject;
 
     // for each module member, which other members are visible via a class or function
@@ -541,6 +574,9 @@ public:
 
     // for each module member, the objects that are reachable from it back to the module
     std::map<std::string, std::unordered_set<PyObjectHandle> > mInternalObjects;
+
+    std::map<PyObjectHandle, size_t> mInternalObjectIdentities;
+    std::map<size_t, PyObjectHandle> mIdentityToInternalObject;
 
     // for each thing that's considered external, how many things can reach it?
     std::unordered_map<PyObjectHandle, long> mExternalCount;
