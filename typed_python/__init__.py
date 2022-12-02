@@ -42,7 +42,6 @@ from typed_python.type_function import TypeFunction
 from typed_python.hash import sha_hash
 from typed_python.SerializationContext import SerializationContext
 from typed_python.type_filter import TypeFilter
-from typed_python.compiler.typeof import TypeOf
 from typed_python._types import (
     Forward, TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict, SubclassOf,
     Alternative, Value, serialize, deserialize, serializeStream, deserializeStream,
@@ -78,6 +77,7 @@ from typed_python.generator import Generator  # noqa
 from typed_python.lib.map import map  # noqa
 from typed_python.lib.pmap import pmap  # noqa
 from typed_python.lib.reduce import reduce  # noqa
+from typed_python.compiler.typeof import TypeOf  # noqa
 
 _types.initializeGlobalStatics()
 

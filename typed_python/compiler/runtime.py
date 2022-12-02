@@ -15,24 +15,18 @@
 import threading
 import os
 import time
-import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
 import typed_python.compiler.llvm_compiler as llvm_compiler
 import typed_python
 from typed_python.compiler.runtime_lock import runtimeLock
-from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.compiler_cache import CompilerCache
-from typed_python.type_function import TypeFunction
-from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
-from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
+from typed_python.compiler.compiler_input import CompilerInput, typeWrapper
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper, NoReturnTypeSpecified
 from typed_python import Function, _types, Value
 from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
 
 _singleton = [None]
 _singletonLock = threading.RLock()
-
-typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
 
 _resultTypeCache = {}
 
@@ -192,60 +186,6 @@ class Runtime:
     def removeEventVisitor(self, visitor: RuntimeEventVisitor):
         self.converter.removeVisitor(visitor)
 
-    @staticmethod
-    def passingTypeForValue(arg):
-        if isinstance(arg, types.FunctionType):
-            return type(Function(arg))
-
-        elif isinstance(arg, type) and issubclass(arg, TypeFunction) and len(arg.MRO) == 2:
-            return Value(arg)
-
-        elif isinstance(arg, type):
-            return Value(arg)
-
-        return type(arg)
-
-    @staticmethod
-    def pickSpecializationTypeFor(overloadArg, argValue, argumentsAreTypes=False):
-        """Compute the typeWrapper we'll use for this particular argument based on 'argValue'.
-
-        Args:
-            overloadArg - the internals.FunctionOverloadArg instance representing this argument.
-                This tells us whether we're dealing with a normal positional/keyword argument or
-                a *arg / **kwarg, where the typeFilter applies to the items of the tuple but
-                not the tuple itself.
-            argValue - the value being passed for this argument. If 'argumentsAreTypes' is true,
-                then this is the actual type, not the value.
-
-        Returns:
-            the Wrapper or type instance to use for this argument.
-        """
-        if not argumentsAreTypes:
-            if overloadArg.isStarArg:
-                argType = TypedTupleMasqueradingAsTuple(
-                    typed_python.Tuple(*[Runtime.passingTypeForValue(v) for v in argValue])
-                )
-            elif overloadArg.isKwarg:
-                argType = NamedTupleMasqueradingAsDict(
-                    typed_python.NamedTuple(
-                        **{k: Runtime.passingTypeForValue(v) for k, v in argValue.items()}
-                    )
-                )
-            else:
-                argType = typeWrapper(Runtime.passingTypeForValue(argValue))
-        else:
-            argType = typeWrapper(argValue)
-
-        resType = PythonTypedFunctionWrapper.pickSpecializationTypeFor(overloadArg, argType)
-
-        if argType.can_convert_to_type(resType, ConversionLevel.Implicit) is False:
-            return None
-
-        if (overloadArg.isStarArg or overloadArg.isKwarg) and resType != argType:
-            return None
-
-        return resType
-
     def compileFunctionOverload(self, functionType, overloadIx, arguments, argumentsAreTypes=False):
         """Attempt to compile typedFunc.overloads[overloadIx]' with the given arguments.
 
@@ -261,9 +201,6 @@ class Runtime:
             None if it is not possible to match this overload with these arguments or
             a TypedCallTarget.
         """
-        overload = functionType.overloads[overloadIx]
-
-        assert len(arguments) == len(overload.args)
 
         try:
             t0 = time.time()
@@ -272,23 +209,18 @@ class Runtime:
             defCount = self.converter.getDefinitionCount()
 
             with self.lock:
-                inputWrappers = []
+                # generate the parcel of code corresponding to an input to the compiler
+                compiler_input = CompilerInput.make(
+                    functionType, overloadIx, arguments, argumentsAreTypes
+                )
 
-                for i in range(len(arguments)):
-                    inputWrappers.append(
-                        self.pickSpecializationTypeFor(overload.args[i], arguments[i], argumentsAreTypes)
-                    )
-
-                if any(x is None for x in inputWrappers):
-                    # this signature is unmatchable with these arguments.
+                if compiler_input is None:
                     return None
 
                 self.timesCompiled += 1
 
                 callTarget = self.converter.convertTypedFunctionCall(
-                    functionType,
-                    overloadIx,
-                    inputWrappers,
+                    compiler_input,
                     assertIsRoot=True
                 )
 
@@ -304,7 +236,7 @@ class Runtime:
 
                 fp = self.converter.functionPointerByName(wrappingCallTargetName)
 
-                overload._installNativePointer(
+                compiler_input.install_native_pointer(
                     fp.fp,
                     callTarget.output_type.typeRepresentation if callTarget.output_type is not None else type(None),
                     [i.typeRepresentation for i in callTarget.input_types]
