@@ -24,23 +24,50 @@
 #include <unordered_map>
 
 
+class OidMap {
+public:
+    bool has(PyObjectHandle o) const {
+        return mObjToId.find(o) != mObjToId.end();
+    }
+
+    bool has(size_t s) const {
+        return mIdToObj.find(s) != mIdToObj.end();
+    }
+
+    size_t get(PyObjectHandle o) const {
+        auto it = mObjToId.find(o);
+        if (it == mObjToId.end()) {
+            return 0;
+        }
+        return it->second;
+    }
+
+    PyObjectHandle get(size_t s) const {
+        auto it = mIdToObj.find(s);
+        if (it == mIdToObj.end()) {
+            return PyObjectHandle();
+        }
+        return it->second;
+    }
+
+    void add(PyObjectHandle o, size_t oid) {
+        mObjToId[o] = oid;
+        mIdToObj[oid] = o;
+    }
+
+private:
+    std::unordered_map<PyObjectHandle, size_t> mObjToId;
+    std::unordered_map<size_t, PyObjectHandle> mIdToObj;
+};
+
+
 class ModuleRepresentationCopyContext {
 public:
     ModuleRepresentationCopyContext(
-        std::unordered_map<PyObjectHandle, PyObjectHandle>& inObjectMemo,
-        const std::unordered_set<PyObjectHandle>& inInternalObjects,
-        PyObject* inSourceModule,
-        PyObject* inDestModule,
-        std::map<PyObjectHandle, size_t>& inSourceInternalObjectIdentities,
-        std::map<PyObjectHandle, size_t>& inDestInternalObjectIdentities,
-        std::map<size_t, PyObjectHandle>& inDestIdentityToInternalObject
-    ) : mObjectMemo(inObjectMemo),
-        mInternalObjects(inInternalObjects),
-        mSourceModule(inSourceModule),
-        mDestModule(inDestModule),
-        mSourceInternalObjectIdentities(inSourceInternalObjectIdentities),
-        mDestInternalObjectIdentities(inDestInternalObjectIdentities),
-        mDestIdentityToInternalObject(inDestIdentityToInternalObject)
+        const OidMap& inSourceOidMap,
+        OidMap& inDestOidMap
+    ) : mSourceOidMap(inSourceOidMap),
+        mDestOidMap(inDestOidMap)
     {
     }
 
@@ -53,15 +80,13 @@ public:
     }
 
     void setMemo(PyObjectHandle key, PyObjectHandle obj) {
-        auto sourceOidIt = mSourceInternalObjectIdentities.find(key);
-        if (sourceOidIt != mSourceInternalObjectIdentities.end()) {
-            // this object has a source ID, and we need to make sure in our dest that
-            // its properly represented
-            mDestInternalObjectIdentities[obj] = sourceOidIt->second;
-            mDestIdentityToInternalObject[sourceOidIt->second] = obj;
+        if (!mSourceOidMap.has(key)) {
+            throw std::runtime_error(
+                "mSourceOidMap doesn't have " + key.shortRepr()
+            );
         }
 
-        mObjectMemo[key] = obj;
+        mDestOidMap.add(obj, mSourceOidMap.get(key));
     }
 
     Type* copyType(Type* t) {
@@ -147,52 +172,28 @@ public:
         return false;
     }
 
-    // duplicate 'obj', replacing references to 'mSourceModule' or its dict with 'mDestModule' and its dict.
-    // objects should be placed into 'mObjectMemo' and recovered from there as well.
+    // duplicate 'obj', replacing references to other objects in the
+    // source module with objects in the dest module, adding the oids
+    // if necessary.
     PyObjectHandle copy(PyObjectHandle obj) {
-        auto inMemo = mObjectMemo.find(obj);
+        size_t oid = mSourceOidMap.get(obj);
 
-        if (inMemo != mObjectMemo.end()) {
-            return inMemo->second;
+        // this is external
+        if (!oid) {
+            return obj;
+        }
+
+        // see if we've already copied this
+        if (mDestOidMap.has(oid)) {
+            return mDestOidMap.get(oid);
         }
 
         if (isPrimitive(obj)) {
             return obj;
         }
 
-        if (obj.pyobj() && obj.pyobj() == mSourceModule) {
-            return PyObjectHandle(mDestModule);
-        }
-
-        if (obj.pyobj() && obj.pyobj() == PyModule_GetDict(mSourceModule)) {
-            return PyObjectHandle(PyModule_GetDict(mDestModule));
-        }
-
         if (isModuleObjectOrModuleDict(obj)) {
             return obj;
-        }
-
-        // don't duplicate anything that's not internal to our graph
-        if (mInternalObjects.find(obj) == mInternalObjects.end()) {
-            return obj;
-        }
-
-        // check if this object has an identity because it was defined in
-        // a prior module. If so, we want to make sure that we only end up with
-        // one copy of this object - we could be copying in from multiple modules
-        // and they could each have their own copy of this object.
-        auto sourceObjIdIt = mSourceInternalObjectIdentities.find(obj);
-        if (sourceObjIdIt != mSourceInternalObjectIdentities.end()) {
-            size_t objectIdentity = sourceObjIdIt->second;
-
-            auto it = mDestIdentityToInternalObject.find(objectIdentity);
-
-            if (it != mDestIdentityToInternalObject.end()) {
-                // this unique object id was already copied into our dest module
-                // and we only want that object - lets not deepcopy it
-                mObjectMemo[obj] = it->second;
-                return mObjectMemo[obj];
-            }
         }
 
         if (obj.typeObj()) {
@@ -255,7 +256,7 @@ public:
                 // update the memo so its not a forward
                 setMemo(obj, outF);
 
-                return mObjectMemo[obj];
+                return PyObjectHandle(outF);
             }
 
             if (t->isClass()) {
@@ -316,7 +317,7 @@ public:
                 // update the memo so its not a forward
                 setMemo(obj, outC);
 
-                return mObjectMemo[obj];
+                return PyObjectHandle(outC);
             }
 
             if (t->isForward()) {
@@ -331,7 +332,7 @@ public:
                     newForward->define(copyType(f->getTarget()));
                 }
 
-                return mObjectMemo[obj];
+                return PyObjectHandle(newForward);
             }
         }
 
@@ -575,14 +576,12 @@ public:
                     }
 
                     if (in->tp_dict) {
-                        PyObjectHandle newTypeDict = copy(in->tp_dict);
-
                         PyObject *key, *value;
                         Py_ssize_t pos = 0;
 
-                        while (PyDict_Next(newTypeDict.pyobj(), &pos, &key, &value)) {
+                        while (PyDict_Next(in->tp_dict, &pos, &key, &value)) {
                             if (!PyDict_GetItem(((PyTypeObject*)res)->tp_dict, key)) {
-                                PyObject_SetAttr(res, key, value);
+                                PyObject_SetAttr(res, key, copy(value).pyobj());
                             }
                         }
                     }
@@ -638,12 +637,189 @@ public:
         return obj;
     }
 
+    // put all the objects reachable from 'source' in a single hop into 'reachable'.
+    template<class set_type>
+    static void computeReachableFrom(PyObjectHandle source, set_type& reachable) {
+        if (source.typeObj()) {
+            Type* t = source.typeObj();
+
+            if (t->isFunction()) {
+                Function* f = (Function*)t;
+
+                for (auto& o: f->getOverloads()) {
+                    for (auto& a: o.getArgs()) {
+                        if (a.getTypeFilter()) {
+                            reachable.insert(a.getTypeFilter());
+                        }
+
+                        if (a.getDefaultValue()) {
+                            reachable.insert(a.getDefaultValue());
+                        }
+                    }
+
+                    reachable.insert(PyObjectHandle(o.getFunctionGlobals()));
+
+                    for (auto nameAndObj: o.getFunctionGlobalsInCells()) {
+                        if (nameAndObj.second) {
+                            reachable.insert(PyObjectHandle(nameAndObj.second));
+                        }
+                    }
+
+                    if (o.getFunctionAnnotations()) {
+                        reachable.insert(o.getFunctionAnnotations());
+                    }
+
+                    if (o.getFunctionDefaults()) {
+                        reachable.insert(o.getFunctionDefaults());
+                    }
+
+                    if (o.getReturnType()) {
+                        reachable.insert(PyObjectHandle(o.getReturnType()));
+                    }
+                }
+            }
+
+            if (t->isClass()) {
+                Class* c = (Class*)t;
+
+                for (auto& base: c->getBases()) {
+                    reachable.insert(PyObjectHandle(base->getClassType()));
+                }
+
+                for (auto& nameAndF: c->getOwnMemberFunctions()) {
+                    reachable.insert(PyObjectHandle(nameAndF.second));
+                }
+                for (auto& nameAndF: c->getOwnStaticFunctions()) {
+                    reachable.insert(PyObjectHandle(nameAndF.second));
+                }
+                for (auto& nameAndF: c->getOwnPropertyFunctions()) {
+                    reachable.insert(PyObjectHandle(nameAndF.second));
+                }
+                for (auto& nameAndObj: c->getOwnClassMembers()) {
+                    reachable.insert(PyObjectHandle(nameAndObj.second));
+                }
+            }
+
+            if (t->isForward()) {
+                Forward* f = (Forward*)t;
+
+                if (f->getTarget()) {
+                    reachable.insert(PyObjectHandle(f->getTarget()));
+                }
+            }
+
+            return;
+        }
+
+        if (source.pyobj()) {
+            PyObject* o = source.pyobj();
+
+            if (PyInstance::isNativeType(o->ob_type)) {
+                reachable.insert(PyObjectHandle(PyInstance::extractTypeFrom(o->ob_type)));
+                return;
+            }
+
+            if (PyDict_Check(o)) {
+                PyObject *key, *value;
+                Py_ssize_t pos = 0;
+
+                while (PyDict_Next(o, &pos, &key, &value)) {
+                    if (!isPrimitive(key)) {
+                        reachable.insert(key);
+                    }
+
+                    if (!isPrimitive(value)) {
+                        reachable.insert(value);
+                    }
+                }
+            } else if (PyTuple_Check(o)) {
+                for (long k = 0; k < PyTuple_Size(o); k++) {
+                    reachable.insert(PyTuple_GetItem(o, k));
+                }
+            } else if (PyList_Check(o)) {
+                for (long k = 0; k < PyList_Size(o); k++) {
+                    reachable.insert(PyList_GetItem(o, k));
+                }
+            } else if (PySet_Check(o)) {
+                iterate(o, [&](PyObject* o2) { reachable.insert(o2); });
+            } else if (PyFunction_Check(o)) {
+                reachable.insert(PyFunction_GetGlobals(o));
+
+                if (PyFunction_GetClosure(o)) {
+                    reachable.insert(PyFunction_GetClosure(o));
+                }
+
+                if (PyFunction_GetAnnotations(o)) {
+                    reachable.insert(PyFunction_GetAnnotations(o));
+                }
+            } else if (PyCell_Check(o)) {
+                if (PyCell_GET(o)) {
+                    reachable.insert(PyCell_GET(o));
+                }
+            } else if (PyType_Check(o)) {
+                if (o->ob_type == &PyType_Type) {
+                    // this is a user-defined type
+                    if (((PyTypeObject*)o)->tp_dict) {
+                        PyObject *key, *value;
+                        Py_ssize_t pos = 0;
+
+                        while (PyDict_Next(((PyTypeObject*)o)->tp_dict, &pos, &key, &value)) {
+                            reachable.insert(value);
+                        }
+                    }
+                    if (((PyTypeObject*)o)->tp_bases) {
+                        reachable.insert(((PyTypeObject*)o)->tp_bases);
+                    }
+                }
+            } else if (o->ob_type == &PyProperty_Type) {
+                JustLikeAPropertyObject* source = (JustLikeAPropertyObject*)o;
+
+                if (source->prop_get) {
+                    reachable.insert(source->prop_get);
+                }
+
+                if (source->prop_set) {
+                    reachable.insert(source->prop_set);
+                }
+
+                if (source->prop_del) {
+                    reachable.insert(source->prop_del);
+                }
+
+                if (source->prop_doc) {
+                    reachable.insert(source->prop_doc);
+                }
+
+                #if PY_MINOR_VERSION >= 10
+                    if (source->prop_name) {
+                        reachable.insert(source->prop_name);
+                    }
+                #endif
+
+
+            } else if (o->ob_type == &PyStaticMethod_Type || o->ob_type == &PyClassMethod_Type) {
+                JustLikeAClassOrStaticmethod* source = (JustLikeAClassOrStaticmethod*)o;
+
+                if (source->cm_callable) {
+                    reachable.insert(source->cm_callable);
+                }
+
+                if (source->cm_dict) {
+                    reachable.insert(source->cm_dict);
+                }
+
+            } else if (PyObject_HasAttrString(o, "__dict__")) {
+                PyObjectStealer dict(PyObject_GetAttrString(o, "__dict__"));
+
+                computeReachableFrom(PyObjectHandle(dict), reachable);
+
+                // the type object itself is also reachable
+                reachable.insert((PyObject*)o->ob_type);
+            }
+        }
+    }
+
 private:
-    std::unordered_map<PyObjectHandle, PyObjectHandle>& mObjectMemo;
-    const std::unordered_set<PyObjectHandle>& mInternalObjects;
-    PyObject* mSourceModule;
-    PyObject* mDestModule;
-    std::map<PyObjectHandle, size_t>& mSourceInternalObjectIdentities;
-    std::map<PyObjectHandle, size_t>& mDestInternalObjectIdentities;
-    std::map<size_t, PyObjectHandle>& mDestIdentityToInternalObject;
+    const OidMap& mSourceOidMap;
+    OidMap& mDestOidMap;
 };

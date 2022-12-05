@@ -123,6 +123,22 @@ public:
         return nullptr;
     }
 
+    std::string shortRepr() {
+        std::ostringstream s;
+
+        PyObjectStealer repr(PyObject_Repr(mPyObj));
+
+        s << "<PyObj of type " << mPyObj->ob_type->tp_name;
+
+        if (repr) {
+            s << " with repr " << std::string(PyUnicode_AsUTF8(repr)).substr(0, 200);
+        }
+
+        s << "@" << (void*)mPyObj << ">";
+
+        return s.str();
+    }
+
 private:
     PyObject* mPyObj;
 };

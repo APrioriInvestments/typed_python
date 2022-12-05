@@ -24,11 +24,12 @@ PyDoc_STRVAR(PyModuleRepresentation_doc,
 PyMethodDef PyModuleRepresentationInstance_methods[] = {
     {"addExternal", (PyCFunction)PyModuleRepresentation::addExternal, METH_VARARGS | METH_KEYWORDS, NULL},
     {"getDict", (PyCFunction)PyModuleRepresentation::getDict, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"isSetupComplete", (PyCFunction)PyModuleRepresentation::isSetupComplete, METH_VARARGS | METH_KEYWORDS, NULL},
     {"update", (PyCFunction)PyModuleRepresentation::update, METH_VARARGS | METH_KEYWORDS, NULL},
-    {"getExternalReferences", (PyCFunction)PyModuleRepresentation::getExternalReferences, METH_VARARGS | METH_KEYWORDS, NULL},
-    {"getInternalReferences", (PyCFunction)PyModuleRepresentation::getInternalReferences, METH_VARARGS | METH_KEYWORDS, NULL},
-    {"getVisibleNames", (PyCFunction)PyModuleRepresentation::getVisibleNames, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"setupComplete", (PyCFunction)PyModuleRepresentation::setupComplete, METH_VARARGS | METH_KEYWORDS, NULL},
     {"copyInto", (PyCFunction)PyModuleRepresentation::copyInto, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"copyIntoAsInactive", (PyCFunction)PyModuleRepresentation::copyIntoAsInactive, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"oidFor", (PyCFunction)PyModuleRepresentation::oidFor, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL}  /* Sentinel */
 };
 
@@ -36,10 +37,7 @@ PyMethodDef PyModuleRepresentationInstance_methods[] = {
 /* static */
 void PyModuleRepresentation::dealloc(PyModuleRepresentation *self)
 {
-    if (self->mModuleRepresentation) {
-        delete self->mModuleRepresentation;
-    }
-
+    self->mModuleRepresentation.~shared_ptr();
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -51,7 +49,7 @@ PyObject* PyModuleRepresentation::new_(PyTypeObject *type, PyObject *args, PyObj
     self = (PyModuleRepresentation*)type->tp_alloc(type, 0);
 
     if (self != NULL) {
-        self->mModuleRepresentation = nullptr;
+        new (&self->mModuleRepresentation) std::shared_ptr<ModuleRepresentation>();
     }
 
     return (PyObject*)self;
@@ -68,7 +66,7 @@ int PyModuleRepresentation::init(PyModuleRepresentation *self, PyObject *args, P
         return -1;
     }
 
-    self->mModuleRepresentation = new ModuleRepresentation(name);
+    self->mModuleRepresentation.reset(new ModuleRepresentation(name));
 
     return 0;
 }
@@ -88,81 +86,11 @@ PyObject* PyModuleRepresentation::addExternal(PyModuleRepresentation* self, PyOb
             throw std::runtime_error("Unpopulated ModuleRepresentation");
         }
 
-        self->mModuleRepresentation->addExternal(name, value);
+        std::string nameStr(PyUnicode_AsUTF8(name));
+
+        self->mModuleRepresentation->addExternal(nameStr, PyObjectHandle(value));
 
         return incref(Py_None);
-    });
-}
-
-PyObject* PyModuleRepresentation::getInternalReferences(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs) {
-    static const char* kwlist[] = {"name", NULL};
-
-    const char* name;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", (char**)kwlist, &name)) {
-        return nullptr;
-    }
-
-    return translateExceptionToPyObject([&]() {
-        if (!self->mModuleRepresentation) {
-            throw std::runtime_error("Unpopulated ModuleRepresentation");
-        }
-
-        PyObject* res = PyList_New(0);
-
-        for (auto o: self->mModuleRepresentation->getInternalReferences(name)) {
-            PyList_Append(res, o.pyobj());
-        }
-
-        return res;
-    });
-}
-
-PyObject* PyModuleRepresentation::getExternalReferences(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs) {
-    static const char* kwlist[] = {"name", NULL};
-
-    const char* name;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", (char**)kwlist, &name)) {
-        return nullptr;
-    }
-
-    return translateExceptionToPyObject([&]() {
-        if (!self->mModuleRepresentation) {
-            throw std::runtime_error("Unpopulated ModuleRepresentation");
-        }
-
-        PyObject* res = PyList_New(0);
-
-        for (auto o: self->mModuleRepresentation->getExternalReferences(name)) {
-            PyList_Append(res, o.pyobj());
-        }
-
-        return res;
-    });
-}
-
-PyObject* PyModuleRepresentation::getVisibleNames(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs) {
-    static const char* kwlist[] = {"name", NULL};
-
-    const char* name;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", (char**)kwlist, &name)) {
-        return nullptr;
-    }
-
-    return translateExceptionToPyObject([&]() {
-        if (!self->mModuleRepresentation) {
-            throw std::runtime_error("Unpopulated ModuleRepresentation");
-        }
-
-        PyObject* res = PyList_New(0);
-
-        for (auto o: self->mModuleRepresentation->getVisibleNames(name)) {
-            PyList_Append(res, PyUnicode_FromString(o.c_str()));
-        }
-
-        return res;
     });
 }
 
@@ -178,7 +106,53 @@ PyObject* PyModuleRepresentation::getDict(PyModuleRepresentation* self, PyObject
             throw std::runtime_error("Unpopulated ModuleRepresentation");
         }
 
-        return incref(PyModule_GetDict(self->mModuleRepresentation->mModuleObject.get()));
+        if (!self->mModuleRepresentation->isSetupComplete()) {
+            self->mModuleRepresentation->setupComplete();
+        }
+
+        return incref(PyModule_GetDict(self->mModuleRepresentation->moduleObject().pyobj()));
+    });
+}
+
+PyObject* PyModuleRepresentation::isSetupComplete(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+        return nullptr;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        if (!self->mModuleRepresentation) {
+            throw std::runtime_error("Unpopulated ModuleRepresentation");
+        }
+
+        return incref(self->mModuleRepresentation->isSetupComplete() ? Py_True : Py_False);
+    });
+}
+
+PyObject* PyModuleRepresentation::oidFor(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"object", NULL};
+
+    PyObject* obj;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist, &obj)) {
+        return nullptr;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        if (!self->mModuleRepresentation) {
+            throw std::runtime_error("Unpopulated ModuleRepresentation");
+        }
+
+        if (!self->mModuleRepresentation->isSetupComplete()) {
+            self->mModuleRepresentation->setupComplete();
+        }
+
+        size_t oid = self->mModuleRepresentation->oidFor(PyObjectHandle(obj));
+        if (oid == 0) {
+            return incref(Py_None);
+        }
+        return PyLong_FromLong(oid);
     });
 }
 
@@ -200,7 +174,75 @@ PyObject* PyModuleRepresentation::update(PyModuleRepresentation* self, PyObject*
     });
 }
 
+PyObject* PyModuleRepresentation::setupComplete(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+        return nullptr;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        if (!self->mModuleRepresentation) {
+            throw std::runtime_error("Unpopulated ModuleRepresentation");
+        }
+
+        self->mModuleRepresentation->setupComplete();
+
+        return incref(Py_None);
+    });
+}
+
 PyObject* PyModuleRepresentation::copyInto(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"other", "names", NULL};
+
+    PyObject* other;
+    PyObject* names;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO", (char**)kwlist, &other, &names)) {
+        return nullptr;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        if (!self->mModuleRepresentation) {
+            throw std::runtime_error("Unpopulated ModuleRepresentation");
+        }
+
+        if (!self->mModuleRepresentation->isSetupComplete()) {
+            self->mModuleRepresentation->setupComplete();
+        }
+
+        if (other->ob_type != &PyType_ModuleRepresentation) {
+            throw std::runtime_error("'other' must be a ModuleRepresentation");
+        }
+
+        PyModuleRepresentation* otherAsModule = (PyModuleRepresentation*)other;
+
+        if (!otherAsModule->mModuleRepresentation) {
+            throw std::runtime_error("Unpopulated ModuleRepresentation");
+        }
+
+        std::set<std::string> namesAsStrings;
+
+        iterate(names, [&](PyObject* aName) {
+            if (!PyUnicode_Check(aName)) {
+                throw std::runtime_error("Expected 'names' to contain strings");
+            }
+
+            namesAsStrings.insert(PyUnicode_AsUTF8(aName));
+        });
+
+
+        otherAsModule->mModuleRepresentation->copyFrom(
+            self->mModuleRepresentation,
+            namesAsStrings,
+            true
+        );
+
+        return incref(Py_None);
+    });
+}
+
+PyObject* PyModuleRepresentation::copyIntoAsInactive(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs) {
     static const char* kwlist[] = {"other", "names", NULL};
 
     PyObject* other;
@@ -235,8 +277,11 @@ PyObject* PyModuleRepresentation::copyInto(PyModuleRepresentation* self, PyObjec
             namesAsStrings.insert(PyUnicode_AsUTF8(aName));
         });
 
-
-        self->mModuleRepresentation->copyInto(*otherAsModule->mModuleRepresentation, namesAsStrings);
+        otherAsModule->mModuleRepresentation->copyFrom(
+            self->mModuleRepresentation,
+            namesAsStrings,
+            false
+        );
 
         return incref(Py_None);
     });

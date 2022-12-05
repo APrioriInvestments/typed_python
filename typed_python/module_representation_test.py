@@ -7,6 +7,9 @@ import os
 
 
 def evaluateInto(module, code, codeDir=None):
+    if not module.isSetupComplete():
+        module.setupComplete()
+
     if codeDir is None:
         exec(code, module.getDict())
     else:
@@ -37,68 +40,26 @@ class TestModuleRepresentation(unittest.TestCase):
     def test_addExternal(self):
         mr = ModuleRepresentation("module")
 
-        assert mr.getDict()['__name__'] == 'module'
-
         mr.addExternal("hi", "bye")
 
+        assert mr.getDict()['__name__'] == 'module'
         assert mr.getDict()['hi'] == 'bye'
+        assert mr.oidFor('bye') is None
 
-    def test_canSeeRecursives(self):
-        mr = ModuleRepresentation("module")
-
-        evaluateInto(mr, "x = lambda: 10\n")
-
-        assert not mr.getVisibleNames('x')
-
-        evaluateInto(mr, "x = lambda: x + 10\n")
-        assert mr.getVisibleNames('x') == ['x']
-
-        evaluateInto(mr, "x = (lambda: x + 10, 1)\n")
-        assert mr.getVisibleNames('x') == ['x']
-
-        evaluateInto(mr, "x = [lambda: x + 10]\n")
-        assert mr.getVisibleNames('x') == ['x']
-
-        evaluateInto(mr, "x = set([lambda: x + 10])\n")
-        assert mr.getVisibleNames('x') == ['x']
-
-        evaluateInto(mr, "x = {'a': lambda: x + 10}\n")
-        assert mr.getVisibleNames('x') == ['x']
-
-        evaluateInto(
-            mr,
-            "class C:\n"
-            "    def __init__(self, x):\n"
-            "        self.x = x\n"
-            "x = C(lambda: x + 10)\n"
-        )
-        assert mr.getVisibleNames('x') == ['x']
-
-    def test_canSeeMutuallyRecursive(self):
-        mr = ModuleRepresentation("module")
-
-        evaluateInto(mr, "x = lambda: y\n")
-
-        assert mr.getVisibleNames('x') == ['y']
-        assert not mr.getVisibleNames('y')
-
-        evaluateInto(mr, "y = lambda: x\n")
-
-        assert mr.getVisibleNames('x') == ['y']
-        assert mr.getVisibleNames('y') == ['x']
+        with self.assertRaisesRegex(Exception, ""):
+            mr.addExternal("hi2", "bye2")
 
     def test_otherModulesAreExternal(self):
         mr = ModuleRepresentation("module")
 
-        evaluateInto(mr, "import numpy")
-        evaluateInto(mr, "array = numpy.array")
+        evaluateInto(mr, "import os")
+        evaluateInto(mr, "path = os.path")
 
-        assert len(mr.getExternalReferences('numpy')) == 1
-        assert len(mr.getExternalReferences('array')) == 1
+        assert mr.oidFor(os) is None
+        assert mr.oidFor(os.path) is None
 
     def test_copy_into_basic(self):
         mr = ModuleRepresentation("module")
-
         evaluateInto(mr, "y = 10")
 
         mr2 = ModuleRepresentation("module")
@@ -126,6 +87,25 @@ class TestModuleRepresentation(unittest.TestCase):
         evaluateInto(mr, "y = 20")
         assert mr.getDict()['f']() == 20
         assert mr2.getDict()['f']() == 10
+
+    def test_duplication_of_functions(self):
+        mr = ModuleRepresentation("module")
+
+        evaluateInto(mr, "def f(): return 0")
+
+        assert mr.oidFor(mr.getDict()) is not None
+        assert mr.oidFor(mr.getDict()['f']) is not None
+        assert mr.oidFor(mr.getDict()['f'].__globals__) is not None
+
+        mr2 = ModuleRepresentation("module")
+        mr.copyInto(mr2, ['f'])
+
+        mr3 = ModuleRepresentation("module")
+        mr2.copyInto(mr3, ['f'])
+
+        assert mr.getDict()['f'].__globals__ is mr.getDict()
+        assert mr2.getDict()['f'].__globals__ is mr2.getDict()
+        assert mr3.getDict()['f'].__globals__ is mr3.getDict()
 
     def test_duplication_of_mutually_recursive_functions(self):
         mr = ModuleRepresentation("module")
@@ -223,8 +203,6 @@ class TestModuleRepresentation(unittest.TestCase):
                 td
             )
 
-            assert mr.getVisibleNames('f') == ['g']
-
             # verify we can execute and compile this, and that it throws
             # because 'g' is not defined
 
@@ -268,8 +246,6 @@ class TestModuleRepresentation(unittest.TestCase):
                 "        return g3(self.m)\n",
                 td
             )
-
-            assert mr.getVisibleNames('C') == ['g', 'g2', 'g3']
 
             # verify we can execute and compile this, and that it throws
             # because 'g' is not defined
@@ -396,8 +372,6 @@ class TestModuleRepresentation(unittest.TestCase):
                 td
             )
 
-            assert mr.getVisibleNames('C') == ['C']
-
             mr2 = ModuleRepresentation("module")
 
             # copy into mr2
@@ -425,8 +399,6 @@ class TestModuleRepresentation(unittest.TestCase):
                 "x = 10\n",
                 td
             )
-
-            assert mr.getVisibleNames('C') == ['C', 'x']
 
             mr2 = ModuleRepresentation("module")
 
@@ -458,8 +430,6 @@ class TestModuleRepresentation(unittest.TestCase):
                 td
             )
 
-            assert mr.getDict()['Base'] not in mr.getInternalReferences('Child')
-
             mr2 = ModuleRepresentation("module")
 
             # copy into mr2
@@ -484,8 +454,6 @@ class TestModuleRepresentation(unittest.TestCase):
                 "        return x\n",
                 td
             )
-
-            assert mr.getDict()['Base'] not in mr.getInternalReferences('Child')
 
             mr2 = ModuleRepresentation("module")
 
@@ -515,6 +483,28 @@ class TestModuleRepresentation(unittest.TestCase):
 
             assert issubclass(mr3.getDict()['Child'], mr3.getDict()['Base'])
 
+    def test_defining_subclass_referenced_in_base_class_2(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(mr, "class Base:\n\tdef f(self):\n\t\treturn Child2", td)
+
+            mr2 = ModuleRepresentation("module")
+            mr.copyIntoAsInactive(mr2, ['Base'])
+            evaluateInto(mr2, "class Child1(Base):\n\tpass", td)
+
+            mr3 = ModuleRepresentation("module")
+
+            mr.copyInto(mr3, ['Base'])
+
+            mr2.copyInto(mr3, ['Child1'])
+
+            evaluateInto(mr3, "class Child2(Base):\n\tpass", td)
+            mr3.update()
+
+            assert issubclass(mr3.getDict()['Child1'], mr3.getDict()['Base'])
+            assert issubclass(mr3.getDict()['Child2'], mr3.getDict()['Base'])
+
     def test_copying_classes_with_methods_is_transitive(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -538,6 +528,38 @@ class TestModuleRepresentation(unittest.TestCase):
             assert mr3.getDict()['C'].f.__globals__ is not mr2.getDict()
             assert mr3.getDict()['C'].f.__globals__ is mr3.getDict()
 
+    def test_duplicate_class_with_functions(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(
+                mr,
+                "class C:\n"
+                "    def f(self):\n"
+                "        return\n",
+                td
+            )
+
+            assert mr.oidFor(mr.getDict()['C']) is not None
+            assert mr.oidFor(mr.getDict()['C'].f) is not None
+            assert mr.getDict()['C'].f.__globals__ is mr.getDict()
+
+            mr2 = ModuleRepresentation("module")
+            mr.copyInto(mr2, ['C'])
+
+            assert mr2.oidFor(mr2.getDict()['C']) is not None
+            assert mr2.oidFor(mr2.getDict()['C'].f) is not None
+            assert mr2.getDict()['C'].f.__globals__ is mr2.getDict()
+
+            mr3 = ModuleRepresentation("module")
+            mr2.copyInto(mr3, ['C'])
+
+            assert mr3.oidFor(mr3.getDict()['C']) is not None
+            assert mr3.oidFor(mr3.getDict()['C'].f) is not None
+            assert mr3.getDict()['C'].f is not mr2.getDict()['C'].f
+            assert mr3.getDict()['C'].f.__globals__ is not mr2.getDict()
+            assert mr3.getDict()['C'].f.__globals__ is mr3.getDict()
+
     def test_assign_to_global_scope_updates_class_and_subclass(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -552,9 +574,13 @@ class TestModuleRepresentation(unittest.TestCase):
                 td
             )
 
+            assert mr.getDict()['Base'].__init__.__globals__ is mr.getDict()
+
             mr2 = ModuleRepresentation("module")
             mr.copyInto(mr2, ['Base'])
 
+            assert mr2.oidFor(mr2.getDict()['Base']) is not None
+            assert mr2.oidFor(mr2.getDict()['Base'].__init__) is not None
             assert mr2.getDict()['Base'].__init__.__globals__ is mr2.getDict()
 
             evaluateInto(
@@ -567,12 +593,14 @@ class TestModuleRepresentation(unittest.TestCase):
 
             mr3 = ModuleRepresentation("module")
 
-            # copy into mr2
+            # copy into mr3
             mr2.copyInto(mr3, ['Child', 'Base'])
 
-            Base = mr3.getDict()['Base']
+            mr3.setupComplete()
 
-            assert Base.__init__.__globals__ is mr3.getDict()
+            assert mr3.getDict()['Base'].__init__ is not mr2.getDict()['Base'].__init__
+            assert mr3.getDict()['Base'].__init__.__globals__ is not mr2.getDict()
+            assert mr3.getDict()['Base'].__init__.__globals__ is mr3.getDict()
 
     def test_duplicated_child_class_interchangeable(self):
         with tempfile.TemporaryDirectory() as td:

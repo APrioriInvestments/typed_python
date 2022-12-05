@@ -17,12 +17,13 @@
 #pragma once
 
 #include "ModuleRepresentation.hpp"
+#include <memory>
 
 class PyModuleRepresentation {
 public:
     PyObject_HEAD
 
-    ModuleRepresentation* mModuleRepresentation;
+    std::shared_ptr<ModuleRepresentation> mModuleRepresentation;
 
     static void dealloc(PyModuleRepresentation *self);
 
@@ -34,15 +35,17 @@ public:
 
     static PyObject* getDict(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs);
 
+    static PyObject* isSetupComplete(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs);
+
     static PyObject* update(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs);
 
-    static PyObject* getInternalReferences(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs);
-
-    static PyObject* getExternalReferences(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs);
-
-    static PyObject* getVisibleNames(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs);
+    static PyObject* setupComplete(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs);
 
     static PyObject* copyInto(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs);
+
+    static PyObject* copyIntoAsInactive(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs);
+
+    static PyObject* oidFor(PyModuleRepresentation* self, PyObject* args, PyObject* kwargs);
 };
 
 extern PyTypeObject PyType_ModuleRepresentation;
