@@ -560,6 +560,49 @@ class TestModuleRepresentation(unittest.TestCase):
             assert mr3.getDict()['C'].f.__globals__ is not mr2.getDict()
             assert mr3.getDict()['C'].f.__globals__ is mr3.getDict()
 
+    def test_add_base_class_as_inactive_preserves_identity(self):
+        with tempfile.TemporaryDirectory() as td:
+            mr = ModuleRepresentation("module")
+
+            evaluateInto(
+                mr,
+                "class O:\n"
+                "    def f(self):\n"
+                "        return\n",
+                td
+            )
+
+            mr2 = ModuleRepresentation("module")
+            mr.copyIntoAsInactive(mr2, ['O'])
+
+            evaluateInto(
+                mr2,
+                "class C(O):\n"
+                "    def f(self):\n"
+                "        return g\n",
+                td
+            )
+
+            mr3 = ModuleRepresentation("module")
+            mr2.copyInto(mr3, ['C'])
+            mr.copyIntoAsInactive(mr3, ['O'])
+
+            assert issubclass(mr2.getDict()['C'], mr2.getDict()['O'])
+            assert mr3.getDict()['O'] is mr2.getDict()['O']
+            assert issubclass(mr3.getDict()['C'], mr2.getDict()['O'])
+
+            evaluateInto(
+                mr3,
+                "def g():\n"
+                "    return 1\n",
+                td
+            )
+
+            mr4 = ModuleRepresentation("module")
+            mr3.copyInto(mr4, ['C'])
+
+            assert issubclass(mr4.getDict()['C'], mr3.getDict()['O'])
+
     def test_assign_to_global_scope_updates_class_and_subclass(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")

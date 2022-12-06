@@ -267,6 +267,29 @@ public:
 
         mHasBeenSetup = true;
 
+        // walk all upstreams and implicitly add all
+        // upstream module values as inactive entries.
+
+        std::set<std::shared_ptr<ModuleRepresentation> > modules;
+        for (auto& nameAndEntry: mInitialEntries) {
+            if (nameAndEntry.second.module()) {
+                modules.insert(nameAndEntry.second.module());
+            }
+        }
+
+        for (auto module: modules) {
+            for (auto& nameAndValue: module->mPriorUpdateValues) {
+                std::string name = nameAndValue.first;
+                if (mInitialEntries.find(name) == mInitialEntries.end()) {
+                    mInitialEntries[name] = Entry(
+                        nameAndValue.second,
+                        module,
+                        false
+                    );
+                }
+            }
+        }
+
         for (auto& nameAndEntry: mInitialEntries) {
             if (nameAndEntry.second.isExternal()) {
                 mExternalObjects.insert(nameAndEntry.second.value());
@@ -280,22 +303,6 @@ public:
                     nameAndEntry.second.value()
                 );
             } else
-            if (nameAndEntry.second.isActive()) {
-                PyObjectHandle copied = copyActiveObjectFrom(
-                    nameAndEntry.second.value(),
-                    nameAndEntry.second.module()
-                );
-
-                PyDict_SetItemString(
-                    PyModule_GetDict(mModuleObject.pyobj()),
-                    nameAndEntry.first.c_str(),
-                    copied.pyobj()
-                );
-                mPriorUpdateValues[nameAndEntry.first] = copied;
-            }
-        }
-
-        for (auto& nameAndEntry: mInitialEntries) {
             if (nameAndEntry.second.isInactive()) {
                 addInactiveFrom(
                     nameAndEntry.second.value(),
@@ -310,6 +317,22 @@ public:
                 mPriorUpdateValues[nameAndEntry.first] = (
                     nameAndEntry.second.value()
                 );
+            }
+        }
+
+        for (auto& nameAndEntry: mInitialEntries) {
+            if (nameAndEntry.second.isActive()) {
+                PyObjectHandle copied = copyActiveObjectFrom(
+                    nameAndEntry.second.value(),
+                    nameAndEntry.second.module()
+                );
+
+                PyDict_SetItemString(
+                    PyModule_GetDict(mModuleObject.pyobj()),
+                    nameAndEntry.first.c_str(),
+                    copied.pyobj()
+                );
+                mPriorUpdateValues[nameAndEntry.first] = copied;
             }
         }
 
