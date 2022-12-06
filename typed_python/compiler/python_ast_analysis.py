@@ -177,7 +177,7 @@ def computeVariablesReadByClosures(astNode, isInsideClassDef=False):
                 closureVars.update(computeVariablesReadByClosures(x.keywords))
                 closureVars.update(computeVariablesReadByClosures(x.decorator_list))
                 for smt in x.body:
-                    closureVars.update(computeReadVariables(x.body, True))
+                    closureVars.update(computeReadVariables(smt, True))
                 return False
 
             assertValidStatement(x)

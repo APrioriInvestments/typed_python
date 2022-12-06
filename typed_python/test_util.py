@@ -21,6 +21,7 @@ import subprocess
 import sys
 import os
 
+from typed_python import sha_hash
 from typed_python import Entrypoint, SerializationContext
 
 
@@ -223,3 +224,35 @@ def evaluateExprInFreshProcess(filesToWrite, expression, compilerCacheDir=None, 
             return pickle.loads(eval(result))
         except Exception:
             raise Exception("Failed to understand output:\n" + output.decode("ASCII"))
+
+
+class CodeEvaluator:
+    """Make a temporary directory and use it to evaluate code snippets.
+
+    Usage:
+        c = CodeEvaluator()
+        m = {}
+
+        c.evaluateInto("def f():\n\treturn 10", m)
+        assert m['f']() == 10
+
+    This is better than 'exec' because the code is backed by a file, so we
+    can find the text and use various TP functions on it.
+    """
+    def __init__(self):
+        self.dir = tempfile.TemporaryDirectory()
+
+    def evaluateInto(self, code, moduleDict):
+        filename = os.path.abspath(
+            os.path.join(self.dir.name, sha_hash(code).hexdigest)
+        )
+
+        try:
+            os.makedirs(os.path.dirname(filename))
+        except OSError:
+            pass
+
+        with open(filename, "wb") as codeFile:
+            codeFile.write(code.encode("utf8"))
+
+        exec(compile(code, filename, "exec"), moduleDict)

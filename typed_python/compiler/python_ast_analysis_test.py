@@ -14,8 +14,9 @@
 
 import typed_python.python_ast as python_ast
 import typed_python.compiler.python_ast_analysis as python_ast_analysis
-
+from typed_python.test_util import CodeEvaluator
 import unittest
+import time
 
 
 class TestPythonAstAnalysis(unittest.TestCase):
@@ -223,3 +224,30 @@ class TestPythonAstAnalysis(unittest.TestCase):
         pyast = python_ast.convertFunctionToAlgebraicPyAst(f)
 
         assert python_ast_analysis.computeAssignedVariables(pyast.body) == {'a', 'blah'}
+
+    def test_variables_read_perf(self):
+        evaluator = CodeEvaluator()
+
+        def makeF(cCount):
+            CODE = (
+                "def f():\n"
+                "    class C:\n"
+            ) + (
+                "        class B:\n"
+                "            pass\n"
+            ) * cCount
+
+            moduleDict = {}
+
+            evaluator.evaluateInto(CODE, moduleDict)
+
+            return moduleDict.get('f')
+
+        def timeIt(cCount):
+            pyast = python_ast.convertFunctionToAlgebraicPyAst(makeF(cCount))
+
+            t0 = time.time()
+            python_ast_analysis.computeVariablesReadByClosures(pyast.body)
+            return time.time() - t0
+
+        assert timeIt(200) < timeIt(10) * 50
