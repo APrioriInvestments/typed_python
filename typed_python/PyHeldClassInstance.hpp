@@ -223,6 +223,39 @@ public:
         return PyClassInstance::tpGetattrGeneric((PyObject*)this, type(), dataPtr(), pyAttrName, attrName);
     }
 
+    static bool compare_to_python_concrete(HeldClass* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+        if (t->hasAnyComparisonOperators()) {
+            auto it = t->getMemberFunctions().find(Class::pyComparisonOpToMethodName(pyComparisonOp));
+
+            if (it != t->getMemberFunctions().end()) {
+                //we found a user-defined method for this comparison function.
+                PyObjectStealer selfAsPyObj(PyInstance::extractPythonObject(self, t));
+
+                std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
+                    it->second,
+                    nullptr,
+                    selfAsPyObj,
+                    other
+                );
+
+                if (res.first && !res.second) {
+                    throw PythonExceptionSet();
+                }
+
+                int result = PyObject_IsTrue(res.second);
+                decref(res.second);
+
+                if (result == -1) {
+                    throw PythonExceptionSet();
+                }
+
+                return result != 0;
+            }
+        }
+
+        return PyInstance::compare_to_python_concrete(t, self, other, exact, pyComparisonOp);
+    }
+
     int tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
         return PyClassInstance::tpSetattrGeneric((PyObject*)this, type(), dataPtr(), attrName, attrVal);
     }

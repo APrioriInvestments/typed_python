@@ -16,6 +16,7 @@ from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
+import typed_python.python_ast as python_ast
 from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
     ClassOrAlternativeWrapperMixin
 )
@@ -322,6 +323,9 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
         return bytePtr.store(bytePtr.load().bitand(native_ast.const_uint8_expr(255 - (1 << bit))))
 
     def convert_attribute(self, context, instance, attribute, nocheck=False):
+        if isinstance(attribute, int):
+            attribute = self.classType.MemberNames[attribute]
+
         if attribute in self.classType.MemberFunctions:
             methodType = BoundMethodWrapper(_types.BoundMethod(self.refToType, attribute))
 
@@ -330,10 +334,7 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
         if attribute in self.classType.PropertyFunctions:
             return self.convert_method_call(context, instance, attribute, (), {})
 
-        if not isinstance(attribute, int):
-            ix = self.nameToIndex.get(attribute)
-        else:
-            ix = attribute
+        ix = self.nameToIndex.get(attribute)
 
         if ix is None:
             if self.has_method("__getattr__"):
@@ -410,18 +411,78 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
             return native_ast.nullExpr
 
     def convert_comparison(self, context, left, op, right):
-        assert left.isReference and right.isReference
+        if not right.expr_type.can_convert_to_type(left.expr_type, ConversionLevel.Signature):
+            return context.constant(False)
 
-        if op.matches.Eq:
-            native_expr = left.expr.cast(native_ast.UInt64).eq(right.expr.cast(native_ast.UInt64))
-            return TypedExpression(context, native_expr, bool, False)
+        native = context.converter.defineNativeFunction(
+            f'held_class_equality_check({left.expr_type} -> {right.expr_type})',
+            ('held_class_equality_check', left.expr_type, right.expr_type),
+            [left.expr_type, right.expr_type],
+            bool,
+            self.generate_equality_check
+        )
+
+        if not (op.matches.Eq or op.matches.NotEq):
+            context.pushException(
+                TypeError,
+                f"Can't compare instances of {left.expr_type.typeRepresentation}"
+                f" and {right.expr_type.typeRepresentation} with {op}"
+            )
+
+        isEqual = context.pushPod(
+            bool,
+            native.call(left, right)
+        )
 
         if op.matches.NotEq:
-            native_expr = left.expr.cast(native_ast.UInt64).neq(right.expr.cast(native_ast.UInt64))
-            return TypedExpression(context, native_expr, bool, False)
+            return isEqual.convert_unary_op(python_ast.UnaryOp.Not())
+        else:
+            return isEqual
 
-        return context.pushException(TypeError, f"Can't compare instances of {left.expr_type.typeRepresentation}"
-                                                f" and {right.expr_type.typeRepresentation} with {op}")
+    def generate_equality_check(self, context, _, left, right):
+        # if we were passed a different type (say, its held as object) attempt to convert
+        # it at the 'Signature' level.
+        if left.expr_type != right.expr_type:
+            outRight = context.allocateUninitializedSlot(left.expr_type)
+
+            succeeded = right.convert_to_type_with_target(
+                outRight,
+                ConversionLevel.Signature,
+                mayThrowOnFailure=False
+            )
+
+            with context.ifelse(succeeded.nonref_expr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushReturnValue(context.constant(False))
+                with ifTrue:
+                    context.markUninitializedSlotInitialized(outRight)
+
+            right = outRight
+
+        # check if we are not equal at each individual member.
+        for ix in range(len(self.classType.MemberTypes)):
+            # note that we can't re-use ifLeftTrue twice, so we'll end up with two checks internally
+            with context.ifelse(self.isInitializedNativeExpr(left, ix)) as (ifLeftTrue, ifLeftFalse):
+                with ifLeftTrue:
+                    with context.ifelse(self.isInitializedNativeExpr(right, ix)) as (ifRightTrue, ifRightFalse):
+                        with ifRightTrue:
+                            leftVal = left.convert_attribute(ix, nocheck=True)
+                            rightVal = right.convert_attribute(ix, nocheck=True)
+
+                            isEq = leftVal == rightVal
+                            with context.ifelse(isEq.nonref_expr) as (ifEqTrue, ifEqFalse):
+                                with ifEqFalse:
+                                    context.pushReturnValue(context.constant(False))
+
+                        with ifRightFalse:
+                            context.pushReturnValue(context.constant(False))
+
+                with ifLeftFalse:
+                    with context.ifelse(self.isInitializedNativeExpr(right, ix)) as (ifRightTrue, ifRightFalse):
+                        with ifRightTrue:
+                            context.pushReturnValue(context.constant(False))
+
+        context.pushReturnValue(context.constant(True))
 
     def convert_hash(self, context, expr):
         if self.has_method("__hash__"):

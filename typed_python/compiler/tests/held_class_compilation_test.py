@@ -61,6 +61,10 @@ class Complex(Class, Final):
         )
 
 
+timesEqualsCalled = [0]
+timesLtCalled = [0]
+
+
 class TestHeldClassCompilation(unittest.TestCase):
     def checkCompiler(self, f, *args, **kwargs):
         interpretedOutput = f(*args, **kwargs)
@@ -78,6 +82,118 @@ class TestHeldClassCompilation(unittest.TestCase):
 
         assert callPointerTo(h) == pointerTo(h)
         assert h.pointerToSelf() == pointerTo(h)
+
+    def test_comparison_calls_magic_method(self):
+        @Held
+        class H(Class, Final):
+            def __eq__(self, other):
+                timesEqualsCalled[0] += 1
+                return True
+
+            def __lt__(self, other):
+                timesLtCalled[0] += 1
+                return True
+
+        def checkIt():
+            timesEqualsCalled[0] = 0
+            timesLtCalled[0] = 0
+
+            assert H() == H()
+            assert timesEqualsCalled[0] == 1
+            assert H() == 1
+            assert timesEqualsCalled[0] == 2
+
+            assert H() < H()
+            assert timesLtCalled[0] == 1
+            assert H() < 1
+            assert timesLtCalled[0] == 2
+
+        checkIt()
+        Entrypoint(checkIt)()
+
+    def test_comparison_magic_reverse_magic_method(self):
+        @Held
+        class H(Class, Final):
+            def __eq__(self, other):
+                raise Exception(("EQ", str(other)))
+
+            def __lt__(self, other):
+                raise Exception(("LT", str(other)))
+
+            def __gt__(self, other):
+                raise Exception(("GT", str(other)))
+
+        def compareAndCatch(a, b):
+            try:
+                a == b
+            except Exception as e:
+                return e.args[0]
+
+        def ltAndCatch(a, b):
+            try:
+                a < b
+            except Exception as e:
+                return e.args[0]
+
+        def checkIt():
+            assert compareAndCatch(H(), 10) == ("EQ", "10")
+            assert compareAndCatch(H(), H()) == ("EQ", "Held(H)()")
+            assert ltAndCatch(H(), 10) == ("LT", "10")
+            assert ltAndCatch(10, H()) == ("GT", "10")
+            assert ltAndCatch(H(), H()) == ("LT", "Held(H)()")
+
+        checkIt()
+        Entrypoint(checkIt)()
+
+    def test_comparison_default(self):
+        @Held
+        class H(Class, Final):
+            x = Member(int)
+            y = Member(float)
+
+            def __init__(self):
+                pass
+
+            def __init__(self, x): # noqa
+                self.x = x
+
+            def __init__(self, x, y):  # noqa
+                self.x = x
+                self.y = y
+
+        def checkIt():
+            assert 3 != H()
+            assert H() != 3
+
+            assert not (3 == H())
+            assert not (H() == 3)
+
+            assert H() == H()
+
+            assert H(x=1) != H()
+            assert not (H(x=1) == H())
+
+            assert H(x=1) == H(x=1)
+            assert not (H(x=1) != H(x=1))
+
+            assert H(x=1) != H(x=2)
+            assert not (H(x=1) == H(x=2))
+
+        checkIt()
+        Entrypoint(checkIt)()
+
+    def test_comparison_against_object(self):
+        @Held
+        class H(Class, Final):
+            x = Member(int)
+
+        @Entrypoint
+        def checkEqual(h: H, o: object):
+            assert (h == o) == (not (h != o))
+            return h == o
+
+        assert checkEqual(H(x=2), H(x=2))
+        assert not checkEqual(H(x=2), H(x=3))
 
     def test_held_class_repr(self):
         assert repr(H()) == "ReprForH"

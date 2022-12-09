@@ -87,17 +87,73 @@ bool HeldClass::_updateAfterForwardTypesChanged() {
 }
 
 bool HeldClass::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
-    uint64_t leftPtr = *(uint64_t*)left;
-    uint64_t rightPtr = *(uint64_t*)right;
+    if (hasAnyComparisonOperators()) {
+        auto it = getMemberFunctions().find(Class::pyComparisonOpToMethodName(pyComparisonOp));
 
-    if (leftPtr < rightPtr) {
-        return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
-    }
-    if (leftPtr > rightPtr) {
-        return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
+        if (it != getMemberFunctions().end()) {
+            //we found a user-defined method for this comparison function.
+            PyObjectStealer leftAsPyObj(PyInstance::extractPythonObject(left, this));
+            PyObjectStealer rightAsPyObj(PyInstance::extractPythonObject(right, this));
+
+            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
+                it->second,
+                nullptr,
+                leftAsPyObj,
+                rightAsPyObj
+                );
+
+            if (res.first && !res.second) {
+                throw PythonExceptionSet();
+            }
+
+            int result = PyObject_IsTrue(res.second);
+            decref(res.second);
+
+            if (result == -1) {
+                throw PythonExceptionSet();
+            }
+
+            return result != 0;
+        }
     }
 
-    return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
+    if (pyComparisonOp == Py_NE) {
+        return !cmp(left, right, Py_EQ, suppressExceptions);
+    }
+
+    if (pyComparisonOp == Py_EQ) {
+        for (long k = 0; k < m_members.size(); k++) {
+            bool lhsInit = checkInitializationFlag(left, k);
+            bool rhsInit = checkInitializationFlag(right, k);
+
+            if (lhsInit != rhsInit) {
+                return false;
+            }
+
+            if (lhsInit && rhsInit) {
+                if (!m_members[k].getType()->cmp(eltPtr(left, k), eltPtr(right, k), pyComparisonOp, suppressExceptions)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    PyErr_Format(
+        PyExc_TypeError,
+        "'%s' not defined between instances of '%s' and '%s'",
+        pyComparisonOp == Py_EQ ? "==" :
+        pyComparisonOp == Py_NE ? "!=" :
+        pyComparisonOp == Py_LT ? "<" :
+        pyComparisonOp == Py_LE ? "<=" :
+        pyComparisonOp == Py_GT ? ">" :
+        pyComparisonOp == Py_GE ? ">=" : "?",
+        name().c_str(),
+        name().c_str()
+    );
+
+    throw PythonExceptionSet();
 }
 
 void HeldClass::repr(instance_ptr self, ReprAccumulator& stream, bool isStr, bool isClassNotHeldClass) {

@@ -409,26 +409,28 @@ class ClassOrAlternativeWrapperMixin:
         return super().convert_unary_op(context, expr, op)
 
     def convert_bin_op(self, context, l, op, r, inplace):
-        magic = "__add__" if op.matches.Add else \
-            "__sub__" if op.matches.Sub else \
-            "__mul__" if op.matches.Mult else \
-            "__truediv__" if op.matches.Div else \
-            "__floordiv__" if op.matches.FloorDiv else \
-            "__mod__" if op.matches.Mod else \
-            "__matmul__" if op.matches.MatMult else \
-            "__pow__" if op.matches.Pow else \
-            "__lshift__" if op.matches.LShift else \
-            "__rshift__" if op.matches.RShift else \
-            "__or__" if op.matches.BitOr else \
-            "__xor__" if op.matches.BitXor else \
-            "__and__" if op.matches.BitAnd else \
-            "__eq__" if op.matches.Eq else \
-            "__ne__" if op.matches.NotEq else \
-            "__lt__" if op.matches.Lt else \
-            "__gt__" if op.matches.Gt else \
-            "__le__" if op.matches.LtE else \
-            "__ge__" if op.matches.GtE else \
+        magic = (
+            "__add__" if op.matches.Add else
+            "__sub__" if op.matches.Sub else
+            "__mul__" if op.matches.Mult else
+            "__truediv__" if op.matches.Div else
+            "__floordiv__" if op.matches.FloorDiv else
+            "__mod__" if op.matches.Mod else
+            "__matmul__" if op.matches.MatMult else
+            "__pow__" if op.matches.Pow else
+            "__lshift__" if op.matches.LShift else
+            "__rshift__" if op.matches.RShift else
+            "__or__" if op.matches.BitOr else
+            "__xor__" if op.matches.BitXor else
+            "__and__" if op.matches.BitAnd else
+            "__eq__" if op.matches.Eq else
+            "__ne__" if op.matches.NotEq else
+            "__lt__" if op.matches.Lt else
+            "__gt__" if op.matches.Gt else
+            "__le__" if op.matches.LtE else
+            "__ge__" if op.matches.GtE else
             ""
+        )
 
         magic_inplace = '__i' + magic[2:] if magic and inplace else None
 
@@ -479,6 +481,12 @@ class ClassOrAlternativeWrapperMixin:
             "__ror__" if op.matches.BitOr else
             "__rxor__" if op.matches.BitXor else
             "__rand__" if op.matches.BitAnd else
+            "__eq__" if op.matches.Eq else
+            "__ne__" if op.matches.NotEq else
+            "__gt__" if op.matches.Lt else
+            "__lt__" if op.matches.Gt else
+            "__ge__" if op.matches.LtE else
+            "__le__" if op.matches.GtE else
             ""
         )
 

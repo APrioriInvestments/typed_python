@@ -92,7 +92,7 @@ PyFunctionInstance::tryToCallAnyOverload(const Function* f, instance_ptr funcClo
         argTupleTypeDesc.c_str()
         );
 
-    return std::pair<bool, PyObject*>(false, nullptr);
+    return std::pair<bool, PyObject*>(true, nullptr);
 }
 
 // static
