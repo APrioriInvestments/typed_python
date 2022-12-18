@@ -16,7 +16,7 @@ import unittest
 import time
 from typed_python.lib.datetime.date_parser import DateParser
 from typed_python.compiler.runtime import PrintNewFunctionVisitor
-from typed_python import ListOf, Entrypoint
+from typed_python import Entrypoint, ListOf
 
 import pytest
 from datetime import datetime, timedelta
@@ -58,15 +58,10 @@ def get_datetimes_in_range(start, end, step):
     return dates
 
 
-def time_to_sec(hours=0, mins=0, secs=0, fract=0):
-    return (hours * 60 * 60) + (mins * 60) + secs + fract
-
-
-@Entrypoint
 def parseISODatetimes(strings: ListOf(str)):
     res = ListOf(float)()
     for string in strings:
-        res.append(DateParser.parse_iso(string))
+        res.append(DateParser.parse_iso_str(string))
     return res
 
 
@@ -82,7 +77,7 @@ def parseDatetimes(strings: ListOf(str)):
 def parseFormatDatetimes(strings: ListOf(str)):
     res = ListOf(float)()
     for string in strings:
-        res.append(DateParser.parse_format(string, '%Y-%m-%dT%H:%M:%S'))
+        res.append(DateParser.parse_with_format(string, '%Y-%m-%dT%H:%M:%S'))
     return res
 
 
@@ -97,156 +92,8 @@ def make_list_of_iso_datestrings(n):
 
 class TestDateParser(unittest.TestCase):
 
-    def test_empty_string(self):
-        with pytest.raises(ValueError):
-            DateParser.parse('')
-
-    def test_fails_on_random_text(self):
-        with pytest.raises(ValueError):
-            DateParser.parse('scuse me while i kiss the sky')
-
-    def test_fails_with_extra_text(self):
-        with pytest.raises(ValueError):
-            DateParser.parse('1997-01-01 and some more text')
-
-    def test_parse_invalid_year(self):
-        days = [
-            'a997',  # not 4 digit number
-            '97',
-        ]
-        for day in days:
-            with pytest.raises(ValueError):
-                DateParser.parse(day)
-
-    def test_parse_ambiguous_date(self):
-        days = [
-            '22-12-13',
-            '12-12-12'
-        ]
-        for day in days:
-            with pytest.raises(ValueError):
-                DateParser.parse(day)
-
-    def test_parse_valid_year(self):
-        years = [
-            '1997',
-            '2020',
-            '9999',
-            '0000'
-        ]
-        for year in years:
-            DateParser.parse(year)
-
-    def test_parse_invalid_month(self):
-        days = [
-            '1997-00',
-            '1997-13',
-            '1997-ab'
-        ]
-        for day in days:
-            with pytest.raises(ValueError):
-                DateParser.parse_iso(day)
-
-    def test_parse_invalid_day(self):
-        days = [
-            '1997-01-00',  # day < 1
-            '1997-01-32',  # day > 31
-            '1997-04-31',  # day > 30 in Apr
-            '1997-06-31',  # day > 30 in June
-            '1997-09-31',  # day > 30 in Sep
-            '1997-11-31',  # day > 30 in Nov
-            '1997-02-29',  # day > 28 for non-leap year Feb
-            '2020-02-30',  # day > 30 for leap year Feb
-            '2020-02-ab',  # day is not digit
-            '1900-02-29',  # year is multiple of 4, but not leap year so no 29
-        ]
-
-        for day in days:
-            with pytest.raises(ValueError):
-                DateParser.parse_iso(day)
-
-    def test_is_month_valid(self):
-        months = [
-            'Jan', 'January',
-            'Feb', 'February',
-            'Mar', 'March',
-            'Apr', 'April',
-            'May',
-            'Jun', 'June',
-            'Jul', 'July',
-            'Aug', 'August',
-            'Sep', 'Sept', 'September',
-            'Oct', 'October',
-            'Nov', 'November',
-            'Dec', 'December'
-        ]
-
-        for month in months:
-            assert DateParser.is_month(month), month
-            assert DateParser.is_month(month.lower()), month.lower()
-            assert DateParser.is_month(month.upper()), month.upper()
-            assert DateParser.is_month(' ' + month + ' '), month
-
-    def test_is_month_invalid(self):
-        months = [
-            'not a month',
-            'Jane',
-            'Movember',
-            '',
-            '1',
-        ]
-
-        for month in months:
-            assert not DateParser.is_month(month), month
-            assert not DateParser.is_month(month.lower()), month.lower()
-            assert not DateParser.is_month(month.upper()), month.upper()
-
-    def test_is_year_valid(self):
-        years = [
-            '1000',
-            '1999',
-            '0001',
-            '0000'
-        ]
-
-        for year in years:
-            assert DateParser.is_year(year), year
-
-    def test_is_year_invalid(self):
-        years = [
-            '000',
-            'abcd',
-            '10a0',
-            '12345'
-        ]
-
-        for year in years:
-            assert not DateParser.is_year(year), year
-
-    def test_is_tz_offset_valid(self):
-        tz_offsets = [
-            (-12, 0, 0),  # eastmost
-            (14, 0, 0),   # westmost
-            (10, 4, 4),   # random
-        ]
-
-        for tz_offset in tz_offsets:
-            assert DateParser.is_tz_offset(tz_offset[0], tz_offset[1]), tz_offset
-
-    def test_is_tz_offset_invalid(self):
-        tz_offsets = [
-            (-13, 0, 0),  # out of range
-            (-12, 1, 0),  # out of range
-            (14, 1, 0),   # out of range
-            (10, 60, 4),  # min > 59
-            (10, -1, 4),  # min < 0
-        ]
-
-        for tz_offset in tz_offsets:
-            assert not DateParser.is_tz_offset(tz_offset[0], tz_offset[1]), tz_offset
-
     # -------------------------------------------------------
-    # This set of tests exercise the parse() entrypoint
+    # This set of tests exercises the parse() entrypoint
     # -------------------------------------------------------
 
     def test_parse(self):
@@ -297,14 +144,82 @@ class TestDateParser(unittest.TestCase):
             for second in seconds:
                 assert DateParser.parse(second.strftime(format)) == datetime.timestamp(second), second.strftime(format)
 
+    def test_empty_string(self):
+        with pytest.raises(ValueError):
+            DateParser.parse('')
+
+    def test_fails_on_random_text(self):
+        with pytest.raises(ValueError):
+            DateParser.parse('scuse me while i kiss the sky')
+
+    def test_fails_with_extra_text(self):
+        with pytest.raises(ValueError):
+            DateParser.parse('1997-01-01 and some more text')
+
+    def test_parse_invalid_year(self):
+        days = [
+            'a997',  # not 4 digit number
+            '97',
+        ]
+        for day in days:
+            with pytest.raises(ValueError):
+                DateParser.parse(day)
+
+    def test_parse_ambiguous_date(self):
+        days = [
+            '22-12-13',
+            '12-12-12'
+        ]
+        for day in days:
+            with pytest.raises(ValueError):
+                DateParser.parse(day)
+
+    def test_parse_valid_year(self):
+        years = [
+            '1997',
+            '2020',
+            '9999',
+            '0000'
+        ]
+        for year in years:
+            DateParser.parse(year)
+
     # -------------------------------------------------------
-    # This set of tests exercise the parse_iso method
+    # This set of tests exercises the parse_iso method
     # -------------------------------------------------------
+
+    def test_parse_invalid_date(self):
+        days = [
+            '1997-01-00',  # day < 1
+            '1997-01-32',  # day > 31
+            '1997-04-31',  # day > 30 in Apr
+            '1997-06-31',  # day > 30 in June
+            '1997-09-31',  # day > 30 in Sep
+            '1997-11-31',  # day > 30 in Nov
+            '1997-02-29',  # day > 28 for non-leap year Feb
+            '2020-02-30',  # day > 30 for leap year Feb
+            '2020-02-ab',  # day is not digit
+            '1900-02-29',  # year is multiple of 4, but not leap year so no 29
+        ]
+
+        for day in days:
+            with pytest.raises(ValueError):
+                DateParser.parse_iso_str(day)
+
+    def test_parse_iso_invalid_month(self):
+        days = [
+            '1997-00',
+            '1997-13',
+            '1997-ab'
+        ]
+        for day in days:
+            with pytest.raises(ValueError):
+                DateParser.parse_iso_str(day)
 
     def test_parse_iso_yyyy(self):
         years = get_years_in_range(1942, 1970) + get_years_in_range(2001, 2022)
         for year in years:
-            assert DateParser.parse_iso(year.strftime('%Y')) == datetime.timestamp(year), year.strftime('%Y')
+            assert DateParser.parse_iso_str(year.strftime('%Y')) == datetime.timestamp(year), year.strftime('%Y')
 
     def test_parse_iso_yyyymm(self):
         months = get_months_in_year(1999) + get_months_in_year(2020)
@@ -315,7 +230,7 @@ class TestDateParser(unittest.TestCase):
         ]
         for format in formats:
             for month in months:
-                assert DateParser.parse(month.strftime(format)) == datetime.timestamp(month), month.strftime(format)
+                assert DateParser.parse_iso_str(month.strftime(format)) == datetime.timestamp(month), month.strftime(format)
 
     def test_parse_iso_yyyymmdd(self):
         # all days in non leap year and leap year
@@ -330,7 +245,7 @@ class TestDateParser(unittest.TestCase):
         ]
         for format in formats:
             for day in days:
-                assert DateParser.parse_iso(day.strftime(format)) == datetime.timestamp(day), day.strftime(format)
+                assert DateParser.parse_iso_str(day.strftime(format)) == datetime.timestamp(day), day.strftime(format)
 
     def test_parse_iso_yyyymmddhh(self):
         # all hours in feb 2020
@@ -352,7 +267,7 @@ class TestDateParser(unittest.TestCase):
 
         for format in formats:
             for hour in hours:
-                assert DateParser.parse_iso(hour.strftime(format)) == datetime.timestamp(hour), hour.strftime(format)
+                assert DateParser.parse_iso_str(hour.strftime(format)) == datetime.timestamp(hour), hour.strftime(format)
 
     def test_parse_iso_yyyymmddhhmm(self):
         minutes = get_datetimes_in_range(start=datetime(2020, 2, 29, 13, 0, 0, 0, pytz.UTC),
@@ -373,7 +288,7 @@ class TestDateParser(unittest.TestCase):
 
         for format in formats:
             for minute in minutes:
-                assert DateParser.parse(minute.strftime(format)) == datetime.timestamp(minute), minute.strftime(format)
+                assert DateParser.parse_iso_str(minute.strftime(format)) == datetime.timestamp(minute), minute.strftime(format)
 
     def test_parse_iso_yyyymmddhhmmss(self):
         seconds = get_datetimes_in_range(start=datetime(2020, 2, 29, 13, 17, 0, 0, pytz.UTC),
@@ -394,7 +309,7 @@ class TestDateParser(unittest.TestCase):
 
         for format in formats:
             for second in seconds:
-                assert DateParser.parse_iso(second.strftime(format)) == datetime.timestamp(second), second.strftime(format)
+                assert DateParser.parse_iso_str(second.strftime(format)) == datetime.timestamp(second), second.strftime(format)
 
     def test_parse_iso_yyyymmddhhmmsssss(self):
         seconds = get_datetimes_in_range(start=datetime(2020, 2, 29, 13, 17, 0, 0, pytz.UTC),
@@ -415,7 +330,7 @@ class TestDateParser(unittest.TestCase):
 
         for format in formats:
             for second in seconds:
-                assert DateParser.parse_iso(second.strftime(format)) == datetime.timestamp(second) + .123, second.strftime(format)
+                assert DateParser.parse_iso_str(second.strftime(format)) == datetime.timestamp(second) + .123, second.strftime(format)
 
     def test_parse_iso_with_tz_offset(self):
         hours = get_datetimes_in_range(start=datetime(2020, 2, 1, 0, 0, 0, 0, pytz.UTC),
@@ -431,11 +346,42 @@ class TestDateParser(unittest.TestCase):
 
         for format in formats:
             for hour in hours:
-                assert DateParser.parse_iso(hour.strftime(format)) == datetime.timestamp(hour) + tz_offset, hour.strftime(format)
+                assert DateParser.parse_iso_str(hour.strftime(format)) == datetime.timestamp(hour) + tz_offset, hour.strftime(format)
 
     # -------------------------------------------------------
     # This group of tests exercise the parse_non_iso method
     # -------------------------------------------------------
+
+    def test_parse_non_iso_valid_month_string(self):
+        months = [
+            'Jan', 'January',
+            'Feb', 'February',
+            'Mar', 'March',
+            'Apr', 'April',
+            'May',
+            'Jun', 'June',
+            'Jul', 'July',
+            'Aug', 'August',
+            'Sep', 'Sept', 'September',
+            'Oct', 'October',
+            'Nov', 'November',
+            'Dec', 'December'
+        ]
+
+        for month in months:
+            DateParser.parse_non_iso(month + ' 1, 1997')
+
+    def test_parse_non_iso_invalid_month_string(self):
+        months = [
+            'not a month',
+            'Jane',
+            'Movember',
+            '&*&'
+        ]
+
+        for month in months:
+            with pytest.raises(ValueError):
+                DateParser.parse_non_iso(month + ' 1, 1997')
 
     def test_parse_non_iso_with_whitespace(self):
         hours = get_datetimes_in_range(start=datetime(2020, 2, 1, 0, 0, 0, 0, pytz.UTC),
@@ -560,8 +506,7 @@ class TestDateParser(unittest.TestCase):
             for second in seconds:
                 assert DateParser.parse_non_iso(second.strftime(format)) == datetime.timestamp(second), second.strftime(format)
 
-    def test_non_iso_pm_indicator(self):
-
+    def test_parse_non_iso_pm_indicator(self):
         times = get_datetimes_in_range(start=datetime(2020, 2, 29, 13, 0, 0, 0, pytz.UTC),
                                        end=datetime(2020, 2, 29, 23, 59, 0, 0, pytz.UTC),
                                        step='minutes')
@@ -576,8 +521,7 @@ class TestDateParser(unittest.TestCase):
             for t in times:
                 assert DateParser.parse_non_iso(t.strftime(format)) == datetime.timestamp(t), t.strftime(format)
 
-    def test_non_iso_am_indicator(self):
-
+    def test_parse_non_iso_am_indicator(self):
         times = get_datetimes_in_range(start=datetime(2020, 2, 29, 0, 0, 0, 0, pytz.UTC),
                                        end=datetime(2020, 2, 29, 11, 59, 0, 0, pytz.UTC),
                                        step='minutes')
@@ -616,7 +560,7 @@ class TestDateParser(unittest.TestCase):
         date_strings = make_list_of_iso_datestrings(runs)
 
         with PrintNewFunctionVisitor():
-            DateParser.parse_iso('1997')
+            DateParser.parse_iso_str('1997')
 
         start = time.time()
         parseISODatetimes(date_strings)
@@ -644,7 +588,7 @@ class TestDateParser(unittest.TestCase):
     def test_parse_format_yyyy(self):
         years = get_years_in_range(1942, 1970) + get_years_in_range(2001, 2022)
         for year in years:
-            assert DateParser.parse_format(year.strftime('%Y'), '%Y') == datetime.timestamp(year), year.strftime('%Y')
+            assert DateParser.parse_with_format(year.strftime('%Y'), '%Y') == datetime.timestamp(year), year.strftime('%Y')
 
     def test_parse_format_yyyymm(self):
         months = get_months_in_year(1999) + get_months_in_year(2020)
@@ -655,7 +599,7 @@ class TestDateParser(unittest.TestCase):
         ]
         for format in formats:
             for month in months:
-                assert DateParser.parse_format(month.strftime(format), format) == datetime.timestamp(month), month.strftime(format)
+                assert DateParser.parse_with_format(month.strftime(format), format) == datetime.timestamp(month), month.strftime(format)
 
     def test_parse_format_yyyymmdd(self):
         # all days in non leap year and leap year
@@ -670,7 +614,7 @@ class TestDateParser(unittest.TestCase):
         ]
         for format in formats:
             for day in days:
-                assert DateParser.parse_format(day.strftime(format), format) == datetime.timestamp(day), day.strftime(format)
+                assert DateParser.parse_with_format(day.strftime(format), format) == datetime.timestamp(day), day.strftime(format)
 
     def test_parse_format_yyyymmddhh(self):
         # all hours in feb 2020
@@ -692,7 +636,7 @@ class TestDateParser(unittest.TestCase):
 
         for format in formats:
             for hour in hours:
-                assert DateParser.parse_format(hour.strftime(format), format) == datetime.timestamp(hour), hour.strftime(format)
+                assert DateParser.parse_with_format(hour.strftime(format), format) == datetime.timestamp(hour), hour.strftime(format)
 
     def test_parse_format_yyyymmddhhmm(self):
         minutes = get_datetimes_in_range(start=datetime(2020, 2, 29, 13, 0, 0, 0, pytz.UTC),
@@ -728,7 +672,7 @@ class TestDateParser(unittest.TestCase):
         ]
         for format in supported_formats:
             for minute in minutes:
-                assert DateParser.parse_format(minute.strftime(format), format) == datetime.timestamp(minute), minute.strftime(format)
+                assert DateParser.parse_with_format(minute.strftime(format), format) == datetime.timestamp(minute), minute.strftime(format)
 
     def test_parse_format_yyyymmddhhmmss(self):
         seconds = get_datetimes_in_range(start=datetime(2020, 2, 29, 13, 17, 0, 0, pytz.UTC),
@@ -749,14 +693,14 @@ class TestDateParser(unittest.TestCase):
 
         for format in formats:
             for second in seconds:
-                assert DateParser.parse_format(second.strftime(format), format) == datetime.timestamp(second), second.strftime(format)
+                assert DateParser.parse_with_format(second.strftime(format), format) == datetime.timestamp(second), second.strftime(format)
 
     def test_compare_parse_format_perf(self):
         runs = 100000
         date_strings = make_list_of_iso_datestrings(runs)
 
         with PrintNewFunctionVisitor():
-            DateParser.parse_format('1997', '%Y')
+            DateParser.parse_with_format('1997', '%Y')
 
         start = time.time()
         parseFormatDatetimes(date_strings)

@@ -12,11 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Class, Final, Entrypoint, ListOf, Dict
-from typed_python.lib.datetime.chrono import is_leap_year, convert_to_12h, weekday_from_days
-
+from typed_python import Class, Dict, Entrypoint, Final, ListOf
+from typed_python.lib.datetime.chrono import Chrono
 # int to string month mapping where 1 => January
-MONTH_NAMES = Dict(int, str)({
+INT_TO_MONTH_NAMES = Dict(int, str)({
     1: 'January',
     2: 'February',
     3: 'March',
@@ -32,7 +31,7 @@ MONTH_NAMES = Dict(int, str)({
 })
 
 # int to string abbreviated month mapping where 1 => Jan
-MONTH_ABBR = Dict(int, str)({
+INT_TO_MONTH_ABBR = Dict(int, str)({
     1: 'Jan',
     2: 'Feb',
     3: 'Mar',
@@ -48,7 +47,7 @@ MONTH_ABBR = Dict(int, str)({
 })
 
 # int to string abbreviated day mapping where 0 => Sunday
-DAY_NAMES = Dict(int, str)({
+INT_TO_DAY_NAMES = Dict(int, str)({
     0: 'Sunday',
     1: 'Monday',
     2: 'Tuesday',
@@ -59,7 +58,7 @@ DAY_NAMES = Dict(int, str)({
 })
 
 # int to string abbreviated day mapping where 0 => Sun
-DAY_ABBR = Dict(int, str)({
+INT_TO_DAY_ABBR = Dict(int, str)({
     0: 'Sun',
     1: 'Mon',
     2: 'Tue',
@@ -70,8 +69,12 @@ DAY_ABBR = Dict(int, str)({
 })
 
 
-class DateFormatter(Class, Final):
+@Entrypoint
+def convert_to_12h(hour: int):
+    return 12 if (hour == 0 or hour == 12 or hour == 24) else (hour if hour < 12 else hour - 12)
 
+
+class DateFormatter(Class, Final):
     @Entrypoint
     @staticmethod
     def isoformat(ts: float, utc_offset: int = 0):
@@ -162,7 +165,7 @@ class DateFormatter(Class, Final):
         min = (tsi // 60) % 60
         s = tsi % 60
 
-        weekday = weekday_from_days(tsi // 86400)
+        weekday = Chrono.weekday_from_days(tsi // 86400)
 
         # Above is based on a year starting on March 1.
         # Shift to January 1 based year by adding 60 days and wrapping
@@ -171,7 +174,7 @@ class DateFormatter(Class, Final):
             doy = doy % 365
 
         # add extra day to doy if leap year and month is march or greater
-        if m > 2 and is_leap_year(y):
+        if m > 2 and Chrono.is_leap_year(y):
             doy += 1
 
         # short circuits for common formats
@@ -215,15 +218,15 @@ class DateFormatter(Class, Final):
                 elif directive == 'S':
                     result.append(DateFormatter.f2d(s))
                 elif directive == 'a':
-                    result.append(DAY_ABBR[weekday])
+                    result.append(INT_TO_DAY_ABBR[weekday])
                 elif directive == 'A':
-                    result.append(DAY_NAMES[weekday])
+                    result.append(INT_TO_DAY_NAMES[weekday])
                 elif directive == 'w':
                     result.append(str(weekday))
                 elif directive == 'b':
-                    result.append(MONTH_ABBR[m])
+                    result.append(INT_TO_MONTH_ABBR[m])
                 elif directive == 'B':
-                    result.append(MONTH_NAMES[m])
+                    result.append(INT_TO_MONTH_NAMES[m])
                 elif directive == 'y':
                     result.append(DateFormatter.f2d(y % 100))
                 elif directive == 'I':
