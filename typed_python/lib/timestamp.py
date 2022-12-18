@@ -17,7 +17,7 @@ from typed_python.compiler.runtime import Entrypoint
 from typed_python import Class, Final, Member, Held
 from typed_python.lib.datetime.date_parser import DateParser
 from typed_python.lib.datetime.date_formatter import DateFormatter
-from typed_python.lib.datetime.chrono import date_to_seconds, time_to_seconds
+from typed_python.lib.datetime.chrono import Chrono
 
 
 @Held
@@ -124,4 +124,4 @@ class Timestamp(Class, Final):
         Returns:
             timestamp (Timestamp): A Timestamp
         '''
-        return Timestamp(ts=date_to_seconds(year, month, day) + time_to_seconds(hour, minute, second))
+        return Timestamp(ts=Chrono.date_to_seconds(year, month, day) + Chrono.time_to_seconds(hour, minute, second))

@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 import unittest
-from typed_python.lib.datetime.chrono import is_leap_year, is_date, is_time
+from typed_python.lib.datetime.chrono import Chrono
 
 
 class TestChrono(unittest.TestCase):
@@ -24,7 +24,7 @@ class TestChrono(unittest.TestCase):
         ]
 
         for year in leap_years:
-            assert is_leap_year(year), year
+            assert Chrono.is_leap_year(year), year
 
     def test_is_leap_year_invalid(self):
         not_leap_years = [
@@ -32,7 +32,7 @@ class TestChrono(unittest.TestCase):
         ]
 
         for year in not_leap_years:
-            assert not is_leap_year(year), year
+            assert not Chrono.is_leap_year(year), year
 
     def test_is_date_valid(self):
         # y, m, d
@@ -42,7 +42,7 @@ class TestChrono(unittest.TestCase):
         ]
 
         for date in dates:
-            assert is_date(date[0], date[1], date[2]), date
+            assert Chrono.is_valid_date(date[0], date[1], date[2]), date
 
     def test_is_date_invalid(self):
         # y, m, d
@@ -62,7 +62,7 @@ class TestChrono(unittest.TestCase):
         ]
 
         for date in dates:
-            assert not is_date(date[0], date[1], date[2]), date
+            assert not Chrono.is_valid_date(date[0], date[1], date[2]), date
 
     def test_is_time_valid(self):
         # h, m, s
@@ -73,7 +73,7 @@ class TestChrono(unittest.TestCase):
             (12, 59, 59)  # random time
         ]
         for time in times:
-            assert is_time(time[0], time[1], time[2]), time
+            assert Chrono.is_valid_time(time[0], time[1], time[2]), time
 
     def test_is_time_invalid(self):
         # h, m, s
@@ -87,4 +87,4 @@ class TestChrono(unittest.TestCase):
             (1, 60, 0)    # min > 59
         ]
         for time in times:
-            assert not is_time(time[0], time[1], time[2]), time
+            assert not Chrono.is_valid_time(time[0], time[1], time[2]), time
