@@ -35,7 +35,7 @@ class Timestamp(Class, Final):
 
     @Entrypoint
     def __str__(self):
-        return self.format()
+        return str(self.ts)
 
     @Entrypoint
     def __eq__(self, other) -> bool:
@@ -62,12 +62,16 @@ class Timestamp(Class, Final):
         return self.ts <= other.ts
 
     @Entrypoint
-    def __add__(self, other):
-        return Timestamp(ts=self.ts + other.ts)
+    def __add__(self, other: float):
+        return Timestamp(ts=self.ts + other)
 
     @Entrypoint
-    def __sub__(self, other):
-        return Timestamp(ts=self.ts - other.ts)
+    def __sub__(self, other) -> float:
+        return self.ts - other.ts
+
+    @Entrypoint
+    def midpoint(self, other):
+        return self + (other - self) / 2
 
     @Entrypoint
     @staticmethod
