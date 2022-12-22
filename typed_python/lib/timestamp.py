@@ -114,6 +114,12 @@ class Timestamp(Class, Final):
         return DateFormatter.format(self.ts, utc_offset, format)
 
     @Entrypoint
+    def weekday(self, offset=0) -> int:
+        assert offset == 0, "Not implemented"
+
+        return Chrono.weekday_from_days(int(self.ts) // 86400)
+
+    @Entrypoint
     @staticmethod
     def from_date(year=0, month=0, day=0, hour=0, minute=0, second=0):
         '''

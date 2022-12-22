@@ -105,6 +105,20 @@ def formatDatetimes(datetimes: ListOf(datetime)):
 
 
 class TestTimestamp(unittest.TestCase):
+    def test_aaron_demo(self):
+        ts = Timestamp.make(time.time())
+
+        print(ts.weekday())
+        print((ts + 86400).weekday())
+
+        for userString in [
+            "2029-01-01 23:59:59",
+            "2020-01-01 23:59:59",
+            "2039-01-01 23:59:59",
+        ]:
+            ts = Timestamp.parse(userString)
+
+            print(userString, ts.weekday(), (ts + 1).weekday())
 
     def test_demo_usage(self):
 
@@ -145,6 +159,10 @@ class TestTimestamp(unittest.TestCase):
         # get date string from timestamp as YYYY-MM-DD
         ts = Timestamp.make(time.time())
         ts.format(format='%Y-%m-%d')
+
+        print(repr(ts))
+        print(ts)
+        print(ts.format(format='%Y-%m-%d'))
 
     def test_eq(self):
         # The following commented block of code sometimes unexpectedly errors with something like
