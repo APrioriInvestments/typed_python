@@ -17,7 +17,7 @@ from typed_python.compiler.runtime import Entrypoint
 from typed_python import Class, Final, Member, Held
 from typed_python.lib.datetime.date_parser import DateParser
 from typed_python.lib.datetime.date_formatter import DateFormatter
-from typed_python.lib.datetime.chrono import Chrono
+from typed_python.lib.datetime.date_time import UTC, NYC, Timezone
 
 
 @Held
@@ -77,13 +77,6 @@ class Timestamp(Class, Final):
     @Entrypoint
     @staticmethod
     def make(ts: float):
-        """
-        Creates a Timestamp from a float
-        Parameters:
-            ts: a float
-        Returns:
-            timestamp (Timestamp): A Timestamp
-        """
         return Timestamp(ts=ts)
 
     @Entrypoint
@@ -92,44 +85,76 @@ class Timestamp(Class, Final):
 
     @Entrypoint
     @staticmethod
-    def parse(date_str: str):
-        """
-        Creates a Timestamp from date strings.
-        Parameters:
-            date_str (str): A date string. E.g 2022-07-30 17:56:46
-        Returns:
-            timestamp (Timestamp): A Timestamp
-        """
-        return Timestamp(ts=DateParser.parse(date_str))
-
-    @Entrypoint
-    def format(self, utc_offset: int = 0, format: str = "%Y-%m-%d %H:%M:%S") -> str:
-        """
-        Converts a Timestamp to a string in a given format
-        Parameters:
-            utc_offset (int): The offset from UTC in seconds
-            format (str): A string specifying formatting directives. E.g. '%Y-%m-%dT%H:%M:%S'
-        Returns:
-            date_str(str): A string representing the date in the specified format. E.g. "Mon January 2, 2021"
-        """
-        return DateFormatter.format(self.ts, utc_offset, format)
+    def parse(date_str: str, timezone: Timezone):  # noqa: F811
+        return Timestamp(ts=DateParser.parse_with_timezone(date_str, timezone))
 
     @Entrypoint
     @staticmethod
-    def from_date(year=0, month=0, day=0, hour=0, minute=0, second=0):
+    def parse_nyc(date_str: str):
+        return Timestamp(ts=DateParser.parse_with_timezone(date_str, NYC))
+
+    @Entrypoint
+    @staticmethod
+    def parse(date_str: str):  # noqa: F811
+        return Timestamp(ts=DateParser.parse(date_str))
+
+    @Entrypoint
+    def format(self, timezone: Timezone = UTC, format: str = "%Y-%m-%d %H:%M:%S") -> str:
+        """ Converts a Timestamp to a formatted string in a given timezone
+
+        Parameters
+        ----------
+        timezone : Timezone
+            The timezone in which to compute formatted string of the UTC timestamp.
+        format : str
+            The format for the string.
         """
-        Creates a Timestamp from date values.
-        Parameters:
-            year (int): The year
-            month (int): The month. January: 1, February: 2, ....
-            day (int): The day
-            hour (int): The hour (0-23)
-            minute (int): The minute
-            second (float): The second.
-        Returns:
-            timestamp (Timestamp): A Timestamp
+        return DateFormatter.format(self.ts, timezone, format)
+
+    @Entrypoint
+    def format_nyc(self, format: str = "%Y-%m-%d %H:%M:%S") -> str:
+        """ Converts a Timestamp to a formatted string in NYC
+
+        Parameters
+        ----------
+        format : str
+            The format for the string.
         """
-        return Timestamp(
-            ts=Chrono.date_to_seconds(year, month, day)
-            + Chrono.time_to_seconds(hour, minute, second)
-        )
+        return DateFormatter.format(self.ts, NYC, format)
+
+    @Entrypoint
+    def weekday(self, timezone: Timezone) -> int:
+        """The day of the week of the timestamp in a given timezone.
+            0 => Sunday,  1 => Monday
+
+        Parameters
+        ----------
+        timezone : Timezone
+            The timezone in which to compute the weekday.
+
+        """
+        return timezone.datetime(self.ts).date.weekday()
+
+    @Entrypoint
+    def dayOfYear(self, timezone: Timezone) -> int:
+        """Get the day of the year for the timestamp in a given timezone..
+
+        Parameters
+        ----------
+        timezone : Timezone
+            The timezone in which to compute the day of the year.
+
+        """
+        return timezone.datetime(self.ts).date.dayOfYear()
+
+    @Entrypoint
+    def quarterOfYear(self, timezone: Timezone) -> int:
+        """Get the quarter of the year for the timestamp in a given timezone..
+
+        Parameters
+        ----------
+        timezone : Timezone
+            The timezone in which to compute the day of the year.
+
+        """
+        return timezone.datetime(self.ts).date.quarterOfYear()

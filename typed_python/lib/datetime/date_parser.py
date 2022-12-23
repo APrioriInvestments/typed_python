@@ -14,8 +14,16 @@
 
 from typed_python import Class, Dict, Final
 from typed_python import Entrypoint, ListOf
-from typed_python.lib.datetime.timezone import Timezone
 from typed_python.lib.datetime.chrono import Chrono
+from typed_python.lib.datetime.date_time import (
+    Timezone,
+    UTC,
+    TimezoneChecker,
+    TimeOfDay,
+    Date,
+    DateTime,
+    FixedOffsetTimezone,
+)
 
 JAN = "jan"
 FEB = "feb"
@@ -123,47 +131,7 @@ def is2d(str: str) -> bool:
 class DateParser(Class, Final):
     @Entrypoint
     @staticmethod
-    def parse(date_str: str, format: str = "") -> float:
-        """
-        Parse a date string and return a unix timestamp
-        Parameters:
-            date_str (str): A string representing a date time. examples: 2022-01-03T02:45 or January 2, 1997 2:00pm
-            format (str): An optional format string. E.g. '%Y-%m-%d'. If no format string is provided, the parser will
-                        correctly parse ISO 8601 formatted strings and a number of non ISO 8601 formats
-        Returns:
-            (float) A unix timestamp
-        """
-        if format != "":
-            return DateParser.parse_with_format(date_str, format)
-
-        try:
-            return DateParser.parse_iso_str(date_str)
-        except ValueError:
-            return DateParser.parse_non_iso(date_str)
-
-    @Entrypoint
-    @staticmethod
     def parse_with_format(date_str: str, format: str) -> float:
-        """
-        Parse a date string in the specified format and return a unix timestamp
-        Parameters:
-            date_str (str): A date string
-            format (str): A string containing format directives. E.g. '%Y-%m-%d'
-                Supported directives are:
-                   %Y (zero padded 4 digit year)
-                   %m (zero padded 2 digit month, 01-12)
-                   %d (zero padded 2 digit day, 01-31)
-                   %H (zero padded 2 digit hour in 24 hour format, 00-24)
-                   %I (zero padded 2 digit hour in 12 hour format, 00-12)
-                   %M (zero padded 2 digit minute, 00-59)
-                   %S (zero padded 2 digit second, 00-59)
-                   %b (3 character month abbreviation, jan-dec)
-                   %B (month, january-december)
-                   %Z (timezone abbreviation, e.g. EST, UTC, NYC)
-                   %z (timezone offset, e.g. +0000, +00:00)
-        Returns:
-            (float) A unix timestamp
-        """
         year, month, day, hour, minute, second = -1, -1, -1, 0, 0, 0
         tz_str = ""
 
@@ -285,25 +253,25 @@ class DateParser(Class, Final):
                         raise ValueError("Bad value for %B:", date_str)
                 elif directive == "Z":
                     # 5 character tz abbreviations (future proofing since we don't currently support any)
-                    if Timezone.is_valid_tz_string(
+                    if TimezoneChecker.isValidTimezone(
                         date_str[date_str_cursor:date_str_cursor + 4]
                     ):
                         tz_str = date_str[date_str_cursor:date_str_cursor + 4]
                         date_str_cursor += 4
                     # 4 character tz abbreviations (future proofing since we don't currenlty support any)
-                    elif Timezone.is_valid_tz_string(
+                    elif TimezoneChecker.isValidTimezone(
                         date_str[date_str_cursor:date_str_cursor + 4]
                     ):
                         tz_str = date_str[date_str_cursor:date_str_cursor + 4]
                         date_str_cursor += 4
                     # e.g. EST, EDT, PST
-                    elif Timezone.is_valid_tz_string(
+                    elif TimezoneChecker.isValidTimezone(
                         date_str[date_str_cursor:date_str_cursor + 3]
                     ):
                         tz_str = date_str[date_str_cursor:date_str_cursor + 3]
                         date_str_cursor += 3
                     # e.g. PT, ET, CT
-                    elif Timezone.is_valid_tz_string(
+                    elif TimezoneChecker.isValidTimezone(
                         date_str[date_str_cursor:date_str_cursor + 2]
                     ):
                         tz_str = date_str[date_str_cursor:date_str_cursor + 2]
@@ -312,13 +280,13 @@ class DateParser(Class, Final):
                         raise ValueError("Bad value for %Z:", date_str)
                 elif directive == "z":
                     # [+|-]DDDD or [+|-]DD:DD, e.g. +0000, +1200
-                    if Timezone.is_valid_tz_string(
+                    if TimezoneChecker.isValidTimezone(
                         date_str[date_str_cursor:date_str_cursor + 5]
                     ):
                         tz_str = date_str[date_str_cursor:date_str_cursor + 5]
                         date_str_cursor += 5
                     # [+|-]DD or [+|-]DD
-                    elif Timezone.is_valid_tz_string(
+                    elif TimezoneChecker.isValidTimezone(
                         date_str[date_str_cursor:date_str_cursor + 3]
                     ):
                         tz_str = date_str[date_str_cursor:date_str_cursor + 3]
@@ -357,22 +325,308 @@ class DateParser(Class, Final):
         if day == -1:
             day = 1
 
-        datetime = Chrono.date_to_seconds(year, month, day) + Chrono.time_to_seconds(
-            hour, minute, second
+        timezone = DateParser.get_timezone_from_string(tz_str)
+
+        datetime = DateTime(
+            date=Date(year=year, month=month, day=day),
+            timeOfDay=TimeOfDay(hour=hour, minute=minute, second=second),
+        )
+        return timezone.timestamp(datetime)
+
+    @Entrypoint
+    @staticmethod
+    def parse_with_timezone(
+        date_str: str, timezone: Timezone, format: str = ""
+    ) -> float:
+        if format != "":
+            return DateParser.parse_with_format_and_timezone(date_str, format, timezone)
+        try:
+            return DateParser.parse_iso_str_and_timezone(date_str, timezone)
+        except ValueError:
+            return DateParser.parse_non_iso(date_str, timezone)
+
+    @Entrypoint
+    @staticmethod
+    def parse(date_str: str, format: str = "") -> float:
+        """
+        Parse a date string and return a unix timestamp
+        Parameters:
+            date_str (str): A string representing a date time. examples: 2022-01-03T02:45 or January 2, 1997 2:00pm
+            format (str): An optional format string. E.g. '%Y-%m-%d'. If no format string is provided, the parser will
+                        correctly parse ISO 8601 formatted strings and a number of non ISO 8601 formats
+        Returns:
+            (float) A unix timestamp
+        """
+        if format != "":
+            return DateParser.parse_with_format(date_str, format)
+
+        try:
+            return DateParser.parse_iso_str(date_str)
+        except ValueError:
+            return DateParser.parse_non_iso(date_str)
+
+    @Entrypoint
+    @staticmethod
+    def parse_with_format_and_timezone(
+        date_str: str, format: str, timezone: Timezone
+    ) -> float:
+        """
+        Parse a date string in the specified format and return a unix timestamp
+        Parameters:
+            date_str (str): A date string
+            format (str): A string containing format directives. E.g. '%Y-%m-%d'
+                Supported directives are:
+                   %Y (zero padded 4 digit year)
+                   %m (zero padded 2 digit month, 01-12)
+                   %d (zero padded 2 digit day, 01-31)
+                   %H (zero padded 2 digit hour in 24 hour format, 00-24)
+                   %I (zero padded 2 digit hour in 12 hour format, 00-12)
+                   %M (zero padded 2 digit minute, 00-59)
+                   %S (zero padded 2 digit second, 00-59)
+                   %b (3 character month abbreviation, jan-dec)
+                   %B (month, january-december)
+                   %Z (timezone abbreviation, e.g. EST, UTC, NYC)
+                   %z (timezone offset, e.g. +0000, +00:00)
+        Returns:
+            (float) A unix timestamp
+        """
+        year, month, day, hour, minute, second = -1, -1, -1, 0, 0, 0
+
+        format_str_len = len(format)
+        date_str = date_str.lower()
+        ampm = ""
+        date_str_cursor = format_cursor = 0
+
+        while format_cursor < format_str_len:
+            if format[format_cursor] == "%" and format_cursor + 1 < format_str_len:
+                directive = format[format_cursor + 1]
+                format_cursor += 1
+
+                if directive == "Y":
+                    if is4d(date_str[date_str_cursor:date_str_cursor + 4]):
+                        year = int(date_str[date_str_cursor:date_str_cursor + 4])
+                        date_str_cursor += 4
+                    else:
+                        raise ValueError("Bad value for %Y:", date_str)
+                elif directive == "m":
+                    if is2d(date_str[date_str_cursor:date_str_cursor + 2]):
+                        month = int(date_str[date_str_cursor:date_str_cursor + 2])
+                        date_str_cursor += 2
+                    else:
+                        raise ValueError("Bad value for %m:", date_str)
+                elif directive == "d":
+                    if is2d(date_str[date_str_cursor:date_str_cursor + 2]):
+                        day = int(date_str[date_str_cursor:date_str_cursor + 2])
+                        date_str_cursor += 2
+                    else:
+                        raise ValueError("Bad value for %d:", date_str)
+                elif directive == "H":
+                    if is2d(date_str[date_str_cursor:date_str_cursor + 2]):
+                        hour = int(date_str[date_str_cursor:date_str_cursor + 2])
+                        date_str_cursor += 2
+                    else:
+                        raise ValueError("Bad value for %H:", date_str)
+                elif directive == "I":
+                    if is2d(date_str[date_str_cursor:date_str_cursor + 2]):
+                        hour = int(date_str[date_str_cursor:date_str_cursor + 2])
+                        date_str_cursor += 2
+                    else:
+                        raise ValueError("Bad value for %I:", date_str)
+                elif directive == "M":
+                    if is2d(date_str[date_str_cursor:date_str_cursor + 2]):
+                        minute = int(date_str[date_str_cursor:date_str_cursor + 2])
+                        date_str_cursor += 2
+                    else:
+                        raise ValueError("Bad value for %M:", date_str)
+                elif directive == "S":
+                    if is2d(date_str[date_str_cursor:date_str_cursor + 2]):
+                        second = int(date_str[date_str_cursor:date_str_cursor + 2])
+                        date_str_cursor += 2
+                    else:
+                        raise ValueError("Bad value for %SL", date_str)
+                elif directive == "b":
+                    month = date_str[date_str_cursor:date_str_cursor + 3]
+                    if month in MONTH_TO_INT:
+                        month = MONTH_TO_INT[month]
+                        date_str_cursor += 3
+                    else:
+                        raise ValueError("Bad value for %b:", date_str)
+                elif directive == "B":
+                    # september
+                    if date_str[date_str_cursor:date_str_cursor + 9] in MONTH_TO_INT:
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor:date_str_cursor + 9]
+                        ]
+                        date_str_cursor += 9
+                    # february, november, december
+                    elif (
+                        date_str[date_str_cursor:date_str_cursor + 8] in MONTH_TO_INT
+                    ):
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor:date_str_cursor + 8]
+                        ]
+                        date_str_cursor += 8
+                    # january,october
+                    elif (
+                        date_str[date_str_cursor:date_str_cursor + 7] in MONTH_TO_INT
+                    ):
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor:date_str_cursor + 7]
+                        ]
+                        date_str_cursor += 7
+                    # august
+                    elif (
+                        date_str[date_str_cursor:date_str_cursor + 6] in MONTH_TO_INT
+                    ):
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor:date_str_cursor + 6]
+                        ]
+                        date_str_cursor += 6
+                    # march,april
+                    elif (
+                        date_str[date_str_cursor:date_str_cursor + 5] in MONTH_TO_INT
+                    ):
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor:date_str_cursor + 5]
+                        ]
+                        date_str_cursor += 5
+                    # june, july
+                    elif (
+                        date_str[date_str_cursor:date_str_cursor + 4] in MONTH_TO_INT
+                    ):
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor:date_str_cursor + 4]
+                        ]
+                        date_str_cursor += 4
+                    # may
+                    elif (
+                        date_str[date_str_cursor:date_str_cursor + 3] in MONTH_TO_INT
+                    ):
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor:date_str_cursor + 3]
+                        ]
+                        date_str_cursor += 3
+                    else:
+                        raise ValueError("Bad value for %B:", date_str)
+
+                elif directive.lower() == "z":
+                    raise Exception(
+                        "You cannot pass a timezone via string "
+                        "if you are already passing it directly"
+                    )
+
+                elif directive == "p":
+                    tok = date_str[date_str_cursor:date_str_cursor + 2]
+                    if tok != AM and tok != PM:
+                        raise ValueError("Bad value for %p:", date_str)
+                    ampm = tok
+                    date_str_cursor += 2
+                else:
+                    raise ValueError("Unsupported directive:", directive)
+
+                format_cursor += 1
+            else:
+                format_cursor += 1
+                date_str_cursor += 1
+
+        if ampm != "":
+            if hour > 12 or hour < 1:
+                raise ValueError("AM/PM specified. hour must be between 1 and 12")
+            if ampm == AM and hour == 12:
+                hour = 0
+            elif ampm == PM:
+                hour = hour + 12
+
+        if not Chrono.is_valid_date(year, month, day):
+            raise ValueError("Invalid date:", date_str)
+        if not Chrono.is_valid_time(hour, minute, second):
+            raise ValueError("Invalid time:", date_str)
+
+        if month == -1:
+            month = 1
+        if day == -1:
+            day = 1
+
+        datetime = DateTime(year, month, day, hour, minute, second)
+        return timezone.timestamp(datetime)
+
+    @Entrypoint
+    @staticmethod
+    def parse_iso_str_and_timezone(date_str: str, timezone: Timezone) -> float:
+        tokens = DateParser._get_tokens(
+            time_str=date_str.lower().replace(" ", T), skip_chars="/-:"
         )
 
-        if Timezone.is_valid_tz_string(tz_str):
-            datetime += Timezone.tz_str_to_utc_offset(tz_str, datetime)
-        else:
-            raise ValueError("Unrecognized timezone: ", tz_str)
+        # Process date segment
+        date_tokens = ListOf(str)()
+        cursor = 0
+        while cursor < len(tokens):
+            if tokens[cursor] == T or tokens[cursor] == PLUS or tokens[cursor] == DASH:
+                cursor += 1
+                break
+            else:
+                date_tokens.append(tokens[cursor])
+                cursor += 1
 
-        return datetime
+        year = month = day = -1
+
+        if len(date_tokens) == 1:
+            if len(date_tokens[0]) == 8:
+                year, month, day = (
+                    int(date_tokens[0][:4]),
+                    int(date_tokens[0][4:6]),
+                    int(date_tokens[0][6:8]),
+                )
+            elif len(date_tokens[0]) == 6:
+                year, month, day = int(date_tokens[0][:4]), int(date_tokens[0][4:6]), 1
+            elif len(date_tokens[0]) == 4:
+                year, month, day = int(date_tokens[0][:4]), 1, 1
+        elif len(date_tokens) == 2 and is4d(date_tokens[0]):
+            year, month, day = int(date_tokens[0]), int(date_tokens[1]), 1
+        elif len(date_tokens) == 3 and is4d(date_tokens[0]):
+            year, month, day = (
+                int(date_tokens[0]),
+                int(date_tokens[1]),
+                int(date_tokens[2]),
+            )
+        else:
+            raise ValueError("Invalid format: ", date_tokens)
+
+        if not Chrono.is_valid_date(year, month, day):
+            raise ValueError("Invalid date_tokens: ", date_tokens)
+
+        midnight = timezone.timestamp(DateTime(year, month, day, 0, 0, 0.0))
+
+        if cursor >= len(tokens):
+            return midnight
+
+        # Process time segement
+        time_tokens = ListOf(str)()
+        while cursor < len(tokens):
+            if tokens[cursor] == T:
+                cursor += 1
+                break
+            elif tokens[cursor] == PLUS or tokens[cursor] == DASH:
+                break
+            elif tokens[cursor].isalpha():
+                raise ValueError("Invalid date_tokens: ", date_tokens)
+            else:
+                time_tokens.append(tokens[cursor])
+                cursor += 1
+
+        timeOfDay = DateParser._parse_iso_time_tokens(time_tokens)
+        datetime = DateTime(
+            year, month, day, timeOfDay.hour, timeOfDay.minute, timeOfDay.second
+        )
+
+        return timezone.timestamp(datetime)
 
     @Entrypoint
     @staticmethod
     def parse_iso_str(date_str: str) -> float:
         """
         Converts an ISO 8601 formated date string to a unix timestamp
+        (this means year - month - day)
         Parameters:
             date_str (str): An ISO 8601 formatted string
         Returns:
@@ -420,10 +674,10 @@ class DateParser(Class, Final):
         if not Chrono.is_valid_date(year, month, day):
             raise ValueError("Invalid date_tokens: ", date_tokens)
 
-        dt = Chrono.date_to_seconds(year, month, day)
+        midnight = UTC.timestamp(DateTime(year, month, day, 0, 0, 0.0))
 
         if cursor >= len(tokens):
-            return dt
+            return midnight
 
         # Process time segement
         time_tokens = ListOf(str)()
@@ -441,15 +695,21 @@ class DateParser(Class, Final):
                 time_tokens.append(tokens[cursor])
                 cursor += 1
 
-        dt += DateParser._parse_iso_time_tokens(time_tokens)
-        if cursor >= len(tokens):
-            return dt
+        timeOfDay = DateParser._parse_iso_time_tokens(time_tokens)
+        datetime = DateTime(
+            year, month, day, timeOfDay.hour, timeOfDay.minute, timeOfDay.second
+        )
 
-        return Timezone.ts_to_utc(dt, "".join(tokens[cursor:]))
+        if cursor >= len(tokens):
+            return UTC.timestamp(datetime)
+
+        timezone = DateParser.get_timezone_from_string("".join(tokens[cursor:]))
+
+        return timezone.timestamp(datetime)
 
     @Entrypoint
     @staticmethod
-    def _parse_iso_time_tokens(time_tokens: ListOf(str)):
+    def _parse_iso_time_tokens(time_tokens: ListOf(str)) -> TimeOfDay:
         hour, minute, second = 0, 0, 0.0
 
         if len(time_tokens) == 1:
@@ -479,7 +739,7 @@ class DateParser(Class, Final):
         if not Chrono.is_valid_time(hour, minute, second):
             raise ValueError("Invalid time: ", time_tokens)
 
-        return Chrono.time_to_seconds(hour, minute, second)
+        return TimeOfDay(hour=hour, minute=minute, second=second)
 
     @Entrypoint
     @staticmethod
@@ -545,7 +805,7 @@ class DateParser(Class, Final):
 
     @Entrypoint
     @staticmethod
-    def parse_non_iso_time(tokens) -> float:
+    def parse_non_iso_time(tokens) -> TimeOfDay:
         """
         Converts a set of tokens representing a time seconds
         Parameters:
@@ -556,7 +816,7 @@ class DateParser(Class, Final):
         h = m = s = 0
 
         if len(tokens) == 0:
-            return 0
+            return TimeOfDay(hour=0, minute=0, second=0.0)
 
         # break into time and ampm parts
         sep_idx = -1
@@ -605,11 +865,11 @@ class DateParser(Class, Final):
 
         if not Chrono.is_valid_time(h, m, s):
             raise ValueError("Invalid time: ", h, m, s)
-        return Chrono.time_to_seconds(h, m, s)
+        return TimeOfDay(hour=h, minute=m, second=s)
 
     @Entrypoint
     @staticmethod
-    def parse_non_iso(date_str: str) -> float:
+    def parse_non_iso(date_str: str, timezone: Timezone = UTC) -> float:
         """
         Parse a date string and return a unix timestamp
         Parameters:
@@ -666,28 +926,49 @@ class DateParser(Class, Final):
                     tokens[5:],
                 )
 
+            # 5+ DD-MM-YYYY or DD/MM/YYYY
+            elif (
+                len(tokens) >= 5
+                and is4d(tokens[4])
+                and (tokens[1] == BACKSLASH and tokens[3] == BACKSLASH)
+                or (tokens[1] == DASH and tokens[3] == DASH)
+                and tokens[0].isdigit()
+                and tokens[2].isdigit()
+            ):
+                if int(tokens[0]) > 12:
+                    y, m, d, time_tokens = (
+                        int(tokens[4]),
+                        int(tokens[2]),
+                        int(tokens[0]),
+                        tokens[5:],
+                    )
+                else:
+                    y, m, d, time_tokens = (
+                        int(tokens[4]),
+                        int(tokens[0]),
+                        int(tokens[2]),
+                        tokens[5:],
+                    )
             else:
                 raise ValueError("Unsupported date format: " + date_str)
 
-        # 5+ tokens with 4 digit year as 1st token
+        # YYYY/Month/DD or YYYY-Month-DD
         elif (
             len(tokens) >= 5
             and is4d(tokens[0])
             and is_month(tokens[2])
             and tokens[4].isdigit()
+            and (
+                (tokens[1] == BACKSLASH and tokens[3] == BACKSLASH)
+                or (tokens[1] == DASH and tokens[3] == DASH)
+            )
         ):
-            # YYYY/Month/DD or YYYY-Month-DD
-            if (tokens[1] == BACKSLASH and tokens[3] == BACKSLASH) or (
-                tokens[1] == DASH and tokens[3] == DASH
-            ):
-                y, m, d, time_tokens = (
-                    int(tokens[0]),
-                    MONTH_TO_INT[tokens[2]],
-                    int(tokens[4]),
-                    tokens[5:],
-                )
-            else:
-                raise ValueError("Unsupported date format: " + date_str)
+            y, m, d, time_tokens = (
+                int(tokens[0]),
+                MONTH_TO_INT[tokens[2]],
+                int(tokens[4]),
+                tokens[5:],
+            )
 
         # Month D YYYY
         elif (
@@ -731,12 +1012,92 @@ class DateParser(Class, Final):
                 tokens[3:],
             )
 
+        # YYYY-MM-DD or YYYY/MM/DD
+        elif (
+            len(tokens) >= 5
+            and is4d(tokens[0])
+            and tokens[2].isdigit()
+            and tokens[4].isdigit()
+            and (
+                (tokens[1] == BACKSLASH and tokens[3] == BACKSLASH)
+                or (tokens[1] == DASH and tokens[3] == DASH)
+            )
+        ):
+            y, m, d, time_tokens = (
+                int(tokens[0]),
+                int(tokens[2]),
+                int(tokens[4]),
+                tokens[5:],
+            )
+
+        # YYYYMMDD-time
+        elif (
+            len(tokens) >= 1
+            and len(tokens[0]) == 8
+            and tokens[0].isdigit()
+            and tokens[1] == DASH
+        ):
+            y, m, d, time_tokens = (
+                int("".join(tokens[0][:4])),
+                int("".join(tokens[0][4:6])),
+                int("".join(tokens[0][6:8])),
+                tokens[2:],
+            )
+
+        # DD-Month-YY or DD/Month/YY
+        elif (
+            len(tokens) >= 5
+            and is2d(tokens[0])
+            and is2d(tokens[4])
+            and is_month(tokens[2])
+            and (
+                (tokens[1] == BACKSLASH and tokens[3] == BACKSLASH)
+                or (tokens[1] == DASH and tokens[3] == DASH)
+            )
+        ):
+            y, m, d, time_tokens = (
+                int(tokens[4]),
+                MONTH_TO_INT[tokens[2]],
+                int(tokens[0]),
+                tokens[5:],
+            )
+
+            y = y + (1900 if y >= 1900 else 2000)
+
         else:
             raise ValueError("Unsupported date format: " + date_str)
 
         if not Chrono.is_valid_date(y, m, d):
             raise ValueError("Invalid date: " + date_str)
 
-        return Chrono.date_to_seconds(y, m, d) + DateParser.parse_non_iso_time(
-            time_tokens
-        )
+        timeOfDay = DateParser.parse_non_iso_time(time_tokens)
+        datetime = DateTime(y, m, d, timeOfDay.hour, timeOfDay.minute, timeOfDay.second)
+        return timezone.timestamp(datetime)
+
+    @Entrypoint
+    @staticmethod
+    def get_timezone_from_string(tz_str: str) -> Timezone:
+        if TimezoneChecker.isValidTimezone(tz_str):
+            return TimezoneChecker.TIMEZONES[tz_str]
+
+        elif tz_str[0] == "+" or tz_str[0] == "-":
+            tz_components = tz_str[1:]
+            if len(tz_components) == 2:
+                offset_hours = float(tz_components)
+            elif len(tz_components) == 4:
+                offset_hours = float(tz_components[:2]) + float(tz_components[2:]) / 60
+            elif len(tz_components) == 6:
+                offset_hours = (
+                    float(tz_components[:2])
+                    + float(tz_components[2:4]) / 60
+                    + float(tz_components[4:]) / 3600
+                )
+            else:
+                raise ValueError("Invalid timezone offset: ", tz_str)
+
+            if tz_str[0] == "-":
+                offset_hours = -offset_hours
+
+            return FixedOffsetTimezone(offset_hours=offset_hours)
+
+        raise ValueError("Invalid timezone offset: ", tz_str)

@@ -94,3 +94,16 @@ class TestChrono(unittest.TestCase):
         ]
         for time in times:
             assert not Chrono.is_valid_time(time[0], time[1], time[2]), time
+
+    def test_days_from_civil(self):
+        days = Chrono.days_from_civil(1999, 2, 15)
+        res = Chrono.civil_from_days(days)
+        assert res.year == 1999
+        assert res.month == 2
+        assert res.day == 15
+
+        days = Chrono.days_from_civil(2022, 12, 23)
+        res = Chrono.civil_from_days(days)
+        assert res.year == 2022
+        assert res.month == 12
+        assert res.day == 23
