@@ -6,6 +6,9 @@ class TimeOfDay(Class, Final):
     minute = Member(int)
     second = Member(float)
 
+    def secondsSinceMidnight(self, occurence=1: int):
+        return occurence * (second + minute * 60 + hour * 3600)
+
 
 class Date(Class, Final):
     year = Member(int)
@@ -33,28 +36,12 @@ class DateTime(Class, Final):
     timeOfDay = Member(TimeOfDay)
 
 
+
 class TimeZone(Class):
     @Entrypoint
     @staticmethod
-    def getConcurrentUtcDateTime(dateTime: DateTime, fold: int = 1) -> DateTime:
+    def timestamp(dateTime: DateTime, occurence: int = 1) -> float:
         raise NotImplementedError("Subclasses implement.")
-
-    @Entrypoint
-    @staticmethod
-    def offsetDateTime(dateTime: DateTime, offset_hours: int) -> DateTime:
-        hours = dateTime.timeOfDay.hour + offset_hours
-        daysToAdd, hours = divmod(hours, 24)
-
-        if daysToAdd != 0:
-            days = dateTime.date.daysSinceEpoch() + daysToAdd
-            date = Date.fromDaysSinceEpoch(days)
-        else:
-            date = dateTime.date
-
-        return DateTime(
-            date=date,
-            timeOfDay=TimeOfDay(hour=hours, minute=dateTime.timeOfDay.minute, second=dateTime.timeOfDay.second),
-        )
 
 
 class DaylightSavingsTimezone(TimeZone, Final):
@@ -63,7 +50,8 @@ class DaylightSavingsTimezone(TimeZone, Final):
 
     @Entrypoint
     @staticmethod
-    def _is_daylight_savings(dateTime, occurence: int=1) -> bool:
+    def timestamp(self, dateTime: DateTime, occurence: int = 1) -> bool:
+
         year = dateTime.date.year
 
         # second sunday of march 
@@ -74,31 +62,29 @@ class DaylightSavingsTimezone(TimeZone, Final):
 
         day = dateTime.date.daysSinceEpoch()
 
+        is_daylight_savings = True
+
         if day < ds_start:
-            return False
+            is_daylight_savings = False
 
         if day > ds_end:
-            return False
+            is_daylight_savings = False
 
         if day == ds_start:
-            return dateTime.timeOfDay.hour>2
+            is_daylight_savings = dateTime.timeOfDay.hour>2
 
         if day == ds_end:
-            return occurrence < 2 and dateTime.timeOfDay.hour<2
+            is_daylight_savings = occurrence < 2 and dateTime.timeOfDay.hour<2
 
-        return True
+        offset_hours = self.dst_offset_hours if is_daylight_savings else self.st_offset_hours
 
+        return days * 86400 + offset_hours * 3600 + dateTime.timeOfDay.secondsSinceMidnight(occurence)
 
-    @Entrypoint
-    @staticmethod
-    def getConcurrentUtcDateTime(self, dateTime: DateTime, occurence: int = 1) -> bool:
-        offset_hours = self.dst_offset_hours if self._is_daylight_savings(dateTime, occurence) else self.st_offset_hours
-        return self.offsetDateTime(dateTime, offset_hours)
 
 
 class FixedOffsetTimezone(TimeZone, Final):
     offset_hours = Member(int)
 
     @Entrypoint
-    def getConcurrentUtcDateTime(self, dateTime: DateTime, occurence: int = 1) -> DateTime:
-        return self.offsetDateTime(dateTime, self.offset_hours)
+    def timestamp(self, dateTime: DateTime, occurence: int = 1) -> DateTime:
+        return dateTime.date.daysSinceEpoch() * 86400 + dateTime.timeOfDay.secondsSinceMidnight(occurence) + self.offset_hours * 3600
