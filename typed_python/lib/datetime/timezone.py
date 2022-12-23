@@ -18,8 +18,12 @@ from typed_python.lib.datetime.chrono import Chrono
 
 class Offset(Class):
     @Entrypoint
-    def get_offset(self, _: int) -> int:
+    def get_offset(self, ts: int) -> int:
         raise NotImplementedError
+
+    @Entrypoint
+    def localize(self, ts):
+        return ts + self.get_offset(ts)
 
 
 class FixedOffset(Offset, Final):
@@ -30,7 +34,7 @@ class FixedOffset(Offset, Final):
         self.offset = offset
 
     @Entrypoint
-    def get_offset(self, _: int) -> int:
+    def get_offset(self, ts: int) -> int:
         return self.offset
 
 # Would like to give RelativeOffset* better names but...

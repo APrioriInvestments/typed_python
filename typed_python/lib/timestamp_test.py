@@ -108,17 +108,29 @@ class TestTimestamp(unittest.TestCase):
     def test_aaron_demo(self):
         ts = Timestamp.make(time.time())
 
+        from typed_python.lib.datetime.date_parser import DateParser
+        from typed_python.lib.datetime.timezone import Timezone
+        DateParser.parse_iso_str("2029-01-01 23:59:59")
+        # DateParser.parse_non_iso("2029-01-01 23:59:59")
+
         print(ts.weekday())
         print((ts + 86400).weekday())
 
-        for userString in [
+        userStrings = [
             "2029-01-01 23:59:59",
             "2020-01-01 23:59:59",
             "2039-01-01 23:59:59",
-        ]:
+        ]
+
+        for userString in userStrings:
             ts = Timestamp.parse(userString)
 
             print(userString, ts.weekday(), (ts + 1).weekday())
+
+        for userString in userStrings:
+            ts1 = Timestamp.parse(userString + "NYC")
+            ts = Timestamp.parse(userString, Timezone.ET)
+            assert ts - ts1 == 0.0
 
     def test_demo_usage(self):
 
@@ -235,7 +247,7 @@ class TestTimestamp(unittest.TestCase):
         unixtime = time.time()
         ts1 = Timestamp.make(unixtime)
         ts2 = Timestamp.make(5)
-        ts3 = ts1 + ts2
+        ts3 = ts1 + ts2.ts
         assert ts3.ts == unixtime + 5
 
     def test_sub(self):
@@ -243,7 +255,7 @@ class TestTimestamp(unittest.TestCase):
         ts1 = Timestamp.make(unixtime)
         ts2 = Timestamp.make(5)
         ts3 = ts1 - ts2
-        assert ts3.ts == unixtime - 5
+        assert ts3 == unixtime - 5
 
     def test_format_default(self):
         # Just a superficial test. format proxies to DateFormatter.format

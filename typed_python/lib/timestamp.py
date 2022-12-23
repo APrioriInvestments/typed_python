@@ -18,6 +18,7 @@ from typed_python import Class, Final, Member, Held
 from typed_python.lib.datetime.date_parser import DateParser
 from typed_python.lib.datetime.date_formatter import DateFormatter
 from typed_python.lib.datetime.chrono import Chrono
+from typed_python.lib.datetime.timezone import Offset
 
 
 @Held
@@ -92,21 +93,31 @@ class Timestamp(Class, Final):
     @Entrypoint
     @staticmethod
     def parse(date_str: str):
-        '''
-        Creates a Timestamp from date strings.
-        Parameters:
-            date_str (str): A date string. E.g 2022-07-30 17:56:46
-        Returns:
-            timestamp (Timestamp): A Timestamp
-        '''
+        # work out if there is localization info present
+        # if not, parseDirect
+        # otherwise, split the argument into (userString, localizationString)
+        # turn the localizationString into an offset
+        # call parse with (userString, offset)
         return Timestamp(ts=DateParser.parse(date_str))
+
+    @Entrypoint
+    @staticmethod
+    def parseDirect(date_str: str):
+        # TODO: refactor DateParser so that it errors if there's a localization component here
+        return Timestamp(ts=DateParser.parse(date_str))
+
+    @Entrypoint
+    @staticmethod
+    def parse(date_str: str, offset: Offset):  # noqa: F811
+        # TODO: refactor DateParser so that it errors if there's a localization component here
+        return Timestamp(ts=offset.localize(DateParser.parse(date_str)))
 
     @Entrypoint
     def format(self, utc_offset: int = 0, format: str = "%Y-%m-%d %H:%M:%S") -> str:
         '''
         Converts a Timestamp to a string in a given format
         Parameters:
-            utc_offset (int): The offset from UTC in seconds
+            offset (int): The offset from UTC
             format (str): A string specifying formatting directives. E.g. '%Y-%m-%dT%H:%M:%S'
         Returns:
             date_str(str): A string representing the date in the specified format. E.g. "Mon January 2, 2021"
