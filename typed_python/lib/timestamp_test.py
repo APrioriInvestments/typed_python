@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import pytz
 import time
 import unittest
 
@@ -72,6 +73,14 @@ def listOfDatetimes(N):
 
 
 @Entrypoint
+def parseNycTimestamps(strings: ListOf(str)):
+    res = ListOf(Timestamp)()
+    for string in strings:
+        res.append(Timestamp.parse_nyc(string))
+    return res
+
+
+@Entrypoint
 def parseTimestamps(strings: ListOf(str)):
     res = ListOf(Timestamp)()
     for string in strings:
@@ -105,18 +114,11 @@ def formatDatetimes(datetimes: ListOf(datetime)):
 
 
 class TestTimestamp(unittest.TestCase):
-
     def test_demo_usage(self):
 
         # create timestamp from unixtime
         Timestamp.make(time.time())
         Timestamp.make(ts=time.time())
-
-        # create timestamp from ints representing a date (year, month, day, hour, min, sec)
-        # can omit smaller granularities in order
-        Timestamp.from_date(2022, 10, 22, 6, 39, 7)
-        Timestamp.from_date(2022, 10, 22, 6)
-        Timestamp.from_date(2022, 10)
 
         # create timestamp from iso 8601 date string
         Timestamp.parse("2022-10-22T06:39")
@@ -130,17 +132,11 @@ class TestTimestamp(unittest.TestCase):
         # with relative tz (offset changes with dst)
         Timestamp.parse("2022-10-22T06:39NYC")
 
-        # with relative tz (offset changes with dst)
-        Timestamp.parse("2022-10-22T06:39ET")
-
         # with fixed offset tz
         Timestamp.parse("2022-10-22T06:39UTC")
 
         # with fixed offset tz
         Timestamp.parse("2022-10-22T06:39EST")
-
-        # with fixed offset tz
-        Timestamp.parse("2022-10-22T06:39EDT")
 
         # get date string from timestamp as YYYY-MM-DD
         ts = Timestamp.make(time.time())
@@ -220,7 +216,7 @@ class TestTimestamp(unittest.TestCase):
         unixtime = time.time()
         ts1 = Timestamp.make(unixtime)
         ts2 = Timestamp.make(5)
-        ts3 = ts1 + ts2
+        ts3 = ts1 + ts2.ts
         assert ts3.ts == unixtime + 5
 
     def test_sub(self):
@@ -228,7 +224,7 @@ class TestTimestamp(unittest.TestCase):
         ts1 = Timestamp.make(unixtime)
         ts2 = Timestamp.make(5)
         ts3 = ts1 - ts2
-        assert ts3.ts == unixtime - 5
+        assert ts3 == unixtime - 5
 
     def test_format_default(self):
         # Just a superficial test. format proxies to DateFormatter.format
@@ -248,20 +244,6 @@ class TestTimestamp(unittest.TestCase):
             format="%Y-%m-%dT%H:%M:%S"
         )
 
-    def test_from_date(self):
-        unixtime = time.time()
-        dt_tuple = datetime.fromtimestamp(unixtime, tz=timezone.utc).timetuple()
-
-        timestamp = Timestamp.from_date(
-            year=dt_tuple.tm_year,
-            month=dt_tuple.tm_mon,
-            day=dt_tuple.tm_mday,
-            hour=dt_tuple.tm_hour,
-            minute=dt_tuple.tm_min,
-            second=dt_tuple.tm_sec,
-        )
-        assert int(unixtime) == int(timestamp)
-
     def test_parse(self):
         unixtime = time.time()
         timestamp = Timestamp.make(unixtime)
@@ -270,6 +252,16 @@ class TestTimestamp(unittest.TestCase):
         parsed_timestamp = Timestamp.parse(date_str)
 
         assert int(timestamp) == int(parsed_timestamp)
+
+    def test_parse_ampm(self):
+        res = Timestamp.parse_nyc('2019/08/04 6:59 PM').ts
+        expected = pytz.timezone('America/New_York').localize(datetime(2019, 8, 4, 18, 59, 0, 0)).timestamp()
+        assert res == expected
+
+    def test_parse_single_digit_day(self):
+        res = Timestamp.parse_nyc('2020/12/1  14:15').ts
+        expected = pytz.timezone('America/New_York').localize(datetime(2020, 12, 1, 14, 15, 0)).timestamp()
+        assert res == expected
 
     def test_compare_timestamp_datetime_from_unixtime(self):
         runs = 10000000
@@ -367,4 +359,38 @@ class TestTimestamp(unittest.TestCase):
             + ")"
         )
 
-        assert dtTime > tsTime and (speedup > 2 and speedup <= 4)
+        assert dtTime > tsTime and (speedup > 1 and speedup <= 4)
+
+    def test_compare_timestamp_nyc_datetime_from_string(self):
+        runs = 100000
+        date_strings = make_list_of_iso_datestrings(runs)
+
+        with PrintNewFunctionVisitor():
+            Timestamp.parse_nyc("1997")
+
+        start = time.time()
+        parseNycTimestamps(date_strings)
+        tsTime = time.time() - start
+
+        start = time.time()
+        parseDatetimes(date_strings)
+        dtTime = time.time() - start
+
+        if dtTime > tsTime:
+            speedup = dtTime / tsTime
+            compare = "x faster"
+        else:
+            speedup = tsTime / dtTime
+            compare = "x slower"
+
+        print(
+            "Timestamp.parse ("
+            + str(tsTime)
+            + ") is "
+            + str("{:.2f}".format(speedup))
+            + compare
+            + " than datetime.strptime ("
+            + str(dtTime)
+            + ")"
+        )
+        # assert speedup > 7 and speedup < 8
