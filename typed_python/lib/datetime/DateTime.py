@@ -1,4 +1,5 @@
 from typed_python import Class, Final, Member, Entrypoint
+from typed_python.lib.datetime.chrono import Chrono
 
 
 class TimeOfDay(Class, Final):
@@ -6,8 +7,8 @@ class TimeOfDay(Class, Final):
     minute = Member(int)
     second = Member(float)
 
-    def secondsSinceMidnight(self, occurence=1: int):
-        return occurence * (second + minute * 60 + hour * 3600)
+    def secondsSinceMidnight(self, occurrence: int=1) -> float:
+        return occurrence * (self.second + self.minute * 60 + self.hour * 3600)
 
 
 class Date(Class, Final):
@@ -26,7 +27,7 @@ class Date(Class, Final):
 
     @Entrypoint
     @staticmethod
-    def fromDaysSinceEpoch(daysSinceEpoch: int) -> Date:
+    def fromDaysSinceEpoch(daysSinceEpoch: int):
         dateTuple = Chrono.civil_from_days(daysSinceEpoch)
         return Date(year=dateTuple.year, month=dateTuple.month, day=dateTuple.day)
 
@@ -39,8 +40,7 @@ class DateTime(Class, Final):
 
 class TimeZone(Class):
     @Entrypoint
-    @staticmethod
-    def timestamp(dateTime: DateTime, occurence: int = 1) -> float:
+    def timestamp(dateTime: DateTime, occurrence: int = 1) -> float:
         raise NotImplementedError("Subclasses implement.")
 
 
@@ -49,8 +49,7 @@ class DaylightSavingsTimezone(TimeZone, Final):
     st_offset_hours = Member(int)
 
     @Entrypoint
-    @staticmethod
-    def timestamp(self, dateTime: DateTime, occurence: int = 1) -> bool:
+    def timestamp(self, dateTime: DateTime, occurrence: int = 1) -> float:
 
         year = dateTime.date.year
 
@@ -78,7 +77,7 @@ class DaylightSavingsTimezone(TimeZone, Final):
 
         offset_hours = self.dst_offset_hours if is_daylight_savings else self.st_offset_hours
 
-        return days * 86400 + offset_hours * 3600 + dateTime.timeOfDay.secondsSinceMidnight(occurence)
+        return day * 86400 + offset_hours * 3600 + dateTime.timeOfDay.secondsSinceMidnight(occurrence)
 
 
 
@@ -86,5 +85,5 @@ class FixedOffsetTimezone(TimeZone, Final):
     offset_hours = Member(int)
 
     @Entrypoint
-    def timestamp(self, dateTime: DateTime, occurence: int = 1) -> DateTime:
-        return dateTime.date.daysSinceEpoch() * 86400 + dateTime.timeOfDay.secondsSinceMidnight(occurence) + self.offset_hours * 3600
+    def timestamp(self, dateTime: DateTime, occurrence: int = 1) -> float:
+        return dateTime.date.daysSinceEpoch() * 86400 + dateTime.timeOfDay.secondsSinceMidnight(occurrence) + self.offset_hours * 3600
