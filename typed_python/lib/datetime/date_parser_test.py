@@ -15,6 +15,7 @@
 import unittest
 import time
 from typed_python.lib.datetime.date_parser import DateParser
+from typed_python.lib.datetime.date_time import DateTime, UTC, NYC
 from typed_python.compiler.runtime import PrintNewFunctionVisitor
 from typed_python import Entrypoint, ListOf
 
@@ -348,6 +349,53 @@ class TestDateParser(unittest.TestCase):
                     == datetime.timestamp(second) + 0.123
                 ), second.strftime(format)
 
+    def test_parse_non_iso_mmddyyyy(self):
+        # all days in non leap year and leap year
+        days = get_datetimes_in_range(
+            start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
+            end=datetime(2020, 1, 31, 0, 0, 0, 0, pytz.UTC),
+            step="days",
+        )
+        formats = [
+            "%m-%d-%Y",
+            "%m/%d/%Y",
+        ]
+        for format in formats:
+            for day in days:
+                assert DateParser.parse_non_iso(
+                    day.strftime(format)
+                ) == datetime.timestamp(day), day.strftime(format)
+
+        assert (
+            DateParser.parse_non_iso("11-29-1956")
+            == pytz.timezone("Utc")
+            .localize(datetime(1956, 11, 29, 0, 0, 0))
+            .timestamp()
+        )
+        assert (
+            DateParser.parse_non_iso("29-11-1956")
+            == pytz.timezone("Utc")
+            .localize(datetime(1956, 11, 29, 0, 0, 0))
+            .timestamp()
+        )
+
+    def test_parse_non_iso_ddmonthyyyy(self):
+        # all days in non leap year and leap year
+        days = get_datetimes_in_range(
+            start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
+            end=datetime(2020, 1, 31, 0, 0, 0, 0, pytz.UTC),
+            step="days",
+        )
+        formats = [
+            "%d-%b-%y",
+            "%d/%b/%y",
+        ]
+        for format in formats:
+            for day in days:
+                assert DateParser.parse_non_iso(
+                    day.strftime(format)
+                ) == datetime.timestamp(day), day.strftime(format)
+
     def test_parse_iso_with_tz_offset(self):
         hours = get_datetimes_in_range(
             start=datetime(2020, 2, 1, 0, 0, 0, 0, pytz.UTC),
@@ -366,8 +414,29 @@ class TestDateParser(unittest.TestCase):
             for hour in hours:
                 assert (
                     DateParser.parse_iso_str(hour.strftime(format))
-                    == datetime.timestamp(hour) + tz_offset
+                    == datetime.timestamp(hour) - tz_offset
                 ), hour.strftime(format)
+
+    def test_parse_iso_with_tz_offset_ist(self):
+        ymdhms = (2022, 1, 1, 12, 0, 0)
+
+        # This is how it should work.
+        dtimePython = datetime(*ymdhms)
+        tsIst = pytz.timezone("Israel").localize(dtimePython).timestamp()
+        tsUtc = pytz.timezone("UTC").localize(dtimePython).timestamp()
+        assert tsIst == tsUtc - (2 * 3600)
+
+        # This is how it *does* work.
+        formats = [
+            "%Y-%m-%dT%H:%M+02:00",
+            "%Y-%m-%d %H:%M+02:00",
+        ]
+
+        dtime = DateTime(*ymdhms)
+        tsUtc = UTC.timestamp(dtime)
+        for format in formats:
+            tsIstNew = DateParser.parse_iso_str(dtimePython.strftime(format))
+            assert tsIstNew == tsUtc - (2 * 3600)
 
     # -------------------------------------------------------
     # This group of tests exercise the parse_non_iso method
@@ -599,13 +668,8 @@ class TestDateParser(unittest.TestCase):
             DateParser.parse_non_iso("Janeary 01 1997")
 
     def test_nyc_tz(self):
-        # edt: Oct 21, 2022
         assert 1666355040 == DateParser.parse("2022-10-21t08:24:00NYC")
-        assert 1666355040 == DateParser.parse("2022-10-21t08:24:00EDT")
-
-        # est: Dec 21, 2022
         assert 1671629040 == DateParser.parse("2022-12-21t08:24:00NYC")
-        assert 1671629040 == DateParser.parse("2022-12-21t08:24:00EST")
 
     def test_compare_parse_iso_perf(self):
         runs = 100000
@@ -652,6 +716,10 @@ class TestDateParser(unittest.TestCase):
                 year.strftime("%Y"), "%Y"
             ) == datetime.timestamp(year), year.strftime("%Y")
 
+            assert DateParser.parse_with_format_and_timezone(
+                year.strftime("%Y"), "%Y", UTC
+            ) == datetime.timestamp(year), year.strftime("%Y")
+
     def test_parse_format_yyyymm(self):
         months = get_months_in_year(1999) + get_months_in_year(2020)
         formats = [
@@ -663,6 +731,10 @@ class TestDateParser(unittest.TestCase):
             for month in months:
                 assert DateParser.parse_with_format(
                     month.strftime(format), format
+                ) == datetime.timestamp(month), month.strftime(format)
+
+                assert DateParser.parse_with_format_and_timezone(
+                    month.strftime(format), format, UTC
                 ) == datetime.timestamp(month), month.strftime(format)
 
     def test_parse_format_yyyymmdd(self):
@@ -681,6 +753,10 @@ class TestDateParser(unittest.TestCase):
             for day in days:
                 assert DateParser.parse_with_format(
                     day.strftime(format), format
+                ) == datetime.timestamp(day), day.strftime(format)
+
+                assert DateParser.parse_with_format_and_timezone(
+                    day.strftime(format), format, UTC
                 ) == datetime.timestamp(day), day.strftime(format)
 
     def test_parse_format_yyyymmddhh(self):
@@ -707,6 +783,10 @@ class TestDateParser(unittest.TestCase):
             for hour in hours:
                 assert DateParser.parse_with_format(
                     hour.strftime(format), format
+                ) == datetime.timestamp(hour), hour.strftime(format)
+
+                assert DateParser.parse_with_format_and_timezone(
+                    hour.strftime(format), format, UTC
                 ) == datetime.timestamp(hour), hour.strftime(format)
 
     def test_parse_format_yyyymmddhhmm(self):
@@ -773,6 +853,67 @@ class TestDateParser(unittest.TestCase):
                 assert DateParser.parse_with_format(
                     second.strftime(format), format
                 ) == datetime.timestamp(second), second.strftime(format)
+
+                assert DateParser.parse_with_format_and_timezone(
+                    second.strftime(format), format, UTC
+                ) == datetime.timestamp(second), second.strftime(format)
+
+        with pytest.raises(Exception):
+            DateParser.parse_with_format_and_timezone(
+                "2022-01-15T12:40:25nyc", "%Y-%m-%dT%H:%M:%S%Z", NYC
+            )
+
+    def test_parse_format_with_timezone(self):
+        way1 = DateParser.parse_with_format(
+            "2022-01-15 18:01:02nyc", "%Y-%m-%dT%H:%M:%S%Z"
+        )
+        way2 = DateParser.parse_with_format_and_timezone(
+            "2022-01-15 18:01:02", "%Y-%m-%dT%H:%M:%S", NYC
+        )
+        assert way1 == way2
+
+    def test_parse_non_iso_edge(self):
+        res = DateParser.parse_non_iso("02/19/1993 18:00:00", NYC)
+        expected = (
+            pytz.timezone("America/New_York")
+            .localize(datetime(1993, 2, 19, 18, 0, 0))
+            .timestamp()
+        )
+        assert res == expected
+
+        res = DateParser.parse_non_iso("02/12/1993 18:00:00", NYC)
+        expected = (
+            pytz.timezone("America/New_York")
+            .localize(datetime(1993, 2, 12, 18, 0, 0))
+            .timestamp()
+        )
+
+    def test_parse_non_iso_YYYYMMDD(self):
+        res = DateParser.parse_non_iso("2021/01/01", NYC)
+        expected = (
+            pytz.timezone("America/New_York")
+            .localize(datetime(2021, 1, 1, 0, 0, 0))
+            .timestamp()
+        )
+        assert res == expected
+
+    def test_parse_non_iso_YYYYMMDD_together(self):
+        res = DateParser.parse_non_iso("20210101-07:37:07", NYC)
+        expected = (
+            pytz.timezone("America/New_York")
+            .localize(datetime(2021, 1, 1, 7, 37, 7))
+            .timestamp()
+        )
+        assert res == expected, (expected - res) / 3600
+
+    def test_parse_non_iso_ampm(self):
+        res = DateParser.parse_non_iso("2019/08/04 6:59 PM", NYC)
+        expected = (
+            pytz.timezone("America/New_York")
+            .localize(datetime(2019, 8, 4, 18, 59, 0, 0))
+            .timestamp()
+        )
+        assert res == expected
 
     def test_compare_parse_format_perf(self):
         runs = 100000
