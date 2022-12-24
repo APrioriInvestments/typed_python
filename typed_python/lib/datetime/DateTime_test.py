@@ -67,3 +67,24 @@ def test_DateTime_from_timestamp():
     timestamp = Utc.timestamp(dateTime)
     newDateTime = Utc.datetime(timestamp)
     assert newDateTime == dateTime
+
+
+def test_DateTime_to_timestamp_daylight_savings():
+    year, month, day = 2022, 11, 6
+    hour, minute, second = 5, 30, 0
+    date = Date(year=year, month=month, day=day)
+    timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
+    utcDateTime = DateTime(date=date, timeOfDay=timeOfDay)
+
+    oneThirtyAmNycFirstFold = Utc.timestamp(utcDateTime)
+
+    year, month, day = 2022, 11, 6
+    hour, minute, second = 6, 30, 0
+    date = Date(year=year, month=month, day=day)
+    timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
+    utcDateTime = DateTime(date=date, timeOfDay=timeOfDay)
+
+    oneThirtyAmNycSecondFold = Utc.timestamp(utcDateTime)
+
+    assert oneThirtyAmNycSecondFold - oneThirtyAmNycFirstFold == 3600
+    assert Nyc.datetime(oneThirtyAmNycFirstFold) == Nyc.datetime(oneThirtyAmNycSecondFold)

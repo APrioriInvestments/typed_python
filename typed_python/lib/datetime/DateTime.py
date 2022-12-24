@@ -115,22 +115,22 @@ class DaylightSavingsTimezone(TimeZone, Final):
 
         # second sunday of march
         ds_start = (
-            Chrono.get_nth_dow_of_month(2, 0, 3, utcDateNt.year) + self.st_offset_hours * 3600
-        )
+            Chrono.get_nth_dow_of_month(2, 0, 3, utcDateNt.year) * 86400
+            + self.st_offset_hours * 3600
+        ) + 7200
 
         # first sunday of november
         ds_end = (
-            Chrono.get_nth_dow_of_month(1, 0, 11, utcDateNt.year)
+            Chrono.get_nth_dow_of_month(1, 0, 11, utcDateNt.year) * 86400
             + self.dst_offset_hours * 3600
-        )
+        ) + 7200
 
         # get offset
-        offset_hours = (
-            self.dst_offset_hours
-            if timestamp < ds_start and timestamp > ds_end
-            else self.st_offset_hours
+        offset_hours = -(
+            self.st_offset_hours
+            if timestamp < ds_start or timestamp > ds_end
+            else self.dst_offset_hours
         )
-
         # adjust seconds since midnight for timezone and re-compute into datetime.
         secondsSinceMidnight += offset_hours * 3600
         daysToAdd, secondsSinceMidnight = divmod(secondsSinceMidnight, 86400)
@@ -160,7 +160,7 @@ class FixedOffsetTimezone(TimeZone, Final):
         daysSinceEpoch, secondsSinceMidnight = divmod(timestamp, 86400)
         utcDateNt = Chrono.civil_from_days(daysSinceEpoch)
 
-        offset_hours = self.offset_hours
+        offset_hours = -self.offset_hours
 
         # adjust seconds since midnight for timezone and re-compute into datetime.
         secondsSinceMidnight += offset_hours * 3600
