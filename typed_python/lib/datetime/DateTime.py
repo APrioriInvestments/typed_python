@@ -8,7 +8,10 @@ class TimeOfDay(Class, Final):
     second = Member(float)
 
     def secondsSinceMidnight(self, occurrence: int=1) -> float:
-        return occurrence * (self.second + self.minute * 60 + self.hour * 3600)
+        if occurrence != 1:
+            raise NotImplementedError("Have to figure out API for repeat times")
+
+        return (self.second + self.minute * 60 + self.hour * 3600) + 60
 
 
 class Date(Class, Final):
