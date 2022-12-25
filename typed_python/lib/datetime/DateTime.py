@@ -157,19 +157,13 @@ class FixedOffsetTimezone(TimeZone, Final):
 
     @Entrypoint
     def datetime(self, timestamp) -> DateTime:
-        daysSinceEpoch, secondsSinceMidnight = divmod(timestamp, 86400)
-        utcDateNt = Chrono.civil_from_days(daysSinceEpoch)
+        day, secondsSinceMidnight = divmod(timestamp - self.offset_hours * 3600, 86400)
+        date = Chrono.civil_from_days(day)
 
-        offset_hours = -self.offset_hours
-
-        # adjust seconds since midnight for timezone and re-compute into datetime.
-        secondsSinceMidnight += offset_hours * 3600
-        daysToAdd, secondsSinceMidnight = divmod(secondsSinceMidnight, 86400)
         hour, seconds = divmod(secondsSinceMidnight, 3600)
         minute, second = divmod(seconds, 60)
-
-        date = Chrono.civil_from_days(daysSinceEpoch + daysToAdd) if daysToAdd else utcDateNt
         tod = TimeOfDay(hour=hour, minute=minute, second=second)
+
         return DateTime(
             date=Date(year=date.year, month=date.month, day=date.day), timeOfDay=tod
         )

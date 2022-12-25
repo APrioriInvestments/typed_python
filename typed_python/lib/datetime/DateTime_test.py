@@ -13,6 +13,7 @@ from typed_python.lib.datetime.DateTime import (
 
 Nyc = DaylightSavingsTimezone(dst_offset_hours=4, st_offset_hours=5)
 Utc = FixedOffsetTimezone(offset_hours=0)
+Awt = FixedOffsetTimezone(offset_hours=-8)
 
 
 def test_DateTime_to_timestamp():
@@ -88,3 +89,18 @@ def test_DateTime_to_timestamp_daylight_savings():
 
     assert oneThirtyAmNycSecondFold - oneThirtyAmNycFirstFold == 3600
     assert Nyc.datetime(oneThirtyAmNycFirstFold) == Nyc.datetime(oneThirtyAmNycSecondFold)
+
+
+def test_fixed_offset():
+    year, month, day = 2022, 11, 6
+    hour, minute, second = 5, 30, 0
+    date = Date(year=year, month=month, day=day)
+    timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
+    dateTime = DateTime(date=date, timeOfDay=timeOfDay)
+
+    ts = pytz.timezone('Asia/Hong_Kong').localize(datetime.datetime(year, month, day, hour, minute, second)).timestamp()
+
+    res = FixedOffsetTimezone(offset_hours=-8).timestamp(dateTime)
+    assert ts == res
+
+
