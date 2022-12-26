@@ -61,6 +61,23 @@ class TimeZone(Class):
     def timestamp(dateTime: DateTime, afterFold: bool = False) -> float:
         raise NotImplementedError("Subclasses implement.")
 
+    @Entrypoint
+    def datetime(timestamp: float) -> float:
+        raise NotImplementedError("Subclasses implement.")
+
+    @Entrypoint
+    def _datetimeFromTimestampAndOffset(self, timestamp: float, offset_hours: int):
+        day, secondsSinceMidnight = divmod(timestamp - offset_hours * 3600, 86400)
+        date = Chrono.civil_from_days(day)
+
+        hour, seconds = divmod(secondsSinceMidnight, 3600)
+        minute, second = divmod(seconds, 60)
+        tod = TimeOfDay(hour=hour, minute=minute, second=second)
+
+        return DateTime(
+            date=Date(year=date.year, month=date.month, day=date.day), timeOfDay=tod
+        )
+
 
 class DaylightSavingsTimezone(TimeZone, Final):
     dst_offset_hours = Member(int)
@@ -110,39 +127,30 @@ class DaylightSavingsTimezone(TimeZone, Final):
 
     @Entrypoint
     def datetime(self, timestamp) -> DateTime:
+        # Figure out if this timestamp falls within daylight savings or not.
         daysSinceEpoch, secondsSinceMidnight = divmod(timestamp, 86400)
         utcDateNt = Chrono.civil_from_days(daysSinceEpoch)
 
         # second sunday of march
-        ds_start = (
+        ts_start = (
             Chrono.get_nth_dow_of_month(2, 0, 3, utcDateNt.year) * 86400
             + self.st_offset_hours * 3600
         ) + 7200
 
         # first sunday of november
-        ds_end = (
+        ts_end = (
             Chrono.get_nth_dow_of_month(1, 0, 11, utcDateNt.year) * 86400
             + self.dst_offset_hours * 3600
         ) + 7200
 
         # get offset
-        offset_hours = -(
+        offset_hours = (
             self.st_offset_hours
-            if timestamp < ds_start or timestamp > ds_end
+            if timestamp < ts_start or timestamp > ts_end
             else self.dst_offset_hours
         )
-        # adjust seconds since midnight for timezone and re-compute into datetime.
-        secondsSinceMidnight += offset_hours * 3600
-        daysToAdd, secondsSinceMidnight = divmod(secondsSinceMidnight, 86400)
-        hour, seconds = divmod(secondsSinceMidnight, 3600)
-        minute, second = divmod(seconds, 60)
 
-        date = Chrono.civil_from_days(daysSinceEpoch + daysToAdd) if daysToAdd else utcDateNt
-        tod = TimeOfDay(hour=hour, minute=minute, second=second)
-        return DateTime(
-            date=Date(year=date.year, month=date.month, day=date.day), timeOfDay=tod
-        )
-
+        return self._datetimeFromTimestampAndOffset(timestamp, offset_hours)
 
 class FixedOffsetTimezone(TimeZone, Final):
     offset_hours = Member(int)
@@ -157,13 +165,4 @@ class FixedOffsetTimezone(TimeZone, Final):
 
     @Entrypoint
     def datetime(self, timestamp) -> DateTime:
-        day, secondsSinceMidnight = divmod(timestamp - self.offset_hours * 3600, 86400)
-        date = Chrono.civil_from_days(day)
-
-        hour, seconds = divmod(secondsSinceMidnight, 3600)
-        minute, second = divmod(seconds, 60)
-        tod = TimeOfDay(hour=hour, minute=minute, second=second)
-
-        return DateTime(
-            date=Date(year=date.year, month=date.month, day=date.day), timeOfDay=tod
-        )
+        return self._datetimeFromTimestampAndOffset(timestamp, self.offset_hours)
