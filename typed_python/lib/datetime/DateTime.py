@@ -128,18 +128,20 @@ class DaylightSavingsTimezone(TimeZone, Final):
     @Entrypoint
     def datetime(self, timestamp) -> DateTime:
         # Figure out if this timestamp falls within daylight savings or not.
-        daysSinceEpoch, secondsSinceMidnight = divmod(timestamp, 86400)
-        utcDateNt = Chrono.civil_from_days(daysSinceEpoch)
+        # Technically this could be off by a day (on Dec 31 or Jan1), 
+        # and in these cases, we're not in daylight savings time anyway,
+        # so it gives the right answer.
+        year = Chrono.civil_from_days(timestamp // 86400).year
 
         # second sunday of march
         ts_start = (
-            Chrono.get_nth_dow_of_month(2, 0, 3, utcDateNt.year) * 86400
+            Chrono.get_nth_dow_of_month(2, 0, 3, year) * 86400
             + self.st_offset_hours * 3600
         ) + 7200
 
         # first sunday of november
         ts_end = (
-            Chrono.get_nth_dow_of_month(1, 0, 11, utcDateNt.year) * 86400
+            Chrono.get_nth_dow_of_month(1, 0, 11, year) * 86400
             + self.dst_offset_hours * 3600
         ) + 7200
 
