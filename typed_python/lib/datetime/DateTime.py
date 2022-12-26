@@ -70,7 +70,7 @@ class TimeZone(Class):
 
     @Entrypoint
     def _datetimeFromTimestampAndOffset(self, timestamp: float, offset_hours: int):
-        day, secondsSinceMidnight = divmod(timestamp - offset_hours * 3600, 86400)
+        day, secondsSinceMidnight = divmod(timestamp + offset_hours * 3600, 86400)
         date = Chrono.civil_from_days(day)
 
         hour, seconds = divmod(secondsSinceMidnight, 3600)
@@ -131,7 +131,7 @@ class DaylightSavingsTimezone(TimeZone, Final):
 
         return (
             day * 86400
-            + offset_hours * 3600
+            - offset_hours * 3600
             + dateTime.timeOfDay.secondsSinceMidnight(afterFold)
         )
 
@@ -146,13 +146,13 @@ class DaylightSavingsTimezone(TimeZone, Final):
         # second sunday of march
         ts_start = (
             Chrono.get_nth_dow_of_month(2, 0, 3, year) * 86400
-            + self.st_offset_hours * 3600
+            - self.st_offset_hours * 3600
         ) + 7200
 
         # first sunday of november
         ts_end = (
             Chrono.get_nth_dow_of_month(1, 0, 11, year) * 86400
-            + self.dst_offset_hours * 3600
+            - self.dst_offset_hours * 3600
         ) + 7200
 
         # get offset

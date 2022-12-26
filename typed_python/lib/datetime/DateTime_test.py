@@ -11,9 +11,9 @@ from typed_python.lib.datetime.DateTime import (
     FixedOffsetTimezone,
 )
 
-Nyc = DaylightSavingsTimezone(dst_offset_hours=4, st_offset_hours=5)
+Nyc = DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5)
 Utc = FixedOffsetTimezone(offset_hours=0)
-Awt = FixedOffsetTimezone(offset_hours=-8)
+Awt = FixedOffsetTimezone(offset_hours=8)
 
 
 def test_DateTime_to_timestamp():
