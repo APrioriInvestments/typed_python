@@ -5,6 +5,9 @@ from typed_python.lib.datetime.chrono import Chrono
 class NonexistentDateTime(Exception):
     pass
 
+class OneFold(Exception):
+    pass
+
 
 class TimeOfDay(Class, Final):
     hour = Member(int)
@@ -100,13 +103,20 @@ class DaylightSavingsTimezone(TimeZone, Final):
 
         if day < ds_start:
             is_daylight_savings = False
+            if afterFold:
+                raise OneFold("There is only one fold.")
 
         if day > ds_end:
             is_daylight_savings = False
+            if afterFold:
+                raise OneFold("There is only one fold.")
 
         if day == ds_start:
             if dateTime.timeOfDay.hour == 2:
                 raise NonexistentDateTime("This date time does not exist on this date.")
+
+            if afterFold:
+                raise OneFold("There is only one fold.")
 
             is_daylight_savings = dateTime.timeOfDay.hour > 2
 
