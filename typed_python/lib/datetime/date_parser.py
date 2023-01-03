@@ -16,6 +16,7 @@ from typed_python import Class, Dict, Final
 from typed_python import Entrypoint, ListOf
 from typed_python.lib.datetime.timezone import Timezone
 from typed_python.lib.datetime.chrono import Chrono
+from typed_python.lib.datetime.DateTime import TimeZone, UTC, NYC, TimeZoneChecker, TimeOfDay, Date, DateTime
 
 JAN = 'jan'
 FEB = 'feb'
@@ -245,30 +246,31 @@ class DateParser(Class, Final):
                         raise ValueError('Bad value for %B:', date_str)
                 elif directive == 'Z':
                     # 5 character tz abbreviations (future proofing since we don't currently support any)
-                    if Timezone.is_valid_tz_string(date_str[date_str_cursor: date_str_cursor + 4]):
+                    print(date_str[date_str_cursor: date_str_cursor + 4])
+                    if TimeZoneChecker.isValidTimezone(date_str[date_str_cursor: date_str_cursor + 4]):
                         tz_str = date_str[date_str_cursor: date_str_cursor + 4]
                         date_str_cursor += 4
                     # 4 character tz abbreviations (future proofing since we don't currenlty support any)
-                    elif Timezone.is_valid_tz_string(date_str[date_str_cursor: date_str_cursor + 4]):
+                    elif TimeZoneChecker.isValidTimezone(date_str[date_str_cursor: date_str_cursor + 4]):
                         tz_str = date_str[date_str_cursor: date_str_cursor + 4]
                         date_str_cursor += 4
                     # e.g. EST, EDT, PST
-                    elif Timezone.is_valid_tz_string(date_str[date_str_cursor: date_str_cursor + 3]):
+                    elif TimeZoneChecker.isValidTimezone(date_str[date_str_cursor: date_str_cursor + 3]):
                         tz_str = date_str[date_str_cursor: date_str_cursor + 3]
                         date_str_cursor += 3
                     # e.g. PT, ET, CT
-                    elif Timezone.is_valid_tz_string(date_str[date_str_cursor: date_str_cursor + 2]):
+                    elif TimeZoneChecker.isValidTimezone(date_str[date_str_cursor: date_str_cursor + 2]):
                         tz_str = date_str[date_str_cursor: date_str_cursor + 2]
                         date_str_cursor += 2
                     else:
                         raise ValueError('Bad value for %Z:', date_str)
                 elif directive == 'z':
                     # [+|-]DDDD or [+|-]DD:DD, e.g. +0000, +1200
-                    if Timezone.is_valid_tz_string(date_str[date_str_cursor: date_str_cursor + 5]):
+                    if TimeZoneChecker.isValidTimezone(date_str[date_str_cursor: date_str_cursor + 5]):
                         tz_str = date_str[date_str_cursor: date_str_cursor + 5]
                         date_str_cursor += 5
                     # [+|-]DD or [+|-]DD
-                    elif Timezone.is_valid_tz_string(date_str[date_str_cursor: date_str_cursor + 3]):
+                    elif TimeZoneChecker.isValidTimezone(date_str[date_str_cursor: date_str_cursor + 3]):
                         tz_str = date_str[date_str_cursor: date_str_cursor + 3]
                         date_str_cursor += 3
                     else:
@@ -305,14 +307,13 @@ class DateParser(Class, Final):
         if day == -1:
             day = 1
 
-        datetime = Chrono.date_to_seconds(year, month, day) + Chrono.time_to_seconds(hour, minute, second)
+        timezone = UTC 
+        if TimeZoneChecker.isValidTimezone(tz_str):
+            timezone = TimeZoneChecker.TIMEZONES[tz_str]
 
-        if Timezone.is_valid_tz_string(tz_str):
-            datetime += Timezone.tz_str_to_utc_offset(tz_str, datetime)
-        else:
-            raise ValueError('Unrecognized timezone: ', tz_str)
+        datetime = DateTime(date=Date(year, month, day), timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second))
+        return UTC.timestamp(datetime)
 
-        return datetime
 
     @Entrypoint
     @staticmethod
@@ -356,10 +357,11 @@ class DateParser(Class, Final):
         if not Chrono.is_valid_date(year, month, day):
             raise ValueError('Invalid date_tokens: ', date_tokens)
 
-        dt = Chrono.date_to_seconds(year, month, day)
+        dt = Date(year=year, month=month, day=day)
+        midnight = UTC.timestamp(DateTime(date=dt, timeOfDay=TimeOfDay(hour=0, minute=0, second=0.0)))
 
         if cursor >= len(tokens):
-            return dt
+            return midnight
 
         # Process time segement
         time_tokens = ListOf(str)()
@@ -373,15 +375,22 @@ class DateParser(Class, Final):
                 time_tokens.append(tokens[cursor])
                 cursor += 1
 
-        dt += DateParser._parse_iso_time_tokens(time_tokens)
-        if cursor >= len(tokens):
-            return dt
+        timeOfDay = DateParser._parse_iso_time_tokens(time_tokens)
+        datetime = DateTime(date=dt, timeOfDay=timeOfDay)
 
-        return Timezone.ts_to_utc(dt, ''.join(tokens[cursor:]))
+        if cursor >= len(tokens):
+            return UTC.timestamp(datetime)
+
+        timezone_string = ''.join(tokens[cursor:])
+        if TimeZoneChecker.isValidTimezone(timezone_string):
+            timezone = TimeZoneChecker.TIMEZONES[timezone_string]
+
+            return timezone.timestamp(datetime)
+
 
     @Entrypoint
     @staticmethod
-    def _parse_iso_time_tokens(time_tokens: ListOf(str)):
+    def _parse_iso_time_tokens(time_tokens: ListOf(str)) -> TimeOfDay:
         hour, minute, second = 0, 0, 0.0
 
         if len(time_tokens) == 1:
@@ -399,7 +408,7 @@ class DateParser(Class, Final):
         if not Chrono.is_valid_time(hour, minute, second):
             raise ValueError('Invalid time: ', time_tokens)
 
-        return Chrono.time_to_seconds(hour, minute, second)
+        return TimeOfDay(hour=hour, minute=minute, second=second)
 
     @Entrypoint
     @staticmethod
@@ -459,7 +468,7 @@ class DateParser(Class, Final):
 
     @ Entrypoint
     @ staticmethod
-    def parse_non_iso_time(tokens) -> float:
+    def parse_non_iso_time(tokens) -> TimeOfDay:
         '''
         Converts a set of tokens representing a time seconds
         Parameters:
@@ -510,7 +519,7 @@ class DateParser(Class, Final):
 
         if not Chrono.is_valid_time(h, m, s):
             raise ValueError('Invalid time: ', h, m, s)
-        return Chrono.time_to_seconds(h, m, s)
+        return TimeOfDay(hour=h, minute=m, second=s)
 
     @Entrypoint
     @staticmethod
@@ -576,4 +585,7 @@ class DateParser(Class, Final):
         if not Chrono.is_valid_date(y, m, d):
             raise ValueError('Invalid date: ' + date_str)
 
-        return Chrono.date_to_seconds(y, m, d) + DateParser.parse_non_iso_time(time_tokens)
+        date = Date(year=y, month=m, day=d)
+        timeOfDay = DateParser.parse_non_iso_time(time_tokens)
+        datetime = DateTime(date=date, timeOfDay=timeOfDay)
+        return UTC.timestamp(datetime)

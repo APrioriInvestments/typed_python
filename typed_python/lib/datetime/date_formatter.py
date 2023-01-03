@@ -14,6 +14,7 @@
 
 from typed_python import Class, Dict, Entrypoint, Final, ListOf
 from typed_python.lib.datetime.chrono import Chrono
+from typed_python.lib.datetime.DateTime import DateTime, TimeZone, UTC
 # int to string month mapping where 1 => January
 INT_TO_MONTH_NAMES = Dict(int, str)({
     1: 'January',
@@ -77,8 +78,8 @@ def convert_to_12h(hour: int):
 class DateFormatter(Class, Final):
     @Entrypoint
     @staticmethod
-    def isoformat(ts: float, utc_offset: int = 0):
-        return DateFormatter.format(ts=ts, format='%Y-%m-%dT%H:%M:%S', utc_offset=utc_offset)
+    def isoformat(ts: float, timezone: TimeZone = UTC) -> str:
+        return DateFormatter.format(ts, timezone, '%Y-%m-%dT%H:%M:%S')
 
     @Entrypoint
     @staticmethod
@@ -133,9 +134,9 @@ class DateFormatter(Class, Final):
             return '000' + res
         return res
 
-    @ Entrypoint
-    @ staticmethod
-    def format(ts: float = 0, utc_offset: int = 0, format: str = "%Y-%m-%d %H:%M:%S") -> str:
+    @Entrypoint
+    @staticmethod
+    def format(ts: float = 0, timezone: TimeZone = UTC, format: str = "%Y-%m-%d %H:%M:%S") -> str:
         '''
         Converts a Timestamp to a string in a given format
         Parameters:
@@ -144,38 +145,16 @@ class DateFormatter(Class, Final):
         Returns:
             date_str(str): A string representing the date in the specified format. E.g. "Mon January 2, 2021"
         '''
-        # This bit of logic rightly belongs in the Chrono module. However, we gain some efficiency by inlining
-        # here instead of paying the tuple creation cost - i.e to return (year, month, day, hour, etc)
-        # especially considering that .format may be called in large loops/batches
-        ts = ts + utc_offset
+        datetime = timezone.datetime(ts)
+        weekday = datetime.date.weekday()
+        doy = datetime.date.dayOfYear()
+        y = datetime.date.year
+        m = datetime.date.month
+        d = datetime.date.day
 
-        tsi = int(ts)
-        z = tsi // 86400 + 719468
-        era = (z if z >= 0 else z - 146096) // 146097
-        doe = z - era * 146097
-        yoe = (doe - (doe // 1460) + (doe // 36524) - (doe // 146096)) // 365
-        y = yoe + era * 400
-        doy = doe - ((365 * yoe) + (yoe // 4) - (yoe // 100))
-        mp = (5 * doy + 2) // 153
-        d = doy - (153 * mp + 2) // 5 + 1
-        m = mp + (3 if mp < 10 else -9)
-        y += (m <= 2)
-
-        h = (tsi // 3600) % 24
-        min = (tsi // 60) % 60
-        s = tsi % 60
-
-        weekday = Chrono.weekday_from_days(tsi // 86400)
-
-        # Above is based on a year starting on March 1.
-        # Shift to January 1 based year by adding 60 days and wrapping
-        doy += 60
-        if doy > 365:
-            doy = doy % 365
-
-        # add extra day to doy if leap year and month is march or greater
-        if m > 2 and Chrono.is_leap_year(y):
-            doy += 1
+        h = datetime.timeOfDay.hour
+        min = datetime.timeOfDay.minute
+        s = datetime.timeOfDay.second
 
         # short circuits for common formats
         if format == '%Y-%m-%d':

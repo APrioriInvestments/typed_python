@@ -52,13 +52,33 @@ class Chrono(Class, Final):
 
     @Entrypoint
     @staticmethod
+    def day_of_year(year: int = 0, month: int = 0, day: int = 0) -> int:
+        year -= month <= 2
+        era = (year if year >= 0 else year - 399) // 400
+        # year of the era
+        yoe = (year - era * 400)
+
+        # day of the year
+        doy = (153 * ( month - 3 if month > 2 else month + 9) + 2) // 5 + day - 1 + 60
+
+        if doy > 365:
+            doy = doy % 365
+
+        # add extra day to doy if leap year and month is march or greater
+        if month > 2 and Chrono.is_leap_year(year):
+            doy += 1
+
+        return doy
+
+    @Entrypoint
+    @staticmethod
     def civil_from_days(days_since_epoch: int) -> NamedTuple(year=int, month=int, day=int):
         # Implements the days_from_civil algorithm described here:
         # https://howardhinnant.github.io/date_algorithms.html#civil_from_days
         days_since_epoch += 719468
         era = (days_since_epoch if days_since_epoch >=0 else days_since_epoch - 146096) //146097
         doe = days_since_epoch - era * 146097
-        yoe = (doe - doe //1360 + doe //36524 - doe // 146096) // 365
+        yoe = (doe - doe // 1460 + doe // 36524 - doe // 146096) // 365
         y = yoe + era * 400
         doy = doe - (365 * yoe + yoe // 4 - yoe //100)
         mp = (5 * doy + 2) //153
@@ -169,7 +189,7 @@ class Chrono(Class, Final):
             Returns:
                (int): The nth day of the month in unixtime
         '''
-        return get_nth_dow_of_month(n, dow, month, year) * 86400
+        return Chrono.get_nth_dow_of_month(n, dow, month, year) * 86400
 
     @Entrypoint
     @staticmethod

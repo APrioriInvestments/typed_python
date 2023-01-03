@@ -19,6 +19,7 @@ from typed_python.lib.datetime.date_parser import DateParser
 from typed_python.lib.datetime.date_formatter import DateFormatter
 from typed_python.lib.datetime.chrono import Chrono
 from typed_python.lib.datetime.timezone import Offset
+from typed_python.lib.datetime.DateTime import TimeZone, UTC
 
 
 @Held
@@ -113,7 +114,7 @@ class Timestamp(Class, Final):
         return Timestamp(ts=offset.localize(DateParser.parse(date_str)))
 
     @Entrypoint
-    def format(self, utc_offset: int = 0, format: str = "%Y-%m-%d %H:%M:%S") -> str:
+    def format(self, timezone: TimeZone = UTC, format: str = "%Y-%m-%d %H:%M:%S") -> str:
         '''
         Converts a Timestamp to a string in a given format
         Parameters:
@@ -122,7 +123,7 @@ class Timestamp(Class, Final):
         Returns:
             date_str(str): A string representing the date in the specified format. E.g. "Mon January 2, 2021"
         '''
-        return DateFormatter.format(self.ts, utc_offset, format)
+        return DateFormatter.format(self.ts, timezone, format)
 
     @Entrypoint
     def weekday(self, offset=0) -> int:

@@ -1,4 +1,4 @@
-from typed_python import Class, Final, Member, Entrypoint
+from typed_python import Class, Final, Member, Entrypoint, ConstDict
 from typed_python.lib.datetime.chrono import Chrono
 
 
@@ -42,13 +42,11 @@ class Date(Class, Final):
     @Entrypoint
     def weekday(self):
         daysSinceEpoch = self.daysSinceEpoch()
-        return Chrono.weekday_from_day(daysSinceEpoch)
+        return Chrono.weekday_from_days(daysSinceEpoch)
 
     @Entrypoint
-    @staticmethod
-    def fromDaysSinceEpoch(daysSinceEpoch: int):
-        dateTuple = Chrono.civil_from_days(daysSinceEpoch)
-        return Date(year=dateTuple.year, month=dateTuple.month, day=dateTuple.day)
+    def dayOfYear(self):
+        return Chrono.day_of_year(self.year, self.month, self.day)
 
 
 class DateTime(Class, Final):
@@ -65,11 +63,11 @@ class TimeZone(Class):
         raise NotImplementedError("Subclasses implement.")
 
     @Entrypoint
-    def datetime(timestamp: float) -> float:
+    def datetime(timestamp: float) -> DateTime:
         raise NotImplementedError("Subclasses implement.")
 
     @Entrypoint
-    def _datetimeFromTimestampAndOffset(self, timestamp: float, offset_hours: int):
+    def _datetimeFromTimestampAndOffset(self, timestamp: float, offset_hours: int) -> DateTime:
         day, secondsSinceMidnight = divmod(timestamp + offset_hours * 3600, 86400)
         date = Chrono.civil_from_days(day)
 
@@ -176,5 +174,23 @@ class FixedOffsetTimezone(TimeZone, Final):
         )
 
     @Entrypoint
-    def datetime(self, timestamp) -> DateTime:
+    def datetime(self, timestamp: float) -> DateTime:
         return self._datetimeFromTimestampAndOffset(timestamp, self.offset_hours)
+
+NYC = DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5)
+UTC = FixedOffsetTimezone(offset_hours=0)
+
+class TimeZoneChecker(Class, Final):
+    TIMEZONES = ConstDict(str, TimeZone)(
+        {
+            '': UTC,
+            '+0000': UTC,
+            'nyc': NYC,
+            'utc': UTC,
+        }
+    )
+
+    @classmethod
+    @Entrypoint
+    def isValidTimezone(cls, timeZoneString: str) -> bool:
+        return timeZoneString.lower() in cls.TIMEZONES
