@@ -72,6 +72,14 @@ def listOfDatetimes(N):
 
 
 @Entrypoint
+def parseNycTimestamps(strings: ListOf(str)):
+    res = ListOf(Timestamp)()
+    for string in strings:
+        res.append(Timestamp.parse_nyc(string))
+    return res
+
+
+@Entrypoint
 def parseTimestamps(strings: ListOf(str)):
     res = ListOf(Timestamp)()
     for string in strings:
@@ -364,4 +372,38 @@ class TestTimestamp(unittest.TestCase):
             + ")"
         )
 
-        assert dtTime > tsTime and (speedup > 1 and speedup <= 4)
+        assert dtTime > tsTime and (speedup > 2 and speedup <= 4)
+
+    def test_compare_timestamp_nyc_datetime_from_string(self):
+        runs = 100000
+        date_strings = make_list_of_iso_datestrings(runs)
+
+        with PrintNewFunctionVisitor():
+            Timestamp.parse_nyc("1997")
+
+        start = time.time()
+        parseNycTimestamps(date_strings)
+        tsTime = time.time() - start
+
+        start = time.time()
+        parseDatetimes(date_strings)
+        dtTime = time.time() - start
+
+        if dtTime > tsTime:
+            speedup = dtTime / tsTime
+            compare = "x faster"
+        else:
+            speedup = tsTime / dtTime
+            compare = "x slower"
+
+        print(
+            "Timestamp.parse ("
+            + str(tsTime)
+            + ") is "
+            + str("{:.2f}".format(speedup))
+            + compare
+            + " than datetime.strptime ("
+            + str(dtTime)
+            + ")"
+        )
+        # assert speedup > 7 and speedup < 8

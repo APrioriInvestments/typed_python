@@ -15,7 +15,7 @@
 import unittest
 import time
 from typed_python.lib.datetime.date_parser import DateParser
-from typed_python.lib.datetime.date_time import DateTime, UTC
+from typed_python.lib.datetime.date_time import DateTime, UTC, NYC
 from typed_python.compiler.runtime import PrintNewFunctionVisitor
 from typed_python import Entrypoint, ListOf
 
@@ -669,6 +669,10 @@ class TestDateParser(unittest.TestCase):
                 year.strftime("%Y"), "%Y"
             ) == datetime.timestamp(year), year.strftime("%Y")
 
+            assert DateParser.parse_with_format_and_timezone(
+                year.strftime("%Y"), "%Y", UTC
+            ) == datetime.timestamp(year), year.strftime("%Y")
+
     def test_parse_format_yyyymm(self):
         months = get_months_in_year(1999) + get_months_in_year(2020)
         formats = [
@@ -680,6 +684,10 @@ class TestDateParser(unittest.TestCase):
             for month in months:
                 assert DateParser.parse_with_format(
                     month.strftime(format), format
+                ) == datetime.timestamp(month), month.strftime(format)
+
+                assert DateParser.parse_with_format_and_timezone(
+                    month.strftime(format), format, UTC
                 ) == datetime.timestamp(month), month.strftime(format)
 
     def test_parse_format_yyyymmdd(self):
@@ -698,6 +706,10 @@ class TestDateParser(unittest.TestCase):
             for day in days:
                 assert DateParser.parse_with_format(
                     day.strftime(format), format
+                ) == datetime.timestamp(day), day.strftime(format)
+
+                assert DateParser.parse_with_format_and_timezone(
+                    day.strftime(format), format, UTC
                 ) == datetime.timestamp(day), day.strftime(format)
 
     def test_parse_format_yyyymmddhh(self):
@@ -724,6 +736,10 @@ class TestDateParser(unittest.TestCase):
             for hour in hours:
                 assert DateParser.parse_with_format(
                     hour.strftime(format), format
+                ) == datetime.timestamp(hour), hour.strftime(format)
+
+                assert DateParser.parse_with_format_and_timezone(
+                    hour.strftime(format), format, UTC
                 ) == datetime.timestamp(hour), hour.strftime(format)
 
     def test_parse_format_yyyymmddhhmm(self):
@@ -790,6 +806,18 @@ class TestDateParser(unittest.TestCase):
                 assert DateParser.parse_with_format(
                     second.strftime(format), format
                 ) == datetime.timestamp(second), second.strftime(format)
+
+                assert DateParser.parse_with_format_and_timezone(
+                    second.strftime(format), format, UTC
+                ) == datetime.timestamp(second), second.strftime(format)
+
+        with pytest.raises(Exception):
+            DateParser.parse_with_format_and_timezone( '2022-01-15T12:40:25nyc', "%Y-%m-%dT%H:%M:%S%Z", NYC)
+
+    def test_parse_format_with_timezone(self):
+        way1 = DateParser.parse_with_format('2022-01-15 18:01:02nyc', "%Y-%m-%dT%H:%M:%S%Z")
+        way2 = DateParser.parse_with_format_and_timezone('2022-01-15 18:01:02', "%Y-%m-%dT%H:%M:%S", NYC)
+        assert way1 == way2
 
     def test_compare_parse_format_perf(self):
         runs = 100000

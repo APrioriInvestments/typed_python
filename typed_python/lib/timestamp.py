@@ -18,7 +18,7 @@ from typed_python import Class, Final, Member, Held
 from typed_python.lib.datetime.date_parser import DateParser
 from typed_python.lib.datetime.date_formatter import DateFormatter
 from typed_python.lib.datetime.chrono import Chrono
-from typed_python.lib.datetime.date_time import TimeZone, UTC
+from typed_python.lib.datetime.date_time import TimeZone, UTC, NYC
 
 
 @Held
@@ -93,7 +93,17 @@ class Timestamp(Class, Final):
 
     @Entrypoint
     @staticmethod
-    def parse(date_str: str):
+    def parse(date_str: str, timezone: TimeZone):  # noqa: F811
+        return Timestamp(ts=DateParser.parse_with_timezone(date_str, timezone))
+
+    @Entrypoint
+    @staticmethod
+    def parse_nyc(date_str: str):
+        return Timestamp(ts=DateParser.parse_with_timezone(date_str, NYC))
+
+    @Entrypoint
+    @staticmethod
+    def parse(date_str: str):  # noqa: F811
         return Timestamp(ts=DateParser.parse(date_str))
 
     @Entrypoint
@@ -109,8 +119,16 @@ class Timestamp(Class, Final):
         return DateFormatter.format(self.ts, timezone, format)
 
     @Entrypoint
+    def format_nyc(self, format: str = "%Y-%m-%d %H:%M:%S") -> str:
+        return DateFormatter.format(self.ts, NYC, format)
+
+    @Entrypoint
     def weekday(self, timezone: TimeZone) -> int:
         return timezone.datetime(self.ts).date.weekday()
+
+    @Entrypoint
+    def dayOfYear(self, timezone: TimeZone) -> int:
+        return timezone.datetime(self.ts).date.dayOfYear()
 
     @Entrypoint
     @staticmethod

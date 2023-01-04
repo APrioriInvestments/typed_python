@@ -189,7 +189,8 @@ class TestDateFormatter(unittest.TestCase):
 
         unixtime = time.time()
         dt = datetime.fromtimestamp(unixtime)
-        timezone = FixedOffsetTimezone(offset_hours=-time.localtime().tm_gmtoff)
+        offset_hours = time.localtime().tm_gmtoff / 3600
+        timezone = FixedOffsetTimezone(offset_hours=offset_hours)
         assert dt.strftime("%I") == DateFormatter.format(unixtime, timezone, "%I")
 
     def test_format_directive_p(self):
