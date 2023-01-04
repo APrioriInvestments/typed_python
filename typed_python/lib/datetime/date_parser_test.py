@@ -15,7 +15,7 @@
 import unittest
 import time
 from typed_python.lib.datetime.date_parser import DateParser
-from typed_python.lib.datetime.date_time import Date, TimeOfDay, DateTime, UTC
+from typed_python.lib.datetime.date_time import DateTime, UTC
 from typed_python.compiler.runtime import PrintNewFunctionVisitor
 from typed_python import Entrypoint, ListOf
 
@@ -371,13 +371,10 @@ class TestDateParser(unittest.TestCase):
                 ), hour.strftime(format)
 
     def test_parse_iso_with_tz_offset_ist(self):
-        dtime = DateTime(
-            date=Date(year=2022, month=1, day=1),
-            timeOfDay=TimeOfDay(hour=12, minute=0, second=0),
-        )
+        ymdhms = (2022, 1, 1, 12, 0, 0)
 
         # This is how it should work.
-        dtimePython = datetime(2022, 1, 1, 12, 0, 0)
+        dtimePython = datetime(*ymdhms)
         tsIst = pytz.timezone("Israel").localize(dtimePython).timestamp()
         tsUtc = pytz.timezone("UTC").localize(dtimePython).timestamp()
         assert tsIst == tsUtc - (2 * 3600)
@@ -388,6 +385,7 @@ class TestDateParser(unittest.TestCase):
             "%Y-%m-%d %H:%M+02:00",
         ]
 
+        dtime = DateTime(*ymdhms)
         tsUtc = UTC.timestamp(dtime)
         for format in formats:
             tsIstNew = DateParser.parse_iso_str(dtimePython.strftime(format))

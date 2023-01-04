@@ -110,11 +110,8 @@ class TimeZone(Class):
         seconds = secondsSinceMidnight % 3600
         minute = seconds // 60
         second = seconds % 60
-        tod = TimeOfDay(hour=hour, minute=minute, second=second)
 
-        return DateTime(
-            date=Date(year=date.year, month=date.month, day=date.day), timeOfDay=tod
-        )
+        return DateTime(date.year, date.month, date.day, hour, minute, second)
 
 
 class DaylightSavingsTimezone(TimeZone, Final):

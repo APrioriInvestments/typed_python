@@ -3,8 +3,6 @@ import pytz
 import datetime
 from typed_python.lib.datetime.date_time import (
     DateTime,
-    Date,
-    TimeOfDay,
     NonexistentDateTime,
     FixedOffsetTimezone,
     EST,
@@ -36,11 +34,7 @@ def test_DateTime_nonexistent_DateTime():
 
 
 def test_DateTime_from_timestamp():
-    year, month, day = 2022, 11, 6
-    hour, minute, second = 1, 30, 0
-    date = Date(year=year, month=month, day=day)
-    timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
-    dateTime = DateTime(date=date, timeOfDay=timeOfDay)
+    dateTime = DateTime(2022, 11, 6, 1, 30, 0)
 
     timestamp = UTC.timestamp(dateTime)
     newDateTime = UTC.datetime(timestamp)
@@ -48,20 +42,10 @@ def test_DateTime_from_timestamp():
 
 
 def test_DateTime_to_timestamp_daylight_savings():
-    year, month, day = 2022, 11, 6
-    hour, minute, second = 5, 30, 0
-    date = Date(year=year, month=month, day=day)
-    timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
-    utcDateTime = DateTime(date=date, timeOfDay=timeOfDay)
-
+    utcDateTime = DateTime(2022, 11, 6, 5, 30, 0)
     oneThirtyAmNycFirstFold = UTC.timestamp(utcDateTime)
 
-    year, month, day = 2022, 11, 6
-    hour, minute, second = 6, 30, 0
-    date = Date(year=year, month=month, day=day)
-    timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
-    utcDateTime = DateTime(date=date, timeOfDay=timeOfDay)
-
+    utcDateTime = DateTime(2022, 11, 6, 6, 30, 0)
     oneThirtyAmNycSecondFold = UTC.timestamp(utcDateTime)
 
     assert oneThirtyAmNycSecondFold - oneThirtyAmNycFirstFold == 3600
@@ -71,27 +55,22 @@ def test_DateTime_to_timestamp_daylight_savings():
 
 
 def test_fixed_offset():
-    year, month, day = 2022, 11, 6
-    hour, minute, second = 5, 30, 0
-    date = Date(year=year, month=month, day=day)
-    timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
-    dateTime = DateTime(date=date, timeOfDay=timeOfDay)
+    ymdhms = (2022, 11, 6, 5, 30, 0)
 
     ts = (
         pytz.timezone("Asia/Hong_Kong")
-        .localize(datetime.datetime(year, month, day, hour, minute, second))
+        .localize(datetime.datetime(*ymdhms))
         .timestamp()
     )
 
+    dateTime = DateTime(*ymdhms)
     res = FixedOffsetTimezone(offset_hours=+8).timestamp(dateTime)
     assert ts == res
 
 
 def test_datetime_to_timestamp_and_back():
     for tz in [NYC, EST, UTC]:
-        date = Date(year=2022, month=11, day=6)
-        timeOfDay = TimeOfDay(hour=1, minute=30, second=0)
-        dtime = DateTime(date=date, timeOfDay=timeOfDay)
+        dtime = DateTime(2022, 11, 6, 1, 30, 0)
         ts = tz.timestamp(dtime)
         dtime2 = tz.datetime(ts)
         assert dtime == dtime2
