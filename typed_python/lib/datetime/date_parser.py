@@ -246,7 +246,6 @@ class DateParser(Class, Final):
                         raise ValueError('Bad value for %B:', date_str)
                 elif directive == 'Z':
                     # 5 character tz abbreviations (future proofing since we don't currently support any)
-                    print(date_str[date_str_cursor: date_str_cursor + 4])
                     if TimeZoneChecker.isValidTimezone(date_str[date_str_cursor: date_str_cursor + 4]):
                         tz_str = date_str[date_str_cursor: date_str_cursor + 4]
                         date_str_cursor += 4
