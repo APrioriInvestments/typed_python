@@ -18,7 +18,6 @@ from typed_python import Class, Final, Member, Held
 from typed_python.lib.datetime.date_parser import DateParser
 from typed_python.lib.datetime.date_formatter import DateFormatter
 from typed_python.lib.datetime.chrono import Chrono
-from typed_python.lib.datetime.timezone import Offset
 from typed_python.lib.datetime.DateTime import TimeZone, UTC
 
 

@@ -103,6 +103,20 @@ class Chrono(Class, Final):
 
     @Entrypoint
     @staticmethod
+    def time_to_seconds(hour: int = 0, minute: int = 0, second: float = 0) -> float:
+        '''
+            Converts and hour, min, second combination into seconds
+            Parameters:
+                hour (int): The hour (0-23)
+                minute (int): The minute
+                second (float): The second
+            Returns:
+                (float) the number of seconds
+        '''
+        return (hour * 3600) + (minute * 60) + second
+
+    @Entrypoint
+    @staticmethod
     def weekday_difference(day1: int, day2: int) -> int:
         '''
             Gets the difference in days between two weekdays
