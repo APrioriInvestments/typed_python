@@ -14,7 +14,6 @@
 
 from typed_python import Class, Dict, Final
 from typed_python import Entrypoint, ListOf
-from typed_python.lib.datetime.timezone import Timezone
 from typed_python.lib.datetime.chrono import Chrono
 from typed_python.lib.datetime.DateTime import (
     TimeZone,
@@ -465,9 +464,6 @@ class DateParser(Class, Final):
 
         else:
             raise ValueError("Unrecognized timezone: ", tz_str)
-
-        print(f"datetime:\n{datetime}")
-        print(f"timezone:\n{timezone}")
 
         return timezone.timestamp(datetime)
 
