@@ -14,6 +14,7 @@ class TimeOfDay(Class, Final):
     minute = Member(int)
     second = Member(float)
 
+    @Entrypoint
     def secondsSinceMidnight(self, afterFold: bool = False) -> float:
         return (self.second + self.minute * 60 + self.hour * 3600) + afterFold * 3600
 
@@ -68,11 +69,17 @@ class TimeZone(Class):
 
     @Entrypoint
     def _datetimeFromTimestampAndOffset(self, timestamp: float, offset_hours: int) -> DateTime:
-        day, secondsSinceMidnight = divmod(timestamp + offset_hours * 3600, 86400)
+        ts = timestamp + offset_hours * 3600
+        day = ts // 86400
+        secondsSinceMidnight = ts % 86400
+
         date = Chrono.civil_from_days(day)
 
-        hour, seconds = divmod(secondsSinceMidnight, 3600)
-        minute, second = divmod(seconds, 60)
+        hour = secondsSinceMidnight//3600
+        seconds = secondsSinceMidnight%3600
+        minute = seconds // 60
+        second = seconds % 60
+
         tod = TimeOfDay(hour=hour, minute=minute, second=second)
 
         return DateTime(
@@ -179,6 +186,7 @@ class FixedOffsetTimezone(TimeZone, Final):
 
 NYC = DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5)
 UTC = FixedOffsetTimezone(offset_hours=0)
+EST = FixedOffsetTimezone(offset_hours = -5)
 
 class TimeZoneChecker(Class, Final):
     TIMEZONES = ConstDict(str, TimeZone)(
@@ -188,6 +196,8 @@ class TimeZoneChecker(Class, Final):
             'nyc': NYC,
             'utc': UTC,
             'z': UTC,
+            'est': EST,
+            'edt': NYC,
         }
     )
 

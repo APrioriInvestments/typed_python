@@ -94,24 +94,7 @@ class Timestamp(Class, Final):
     @Entrypoint
     @staticmethod
     def parse(date_str: str):
-        # work out if there is localization info present
-        # if not, parseDirect
-        # otherwise, split the argument into (userString, localizationString)
-        # turn the localizationString into an offset
-        # call parse with (userString, offset)
         return Timestamp(ts=DateParser.parse(date_str))
-
-    @Entrypoint
-    @staticmethod
-    def parseDirect(date_str: str):
-        # TODO: refactor DateParser so that it errors if there's a localization component here
-        return Timestamp(ts=DateParser.parse(date_str))
-
-    @Entrypoint
-    @staticmethod
-    def parse(date_str: str, offset: Offset):  # noqa: F811
-        # TODO: refactor DateParser so that it errors if there's a localization component here
-        return Timestamp(ts=offset.localize(DateParser.parse(date_str)))
 
     @Entrypoint
     def format(self, timezone: TimeZone = UTC, format: str = "%Y-%m-%d %H:%M:%S") -> str:
@@ -126,10 +109,8 @@ class Timestamp(Class, Final):
         return DateFormatter.format(self.ts, timezone, format)
 
     @Entrypoint
-    def weekday(self, offset=0) -> int:
-        assert offset == 0, "Not implemented"
-
-        return Chrono.weekday_from_days(int(self.ts) // 86400)
+    def weekday(self, timezone: TimeZone) -> int:
+        return timezone.datetime(self.ts).date.weekday()
 
     @Entrypoint
     @staticmethod

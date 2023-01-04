@@ -156,18 +156,11 @@ class TestTimestamp(unittest.TestCase):
         # with relative tz (offset changes with dst)
         Timestamp.parse('2022-10-22T06:39NYC')
 
-        # with relative tz (offset changes with dst)
-        Timestamp.parse('2022-10-22T06:39ET')
-
         # with fixed offset tz
         Timestamp.parse('2022-10-22T06:39UTC')
 
         # with fixed offset tz
         Timestamp.parse('2022-10-22T06:39EST')
-
-        # with fixed offset tz
-        ts = Timestamp.parse('2022-10-22T06:39EDT')
-        import pdb; pdb.set_trace()
 
         # get date string from timestamp as YYYY-MM-DD
         ts = Timestamp.make(time.time())
