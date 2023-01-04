@@ -25,6 +25,7 @@ from typed_python.lib.datetime.DateTime import TimeZone, UTC
 @Held
 class Timestamp(Class, Final):
     """A wrapper around a unix timestamp that adds functionality for parsing and string formatting"""
+
     ts = Member(float)
 
     @Entrypoint
@@ -78,13 +79,13 @@ class Timestamp(Class, Final):
     @Entrypoint
     @staticmethod
     def make(ts: float):
-        '''
+        """
         Creates a Timestamp from a float
         Parameters:
             ts: a float
         Returns:
             timestamp (Timestamp): A Timestamp
-        '''
+        """
         return Timestamp(ts=ts)
 
     @Entrypoint
@@ -97,15 +98,20 @@ class Timestamp(Class, Final):
         return Timestamp(ts=DateParser.parse(date_str))
 
     @Entrypoint
+    @staticmethod
+    def parse(date_str: str, timezone: TimeZone):
+        return Timestamp(ts=DateParser.parse(date_str))
+
+    @Entrypoint
     def format(self, timezone: TimeZone = UTC, format: str = "%Y-%m-%d %H:%M:%S") -> str:
-        '''
+        """
         Converts a Timestamp to a string in a given format
         Parameters:
             offset (int): The offset from UTC
             format (str): A string specifying formatting directives. E.g. '%Y-%m-%dT%H:%M:%S'
         Returns:
             date_str(str): A string representing the date in the specified format. E.g. "Mon January 2, 2021"
-        '''
+        """
         return DateFormatter.format(self.ts, timezone, format)
 
     @Entrypoint
@@ -115,7 +121,7 @@ class Timestamp(Class, Final):
     @Entrypoint
     @staticmethod
     def from_date(year=0, month=0, day=0, hour=0, minute=0, second=0):
-        '''
+        """
         Creates a Timestamp from date values.
         Parameters:
             year (int): The year
@@ -126,5 +132,8 @@ class Timestamp(Class, Final):
             second (float): The second.
         Returns:
             timestamp (Timestamp): A Timestamp
-        '''
-        return Timestamp(ts=Chrono.date_to_seconds(year, month, day) + Chrono.time_to_seconds(hour, minute, second))
+        """
+        return Timestamp(
+            ts=Chrono.date_to_seconds(year, month, day)
+            + Chrono.time_to_seconds(hour, minute, second)
+        )
