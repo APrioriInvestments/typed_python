@@ -238,31 +238,57 @@ class DateParser(Class, Final):
                 elif directive == "B":
                     # september
                     if date_str[date_str_cursor : date_str_cursor + 9] in MONTH_TO_INT:
-                        month = MONTH_TO_INT[date_str[date_str_cursor : date_str_cursor + 9]]
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor : date_str_cursor + 9]
+                        ]
                         date_str_cursor += 9
                     # february, november, december
-                    elif date_str[date_str_cursor : date_str_cursor + 8] in MONTH_TO_INT:
-                        month = MONTH_TO_INT[date_str[date_str_cursor : date_str_cursor + 8]]
+                    elif (
+                        date_str[date_str_cursor : date_str_cursor + 8] in MONTH_TO_INT
+                    ):
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor : date_str_cursor + 8]
+                        ]
                         date_str_cursor += 8
                     # january,october
-                    elif date_str[date_str_cursor : date_str_cursor + 7] in MONTH_TO_INT:
-                        month = MONTH_TO_INT[date_str[date_str_cursor : date_str_cursor + 7]]
+                    elif (
+                        date_str[date_str_cursor : date_str_cursor + 7] in MONTH_TO_INT
+                    ):
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor : date_str_cursor + 7]
+                        ]
                         date_str_cursor += 7
                     # august
-                    elif date_str[date_str_cursor : date_str_cursor + 6] in MONTH_TO_INT:
-                        month = MONTH_TO_INT[date_str[date_str_cursor : date_str_cursor + 6]]
+                    elif (
+                        date_str[date_str_cursor : date_str_cursor + 6] in MONTH_TO_INT
+                    ):
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor : date_str_cursor + 6]
+                        ]
                         date_str_cursor += 6
                     # march,april
-                    elif date_str[date_str_cursor : date_str_cursor + 5] in MONTH_TO_INT:
-                        month = MONTH_TO_INT[date_str[date_str_cursor : date_str_cursor + 5]]
+                    elif (
+                        date_str[date_str_cursor : date_str_cursor + 5] in MONTH_TO_INT
+                    ):
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor : date_str_cursor + 5]
+                        ]
                         date_str_cursor += 5
                     # june, july
-                    elif date_str[date_str_cursor : date_str_cursor + 4] in MONTH_TO_INT:
-                        month = MONTH_TO_INT[date_str[date_str_cursor : date_str_cursor + 4]]
+                    elif (
+                        date_str[date_str_cursor : date_str_cursor + 4] in MONTH_TO_INT
+                    ):
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor : date_str_cursor + 4]
+                        ]
                         date_str_cursor += 4
                     # may
-                    elif date_str[date_str_cursor : date_str_cursor + 3] in MONTH_TO_INT:
-                        month = MONTH_TO_INT[date_str[date_str_cursor : date_str_cursor + 3]]
+                    elif (
+                        date_str[date_str_cursor : date_str_cursor + 3] in MONTH_TO_INT
+                    ):
+                        month = MONTH_TO_INT[
+                            date_str[date_str_cursor : date_str_cursor + 3]
+                        ]
                         date_str_cursor += 3
                     else:
                         raise ValueError("Bad value for %B:", date_str)
@@ -389,7 +415,11 @@ class DateParser(Class, Final):
         elif len(date_tokens) == 2 and is4d(date_tokens[0]):
             year, month, day = int(date_tokens[0]), int(date_tokens[1]), 1
         elif len(date_tokens) == 3 and is4d(date_tokens[0]):
-            year, month, day = int(date_tokens[0]), int(date_tokens[1]), int(date_tokens[2])
+            year, month, day = (
+                int(date_tokens[0]),
+                int(date_tokens[1]),
+                int(date_tokens[2]),
+            )
         else:
             raise ValueError("Invalid format: ", date_tokens)
 
@@ -410,7 +440,11 @@ class DateParser(Class, Final):
             if tokens[cursor] == T:
                 cursor += 1
                 break
-            elif tokens[cursor] == PLUS or tokens[cursor] == DASH or tokens[cursor].isalpha():
+            elif (
+                tokens[cursor] == PLUS
+                or tokens[cursor] == DASH
+                or tokens[cursor].isalpha()
+            ):
                 break
             else:
                 time_tokens.append(tokens[cursor])
@@ -439,7 +473,11 @@ class DateParser(Class, Final):
                     float(time_tokens[0][4:6]),
                 )
             elif len(time_tokens[0]) == 4:
-                hour, minute, second = int(time_tokens[0][:2]), int(time_tokens[0][2:4]), 0.0
+                hour, minute, second = (
+                    int(time_tokens[0][:2]),
+                    int(time_tokens[0][2:4]),
+                    0.0,
+                )
             elif len(time_tokens[0]) == 2:
                 hour, minute, second = int(time_tokens[0][:2]), 0, 0.0
         elif len(time_tokens) == 2:
@@ -484,7 +522,9 @@ class DateParser(Class, Final):
 
             # greedily grab digits or . to make a numeric token
             start = stop = cursor
-            while cursor < strlen and (time_str[cursor].isdigit() or time_str[cursor] == DOT):
+            while cursor < strlen and (
+                time_str[cursor].isdigit() or time_str[cursor] == DOT
+            ):
                 cursor += 1
                 stop += 1
                 continue
@@ -557,7 +597,11 @@ class DateParser(Class, Final):
                 raise ValueError()
         elif len(time_part) == 3:
             # HH:MM
-            if time_part[0].isdigit() and time_part[1] == COLON and time_part[2].isdigit():
+            if (
+                time_part[0].isdigit()
+                and time_part[1] == COLON
+                and time_part[2].isdigit()
+            ):
                 h, m, s = int(time_part[0]), int(time_part[2]), 0
             else:
                 raise ValueError()
@@ -717,7 +761,7 @@ class DateParser(Class, Final):
         if TimeZoneChecker.isValidTimezone(tz_str):
             timezone = TimeZoneChecker.TIMEZONES[tz_str]
 
-        elif tz_str[0] == "+" or tz_str[0] == '-':
+        elif tz_str[0] == "+" or tz_str[0] == "-":
             tz_components = tz_str[1:]
             if len(tz_components) == 2:
                 offset_hours = float(tz_components)
@@ -732,11 +776,9 @@ class DateParser(Class, Final):
             else:
                 raise ValueError("Invalid timezone offset: ", tz_str)
 
-            if tz_str[0] == '-':
+            if tz_str[0] == "-":
                 offset_hours = -offset_hours
 
             return FixedOffsetTimezone(offset_hours=offset_hours)
 
         raise ValueError("Invalid timezone offset: ", tz_str)
-
-

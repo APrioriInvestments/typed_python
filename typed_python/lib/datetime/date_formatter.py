@@ -74,7 +74,9 @@ INT_TO_DAY_ABBR = Dict(int, str)(
 @Entrypoint
 def convert_to_12h(hour: int):
     return (
-        12 if (hour == 0 or hour == 12 or hour == 24) else (hour if hour < 12 else hour - 12)
+        12
+        if (hour == 0 or hour == 12 or hour == 24)
+        else (hour if hour < 12 else hour - 12)
     )
 
 
@@ -164,7 +166,9 @@ class DateFormatter(Class, Final):
         # short circuits for common formats
         if format == "%Y-%m-%d":
             return "-".join(
-                ListOf(str)([DateFormatter.f4d(y), DateFormatter.f2d(m), DateFormatter.f2d(d)])
+                ListOf(str)(
+                    [DateFormatter.f4d(y), DateFormatter.f2d(m), DateFormatter.f2d(d)]
+                )
             )
 
         if format == "%Y-%m-%d %H:%M:%S":
@@ -224,9 +228,13 @@ class DateFormatter(Class, Final):
                 elif directive == "p":
                     result.append("AM" if h < 12 else "PM")
                 elif directive == "Z":
-                    result.append("UTC")  # timestamps don't store tz data, are pegged to UTC
+                    result.append(
+                        "UTC"
+                    )  # timestamps don't store tz data, are pegged to UTC
                 elif directive == "z":
-                    result.append("+0000")  # timestamps don't store tz data, are pegged to UTC
+                    result.append(
+                        "+0000"
+                    )  # timestamps don't store tz data, are pegged to UTC
                 elif directive == "j":
                     result.append(DateFormatter.f3d(doy))  # day number of year
                 elif directive == "C":
@@ -234,7 +242,9 @@ class DateFormatter(Class, Final):
                 elif directive == "%":
                     result.append("%")
                 elif directive == "u":
-                    result.append(str(7 if weekday == 0 else weekday))  # ISO weekday 1-7
+                    result.append(
+                        str(7 if weekday == 0 else weekday)
+                    )  # ISO weekday 1-7
                 else:
                     raise ValueError("Unsupported formatting directive: " + directive)
                 pos += 1

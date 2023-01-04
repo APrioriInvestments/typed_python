@@ -55,9 +55,11 @@ class TestDateFormatter(unittest.TestCase):
             step="seconds",
         )
         for second in seconds:
-            assert DateFormatter.isoformat(datetime.timestamp(second), UTC) == second.strftime(
+            assert DateFormatter.isoformat(
+                datetime.timestamp(second), UTC
+            ) == second.strftime("%Y-%m-%dT%H:%M:%S"), second.strftime(
                 "%Y-%m-%dT%H:%M:%S"
-            ), second.strftime("%Y-%m-%dT%H:%M:%S")
+            )
 
     def test_format_directives(self):
         seconds = get_datetimes_in_range(
@@ -68,7 +70,9 @@ class TestDateFormatter(unittest.TestCase):
         for second in seconds:
             assert DateFormatter.format(
                 datetime.timestamp(second), UTC, "%Y-%m-%dT%H:%M:%S"
-            ) == second.strftime("%Y-%m-%dT%H:%M:%S"), second.strftime("%Y-%m-%dT%H:%M:%S")
+            ) == second.strftime("%Y-%m-%dT%H:%M:%S"), second.strftime(
+                "%Y-%m-%dT%H:%M:%S"
+            )
 
     def test_format_directive_a(self):
         days = get_datetimes_in_range(
@@ -78,9 +82,9 @@ class TestDateFormatter(unittest.TestCase):
         )
 
         for day in days:
-            assert DateFormatter.format(datetime.timestamp(day), UTC, "%a") == day.strftime(
-                "%a"
-            ), day.strftime("%Y-%m-%d")
+            assert DateFormatter.format(
+                datetime.timestamp(day), UTC, "%a"
+            ) == day.strftime("%a"), day.strftime("%Y-%m-%d")
 
     def test_format_directive_A(self):
         days = get_datetimes_in_range(
@@ -90,9 +94,9 @@ class TestDateFormatter(unittest.TestCase):
         )
 
         for day in days:
-            assert DateFormatter.format(datetime.timestamp(day), UTC, "%A") == day.strftime(
-                "%A"
-            ), day.strftime("%Y-%m-%d")
+            assert DateFormatter.format(
+                datetime.timestamp(day), UTC, "%A"
+            ) == day.strftime("%A"), day.strftime("%Y-%m-%d")
 
     def test_format_directive_w(self):
         days = get_datetimes_in_range(
@@ -102,9 +106,9 @@ class TestDateFormatter(unittest.TestCase):
         )
 
         for day in days:
-            assert DateFormatter.format(datetime.timestamp(day), UTC, "%w") == day.strftime(
-                "%w"
-            ), day.strftime("%Y-%m-%d")
+            assert DateFormatter.format(
+                datetime.timestamp(day), UTC, "%w"
+            ) == day.strftime("%w"), day.strftime("%Y-%m-%d")
 
     def test_format_directive_d(self):
         days = get_datetimes_in_range(
@@ -118,9 +122,9 @@ class TestDateFormatter(unittest.TestCase):
                 dtime = UTC.datetime(datetime.timestamp(day))
             else:
                 continue
-            assert DateFormatter.format(datetime.timestamp(day), UTC, "%d") == day.strftime(
-                "%d"
-            ), day.strftime("%Y-%m-%d")
+            assert DateFormatter.format(
+                datetime.timestamp(day), UTC, "%d"
+            ) == day.strftime("%d"), day.strftime("%Y-%m-%d")
 
     def test_format_directive_b(self):
         days = get_datetimes_in_range(
@@ -130,9 +134,9 @@ class TestDateFormatter(unittest.TestCase):
         )
 
         for day in days:
-            assert DateFormatter.format(datetime.timestamp(day), UTC, "%b") == day.strftime(
-                "%b"
-            ), day.strftime("%Y-%m-%d")
+            assert DateFormatter.format(
+                datetime.timestamp(day), UTC, "%b"
+            ) == day.strftime("%b"), day.strftime("%Y-%m-%d")
 
     def test_format_directive_B(self):
         days = get_datetimes_in_range(
@@ -142,9 +146,9 @@ class TestDateFormatter(unittest.TestCase):
         )
 
         for day in days:
-            assert DateFormatter.format(datetime.timestamp(day), UTC, "%B") == day.strftime(
-                "%B"
-            ), day.strftime("%Y-%m-%d")
+            assert DateFormatter.format(
+                datetime.timestamp(day), UTC, "%B"
+            ) == day.strftime("%B"), day.strftime("%Y-%m-%d")
 
     def test_format_directive_m(self):
         days = get_datetimes_in_range(
@@ -154,16 +158,16 @@ class TestDateFormatter(unittest.TestCase):
         )
 
         for day in days:
-            assert DateFormatter.format(datetime.timestamp(day), UTC, "%m") == day.strftime(
-                "%m"
-            ), day.strftime("%Y-%m-%d")
+            assert DateFormatter.format(
+                datetime.timestamp(day), UTC, "%m"
+            ) == day.strftime("%m"), day.strftime("%Y-%m-%d")
 
     def test_format_directive_y(self):
         years = get_years_in_range(1999, 2022)
         for year in years:
-            assert DateFormatter.format(datetime.timestamp(year), UTC, "%y") == year.strftime(
-                "%y"
-            ), year.strftime("%Y-%m-%d")
+            assert DateFormatter.format(
+                datetime.timestamp(year), UTC, "%y"
+            ) == year.strftime("%y"), year.strftime("%Y-%m-%d")
 
     def test_format_directive_H(self):
         minutes = get_datetimes_in_range(
@@ -253,16 +257,16 @@ class TestDateFormatter(unittest.TestCase):
         years = get_years_in_range(1999, 2022)
 
         for year in years:
-            assert DateFormatter.format(datetime.timestamp(year), UTC, "%C") == year.strftime(
-                "%C"
-            ), year.strftime("%Y")
+            assert DateFormatter.format(
+                datetime.timestamp(year), UTC, "%C"
+            ) == year.strftime("%C"), year.strftime("%Y")
 
     def test_format_directive_Y(self):
         years = get_years_in_range(1999, 2022)
         for year in years:
-            assert DateFormatter.format(datetime.timestamp(year), UTC, "%Y") == year.strftime(
-                "%Y"
-            ), year.strftime("%Y-%m-%d")
+            assert DateFormatter.format(
+                datetime.timestamp(year), UTC, "%Y"
+            ) == year.strftime("%Y"), year.strftime("%Y-%m-%d")
 
     def test_format_directive_u(self):
         days = get_datetimes_in_range(
@@ -272,9 +276,9 @@ class TestDateFormatter(unittest.TestCase):
         )
 
         for day in days:
-            assert DateFormatter.format(datetime.timestamp(day), UTC, "%u") == day.strftime(
-                "%u"
-            ), day.strftime("%Y-%m-%d")
+            assert DateFormatter.format(
+                datetime.timestamp(day), UTC, "%u"
+            ) == day.strftime("%u"), day.strftime("%Y-%m-%d")
 
     def test_format_directive_percent(self):
         days = get_datetimes_in_range(
@@ -284,9 +288,9 @@ class TestDateFormatter(unittest.TestCase):
         )
 
         for day in days:
-            assert DateFormatter.format(datetime.timestamp(day), UTC, "%%") == day.strftime(
-                "%%"
-            ), day.strftime("%Y-%m-%d")
+            assert DateFormatter.format(
+                datetime.timestamp(day), UTC, "%%"
+            ) == day.strftime("%%"), day.strftime("%Y-%m-%d")
 
     def test_format_directive_doy(self):
         days = get_datetimes_in_range(
@@ -296,9 +300,9 @@ class TestDateFormatter(unittest.TestCase):
         )
 
         for day in days:
-            assert DateFormatter.format(datetime.timestamp(day), UTC, "%j") == day.strftime(
-                "%j"
-            ), day.strftime("%Y-%m-%d")
+            assert DateFormatter.format(
+                datetime.timestamp(day), UTC, "%j"
+            ) == day.strftime("%j"), day.strftime("%Y-%m-%d")
 
     def test_format_string_Ymd(self):
         days = get_datetimes_in_range(
@@ -345,7 +349,9 @@ class TestDateFormatter(unittest.TestCase):
         for minute in minutes:
             assert DateFormatter.format(
                 datetime.timestamp(minute), UTC, "%Y-%m-%d %H:%M:%S"
-            ) == minute.strftime("%Y-%m-%d %H:%M:%S"), minute.strftime("%Y-%m-%dT%H:%M:%S")
+            ) == minute.strftime("%Y-%m-%d %H:%M:%S"), minute.strftime(
+                "%Y-%m-%dT%H:%M:%S"
+            )
 
     def test_format_string_YmdTHMS(self):
         minutes = get_datetimes_in_range(
@@ -356,4 +362,6 @@ class TestDateFormatter(unittest.TestCase):
         for minute in minutes:
             assert DateFormatter.format(
                 datetime.timestamp(minute), UTC, "%Y-%m-%dT%H:%M:%S"
-            ) == minute.strftime("%Y-%m-%dT%H:%M:%S"), minute.strftime("%Y-%m-%dT%H:%M:%S")
+            ) == minute.strftime("%Y-%m-%dT%H:%M:%S"), minute.strftime(
+                "%Y-%m-%dT%H:%M:%S"
+            )

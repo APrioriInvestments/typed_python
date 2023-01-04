@@ -5,6 +5,7 @@ from typed_python.lib.datetime.chrono import Chrono
 class NonexistentDateTime(Exception):
     pass
 
+
 class OneFold(Exception):
     pass
 
@@ -34,7 +35,11 @@ class Date(Class, Final):
 
     @Entrypoint
     def __eq__(self, other):
-        return self.year == other.year and self.month == other.month and self.day == other.day
+        return (
+            self.year == other.year
+            and self.month == other.month
+            and self.day == other.day
+        )
 
     @Entrypoint
     def daysSinceEpoch(self):
@@ -68,15 +73,17 @@ class TimeZone(Class):
         raise NotImplementedError("Subclasses implement.")
 
     @Entrypoint
-    def _datetimeFromTimestampAndOffset(self, timestamp: float, offset_hours: int) -> DateTime:
+    def _datetimeFromTimestampAndOffset(
+        self, timestamp: float, offset_hours: int
+    ) -> DateTime:
         ts = timestamp + offset_hours * 3600
         day = ts // 86400
         secondsSinceMidnight = ts % 86400
 
         date = Chrono.civil_from_days(day)
 
-        hour = secondsSinceMidnight//3600
-        seconds = secondsSinceMidnight%3600
+        hour = secondsSinceMidnight // 3600
+        seconds = secondsSinceMidnight % 3600
         minute = seconds // 60
         second = seconds % 60
         tod = TimeOfDay(hour=hour, minute=minute, second=second)
@@ -131,7 +138,9 @@ class DaylightSavingsTimezone(TimeZone, Final):
             else:
                 is_daylight_savings = afterFold < 2 and dateTime.timeOfDay.hour < 2
 
-        offset_hours = self.dst_offset_hours if is_daylight_savings else self.st_offset_hours
+        offset_hours = (
+            self.dst_offset_hours if is_daylight_savings else self.st_offset_hours
+        )
 
         return (
             day * 86400
@@ -142,7 +151,7 @@ class DaylightSavingsTimezone(TimeZone, Final):
     @Entrypoint
     def datetime(self, timestamp) -> DateTime:
         # Figure out if this timestamp falls within daylight savings or not.
-        # Technically this could be off by a day (on Dec 31 or Jan1), 
+        # Technically this could be off by a day (on Dec 31 or Jan1),
         # and in these cases, we're not in daylight savings time anyway,
         # so it gives the right answer.
         year = Chrono.civil_from_days(timestamp // 86400).year
@@ -168,6 +177,7 @@ class DaylightSavingsTimezone(TimeZone, Final):
 
         return self._datetimeFromTimestampAndOffset(timestamp, offset_hours)
 
+
 class FixedOffsetTimezone(TimeZone, Final):
     offset_hours = Member(float)
 
@@ -183,22 +193,24 @@ class FixedOffsetTimezone(TimeZone, Final):
     def datetime(self, timestamp: float) -> DateTime:
         return self._datetimeFromTimestampAndOffset(timestamp, self.offset_hours)
 
+
 NYC = DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5)
 UTC = FixedOffsetTimezone(offset_hours=0)
-EST = FixedOffsetTimezone(offset_hours = -5)
-IST = FixedOffsetTimezone(offset_hours = 2)
+EST = FixedOffsetTimezone(offset_hours=-5)
+IST = FixedOffsetTimezone(offset_hours=2)
+
 
 class TimeZoneChecker(Class, Final):
     TIMEZONES = ConstDict(str, TimeZone)(
         {
-            '': UTC,
-            '+0000': UTC,
-            'nyc': NYC,
-            'utc': UTC,
-            'z': UTC,
-            'est': EST,
-            'edt': NYC,
-            'ist': IST,
+            "": UTC,
+            "+0000": UTC,
+            "nyc": NYC,
+            "utc": UTC,
+            "z": UTC,
+            "est": EST,
+            "edt": NYC,
+            "ist": IST,
         }
     )
 
