@@ -10,13 +10,10 @@ from typed_python.lib.datetime.DateTime import (
     NonexistentDateTime,
     FixedOffsetTimezone,
     EST,
-    NYC
+    NYC,
+    UTC
 )
 from typed_python.lib.timestamp import Timestamp
-
-Nyc = DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5)
-Utc = FixedOffsetTimezone(offset_hours=0)
-Awt = FixedOffsetTimezone(offset_hours=8)
 
 
 def test_DateTime_to_timestamp():
@@ -26,7 +23,7 @@ def test_DateTime_to_timestamp():
     timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
     dateTime = DateTime(date=date, timeOfDay=timeOfDay)
 
-    timestamp = Nyc.timestamp(dateTime)
+    timestamp = NYC.timestamp(dateTime)
 
     tz = pytz.timezone("America/New_York")
     ts = tz.localize(datetime.datetime(year, month, day, hour, minute, second)).timestamp()
@@ -42,7 +39,7 @@ def test_DateTime_nonexistent_DateTime():
     dateTime = DateTime(date=date, timeOfDay=timeOfDay)
 
     with pytest.raises(NonexistentDateTime):
-        Nyc.timestamp(dateTime)
+        NYC.timestamp(dateTime)
 
 
 def test_DateTime_to_timestamp_daylight_savings():
@@ -52,8 +49,8 @@ def test_DateTime_to_timestamp_daylight_savings():
     timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
     dateTime = DateTime(date=date, timeOfDay=timeOfDay)
 
-    timestamp1 = Nyc.timestamp(dateTime)
-    timestamp2 = Nyc.timestamp(dateTime, afterFold=True)
+    timestamp1 = NYC.timestamp(dateTime)
+    timestamp2 = NYC.timestamp(dateTime, afterFold=True)
 
     tz = pytz.timezone("America/New_York")
     ts = tz.localize(datetime.datetime(year, month, day, hour, minute, second)).timestamp()
@@ -68,8 +65,8 @@ def test_DateTime_from_timestamp():
     timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
     dateTime = DateTime(date=date, timeOfDay=timeOfDay)
 
-    timestamp = Utc.timestamp(dateTime)
-    newDateTime = Utc.datetime(timestamp)
+    timestamp = UTC.timestamp(dateTime)
+    newDateTime = UTC.datetime(timestamp)
     assert newDateTime == dateTime
 
 
@@ -80,7 +77,7 @@ def test_DateTime_to_timestamp_daylight_savings():
     timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
     utcDateTime = DateTime(date=date, timeOfDay=timeOfDay)
 
-    oneThirtyAmNycFirstFold = Utc.timestamp(utcDateTime)
+    oneThirtyAmNycFirstFold = UTC.timestamp(utcDateTime)
 
     year, month, day = 2022, 11, 6
     hour, minute, second = 6, 30, 0
@@ -88,10 +85,10 @@ def test_DateTime_to_timestamp_daylight_savings():
     timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
     utcDateTime = DateTime(date=date, timeOfDay=timeOfDay)
 
-    oneThirtyAmNycSecondFold = Utc.timestamp(utcDateTime)
+    oneThirtyAmNycSecondFold = UTC.timestamp(utcDateTime)
 
     assert oneThirtyAmNycSecondFold - oneThirtyAmNycFirstFold == 3600
-    assert Nyc.datetime(oneThirtyAmNycFirstFold) == Nyc.datetime(oneThirtyAmNycSecondFold)
+    assert NYC.datetime(oneThirtyAmNycFirstFold) == NYC.datetime(oneThirtyAmNycSecondFold)
 
 
 def test_fixed_offset():
@@ -107,11 +104,11 @@ def test_fixed_offset():
         .timestamp()
     )
 
-    res = FixedOffsetTimezone(offset_hours=-8).timestamp(dateTime)
+    res = FixedOffsetTimezone(offset_hours=+8).timestamp(dateTime)
     assert ts == res
 
 def test_datetime_to_timestamp_and_back():
-    for tz in [NYC, EST]:
+    for tz in [NYC, EST, UTC]:
         date = Date(year=2022, month=11, day=6)
         timeOfDay = TimeOfDay(hour=1, minute=30, second=0)
         dtime = DateTime(date=date, timeOfDay=timeOfDay)
