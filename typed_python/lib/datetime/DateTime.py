@@ -10,10 +10,17 @@ class OneFold(Exception):
     pass
 
 
+@Held
 class TimeOfDay(Class, Final):
     hour = Member(int)
     minute = Member(int)
     second = Member(float)
+
+    @Entrypoint
+    def __init__(hour: int, minute: int, second: float):
+        self.hour = hour
+        self.minute = minute
+        self.second = second
 
     @Entrypoint
     def secondsSinceMidnight(self, afterFold: bool = False) -> float:
@@ -28,10 +35,17 @@ class TimeOfDay(Class, Final):
         )
 
 
+@Held
 class Date(Class, Final):
     year = Member(int)
     month = Member(int)
     day = Member(int)
+
+    @Entrypoint
+    def __init__(year: int, month: int, day: int):
+        self.year = year
+        self.month = month
+        self.day = day
 
     @Entrypoint
     def __eq__(self, other):
@@ -58,6 +72,16 @@ class Date(Class, Final):
 class DateTime(Class, Final):
     date = Member(Date)
     timeOfDay = Member(TimeOfDay)
+
+    @Entrypoint
+    def __init__(self, year: int, month: int, day: int, hour: int, minute: int, second: float):
+        self.date = Date(year, month, day)
+        self.timeOfDay = TimeOfDay(hour, minute, second)
+
+    @Entrypoint
+    def __init__(self, date: Date, timeOfDay: TimeOfDay):
+        self.date = date
+        self.timeOfDay = timeOfDay
 
     def __eq__(self, other):
         return self.date == other.date and self.timeOfDay == other.timeOfDay

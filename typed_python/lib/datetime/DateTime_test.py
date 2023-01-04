@@ -15,28 +15,21 @@ from typed_python.lib.timestamp import Timestamp
 
 
 def test_DateTime_to_timestamp():
-    year, month, day = 2022, 12, 23
-    hour, minute, second = 18, 40, 36
-    date = Date(year=year, month=month, day=day)
-    timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
-    dateTime = DateTime(date=date, timeOfDay=timeOfDay)
+    ymdhms = (2022, 12, 23, 18, 40, 46)
+    dateTime = DateTime(*ymdhms)
 
     timestamp = NYC.timestamp(dateTime)
 
     tz = pytz.timezone("America/New_York")
     ts = tz.localize(
-        datetime.datetime(year, month, day, hour, minute, second)
+        datetime.datetime(*ymdhms)
     ).timestamp()
 
     assert timestamp == ts
 
 
 def test_DateTime_nonexistent_DateTime():
-    year, month, day = 2022, 3, 13
-    hour, minute, second = 2, 30, 0
-    date = Date(year=year, month=month, day=day)
-    timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
-    dateTime = DateTime(date=date, timeOfDay=timeOfDay)
+    dateTime = DateTime(2022, 3, 13, 2, 30, 0)
 
     with pytest.raises(NonexistentDateTime):
         NYC.timestamp(dateTime)
