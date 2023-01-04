@@ -97,11 +97,6 @@ class Timestamp(Class, Final):
         return Timestamp(ts=DateParser.parse(date_str))
 
     @Entrypoint
-    @staticmethod
-    def parse(date_str: str, timezone: TimeZone):
-        return Timestamp(ts=DateParser.parse(date_str))
-
-    @Entrypoint
     def format(self, timezone: TimeZone = UTC, format: str = "%Y-%m-%d %H:%M:%S") -> str:
         """
         Converts a Timestamp to a string in a given format

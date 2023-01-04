@@ -18,7 +18,6 @@ from typed_python.lib.datetime.chrono import Chrono
 from typed_python.lib.datetime.DateTime import (
     TimeZone,
     UTC,
-    NYC,
     TimeZoneChecker,
     TimeOfDay,
     Date,
@@ -187,49 +186,49 @@ class DateParser(Class, Final):
                 format_cursor += 1
 
                 if directive == "Y":
-                    if is4d(date_str[date_str_cursor : date_str_cursor + 4]):
-                        year = int(date_str[date_str_cursor : date_str_cursor + 4])
+                    if is4d(date_str[date_str_cursor:date_str_cursor + 4]):
+                        year = int(date_str[date_str_cursor:date_str_cursor + 4])
                         date_str_cursor += 4
                     else:
                         raise ValueError("Bad value for %Y:", date_str)
                 elif directive == "m":
-                    if is2d(date_str[date_str_cursor : date_str_cursor + 2]):
-                        month = int(date_str[date_str_cursor : date_str_cursor + 2])
+                    if is2d(date_str[date_str_cursor:date_str_cursor + 2]):
+                        month = int(date_str[date_str_cursor:date_str_cursor + 2])
                         date_str_cursor += 2
                     else:
                         raise ValueError("Bad value for %m:", date_str)
                 elif directive == "d":
-                    if is2d(date_str[date_str_cursor : date_str_cursor + 2]):
-                        day = int(date_str[date_str_cursor : date_str_cursor + 2])
+                    if is2d(date_str[date_str_cursor:date_str_cursor + 2]):
+                        day = int(date_str[date_str_cursor:date_str_cursor + 2])
                         date_str_cursor += 2
                     else:
                         raise ValueError("Bad value for %d:", date_str)
                 elif directive == "H":
-                    if is2d(date_str[date_str_cursor : date_str_cursor + 2]):
-                        hour = int(date_str[date_str_cursor : date_str_cursor + 2])
+                    if is2d(date_str[date_str_cursor:date_str_cursor + 2]):
+                        hour = int(date_str[date_str_cursor:date_str_cursor + 2])
                         date_str_cursor += 2
                     else:
                         raise ValueError("Bad value for %H:", date_str)
                 elif directive == "I":
-                    if is2d(date_str[date_str_cursor : date_str_cursor + 2]):
-                        hour = int(date_str[date_str_cursor : date_str_cursor + 2])
+                    if is2d(date_str[date_str_cursor:date_str_cursor + 2]):
+                        hour = int(date_str[date_str_cursor:date_str_cursor + 2])
                         date_str_cursor += 2
                     else:
                         raise ValueError("Bad value for %I:", date_str)
                 elif directive == "M":
-                    if is2d(date_str[date_str_cursor : date_str_cursor + 2]):
-                        minute = int(date_str[date_str_cursor : date_str_cursor + 2])
+                    if is2d(date_str[date_str_cursor:date_str_cursor + 2]):
+                        minute = int(date_str[date_str_cursor:date_str_cursor + 2])
                         date_str_cursor += 2
                     else:
                         raise ValueError("Bad value for %M:", date_str)
                 elif directive == "S":
-                    if is2d(date_str[date_str_cursor : date_str_cursor + 2]):
-                        second = int(date_str[date_str_cursor : date_str_cursor + 2])
+                    if is2d(date_str[date_str_cursor:date_str_cursor + 2]):
+                        second = int(date_str[date_str_cursor:date_str_cursor + 2])
                         date_str_cursor += 2
                     else:
                         raise ValueError("Bad value for %SL", date_str)
                 elif directive == "b":
-                    month = date_str[date_str_cursor : date_str_cursor + 3]
+                    month = date_str[date_str_cursor:date_str_cursor + 3]
                     if month in MONTH_TO_INT:
                         month = MONTH_TO_INT[month]
                         date_str_cursor += 3
@@ -237,57 +236,57 @@ class DateParser(Class, Final):
                         raise ValueError("Bad value for %b:", date_str)
                 elif directive == "B":
                     # september
-                    if date_str[date_str_cursor : date_str_cursor + 9] in MONTH_TO_INT:
+                    if date_str[date_str_cursor:date_str_cursor + 9] in MONTH_TO_INT:
                         month = MONTH_TO_INT[
-                            date_str[date_str_cursor : date_str_cursor + 9]
+                            date_str[date_str_cursor:date_str_cursor + 9]
                         ]
                         date_str_cursor += 9
                     # february, november, december
                     elif (
-                        date_str[date_str_cursor : date_str_cursor + 8] in MONTH_TO_INT
+                        date_str[date_str_cursor:date_str_cursor + 8] in MONTH_TO_INT
                     ):
                         month = MONTH_TO_INT[
-                            date_str[date_str_cursor : date_str_cursor + 8]
+                            date_str[date_str_cursor:date_str_cursor + 8]
                         ]
                         date_str_cursor += 8
                     # january,october
                     elif (
-                        date_str[date_str_cursor : date_str_cursor + 7] in MONTH_TO_INT
+                        date_str[date_str_cursor:date_str_cursor + 7] in MONTH_TO_INT
                     ):
                         month = MONTH_TO_INT[
-                            date_str[date_str_cursor : date_str_cursor + 7]
+                            date_str[date_str_cursor:date_str_cursor + 7]
                         ]
                         date_str_cursor += 7
                     # august
                     elif (
-                        date_str[date_str_cursor : date_str_cursor + 6] in MONTH_TO_INT
+                        date_str[date_str_cursor:date_str_cursor + 6] in MONTH_TO_INT
                     ):
                         month = MONTH_TO_INT[
-                            date_str[date_str_cursor : date_str_cursor + 6]
+                            date_str[date_str_cursor:date_str_cursor + 6]
                         ]
                         date_str_cursor += 6
                     # march,april
                     elif (
-                        date_str[date_str_cursor : date_str_cursor + 5] in MONTH_TO_INT
+                        date_str[date_str_cursor:date_str_cursor + 5] in MONTH_TO_INT
                     ):
                         month = MONTH_TO_INT[
-                            date_str[date_str_cursor : date_str_cursor + 5]
+                            date_str[date_str_cursor:date_str_cursor + 5]
                         ]
                         date_str_cursor += 5
                     # june, july
                     elif (
-                        date_str[date_str_cursor : date_str_cursor + 4] in MONTH_TO_INT
+                        date_str[date_str_cursor:date_str_cursor + 4] in MONTH_TO_INT
                     ):
                         month = MONTH_TO_INT[
-                            date_str[date_str_cursor : date_str_cursor + 4]
+                            date_str[date_str_cursor:date_str_cursor + 4]
                         ]
                         date_str_cursor += 4
                     # may
                     elif (
-                        date_str[date_str_cursor : date_str_cursor + 3] in MONTH_TO_INT
+                        date_str[date_str_cursor:date_str_cursor + 3] in MONTH_TO_INT
                     ):
                         month = MONTH_TO_INT[
-                            date_str[date_str_cursor : date_str_cursor + 3]
+                            date_str[date_str_cursor:date_str_cursor + 3]
                         ]
                         date_str_cursor += 3
                     else:
@@ -295,47 +294,47 @@ class DateParser(Class, Final):
                 elif directive == "Z":
                     # 5 character tz abbreviations (future proofing since we don't currently support any)
                     if TimeZoneChecker.isValidTimezone(
-                        date_str[date_str_cursor : date_str_cursor + 4]
+                        date_str[date_str_cursor:date_str_cursor + 4]
                     ):
-                        tz_str = date_str[date_str_cursor : date_str_cursor + 4]
+                        tz_str = date_str[date_str_cursor:date_str_cursor + 4]
                         date_str_cursor += 4
                     # 4 character tz abbreviations (future proofing since we don't currenlty support any)
                     elif TimeZoneChecker.isValidTimezone(
-                        date_str[date_str_cursor : date_str_cursor + 4]
+                        date_str[date_str_cursor:date_str_cursor + 4]
                     ):
-                        tz_str = date_str[date_str_cursor : date_str_cursor + 4]
+                        tz_str = date_str[date_str_cursor:date_str_cursor + 4]
                         date_str_cursor += 4
                     # e.g. EST, EDT, PST
                     elif TimeZoneChecker.isValidTimezone(
-                        date_str[date_str_cursor : date_str_cursor + 3]
+                        date_str[date_str_cursor:date_str_cursor + 3]
                     ):
-                        tz_str = date_str[date_str_cursor : date_str_cursor + 3]
+                        tz_str = date_str[date_str_cursor:date_str_cursor + 3]
                         date_str_cursor += 3
                     # e.g. PT, ET, CT
                     elif TimeZoneChecker.isValidTimezone(
-                        date_str[date_str_cursor : date_str_cursor + 2]
+                        date_str[date_str_cursor:date_str_cursor + 2]
                     ):
-                        tz_str = date_str[date_str_cursor : date_str_cursor + 2]
+                        tz_str = date_str[date_str_cursor:date_str_cursor + 2]
                         date_str_cursor += 2
                     else:
                         raise ValueError("Bad value for %Z:", date_str)
                 elif directive == "z":
                     # [+|-]DDDD or [+|-]DD:DD, e.g. +0000, +1200
                     if TimeZoneChecker.isValidTimezone(
-                        date_str[date_str_cursor : date_str_cursor + 5]
+                        date_str[date_str_cursor:date_str_cursor + 5]
                     ):
-                        tz_str = date_str[date_str_cursor : date_str_cursor + 5]
+                        tz_str = date_str[date_str_cursor:date_str_cursor + 5]
                         date_str_cursor += 5
                     # [+|-]DD or [+|-]DD
                     elif TimeZoneChecker.isValidTimezone(
-                        date_str[date_str_cursor : date_str_cursor + 3]
+                        date_str[date_str_cursor:date_str_cursor + 3]
                     ):
-                        tz_str = date_str[date_str_cursor : date_str_cursor + 3]
+                        tz_str = date_str[date_str_cursor:date_str_cursor + 3]
                         date_str_cursor += 3
                     else:
                         raise ValueError("Bad value for %z:", date_str)
                 elif directive == "p":
-                    tok = date_str[date_str_cursor : date_str_cursor + 2]
+                    tok = date_str[date_str_cursor:date_str_cursor + 2]
                     if tok != AM and tok != PM:
                         raise ValueError("Bad value for %p:", date_str)
                     ampm = tok
@@ -759,7 +758,7 @@ class DateParser(Class, Final):
     @staticmethod
     def get_timezone_from_string(tz_str: str) -> TimeZone:
         if TimeZoneChecker.isValidTimezone(tz_str):
-            timezone = TimeZoneChecker.TIMEZONES[tz_str]
+            return TimeZoneChecker.TIMEZONES[tz_str]
 
         elif tz_str[0] == "+" or tz_str[0] == "-":
             tz_components = tz_str[1:]

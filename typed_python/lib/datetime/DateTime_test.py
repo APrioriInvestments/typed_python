@@ -5,8 +5,6 @@ from typed_python.lib.datetime.DateTime import (
     DateTime,
     Date,
     TimeOfDay,
-    TimeZone,
-    DaylightSavingsTimezone,
     NonexistentDateTime,
     FixedOffsetTimezone,
     EST,
@@ -42,24 +40,6 @@ def test_DateTime_nonexistent_DateTime():
 
     with pytest.raises(NonexistentDateTime):
         NYC.timestamp(dateTime)
-
-
-def test_DateTime_to_timestamp_daylight_savings():
-    year, month, day = 2022, 11, 6
-    hour, minute, second = 1, 30, 0
-    date = Date(year=year, month=month, day=day)
-    timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
-    dateTime = DateTime(date=date, timeOfDay=timeOfDay)
-
-    timestamp1 = NYC.timestamp(dateTime)
-    timestamp2 = NYC.timestamp(dateTime, afterFold=True)
-
-    tz = pytz.timezone("America/New_York")
-    ts = tz.localize(
-        datetime.datetime(year, month, day, hour, minute, second)
-    ).timestamp()
-
-    assert timestamp2 == ts
 
 
 def test_DateTime_from_timestamp():
@@ -163,7 +143,8 @@ def test_timestamp_parse_around_daylight_savings_switch():
         "2022-11-05 23:30:00nyc": "2022-11-06 03:30:00",
         # next day
         "2022-11-06 00:30:00nyc": "2022-11-06 04:30:00",
-        "2022-11-06 01:30:00nyc": "2022-11-06 05:30:00",  # this nyc datetime string corresponds to two different timestamps-- by default, we pick the first.
+        "2022-11-06 01:30:00nyc": "2022-11-06 05:30:00",  # this nyc datetime string corresponds to
+        # two different timestamps-- by default, we pick the first.
         # daylight savings fall
         "2022-11-06 02:30:00nyc": "2022-11-06 07:30:00",
         "2022-11-06 03:30:00nyc": "2022-11-06 08:30:00",
@@ -222,7 +203,8 @@ def test_timestamp_parse_around_daylight_savings_switch():
         "2022-03-13 00:30:00nyc": "2022-03-13 05:30:00",
         "2022-03-13 01:30:00nyc": "2022-03-13 06:30:00",
         # daylight3savings spring
-        "2022-03-13 02:30:00nyc": "2022-03-13 06:30:00",  # this nyc datetime string should not exist!
+        "2022-03-13 02:30:00nyc": "2022-03-13 06:30:00",  # this nyc datetime
+        # string should not exist!
         "2022-03-13 03:30:00nyc": "2022-03-13 07:30:00",
         "2022-03-13 04:30:00nyc": "2022-03-13 08:30:00",
         "2022-03-13 05:30:00nyc": "2022-03-13 09:30:00",

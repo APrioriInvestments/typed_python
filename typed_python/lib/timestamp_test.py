@@ -18,9 +18,9 @@ import unittest
 from typed_python.compiler.runtime import Entrypoint, PrintNewFunctionVisitor
 
 from typed_python.lib.timestamp import Timestamp
-from typed_python.lib.datetime.DateTime import UTC, Date, TimeOfDay, DateTime
 from datetime import datetime, timezone
 from typed_python import ListOf
+
 
 class Timer:
     def __enter__(self):
@@ -241,7 +241,9 @@ class TestTimestamp(unittest.TestCase):
         unixtime = time.time()
         timestamp = Timestamp.make(unixtime + time.localtime().tm_gmtoff)
         dt = datetime.fromtimestamp(unixtime)
-        assert dt.isoformat(timespec="seconds") == timestamp.format(format="%Y-%m-%dT%H:%M:%S")
+        assert dt.isoformat(timespec="seconds") == timestamp.format(
+            format="%Y-%m-%dT%H:%M:%S"
+        )
 
     def test_from_date(self):
         unixtime = time.time()

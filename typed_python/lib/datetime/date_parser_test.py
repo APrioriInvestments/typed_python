@@ -15,7 +15,7 @@
 import unittest
 import time
 from typed_python.lib.datetime.date_parser import DateParser
-from typed_python.lib.datetime.DateTime import Date, TimeOfDay, DateTime, UTC, IST
+from typed_python.lib.datetime.DateTime import Date, TimeOfDay, DateTime, UTC
 from typed_python.compiler.runtime import PrintNewFunctionVisitor
 from typed_python import Entrypoint, ListOf
 

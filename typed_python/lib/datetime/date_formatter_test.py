@@ -118,10 +118,6 @@ class TestDateFormatter(unittest.TestCase):
         )
 
         for day in days:
-            if day.year == 2019 and day.month == 3 and day.day == 1:
-                dtime = UTC.datetime(datetime.timestamp(day))
-            else:
-                continue
             assert DateFormatter.format(
                 datetime.timestamp(day), UTC, "%d"
             ) == day.strftime("%d"), day.strftime("%Y-%m-%d")

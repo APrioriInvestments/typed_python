@@ -54,12 +54,6 @@ class Chrono(Class, Final):
     @Entrypoint
     @staticmethod
     def day_of_year(year: int = 0, month: int = 0, day: int = 0) -> int:
-        year -= month <= 2
-        era = (year if year >= 0 else year - 399) // 400
-        # year of the era
-        yoe = year - era * 400
-
-        # day of the year
         doy = (153 * (month - 3 if month > 2 else month + 9) + 2) // 5 + day - 1 + 60
 
         if doy > 365:
