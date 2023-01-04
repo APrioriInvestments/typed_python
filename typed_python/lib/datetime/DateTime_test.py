@@ -9,6 +9,8 @@ from typed_python.lib.datetime.DateTime import (
     DaylightSavingsTimezone,
     NonexistentDateTime,
     FixedOffsetTimezone,
+    EST,
+    NYC
 )
 
 Nyc = DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5)
@@ -98,9 +100,20 @@ def test_fixed_offset():
     timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second)
     dateTime = DateTime(date=date, timeOfDay=timeOfDay)
 
-    ts = pytz.timezone('Asia/Hong_Kong').localize(datetime.datetime(year, month, day, hour, minute, second)).timestamp()
+    ts = (
+        pytz.timezone("Asia/Hong_Kong")
+        .localize(datetime.datetime(year, month, day, hour, minute, second))
+        .timestamp()
+    )
 
     res = FixedOffsetTimezone(offset_hours=-8).timestamp(dateTime)
     assert ts == res
 
-
+def test_datetime_to_timestamp_and_back():
+    for tz in [NYC, EST]:
+        date = Date(year=2022, month=11, day=6)
+        timeOfDay = TimeOfDay(hour=1, minute=30, second=0)
+        dtime = DateTime(date=date, timeOfDay=timeOfDay)
+        ts = tz.timestamp(dtime)
+        dtime2 = tz.datetime(ts)
+        assert dtime == dtime2

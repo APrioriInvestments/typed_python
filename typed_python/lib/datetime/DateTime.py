@@ -79,7 +79,6 @@ class TimeZone(Class):
         seconds = secondsSinceMidnight%3600
         minute = seconds // 60
         second = seconds % 60
-
         tod = TimeOfDay(hour=hour, minute=minute, second=second)
 
         return DateTime(
@@ -177,7 +176,7 @@ class FixedOffsetTimezone(TimeZone, Final):
         return (
             dateTime.date.daysSinceEpoch() * 86400
             + dateTime.timeOfDay.secondsSinceMidnight(afterFold)
-            + self.offset_hours * 3600
+            - self.offset_hours * 3600
         )
 
     @Entrypoint
