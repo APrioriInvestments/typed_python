@@ -15,6 +15,7 @@
 import unittest
 import time
 from typed_python.lib.datetime.date_parser import DateParser
+from typed_python.lib.datetime.DateTime import Date, TimeOfDay, DateTime, UTC, IST
 from typed_python.compiler.runtime import PrintNewFunctionVisitor
 from typed_python import Entrypoint, ListOf
 
@@ -346,15 +347,36 @@ class TestDateParser(unittest.TestCase):
 
         for format in formats:
             for hour in hours:
-                assert DateParser.parse_iso_str(hour.strftime(format)) == datetime.timestamp(hour) + tz_offset, hour.strftime(format)
+                assert DateParser.parse_iso_str(hour.strftime(format)) == datetime.timestamp(hour) - tz_offset, hour.strftime(format)
+
+    def test_parse_iso_with_tz_offset_ist(self):
+        dtime = DateTime(date=Date(year=2022, month=1, day=1), timeOfDay=TimeOfDay(hour=12, minute=0, second=0))
+
+
+        # This is how it should work.
+        dtimePython = datetime(2022, 1, 1, 12, 0, 0)
+        tsIst = pytz.timezone('Israel').localize(dtimePython).timestamp()
+        tsUtc = pytz.timezone('UTC').localize(dtimePython).timestamp()
+        assert tsIst == tsUtc - (2 * 3600)
+
+        # This is how it *does* work.
+        formats = [
+            '%Y-%m-%dT%H:%M+02:00',
+            '%Y-%m-%d %H:%M+02:00',
+        ]
+
+        tsUtc = UTC.timestamp(dtime)
+        for format in formats:
+            tsIstNew = DateParser.parse_iso_str(dtimePython.strftime(format))
+            assert tsIstNew == tsUtc - (2 * 3600)
+
 
     # -------------------------------------------------------
     # This group of tests exercise the parse_non_iso method
     # -------------------------------------------------------
 
     def test_parse_non_iso_valid_month_string(self):
-        months = [
-            'Jan', 'January',
+        months = [ 'Jan', 'January',
             'Feb', 'February',
             'Mar', 'March',
             'Apr', 'April',

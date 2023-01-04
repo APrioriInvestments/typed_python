@@ -18,10 +18,9 @@ import unittest
 from typed_python.compiler.runtime import Entrypoint, PrintNewFunctionVisitor
 
 from typed_python.lib.timestamp import Timestamp
-from typed_python.lib.datetime.DateTime import UTC
+from typed_python.lib.datetime.DateTime import UTC, Date, TimeOfDay, DateTime
 from datetime import datetime, timezone
 from typed_python import ListOf
-
 
 class Timer:
     def __enter__(self):

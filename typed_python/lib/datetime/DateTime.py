@@ -186,6 +186,7 @@ class FixedOffsetTimezone(TimeZone, Final):
 NYC = DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5)
 UTC = FixedOffsetTimezone(offset_hours=0)
 EST = FixedOffsetTimezone(offset_hours = -5)
+IST = FixedOffsetTimezone(offset_hours = 2)
 
 class TimeZoneChecker(Class, Final):
     TIMEZONES = ConstDict(str, TimeZone)(
@@ -197,6 +198,7 @@ class TimeZoneChecker(Class, Final):
             'z': UTC,
             'est': EST,
             'edt': NYC,
+            'ist': IST,
         }
     )
 
