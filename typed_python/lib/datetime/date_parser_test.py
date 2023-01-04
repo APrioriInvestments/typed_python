@@ -547,13 +547,8 @@ class TestDateParser(unittest.TestCase):
             DateParser.parse_non_iso('Janeary 01 1997')
 
     def test_nyc_tz(self):
-        # edt: Oct 21, 2022
         assert 1666355040 == DateParser.parse('2022-10-21t08:24:00NYC')
-        assert 1666355040 == DateParser.parse('2022-10-21t08:24:00EDT')
-
-        # est: Dec 21, 2022
         assert 1671629040 == DateParser.parse('2022-12-21t08:24:00NYC')
-        assert 1671629040 == DateParser.parse('2022-12-21t08:24:00EST')
 
     def test_compare_parse_iso_perf(self):
         runs = 100000

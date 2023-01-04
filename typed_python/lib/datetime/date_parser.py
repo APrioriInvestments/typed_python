@@ -16,7 +16,7 @@ from typed_python import Class, Dict, Final
 from typed_python import Entrypoint, ListOf
 from typed_python.lib.datetime.timezone import Timezone
 from typed_python.lib.datetime.chrono import Chrono
-from typed_python.lib.datetime.DateTime import TimeZone, UTC, NYC, TimeZoneChecker, TimeOfDay, Date, DateTime
+from typed_python.lib.datetime.DateTime import TimeZone, UTC, NYC, TimeZoneChecker, TimeOfDay, Date, DateTime, FixedOffsetTimezone
 
 JAN = 'jan'
 FEB = 'feb'
@@ -307,12 +307,28 @@ class DateParser(Class, Final):
         if day == -1:
             day = 1
 
-        timezone = UTC 
         if TimeZoneChecker.isValidTimezone(tz_str):
             timezone = TimeZoneChecker.TIMEZONES[tz_str]
 
-        datetime = DateTime(date=Date(year, month, day), timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second))
-        return UTC.timestamp(datetime)
+        elif tz_str[0] == '+':
+            tz_components = tz_str[1:]
+            if len(tz_components) == 2:
+                offset_hours = float(tz_components)
+            elif len(tz_components) == 4:
+                offset_hours = float(tz_components[:2]) + float(tz_components[2:]) / 60
+            elif len(tz_components) == 6:
+                offset_hours = float(tz_components[:2]) + float(tz_components[2:4]) / 60 + float(tz_components[4:]) / 3600
+            else:
+                raise ValueError('Unrecognized timezone: ', tz_str)
+
+            timezone = FixedOffsetTimezone(offset_hours=offset_hours)
+
+        else:
+            raise ValueError('Unrecognized timezone: ', tz_str)
+
+
+        datetime = DateTime(date=Date(year=year, month=month, day=day), timeOfDay = TimeOfDay(hour=hour, minute=minute, second=second))
+        return timezone.timestamp(datetime)
 
 
     @Entrypoint
@@ -381,11 +397,26 @@ class DateParser(Class, Final):
         if cursor >= len(tokens):
             return UTC.timestamp(datetime)
 
-        timezone_string = ''.join(tokens[cursor:])
-        if TimeZoneChecker.isValidTimezone(timezone_string):
-            timezone = TimeZoneChecker.TIMEZONES[timezone_string]
+        tz_str = ''.join(tokens[cursor:])
+        if TimeZoneChecker.isValidTimezone(tz_str):
+            timezone = TimeZoneChecker.TIMEZONES[tz_str]
+        elif tz_str[0] == '+':
+            tz_components = tz_str[1:]
+            if len(tz_components) == 2:
+                offset_hours = float(tz_components)
+            elif len(tz_components) == 4:
+                offset_hours = float(tz_components[:2]) + float(tz_components[2:]) / 60
+            elif len(tz_components) == 6:
+                offset_hours = float(tz_components[:2]) + float(tz_components[2:4]) / 60 + float(tz_components[4:]) / 3600
+            else:
+                raise ValueError('Unrecognized timezone: ', tz_str)
 
-            return timezone.timestamp(datetime)
+            timezone = FixedOffsetTimezone(offset_hours=offset_hours)
+
+        else:
+            raise ValueError('Unrecognized timezone: ', tz_str)
+
+        return timezone.timestamp(datetime)
 
 
     @Entrypoint
@@ -479,7 +510,7 @@ class DateParser(Class, Final):
         h = m = s = 0
 
         if len(tokens) == 0:
-            return 0
+            return TimeOfDay(hour=0, minute=0, second=0.0)
 
         # break into time and ampm parts
         sep_idx = -1

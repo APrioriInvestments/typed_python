@@ -59,11 +59,11 @@ class DateTime(Class, Final):
 
 class TimeZone(Class):
     @Entrypoint
-    def timestamp(dateTime: DateTime, afterFold: bool = False) -> float:
+    def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
         raise NotImplementedError("Subclasses implement.")
 
     @Entrypoint
-    def datetime(timestamp: float) -> DateTime:
+    def datetime(self, timestamp: float) -> DateTime:
         raise NotImplementedError("Subclasses implement.")
 
     @Entrypoint
@@ -163,7 +163,7 @@ class DaylightSavingsTimezone(TimeZone, Final):
         return self._datetimeFromTimestampAndOffset(timestamp, offset_hours)
 
 class FixedOffsetTimezone(TimeZone, Final):
-    offset_hours = Member(int)
+    offset_hours = Member(float)
 
     @Entrypoint
     def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
@@ -187,6 +187,7 @@ class TimeZoneChecker(Class, Final):
             '+0000': UTC,
             'nyc': NYC,
             'utc': UTC,
+            'z': UTC,
         }
     )
 
