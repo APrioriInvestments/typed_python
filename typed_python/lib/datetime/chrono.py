@@ -103,20 +103,6 @@ class Chrono(Class, Final):
 
     @Entrypoint
     @staticmethod
-    def time_to_seconds(hour: int = 0, minute: int = 0, second: float = 0) -> float:
-        '''
-            Converts and hour, min, second combination into seconds
-            Parameters:
-                hour (int): The hour (0-23)
-                minute (int): The minute
-                second (float): The second
-            Returns:
-                (float) the number of seconds
-        '''
-        return (hour * 3600) + (minute * 60) + second
-
-    @Entrypoint
-    @staticmethod
     def weekday_difference(day1: int, day2: int) -> int:
         '''
             Gets the difference in days between two weekdays
@@ -173,46 +159,6 @@ class Chrono(Class, Final):
             month=month,
             day=Chrono.weekday_difference(dow, weekday) + 1 + (n - 1) * 7
         )
-
-
-    @Entrypoint
-    @staticmethod
-    def get_nth_dow_of_month_ts(n: int, dow: int, month: int, year: int) -> int:
-        '''
-            Gets the timestamp for the nth day-of-week for the given month/year. E.g. get 2nd Sat in July 2022
-            Parameters:
-                n (int): nth day of week (1-4).
-                dow (int): The day of the week (0-6) where 0 => Sunday ... 6 => Saturday
-                month (int): the month (1-12)
-                year (int): the year
-
-            Returns:
-               (int): The nth day of the month in unixtime
-        '''
-        return Chrono.get_nth_dow_of_month(n, dow, month, year) * 86400
-
-    @Entrypoint
-    @staticmethod
-    def year_from_ts(ts: float) -> int:
-        '''
-            Gets the year from a unix timestamp
-            Parameters:
-                ts (float): the unix timestamp
-            Returns:
-                (int): The year
-        '''
-        # Based on the days_from_civil algorithm described here:
-        # https://howardhinnant.github.io/date_algorithms.html#civil_from_days
-        z = int(ts // 86400 + 719468)
-        era = (z if z >= 0 else z - 146096) // 146097
-        doe = z - era * 146097
-        yoe = (doe - (doe // 1460) + (doe // 36524) - (doe // 146096)) // 365
-        year = yoe + era * 400
-        doy = doe - ((365 * yoe) + (yoe // 4) - (yoe // 100))
-        mp = (5 * doy + 2) // 153
-        m = mp + (3 if mp < 10 else -9)
-        year += (m <= 2)
-        return year
 
     @Entrypoint
     @staticmethod
