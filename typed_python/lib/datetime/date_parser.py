@@ -15,7 +15,7 @@
 from typed_python import Class, Dict, Final
 from typed_python import Entrypoint, ListOf
 from typed_python.lib.datetime.chrono import Chrono
-from typed_python.lib.datetime.DateTime import (
+from typed_python.lib.datetime.date_time import (
     TimeZone,
     UTC,
     TimeZoneChecker,

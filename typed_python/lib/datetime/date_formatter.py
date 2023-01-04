@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import Class, Dict, Entrypoint, Final, ListOf
-from typed_python.lib.datetime.DateTime import TimeZone, UTC
+from typed_python.lib.datetime.date_time import TimeZone, UTC
 
 # int to string month mapping where 1 => January
 INT_TO_MONTH_NAMES = Dict(int, str)(

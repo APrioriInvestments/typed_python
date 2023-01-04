@@ -16,7 +16,7 @@ import unittest
 import time
 from datetime import datetime, timedelta
 from typed_python.lib.datetime.date_formatter import DateFormatter
-from typed_python.lib.datetime.DateTime import UTC, FixedOffsetTimezone
+from typed_python.lib.datetime.date_time import UTC, FixedOffsetTimezone
 import pytz
 
 

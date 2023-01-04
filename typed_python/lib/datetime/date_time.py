@@ -1,4 +1,4 @@
-from typed_python import Class, Final, Member, Entrypoint, ConstDict
+from typed_python import Class, Final, Member, Entrypoint, ConstDict, Held
 from typed_python.lib.datetime.chrono import Chrono
 
 
@@ -17,7 +17,7 @@ class TimeOfDay(Class, Final):
     second = Member(float)
 
     @Entrypoint
-    def __init__(hour: int, minute: int, second: float):
+    def __init__(self, hour: int, minute: int, second: float):
         self.hour = hour
         self.minute = minute
         self.second = second
@@ -42,7 +42,7 @@ class Date(Class, Final):
     day = Member(int)
 
     @Entrypoint
-    def __init__(year: int, month: int, day: int):
+    def __init__(self, year: int, month: int, day: int):
         self.year = year
         self.month = month
         self.day = day
@@ -79,7 +79,7 @@ class DateTime(Class, Final):
         self.timeOfDay = TimeOfDay(hour, minute, second)
 
     @Entrypoint
-    def __init__(self, date: Date, timeOfDay: TimeOfDay):
+    def __init__(self, date: Date, timeOfDay: TimeOfDay):  # noqa: F811
         self.date = date
         self.timeOfDay = timeOfDay
 

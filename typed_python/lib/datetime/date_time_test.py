@@ -1,7 +1,7 @@
 import pytest
 import pytz
 import datetime
-from typed_python.lib.datetime.DateTime import (
+from typed_python.lib.datetime.date_time import (
     DateTime,
     Date,
     TimeOfDay,
