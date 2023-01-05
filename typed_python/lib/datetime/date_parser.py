@@ -1006,6 +1006,24 @@ class DateParser(Class, Final):
                 tokens[3:],
             )
 
+        # YYYY-MM-DD or YYYY/MM/DD
+        elif (
+            len(tokens) >= 5
+            and is4d(tokens[0])
+            and is2d(tokens[2])
+            and is2d(tokens[4])
+            and (
+                (tokens[1] == BACKSLASH and tokens[3] == BACKSLASH)
+                or (tokens[1] == DASH and tokens[3] == DASH)
+            )
+        ):
+            y, m, d, time_tokens = (
+                int(tokens[0]),
+                int(tokens[2]),
+                int(tokens[4]),
+                tokens[5:],
+            )
+
         # DD-Month-YY or DD/Month/YY
         elif (
             len(tokens) >= 5
