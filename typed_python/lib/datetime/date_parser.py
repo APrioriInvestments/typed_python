@@ -1024,6 +1024,20 @@ class DateParser(Class, Final):
                 tokens[5:],
             )
 
+        # YYYYMMDD-time
+        elif (
+            len(tokens) >= 1
+            and len(tokens[0]) == 8
+            and tokens[0].isdigit()
+            and tokens[1] == DASH
+        ):
+            y, m, d, time_tokens = (
+                int(''.join(tokens[0][:4])),
+                int(''.join(tokens[0][4:6])),
+                int(''.join(tokens[0][6:8])),
+                tokens[2:],
+            )
+
         # DD-Month-YY or DD/Month/YY
         elif (
             len(tokens) >= 5

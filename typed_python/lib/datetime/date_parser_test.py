@@ -864,10 +864,15 @@ class TestDateParser(unittest.TestCase):
         res = DateParser.parse_non_iso('02/12/1993 18:00:00', NYC)
         expected = pytz.timezone('America/New_York').localize(datetime(1993, 2, 12, 18, 0, 0)).timestamp()
 
-    def test_parse_non_iso_edge2(self):
+    def test_parse_non_iso_YYYYMMDD(self):
         res = DateParser.parse_non_iso('2021/01/01', NYC)
         expected = pytz.timezone('America/New_York').localize(datetime(2021, 1, 1, 0, 0, 0)).timestamp()
         assert res == expected
+
+    def test_parse_non_iso_YYYYMMDD_together(self):
+        res = DateParser.parse_non_iso('20210101-07:37:07', NYC)
+        expected = pytz.timezone('America/New_York').localize(datetime(2021, 1, 1, 7, 37, 7)).timestamp()
+        assert res == expected, (expected-res)/3600
 
     def test_compare_parse_format_perf(self):
         runs = 100000
