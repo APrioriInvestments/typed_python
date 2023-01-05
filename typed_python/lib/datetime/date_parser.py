@@ -919,6 +919,29 @@ class DateParser(Class, Final):
                     tokens[5:],
                 )
 
+            # 5+ DD-MM-YYYY or DD/MM/YYYY
+            elif (
+                len(tokens) >= 5
+                and is4d(tokens[4])
+                and (tokens[1] == BACKSLASH and tokens[3] == BACKSLASH)
+                or (tokens[1] == DASH and tokens[3] == DASH)
+                and tokens[0].isdigit()
+                and tokens[2].isdigit()
+            ):
+                if int(tokens[2]) > 12:
+                    y, m, d, time_tokens = (
+                        int(tokens[-1]),
+                        int(tokens[0]),
+                        int(tokens[2]),
+                        tokens[5:]
+                    )
+                else:
+                    y, m, d, time_tokens = (
+                        int(tokens[-1]),
+                        int(tokens[2]),
+                        int(tokens[0]),
+                        tokens[5:]
+                    )
             else:
                 raise ValueError("Unsupported date format: " + date_str)
 
