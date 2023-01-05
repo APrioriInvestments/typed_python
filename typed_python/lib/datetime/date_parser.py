@@ -622,6 +622,7 @@ class DateParser(Class, Final):
     def parse_iso_str(date_str: str) -> float:
         """
         Converts an ISO 8601 formated date string to a unix timestamp
+        (this means year - month - day)
         Parameters:
             date_str (str): An ISO 8601 formatted string
         Returns:
@@ -945,25 +946,23 @@ class DateParser(Class, Final):
             else:
                 raise ValueError("Unsupported date format: " + date_str)
 
-        # 5+ tokens with 4 digit year as 1st token
+        # YYYY/Month/DD or YYYY-Month-DD
         elif (
             len(tokens) >= 5
             and is4d(tokens[0])
             and is_month(tokens[2])
             and tokens[4].isdigit()
+            and (
+                (tokens[1] == BACKSLASH and tokens[3] == BACKSLASH)
+                or ( tokens[1] == DASH and tokens[3] == DASH)
+            )
         ):
-            # YYYY/Month/DD or YYYY-Month-DD
-            if (tokens[1] == BACKSLASH and tokens[3] == BACKSLASH) or (
-                tokens[1] == DASH and tokens[3] == DASH
-            ):
-                y, m, d, time_tokens = (
-                    int(tokens[0]),
-                    MONTH_TO_INT[tokens[2]],
-                    int(tokens[4]),
-                    tokens[5:],
-                )
-            else:
-                raise ValueError("Unsupported date format: " + date_str)
+            y, m, d, time_tokens = (
+                int(tokens[0]),
+                MONTH_TO_INT[tokens[2]],
+                int(tokens[4]),
+                tokens[5:],
+            )
 
         # Month D YYYY
         elif (
@@ -1006,6 +1005,26 @@ class DateParser(Class, Final):
                 int(tokens[2]),
                 tokens[3:],
             )
+
+        # DD-Month-YY or DD/Month/YY
+        elif (
+            len(tokens) >= 5
+            and is2d(tokens[0])
+            and is2d(tokens[4])
+            and is_month(tokens[2])
+            and (
+                (tokens[1] == BACKSLASH and tokens[3] == BACKSLASH)
+                or (tokens[1] == DASH and tokens[3] == DASH)
+            )
+        ):
+            y, m, d, time_tokens = (
+                int(tokens[4]),
+                MONTH_TO_INT[tokens[2]],
+                int(tokens[0]),
+                tokens[5:],
+            )
+
+            y = y + (1900 if y >= 1900 else 2000)
 
         else:
             raise ValueError("Unsupported date format: " + date_str)

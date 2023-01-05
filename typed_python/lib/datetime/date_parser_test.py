@@ -369,6 +369,23 @@ class TestDateParser(unittest.TestCase):
         assert DateParser.parse_non_iso('11-29-1956') == pytz.timezone('Utc').localize(datetime(1956, 11, 29, 0, 0, 0)).timestamp()
         assert DateParser.parse_non_iso('29-11-1956') == pytz.timezone('Utc').localize(datetime(1956, 11, 29, 0, 0, 0)).timestamp()
 
+    def test_parse_non_iso_ddmonthyyyy(self):
+        # all days in non leap year and leap year
+        days = get_datetimes_in_range(
+            start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
+            end=datetime(2020, 1, 31, 0, 0, 0, 0, pytz.UTC),
+            step="days",
+        )
+        formats = [
+            "%d-%b-%y",
+            "%d/%b/%y",
+        ]
+        for format in formats:
+            for day in days:
+                assert DateParser.parse_non_iso(
+                    day.strftime(format)
+                ) == datetime.timestamp(day), day.strftime(format)
+
     def test_parse_iso_with_tz_offset(self):
         hours = get_datetimes_in_range(
             start=datetime(2020, 2, 1, 0, 0, 0, 0, pytz.UTC),
