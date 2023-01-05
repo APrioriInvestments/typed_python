@@ -605,9 +605,10 @@ class DateParser(Class, Final):
             elif (
                 tokens[cursor] == PLUS
                 or tokens[cursor] == DASH
-                or tokens[cursor].isalpha()
             ):
                 break
+            elif tokens[cursor].isalpha():
+                raise ValueError("Invalid date_tokens: ", date_tokens)
             else:
                 time_tokens.append(tokens[cursor])
                 cursor += 1

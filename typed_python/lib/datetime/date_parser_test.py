@@ -349,7 +349,7 @@ class TestDateParser(unittest.TestCase):
                     == datetime.timestamp(second) + 0.123
                 ), second.strftime(format)
 
-    def test_parse_non_iso_ddmmyyyy(self):
+    def test_parse_non_iso_mmddyyyy(self):
         # all days in non leap year and leap year
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -357,8 +357,8 @@ class TestDateParser(unittest.TestCase):
             step="days",
         )
         formats = [
-            "%d-%m-%Y",
-            "%d/%m/%Y",
+            "%m-%d-%Y",
+            "%m/%d/%Y",
         ]
         for format in formats:
             for day in days:
@@ -873,6 +873,11 @@ class TestDateParser(unittest.TestCase):
         res = DateParser.parse_non_iso('20210101-07:37:07', NYC)
         expected = pytz.timezone('America/New_York').localize(datetime(2021, 1, 1, 7, 37, 7)).timestamp()
         assert res == expected, (expected-res)/3600
+
+    def test_parse_non_iso_ampm(self):
+        res = DateParser.parse_non_iso('2019/08/04 6:59 PM', NYC)
+        expected = pytz.timezone('America/New_York').localize(datetime(2019, 8, 4, 18, 59, 0, 0)).timestamp()
+        assert res == expected
 
     def test_compare_parse_format_perf(self):
         runs = 100000

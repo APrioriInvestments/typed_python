@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import pytz
 import time
 import unittest
 
@@ -275,6 +276,11 @@ class TestTimestamp(unittest.TestCase):
         parsed_timestamp = Timestamp.parse(date_str)
 
         assert int(timestamp) == int(parsed_timestamp)
+
+    def test_parse_ampm(self):
+        res = Timestamp.parse_nyc('2019/08/04 6:59 PM').ts
+        expected = pytz.timezone('America/New_York').localize(datetime(2019, 8, 4, 18, 59, 0, 0)).timestamp()
+        assert res == expected
 
     def test_compare_timestamp_datetime_from_unixtime(self):
         runs = 10000000
