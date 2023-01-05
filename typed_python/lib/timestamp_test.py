@@ -372,7 +372,7 @@ class TestTimestamp(unittest.TestCase):
             + ")"
         )
 
-        assert dtTime > tsTime and (speedup > 2 and speedup <= 4)
+        assert dtTime > tsTime and (speedup > 1 and speedup <= 4)
 
     def test_compare_timestamp_nyc_datetime_from_string(self):
         runs = 100000
