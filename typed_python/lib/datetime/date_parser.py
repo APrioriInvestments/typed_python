@@ -929,18 +929,18 @@ class DateParser(Class, Final):
                 and tokens[0].isdigit()
                 and tokens[2].isdigit()
             ):
-                if int(tokens[2]) > 12:
+                if int(tokens[0]) > 12:
                     y, m, d, time_tokens = (
                         int(tokens[4]),
-                        int(tokens[0]),
                         int(tokens[2]),
+                        int(tokens[0]),
                         tokens[5:]
                     )
                 else:
                     y, m, d, time_tokens = (
                         int(tokens[4]),
-                        int(tokens[2]),
                         int(tokens[0]),
+                        int(tokens[2]),
                         tokens[5:]
                     )
             else:

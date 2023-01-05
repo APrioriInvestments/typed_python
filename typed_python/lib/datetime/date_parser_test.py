@@ -861,6 +861,9 @@ class TestDateParser(unittest.TestCase):
         expected = pytz.timezone('America/New_York').localize(datetime(1993, 2, 19, 18, 0, 0)).timestamp()
         assert res == expected
 
+        res = DateParser.parse_non_iso('02/12/1993 18:00:00', NYC)
+        expected = pytz.timezone('America/New_York').localize(datetime(1993, 2, 12, 18, 0, 0)).timestamp()
+
     def test_compare_parse_format_perf(self):
         runs = 100000
         date_strings = make_list_of_iso_datestrings(runs)
