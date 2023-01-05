@@ -1011,8 +1011,8 @@ class DateParser(Class, Final):
         elif (
             len(tokens) >= 5
             and is4d(tokens[0])
-            and is2d(tokens[2])
-            and is2d(tokens[4])
+            and tokens[2].isdigit()
+            and tokens[4].isdigit()
             and (
                 (tokens[1] == BACKSLASH and tokens[3] == BACKSLASH)
                 or (tokens[1] == DASH and tokens[3] == DASH)

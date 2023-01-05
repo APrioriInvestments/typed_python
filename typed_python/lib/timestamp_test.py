@@ -282,6 +282,11 @@ class TestTimestamp(unittest.TestCase):
         expected = pytz.timezone('America/New_York').localize(datetime(2019, 8, 4, 18, 59, 0, 0)).timestamp()
         assert res == expected
 
+    def test_parse_single_digit_day(self):
+        res = Timestamp.parse_nyc('2020/12/1  14:15').ts
+        expected = pytz.timezone('America/New_York').localize(datetime(2020, 12, 1, 14, 15, 0)).timestamp()
+        assert res == expected
+
     def test_compare_timestamp_datetime_from_unixtime(self):
         runs = 10000000
 
