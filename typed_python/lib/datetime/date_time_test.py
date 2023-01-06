@@ -10,9 +10,10 @@ from typed_python.lib.datetime.date_time import (
     EST,
     NYC,
     UTC,
-    last_weekday_of_month
+    last_weekday_of_month,
 )
 from typed_python.lib.timestamp import Timestamp
+
 
 def test_last_weekday_of_month():
     assert last_weekday_of_month(2023, 1, 1) == Date(2023, 1, 31)
@@ -31,6 +32,7 @@ def test_last_weekday_of_month():
     assert last_weekday_of_month(1965, 2, 1) == Date(1965, 2, 23)
     assert last_weekday_of_month(1965, 2, 0) == Date(1965, 2, 22)
 
+
 def test_DateTime_to_timestamp():
     ymdhms = (2022, 12, 23, 18, 40, 46)
     dateTime = DateTime(*ymdhms)
@@ -38,9 +40,7 @@ def test_DateTime_to_timestamp():
     timestamp = NYC.timestamp(dateTime)
 
     tz = pytz.timezone("America/New_York")
-    ts = tz.localize(
-        datetime.datetime(*ymdhms)
-    ).timestamp()
+    ts = tz.localize(datetime.datetime(*ymdhms)).timestamp()
 
     assert timestamp == ts
 
@@ -68,19 +68,13 @@ def test_DateTime_to_timestamp_daylight_savings():
     oneThirtyAmNycSecondFold = UTC.timestamp(utcDateTime)
 
     assert oneThirtyAmNycSecondFold - oneThirtyAmNycFirstFold == 3600
-    assert NYC.datetime(oneThirtyAmNycFirstFold) == NYC.datetime(
-        oneThirtyAmNycSecondFold
-    )
+    assert NYC.datetime(oneThirtyAmNycFirstFold) == NYC.datetime(oneThirtyAmNycSecondFold)
 
 
 def test_fixed_offset():
     ymdhms = (2022, 11, 6, 5, 30, 0)
 
-    ts = (
-        pytz.timezone("Asia/Hong_Kong")
-        .localize(datetime.datetime(*ymdhms))
-        .timestamp()
-    )
+    ts = pytz.timezone("Asia/Hong_Kong").localize(datetime.datetime(*ymdhms)).timestamp()
 
     dateTime = DateTime(*ymdhms)
     res = FixedOffsetTimezone(offset_hours=+8).timestamp(dateTime)
@@ -97,13 +91,9 @@ def test_datetime_to_timestamp_and_back():
 
 def test_EST_against_datetime():
     tz = pytz.timezone("America/Atikokan")
-    externalTimestamp = tz.localize(
-        datetime.datetime(2022, 11, 6, 1, 30, 0)
-    ).timestamp()
+    externalTimestamp = tz.localize(datetime.datetime(2022, 11, 6, 1, 30, 0)).timestamp()
     internalTimestamp = Timestamp.parse("2022-11-06 01:30:00est")
-    assert externalTimestamp == internalTimestamp.ts, (
-        externalTimestamp - internalTimestamp.ts
-    )
+    assert externalTimestamp == internalTimestamp.ts, externalTimestamp - internalTimestamp.ts
 
 
 def test_timestamp_parse_around_daylight_savings_switch():
@@ -167,7 +157,6 @@ def test_timestamp_parse_around_daylight_savings_switch():
             assert res == expected, (res, expected)
         except NonexistentDateTime:
             assert k == "2022-03-13 02:30:00nyc"
-
 
     nycDateStringsToUtcDateStrings = {
         "2022-11-05 00:30:00nyc": "2022-11-05 04:30:00",
@@ -233,8 +222,11 @@ def test_TimeOfDay():
     assert TimeOfDay(11, 10, 30) < TimeOfDay(12, 3, 31)
     assert TimeOfDay(13, 10, 30) > TimeOfDay(12, 3, 31)
 
+
 def test_afterFold_dst_end():
     ymdhms = (2022, 11, 6, 1, 30, 0)
-    tsSecondFold = pytz.timezone("America/New_York").localize(datetime.datetime(*ymdhms)).timestamp()
+    tsSecondFold = (
+        pytz.timezone("America/New_York").localize(datetime.datetime(*ymdhms)).timestamp()
+    )
     assert NYC.timestamp(DateTime(*ymdhms), afterFold=False) == tsSecondFold - 3600
     assert NYC.timestamp(DateTime(*ymdhms), afterFold=True) == tsSecondFold
