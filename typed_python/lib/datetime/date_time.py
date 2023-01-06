@@ -9,6 +9,7 @@ class NonexistentDateTime(Exception):
 class OneFoldOnlyError(Exception):
     pass
 
+
 @Held
 class TimeOfDay(Class, Final):
     hour = Member(int)
@@ -23,7 +24,7 @@ class TimeOfDay(Class, Final):
 
     @Entrypoint
     def secondsSinceMidnight(self) -> float:
-        return (self.second + self.minute * 60 + self.hour * 3600)
+        return self.second + self.minute * 60 + self.hour * 3600
 
     @Entrypoint
     def __eq__(self, other):
@@ -74,11 +75,7 @@ class Date(Class, Final):
 
     @Entrypoint
     def __eq__(self, other):
-        return (
-            self.year == other.year
-            and self.month == other.month
-            and self.day == other.day
-        )
+        return self.year == other.year and self.month == other.month and self.day == other.day
 
     @Entrypoint
     def __lt__(self, other):
@@ -105,16 +102,6 @@ class Date(Class, Final):
             return other.day < self.day
 
         return False
-
-
-    @Entrypoint
-    def __gt__(self, other):
-        return (
-            self.year == other.year
-            and self.month == other.month
-            and self.day == other.day
-        )
-
 
     @Entrypoint
     def __sub__(self, other) -> int:
@@ -167,6 +154,7 @@ class Date(Class, Final):
     def lastWeekdayOfMonth(self, weekday: int):
         self.firstOfMonth().weekday()
 
+
 class DateTime(Class, Final):
     date = Member(Date)
     timeOfDay = Member(TimeOfDay)
@@ -214,9 +202,7 @@ class TimeZone(Class):
         raise NotImplementedError("Subclasses implement.")
 
     @Entrypoint
-    def _datetimeFromTimestampAndOffset(
-        self, timestamp: float, offset_hours: int
-    ) -> DateTime:
+    def _datetimeFromTimestampAndOffset(self, timestamp: float, offset_hours: int) -> DateTime:
         ts = timestamp + offset_hours * 3600
         day = ts // 86400
         secondsSinceMidnight = ts % 86400
@@ -230,14 +216,16 @@ class TimeZone(Class):
 
         return DateTime(date.year, date.month, date.day, hour, minute, second)
 
+
 class DaylightSavingsBoundaryRule(Class):
     @Entrypoint
     def getDaylightSavingsStart(self, year: int) -> DateTime:
-        raise NotImplementedError('Subclasses implement')
+        raise NotImplementedError("Subclasses implement")
 
     @Entrypoint
     def getDaylightSavingsEnd(self, year: int) -> DateTime:
-        raise NotImplementedError('Subclasses implement')
+        raise NotImplementedError("Subclasses implement")
+
 
 class NthWeekdayRule(DaylightSavingsBoundaryRule, Final):
     nStart = Member(int)
@@ -258,12 +246,16 @@ class NthWeekdayRule(DaylightSavingsBoundaryRule, Final):
 
     @Entrypoint
     def getDaylightSavingsStart(self, year: int) -> DateTime:
-        date = Date.fromDaysSinceEpoch(Chrono.get_nth_dow_of_month(self.nStart, self.weekdayStart, self.monthStart, year))
+        date = Date.fromDaysSinceEpoch(
+            Chrono.get_nth_dow_of_month(self.nStart, self.weekdayStart, self.monthStart, year)
+        )
         return DateTime(date=date, timeOfDay=TimeOfDay(2, 0, 0))
 
     @Entrypoint
     def getDaylightSavingsEnd(self, year: int) -> DateTime:
-        date = Date.fromDaysSinceEpoch(Chrono.get_nth_dow_of_month(self.nEnd, self.weekdayEnd, self.monthEnd, year))
+        date = Date.fromDaysSinceEpoch(
+            Chrono.get_nth_dow_of_month(self.nEnd, self.weekdayEnd, self.monthEnd, year)
+        )
         return DateTime(date=date, timeOfDay=TimeOfDay(2, 0, 0))
 
 
@@ -290,6 +282,7 @@ class LastWeekdayRule(DaylightSavingsBoundaryRule, Final):
         date = last_weekday_of_month(year, self.monthEnd, self.weekdayEnd)
         return DateTime(date=date, timeOfDay=TimeOfDay(2, 0, 0))
 
+
 class FirstToLastWeekdayRule(DaylightSavingsBoundaryRule, Final):
     weekdayStart = Member(int)
     monthStart = Member(int)
@@ -305,7 +298,9 @@ class FirstToLastWeekdayRule(DaylightSavingsBoundaryRule, Final):
 
     @Entrypoint
     def getDaylightSavingsStart(self, year: int) -> DateTime:
-        date = Date.fromDaysSinceEpoch(Chrono.get_nth_dow_of_month(1, self.weekdayStart, self.monthStart, year))
+        date = Date.fromDaysSinceEpoch(
+            Chrono.get_nth_dow_of_month(1, self.weekdayStart, self.monthStart, year)
+        )
         return DateTime(date=date, timeOfDay=TimeOfDay(2, 0, 0))
 
     @Entrypoint
@@ -338,7 +333,6 @@ class DateTimeRule(DaylightSavingsBoundaryRule, Final):
         self.endDateTime
 
 
-
 class DaylightSavingsTimezone(TimeZone, Final):
     dst_offset_hours = Member(int)
     st_offset_hours = Member(int)
@@ -354,7 +348,6 @@ class DaylightSavingsTimezone(TimeZone, Final):
 
         # first sunday of november
         ds_end = self.dst_boundaries.getDaylightSavingsEnd(year)
-
 
         is_daylight_savings = True
 
@@ -379,9 +372,7 @@ class DaylightSavingsTimezone(TimeZone, Final):
             else:
                 is_daylight_savings = not afterFold and dateTime.timeOfDay < ds_end.timeOfDay
 
-        offset_hours = (
-            self.dst_offset_hours if is_daylight_savings else self.st_offset_hours
-        )
+        offset_hours = self.dst_offset_hours if is_daylight_savings else self.st_offset_hours
 
         return (
             dateTime.date.daysSinceEpoch() * 86400
@@ -401,13 +392,11 @@ class DaylightSavingsTimezone(TimeZone, Final):
         endDateTime = self.dst_boundaries.getDaylightSavingsEnd(year)
 
         ts_start = (
-            startDateTime.date.daysSinceEpoch() * 86400
-            - self.st_offset_hours * 3600
+            startDateTime.date.daysSinceEpoch() * 86400 - self.st_offset_hours * 3600
         ) + startDateTime.timeOfDay.secondsSinceMidnight()
 
         ts_end = (
-            endDateTime.date.daysSinceEpoch() * 86400
-            - self.dst_offset_hours * 3600
+            endDateTime.date.daysSinceEpoch() * 86400 - self.dst_offset_hours * 3600
         ) + endDateTime.timeOfDay.secondsSinceMidnight()
 
         # get offset
@@ -434,6 +423,7 @@ class FixedOffsetTimezone(TimeZone, Final):
     @Entrypoint
     def datetime(self, timestamp: float) -> DateTime:
         return self._datetimeFromTimestampAndOffset(timestamp, self.offset_hours)
+
 
 class NycTimezone(TimeZone, Final):
     @Entrypoint
@@ -469,58 +459,85 @@ class SwitchOffsetTimezone(TimeZone, Final):
 
     @Entrypoint
     def datetime(self, timestamp: float) -> DateTime:
-        year = Chrono.civil_from_days(timestamp // 86400).year
-
         ts_switch = (
-            self.switchDateTime.date.daysSinceEpoch() * 86400
-            - self.offset_hours_before * 3600
-        ) + startDateTime.timeOfDay.secondsSinceMidnight()
+            self.switch_datetime.date.daysSinceEpoch() * 86400 - self.offset_hours_before * 3600
+        ) + self.switch_datetime.timeOfDay.secondsSinceMidnight()
 
         # get offset
-        offset_hours = ( self.offset_hours_before if timestamp < ts_start else self.offset_hours_after)
+        offset_hours = (
+            self.offset_hours_before if timestamp < ts_switch else self.offset_hours_after
+        )
 
         return self._datetimeFromTimestampAndOffset(timestamp, offset_hours)
+
 
 @TypeFunction
 def UsTimeZone(st_offset_hours, dst_offset_hours):
     class UsTimeZone_(TimeZone, Final):
-        TIMEZONES_BY_START_YEAR = ConstDict(int, TimeZone)({
-            2007: DaylightSavingsTimezone(dst_offset_hours=dst_offset_hours, st_offset_hours=st_offset_hours, dst_boundaries=FirstToLastWeekdayRule(0, 4, 0, 10)),
-            1987: DaylightSavingsTimezone(dst_offset_hours=dst_offset_hours, st_offset_hours=st_offset_hours, dst_boundaries=FirstToLastWeekdayRule(0, 4, 0, 10)),
-            1975: DaylightSavingsTimezone(
-                dst_offset_hours=dst_offset_hours,
-                st_offset_hours=st_offset_hours,
-                dst_boundaries=DateTimeRule(
-                    DateTime(1975, 2, 23, 2, 0, 0),
-                    DateTime(1975, 10, 26, 2, 0, 0)
-                )
-            ),
-            1974: DaylightSavingsTimezone(
-                dst_offset_hours=dst_offset_hours,
-                st_offset_hours=st_offset_hours,
-                dst_boundaries=DateTimeRule(
-                    DateTime(1974, 1, 6, 2, 0, 0),
-                    DateTime(1974, 10, 27, 2, 0, 0)
-                )
-            ),
-            1955: DaylightSavingsTimezone(dst_offset_hours=dst_offset_hours, st_offset_hours=st_offset_hours, dst_boundaries=LastWeekdayRule(0, 4, 0, 10)),
-            1946: DaylightSavingsTimezone(dst_offset_hours=dst_offset_hours, st_offset_hours=st_offset_hours, dst_boundaries=LastWeekdayRule(0, 4, 0, 9)),
-            1945: DaylightSavingsTimezone(
-                dst_offset_hours=dst_offset_hours,
-                st_offset_hours=st_offset_hours,
-                dst_boundaries=DateTimeRule(
-                    DateTime(1945, 8, 14, 19, 0, 0),
-                    DateTime(1945, 9, 30, 2, 0, 0)
-                )
-            ),
-            1943: FixedOffsetTimezone(offset_hours = st_offset_hours),
-            1942: SwitchOffsetTimezone(offset_hours_before = st_offset_hours, offset_hours_after = dst_offset_hours),
-            1921: DaylightSavingsTimezone(dst_offset_hours=dst_offset_hours, st_offset_hours=st_offset_hours, dst_boundaries=LastWeekdayRule(0, 3, 0, 10)),
-            1918: DaylightSavingsTimezone(dst_offset_hours=dst_offset_hours, st_offset_hours=st_offset_hours, dst_boundaries=LastWeekdayRule(0, 3, 0, 10)),
-            1884: FixedOffsetTimezone(offset_hours = st_offset_hours),
-            1883: SwitchOffsetTimezone(offset_hours_before = -17762 / 3600, offset_hours_after = -10858 / 3600),
-            1776: FixedOffsetTimezone(offset_hours = -17762 / 3600),
-        })
+        TIMEZONES_BY_START_YEAR = ConstDict(int, TimeZone)(
+            {
+                2007: DaylightSavingsTimezone(
+                    dst_offset_hours=dst_offset_hours,
+                    st_offset_hours=st_offset_hours,
+                    dst_boundaries=FirstToLastWeekdayRule(0, 4, 0, 10),
+                ),
+                1987: DaylightSavingsTimezone(
+                    dst_offset_hours=dst_offset_hours,
+                    st_offset_hours=st_offset_hours,
+                    dst_boundaries=FirstToLastWeekdayRule(0, 4, 0, 10),
+                ),
+                1975: DaylightSavingsTimezone(
+                    dst_offset_hours=dst_offset_hours,
+                    st_offset_hours=st_offset_hours,
+                    dst_boundaries=DateTimeRule(
+                        DateTime(1975, 2, 23, 2, 0, 0), DateTime(1975, 10, 26, 2, 0, 0)
+                    ),
+                ),
+                1974: DaylightSavingsTimezone(
+                    dst_offset_hours=dst_offset_hours,
+                    st_offset_hours=st_offset_hours,
+                    dst_boundaries=DateTimeRule(
+                        DateTime(1974, 1, 6, 2, 0, 0), DateTime(1974, 10, 27, 2, 0, 0)
+                    ),
+                ),
+                1955: DaylightSavingsTimezone(
+                    dst_offset_hours=dst_offset_hours,
+                    st_offset_hours=st_offset_hours,
+                    dst_boundaries=LastWeekdayRule(0, 4, 0, 10),
+                ),
+                1946: DaylightSavingsTimezone(
+                    dst_offset_hours=dst_offset_hours,
+                    st_offset_hours=st_offset_hours,
+                    dst_boundaries=LastWeekdayRule(0, 4, 0, 9),
+                ),
+                1945: DaylightSavingsTimezone(
+                    dst_offset_hours=dst_offset_hours,
+                    st_offset_hours=st_offset_hours,
+                    dst_boundaries=DateTimeRule(
+                        DateTime(1945, 8, 14, 19, 0, 0), DateTime(1945, 9, 30, 2, 0, 0)
+                    ),
+                ),
+                1943: FixedOffsetTimezone(offset_hours=st_offset_hours),
+                1942: SwitchOffsetTimezone(
+                    offset_hours_before=st_offset_hours, offset_hours_after=dst_offset_hours
+                ),
+                1921: DaylightSavingsTimezone(
+                    dst_offset_hours=dst_offset_hours,
+                    st_offset_hours=st_offset_hours,
+                    dst_boundaries=LastWeekdayRule(0, 3, 0, 10),
+                ),
+                1918: DaylightSavingsTimezone(
+                    dst_offset_hours=dst_offset_hours,
+                    st_offset_hours=st_offset_hours,
+                    dst_boundaries=LastWeekdayRule(0, 3, 0, 10),
+                ),
+                1884: FixedOffsetTimezone(offset_hours=st_offset_hours),
+                1883: SwitchOffsetTimezone(
+                    offset_hours_before=-17762 / 3600, offset_hours_after=-10858 / 3600
+                ),
+                1776: FixedOffsetTimezone(offset_hours=-17762 / 3600),
+            }
+        )
 
         @Entrypoint
         def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
