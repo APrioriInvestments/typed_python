@@ -11,8 +11,11 @@ from typed_python.lib.datetime.date_time import (
     NYC,
     UTC,
     last_weekday_of_month,
+    DaylightSavingsTimezone,
+    SwitchOffsetTimezone
 )
 from typed_python.lib.timestamp import Timestamp
+from typed_python.lib.datetime.date_parser_test import get_datetimes_in_range
 
 
 def test_last_weekday_of_month():
@@ -230,3 +233,59 @@ def test_afterFold_dst_end():
     )
     assert NYC.timestamp(DateTime(*ymdhms), afterFold=False) == tsSecondFold - 3600
     assert NYC.timestamp(DateTime(*ymdhms), afterFold=True) == tsSecondFold
+
+def test_nyc_1918_10_27():
+    nycDateStringsToUtcDateStrings = {
+        "1918-10-27 00:30:00nyc": "1918-10-27 04:30:00",
+        "1918-10-27 01:30:00nyc": "1918-10-27 05:30:00",
+        # daylight savings fall back
+        "1918-10-27 02:30:00nyc": "1918-10-27 07:30:00",
+        "1918-10-27 03:30:00nyc": "1918-10-27 08:30:00",
+        "1918-10-27 04:30:00nyc": "1918-10-27 09:30:00",
+    }
+
+    for k, expected in nycDateStringsToUtcDateStrings.items():
+        res = Timestamp.parse(k).format()
+        assert res == expected, (res, expected)
+
+
+def test_nyc_since_1902():
+    nyc = pytz.timezone("America/New_York")
+    datetimes = get_datetimes_in_range(
+        start=datetime.datetime(1902, 1, 1, 20, 0, 1, 0),
+        end=datetime.datetime(2023, 1, 1, 20, 0, 1, 0),
+        step="hours",
+    )
+
+    lastYear = None
+    for dt in datetimes:
+        if dt.year != lastYear:
+            print(f"Checking year {dt.year}")
+        lastYear = dt.year
+
+        them = nyc.localize(dt).timestamp()
+
+        try:
+            dateTime = DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+            us = NYC.timestamp(dateTime)
+
+        except NonexistentDateTime:
+            continue
+
+        try:
+            assert us == them, f"Difference for {str(dt)} is {us - them} seconds"
+
+        except:
+            tz = NYC.chooseTimezone(dt.year)
+            if isinstance(tz, DaylightSavingsTimezone):
+                dst_end = tz.dst_boundaries.getDaylightSavingsEnd(dt.year)
+                if dst_end.date == dateTime.date and dst_end.timeOfDay.hour - 1 == dateTime.timeOfDay.hour:
+                    if us - them == -3600: # we choose the first fold and they choose the second.
+                        continue
+            elif isinstance(tz, SwitchOffsetTimezone):
+                switch = tz.switch_datetime
+                if switch.date == dateTime.date and switch.timeOfDay.hour - 1 == dateTime.timeOfDay.hour:
+                    if us - them == -3600: # we choose the first fold and they choose the second.
+                        continue
+
+            raise

@@ -23,8 +23,8 @@ class TimeOfDay(Class, Final):
         self.second = second
 
     @Entrypoint
-    def secondsSinceMidnight(self) -> float:
-        return self.second + self.minute * 60 + self.hour * 3600
+    def secondsSinceMidnight(self, afterFold: bool = False) -> float:
+        return self.second + self.minute * 60 + (self.hour + afterFold) * 3600
 
     @Entrypoint
     def __eq__(self, other):
@@ -169,9 +169,11 @@ class DateTime(Class, Final):
         self.date = date
         self.timeOfDay = timeOfDay
 
+    @Entrypoint
     def __eq__(self, other):
         return self.date == other.date and self.timeOfDay == other.timeOfDay
 
+    @Entrypoint
     def __lt__(self, other):
         if self.date != other.date:
             return self.date < other.date
@@ -190,6 +192,26 @@ class DateTime(Class, Final):
             return other.timeOfDay < self.timeOfDay
 
         return False
+
+    def __str__(self):
+
+        return (
+            "-".join(
+                [
+                    str(self.date.year),
+                    str(self.date.month).zfill(2),
+                    str(self.date.day).zfill(2),
+                ]
+            )
+            + " "
+            + ":".join(
+                [
+                    str(self.timeOfDay.hour).zfill(2),
+                    str(self.timeOfDay.minute).zfill(2),
+                    str(int(self.timeOfDay.second)).zfill(2),
+                ]
+            )
+        )
 
 
 class TimeZone(Class):
@@ -283,14 +305,18 @@ class LastWeekdayRule(DaylightSavingsBoundaryRule, Final):
         return DateTime(date=date, timeOfDay=TimeOfDay(2, 0, 0))
 
 
-class FirstToLastWeekdayRule(DaylightSavingsBoundaryRule, Final):
+class NthToLastWeekdayRule(DaylightSavingsBoundaryRule, Final):
+    nStart = Member(int)
     weekdayStart = Member(int)
     monthStart = Member(int)
     weekdayEnd = Member(int)
     monthEnd = Member(int)
 
     @Entrypoint
-    def __init__(self, weekdayStart: int, monthStart: int, weekdayEnd: int, monthEnd: int):
+    def __init__(
+        self, nStart: int, weekdayStart: int, monthStart: int, weekdayEnd: int, monthEnd: int
+    ):
+        self.nStart = nStart
         self.weekdayStart = weekdayStart
         self.monthStart = monthStart
         self.weekdayEnd = weekdayEnd
@@ -299,7 +325,7 @@ class FirstToLastWeekdayRule(DaylightSavingsBoundaryRule, Final):
     @Entrypoint
     def getDaylightSavingsStart(self, year: int) -> DateTime:
         date = Date.fromDaysSinceEpoch(
-            Chrono.get_nth_dow_of_month(1, self.weekdayStart, self.monthStart, year)
+            Chrono.get_nth_dow_of_month(self.nStart, self.weekdayStart, self.monthStart, year)
         )
         return DateTime(date=date, timeOfDay=TimeOfDay(2, 0, 0))
 
@@ -320,27 +346,38 @@ class DateTimeRule(DaylightSavingsBoundaryRule, Final):
 
     @Entrypoint
     def getDaylightSavingsStart(self, year: int) -> DateTime:
-        if year != self.dateStart.year:
+        if year != self.dateTimeStart.date.year:
             raise Exception("You are probably using the wrong rule for this timezone.")
 
-        return self.startDateTime
+        return self.dateTimeStart
 
     @Entrypoint
     def getDaylightSavingsEnd(self, year: int) -> DateTime:
-        if year != self.dateStart.year:
+        if year != self.dateTimeEnd.date.year:
             raise Exception("You are probably using the wrong rule for this timezone.")
 
-        self.endDateTime
+        return self.dateTimeEnd
 
 
 class DaylightSavingsTimezone(TimeZone, Final):
-    dst_offset_hours = Member(int)
-    st_offset_hours = Member(int)
+    dst_offset_hours = Member(float)
+    st_offset_hours = Member(float)
     dst_boundaries = Member(DaylightSavingsBoundaryRule)
 
     @Entrypoint
-    def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
+    def __init__(
+        self,
+        dst_offset_hours: float,
+        st_offset_hours: float,
+        dst_boundaries: DaylightSavingsBoundaryRule,
+    ):
+        assert st_offset_hours < dst_offset_hours
+        self.dst_offset_hours = dst_offset_hours
+        self.st_offset_hours = st_offset_hours
+        self.dst_boundaries = dst_boundaries
 
+    @Entrypoint
+    def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
         year = dateTime.date.year
 
         # second sunday of march
@@ -358,12 +395,12 @@ class DaylightSavingsTimezone(TimeZone, Final):
 
         if dateTime.date == ds_start.date:
             if dateTime.timeOfDay.hour == ds_start.timeOfDay.hour:
-                raise NonexistentDateTime("This date time does not exist on this date.")
+                raise NonexistentDateTime(dateTime)
 
             if afterFold:
                 raise OneFoldOnlyError("There is only one fold.")
 
-            is_daylight_savings = dateTime.timeOfDay.hour > 2
+            is_daylight_savings = dateTime.timeOfDay.hour > ds_start.timeOfDay.hour
 
         if dateTime.date == ds_end.date:
             if dateTime.timeOfDay.hour > ds_end.timeOfDay.hour:
@@ -377,7 +414,7 @@ class DaylightSavingsTimezone(TimeZone, Final):
         return (
             dateTime.date.daysSinceEpoch() * 86400
             - offset_hours * 3600
-            + dateTime.timeOfDay.secondsSinceMidnight()
+            + dateTime.timeOfDay.secondsSinceMidnight(afterFold)
         )
 
     @Entrypoint
@@ -445,22 +482,65 @@ class SwitchOffsetTimezone(TimeZone, Final):
     switch_datetime = Member(DateTime)
 
     @Entrypoint
+    def __init__(
+        self, offset_hours_before: float, offset_hours_after: float, switch_datetime: DateTime
+    ):
+        assert (
+            offset_hours_before != offset_hours_after
+        ), "If the offsets are the same, there is no switch."
+
+        self.offset_hours_before = offset_hours_before
+        self.offset_hours_after = offset_hours_after
+        self.switch_datetime = switch_datetime
+
+    @Entrypoint
     def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
-        if dateTime < self.switch_datetime:
-            offset_hours = self.offset_hours_before
-        else:
-            offset_hours = self.offset_hours_after
+        switch = self.switch_datetime
+
+        is_after = True
+
+        if dateTime.date < switch.date:
+            is_after = False
+            if afterFold and self.offset_hours_after > self.offset_hours_before:
+                raise OneFoldOnlyError("There is only one fold.")
+
+        if dateTime.date > switch.date:
+            is_after = True
+            if afterFold and self.offset_hours_after > self.offset_hours_before:
+                raise OneFoldOnlyError("There is only one fold.")
+
+        if dateTime.date == switch.date:
+            # DST start-like
+            if self.offset_hours_after > self.offset_hours_before:
+                if dateTime.timeOfDay.hour == switch.timeOfDay.hour:
+                    raise NonexistentDateTime(dateTime)
+
+                if afterFold:
+                    raise OneFoldOnlyError("There is only one fold.")
+
+                is_after = dateTime.timeOfDay.hour > switch.timeOfDay.hour
+
+            # DST end-like
+            else:
+                if dateTime.timeOfDay.hour > switch.timeOfDay.hour:
+                    afterFold = True
+                    is_after = True
+                else:
+                    is_after = afterFold or dateTime.timeOfDay > switch.timeOfDay
+
+        offset_hours = self.offset_hours_after if is_after else self.offset_hours_before
 
         return (
             dateTime.date.daysSinceEpoch() * 86400
-            + dateTime.timeOfDay.secondsSinceMidnight()
             - offset_hours * 3600
+            + dateTime.timeOfDay.secondsSinceMidnight()
         )
 
     @Entrypoint
     def datetime(self, timestamp: float) -> DateTime:
         ts_switch = (
-            self.switch_datetime.date.daysSinceEpoch() * 86400 - self.offset_hours_before * 3600
+            self.switch_datetime.date.daysSinceEpoch() * 86400
+            - self.offset_hours_before * 3600
         ) + self.switch_datetime.timeOfDay.secondsSinceMidnight()
 
         # get offset
@@ -479,12 +559,12 @@ def UsTimeZone(st_offset_hours, dst_offset_hours):
                 2007: DaylightSavingsTimezone(
                     dst_offset_hours=dst_offset_hours,
                     st_offset_hours=st_offset_hours,
-                    dst_boundaries=FirstToLastWeekdayRule(0, 4, 0, 10),
+                    dst_boundaries=NthWeekdayRule(2, 0, 3, 1, 0, 11),
                 ),
                 1987: DaylightSavingsTimezone(
                     dst_offset_hours=dst_offset_hours,
                     st_offset_hours=st_offset_hours,
-                    dst_boundaries=FirstToLastWeekdayRule(0, 4, 0, 10),
+                    dst_boundaries=NthToLastWeekdayRule(1, 0, 4, 0, 10),
                 ),
                 1975: DaylightSavingsTimezone(
                     dst_offset_hours=dst_offset_hours,
@@ -510,21 +590,21 @@ def UsTimeZone(st_offset_hours, dst_offset_hours):
                     st_offset_hours=st_offset_hours,
                     dst_boundaries=LastWeekdayRule(0, 4, 0, 9),
                 ),
-                1945: DaylightSavingsTimezone(
-                    dst_offset_hours=dst_offset_hours,
-                    st_offset_hours=st_offset_hours,
-                    dst_boundaries=DateTimeRule(
-                        DateTime(1945, 8, 14, 19, 0, 0), DateTime(1945, 9, 30, 2, 0, 0)
-                    ),
+                1945: SwitchOffsetTimezone(
+                    offset_hours_before=dst_offset_hours,
+                    offset_hours_after=st_offset_hours,
+                    switch_datetime=DateTime(1945, 9, 30, 2, 0, 0),
                 ),
-                1943: FixedOffsetTimezone(offset_hours=st_offset_hours),
+                1943: FixedOffsetTimezone(offset_hours=dst_offset_hours),
                 1942: SwitchOffsetTimezone(
-                    offset_hours_before=st_offset_hours, offset_hours_after=dst_offset_hours
+                    offset_hours_before=st_offset_hours,
+                    offset_hours_after=dst_offset_hours,
+                    switch_datetime=DateTime(1942, 2, 9, 2, 0, 0),
                 ),
                 1921: DaylightSavingsTimezone(
                     dst_offset_hours=dst_offset_hours,
                     st_offset_hours=st_offset_hours,
-                    dst_boundaries=LastWeekdayRule(0, 3, 0, 10),
+                    dst_boundaries=LastWeekdayRule(0, 4, 0, 9),
                 ),
                 1918: DaylightSavingsTimezone(
                     dst_offset_hours=dst_offset_hours,
@@ -533,7 +613,9 @@ def UsTimeZone(st_offset_hours, dst_offset_hours):
                 ),
                 1884: FixedOffsetTimezone(offset_hours=st_offset_hours),
                 1883: SwitchOffsetTimezone(
-                    offset_hours_before=-17762 / 3600, offset_hours_after=-10858 / 3600
+                    offset_hours_before=-17762 / 3600,
+                    offset_hours_after=-10858 / 3600,
+                    switch_datetime=DateTime(1883, 11, 18, 12, 3, 0),
                 ),
                 1776: FixedOffsetTimezone(offset_hours=-17762 / 3600),
             }
@@ -541,6 +623,7 @@ def UsTimeZone(st_offset_hours, dst_offset_hours):
 
         @Entrypoint
         def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
+            # print(f"dateTime:\n{dateTime}")
             return self.chooseTimezone(dateTime.date.year).timestamp(dateTime, afterFold)
 
         @Entrypoint
@@ -553,40 +636,40 @@ def UsTimeZone(st_offset_hours, dst_offset_hours):
             if year >= 2007:
                 return self.TIMEZONES_BY_START_YEAR[2007]
 
-            elif year >= 1987:
+            if year >= 1987:
                 return self.TIMEZONES_BY_START_YEAR[1987]
 
-            elif year == 1975:
+            if year == 1975:
                 return self.TIMEZONES_BY_START_YEAR[1975]
 
-            elif year == 1974:
+            if year == 1974:
                 return self.TIMEZONES_BY_START_YEAR[1974]
 
-            elif year >= 1955:
+            if year >= 1955:
                 return self.TIMEZONES_BY_START_YEAR[1955]
 
-            elif year >= 1946:
+            if year >= 1946:
                 return self.TIMEZONES_BY_START_YEAR[1946]
 
-            elif year == 1945:
+            if year == 1945:
                 return self.TIMEZONES_BY_START_YEAR[1945]
 
-            elif year >= 1943:
+            if year >= 1943:
                 return self.TIMEZONES_BY_START_YEAR[1943]
 
-            elif year == 1942:
+            if year == 1942:
                 return self.TIMEZONES_BY_START_YEAR[1942]
 
-            elif year >= 1921:
+            if year >= 1921:
                 return self.TIMEZONES_BY_START_YEAR[1921]
 
-            elif year >= 1918:
+            if year >= 1918:
                 return self.TIMEZONES_BY_START_YEAR[1918]
 
-            elif year >= 1884:
+            if year >= 1884:
                 return self.TIMEZONES_BY_START_YEAR[1884]
 
-            elif year == 1883:
+            if year == 1883:
                 return self.TIMEZONES_BY_START_YEAR[1883]
 
             else:
