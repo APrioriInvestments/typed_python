@@ -1,4 +1,4 @@
-from typed_python import Class, Final, Member, Entrypoint, ConstDict, Held
+from typed_python import Class, Final, Member, Entrypoint, ConstDict, Held, TypeFunction
 from typed_python.lib.datetime.chrono import Chrono
 
 
@@ -481,100 +481,104 @@ class SwitchOffsetTimezone(TimeZone, Final):
 
         return self._datetimeFromTimestampAndOffset(timestamp, offset_hours)
 
-class NewYorkTimezone(TimeZone, Final):
-    TIMEZONES_BY_START_YEAR = ConstDict(int, TimeZone)({
-        2007: DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5, dst_boundaries=FirstToLastWeekdayRule(0, 4, 0, 10)),
-        1987: DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5, dst_boundaries=FirstToLastWeekdayRule(0, 4, 0, 10)),
-        1975: DaylightSavingsTimezone(
-            dst_offset_hours=-4,
-            st_offset_hours=-5,
-            dst_boundaries=DateTimeRule(
-                DateTime(1975, 2, 23, 2, 0, 0),
-                DateTime(1975, 10, 26, 2, 0, 0)
-            )
-        ),
-        1974: DaylightSavingsTimezone(
-            dst_offset_hours=-4,
-            st_offset_hours=-5,
-            dst_boundaries=DateTimeRule(
-                DateTime(1974, 1, 6, 2, 0, 0),
-                DateTime(1974, 10, 27, 2, 0, 0)
-            )
-        ),
-        1955: DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5, dst_boundaries=LastWeekdayRule(0, 4, 0, 10)),
-        1946: DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5, dst_boundaries=LastWeekdayRule(0, 4, 0, 9)),
-        1945: DaylightSavingsTimezone(
-            dst_offset_hours=-4,
-            st_offset_hours=-5,
-            dst_boundaries=DateTimeRule(
-                DateTime(1945, 8, 14, 19, 0, 0),
-                DateTime(1945, 9, 30, 2, 0, 0)
-            )
-        ),
-        1943: FixedOffsetTimezone(offset_hours = -5),
-        1942: SwitchOffsetTimezone(offset_hours_before = -5, offset_hours_after = -4),
-        1921: DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5, dst_boundaries=LastWeekdayRule(0, 3, 0, 10)),
-        1918: DaylightSavingsTimezone(dst_offset_hours=-4, st_offset_hours=-5, dst_boundaries=LastWeekdayRule(0, 3, 0, 10)),
-        1884: FixedOffsetTimezone(offset_hours = -5),
-        1883: SwitchOffsetTimezone(offset_hours_before = -17762 / 3600, offset_hours_after = -10858 / 3600),
-        1776: FixedOffsetTimezone(offset_hours = -17762 / 3600),
-    })
+@TypeFunction
+def UsTimeZone(st_offset_hours, dst_offset_hours):
+    class UsTimeZone_(TimeZone, Final):
+        TIMEZONES_BY_START_YEAR = ConstDict(int, TimeZone)({
+            2007: DaylightSavingsTimezone(dst_offset_hours=dst_offset_hours, st_offset_hours=st_offset_hours, dst_boundaries=FirstToLastWeekdayRule(0, 4, 0, 10)),
+            1987: DaylightSavingsTimezone(dst_offset_hours=dst_offset_hours, st_offset_hours=st_offset_hours, dst_boundaries=FirstToLastWeekdayRule(0, 4, 0, 10)),
+            1975: DaylightSavingsTimezone(
+                dst_offset_hours=dst_offset_hours,
+                st_offset_hours=st_offset_hours,
+                dst_boundaries=DateTimeRule(
+                    DateTime(1975, 2, 23, 2, 0, 0),
+                    DateTime(1975, 10, 26, 2, 0, 0)
+                )
+            ),
+            1974: DaylightSavingsTimezone(
+                dst_offset_hours=dst_offset_hours,
+                st_offset_hours=st_offset_hours,
+                dst_boundaries=DateTimeRule(
+                    DateTime(1974, 1, 6, 2, 0, 0),
+                    DateTime(1974, 10, 27, 2, 0, 0)
+                )
+            ),
+            1955: DaylightSavingsTimezone(dst_offset_hours=dst_offset_hours, st_offset_hours=st_offset_hours, dst_boundaries=LastWeekdayRule(0, 4, 0, 10)),
+            1946: DaylightSavingsTimezone(dst_offset_hours=dst_offset_hours, st_offset_hours=st_offset_hours, dst_boundaries=LastWeekdayRule(0, 4, 0, 9)),
+            1945: DaylightSavingsTimezone(
+                dst_offset_hours=dst_offset_hours,
+                st_offset_hours=st_offset_hours,
+                dst_boundaries=DateTimeRule(
+                    DateTime(1945, 8, 14, 19, 0, 0),
+                    DateTime(1945, 9, 30, 2, 0, 0)
+                )
+            ),
+            1943: FixedOffsetTimezone(offset_hours = st_offset_hours),
+            1942: SwitchOffsetTimezone(offset_hours_before = st_offset_hours, offset_hours_after = dst_offset_hours),
+            1921: DaylightSavingsTimezone(dst_offset_hours=dst_offset_hours, st_offset_hours=st_offset_hours, dst_boundaries=LastWeekdayRule(0, 3, 0, 10)),
+            1918: DaylightSavingsTimezone(dst_offset_hours=dst_offset_hours, st_offset_hours=st_offset_hours, dst_boundaries=LastWeekdayRule(0, 3, 0, 10)),
+            1884: FixedOffsetTimezone(offset_hours = st_offset_hours),
+            1883: SwitchOffsetTimezone(offset_hours_before = -17762 / 3600, offset_hours_after = -10858 / 3600),
+            1776: FixedOffsetTimezone(offset_hours = -17762 / 3600),
+        })
 
-    @Entrypoint
-    def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
-        return self.chooseTimezone(dateTime.date.year).timestamp(dateTime, afterFold)
+        @Entrypoint
+        def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
+            return self.chooseTimezone(dateTime.date.year).timestamp(dateTime, afterFold)
 
-    @Entrypoint
-    def datetime(self, timestamp: float) -> DateTime:
-        year = Chrono.civil_from_days(timestamp // 86400).year
-        return self.chooseTimezone(year).datetime(timestamp)
+        @Entrypoint
+        def datetime(self, timestamp: float) -> DateTime:
+            year = Chrono.civil_from_days(timestamp // 86400).year
+            return self.chooseTimezone(year).datetime(timestamp)
 
-    @Entrypoint
-    def chooseTimezone(self, year: int):
-        if year >= 2007:
-            return self.TIMEZONES_BY_START_YEAR[2007]
+        @Entrypoint
+        def chooseTimezone(self, year: int):
+            if year >= 2007:
+                return self.TIMEZONES_BY_START_YEAR[2007]
 
-        elif year >= 1987:
-            return self.TIMEZONES_BY_START_YEAR[1987]
+            elif year >= 1987:
+                return self.TIMEZONES_BY_START_YEAR[1987]
 
-        elif year == 1975:
-            return self.TIMEZONES_BY_START_YEAR[1975]
+            elif year == 1975:
+                return self.TIMEZONES_BY_START_YEAR[1975]
 
-        elif year == 1974:
-            return self.TIMEZONES_BY_START_YEAR[1974]
+            elif year == 1974:
+                return self.TIMEZONES_BY_START_YEAR[1974]
 
-        elif year >= 1955:
-            return self.TIMEZONES_BY_START_YEAR[1955]
+            elif year >= 1955:
+                return self.TIMEZONES_BY_START_YEAR[1955]
 
-        elif year >= 1946:
-            return self.TIMEZONES_BY_START_YEAR[1946]
+            elif year >= 1946:
+                return self.TIMEZONES_BY_START_YEAR[1946]
 
-        elif year == 1945:
-            return self.TIMEZONES_BY_START_YEAR[1945]
+            elif year == 1945:
+                return self.TIMEZONES_BY_START_YEAR[1945]
 
-        elif year >= 1943:
-            return self.TIMEZONES_BY_START_YEAR[1943]
+            elif year >= 1943:
+                return self.TIMEZONES_BY_START_YEAR[1943]
 
-        elif year == 1942:
-            return self.TIMEZONES_BY_START_YEAR[1942]
+            elif year == 1942:
+                return self.TIMEZONES_BY_START_YEAR[1942]
 
-        elif year >= 1921:
-            return self.TIMEZONES_BY_START_YEAR[1921]
+            elif year >= 1921:
+                return self.TIMEZONES_BY_START_YEAR[1921]
 
-        elif year >= 1918:
-            return self.TIMEZONES_BY_START_YEAR[1918]
+            elif year >= 1918:
+                return self.TIMEZONES_BY_START_YEAR[1918]
 
-        elif year >= 1884:
-            return self.TIMEZONES_BY_START_YEAR[1884]
+            elif year >= 1884:
+                return self.TIMEZONES_BY_START_YEAR[1884]
 
-        elif year == 1883:
-            return self.TIMEZONES_BY_START_YEAR[1883]
+            elif year == 1883:
+                return self.TIMEZONES_BY_START_YEAR[1883]
 
-        else:
-            return self.TIMEZONES_BY_START_YEAR[1776]
+            else:
+                return self.TIMEZONES_BY_START_YEAR[1776]
+
+    return UsTimeZone_
 
 
-NYC = NewYorkTimezone()
+NYC = UsTimeZone(-5, -4)()
 UTC = FixedOffsetTimezone(offset_hours=0)
 EST = FixedOffsetTimezone(offset_hours=-5)
 IST = FixedOffsetTimezone(offset_hours=2)
