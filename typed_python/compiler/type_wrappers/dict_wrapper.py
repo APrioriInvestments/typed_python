@@ -18,8 +18,8 @@ from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler.type_wrappers.hash_table_implementation import table_next_slot, table_clear, table_contains, \
-    dict_delitem, dict_getitem, dict_get, dict_setitem
+from typed_python.compiler.type_wrappers.hash_table_implementation import table_next_slot, table_clear, \
+    dict_table_contains, dict_delitem, dict_getitem, dict_get, dict_setitem
 from typed_python import Tuple, PointerTo, Int32, UInt8, Dict, ConstDict
 
 import typed_python.compiler.native_ast as native_ast
@@ -76,7 +76,8 @@ def initialize_dict_from_mappable(ptrToOutDict, mappable, mayThrow):
         ptrToOutDict.destroy()
         if mayThrow:
             raise
-        return False
+
+    return False
 
 
 def dict_pop_nodefault(dict, item):
@@ -531,7 +532,11 @@ class DictWrapper(DictWrapperBase):
             if right is None:
                 return None
 
-            return context.call_py_function(table_contains, (left, right), {})
+            return context.call_py_function(
+                dict_table_contains,
+                (left, right),
+                {}
+            )
 
         return super().convert_bin_op_reverse(context, left, op, right, inplace)
 

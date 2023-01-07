@@ -108,6 +108,7 @@ class PrintNewFunctionVisitor(RuntimeEventVisitor):
             )
         else:
             print("compiling ", funcName)
+            print("   identifier ", identifier)
             print("   inputs: ", inputTypes)
             print("   output: ", outputType)
             print("   vars: ")

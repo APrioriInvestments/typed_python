@@ -878,7 +878,6 @@ class TestDictCompilation(unittest.TestCase):
         print("object hash of 10 is ", compiledHash(object, 10))
         assert aDict[10] == 20
 
-
         print("object hash of 10.5 is ", compiledHash(object, 10.5))
         assert aDict[10.5] == 30
 

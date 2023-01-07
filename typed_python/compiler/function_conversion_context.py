@@ -2013,6 +2013,11 @@ class FunctionConversionContext(ConversionContextBase):
             if testExpr is None:
                 return expr_context.finalize(None, exceptionsTakeFrom=ast), False
 
+            definitelySucceeds = testExpr.expr.matches.Constant and testExpr.expr.val.truth_value() is True
+
+            if definitelySucceeds:
+                return expr_context.finalize(None, exceptionsTakeFrom=ast), True
+
             definitelyFails = testExpr.expr.matches.Constant and testExpr.expr.val.truth_value() is False
 
             with expr_context.ifelse(testExpr) as (ifTrue, ifFalse):

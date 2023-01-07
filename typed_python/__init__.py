@@ -46,9 +46,9 @@ from typed_python.compiler.typeof import TypeOf
 from typed_python._types import (
     Forward, TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict, SubclassOf,
     Alternative, Value, serialize, deserialize, serializeStream, deserializeStream,
-    PointerTo, RefTo, Dict, validateSerializedObject, validateSerializedObjectStream, decodeSerializedObject,
-    getOrSetTypeResolver, Set, Class, Type, BoundMethod,
-    TypedCell, pointerTo, refTo, copy, identityHash,
+    PointerTo, RefTo, Dict, validateSerializedObject, validateSerializedObjectStream,
+    decodeSerializedObject, getOrSetTypeResolver, Set, Class, Type, BoundMethod,
+    TypedCell, pointerTo, refTo, copy, identityHash, PythonObjectOfType,
     deepBytecount, deepcopy, deepcopyContiguous, totalBytesAllocatedInSlabs,
     deepBytecountAndSlabs, Slab,
     totalBytesAllocatedOnFreeStore,

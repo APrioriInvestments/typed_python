@@ -221,7 +221,7 @@ class PointerToWrapper(Wrapper):
 
         if targetVal.expr_type.typeRepresentation is str:
             asInt = instance.toInt64()
-            asStr = asInt.convert_str_cast()
+            asStr = asInt.toStr()
             targetVal.convert_copy_initialize(context.constant("0x") + asStr)
             return context.constant(True)
 

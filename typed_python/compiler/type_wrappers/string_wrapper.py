@@ -376,7 +376,7 @@ class StringWrapper(RefcountedWrapper):
             return context.push(self, lambda x: x.convert_default_initialize())
 
         if len(args) == 1 and not kwargs:
-            return args[0].convert_str_cast()
+            return args[0].toStr()
 
         if 1 <= len(args) <= 3:
             if len(args) >= 2:

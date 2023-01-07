@@ -2857,3 +2857,16 @@ class TestClassCompilationCompilation(unittest.TestCase):
         t0 = time.time()
         assert constructOne(C, 0, 1000000) == C(0).f() * 1000000
         print(time.time() - t0)
+
+    def test_implicit_conversion_to_bool(self):
+        class C(Class):
+            def __len__(self) -> int:
+                return 10
+
+        @Entrypoint
+        def check(c):
+            if c and True:
+                return 1
+            return 0
+
+        check(C())

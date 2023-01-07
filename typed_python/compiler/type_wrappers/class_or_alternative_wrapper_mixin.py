@@ -44,7 +44,8 @@ def initialize_str_from_method_call(strPtr, instance, mayThrowOnFailure):
     except Exception: # noqa
         if mayThrowOnFailure:
             raise
-        return False
+
+    return False
 
 
 def initialize_float_from_method_call(floatPtr, instance, mayThrowOnFailure):
@@ -68,7 +69,8 @@ def initialize_float_from_method_call(floatPtr, instance, mayThrowOnFailure):
     except Exception: # noqa
         if mayThrowOnFailure:
             raise
-        return False
+
+    return False
 
 
 def initialize_bytes_from_method_call(bytesPtr, instance, mayThrowOnFailure):
@@ -92,7 +94,8 @@ def initialize_bytes_from_method_call(bytesPtr, instance, mayThrowOnFailure):
     except Exception: # noqa
         if mayThrowOnFailure:
             raise
-        return False
+
+    return False
 
 
 def initialize_int_from_method_call(intPtr, instance, mayThrowOnFailure):
@@ -116,7 +119,8 @@ def initialize_int_from_method_call(intPtr, instance, mayThrowOnFailure):
     except Exception: # noqa
         if mayThrowOnFailure:
             raise
-        return False
+
+    return False
 
 
 def initialize_bool_from_method_call(boolPtr, instance, mayThrowOnFailure):
@@ -140,7 +144,8 @@ def initialize_bool_from_method_call(boolPtr, instance, mayThrowOnFailure):
     except Exception: # noqa
         if mayThrowOnFailure:
             raise
-        return False
+
+    return False
 
 
 def initialize_bool_from_len_method_call(boolPtr, instance, mayThrowOnFailure):
@@ -164,7 +169,8 @@ def initialize_bool_from_len_method_call(boolPtr, instance, mayThrowOnFailure):
     except Exception: # noqa
         if mayThrowOnFailure:
             raise
-        return False
+
+    return False
 
 
 class ClassOrAlternativeWrapperMixin:
@@ -260,6 +266,29 @@ class ClassOrAlternativeWrapperMixin:
         return False
 
     def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        res = self._convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
+
+        if res is not None:
+            assert res.expr_type.typeRepresentation is bool
+
+        return res
+
+    def toBool(self, context, instance):
+        if self.has_method("__bool__"):
+            res = instance.convert_method_call("__bool__", [], {})
+            if res is not None:
+                res = res.toBool()
+            return res
+
+        if self.has_method("__len__"):
+            res = instance.convert_method_call("__len__", [], {})
+            if res is not None:
+                res = res.toBool()
+            return res
+
+        return super().toBool(context, instance)
+
+    def _convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         if targetVal.expr_type.typeRepresentation is bool:
             if self.has_method("__bool__"):
                 return context.call_py_function(
@@ -363,7 +392,7 @@ class ClassOrAlternativeWrapperMixin:
                     "__format__", (a1 if a1 is not None else context.constant(''),), {}
                 )
 
-            return expr.convert_str_cast()
+            return expr.toStr()
 
         if f is round:
             if a1 is None:

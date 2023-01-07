@@ -60,6 +60,9 @@ class NoneWrapper(Wrapper):
 
         return super().convert_bin_op(context, left, op, right, inplace)
 
+    def toBool(self, context, expr):
+        return context.constant(False)
+
     def _can_convert_to_type(self, targetType, conversionLevel):
         if not conversionLevel.isNewOrHigher():
             return False

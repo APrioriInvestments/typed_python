@@ -34,11 +34,11 @@ class PrintWrapper(Wrapper):
 
         for kwargName, value in kwargs.items():
             if kwargName == 'sep':
-                sep = value.convert_str_cast()
+                sep = value.toStr()
                 if sep is None:
                     return
             elif kwargName == 'end':
-                end = value.convert_str_cast()
+                end = value.toStr()
                 if end is None:
                     return
             else:
@@ -49,7 +49,7 @@ class PrintWrapper(Wrapper):
 
         # it would be better to use join
         for a in args:
-            converted = a.convert_str_cast()
+            converted = a.toStr()
             if converted is None:
                 return None
 

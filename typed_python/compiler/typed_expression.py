@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import UInt64, PointerTo
+from typed_python import PointerTo
 from typed_python.python_ast import BinaryOp, ComparisonOp, BooleanOp
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -231,21 +231,6 @@ class TypedExpression:
     def has_method(self, methodName):
         return self.expr_type.has_method(methodName)
 
-    def convert_bool_cast(self):
-        return self.convert_to_type(bool, ConversionLevel.New)
-
-    def convert_int_cast(self):
-        return self.convert_to_type(int, ConversionLevel.New)
-
-    def convert_float_cast(self):
-        return self.convert_to_type(float, ConversionLevel.New)
-
-    def convert_str_cast(self):
-        return self.convert_to_type(str, ConversionLevel.New)
-
-    def convert_bytes_cast(self):
-        return self.convert_to_type(bytes, ConversionLevel.New)
-
     def convert_builtin(self, f, a1=None):
         return self.expr_type.convert_builtin(f, self.context, self, a1)
 
@@ -314,13 +299,23 @@ class TypedExpression:
             initialized and control flow may not return. This can only happen if 'mayThrowOnFailure'
             is True
         """
-        return self.expr_type.convert_to_type_with_target(
+        res = self.expr_type.convert_to_type_with_target(
             self.context,
             self,
             targetVal,
             conversionLevel,
             mayThrowOnFailure
         )
+
+        if res is not None:
+            if res.expr_type.typeRepresentation is not bool:
+                raise Exception(
+                    f"calling convert_to_type_with_target on {self} with target\n"
+                    f"{targetVal} and level {conversionLevel} was supposed to produce\n"
+                    f"a bool but produced {res}"
+                )
+
+        return res
 
     def get_iteration_expressions(self):
         return self.expr_type.get_iteration_expressions(self.context, self)
@@ -347,16 +342,19 @@ class TypedExpression:
         return self.convert_to_type(object, ConversionLevel.Signature)
 
     def toFloat64(self):
-        return self.convert_to_type(float, ConversionLevel.New)
+        return self.expr_type.toFloat64(self.context, self)
 
     def toInt64(self):
-        return self.convert_to_type(int, ConversionLevel.New)
+        return self.expr_type.toInt64(self.context, self)
 
     def toUInt64(self):
-        return self.convert_to_type(UInt64, ConversionLevel.New)
+        return self.expr_type.toUInt64(self.context, self)
 
     def toBool(self):
-        return self.convert_to_type(bool, ConversionLevel.New)
+        return self.expr_type.toBool(self.context, self)
+
+    def toStr(self):
+        return self.expr_type.toStr(self.context, self)
 
     def toIndex(self):
         """Equivalent to __index__"""

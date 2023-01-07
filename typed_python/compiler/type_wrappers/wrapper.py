@@ -14,7 +14,7 @@
 
 import typed_python.compiler
 from typed_python.python_ast import ComparisonOp, UnaryOp
-from typed_python import _types, OneOf, ListOf
+from typed_python import _types, OneOf, ListOf, UInt64
 from typed_python.hash import Hash
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.native_ast import VoidPtr
@@ -378,7 +378,7 @@ class Wrapper:
             )
 
         if f is format and a1 is None:
-            return expr.convert_str_cast()
+            return expr.toStr()
 
         return context.pushException(
             TypeError,
@@ -469,6 +469,21 @@ class Wrapper:
             return True
 
         return "Maybe"
+
+    def toFloat64(self, context, expr):
+        return self.convert_to_type(context, expr, float, ConversionLevel.New)
+
+    def toInt64(self, context, expr):
+        return self.convert_to_type(context, expr, int, ConversionLevel.New)
+
+    def toUInt64(self, context, expr):
+        return self.convert_to_type(context, expr, UInt64, ConversionLevel.New)
+
+    def toBool(self, context, expr):
+        return self.convert_to_type(context, expr, bool, ConversionLevel.New)
+
+    def toStr(self, context, expr):
+        return self.convert_to_type(context, expr, str, ConversionLevel.New)
 
     def convert_to_type_constant(self, context, expr, target_type, level: ConversionLevel):
         """Given that 'expr' is a constant expression, attempt to convert it directly.
@@ -594,7 +609,7 @@ class Wrapper:
             context.markUninitializedSlotInitialized(targetVal)
             return targetVal
 
-        succeeded = succeeded.convert_to_type(bool, ConversionLevel.Implicit)
+        succeeded = succeeded.toBool()
         if succeeded is None:
             return
 
