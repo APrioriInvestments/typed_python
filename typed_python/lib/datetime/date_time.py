@@ -450,20 +450,6 @@ class FixedOffsetTimezone(TimeZone, Final):
         return self._datetimeFromTimestampAndOffset(timestamp, self.offset_hours)
 
 
-class NycTimezone(TimeZone, Final):
-    @Entrypoint
-    def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
-        return (
-            dateTime.date.daysSinceEpoch() * 86400
-            + dateTime.timeOfDay.secondsSinceMidnight()
-            - self.offset_hours * 3600
-        )
-
-    @Entrypoint
-    def datetime(self, timestamp: float) -> DateTime:
-        return self._datetimeFromTimestampAndOffset(timestamp, self.offset_hours)
-
-
 class SwitchOffsetTimezone(TimeZone, Final):
     offset_hours_before = Member(float)
     offset_hours_after = Member(float)
@@ -589,7 +575,6 @@ def UsTimeZone(st_offset_hours, dst_offset_hours):
 
         @Entrypoint
         def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
-            # print(f"dateTime:\n{dateTime}")
             return self.chooseTimezone(dateTime.date.year).timestamp(dateTime, afterFold)
 
         @Entrypoint
