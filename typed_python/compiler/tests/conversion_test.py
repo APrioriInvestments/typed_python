@@ -1227,12 +1227,12 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callF1(10), 10)
 
-        with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
+        with self.assertRaisesRegex(TypeError, "annot find a valid overload"):
             callF2(0, 1)
 
         self.assertEqual(callF3(10, 2), 11)
 
-        with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
+        with self.assertRaisesRegex(TypeError, "annot find a valid overload"):
             callF4(0, 1)
 
     def test_typed_functions_with_typed_kwargs(self):
@@ -1302,7 +1302,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(callF2(1.5), 2.5)
         self.assertEqual(callF2(1), 2.0)
 
-        with self.assertRaisesRegex(TypeError, r"Failed to find an overload"):
+        with self.assertRaisesRegex(TypeError, r"annot find a valid overload"):
             callF2("h")
 
     def test_can_call_function_with_typed_function_as_argument(self):

@@ -334,7 +334,8 @@ class PythonToNativeConverter:
             name - the name to actually give the function.
             identity - a tuple consisting of strings, ints, type wrappers, and tuples of same
             input_types - list of Wrapper objects for the incoming types
-            output_type - Wrapper object for the output type.
+            output_type - Wrapper object for the output type, or None if the function doesn't
+                ever return
             generatingFunction - a function producing a native_function_definition.
                 It should accept an expression_conversion_context, an expression for the output
                 if it's not pass-by-value (or None if it is), and a bunch of TypedExpressions
@@ -343,7 +344,9 @@ class PythonToNativeConverter:
 
         returns a TypedCallTarget. 'generatingFunction' may call this recursively if it wants.
         """
-        output_type = typeWrapper(output_type)
+        if output_type is not None:
+            output_type = typeWrapper(output_type)
+
         input_types = [typeWrapper(x) for x in input_types]
 
         identity = (

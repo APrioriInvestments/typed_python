@@ -719,6 +719,8 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(f.resultTypeFor(OneOf(int, float)).typeRepresentation, object)
         self.assertEqual(fFinal.resultTypeFor(OneOf(int, float)).typeRepresentation, OneOf(float, int))
+        self.assertEqual(fFinal.resultTypeFor(int).typeRepresentation, int)
+        self.assertEqual(fFinal.resultTypeFor(float).typeRepresentation, float)
 
     def test_classes_with_lots_of_members(self):
         class BaseClass(Class):
@@ -1720,7 +1722,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         def tryToCallRequiresAFloat():
             requiresAFloat(C())
 
-        with self.assertRaisesRegex(TypeError, "cannot find a valid overload"):
+        with self.assertRaisesRegex(TypeError, "annot find a valid overload"):
             tryToCallRequiresAFloat()
 
     def compileCheck(self, f):

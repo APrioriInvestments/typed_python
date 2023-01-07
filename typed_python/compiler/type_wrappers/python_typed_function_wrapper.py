@@ -628,15 +628,12 @@ class PythonTypedFunctionWrapper(Wrapper):
             )
 
             returnType = mergeTypeWrappers(possibleTypes)
-
-            if returnType is None:
-                return None
         else:
             returnType = typeWrapper(returnType)
 
         argNames = [None for _ in argTypes] + list(kwargTypes)
 
-        return converter.defineNativeFunction(
+        res = converter.defineNativeFunction(
             f'implement_function.{self}{argTypes}.{kwargTypes}->{returnType}',
             ('implement_function.', self, returnType, self, tuple(argTypes), tuple(kwargTypes.items())),
             ([self] if provideClosureArgument else []) + list(argTypes) + list(kwargTypes.values()),
@@ -652,6 +649,8 @@ class PythonTypedFunctionWrapper(Wrapper):
                 )
             )
         )
+
+        return res
 
     @staticmethod
     def overloadMatchesSignature(overload, argTypes, kwargTypes, conversionLevel):
@@ -842,6 +841,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             context - an ExpressionConversionContext
             returnType - the output type we are expecting to return. This will be the union
                 of the return types of all the overloads that might participate in this dispatch.
+                If this definitely throws, this will be None.
             args - the typed_expression for all of our actual arguments, which in this case
                 are the closure (if provideClosureArgument), the instance,
                 and then the actual arguments we want to convert.
@@ -872,8 +872,8 @@ class PythonTypedFunctionWrapper(Wrapper):
         kwargTypes = {argNames[i]: a.expr_type for i, a in enumerate(args) if argNames[i] is not None}
 
         def makeOverloadImplementor(overload, conversionLevel, returnType, forceConvertToSignatureFunc):
-            return lambda context, _, outputVar, *args: self.generateOverloadImplement(
-                context, overload, returnType, conversionLevel, outputVar, args,
+            return lambda context, _, *args: self.generateOverloadImplement(
+                context, overload, returnType, conversionLevel, args,
                 argNames, provideClosureArgument, forceConvertToSignatureFunc
             )
 
@@ -894,6 +894,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                     )
 
                     forceConvertToSignatureFunc = False
+                    functionCallDefinitelyThrows = False
 
                     if overloadRetType is CannotBeDetermined:
                         assert returnType.typeRepresentation is object, returnType
@@ -901,43 +902,70 @@ class PythonTypedFunctionWrapper(Wrapper):
                         forceConvertToSignatureFunc = True
                     elif overloadRetType is SomeInvalidClassReturnType:
                         # this method produces the wrong type
-                        overloadRetType = type(None)
+                        overloadRetType = None
                     elif overloadRetType is NoReturnTypeSpecified:
-                        overloadRetType = returnType.typeRepresentation
+                        if returnType is None:
+                            overloadRetType = None
+                        else:
+                            overloadRetType = returnType.typeRepresentation
 
-                    testSingleOverloadForm = context.converter.defineNativeFunction(
-                        f'implement_overload.{self}.{overloadIndex}.{conversionLevel.LEVEL}.{argTypes}.{kwargTypes}->{overloadRetType}',
-                        ('implement_overload', self, overloadIndex, conversionLevel.LEVEL,
-                         overloadRetType, tuple(argTypes), tuple(kwargTypes.items())),
-                        [PointerTo(overloadRetType)] + ([self] if provideClosureArgument else [])
-                        + list(argTypes) + list(kwargTypes.values()),
-                        typeWrapper(bool),
-                        makeOverloadImplementor(
-                            overload,
-                            conversionLevel,
-                            overloadRetType,
-                            forceConvertToSignatureFunc
+                    if overloadRetType is None:
+                        testSingleOverloadForm = context.converter.defineNativeFunction(
+                            f'implement_overload.{self}.{overloadIndex}.{conversionLevel.LEVEL}.{argTypes}.{kwargTypes}-> <exception>',
+                            ('implement_overload', self, overloadIndex, conversionLevel.LEVEL,
+                             overloadRetType, tuple(argTypes), tuple(kwargTypes.items())),
+                            ([self] if provideClosureArgument else [])
+                            + list(argTypes) + list(kwargTypes.values()),
+                            typeWrapper(bool),
+                            makeOverloadImplementor(
+                                overload,
+                                conversionLevel,
+                                overloadRetType,
+                                forceConvertToSignatureFunc
+                            )
                         )
-                    )
 
-                    outputSlot = context.allocateUninitializedSlot(overloadRetType)
+                        successful = context.call_typed_call_target(
+                            testSingleOverloadForm,
+                            tuple([closureArg] if provideClosureArgument else [])
+                            + args
+                        )
+                    else:
+                        testSingleOverloadForm = context.converter.defineNativeFunction(
+                            f'implement_overload.{self}.{overloadIndex}.{conversionLevel.LEVEL}.{argTypes}'
+                            f'.{kwargTypes}->{overloadRetType}',
+                            ('implement_overload', self, overloadIndex, conversionLevel.LEVEL,
+                             overloadRetType, tuple(argTypes), tuple(kwargTypes.items())),
+                            [PointerTo(overloadRetType)] + ([self] if provideClosureArgument else [])
+                            + list(argTypes) + list(kwargTypes.values()),
+                            typeWrapper(bool),
+                            makeOverloadImplementor(
+                                overload,
+                                conversionLevel,
+                                overloadRetType,
+                                forceConvertToSignatureFunc
+                            )
+                        )
 
-                    successful = context.call_typed_call_target(
-                        testSingleOverloadForm,
-                        (outputSlot.changeType(PointerTo(overloadRetType), False),)
-                        + tuple([closureArg] if provideClosureArgument else [])
-                        + args
-                    )
+                        outputSlot = context.allocateUninitializedSlot(overloadRetType)
 
-                    with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
-                        with ifTrue:
-                            context.markUninitializedSlotInitialized(outputSlot)
+                        successful = context.call_typed_call_target(
+                            testSingleOverloadForm,
+                            (outputSlot.changeType(PointerTo(overloadRetType), False),)
+                            + tuple([closureArg] if provideClosureArgument else [])
+                            + args
+                        )
 
-                            # upcast the result
-                            actualResult = outputSlot.convert_to_type(returnType, ConversionLevel.Signature)
+                        if not functionCallDefinitelyThrows:
+                            with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
+                                with ifTrue:
+                                    context.markUninitializedSlotInitialized(outputSlot)
 
-                            if actualResult is not None:
-                                context.pushReturnValue(actualResult)
+                                    # upcast the result
+                                    actualResult = outputSlot.convert_to_type(returnType, ConversionLevel.Signature)
+
+                                    if actualResult is not None:
+                                        context.pushReturnValue(actualResult)
 
                     # if we definitely match, we can return early
                     if mightMatch is True:
@@ -949,9 +977,31 @@ class PythonTypedFunctionWrapper(Wrapper):
                             )
                         return
 
+        @typed_python.NotCompiled
+        def invalidCallStr(name, *args, **kwargs) -> str:
+            argDesc = []
+
+            for a in args:
+                argDesc.append(type(a).__name__)
+
+            for k in kwargs:
+                argDesc.append(f"{k}={type(kwargs[k]).__name__}")
+
+            return (
+                f"Cannot find a valid overload of '{name}' with arguments of type "
+                f"({', '.join(argDesc)})"
+            )
+
         # generate a cleanup handler for the cases where we don't match a method signature.
         # this should actually be hitting the interpreter instead.
-        context.pushException(TypeError, f"Failed to find an overload for {self} matching {argTypes} and {kwargTypes}")
+        context.pushException(
+            TypeError,
+            context.constant(invalidCallStr, allowArbitrary=True).convert_call(
+                args=(context.constant(self.typeRepresentation.__name__),)
+                + tuple([args[i] for i in range(len(args)) if argNames[i] is None]),
+                kwargs={argNames[i]: args[i] for i in range(len(args)) if argNames[i] is not None}
+            )
+        )
 
     def checkIfOverloadArgsDefinitelyMatch(
         self,
@@ -1091,7 +1141,6 @@ class PythonTypedFunctionWrapper(Wrapper):
         overload,
         retType,
         conversionLevel,
-        outputVar,
         args,
         argNames,
         provideClosureArgument,
@@ -1105,9 +1154,9 @@ class PythonTypedFunctionWrapper(Wrapper):
         Args:
             context - an ExpressionConversionContext
             overload - the FunctionOverload we're trying to convert.
-            retType - the type we're actually planning on returning here.
+            retType - the type we're actually planning on returning here, or None if we don't
+                return
             conversionLevel - the level at which we should convert our arguments
-            outputVar - a TypedExpression(PointerTo(returnType)) we're supposed to initialize.
             args - the arguments to pass to the method (including the closure if necessary and the instance)
             argNames - a list with one element per args, containing None for each positional
                 argument, or the name of the argument if passed as a keyword argument.
@@ -1116,6 +1165,12 @@ class PythonTypedFunctionWrapper(Wrapper):
             forceConvertToSignatureFunc - if True, then force the result to get passed through the
                 overload's signature function
         """
+        if retType is not None:
+            outputVar = args[0]
+            args = args[1:]
+        else:
+            outputVar = None
+
         if provideClosureArgument:
             closureArg = args[0]
             args = args[1:]
@@ -1184,7 +1239,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             else:
                 convertedKwargs[argNames[argIx]] = convertedArg
 
-        if outputVar.expr_type.typeRepresentation.ElementType != retType:
+        if outputVar is not None and outputVar.expr_type.typeRepresentation.ElementType != retType:
             raise Exception(f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}")
 
         if canBail is CannotBeDetermined:
@@ -1203,6 +1258,9 @@ class PythonTypedFunctionWrapper(Wrapper):
 
             res = instance.convert_to_type(object, ConversionLevel.Signature).convert_call(convertedArgs, convertedKwargs)
 
+            if retType is None:
+                res = None
+
             if res is not None:
                 res = res.convert_to_type(retType, ConversionLevel.Signature)
         else:
@@ -1211,10 +1269,16 @@ class PythonTypedFunctionWrapper(Wrapper):
                 closureArg,
                 convertedArgs,
                 convertedKwargs,
-                typeWrapper(retType)
+                typeWrapper(retType) if retType is not None else None
             )
 
         if res is None:
+            context.pushException(Exception, "unreachable")
+            return
+
+        if retType is None:
+            # Even if this overload supposedly returns, we can't actually get here and have
+            # no way to return.
             context.pushException(Exception, "unreachable")
             return
 

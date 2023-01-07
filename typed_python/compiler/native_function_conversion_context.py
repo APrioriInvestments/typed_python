@@ -54,7 +54,7 @@ class NativeFunctionConversionContext:
         return self.allocateLetVarname()
 
     def alwaysRaises(self):
-        return False
+        return self._output_type is None
 
     def typesAreUnstable(self):
         return False
@@ -79,7 +79,7 @@ class NativeFunctionConversionContext:
             input_types = self._input_types
             generatingFunction = self._generatingFunction
 
-            if output_type.is_pass_by_ref:
+            if output_type is not None and output_type.is_pass_by_ref:
                 outputArg = subcontext.inputArg(output_type, '.return')
             else:
                 outputArg = None
@@ -95,7 +95,9 @@ class NativeFunctionConversionContext:
                 for i in range(len(input_types)) if not input_types[i].is_empty
             ]
 
-            if output_type.is_pass_by_ref:
+            if output_type is None:
+                native_output_type = native_ast.Void
+            elif output_type.is_pass_by_ref:
                 # the first argument is actually the output
                 native_output_type = native_ast.Void
                 native_args = [('.return', output_type.getNativePassingType())] + native_args
