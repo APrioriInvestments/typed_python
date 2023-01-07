@@ -280,7 +280,7 @@ def test_nyc_since_1902():
         try:
             assert us == them, f"Difference for {str(dt)} is {us - them} seconds"
 
-        except:
+        except AssertionError:
             tz = NYC.chooseTimezone(dt.year)
             if isinstance(tz, DaylightSavingsTimezone):
                 dst_end = tz.dst_boundaries.getDaylightSavingsEnd(dt.year)

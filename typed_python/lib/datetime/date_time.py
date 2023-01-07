@@ -488,7 +488,7 @@ class SwitchOffsetTimezone(TimeZone, Final):
         is_after = dateTime > switch or afterFold
 
         jumps_forward = self.offset_hours_after > self.offset_hours_before
-        if afterFold and (dateTime.date != switch.date or dateTime > switch or is_start_like):
+        if afterFold and (dateTime.date != switch.date or dateTime > switch or jumps_forward):
             raise OneFoldOnlyError("There is only one fold.")
 
         if jumps_forward and dateTime.timeOfDay.hour == switch.timeOfDay.hour:
@@ -645,6 +645,7 @@ def UsTimeZone(st_offset_hours, dst_offset_hours):
 
 
 NYC = UsTimeZone(-5, -4)()
+CHI = UsTimeZone(-6, -5)()
 UTC = FixedOffsetTimezone(offset_hours=0)
 EST = FixedOffsetTimezone(offset_hours=-5)
 IST = FixedOffsetTimezone(offset_hours=2)
@@ -661,6 +662,7 @@ class TimeZoneChecker(Class, Final):
             "est": EST,
             "edt": NYC,
             "ist": IST,
+            "chi": CHI,
         }
     )
 
