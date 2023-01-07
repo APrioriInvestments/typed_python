@@ -23,8 +23,8 @@ class TimeOfDay(Class, Final):
         self.second = second
 
     @Entrypoint
-    def secondsSinceMidnight(self, afterFold: bool = False) -> float:
-        return self.second + self.minute * 60 + (self.hour + afterFold) * 3600
+    def secondsSinceMidnight(self) -> float:
+        return self.second + self.minute * 60 + self.hour * 3600
 
     @Entrypoint
     def __eq__(self, other):
@@ -386,35 +386,23 @@ class DaylightSavingsTimezone(TimeZone, Final):
         # first sunday of november
         ds_end = self.dst_boundaries.getDaylightSavingsEnd(year)
 
-        is_daylight_savings = True
+        is_daylight_savings = not ((dateTime > ds_end or dateTime < ds_start) or afterFold)
 
-        if dateTime.date < ds_start.date or dateTime.date > ds_end.date:
-            is_daylight_savings = False
-            if afterFold:
-                raise OneFoldOnlyError("There is only one fold.")
+        if afterFold and (dateTime.date != ds_end.date or dateTime > ds_end):
+            raise OneFoldOnlyError("There is only one fold.")
 
-        if dateTime.date == ds_start.date:
-            if dateTime.timeOfDay.hour == ds_start.timeOfDay.hour:
-                raise NonexistentDateTime(dateTime)
-
-            if afterFold:
-                raise OneFoldOnlyError("There is only one fold.")
-
-            is_daylight_savings = dateTime.timeOfDay.hour > ds_start.timeOfDay.hour
-
-        if dateTime.date == ds_end.date:
-            if dateTime.timeOfDay.hour > ds_end.timeOfDay.hour:
-                afterFold = True
-                is_daylight_savings = True
-            else:
-                is_daylight_savings = not afterFold and dateTime.timeOfDay < ds_end.timeOfDay
+        if (
+            dateTime.date == ds_start.date
+            and dateTime.timeOfDay.hour == ds_start.timeOfDay.hour
+        ):
+            raise NonexistentDateTime(dateTime)
 
         offset_hours = self.dst_offset_hours if is_daylight_savings else self.st_offset_hours
 
         return (
             dateTime.date.daysSinceEpoch() * 86400
             - offset_hours * 3600
-            + dateTime.timeOfDay.secondsSinceMidnight(afterFold)
+            + dateTime.timeOfDay.secondsSinceMidnight()
         )
 
     @Entrypoint
@@ -497,36 +485,14 @@ class SwitchOffsetTimezone(TimeZone, Final):
     def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
         switch = self.switch_datetime
 
-        is_after = True
+        is_after = dateTime > switch or afterFold
 
-        if dateTime.date < switch.date:
-            is_after = False
-            if afterFold and self.offset_hours_after > self.offset_hours_before:
-                raise OneFoldOnlyError("There is only one fold.")
+        jumps_forward = self.offset_hours_after > self.offset_hours_before
+        if afterFold and (dateTime.date != switch.date or dateTime > switch or is_start_like):
+            raise OneFoldOnlyError("There is only one fold.")
 
-        if dateTime.date > switch.date:
-            is_after = True
-            if afterFold and self.offset_hours_after > self.offset_hours_before:
-                raise OneFoldOnlyError("There is only one fold.")
-
-        if dateTime.date == switch.date:
-            # DST start-like
-            if self.offset_hours_after > self.offset_hours_before:
-                if dateTime.timeOfDay.hour == switch.timeOfDay.hour:
-                    raise NonexistentDateTime(dateTime)
-
-                if afterFold:
-                    raise OneFoldOnlyError("There is only one fold.")
-
-                is_after = dateTime.timeOfDay.hour > switch.timeOfDay.hour
-
-            # DST end-like
-            else:
-                if dateTime.timeOfDay.hour > switch.timeOfDay.hour:
-                    afterFold = True
-                    is_after = True
-                else:
-                    is_after = afterFold or dateTime.timeOfDay > switch.timeOfDay
+        if jumps_forward and dateTime.timeOfDay.hour == switch.timeOfDay.hour:
+            raise NonexistentDateTime(dateTime)
 
         offset_hours = self.offset_hours_after if is_after else self.offset_hours_before
 

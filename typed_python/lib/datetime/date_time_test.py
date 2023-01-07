@@ -12,28 +12,29 @@ from typed_python.lib.datetime.date_time import (
     UTC,
     last_weekday_of_month,
     DaylightSavingsTimezone,
-    SwitchOffsetTimezone
+    SwitchOffsetTimezone,
+    OneFoldOnlyError,
 )
 from typed_python.lib.timestamp import Timestamp
 from typed_python.lib.datetime.date_parser_test import get_datetimes_in_range
 
 
 def test_last_weekday_of_month():
-    assert last_weekday_of_month(2023, 1, 1) == Date(2023, 1, 31)
-    assert last_weekday_of_month(2023, 1, 0) == Date(2023, 1, 30)
-    assert last_weekday_of_month(2023, 1, 6) == Date(2023, 1, 29)
-    assert last_weekday_of_month(2023, 1, 5) == Date(2023, 1, 28)
-    assert last_weekday_of_month(2023, 1, 4) == Date(2023, 1, 27)
-    assert last_weekday_of_month(2023, 1, 3) == Date(2023, 1, 26)
-    assert last_weekday_of_month(2023, 1, 2) == Date(2023, 1, 25)
+    assert last_weekday_of_month(2023, 1, 2) == Date(2023, 1, 31)
+    assert last_weekday_of_month(2023, 1, 1) == Date(2023, 1, 30)
+    assert last_weekday_of_month(2023, 1, 0) == Date(2023, 1, 29)
+    assert last_weekday_of_month(2023, 1, 6) == Date(2023, 1, 28)
+    assert last_weekday_of_month(2023, 1, 5) == Date(2023, 1, 27)
+    assert last_weekday_of_month(2023, 1, 4) == Date(2023, 1, 26)
+    assert last_weekday_of_month(2023, 1, 3) == Date(2023, 1, 25)
 
-    assert last_weekday_of_month(1965, 2, 6) == Date(1965, 2, 28)
-    assert last_weekday_of_month(1965, 2, 5) == Date(1965, 2, 27)
-    assert last_weekday_of_month(1965, 2, 4) == Date(1965, 2, 26)
-    assert last_weekday_of_month(1965, 2, 3) == Date(1965, 2, 25)
-    assert last_weekday_of_month(1965, 2, 2) == Date(1965, 2, 24)
-    assert last_weekday_of_month(1965, 2, 1) == Date(1965, 2, 23)
-    assert last_weekday_of_month(1965, 2, 0) == Date(1965, 2, 22)
+    assert last_weekday_of_month(1965, 2, 0) == Date(1965, 2, 28)
+    assert last_weekday_of_month(1965, 2, 6) == Date(1965, 2, 27)
+    assert last_weekday_of_month(1965, 2, 5) == Date(1965, 2, 26)
+    assert last_weekday_of_month(1965, 2, 4) == Date(1965, 2, 25)
+    assert last_weekday_of_month(1965, 2, 3) == Date(1965, 2, 24)
+    assert last_weekday_of_month(1965, 2, 2) == Date(1965, 2, 23)
+    assert last_weekday_of_month(1965, 2, 1) == Date(1965, 2, 22)
 
 
 def test_DateTime_to_timestamp():
@@ -227,12 +228,16 @@ def test_TimeOfDay():
 
 
 def test_afterFold_dst_end():
+    with pytest.raises(OneFoldOnlyError):
+        NYC.timestamp(DateTime(2022, 11, 2, 1, 30, 0), afterFold=True)
+
     ymdhms = (2022, 11, 6, 1, 30, 0)
     tsSecondFold = (
         pytz.timezone("America/New_York").localize(datetime.datetime(*ymdhms)).timestamp()
     )
     assert NYC.timestamp(DateTime(*ymdhms), afterFold=False) == tsSecondFold - 3600
     assert NYC.timestamp(DateTime(*ymdhms), afterFold=True) == tsSecondFold
+
 
 def test_nyc_1918_10_27():
     nycDateStringsToUtcDateStrings = {
@@ -253,7 +258,7 @@ def test_nyc_since_1902():
     nyc = pytz.timezone("America/New_York")
     datetimes = get_datetimes_in_range(
         start=datetime.datetime(1902, 1, 1, 20, 0, 1, 0),
-        end=datetime.datetime(2023, 1, 1, 20, 0, 1, 0),
+        end=datetime.datetime(2030, 1, 1, 20, 0, 1, 0),
         step="hours",
     )
 
@@ -279,13 +284,23 @@ def test_nyc_since_1902():
             tz = NYC.chooseTimezone(dt.year)
             if isinstance(tz, DaylightSavingsTimezone):
                 dst_end = tz.dst_boundaries.getDaylightSavingsEnd(dt.year)
-                if dst_end.date == dateTime.date and dst_end.timeOfDay.hour - 1 == dateTime.timeOfDay.hour:
-                    if us - them == -3600: # we choose the first fold and they choose the second.
+                if (
+                    dst_end.date == dateTime.date
+                    and dst_end.timeOfDay.hour - 1 == dateTime.timeOfDay.hour
+                ):
+                    if (
+                        us - them == -3600
+                    ):  # we choose the first fold and they choose the second.
                         continue
             elif isinstance(tz, SwitchOffsetTimezone):
                 switch = tz.switch_datetime
-                if switch.date == dateTime.date and switch.timeOfDay.hour - 1 == dateTime.timeOfDay.hour:
-                    if us - them == -3600: # we choose the first fold and they choose the second.
+                if (
+                    switch.date == dateTime.date
+                    and switch.timeOfDay.hour - 1 == dateTime.timeOfDay.hour
+                ):
+                    if (
+                        us - them == -3600
+                    ):  # we choose the first fold and they choose the second.
                         continue
 
             raise
