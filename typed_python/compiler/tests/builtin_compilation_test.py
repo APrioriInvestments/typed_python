@@ -502,3 +502,10 @@ class TestBuiltinCompilation(unittest.TestCase):
                 assert maxOI(x, y) == max(x, y)
                 assert maxIO(x, y) == max(x, y)
                 assert maxOO(x, y) == max(x, y)
+
+    def test_abs_of_object(self):
+        @Entrypoint
+        def callAbs(o: object):
+            return abs(o)
+
+        assert callAbs(-10) == 10

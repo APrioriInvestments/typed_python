@@ -12,8 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import UInt64
+from typed_python import UInt64, Int32, Type
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
+from typed_python.compiler.conversion_level import ConversionLevel
 
 
 EMPTY = -1
@@ -28,18 +29,50 @@ class NativeHash(CompilableBuiltin):
     which will produce different answers from python right now, and which
     is attempting at some level to mimic python's standard hash functionality.
 
+    This is because our 'hash' function is actually a little messed up right
+    now - it depends on how TP is holding a value. For instance, if we have
+    a ListOf(object) and put a float in, we'll get a different hash than
+    if we had a ListOf(float) and put that same float in, because there is no
+    formal 'TP' hash. We should actually attempt to unify the two hashing
+    models since there's not a good reason to have two of them.
+
     That functionality is not used internally to our datastructures (we
     allow things to hash to -1) so you can't just use 'hash' when implementing
     wrappers for tp internals.
     """
+    def __init__(self, T):
+        self.T = T
+
     def __eq__(self, other):
-        return isinstance(other, NativeHash)
+        return isinstance(other, NativeHash) and self.T == other.T
 
     def __hash__(self):
-        return hash("NativeHash")
+        return hash(("NativeHash", self.T))
 
     def convert_call(self, context, instance, args, kwargs):
         if len(args) == 1:
+            if not issubclass(self.T, Type) and self.T not in (
+                bool, int, float, str, bytes, type(None)
+            ):
+                res = context.constant(hash).convert_call([args[0]], {})
+
+                if res is None:
+                    return res
+
+                # first convert it to an int32 since this is what
+                # Dict(object, object) will do in the interpreter
+                res = res.convert_to_type(
+                    Int32, ConversionLevel.Implicit
+                )
+
+                # then convert it to UInt64 since that's what we're
+                # using in this representation
+                res = res.convert_to_type(
+                    UInt64, ConversionLevel.Implicit
+                )
+
+                return res
+
             return args[0].convert_hash()
 
         return super().convert_call(context, instance, args, kwargs)
@@ -186,25 +219,25 @@ def table_clear(instance):
     instance._top_item_slot = 0
 
 
-def table_contains(instance, item):
-    itemHash = NativeHash()(item)
+# Operations specific to dicts that manipulate the fields directly:
+
+
+def dict_table_contains(instance, item):
+    itemHash = NativeHash(instance.KeyType)(item)
 
     slot = table_slot_for_key(instance, itemHash, item)
 
     return slot != -1
 
 
-# Operations specific to dicts that manipulate the fields directly:
-
-
 def dict_delitem(instance, item):
-    itemHash = NativeHash()(item)
+    itemHash = NativeHash(instance.KeyType)(item)
 
     table_remove_key(instance, item, itemHash, True)
 
 
 def dict_getitem(instance, item):
-    itemHash = NativeHash()(item)
+    itemHash = NativeHash(instance.KeyType)(item)
 
     slot = table_slot_for_key(instance, itemHash, item)
 
@@ -215,7 +248,7 @@ def dict_getitem(instance, item):
 
 
 def dict_get(instance, item, default):
-    itemHash = NativeHash()(item)
+    itemHash = NativeHash(instance.KeyType)(item)
 
     slot = table_slot_for_key(instance, itemHash, item)
 
@@ -226,7 +259,7 @@ def dict_get(instance, item, default):
 
 
 def dict_setitem(instance, key, value):
-    itemHash = NativeHash()(key)
+    itemHash = NativeHash(instance.KeyType)(key)
 
     slot = table_slot_for_key(instance, itemHash, key)
 
@@ -241,9 +274,16 @@ def dict_setitem(instance, key, value):
 
 # Operations specific to sets that manipulate the fields directly:
 
+def set_table_contains(instance, item):
+    itemHash = NativeHash(instance.ElementType)(item)
+
+    slot = table_slot_for_key(instance, itemHash, item)
+
+    return slot != -1
+
 
 def set_add(instance, key):
-    itemHash = NativeHash()(key)
+    itemHash = NativeHash(instance.ElementType)(key)
 
     slot = table_slot_for_key(instance, itemHash, key)
 
@@ -254,7 +294,7 @@ def set_add(instance, key):
 
 
 def set_add_or_remove(instance, key):
-    itemHash = NativeHash()(key)
+    itemHash = NativeHash(instance.ElementType)(key)
 
     slot = table_slot_for_key(instance, itemHash, key)
 
@@ -267,13 +307,13 @@ def set_add_or_remove(instance, key):
 
 
 def set_remove(instance, key):
-    itemHash = NativeHash()(key)
+    itemHash = NativeHash(instance.ElementType)(key)
 
     table_remove_key(instance, key, itemHash, True)
 
 
 def set_discard(instance, key):
-    itemHash = NativeHash()(key)
+    itemHash = NativeHash(instance.ElementType)(key)
 
     table_remove_key(instance, key, itemHash, False)
 

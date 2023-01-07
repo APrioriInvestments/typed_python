@@ -19,7 +19,7 @@ from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethod
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.hash_table_implementation import table_next_slot, table_clear, \
-    table_contains, set_add, set_add_or_remove, set_remove, set_discard, set_pop
+    set_table_contains, set_add, set_add_or_remove, set_remove, set_discard, set_pop
 from typed_python import PointerTo, Int32, UInt8, ListOf, TupleOf, Set, Tuple, NamedTuple, Dict, ConstDict
 
 import typed_python.compiler.native_ast as native_ast
@@ -69,7 +69,7 @@ def initialize_set_from_other_upcast_containers(ptrToOutSet, iterable, mayThrowO
         if mayThrowOnFailure:
             raise
 
-        return False
+    return False
 
 
 def initialize_set_from_other_implicit_containers(ptrToOutSet, iterable, mayThrowOnFailure):
@@ -104,7 +104,7 @@ def initialize_set_from_other_implicit_containers(ptrToOutSet, iterable, mayThro
         if mayThrowOnFailure:
             raise
 
-        return False
+    return False
 
 
 def set_union(left, right):
@@ -682,7 +682,11 @@ class SetWrapper(SetWrapperBase):
             if left is None:
                 return None
 
-            return context.call_py_function(table_contains, (right, left), {})
+            return context.call_py_function(
+                set_table_contains,
+                (right, left),
+                {}
+            )
 
         return super().convert_bin_op_reverse(context, right, op, left, inplace)
 

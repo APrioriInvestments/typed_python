@@ -336,16 +336,17 @@ class Wrapper:
         )
 
     def convert_hash(self, context, expr):
+        """Convert the 'NativeHash' of 'expr'.
+
+        Note that this is not the same as 'hash'. We should try to unify these.
+        """
         return context.pushException(
             TypeError,
             "Can't hash instance of type '%s'" % (str(self),)
         )
 
     def convert_abs(self, context, expr):
-        return context.pushException(
-            TypeError,
-            "Can't take 'abs' of instance of type '%s'" % (str(self),)
-        )
+        return context.constant(abs).convert_call([expr], {})
 
     def convert_index_cast(self, context, expr):
         return context.pushException(

@@ -12,7 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Dict, ListOf, Tuple, TupleOf, Entrypoint, OneOf, Set
+from typed_python import Dict, ListOf, Tuple, TupleOf, Entrypoint, OneOf, Set, Int32, UInt32
+from typed_python.compiler.type_wrappers.hash_table_implementation import NativeHash
 import typed_python._types as _types
 import unittest
 import time
@@ -20,6 +21,11 @@ import threading
 from flaky import flaky
 import numpy
 import numpy.random
+
+
+@Entrypoint
+def compiledHash(T, obj):
+    return NativeHash(T)(obj)
 
 
 class TestDictCompilation(unittest.TestCase):
@@ -855,3 +861,34 @@ class TestDictCompilation(unittest.TestCase):
 
             if time.time() - t0 > 1e-5:
                 print(i, time.time() - t0)
+
+    def test_dict_of_object_compiles(self):
+        aDict = Dict(object, object)()
+
+        @Entrypoint
+        def put(d: Dict(object, object), k: object, v: object):
+            d[k] = v
+
+        put(aDict, 10, 20)
+        put(aDict, 10.5, 30)
+        put(aDict, "hi", 40)
+        put(aDict, hash, 50)
+        put(aDict, UInt32(70), 60)
+
+        print("object hash of 10 is ", compiledHash(object, 10))
+        assert aDict[10] == 20
+
+
+        print("object hash of 10.5 is ", compiledHash(object, 10.5))
+        assert aDict[10.5] == 30
+
+        print("object hash of 'hi' is ", compiledHash(object, 'hi'))
+        print("python's hash is ", hash('hi'))
+        print("python's hash converted to Int32 is ", Int32(hash('hi')))
+        assert aDict["hi"] == 40
+
+        print("object hash of hash is ", compiledHash(object, hash))
+        assert aDict[hash] == 50
+
+        print("object hash of UInt32(70) is ", compiledHash(object, UInt32(70)))
+        assert aDict[UInt32(70)] == 60
