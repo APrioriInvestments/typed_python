@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2023 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -23,7 +23,30 @@ Value::Value(const Instance& instance) :
 {
     m_size = 0;
     m_is_default_constructible = true;
-    m_name = mInstance.repr();
+
+    if (
+        mInstance.type()->isPythonObjectOfType() &&
+        PyType_Check(
+            PyObjectHandleTypeBase::getPyObj(mInstance.data())
+        )
+    ) {
+        PyObject* obj = PyObjectHandleTypeBase::getPyObj(mInstance.data());
+
+        std::string name(((PyTypeObject*)obj)->tp_name);
+
+        auto ix = name.rfind('.');
+
+        if (ix == std::string::npos) {
+            ix = 0;
+        } else {
+            ix += 1;
+        }
+
+        m_name = "Value(" + name.substr(ix) + ")";
+    } else {
+        m_name = mInstance.repr();
+    }
+
     m_doc = Value_doc;
     mValueAsPyobj = PyInstance::extractPythonObject(mInstance);
     endOfConstructorInitialization(); // finish initializing the type object.

@@ -257,6 +257,12 @@ class TypesTests(unittest.TestCase):
         self.assertFalse(ibc(A1.X, A2.Y))
         self.assertFalse(ibc(A1.Y, A2.X))
 
+    def test_name_of_type_as_value_instances(self):
+        T1 = Alternative("T1")
+
+        assert Value(T1).__name__ == 'Value(' + T1.__name__ + ")"
+        assert Value(2).__name__ == '2'
+
     def test_callable_alternatives(self):
         def myCall(self):
             if self.matches.One:
@@ -317,7 +323,7 @@ class TypesTests(unittest.TestCase):
 
         X = OneOf(Value(int), Value(Alternative))
 
-        self.assertEqual(OneOf(Value(int)).__qualname__, "OneOf(<class 'int'>)")
+        self.assertEqual(OneOf(Value(int)).__qualname__, "OneOf(Value(int))")
 
         # these sould work
         X(int)
