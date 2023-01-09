@@ -28,6 +28,9 @@ public:
     ~PyEnsureGilReleased();
 
     static void gilReleaseThreadLoop();
+
+    static void setGilReleaseThreadLoopSleepMicroseconds(int64_t ms);
+
 private:
     bool m_should_reacquire;
 };

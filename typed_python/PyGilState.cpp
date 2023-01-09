@@ -33,6 +33,13 @@ ReleaseableThreadState* waitingPyThreadState = 0;
 int64_t gilReleaseThreadLoopActive = 0;
 
 
+int64_t gilReleaseThreadLoopSleepMicroseconds = 500;
+
+
+void PyEnsureGilReleased::setGilReleaseThreadLoopSleepMicroseconds(int64_t ms) {
+    gilReleaseThreadLoopSleepMicroseconds = ms;
+}
+
 class ReleaseableThreadState {
 public:
     // construct a releasable thread state. We must be
@@ -162,15 +169,37 @@ void PyEnsureGilReleased::gilReleaseThreadLoop() {
     }
 
     while (true) {
-        usleep(500);
+        if (gilReleaseThreadLoopSleepMicroseconds <= 0) {
+            {
+                // indicate that we are not active
+                std::lock_guard<std::mutex> lock(*gilReleaseMutex);
+                gilReleaseThreadLoopActive = 0;
 
-        {
-            std::lock_guard<std::mutex> lock(*gilReleaseMutex);
-            if (waitingPyThreadState) {
-                waitingPyThreadState->release_();
-                waitingPyThreadState = 0;
+                // if anybody is asleep, now's the time to wake them
+                if (waitingPyThreadState) {
+                    waitingPyThreadState->release_();
+                    waitingPyThreadState = 0;
+                }
+            }
+
+            while (gilReleaseThreadLoopSleepMicroseconds <= 0) {
+                usleep(10000);
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(*gilReleaseMutex);
+                gilReleaseThreadLoopActive = 1;
+            }
+        } else {
+            usleep(gilReleaseThreadLoopSleepMicroseconds);
+
+            {
+                std::lock_guard<std::mutex> lock(*gilReleaseMutex);
+                if (waitingPyThreadState) {
+                    waitingPyThreadState->release_();
+                    waitingPyThreadState = 0;
+                }
             }
         }
-
     }
 }

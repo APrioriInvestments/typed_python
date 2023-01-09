@@ -52,7 +52,8 @@ from typed_python._types import (
     deepBytecount, deepcopy, deepcopyContiguous, totalBytesAllocatedInSlabs,
     deepBytecountAndSlabs, Slab,
     totalBytesAllocatedOnFreeStore,
-    ModuleRepresentation
+    ModuleRepresentation,
+    setGilReleaseThreadLoopSleepMicroseconds
 )
 import typed_python._types as _types
 import threading

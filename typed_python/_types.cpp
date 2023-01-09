@@ -3244,11 +3244,26 @@ PyObject *getTypePointer(PyObject* nullValue, PyObject* args) {
 
     return PyLong_FromLong((uint64_t)type);
 }
+
 PyObject* _temporaryReferenceTracerActive(PyObject* null, PyObject* args, PyObject* kwargs) {
     return incref(
         PyTemporaryReferenceTracer::globalTracer.frameToActions.size() ?
         Py_True : Py_False
     );
+}
+
+PyObject* setGilReleaseThreadLoopSleepMicroseconds(PyObject* null, PyObject* args, PyObject* kwargs) {
+    int64_t microseconds;
+
+    static const char *kwlist[] = {"microseconds", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "l", (char**)kwlist, &microseconds)) {
+        return NULL;
+    }
+
+    PyEnsureGilReleased::setGilReleaseThreadLoopSleepMicroseconds(microseconds);
+
+    return incref(Py_None);
 }
 
 PyObject* gilReleaseThreadLoop(PyObject* null, PyObject* args, PyObject* kwargs) {
@@ -3335,6 +3350,7 @@ static PyMethodDef module_methods[] = {
     {"isValidArithmeticConversion", (PyCFunction)isValidArithmeticConversion, METH_VARARGS | METH_KEYWORDS, NULL},
     {"_temporaryReferenceTracerActive", (PyCFunction)_temporaryReferenceTracerActive, METH_VARARGS | METH_KEYWORDS, NULL},
     {"gilReleaseThreadLoop", (PyCFunction)gilReleaseThreadLoop, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"setGilReleaseThreadLoopSleepMicroseconds", (PyCFunction)setGilReleaseThreadLoopSleepMicroseconds, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setModuleDict", (PyCFunction)setModuleDict, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
