@@ -23,9 +23,27 @@ import pytest
 import time
 import psutil
 from math import trunc, floor, ceil
+from typed_python.compiler.type_wrappers.class_wrapper import classCouldBeInstanceOf
 
 
 class TestAlternativeCompilation(unittest.TestCase):
+    def test_could_be_instance_of(self):
+        A = Alternative("A", A=dict(x=int), B=dict(x=int))
+        B = Alternative("A", A=dict(x=int), B=dict(x=int))
+
+        assert classCouldBeInstanceOf(A, Alternative) == True  # noqa
+        assert classCouldBeInstanceOf(Alternative, Alternative) == True  # noqa
+        assert classCouldBeInstanceOf(Alternative, A) == "Maybe"
+
+        assert classCouldBeInstanceOf(A, B) == False  # noqa
+        assert classCouldBeInstanceOf(A.A, B.A) == False  # noqa
+        assert classCouldBeInstanceOf(A, B.A) == False  # noqa
+        assert classCouldBeInstanceOf(A.A, B.A) == False  # noqa
+
+        assert classCouldBeInstanceOf(A, A.A) == "Maybe"
+        assert classCouldBeInstanceOf(A.A, A) == True  # noqa
+        assert classCouldBeInstanceOf(A.A, A.A) == True  # noqa
+
     def test_default_constructor(self):
         @Entrypoint
         def setIt(d, x):

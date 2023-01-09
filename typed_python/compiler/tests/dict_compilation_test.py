@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2023 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Dict, ListOf, Tuple, TupleOf, Entrypoint, OneOf, Set, Int32, UInt32
+from typed_python import Dict, ListOf, Tuple, TupleOf, Entrypoint, OneOf, Set, Int32, UInt32, Alternative
 from typed_python.compiler.type_wrappers.hash_table_implementation import NativeHash
 import typed_python._types as _types
 import unittest
@@ -891,3 +891,16 @@ class TestDictCompilation(unittest.TestCase):
 
         print("object hash of UInt32(70) is ", compiledHash(object, UInt32(70)))
         assert aDict[UInt32(70)] == 60
+
+    def test_dict_of_oneof(self):
+        A = Alternative("A", A=dict())
+        B = Alternative("B", B=dict())
+
+        aDict = Dict(OneOf(A, B), int)()
+
+        @Entrypoint
+        def put(d, k, v):
+            d[k] = v
+
+        put(aDict, B.B(), 10)
+        assert B.B() in aDict

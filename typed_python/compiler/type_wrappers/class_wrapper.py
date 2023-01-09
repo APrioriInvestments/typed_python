@@ -28,7 +28,10 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
     ClassOrAlternativeWrapperMixin
 )
-from typed_python import _types, PointerTo, Int32, Tuple, NamedTuple, bytecount, RefTo, SubclassOf, Class, Value
+from typed_python import (
+    _types, PointerTo, Int32, Tuple, NamedTuple, bytecount, RefTo, SubclassOf,
+    Class, Value, Alternative
+)
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -88,35 +91,59 @@ def classCouldBeInstanceOf(cls, other):
 
 
 def _classCouldBeInstanceOf(cls, other):
-    assert issubclass(cls, Class) or cls is Class, cls
-    assert issubclass(other, Class) or other is Class, other
+    if issubclass(cls, Alternative):
+        if not issubclass(other, Alternative):
+            return False
 
-    if other is Class:
-        return True
+        if other is Alternative:
+            return True
 
-    if cls is Class:
-        return "Maybe"
+        if cls is Alternative:
+            return "Maybe"
 
-    if other in cls.MRO:
-        return True
+        if cls is other:
+            return True
 
-    elif cls in other.MRO:
-        return "Maybe"
+        if cls.__typed_python_category__ == 'ConcreteAlternative':
+            return issubclass(cls, other)
 
-    # the only way we could be a subclass of the other is if there is a common subclass
-    # of both of us.
-    if cls.IsFinal or other.IsFinal:
-        # if we're final, and this is not a parent of us, we are not one of it
+        if other.__typed_python_category__ == 'ConcreteAlternative':
+            if issubclass(other, cls):
+                return "Maybe"
+            return False
+
         return False
 
-    # if both classes have physical members, then there cannot be a common subclass
-    if len(cls.MemberNames) and len(other.MemberNames):
-        return False
+    if issubclass(cls, Class):
+        if not issubclass(other, Class):
+            return False
 
-    for name in set(cls.ClassMembers) & set(other.ClassMembers):
-        if name not in ['__qualname__', '__name__', '__module__', '__typed_python_template__', '__classcell__']:
-            if cls.ClassMembers[name] is not other.ClassMembers[name]:
-                return False
+        if other is Class:
+            return True
+
+        if cls is Class:
+            return "Maybe"
+
+        if other in cls.MRO:
+            return True
+
+        elif cls in other.MRO:
+            return "Maybe"
+
+        # the only way we could be a subclass of the other is if there is a common subclass
+        # of both of us.
+        if cls.IsFinal or other.IsFinal:
+            # if we're final, and this is not a parent of us, we are not one of it
+            return False
+
+        # if both classes have physical members, then there cannot be a common subclass
+        if len(cls.MemberNames) and len(other.MemberNames):
+            return False
+
+        for name in set(cls.ClassMembers) & set(other.ClassMembers):
+            if name not in ['__qualname__', '__name__', '__module__', '__typed_python_template__', '__classcell__']:
+                if cls.ClassMembers[name] is not other.ClassMembers[name]:
+                    return False
 
     return "Maybe"
 

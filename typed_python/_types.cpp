@@ -117,13 +117,14 @@ PyObject *MakeSubclassOfType(PyObject* nullValue, PyObject* args) {
     }
 
     // types that can't be subclassed just produce values
-    if (!t->isClass() || ((Class*)t)->isFinal()) {
-        return MakeValueType(nullValue, args);
+    if ((t->isClass() && !((Class*)t)->isFinal()) ||
+            (t->isAlternative() && !((Class*)t)->isConcreteAlternative())) {
+        return translateExceptionToPyObject([&]{
+            return incref((PyObject*)PyInstance::typeObj(SubclassOfType::Make(t)));
+        });
     }
 
-    return translateExceptionToPyObject([&]{
-        return incref((PyObject*)PyInstance::typeObj(SubclassOfType::Make(t)));
-    });
+    return MakeValueType(nullValue, args);
 }
 
 PyObject *MakeTypedCellType(PyObject* nullValue, PyObject* args) {

@@ -26,6 +26,10 @@ from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin impo
 )
 import typed_python.compiler.native_ast as native_ast
 
+
+from typed_python import SubclassOf
+
+
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
 
@@ -89,6 +93,30 @@ class AlternativeWrapperMixin(ClassOrAlternativeWrapperMixin):
 
         return funcType.convert_call(context, None, (instance,) + tuple(args), kwargs)
 
+    def convert_typeof(self, context, instance):
+        # the common 'convert_typeof' for all Alternatives simply calls
+        # the 'concrete_typeof_X' function which we expect subclasses to
+        # implement
+        assert (
+            typeWrapper(SubclassOf(self.typeRepresentation))
+            .getNativeLayoutType().matches.Pointer
+        )
+
+        return context.push(
+            typeWrapper(SubclassOf(self.typeRepresentation)),
+            lambda outPtr:
+            outPtr.expr.store(
+                context.converter.defineNativeFunction(
+                    "concrete_typeof_" + str(self.typeRepresentation),
+                    ('concrete_typeof', self),
+                    [self],
+                    typeWrapper(SubclassOf(self.typeRepresentation)),
+                    self.generateNativeConcreteTypeof
+                )
+                .call(instance)
+            )
+        )
+
 
 class SimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
     """Wrapper around alternatives with all empty arguments."""
@@ -145,6 +173,26 @@ class SimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
 
         return super().convert_attribute(context, instance, attribute)
 
+    def generateNativeConcreteTypeof(self, context, out, instance):
+        alternatives = self.typeRepresentation.__typed_python_alternatives__
+
+        # out comes in as 'None' here - we're supposed to return
+        assert out is None
+
+        with context.switch(
+            instance.nonref_expr,
+            list(range(len(alternatives))),
+            False
+        ) as indicesAndContexts:
+            for ix, subcontext in indicesAndContexts:
+                with subcontext:
+                    context.pushReturnValue(
+                        context.pushPod(
+                            SubclassOf(self.typeRepresentation),
+                            context.getTypePointer(alternatives[ix]),
+                        )
+                    )
+
 
 class ConcreteSimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
     """Wrapper around alternatives with all empty arguments, after choosing a specific alternative."""
@@ -198,6 +246,9 @@ class ConcreteSimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
             return instance.changeType(methodType)
 
         return super().convert_attribute(context, instance, attribute)
+
+    def convert_typeof(self, context, instance):
+        return context.constant(self.typeRepresentation)
 
 
 class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
@@ -322,6 +373,25 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
             return context.push(self, lambda x: x.convert_default_initialize())
 
         return super().convert_type_call(context, typeInst, args, kwargs)
+
+    def generateNativeConcreteTypeof(self, context, out, instance):
+        alternatives = self.typeRepresentation.__typed_python_alternatives__
+
+        assert out is None
+
+        with context.switch(
+            instance.nonref_expr.ElementPtrIntegers(0, 1).load(),
+            list(range(len(alternatives))),
+            False
+        ) as indicesAndContexts:
+            for ix, subcontext in indicesAndContexts:
+                with subcontext:
+                    context.pushReturnValue(
+                        context.pushPod(
+                            SubclassOf(self.typeRepresentation),
+                            context.getTypePointer(alternatives[ix]),
+                        )
+                    )
 
 
 class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
@@ -451,6 +521,9 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
 
     def convert_check_matches(self, context, instance, typename):
         return context.constant(typename == self.typeRepresentation.Name)
+
+    def convert_typeof(self, context, instance):
+        return context.constant(self.typeRepresentation)
 
 
 class AlternativeMatcherWrapper(Wrapper):
