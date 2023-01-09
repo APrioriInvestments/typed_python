@@ -1530,6 +1530,14 @@ public:
         endOfConstructorInitialization(); // finish initializing the type object.
     }
 
+    std::string moduleNameConcrete() {
+        if (mModulename.size() == 0) {
+            return "builtins";
+        }
+
+        return mModulename;
+    }
+
     std::string nameWithModuleConcrete() {
         if (mModulename.size() == 0) {
             return mRootName;

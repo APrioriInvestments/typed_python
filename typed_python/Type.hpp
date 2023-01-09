@@ -304,6 +304,16 @@ public:
         return m_name;
     }
 
+    std::string moduleName() {
+        return this->check([&](auto& subtype) {
+            return subtype.moduleNameConcrete();
+        });
+    }
+
+    std::string moduleNameConcrete() {
+        return "builtins";
+    }
+
     std::string nameWithModule() {
         return this->check([&](auto& subtype) {
             return subtype.nameWithModuleConcrete();

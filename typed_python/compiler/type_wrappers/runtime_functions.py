@@ -112,6 +112,9 @@ compileClassDestructor = externalCallTarget("np_compileClassDestructor", Void, V
 classObjectDowncast = externalCallTarget(
     "np_classObjectDowncast", Bool, Void.pointer(), Void.pointer(), Void.pointer()
 )
+typePtrToName = externalCallTarget("np_typePtrToName", Void.pointer(), Void.pointer())
+typePtrToQualName = externalCallTarget("np_typePtrToQualName", Void.pointer(), Void.pointer())
+typePtrToModule = externalCallTarget("np_typePtrToModule", Void.pointer(), Void.pointer())
 
 free = externalCallTarget("tp_free", Void, UInt8Ptr)
 malloc = externalCallTarget("tp_malloc", UInt8Ptr, Int64)

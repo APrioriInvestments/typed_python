@@ -1293,6 +1293,24 @@ void StringType::decodeUtf8To(uint8_t* target, uint8_t* utf8Str, int64_t bytes_p
     }
 }
 
+StringType::layout* StringType::createFromString(std::string s) {
+    if (!s.size()) {
+        return nullptr;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + s.size();
+
+    layout* new_layout = (layout*)tp_malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = 1;
+    new_layout->pointcount = s.size();
+
+    memcpy(new_layout->data, s.c_str(), s.size());
+
+    return new_layout;
+}
+
 StringType::layout* StringType::createFromUtf8(const char* utfEncodedString, int64_t length) {
     if (!length) {
         return nullptr;

@@ -39,6 +39,10 @@ public:
         return m_alternative->moduleName() + "." + m_name;
     }
 
+    std::string moduleNameConcrete() {
+        return m_alternative->moduleName();
+    }
+
     void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,

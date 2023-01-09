@@ -35,3 +35,30 @@ def test_type_of_concrete_alternative_is_specific():
             return type(x)
 
         assert typeOfArg(A.A()) is A.A
+
+
+def test_type_name():
+    A = Alternative("A", X=dict(x=int), Y=dict(y=int))
+
+    class C(Class):
+        pass
+
+    class B(C):
+        pass
+
+    @Entrypoint
+    def typenameOfAInst(a: A):
+        return type(a).__name__
+
+    assert typenameOfAInst(A.X()) == 'X'
+    assert typenameOfAInst(A.Y()) == 'Y'
+    assert typenameOfAInst.resultTypeFor(A.X).typeRepresentation is str
+
+    @Entrypoint
+    def typenameOfCInst(c: C):
+        return type(c).__name__
+
+    assert typenameOfCInst(C()) == 'C'
+    assert typenameOfCInst(B()) == 'B'
+    assert typenameOfAInst.resultTypeFor(A.X).typeRepresentation is str
+

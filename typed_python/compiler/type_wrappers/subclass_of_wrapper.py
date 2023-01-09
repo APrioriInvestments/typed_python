@@ -217,21 +217,40 @@ class SubclassOfWrapper(Wrapper):
         return pythonObjectRepresentation(context, type)
 
     def convert_attribute(self, context, instance, attribute):
-        if attribute in self.typeRepresentation.Type.ClassMembers:
-            return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
-                context,
-                self.typeRepresentation.Type.ClassMembers[attribute]
-            )
+        if issubclass(self.typeRepresentation.Type, Class):
+            if attribute in self.typeRepresentation.Type.ClassMembers:
+                return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
+                    context,
+                    self.typeRepresentation.Type.ClassMembers[attribute]
+                )
 
-        if (
-            attribute in self.typeRepresentation.Type.StaticMemberFunctions
-            or attribute in self.typeRepresentation.Type.ClassMemberFunctions
-        ):
-            methodType = BoundMethodWrapper(
-                typed_python._types.BoundMethod(self.typeRepresentation, attribute)
-            )
+            if (
+                attribute in self.typeRepresentation.Type.StaticMemberFunctions
+                or attribute in self.typeRepresentation.Type.ClassMemberFunctions
+            ):
+                methodType = BoundMethodWrapper(
+                    typed_python._types.BoundMethod(self.typeRepresentation, attribute)
+                )
 
-            return instance.changeType(methodType)
+                return instance.changeType(methodType)
+
+        if attribute in ('__name__', '__qualname__', '__module__'):
+            if attribute == '__name__':
+                method = runtime_functions.typePtrToName
+            elif attribute == '__qualname__':
+                method = runtime_functions.typePtrToQualName
+            elif attribute == '__module__':
+                method = runtime_functions.typePtrToModule
+            else:
+                assert False
+
+            return context.push(
+                str,
+                lambda strRef: strRef.expr.store(
+                    method.call(instance.nonref_expr)
+                    .cast(typeWrapper(str).layoutType)
+                ),
+            )
 
         return instance.toPyObj().convert_attribute(attribute)
 

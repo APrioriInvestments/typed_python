@@ -467,6 +467,19 @@ extern "C" {
         return Class::cmpStatic(tp, lhs, rhs, pyComparisonOp);
     }
 
+    StringType::layout* np_typePtrToName(Type* t) {
+        return StringType::createFromString(t->name(true));
+    }
+
+    StringType::layout* np_typePtrToQualName(Type* t) {
+        return StringType::createFromString(t->nameWithModule());
+    }
+
+    StringType::layout* np_typePtrToModule(Type* t) {
+        return StringType::createFromString(t->moduleName());
+    }
+
+
     StringType::layout* nativepython_runtime_string_concat(StringType::layout* lhs, StringType::layout* rhs) {
         return StringType::concatenate(lhs, rhs);
     }

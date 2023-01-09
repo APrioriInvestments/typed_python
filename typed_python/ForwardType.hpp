@@ -40,6 +40,14 @@ public:
         // deliberately don't invoke 'endOfConstructorInitialization'
     }
 
+    std::string moduleNameConcrete() {
+        if (mTarget) {
+            return mTarget->moduleNameConcrete();
+        }
+
+        return "<unresolved>";
+    }
+
     std::string nameWithModuleConcrete() {
         if (mTarget) {
             return mTarget->nameWithModule();

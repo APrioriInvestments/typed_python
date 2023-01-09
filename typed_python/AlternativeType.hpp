@@ -126,6 +126,14 @@ public:
         return m_moduleName + "." + m_name;
     }
 
+    std::string moduleNameConcrete() {
+        if (m_moduleName.size() == 0) {
+            return "builtins";
+        }
+
+        return m_moduleName;
+    }
+
     bool hasGetAttributeMagicMethod() const {
         return m_hasGetAttributeMagicMethod;
     }
@@ -327,10 +335,6 @@ public:
     }
 
     Type* concreteSubtype(size_t which);
-
-    std::string moduleName() const {
-        return m_moduleName;
-    }
 
 private:
     //name of the module in which this Alternative was defined.
