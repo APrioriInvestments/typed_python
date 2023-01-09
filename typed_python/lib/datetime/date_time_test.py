@@ -310,15 +310,13 @@ def test_nyc_since_1902():
 def test_nyc_vs_chi():
     ts_chi = CHI.timestamp(DateTime(2019, 7, 2, 8, 30, 0))
     ts_nyc = NYC.timestamp(DateTime(2019, 7, 2, 8, 30, 0))
-    assert ts_nyc - ts_chi  == -3600
+    assert ts_nyc - ts_chi == -3600
 
 
 def test_Date_methods():
     assert Date(1970, 1, 1).daysSinceEpoch() == 0
     assert Date(1970, 1, 2).daysSinceEpoch() == 1
-    assert Date(1970, 1, 1) - Date(1970, 1,2) == -1
-    assert Date(2000, 12, 31).dayOfYear() == 366 # leap year
+    assert Date(1970, 1, 1) - Date(1970, 1, 2) == -1
+    assert Date(2000, 12, 31).dayOfYear() == 366  # leap year
     assert Date(2000, 12, 31).nextMonthStart() == Date(2001, 1, 1)
     assert Date(2000, 12, 30).nextMonthStart() == Date(2001, 1, 1)
-
-

@@ -78,9 +78,8 @@ from typed_python.generator import Generator  # noqa
 from typed_python.lib.map import map  # noqa
 from typed_python.lib.pmap import pmap  # noqa
 from typed_python.lib.reduce import reduce  # noqa
-
-from typed_python.lib.timestamp import Timestamp, UTC, NYC
-from typed_python.lib.datetime.date_time import UTC, NYC
+from typed_python.lib.timestamp import Timestamp # noqa
+from typed_python.lib.datetime.date_time import UTC, NYC # noqa
 
 _types.initializeGlobalStatics()
 

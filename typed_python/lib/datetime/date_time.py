@@ -198,6 +198,7 @@ class Date(Class, Final):
     def firstOfMonth(self):
         return Date(self.year, self.month, 1)
 
+
 @Held
 class DateTime(Class, Final):
     """Models a naive, timezone-unaware date and time in the Gregorian calendar.
@@ -806,6 +807,7 @@ CHI = UsTimezone(-6, -5)()
 UTC = FixedOffsetTimezone(offset_hours=0)
 EST = FixedOffsetTimezone(offset_hours=-5)
 IST = FixedOffsetTimezone(offset_hours=2)
+
 
 class TimezoneChecker(Class, Final):
     TIMEZONES = ConstDict(str, Timezone)(
