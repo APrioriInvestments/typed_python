@@ -9,6 +9,7 @@ from typed_python.lib.datetime.date_time import (
     FixedOffsetTimezone,
     EST,
     NYC,
+    CHI,
     UTC,
     last_weekday_of_month,
     DaylightSavingsTimezone,
@@ -304,3 +305,9 @@ def test_nyc_since_1902():
                         continue
 
             raise
+
+
+def test_nyc_vs_chi():
+    ts_chi = CHI.timestamp(DateTime(2019, 7, 2, 8, 30, 0))
+    ts_nyc = NYC.timestamp(DateTime(2019, 7, 2, 8, 30, 0))
+    assert ts_nyc - ts_chi  == -3600

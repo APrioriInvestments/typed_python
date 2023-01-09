@@ -506,6 +506,8 @@ class SwitchOffsetTimezone(TimeZone, Final):
 @TypeFunction
 def UsTimeZone(st_offset_hours, dst_offset_hours):
     class UsTimeZone_(TimeZone, Final):
+        st_offset = st_offset_hours
+        dst_offset = dst_offset_hours
         TIMEZONES_BY_START_YEAR = ConstDict(int, TimeZone)(
             {
                 2007: DaylightSavingsTimezone(
@@ -634,7 +636,6 @@ CHI = UsTimeZone(-6, -5)()
 UTC = FixedOffsetTimezone(offset_hours=0)
 EST = FixedOffsetTimezone(offset_hours=-5)
 IST = FixedOffsetTimezone(offset_hours=2)
-
 
 class TimeZoneChecker(Class, Final):
     TIMEZONES = ConstDict(str, TimeZone)(
