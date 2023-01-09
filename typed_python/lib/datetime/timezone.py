@@ -33,6 +33,7 @@ class FixedOffset(Offset, Final):
     def get_offset(self, _: int) -> int:
         return self.offset
 
+
 # Would like to give RelativeOffset* better names but...
 #    1) RelativeOffset_BS_BM_CA_MX_US.... is clunky
 #    2) can't easily name start/end of dst, because other regions have same start dates but different times
@@ -99,50 +100,52 @@ class Timezone(Class, Final):
 
     UTC = FixedOffset(offset=0)
 
-    TZ_STR_TO_OFFSET = Dict(str, Offset)({
-        '': UTC,
-        '+0000': UTC,
-        'cdt': CDT,
-        'cst': CST,
-        'ct': CT,
-        'edt': EDT,
-        'est': EST,
-        'et': ET,
-        'gmt': UTC,
-        'mdt': MDT,
-        'mst': MST,
-        'mt': MT,
-        'nyc': ET,
-        'pdt': PDT,
-        'pst': PST,
-        'pt': PT,
-        'utc': UTC,
-        'z': UTC,
-    })
+    TZ_STR_TO_OFFSET = Dict(str, Offset)(
+        {
+            "": UTC,
+            "+0000": UTC,
+            "cdt": CDT,
+            "cst": CST,
+            "ct": CT,
+            "edt": EDT,
+            "est": EST,
+            "et": ET,
+            "gmt": UTC,
+            "mdt": MDT,
+            "mst": MST,
+            "mt": MT,
+            "nyc": ET,
+            "pdt": PDT,
+            "pst": PST,
+            "pt": PT,
+            "utc": UTC,
+            "z": UTC,
+        }
+    )
 
     @Entrypoint
     @staticmethod
     def tz_str_to_utc_offset(tz_str: str, unixtime: int) -> int:
-        '''
+        """
         Get utc offset by timezone abbreviation
           Parameters:
             tz_abbr(string): a timezone indicator. examples: 'ET', 'EST', 'NYC'
           Returns:
             (int): The utc offset in seconds
-        '''
+        """
         return Timezone.TZ_STR_TO_OFFSET[tz_str.lower()].get_offset(unixtime)
 
     @Entrypoint
     @staticmethod
-    def ts_to_utc(ts: float, tz_str: str = '') -> float:
-        '''
+    def ts_to_utc(ts: float, tz_str: str = "") -> float:
+        """
         Converts a timestamp to its equivalent in UTC
           Parameters:
             ts (float): A unix timetamp
             tz_str(str): A timezone abbreviation (e.g. est, edt, nyc) or an ISO 8601 timezone offset (e.g. +0000 or -0101)
           Returns:
             (int): The utc offset in seconds
-        '''
+        """
         tz_str = tz_str.lower()
 
         if tz_str in Timezone.TZ_STR_TO_OFFSET:
@@ -153,22 +156,22 @@ class Timezone(Class, Final):
     @Entrypoint
     @staticmethod
     def is_valid_tz_string(tz_str: str):
-        '''
+        """
         Tests if a string represents a supported tz
-        '''
+        """
         return tz_str.lower() in Timezone.TZ_STR_TO_OFFSET
 
     @Entrypoint
     @staticmethod
     def is_valid_tz_offset(hour: int, min: int, second: float = 0.0) -> bool:
-        '''
+        """
         Tests if an hour,min combination is a valid offset from UTC
         Parameters:
           hour(int): The hour
           min(int): The minute
         Returns:
           True if the inputs are in the range UTC-12:00 to UTC+14
-        '''
+        """
         if hour > 14 or hour < -12:
             return False
 
@@ -183,15 +186,15 @@ class Timezone(Class, Final):
     @Entrypoint
     @staticmethod
     def parse_tz_offset(offset: str) -> int:
-        '''
+        """
         Converts a set of tokens representing a timezone offset to seconds.
         Parameters:
             tokens (ListOf(str)): A set of string tokens representing a timezone. E.g. ['Z'] or ['+', '02', ':', '23']
         Returns:
             (int): The offset in seconds
-        '''
+        """
 
-        if offset[0] != '+' and offset[0] != '-':
+        if offset[0] != "+" and offset[0] != "-":
             raise ValueError("tz offset must begin with '+' or '-'", offset)
 
         sign = offset[0]
@@ -207,9 +210,13 @@ class Timezone(Class, Final):
         elif len(value) >= 6:
             hour, min, second = int(value[:2]), int(value[2:4]), float(value[6:])
 
-        hour = hour * -1 if sign == '-' else hour
+        hour = hour * -1 if sign == "-" else hour
 
         if Timezone.is_valid_tz_offset(hour, min, second):
-            return hour * 3600 + (min * 60 if hour > 0 else min * -60) + (second if hour > 0 else second * -1)
+            return (
+                hour * 3600
+                + (min * 60 if hour > 0 else min * -60)
+                + (second if hour > 0 else second * -1)
+            )
         else:
-            raise ValueError('Invalid tz offset: ')
+            raise ValueError("Invalid tz offset: ")

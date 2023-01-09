@@ -83,7 +83,7 @@ def parseTimestamps(strings: ListOf(str)):
 def parseDatetimes(strings: ListOf(str)):
     res = ListOf(datetime)()
     for string in strings:
-        res.append(datetime.strptime(string, '%Y-%m-%dT%H:%M:%S'))
+        res.append(datetime.strptime(string, "%Y-%m-%dT%H:%M:%S"))
     return res
 
 
@@ -91,7 +91,7 @@ def parseDatetimes(strings: ListOf(str)):
 def formatTimestamps(timestamps: ListOf(Timestamp)):
     res = ListOf(str)()
     for timestamp in timestamps:
-        res.append(timestamp.format(format='%Y-%m-%d'))
+        res.append(timestamp.format(format="%Y-%m-%d"))
 
     return res
 
@@ -100,7 +100,7 @@ def formatTimestamps(timestamps: ListOf(Timestamp)):
 def formatDatetimes(datetimes: ListOf(datetime)):
     res = ListOf(str)()
     for dt in datetimes:
-        res.append(dt.strftime('%Y-%m-%d'))
+        res.append(dt.strftime("%Y-%m-%d"))
     return res
 
 
@@ -119,32 +119,32 @@ class TestTimestamp(unittest.TestCase):
         Timestamp.from_date(2022, 10)
 
         # create timestamp from iso 8601 date string
-        Timestamp.parse('2022-10-22T06:39')
+        Timestamp.parse("2022-10-22T06:39")
 
         # create timestamp from iso8601ish string (space instead of T separator)
-        Timestamp.parse('2022-10-22 06:39')
+        Timestamp.parse("2022-10-22 06:39")
 
         # create timestamp from non iso date string
-        Timestamp.parse('Oct 22, 2022 06:39')
+        Timestamp.parse("Oct 22, 2022 06:39")
 
         # with relative tz (offset changes with dst)
-        Timestamp.parse('2022-10-22T06:39NYC')
+        Timestamp.parse("2022-10-22T06:39NYC")
 
         # with relative tz (offset changes with dst)
-        Timestamp.parse('2022-10-22T06:39ET')
+        Timestamp.parse("2022-10-22T06:39ET")
 
         # with fixed offset tz
-        Timestamp.parse('2022-10-22T06:39UTC')
+        Timestamp.parse("2022-10-22T06:39UTC")
 
         # with fixed offset tz
-        Timestamp.parse('2022-10-22T06:39EST')
+        Timestamp.parse("2022-10-22T06:39EST")
 
         # with fixed offset tz
-        Timestamp.parse('2022-10-22T06:39EDT')
+        Timestamp.parse("2022-10-22T06:39EDT")
 
         # get date string from timestamp as YYYY-MM-DD
         ts = Timestamp.make(time.time())
-        ts.format(format='%Y-%m-%d')
+        ts.format(format="%Y-%m-%d")
 
     def test_eq(self):
         # The following commented block of code sometimes unexpectedly errors with something like
@@ -160,6 +160,7 @@ class TestTimestamp(unittest.TestCase):
         @Entrypoint
         def inner():
             assert Timestamp.make(2) == Timestamp.make(2)
+
         inner()
 
     def test_ge(self):
@@ -177,6 +178,7 @@ class TestTimestamp(unittest.TestCase):
             ts3 = Timestamp.make(unixtime - 1)
             assert ts1 >= ts2
             assert ts1 >= ts3
+
         inner()
 
     def test_gt(self):
@@ -195,6 +197,7 @@ class TestTimestamp(unittest.TestCase):
             ts3 = Timestamp.make(unixtime + 1)
             assert ts1 <= ts2
             assert ts1 <= ts3
+
         inner()
 
     def test_lt(self):
@@ -233,7 +236,7 @@ class TestTimestamp(unittest.TestCase):
         unixtime = time.time()
         timestamp = Timestamp.make(unixtime + time.localtime().tm_gmtoff)
         dt = datetime.fromtimestamp(unixtime)
-        assert dt.isoformat(timespec='seconds').replace('T', ' ') == timestamp.format()
+        assert dt.isoformat(timespec="seconds").replace("T", " ") == timestamp.format()
 
     def test_format(self):
         # Just a superficial test. format proxies to  DateFormatter.format
@@ -241,18 +244,22 @@ class TestTimestamp(unittest.TestCase):
         unixtime = time.time()
         timestamp = Timestamp.make(unixtime + time.localtime().tm_gmtoff)
         dt = datetime.fromtimestamp(unixtime)
-        assert dt.isoformat(timespec='seconds') == timestamp.format(format="%Y-%m-%dT%H:%M:%S")
+        assert dt.isoformat(timespec="seconds") == timestamp.format(
+            format="%Y-%m-%dT%H:%M:%S"
+        )
 
     def test_from_date(self):
         unixtime = time.time()
         dt_tuple = datetime.fromtimestamp(unixtime, tz=timezone.utc).timetuple()
 
-        timestamp = Timestamp.from_date(year=dt_tuple.tm_year,
-                                        month=dt_tuple.tm_mon,
-                                        day=dt_tuple.tm_mday,
-                                        hour=dt_tuple.tm_hour,
-                                        minute=dt_tuple.tm_min,
-                                        second=dt_tuple.tm_sec)
+        timestamp = Timestamp.from_date(
+            year=dt_tuple.tm_year,
+            month=dt_tuple.tm_mon,
+            day=dt_tuple.tm_mday,
+            hour=dt_tuple.tm_hour,
+            minute=dt_tuple.tm_min,
+            second=dt_tuple.tm_sec,
+        )
         assert int(unixtime) == int(timestamp)
 
     def test_parse(self):
@@ -262,7 +269,7 @@ class TestTimestamp(unittest.TestCase):
         date_str = f"{dt.tm_year}-{dt.tm_mon:02d}-{dt.tm_mday:02d} {dt.tm_hour:02d}:{dt.tm_min:02d}:{dt.tm_sec:02d}"
         parsed_timestamp = Timestamp.parse(date_str)
 
-        assert ((int(timestamp) == int(parsed_timestamp)))
+        assert int(timestamp) == int(parsed_timestamp)
 
     def test_compare_timestamp_datetime_from_unixtime(self):
         runs = 10000000
@@ -279,8 +286,15 @@ class TestTimestamp(unittest.TestCase):
 
         speedup = dtTime / tsTime
 
-        print('Timestamp.make (' + str(tsTime) + ') is ' + str(speedup) +
-              ' faster than datetime.fromtimestamp (' + str(dtTime) + ')')
+        print(
+            "Timestamp.make ("
+            + str(tsTime)
+            + ") is "
+            + str(speedup)
+            + " faster than datetime.fromtimestamp ("
+            + str(dtTime)
+            + ")"
+        )
 
         # assert speedup > 30 and speedup < 40, speedup
 
@@ -289,7 +303,7 @@ class TestTimestamp(unittest.TestCase):
         date_strings = make_list_of_iso_datestrings(runs)
 
         with PrintNewFunctionVisitor():
-            Timestamp.parse('1997')
+            Timestamp.parse("1997")
 
         start = time.time()
         parseTimestamps(date_strings)
@@ -301,13 +315,21 @@ class TestTimestamp(unittest.TestCase):
 
         if dtTime > tsTime:
             speedup = dtTime / tsTime
-            compare = 'x faster'
+            compare = "x faster"
         else:
             speedup = tsTime / dtTime
-            compare = 'x slower'
+            compare = "x slower"
 
-        print('Timestamp.parse (' + str(tsTime) + ') is ' +
-              str("{:.2f}".format(speedup)) + compare + ' than datetime.strptime (' + str(dtTime) + ')')
+        print(
+            "Timestamp.parse ("
+            + str(tsTime)
+            + ") is "
+            + str("{:.2f}".format(speedup))
+            + compare
+            + " than datetime.strptime ("
+            + str(dtTime)
+            + ")"
+        )
         # assert speedup > 7 and speedup < 8
 
     def test_compare_timestamp_datetime_format(self):
@@ -317,7 +339,7 @@ class TestTimestamp(unittest.TestCase):
 
         with PrintNewFunctionVisitor():
             ts = Timestamp.make(2)
-            ts.format(format='%Y-%m-%d')
+            ts.format(format="%Y-%m-%d")
 
         start = time.time()
         formatTimestamps(timestamps)
@@ -329,12 +351,20 @@ class TestTimestamp(unittest.TestCase):
 
         if dtTime > tsTime:
             speedup = dtTime / tsTime
-            compare = 'x faster'
+            compare = "x faster"
         else:
             speedup = tsTime / dtTime
-            compare = 'x slower'
+            compare = "x slower"
 
-        print('Timestamp.format (' + str(tsTime) + ') is ' +
-              str("{:.2f}".format(speedup)) + compare + ' than datetime.strformat (' + str(dtTime) + ')')
+        print(
+            "Timestamp.format ("
+            + str(tsTime)
+            + ") is "
+            + str("{:.2f}".format(speedup))
+            + compare
+            + " than datetime.strformat ("
+            + str(dtTime)
+            + ")"
+        )
 
         assert dtTime > tsTime and (speedup > 2 and speedup <= 4)
