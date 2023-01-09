@@ -79,6 +79,9 @@ from typed_python.lib.map import map  # noqa
 from typed_python.lib.pmap import pmap  # noqa
 from typed_python.lib.reduce import reduce  # noqa
 
+from typed_python.lib.timestamp import Timestamp, UTC, NYC
+from typed_python.lib.datetime.date_time import UTC, NYC
+
 _types.initializeGlobalStatics()
 
 # start a background thread to release the GIL for us. Instead of immediately releasing the GIL,

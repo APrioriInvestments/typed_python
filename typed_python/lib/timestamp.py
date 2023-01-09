@@ -18,7 +18,7 @@ from typed_python import Class, Final, Member, Held
 from typed_python.lib.datetime.date_parser import DateParser
 from typed_python.lib.datetime.date_formatter import DateFormatter
 from typed_python.lib.datetime.chrono import Chrono
-from typed_python.lib.datetime.date_time import TimeZone, UTC, NYC
+from typed_python.lib.datetime.date_time import UTC, NYC, Timezone
 
 
 @Held
@@ -93,7 +93,7 @@ class Timestamp(Class, Final):
 
     @Entrypoint
     @staticmethod
-    def parse(date_str: str, timezone: TimeZone):  # noqa: F811
+    def parse(date_str: str, timezone: Timezone):  # noqa: F811
         return Timestamp(ts=DateParser.parse_with_timezone(date_str, timezone))
 
     @Entrypoint
@@ -107,7 +107,7 @@ class Timestamp(Class, Final):
         return Timestamp(ts=DateParser.parse(date_str))
 
     @Entrypoint
-    def format(self, timezone: TimeZone = UTC, format: str = "%Y-%m-%d %H:%M:%S") -> str:
+    def format(self, timezone: Timezone = UTC, format: str = "%Y-%m-%d %H:%M:%S") -> str:
         """
         Converts a Timestamp to a string in a given format
         Parameters:
@@ -123,11 +123,11 @@ class Timestamp(Class, Final):
         return DateFormatter.format(self.ts, NYC, format)
 
     @Entrypoint
-    def weekday(self, timezone: TimeZone) -> int:
+    def weekday(self, timezone: Timezone) -> int:
         return timezone.datetime(self.ts).date.weekday()
 
     @Entrypoint
-    def dayOfYear(self, timezone: TimeZone) -> int:
+    def dayOfYear(self, timezone: Timezone) -> int:
         return timezone.datetime(self.ts).date.dayOfYear()
 
     @Entrypoint

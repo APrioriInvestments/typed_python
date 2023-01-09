@@ -12,6 +12,8 @@ class OneFoldOnlyError(Exception):
 
 @Held
 class TimeOfDay(Class, Final):
+    """ Models a naive, timezone-unaware time of day."""
+
     hour = Member(int)
     minute = Member(int)
     second = Member(float)
@@ -24,6 +26,16 @@ class TimeOfDay(Class, Final):
 
     @Entrypoint
     def secondsSinceMidnight(self) -> float:
+        """Returns the number of seconds that have elapsed since midnight.
+
+        Does not account for timezone offset switches, e.g., during daylight
+        savings time.
+
+        Returns
+        -------
+        float
+
+        """
         return self.second + self.minute * 60 + self.hour * 3600
 
     @Entrypoint
@@ -63,6 +75,12 @@ class TimeOfDay(Class, Final):
 
 @Held
 class Date(Class, Final):
+    """Models a date in the Gregorian calendar.
+
+    For example, December 22, 1975 would be constructed
+    as `Date(1975, 12, 22)`
+    """
+
     year = Member(int)
     month = Member(int)
     day = Member(int)
@@ -105,24 +123,48 @@ class Date(Class, Final):
 
     @Entrypoint
     def __sub__(self, other) -> int:
+        """Returns the number of days separating `self` from `other`.
+
+        Parameters
+        ----------
+        other : Date
+
+        Returns
+        -------
+        int - the number of days separating `self` from `other`.
+            Negative if `other` comes after `self`.
+
+        """
         return self.daysSinceEpoch() - other.daysSinceEpoch()
 
     @Entrypoint
-    def daysSinceEpoch(self):
+    def daysSinceEpoch(self) -> int:
+        """Returns the number of days since 1970 January 1."""
         return Chrono.days_from_civil(self.year, self.month, self.day)
 
     @Entrypoint
-    def weekday(self):
-        """Returns an integer: 0 for Monday, 1 for Tuesday, ..., 6 for Sunday"""
+    def weekday(self) -> int:
+        """Returns an integer [0, 6] indicating the day of the week.
+        0 => Sunday
+        1 => Monday
+        2 => Tuesday
+        3 => Wednesday
+        4 => Thursday
+        6 => Friday
+        """
         daysSinceEpoch = self.daysSinceEpoch()
         return Chrono.weekday_from_days(daysSinceEpoch)
 
     @Entrypoint
-    def dayOfYear(self):
+    def dayOfYear(self) -> int:
+        """Returns an integer [1, 366] indicating the day of the year..
+        """
         return Chrono.day_of_year(self.year, self.month, self.day)
 
     @Entrypoint
     def nextMonthStart(self):
+        """Returns a Date indicating when the following month begins..
+        """
         if self.month == 12:
             year = self.year + 1
             month = 1
@@ -134,28 +176,33 @@ class Date(Class, Final):
 
     @Entrypoint
     def lastDayOfMonth(self):
+        """Returns the last Date of the month of `self`.
+        """
         return Date.fromDaysSinceEpoch(self.nextMonthStart().daysSinceEpoch() - 1)
 
     @Entrypoint
     @staticmethod
     def fromDaysSinceEpoch(daysSinceEpoch):
+        """Returns a Date from the number of days that have elapsed since
+        1970 January 1."""
         dt = Chrono.civil_from_days(daysSinceEpoch)
         return Date(dt.year, dt.month, dt.day)
 
     @Entrypoint
-    def daysInMonth(self):
+    def daysInMonth(self) -> int:
+        """Returns the number of days in the month.
+        """
         return self.lastDayOfMonth() - Date(self.year, self.month, 1)
 
     @Entrypoint
     def firstOfMonth(self):
         return Date(self.year, self.month, 1)
 
-    @Entrypoint
-    def lastWeekdayOfMonth(self, weekday: int):
-        self.firstOfMonth().weekday()
-
-
+@Held
 class DateTime(Class, Final):
+    """Models a naive, timezone-unaware date and time in the Gregorian calendar.
+    """
+
     date = Member(Date)
     timeOfDay = Member(TimeOfDay)
 
@@ -194,7 +241,6 @@ class DateTime(Class, Final):
         return False
 
     def __str__(self):
-
         return (
             "-".join(
                 [
@@ -214,17 +260,69 @@ class DateTime(Class, Final):
         )
 
 
-class TimeZone(Class):
+class Timezone(Class):
+    """An interface for mapping DateTimes to UTC timestamps (i.e.,
+    unequivocal instants in time and vice versa.
+    """
+
     @Entrypoint
     def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
+        """Return a UTC timestamp at the instant a locale's clocks would
+        show the inputted `DateTime`.
+
+        Parameters
+        ----------
+        dateTime : DateTime
+            The date and time a clock would read in a given locale.
+        afterFold : bool
+            Sometimes, the same DateTime corresponds to two different
+            UTC timestamps, e.g., when clocks are rolled backwards in the
+            Autumn for Daylight Savings time. In these cases, 1am to 2am
+            hour repeats. When `afterFold` is True, we return the second
+            occurence. Otherwise we return the first occurence.
+
+        Returns
+        -------
+        float
+
+        """
         raise NotImplementedError("Subclasses implement.")
 
     @Entrypoint
     def datetime(self, timestamp: float) -> DateTime:
+        """Return the DateTime a locale's clocks would read at the inputted
+        UTC timestamp.
+
+        Parameters
+        ----------
+        timestamp : float
+            timestamp
+
+        Returns
+        -------
+        DateTime
+
+        """
         raise NotImplementedError("Subclasses implement.")
 
     @Entrypoint
-    def _datetimeFromTimestampAndOffset(self, timestamp: float, offset_hours: int) -> DateTime:
+    def _datetimeFromTimestampAndOffset(self, timestamp: float, offset_hours: float) -> DateTime:
+        """Returns a DateTime from a UTC timestamp and an offset (in hours). This
+        returns the clock in a locale offset from UTC by `offset_hours`.
+
+        Parameters
+        ----------
+        timestamp : float
+            a UTC timestamp.
+        offset_hours : float
+            the number of hours ahead or behind UTC for a given locale. For example,
+            eastern standard time, EST, has offset_hours = -5
+
+        Returns
+        -------
+        DateTime
+
+        """
         ts = timestamp + offset_hours * 3600
         day = ts // 86400
         secondsSinceMidnight = ts % 86400
@@ -240,6 +338,10 @@ class TimeZone(Class):
 
 
 class DaylightSavingsBoundaryRule(Class):
+    """An interface for generating DateTimes in a given year corresponding
+    to the beginning and end of a DaylightSavingsTime period in a given
+    locale.
+    """
     @Entrypoint
     def getDaylightSavingsStart(self, year: int) -> DateTime:
         raise NotImplementedError("Subclasses implement")
@@ -250,6 +352,9 @@ class DaylightSavingsBoundaryRule(Class):
 
 
 class NthWeekdayRule(DaylightSavingsBoundaryRule, Final):
+    """A DaylightSavingsBoundaryRule that returns, for example, the second
+    Sunday in March and the last Tuesday in November of a given year.
+    """
     nStart = Member(int)
     weekdayStart = Member(int)
     monthStart = Member(int)
@@ -258,7 +363,29 @@ class NthWeekdayRule(DaylightSavingsBoundaryRule, Final):
     monthEnd = Member(int)
 
     @Entrypoint
-    def __init__(self, nStart, weekdayStart, monthStart, nEnd, weekdayEnd, monthEnd):
+    def __init__(self, nStart: int, weekdayStart: int, monthStart: int, nEnd: int, weekdayEnd: int, monthEnd: int):
+        """
+        Parameters
+        ----------
+        nStart/nEnd : int
+            The ordinal corresponding to which occurence of a weekday we consider
+            to be the start/end.
+        weekdayStart/weekdayEnd : int
+            The day of the week (0 => Sunday)
+        monthStart/monthEnd : int
+            The month of the year (1 => January, etc.)
+
+        For example
+            nStart = 1
+            weekdayStart = 2
+            monthStart = 3
+            nEnd = 4
+            weekdayEnd = 5
+            monthEnd = 6
+
+        models an interval that runs from the first Tuesday of March
+        to the 4th Friday of June.
+        """
         self.nStart = nStart
         self.weekdayStart = weekdayStart
         self.monthStart = monthStart
@@ -282,6 +409,8 @@ class NthWeekdayRule(DaylightSavingsBoundaryRule, Final):
 
 
 class LastWeekdayRule(DaylightSavingsBoundaryRule, Final):
+    """A DaylightSavingsBoundaryRule that returns, for example, the last
+    Tuesday in February and the last Thursday in October of a given year"""
     weekdayStart = Member(int)
     monthStart = Member(int)
     weekdayEnd = Member(int)
@@ -289,6 +418,14 @@ class LastWeekdayRule(DaylightSavingsBoundaryRule, Final):
 
     @Entrypoint
     def __init__(self, weekdayStart: int, monthStart: int, weekdayEnd: int, monthEnd: int):
+        """
+        Parameters
+        ----------
+        weekdayStart/weekdayEnd : int
+            The day of the week (0 => Sunday)
+        monthStart/monthEnd : int
+            The month of the year (1 => January, etc.)
+        """
         self.weekdayStart = weekdayStart
         self.monthStart = monthStart
         self.weekdayEnd = weekdayEnd
@@ -306,6 +443,8 @@ class LastWeekdayRule(DaylightSavingsBoundaryRule, Final):
 
 
 class NthToLastWeekdayRule(DaylightSavingsBoundaryRule, Final):
+    """A DaylightSavingsBoundaryRule that returns, for example, the 2nd
+    Tuesday in February and the last Thursday in October of a given year"""
     nStart = Member(int)
     weekdayStart = Member(int)
     monthStart = Member(int)
@@ -316,6 +455,17 @@ class NthToLastWeekdayRule(DaylightSavingsBoundaryRule, Final):
     def __init__(
         self, nStart: int, weekdayStart: int, monthStart: int, weekdayEnd: int, monthEnd: int
     ):
+        """
+        Parameters
+        ----------
+        nStart : int
+            The ordinal corresponding to which occurence of a weekday we consider
+            to be the start.
+        weekdayStart/weekdayEnd : int
+            The day of the week (0 => Sunday)
+        monthStart/monthEnd : int
+            The month of the year (1 => January, etc.)
+        """
         self.nStart = nStart
         self.weekdayStart = weekdayStart
         self.monthStart = monthStart
@@ -336,6 +486,7 @@ class NthToLastWeekdayRule(DaylightSavingsBoundaryRule, Final):
 
 
 class DateTimeRule(DaylightSavingsBoundaryRule, Final):
+    """A DaylightSavingsBoundaryRule that returns two explicit DateTimes."""
     dateTimeStart = Member(DateTime)
     dateTimeEnd = Member(DateTime)
 
@@ -359,7 +510,12 @@ class DateTimeRule(DaylightSavingsBoundaryRule, Final):
         return self.dateTimeEnd
 
 
-class DaylightSavingsTimezone(TimeZone, Final):
+class DaylightSavingsTimezone(Timezone, Final):
+    """A Timezone that has two different offsets in a given year,
+    st_offset_hours, which applies before and after daylight savings time,
+    dst_offset_hours, which applies during daylight savings time, and a rule
+    for computing when daylight savings time applies."""
+
     dst_offset_hours = Member(float)
     st_offset_hours = Member(float)
     dst_boundaries = Member(DaylightSavingsBoundaryRule)
@@ -371,6 +527,17 @@ class DaylightSavingsTimezone(TimeZone, Final):
         st_offset_hours: float,
         dst_boundaries: DaylightSavingsBoundaryRule,
     ):
+        """
+        Parameters
+        ----------
+        dst_offset_hours : float
+            The number of hours to offset from UTC during daylight savings.
+        st_offset_hours : float
+            The number of hours to offset from UTC outside daylight savings.
+        dst_boundaries : DaylightSavingsBoundaryRule
+            A rule for computing when daylight savings begins and ends in each
+            year.
+        """
         assert st_offset_hours < dst_offset_hours
         self.dst_offset_hours = dst_offset_hours
         self.st_offset_hours = st_offset_hours
@@ -434,7 +601,8 @@ class DaylightSavingsTimezone(TimeZone, Final):
         return self._datetimeFromTimestampAndOffset(timestamp, offset_hours)
 
 
-class FixedOffsetTimezone(TimeZone, Final):
+class FixedOffsetTimezone(Timezone, Final):
+    """Returns a Timezone that is offset a fixed number of hours from UTC"""
     offset_hours = Member(float)
 
     @Entrypoint
@@ -450,7 +618,9 @@ class FixedOffsetTimezone(TimeZone, Final):
         return self._datetimeFromTimestampAndOffset(timestamp, self.offset_hours)
 
 
-class SwitchOffsetTimezone(TimeZone, Final):
+class SwitchOffsetTimezone(Timezone, Final):
+    """Occassionally, the offset will change exactly one time in a given year. This happened
+    in the United States in 1945"""
     offset_hours_before = Member(float)
     offset_hours_after = Member(float)
     switch_datetime = Member(DateTime)
@@ -504,11 +674,11 @@ class SwitchOffsetTimezone(TimeZone, Final):
 
 
 @TypeFunction
-def UsTimeZone(st_offset_hours, dst_offset_hours):
-    class UsTimeZone_(TimeZone, Final):
+def UsTimezone(st_offset_hours, dst_offset_hours):
+    class UsTimezone_(Timezone, Final):
         st_offset = st_offset_hours
         dst_offset = dst_offset_hours
-        TIMEZONES_BY_START_YEAR = ConstDict(int, TimeZone)(
+        TIMEZONES_BY_START_YEAR = ConstDict(int, Timezone)(
             {
                 2007: DaylightSavingsTimezone(
                     dst_offset_hours=dst_offset_hours,
@@ -628,17 +798,17 @@ def UsTimeZone(st_offset_hours, dst_offset_hours):
             else:
                 return self.TIMEZONES_BY_START_YEAR[1776]
 
-    return UsTimeZone_
+    return UsTimezone_
 
 
-NYC = UsTimeZone(-5, -4)()
-CHI = UsTimeZone(-6, -5)()
+NYC = UsTimezone(-5, -4)()
+CHI = UsTimezone(-6, -5)()
 UTC = FixedOffsetTimezone(offset_hours=0)
 EST = FixedOffsetTimezone(offset_hours=-5)
 IST = FixedOffsetTimezone(offset_hours=2)
 
-class TimeZoneChecker(Class, Final):
-    TIMEZONES = ConstDict(str, TimeZone)(
+class TimezoneChecker(Class, Final):
+    TIMEZONES = ConstDict(str, Timezone)(
         {
             "": UTC,
             "+0000": UTC,
@@ -660,7 +830,22 @@ class TimeZoneChecker(Class, Final):
 
 @Entrypoint
 def last_weekday_of_month(year: int, month: int, weekday: int) -> Date:
-    """ weekday = 0 is Sunday """
+    """Return the last weekday in a given month.
+
+    Parameters
+    ----------
+    year : int
+        The year in the Gregorian calendar.
+    month : int
+        The day of the month.
+    weekday : int
+        The day of the week (0=>Sunday).
+
+    Returns
+    -------
+    Date
+
+    """
     monthEnd = Date(year, month, 1).lastDayOfMonth()
     monthEndWeekday = monthEnd.weekday()
     return Date.fromDaysSinceEpoch(monthEnd.daysSinceEpoch() - (monthEndWeekday - weekday) % 7)

@@ -16,9 +16,9 @@ from typed_python import Class, Dict, Final
 from typed_python import Entrypoint, ListOf
 from typed_python.lib.datetime.chrono import Chrono
 from typed_python.lib.datetime.date_time import (
-    TimeZone,
+    Timezone,
     UTC,
-    TimeZoneChecker,
+    TimezoneChecker,
     TimeOfDay,
     Date,
     DateTime,
@@ -253,25 +253,25 @@ class DateParser(Class, Final):
                         raise ValueError("Bad value for %B:", date_str)
                 elif directive == "Z":
                     # 5 character tz abbreviations (future proofing since we don't currently support any)
-                    if TimeZoneChecker.isValidTimezone(
+                    if TimezoneChecker.isValidTimezone(
                         date_str[date_str_cursor:date_str_cursor + 4]
                     ):
                         tz_str = date_str[date_str_cursor:date_str_cursor + 4]
                         date_str_cursor += 4
                     # 4 character tz abbreviations (future proofing since we don't currenlty support any)
-                    elif TimeZoneChecker.isValidTimezone(
+                    elif TimezoneChecker.isValidTimezone(
                         date_str[date_str_cursor:date_str_cursor + 4]
                     ):
                         tz_str = date_str[date_str_cursor:date_str_cursor + 4]
                         date_str_cursor += 4
                     # e.g. EST, EDT, PST
-                    elif TimeZoneChecker.isValidTimezone(
+                    elif TimezoneChecker.isValidTimezone(
                         date_str[date_str_cursor:date_str_cursor + 3]
                     ):
                         tz_str = date_str[date_str_cursor:date_str_cursor + 3]
                         date_str_cursor += 3
                     # e.g. PT, ET, CT
-                    elif TimeZoneChecker.isValidTimezone(
+                    elif TimezoneChecker.isValidTimezone(
                         date_str[date_str_cursor:date_str_cursor + 2]
                     ):
                         tz_str = date_str[date_str_cursor:date_str_cursor + 2]
@@ -280,13 +280,13 @@ class DateParser(Class, Final):
                         raise ValueError("Bad value for %Z:", date_str)
                 elif directive == "z":
                     # [+|-]DDDD or [+|-]DD:DD, e.g. +0000, +1200
-                    if TimeZoneChecker.isValidTimezone(
+                    if TimezoneChecker.isValidTimezone(
                         date_str[date_str_cursor:date_str_cursor + 5]
                     ):
                         tz_str = date_str[date_str_cursor:date_str_cursor + 5]
                         date_str_cursor += 5
                     # [+|-]DD or [+|-]DD
-                    elif TimeZoneChecker.isValidTimezone(
+                    elif TimezoneChecker.isValidTimezone(
                         date_str[date_str_cursor:date_str_cursor + 3]
                     ):
                         tz_str = date_str[date_str_cursor:date_str_cursor + 3]
@@ -335,7 +335,7 @@ class DateParser(Class, Final):
 
     @Entrypoint
     @staticmethod
-    def parse_with_timezone(date_str: str, timezone: TimeZone, format: str = "") -> float:
+    def parse_with_timezone(date_str: str, timezone: Timezone, format: str = "") -> float:
         if format != "":
             return DateParser.parse_with_format_and_timezone(date_str, format, timezone)
         try:
@@ -365,7 +365,7 @@ class DateParser(Class, Final):
 
     @Entrypoint
     @staticmethod
-    def parse_with_format_and_timezone(date_str: str, format: str, timezone: TimeZone) -> float:
+    def parse_with_format_and_timezone(date_str: str, format: str, timezone: Timezone) -> float:
         """
         Parse a date string in the specified format and return a unix timestamp
         Parameters:
@@ -548,7 +548,7 @@ class DateParser(Class, Final):
 
     @Entrypoint
     @staticmethod
-    def parse_iso_str_and_timezone(date_str: str, timezone: TimeZone) -> float:
+    def parse_iso_str_and_timezone(date_str: str, timezone: Timezone) -> float:
         tokens = DateParser._get_tokens(
             time_str=date_str.lower().replace(" ", T), skip_chars="/-:"
         )
@@ -864,7 +864,7 @@ class DateParser(Class, Final):
 
     @Entrypoint
     @staticmethod
-    def parse_non_iso(date_str: str, timezone: TimeZone = UTC) -> float:
+    def parse_non_iso(date_str: str, timezone: Timezone = UTC) -> float:
         """
         Parse a date string and return a unix timestamp
         Parameters:
@@ -1071,9 +1071,9 @@ class DateParser(Class, Final):
 
     @Entrypoint
     @staticmethod
-    def get_timezone_from_string(tz_str: str) -> TimeZone:
-        if TimeZoneChecker.isValidTimezone(tz_str):
-            return TimeZoneChecker.TIMEZONES[tz_str]
+    def get_timezone_from_string(tz_str: str) -> Timezone:
+        if TimezoneChecker.isValidTimezone(tz_str):
+            return TimezoneChecker.TIMEZONES[tz_str]
 
         elif tz_str[0] == "+" or tz_str[0] == "-":
             tz_components = tz_str[1:]

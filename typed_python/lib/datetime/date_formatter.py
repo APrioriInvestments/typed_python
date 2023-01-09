@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import Class, Dict, Entrypoint, Final, ListOf
-from typed_python.lib.datetime.date_time import TimeZone, UTC
+from typed_python.lib.datetime.date_time import Timezone, UTC
 
 # int to string month mapping where 1 => January
 INT_TO_MONTH_NAMES = Dict(int, str)(
@@ -82,7 +82,7 @@ def convert_to_12h(hour: int):
 class DateFormatter(Class, Final):
     @Entrypoint
     @staticmethod
-    def isoformat(ts: float, timezone: TimeZone = UTC) -> str:
+    def isoformat(ts: float, timezone: Timezone = UTC) -> str:
         return DateFormatter.format(ts, timezone, "%Y-%m-%dT%H:%M:%S")
 
     @Entrypoint
@@ -141,7 +141,7 @@ class DateFormatter(Class, Final):
     @Entrypoint
     @staticmethod
     def format(
-        ts: float = 0, timezone: TimeZone = UTC, format: str = "%Y-%m-%d %H:%M:%S"
+        ts: float = 0, timezone: Timezone = UTC, format: str = "%Y-%m-%d %H:%M:%S"
     ) -> str:
         """
         Converts a Timestamp to a string in a given format
