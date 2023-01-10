@@ -501,14 +501,13 @@ class FunctionConverter:
                  module,
                  globalDefinitions,
                  globalDefinitionLlvmValues,
-                 function,
                  converter,
                  builder,
                  arg_assignments,
                  output_type,
-                 external_function_references
+                 external_function_references,
+                 compilerCache,
                  ):
-        self.function = function
 
         # dict from name to GlobalVariableDefinition
         self.globalDefinitions = globalDefinitions
@@ -522,6 +521,7 @@ class FunctionConverter:
         self.external_function_references = external_function_references
         self.tags_initialized = {}
         self.stack_slots = {}
+        self.compilerCache = compilerCache
 
     def tags_as(self, new_tags):
         class scoper():
@@ -648,7 +648,24 @@ class FunctionConverter:
                         llvmlite.ir.Function(self.module, func_type, target.name)
 
             func = self.external_function_references[target.name]
-        elif target.name in self.converter._externallyDefinedFunctionTypes:
+        elif target.name in self.converter._function_definitions:
+            func = self.converter._functions_by_name[target.name]
+
+            if func.module is not self.module:
+                # first, see if we'd like to inline this module
+                if (
+                    self.converter.totalFunctionComplexity(target.name) < CROSS_MODULE_INLINE_COMPLEXITY
+                ):
+                    func = self.converter.repeatFunctionInModule(target.name, self.module)
+                else:
+                    if target.name not in self.external_function_references:
+                        self.external_function_references[target.name] = \
+                            llvmlite.ir.Function(self.module, func.function_type, func.name)
+
+                    func = self.external_function_references[target.name]
+        else:
+            # TODO: decide whether to inline based on something in the compiler cache
+            assert self.compilerCache is not None and self.compilerCache.hasSymbol(target.name)
             # this function is defined in a shared object that we've loaded from a prior
             # invocation
             if target.name not in self.external_function_references:
@@ -665,22 +682,6 @@ class FunctionConverter:
                 )
 
             func = self.external_function_references[target.name]
-        else:
-            func = self.converter._functions_by_name[target.name]
-
-            if func.module is not self.module:
-                # first, see if we'd like to inline this module
-                if (
-                    self.converter.totalFunctionComplexity(target.name) < CROSS_MODULE_INLINE_COMPLEXITY
-                    and self.converter.canBeInlined(target.name)
-                ):
-                    func = self.converter.repeatFunctionInModule(target.name, self.module)
-                else:
-                    if target.name not in self.external_function_references:
-                        self.external_function_references[target.name] = \
-                            llvmlite.ir.Function(self.module, func.function_type, func.name)
-
-                    func = self.external_function_references[target.name]
 
         return TypedLLVMValue(
             func,
@@ -1482,15 +1483,11 @@ def populate_needed_externals(external_function_references, module):
 
 
 class Converter:
-    def __init__(self):
+    def __init__(self, compilerCache):
         object.__init__(self)
         self._modules = {}
         self._functions_by_name = {}
         self._function_definitions = {}
-
-        # a map from function name to function type for functions that
-        # are defined in external shared objects and linked in to this one.
-        self._externallyDefinedFunctionTypes = {}
 
         # total number of instructions in each function, by name
         self._function_complexity = {}
@@ -1500,12 +1497,7 @@ class Converter:
         self._printAllNativeCalls = os.getenv("TP_COMPILER_LOG_NATIVE_CALLS")
         self.verbose = False
 
-    def markExternal(self, functionNameToType):
-        """Provide type signatures for a set of external functions."""
-        self._externallyDefinedFunctionTypes.update(functionNameToType)
-
-    def canBeInlined(self, name):
-        return name not in self._externallyDefinedFunctionTypes
+        self.compilerCache = compilerCache
 
     def totalFunctionComplexity(self, name):
         """Return the total number of instructions contained in a function.
@@ -1619,19 +1611,19 @@ class Converter:
                         TypedLLVMValue(func.args[i], definition.args[i][1])
 
                 block = func.append_basic_block('entry')
-                builder = llvmlite.ir.IRBuilder(block)
+                builder = llvmlite.ir.IRBuilder(block)  # this shares state with func
 
                 try:
                     func_converter = FunctionConverter(
                         module,
                         globalDefinitions,
                         globalDefinitionsLlvmValues,
-                        func,
                         self,
                         builder,
                         arg_assignments,
                         definition.output_type,
-                        external_function_references
+                        external_function_references,
+                        self.compilerCache,
                     )
 
                     func_converter.setup()

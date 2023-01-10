@@ -84,17 +84,13 @@ def create_execution_engine(inlineThreshold):
 
 
 class Compiler:
-    def __init__(self, inlineThreshold):
+    def __init__(self, inlineThreshold, compilerCache):
         self.engine, self.module_pass_manager = create_execution_engine(inlineThreshold)
-        self.converter = native_ast_to_llvm.Converter()
+        self.converter = native_ast_to_llvm.Converter(compilerCache)
         self.functions_by_name = {}
         self.inlineThreshold = inlineThreshold
         self.verbose = False
         self.optimize = True
-
-    def markExternal(self, functionNameToType):
-        """Provide type signatures for a set of external functions."""
-        self.converter.markExternal(functionNameToType)
 
     def mark_converter_verbose(self):
         self.converter.verbose = True
