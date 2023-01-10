@@ -840,3 +840,40 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
             yield 1
 
         assert isinstance(iterate(10), Generator(OneOf(None, int)))
+
+    def test_generators_come_precompiled(self):
+        # verify that once we trigger a generator
+        # we don't force it to compile when we actually use it -
+        # instead we should compile __fastnext__ etc as soon as
+        # we bring the class into compiled existence.
+
+        @Entrypoint
+        def iterate(x) -> Generator(int):
+            yield 1
+
+        @Entrypoint
+        def callIt(actually: int):
+            res = ListOf(int)()
+            if actually:
+                for i in iterate(10):
+                    res.append(i)
+
+            return res
+
+        t0 = time.time()
+        callIt(False)
+        firstTime = time.time() - t0
+
+        t1 = time.time()
+        callIt(True)
+        secondTime = time.time() - t1
+
+        t1 = time.time()
+        callIt(True)
+        thirdTime = time.time() - t1
+
+        print(firstTime, secondTime, thirdTime)
+
+        assert firstTime > 0.001
+        assert secondTime < 0.0001
+        assert thirdTime < 0.0001

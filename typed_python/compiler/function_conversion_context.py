@@ -31,7 +31,10 @@ from typed_python.internals import makeFunctionType, checkOneOfType, checkType
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
-from typed_python import _types, Type, ListOf, PointerTo, pointerTo, Set, Dict, Member
+from typed_python import (
+    _types, Type, ListOf, PointerTo, pointerTo, Set, Dict, Member,
+    OneOf, Function, Tuple, Forward, Class, NamedTuple
+)
 from typed_python.generator import Generator
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.expression_conversion_context import ExpressionConversionContext
@@ -39,7 +42,6 @@ from typed_python.compiler.function_stack_state import FunctionStackState
 from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_exception import ConversionException
-from typed_python import OneOf, Function, Tuple, Forward, Class
 from typed_python.compiler.function_metadata import FunctionMetadata
 from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
 from typed_python.python_ast import evaluateFunctionDefWithLocalsInCells
@@ -618,6 +620,25 @@ class ConversionContextBase:
         )
 
         returnSlot.convert_copy_initialize(output)
+
+        context.converter.triggerVirtualDestructor(generatorSubclass)
+
+        context.converter.triggerVirtualMethodInstantiation(
+            generatorSubclass,
+            "__fastnext__",
+            PointerTo(T),
+            Tuple("instance"),
+            NamedTuple()
+        )
+
+        context.converter.triggerVirtualMethodInstantiation(
+            generatorSubclass,
+            "__next__",
+            T,
+            Tuple("instance"),
+            NamedTuple()
+        )
+
         return context.finalize(native_ast.Expression.Return())
 
     def _constructInitialVarnameToType(self):

@@ -17,6 +17,7 @@ import logging
 
 from typed_python.hash import Hash
 from types import ModuleType
+from typed_python import Class
 import typed_python.python_ast as python_ast
 import typed_python._types as _types
 import typed_python.compiler
@@ -148,6 +149,15 @@ class PythonToNativeConverter:
         # we use this to track which functions need to get rebuilt when
         # other functions change types.
         self._currentlyConverting = None
+
+        # tuple of (baseClass, childClass, slotIndex) containing
+        # virtual methods that need to get instantiated during the
+        # current compilation unit.
+        self._delayedVMIs = []
+        self._delayedDestructors = []
+
+        self._installedVMIs = set()
+        self._installedDestructors = set()
 
         self._dependencies = FunctionDependencyGraph()
 
@@ -568,7 +578,53 @@ class PythonToNativeConverter:
             if dirtyUpstream:
                 self._dependencies.functionReturnSignatureChanged(identity)
 
+    def triggerVirtualDestructor(self, instanceType):
+        self._delayedDestructors.append(instanceType)
+
+    def triggerVirtualMethodInstantiation(self, instanceType, methodName, returnType, argTupleType, kwargTupleType):
+        """Instantiate a virtual method as part of this batch of compilation.
+
+        Normally, compiling 'virtual' methods (method instantiations on subclasses
+        that are known as a base class to the compiler) happens lazily.  In some cases
+        (for instance, generators) we want to force compilation of specific methods
+        when we define the class, since otherwise we end up with irregular performance
+        because we're lazily triggering an expensive operation.
+
+        This method forces the current compilation operation to compile and link
+        instantiating 'methodName' on instances of 'instanceType'.
+        """
+        for baseClass in instanceType.__mro__:
+            if issubclass(baseClass, Class) and baseClass is not Class:
+                slot = _types.allocateClassMethodDispatch(
+                    baseClass,
+                    methodName,
+                    returnType,
+                    argTupleType,
+                    kwargTupleType
+                )
+
+                self._delayedVMIs.append(
+                    (baseClass, instanceType, slot)
+                )
+
+    def flushDelayedVMIs(self):
+        while self._delayedVMIs or self._delayedDestructors:
+            vmis = self._delayedVMIs
+            self._delayedVMIs = []
+
+            for baseClass, instanceClass, dispatchSlot in vmis:
+                self.compileSingleClassDispatch(baseClass, instanceClass, dispatchSlot)
+
+            delayedDestructors = self._delayedDestructors
+            self._delayedDestructors = []
+
+            for T in delayedDestructors:
+                self.compileClassDestructor(T)
+
     def compileSingleClassDispatch(self, interfaceClass, implementingClass, slotIndex):
+        if (interfaceClass, implementingClass, slotIndex) in self._installedVMIs:
+            return
+
         name, retType, argTypeTuple, kwargTypeTuple = _types.getClassMethodDispatchSignature(interfaceClass, implementingClass, slotIndex)
 
         # we are compiling the function 'name' in 'implementingClass' to be installed when
@@ -595,7 +651,14 @@ class PythonToNativeConverter:
 
         _types.installClassMethodDispatch(interfaceClass, implementingClass, slotIndex, fp.fp)
 
+        self._installedVMIs.add(
+            (interfaceClass, implementingClass, slotIndex)
+        )
+
     def compileClassDestructor(self, cls):
+        if cls in self._installedDestructors:
+            return
+
         typedCallTarget = typeWrapper(cls).compileDestructor(self)
 
         assert typedCallTarget is not None
@@ -605,6 +668,7 @@ class PythonToNativeConverter:
         fp = self.functionPointerByName(typedCallTarget.name)
 
         _types.installClassDestructor(cls, fp.fp)
+        self._installedDestructors.add(cls)
 
     def functionPointerByName(self, linkerName) -> NativeFunctionPointer:
         """Find a NativeFunctionPointer for a given link-time name.

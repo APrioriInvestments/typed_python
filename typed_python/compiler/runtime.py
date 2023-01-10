@@ -311,6 +311,8 @@ class Runtime:
                     [i.typeRepresentation for i in callTarget.input_types]
                 )
 
+                self.converter.flushDelayedVMIs()
+
                 return callTarget
         finally:
             if self.verbosityLevel > 0:
