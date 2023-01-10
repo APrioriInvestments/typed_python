@@ -62,8 +62,17 @@ class CompilerCache:
             if len(moduleHash) == 40:
                 self.loadNameManifestFromStoredModuleByHash(moduleHash)
 
+        self.targetsLoaded = {}
+
     def hasSymbol(self, linkName):
         return linkName in self.nameToModuleHash
+
+    def getTarget(self, linkName):
+        assert self.hasSymbol(linkName)
+
+        self.loadForSymbol(linkName)
+
+        return self.targetsLoaded[linkName]
 
     def markModuleHashInvalid(self, hashstr):
         with open(os.path.join(self.cacheDir, hashstr, "marked_invalid"), "w"):
@@ -72,15 +81,9 @@ class CompilerCache:
     def loadForSymbol(self, linkName):
         moduleHash = self.nameToModuleHash[linkName]
 
-        nameToTypedCallTarget = {}
-        nameToNativeFunctionType = {}
+        self.loadModuleByHash(moduleHash)
 
-        if not self.loadModuleByHash(moduleHash, nameToTypedCallTarget, nameToNativeFunctionType):
-            return None
-
-        return nameToTypedCallTarget, nameToNativeFunctionType
-
-    def loadModuleByHash(self, moduleHash, nameToTypedCallTarget, nameToNativeFunctionType):
+    def loadModuleByHash(self, moduleHash):
         """Load a module by name.
 
         As we load, place all the newly imported typed call targets into
@@ -114,11 +117,7 @@ class CompilerCache:
 
         # load the submodules first
         for submodule in submodules:
-            if not self.loadModuleByHash(
-                submodule,
-                nameToTypedCallTarget,
-                nameToNativeFunctionType
-            ):
+            if not self.loadModuleByHash(submodule):
                 return False
 
         modulePath = os.path.join(targetDir, "module.so")
@@ -131,8 +130,7 @@ class CompilerCache:
 
         self.loadedModules[moduleHash] = loaded
 
-        nameToTypedCallTarget.update(callTargets)
-        nameToNativeFunctionType.update(functionNameToNativeType)
+        self.targetsLoaded.update(callTargets)
 
         return True
 
