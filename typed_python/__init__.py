@@ -38,7 +38,7 @@ from typed_python.internals import (
 )
 from typed_python._types import bytecount, refcount
 from typed_python.module import Module
-from typed_python.type_function import TypeFunction
+from typed_python.type_function import TypeFunction, NoMapArg
 from typed_python.hash import sha_hash
 from typed_python.SerializationContext import SerializationContext
 from typed_python.type_filter import TypeFilter
