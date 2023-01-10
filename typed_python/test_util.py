@@ -208,7 +208,7 @@ def evaluateExprInFreshProcess(filesToWrite, expression, compilerCacheDir=None, 
                 stderr=subprocess.PIPE
             )
         except subprocess.CalledProcessError as e:
-            raise Exception("Subprocess failed:\n\n" + e.stdout.decode("ASCII") + "\n\nerr=\n" + e.stderr.decode("ASCII"))
+            raise Exception("Subprocess failed:\n\n" + e.stdout.decode("ASCII") + "\n\nerr=\n" + e.stderr.decode("ASCII")) from e
 
         def isBytes(x):
             return x.startswith(b"b'") or x.startswith(b'b"')

@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import threading
+import inspect
 import os
 import time
 import types
@@ -207,7 +208,7 @@ class Runtime:
             )
         else:
             self.compilerCache = None
-        self.llvm_compiler = llvm_compiler.Compiler(inlineThreshold=100)
+        self.llvm_compiler = llvm_compiler.Compiler(inlineThreshold=100, compilerCache=self.compilerCache)
         self.converter = python_to_native_converter.PythonToNativeConverter(
             self.llvm_compiler,
             self.compilerCache
@@ -502,6 +503,15 @@ def Entrypoint(pyFunc):
         if not callable(typedFunc):
             raise Exception(f"Can only compile functions, not {typedFunc}")
 
+        # check if we are already in the middle of the compilation process, due to the Entrypointed
+        # code being called through a module import, and throw an error if so.
+        if is_importing():
+            compiling_func = Runtime.singleton().converter._currentlyConverting
+            compiling_func_link_name = Runtime.singleton().converter._link_name_for_identity[compiling_func]
+            error_message = f"Can't import Entrypointed code {pyFunc.__module__}.{pyFunc.__qualname__} \
+                while {compiling_func_link_name} is being compiled."
+            raise ImportError(error_message)
+
         typedFunc = Function(typedFunc)
 
     typedFunc = typedFunc.withEntrypoint(True)
@@ -534,3 +544,20 @@ def Compiled(pyFunc):
     f.resultTypeFor(*types)
 
     return f
+
+
+def is_importing():
+    """Walk the stack to check if we are currently importing a module.
+
+    In this case, we will have an 'importlib' between two 'typed_python.compiler.runtime' frames.
+    """
+    in_runtime = False
+    assert __name__ == 'typed_python.compiler.runtime', 'is_importing() should only be called from typed_python.compiler.runtime'
+    for frame, *_ in inspect.stack()[::-1]:
+        frame_name = frame.f_globals.get("__name__")
+        if frame_name == 'typed_python.compiler.runtime':
+            in_runtime = True
+        if in_runtime and frame_name == 'importlib':
+            return True
+
+    return False
