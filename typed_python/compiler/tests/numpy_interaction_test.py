@@ -1,4 +1,4 @@
-from typed_python import ListOf, Entrypoint
+from typed_python import ListOf, Entrypoint, SerializationContext
 import numpy
 import numpy.linalg
 
@@ -44,3 +44,12 @@ def test_listof_from_sliced_numpy_array():
     y = x[::2]
 
     assert ListOf(int)(y) == [0, 2]
+
+
+def test_can_serialize_numpy_ufunc():
+    assert numpy.sin == SerializationContext().deserialize(SerializationContext().serialize(numpy.sin))
+
+
+def test_can_serialize_numpy_array():
+    x = numpy.ones(10)
+    assert (x == SerializationContext().deserialize(SerializationContext().serialize(x))).all()

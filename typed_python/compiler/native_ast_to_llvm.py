@@ -12,12 +12,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import typed_python.compiler.native_ast as native_ast
-from typed_python.compiler.module_definition import ModuleDefinition
-from typed_python.compiler.global_variable_definition import GlobalVariableDefinition
 import llvmlite.ir
 import os
-
+import typed_python.compiler.native_ast as native_ast
+from typed_python.compiler.global_variable_definition import GlobalVariableDefinition
+from typed_python.compiler.module_definition import ModuleDefinition
+from typing import Dict
 llvm_i8ptr = llvmlite.ir.IntType(8).as_pointer()
 llvm_i8 = llvmlite.ir.IntType(8)
 llvm_i32 = llvmlite.ir.IntType(32)
@@ -501,19 +501,19 @@ class FunctionConverter:
                  module,
                  globalDefinitions,
                  globalDefinitionLlvmValues,
-                 function,
                  converter,
                  builder,
                  arg_assignments,
                  output_type,
-                 external_function_references
+                 external_function_references,
+                 compilerCache,
                  ):
-        self.function = function
 
         # dict from name to GlobalVariableDefinition
         self.globalDefinitions = globalDefinitions
         self.globalDefinitionLlvmValues = globalDefinitionLlvmValues
-
+        #  a list of the global LLVM names that the function depends on.
+        self.global_names = []
         self.module = module
         self.converter = converter
         self.builder = builder
@@ -522,6 +522,7 @@ class FunctionConverter:
         self.external_function_references = external_function_references
         self.tags_initialized = {}
         self.stack_slots = {}
+        self.compilerCache = compilerCache
 
     def tags_as(self, new_tags):
         class scoper():
@@ -631,7 +632,16 @@ class FunctionConverter:
         )
         return self.builder.bitcast(exception_ptr, llvm_i8ptr)
 
-    def namedCallTargetToLLVM(self, target):
+    def namedCallTargetToLLVM(self, target: native_ast.NamedCallTarget) -> TypedLLVMValue:
+        """
+        Generate llvm IR code for a given target.
+
+        There are three options for code generation:
+        1. The target is external, i.e something like pyobj_len, np_add_traceback - system-level functions. We add to
+            external_function_references.
+        2. The function is in function_definitions, in which case we grab the function definition and make an inlining decision.
+        3. We have a compiler cache, and the function is in it. We add to external_function_references.
+        """
         if target.external:
             if target.name not in self.external_function_references:
                 func_type = llvmlite.ir.FunctionType(
@@ -648,7 +658,23 @@ class FunctionConverter:
                         llvmlite.ir.Function(self.module, func_type, target.name)
 
             func = self.external_function_references[target.name]
-        elif target.name in self.converter._externallyDefinedFunctionTypes:
+        elif target.name in self.converter._function_definitions:
+            func = self.converter._functions_by_name[target.name]
+            if func.module is not self.module:
+                # first, see if we'd like to inline this module
+                if (
+                    self.converter.totalFunctionComplexity(target.name) < CROSS_MODULE_INLINE_COMPLEXITY
+                ):
+                    func = self.converter.repeatFunctionInModule(target.name, self.module)
+                else:
+                    if target.name not in self.external_function_references:
+                        self.external_function_references[target.name] = \
+                            llvmlite.ir.Function(self.module, func.function_type, func.name)
+
+                    func = self.external_function_references[target.name]
+        else:
+            # TODO (Will): decide whether to inline cached code
+            assert self.compilerCache is not None and self.compilerCache.hasSymbol(target.name)
             # this function is defined in a shared object that we've loaded from a prior
             # invocation
             if target.name not in self.external_function_references:
@@ -665,22 +691,6 @@ class FunctionConverter:
                 )
 
             func = self.external_function_references[target.name]
-        else:
-            func = self.converter._functions_by_name[target.name]
-
-            if func.module is not self.module:
-                # first, see if we'd like to inline this module
-                if (
-                    self.converter.totalFunctionComplexity(target.name) < CROSS_MODULE_INLINE_COMPLEXITY
-                    and self.converter.canBeInlined(target.name)
-                ):
-                    func = self.converter.repeatFunctionInModule(target.name, self.module)
-                else:
-                    if target.name not in self.external_function_references:
-                        self.external_function_references[target.name] = \
-                            llvmlite.ir.Function(self.module, func.function_type, func.name)
-
-                    func = self.external_function_references[target.name]
 
         return TypedLLVMValue(
             func,
@@ -801,6 +811,7 @@ class FunctionConverter:
             return self.stack_slots[expr.name]
 
         if expr.matches.GlobalVariable:
+            self.global_names.append(expr.name)
             if expr.name in self.globalDefinitions:
                 assert expr.metadata == self.globalDefinitions[expr.name].metadata, (
                     expr.metadata, self.globalDefinitions[expr.name].metadata
@@ -1484,15 +1495,11 @@ def populate_needed_externals(external_function_references, module):
 
 
 class Converter:
-    def __init__(self):
+    def __init__(self, compilerCache=None):
         object.__init__(self)
         self._modules = {}
-        self._functions_by_name = {}
-        self._function_definitions = {}
-
-        # a map from function name to function type for functions that
-        # are defined in external shared objects and linked in to this one.
-        self._externallyDefinedFunctionTypes = {}
+        self._functions_by_name: Dict[str, llvmlite.ir.Function] = {}
+        self._function_definitions: Dict[str, native_ast.Function] = {}
 
         # total number of instructions in each function, by name
         self._function_complexity = {}
@@ -1502,17 +1509,12 @@ class Converter:
         self._printAllNativeCalls = os.getenv("TP_COMPILER_LOG_NATIVE_CALLS")
         self.verbose = False
 
-    def markExternal(self, functionNameToType):
-        """Provide type signatures for a set of external functions."""
-        self._externallyDefinedFunctionTypes.update(functionNameToType)
-
-    def canBeInlined(self, name):
-        return name not in self._externallyDefinedFunctionTypes
+        self.compilerCache = compilerCache
 
     def totalFunctionComplexity(self, name):
         """Return the total number of instructions contained in a function.
 
-        The function must already have been defined in a prior parss. We use this
+        The function must already have been defined in a prior pass. We use this
         information to decide which functions to repeat in new module definitions.
         """
         if name in self._function_complexity:
@@ -1546,9 +1548,7 @@ class Converter:
         assert isinstance(funcType, llvmlite.ir.FunctionType)
 
         self._functions_by_name[name] = llvmlite.ir.Function(module, funcType, name)
-
         self._inlineRequests.append(name)
-
         return self._functions_by_name[name]
 
     def add_functions(self, names_to_definitions):
@@ -1604,7 +1604,8 @@ class Converter:
 
         globalDefinitions = {}
         globalDefinitionsLlvmValues = {}
-
+        # we need a separate dictionary owing to the possibility of global var reuse across functions.
+        globalDependencies = {}
         while names_to_definitions:
             for name in sorted(names_to_definitions):
                 definition = names_to_definitions.pop(name)
@@ -1628,12 +1629,12 @@ class Converter:
                         module,
                         globalDefinitions,
                         globalDefinitionsLlvmValues,
-                        func,
                         self,
                         builder,
                         arg_assignments,
                         definition.output_type,
-                        external_function_references
+                        external_function_references,
+                        self.compilerCache,
                     )
 
                     func_converter.setup()
@@ -1641,6 +1642,8 @@ class Converter:
                     res = func_converter.convert(definition.body.body)
 
                     func_converter.finalize()
+
+                    globalDependencies[func.name] = func_converter.global_names
 
                     if res is not None:
                         assert res.llvm_value is None
@@ -1675,7 +1678,8 @@ class Converter:
         return ModuleDefinition(
             str(module),
             functionTypes,
-            globalDefinitions
+            globalDefinitions,
+            globalDependencies
         )
 
     def defineGlobalMetadataAccessor(self, module, globalDefinitions, globalDefinitionsLlvmValues):
