@@ -23,6 +23,11 @@ import typed_python
 _type_to_typefunction = {}
 
 
+class NoMapArg:
+    def __init__(self, arg):
+        self.arg = arg
+
+
 def isTypeFunctionType(type):
     """Is 'type' the result of a type function?
 
@@ -59,15 +64,19 @@ def makeTypeFunction(f):
     Don't stash the type you return, since the actual type returned by the
     function may not be the one you returned.
     """
+
     def nameFor(args, kwargs):
         def toStr(x):
             if isinstance(x, type):
                 return x.__qualname__
             return str(x)
 
-        return f.__qualname__ + "(" + ",".join(
-            [toStr(x) for x in args] + ["%s=%s" % (k, v) for k, v in kwargs]
-        ) + ")"
+        return (
+            f.__qualname__
+            + "("
+            + ",".join([toStr(x) for x in args] + ["%s=%s" % (k, v) for k, v in kwargs])
+            + ")"
+        )
 
     def mapArg(arg):
         """Map a type argument to a valid value. Type arguments must be hashable,
@@ -91,7 +100,13 @@ def makeTypeFunction(f):
         if isinstance(arg, typed_python._types.Function):
             return arg
 
-        raise TypeError("Instance of type '%s' is not a valid argument to a type function" % type(arg))
+        if isinstance(arg, NoMapArg):
+            return arg.arg
+
+        raise TypeError(
+            "Instance of type '%s' is not a valid argument to a type function"
+            % type(arg)
+        )
 
     _memoForKey = {}
 
@@ -106,7 +121,7 @@ def makeTypeFunction(f):
             if isinstance(res, Exception):
                 raise res
 
-            if getattr(res, '__typed_python_category__', None) != 'Forward':
+            if getattr(res, "__typed_python_category__", None) != "Forward":
                 # only return fully resolved TypeFunction values without
                 # locking.
                 return res
