@@ -61,4 +61,3 @@ def test_type_name():
     assert typenameOfCInst(C()) == 'C'
     assert typenameOfCInst(B()) == 'B'
     assert typenameOfAInst.resultTypeFor(A.X).typeRepresentation is str
-
