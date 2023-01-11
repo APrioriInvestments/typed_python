@@ -80,3 +80,37 @@ def sorted(values, key=None):
     valuesCopy = ListOf(type(values).ElementType)(values)
     sort(valuesCopy, key)
     return valuesCopy
+
+
+def compare_values(x, y):
+    if x < y:
+        return -1
+    if y < x:
+        return 1
+
+    if not (x == y):
+        raise Exception("Non-total ordering provided: " + str(x) + " vs " + str(y))
+
+    return 0
+
+
+@Entrypoint
+def searchSorted(item, sortedContainer):
+    """Find the index of 'item' in 'sortedContainer' assuming it's sorted.
+
+    Returns -1 if we can't find it.
+    """
+    low = 0
+    high = len(sortedContainer)
+
+    while low < high:
+        mid = (low + high) // 2
+        c = compare_values(sortedContainer[mid], item)
+        if c < 0:
+            low = mid + 1
+        elif c > 0:
+            high = mid
+        else:
+            return mid
+
+    return low

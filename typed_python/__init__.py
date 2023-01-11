@@ -80,7 +80,7 @@ from typed_python.lib.map import map  # noqa
 from typed_python.lib.pmap import pmap  # noqa
 from typed_python.lib.reduce import reduce  # noqa
 from typed_python.lib.timestamp import Timestamp # noqa
-from typed_python.lib.datetime.date_time import UTC, NYC, TimeOfDay, DateTime, Date # noqa
+from typed_python.lib.datetime.date_time import UTC, NYC, TimeOfDay, DateTime, Date, PytzTimezone # noqa
 
 _types.initializeGlobalStatics()
 

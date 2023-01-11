@@ -13,7 +13,6 @@
 #   limitations under the License.
 
 
-from typed_python.compiler.runtime import Entrypoint
 from typed_python import Class, Final, Member, Held
 from typed_python.lib.datetime.date_parser import DateParser
 from typed_python.lib.datetime.date_formatter import DateFormatter
@@ -26,79 +25,61 @@ class Timestamp(Class, Final):
 
     ts = Member(float)
 
-    @Entrypoint
     def __int__(self):
         return int(self.ts)
 
-    @Entrypoint
     def __float__(self):
         return self.ts
 
-    @Entrypoint
     def __str__(self):
         return str(self.ts)
 
-    @Entrypoint
     def __eq__(self, other) -> bool:
         return self.ts == other.ts
 
-    @Entrypoint
     def __ne__(self, other) -> bool:
         return self.ts != other.ts
 
-    @Entrypoint
     def __ge__(self, other) -> bool:
         return self.ts >= other.ts
 
-    @Entrypoint
     def __gt__(self, other) -> bool:
         return self.ts > other.ts
 
-    @Entrypoint
     def __lt__(self, other) -> bool:
         return self.ts < other.ts
 
-    @Entrypoint
     def __le__(self, other) -> bool:
         return self.ts <= other.ts
 
-    @Entrypoint
     def __add__(self, other: float):
         return Timestamp(ts=self.ts + other)
 
-    @Entrypoint
     def __sub__(self, other) -> float:
         return self.ts - other.ts
 
-    @Entrypoint
     def midpoint(self, other):
         return self + (other - self) / 2
 
-    @Entrypoint
     @staticmethod
     def make(ts: float):
         return Timestamp(ts=ts)
 
-    @Entrypoint
     def __init__(self, ts: float):
         self.ts = ts
 
-    @Entrypoint
     @staticmethod
     def parse(date_str: str, timezone: Timezone):  # noqa: F811
         return Timestamp(ts=DateParser.parse_with_timezone(date_str, timezone))
 
-    @Entrypoint
     @staticmethod
     def parse_nyc(date_str: str):
         return Timestamp(ts=DateParser.parse_with_timezone(date_str, NYC))
 
-    @Entrypoint
     @staticmethod
     def parse(date_str: str):  # noqa: F811
         return Timestamp(ts=DateParser.parse(date_str))
 
-    @Entrypoint
     def format(self, timezone: Timezone = UTC, format: str = "%Y-%m-%d %H:%M:%S") -> str:
         """ Converts a Timestamp to a formatted string in a given timezone
 
@@ -111,7 +92,6 @@ class Timestamp(Class, Final):
         """
         return DateFormatter.format(self.ts, timezone, format)
 
-    @Entrypoint
     def format_nyc(self, format: str = "%Y-%m-%d %H:%M:%S") -> str:
         """ Converts a Timestamp to a formatted string in NYC
 
@@ -122,7 +102,6 @@ class Timestamp(Class, Final):
         """
         return DateFormatter.format(self.ts, NYC, format)
 
-    @Entrypoint
     def weekday(self, timezone: Timezone) -> int:
         """The day of the week of the timestamp in a given timezone.
             0 => Sunday,  1 => Monday
@@ -135,7 +114,6 @@ class Timestamp(Class, Final):
         """
         return timezone.datetime(self.ts).date.weekday()
 
-    @Entrypoint
     def dayOfYear(self, timezone: Timezone) -> int:
         """Get the day of the year for the timestamp in a given timezone..
 
@@ -147,7 +125,6 @@ class Timestamp(Class, Final):
         """
         return timezone.datetime(self.ts).date.dayOfYear()
 
-    @Entrypoint
     def quarterOfYear(self, timezone: Timezone) -> int:
         """Get the quarter of the year for the timestamp in a given timezone..
 

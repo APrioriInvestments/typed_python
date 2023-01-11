@@ -9,12 +9,10 @@ from typed_python.lib.datetime.date_time import (
     FixedOffsetTimezone,
     EST,
     NYC,
-    CHI,
     UTC,
     last_weekday_of_month,
-    DaylightSavingsTimezone,
-    SwitchOffsetTimezone,
     OneFoldOnlyError,
+    PytzTimezone,
 )
 from typed_python import Timestamp
 from typed_python.lib.datetime.date_parser_test import get_datetimes_in_range
@@ -272,6 +270,7 @@ def test_nyc_1918_10_27():
 
 def test_nyc_since_1902():
     nyc = pytz.timezone("America/New_York")
+    NYC = PytzTimezone.fromName("America/New_York")
     datetimes = get_datetimes_in_range(
         start=datetime.datetime(1902, 1, 1, 20, 0, 1, 0),
         end=datetime.datetime(2030, 1, 1, 20, 0, 1, 0),
@@ -295,37 +294,25 @@ def test_nyc_since_1902():
         except NonexistentDateTime:
             continue
 
-        try:
-            assert us == them, f"Difference for {str(dt)} is {us - them} seconds"
+        if us != them:
+            transitions = []
+            for d in NYC.transition_datetimes:
+                if d.date == dateTime.date:
+                    transitions.append(d)
+            assert len(transitions) == 1
 
-        except AssertionError:
-            tz = NYC.chooseTimezone(dt.year)
-            if isinstance(tz, DaylightSavingsTimezone):
-                dst_end = tz.dst_boundaries.getDaylightSavingsEnd(dt.year)
-                if (
-                    dst_end.date == dateTime.date
-                    and dst_end.timeOfDay.hour - 1 == dateTime.timeOfDay.hour
-                ):
-                    if (
-                        us - them == -3600
-                    ):  # we choose the first fold and they choose the second.
-                        continue
-            elif isinstance(tz, SwitchOffsetTimezone):
-                switch = tz.switch_datetime
-                if (
-                    switch.date == dateTime.date
-                    and switch.timeOfDay.hour - 1 == dateTime.timeOfDay.hour
-                ):
-                    if (
-                        us - them == -3600
-                    ):  # we choose the first fold and they choose the second.
-                        continue
-
-            raise
+            assert dateTime.timeOfDay.hour + 1 == transitions[0].timeOfDay.hour
+            print(
+                "We disagree with pytz on",
+                str(dateTime),
+                "because pytz gives the second fold and we give the first.",
+            )
 
 
 def test_nyc_vs_chi():
-    ts_chi = CHI.timestamp(DateTime(2019, 7, 2, 8, 30, 0))
+    ts_chi = PytzTimezone.fromName("America/Chicago").timestamp(
+        DateTime(2019, 7, 2, 8, 30, 0)
+    )
     ts_nyc = NYC.timestamp(DateTime(2019, 7, 2, 8, 30, 0))
     assert ts_nyc - ts_chi == -3600
 
@@ -337,3 +324,45 @@ def test_Date_methods():
     assert Date(2000, 12, 31).dayOfYear() == 366  # leap year
     assert Date(2000, 12, 31).nextMonthStart() == Date(2001, 1, 1)
     assert Date(2000, 12, 30).nextMonthStart() == Date(2001, 1, 1)
+
+
+def test_DateTime_add_and_subtract():
+    assert DateTime(2022, 1, 1, 2, 30, 17) - 17 == DateTime(2022, 1, 1, 2, 30, 0)
+    assert DateTime(2022, 1, 1, 2, 30, 17) - 18 - 30 * 60 - 2 * 3600 == DateTime(
+        2021, 12, 31, 23, 59, 59
+    )
+
+
+def test_PytzTimezone():
+    # check time
+    ymdhms = (2022, 1, 11, 18, 0, 0)
+
+    tz_them = pytz.timezone("America/New_York")
+    tz_us = PytzTimezone.fromName("America/New_York")
+
+    ts_us = tz_us.timestamp(DateTime(*ymdhms))
+    ts_them = tz_them.localize(datetime.datetime(*ymdhms)).timestamp()
+    assert ts_us == ts_them
+
+    # check bogus timezones raise
+    with pytest.raises(Exception):
+        PytzTimezone.fromName("blah")
+
+    # check way into future succeeds datetime -> timestamp
+    ymdhms = (2100, 12, 31, 0, 0, 0)
+    wayIntoFuture = DateTime(*ymdhms)
+    ts_us = tz_us.timestamp(wayIntoFuture)
+    ts_them = tz_them.localize(datetime.datetime(*ymdhms)).timestamp()
+    assert ts_us == ts_them
+
+    # and check timestamp -> datetime
+    ts = ts_us
+    dt_us = tz_us.datetime(ts)
+    dt_them = datetime.datetime.fromtimestamp(ts, tz_them)
+
+    assert dt_them.year == dt_us.date.year
+    assert dt_them.month == dt_us.date.month
+    assert dt_them.day == dt_us.date.day
+    assert dt_them.hour == dt_us.timeOfDay.hour
+    assert dt_them.minute == dt_us.timeOfDay.minute
+    assert dt_them.second == dt_us.timeOfDay.second
