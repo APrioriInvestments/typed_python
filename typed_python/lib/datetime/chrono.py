@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Class, Entrypoint, Final, NamedTuple
+from typed_python import Class, Final, NamedTuple
 
 
 class Chrono(Class, Final):
@@ -20,7 +20,6 @@ class Chrono(Class, Final):
     Implements a number of useful algorithms for working with dates and times.
     """
 
-    @Entrypoint
     @staticmethod
     def days_from_civil(year: int = 0, month: int = 0, day: int = 0) -> int:
         """
@@ -51,7 +50,6 @@ class Chrono(Class, Final):
 
         return days
 
-    @Entrypoint
     @staticmethod
     def day_of_year(year: int = 0, month: int = 0, day: int = 0) -> int:
         doy = (153 * (month - 3 if month > 2 else month + 9) + 2) // 5 + day - 1 + 60
@@ -65,7 +63,6 @@ class Chrono(Class, Final):
 
         return doy
 
-    @Entrypoint
     @staticmethod
     def civil_from_days(
         days_since_epoch: int,
@@ -87,7 +84,6 @@ class Chrono(Class, Final):
             year=y + (m <= 2), month=m, day=d
         )
 
-    @Entrypoint
     @staticmethod
     def date_to_seconds(year: int = 0, month: int = 0, day: int = 0) -> float:
         """
@@ -102,7 +98,6 @@ class Chrono(Class, Final):
         """
         return Chrono.days_from_civil(year, month, day) * 86400
 
-    @Entrypoint
     @staticmethod
     def time_to_seconds(hour: int = 0, minute: int = 0, second: float = 0) -> float:
         """
@@ -116,7 +111,6 @@ class Chrono(Class, Final):
         """
         return (hour * 3600) + (minute * 60) + second
 
-    @Entrypoint
     @staticmethod
     def weekday_difference(day1: int, day2: int) -> int:
         """
@@ -131,7 +125,6 @@ class Chrono(Class, Final):
         day1 -= day2
         return day1 if day1 >= 0 and day1 <= 6 else day1 + 7
 
-    @Entrypoint
     @staticmethod
     def weekday_from_days(days_from_epoch: int) -> int:
         """
@@ -148,7 +141,6 @@ class Chrono(Class, Final):
             else (days_from_epoch + 5) % 7 + 6
         )
 
-    @Entrypoint
     @staticmethod
     def get_nth_dow_of_month(n: int, dow: int, month: int, year: int) -> int:
         """
@@ -179,7 +171,6 @@ class Chrono(Class, Final):
             day=Chrono.weekday_difference(dow, weekday) + 1 + (n - 1) * 7,
         )
 
-    @Entrypoint
     @staticmethod
     def is_leap_year(year: int):
         """
@@ -191,7 +182,6 @@ class Chrono(Class, Final):
         """
         return (year % 4 == 0 and year % 100 != 0) or year % 400 == 0
 
-    @Entrypoint
     @staticmethod
     def is_valid_time(hour: int, minute: int, second: float) -> bool:
         """
@@ -210,7 +200,6 @@ class Chrono(Class, Final):
             return False
         return True
 
-    @Entrypoint
     @staticmethod
     def is_valid_date(year: int, month: int, day: int) -> bool:
         """

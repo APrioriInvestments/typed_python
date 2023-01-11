@@ -1,5 +1,16 @@
-from typed_python import Class, Final, Member, Entrypoint, ConstDict, Held, TypeFunction
+import pytz
+
+from typed_python import (
+    Class,
+    Final,
+    Member,
+    ConstDict,
+    Held,
+    TypeFunction,
+    ListOf,
+)
 from typed_python.lib.datetime.chrono import Chrono
+from typed_python.lib.sorting import searchSorted
 
 
 class NonexistentDateTime(Exception):
@@ -30,7 +41,6 @@ class TimeOfDay(Class, Final):
             f"TimeOfDay(hour={self.hour}, minute={self.minute}, second={self.second})"
         )
 
-    @Entrypoint
     def secondsSinceMidnight(self) -> float:
         """Returns the number of seconds that have elapsed since midnight.
 
@@ -39,7 +49,6 @@ class TimeOfDay(Class, Final):
         """
         return self.second + self.minute * 60 + self.hour * 3600
 
-    @Entrypoint
     def __eq__(self, other):
         return (
             self.hour == other.hour
@@ -47,7 +56,6 @@ class TimeOfDay(Class, Final):
             and self.second == other.second
         )
 
-    @Entrypoint
     def __lt__(self, other):
         if self.hour != other.hour:
             return self.hour < other.hour
@@ -60,7 +68,6 @@ class TimeOfDay(Class, Final):
 
         return False
 
-    @Entrypoint
     def __gt__(self, other):
         if other.hour != self.hour:
             return other.hour < self.hour
@@ -73,11 +80,9 @@ class TimeOfDay(Class, Final):
 
         return False
 
-    @Entrypoint
     def __le__(self, other):
         return self == other or self < other
 
-    @Entrypoint
     def __ge__(self, other):
         return self == other or self > other
 
@@ -103,7 +108,6 @@ class Date(Class, Final):
     def __repr__(self):
         return f"Date(year={self.year}, month={self.month}, day={self.day})"
 
-    @Entrypoint
     def __eq__(self, other):
         return (
             self.year == other.year
@@ -111,7 +115,6 @@ class Date(Class, Final):
             and self.day == other.day
         )
 
-    @Entrypoint
     def __lt__(self, other):
         if self.year != other.year:
             return self.year < other.year
@@ -124,7 +127,6 @@ class Date(Class, Final):
 
         return False
 
-    @Entrypoint
     def __gt__(self, other):
         if other.year != self.year:
             return other.year < self.year
@@ -137,15 +139,12 @@ class Date(Class, Final):
 
         return False
 
-    @Entrypoint
     def __le__(self, other):
         return self == other or self < other
 
-    @Entrypoint
     def __ge__(self, other):
         return self == other or self > other
 
-    @Entrypoint
     def __sub__(self, other) -> int:
         """Returns the number of days separating `self` from `other`.
 
@@ -160,12 +159,10 @@ class Date(Class, Final):
         """
         return self.daysSinceEpoch() - other.daysSinceEpoch()
 
-    @Entrypoint
     def daysSinceEpoch(self) -> int:
         """Returns the number of days since 1970 January 1."""
         return Chrono.days_from_civil(self.year, self.month, self.day)
 
-    @Entrypoint
     def weekday(self) -> int:
         """Returns an integer [0, 6] indicating the day of the week.
         0 => Sunday
@@ -178,12 +175,10 @@ class Date(Class, Final):
         daysSinceEpoch = self.daysSinceEpoch()
         return Chrono.weekday_from_days(daysSinceEpoch)
 
-    @Entrypoint
     def dayOfYear(self) -> int:
         """Returns an integer [1, 366] indicating the day of the year."""
         return Chrono.day_of_year(self.year, self.month, self.day)
 
-    @Entrypoint
     def nextMonthStart(self):
         """Returns a Date indicating when the following month begins."""
         if self.month == 12:
@@ -195,24 +190,19 @@ class Date(Class, Final):
 
         return Date(year, month, 1)
 
-    @Entrypoint
     def lastDayOfMonth(self):
         """Returns the last Date of the month of `self`."""
         return Date.fromDaysSinceEpoch(self.nextMonthStart().daysSinceEpoch() - 1)
 
-    @Entrypoint
     def daysUntilEndOfMonth(self) -> int:
         return self.lastDayOfMonth() - self
 
-    @Entrypoint
     def daysUntilEndOfYear(self) -> int:
         return self.lastDayOfYear() - self
 
-    @Entrypoint
     def lastDayOfYear(self):
         return Date(self.year, 12, 31)
 
-    @Entrypoint
     @staticmethod
     def fromDaysSinceEpoch(daysSinceEpoch):
         """Returns a Date from the number of days that have elapsed since
@@ -220,17 +210,14 @@ class Date(Class, Final):
         dt = Chrono.civil_from_days(daysSinceEpoch)
         return Date(dt.year, dt.month, dt.day)
 
-    @Entrypoint
     def daysInMonth(self) -> int:
         """Returns the number of days in the month."""
         return self.lastDayOfMonth() - Date(self.year, self.month, 1)
 
-    @Entrypoint
     def firstOfMonth(self):
         """Returns the first of the month"""
         return Date(self.year, self.month, 1)
 
-    @Entrypoint
     def quarterOfYear(self):
         return (self.date.month - 1) // 3 + 1
 
@@ -251,11 +238,9 @@ class DateTime(Class, Final):
         self.date = date
         self.timeOfDay = timeOfDay
 
-    @Entrypoint
     def __eq__(self, other):
         return self.date == other.date and self.timeOfDay == other.timeOfDay
 
-    @Entrypoint
     def __lt__(self, other):
         if self.date != other.date:
             return self.date < other.date
@@ -265,7 +250,6 @@ class DateTime(Class, Final):
 
         return False
 
-    @Entrypoint
     def __gt__(self, other):
         if other.date != self.date:
             return other.date < self.date
@@ -275,11 +259,9 @@ class DateTime(Class, Final):
 
         return False
 
-    @Entrypoint
     def __le__(self, other):
         return self == other or self < other
 
-    @Entrypoint
     def __ge__(self, other):
         return self == other or self > other
 
@@ -289,12 +271,17 @@ class DateTime(Class, Final):
     def __repr__(self):
         return f"DateTime(date={repr(self.date)}, timeOfDay={repr(self.timeOfDay)})"
 
+    def __sub__(self, seconds: float):
+        return UTC.datetime(UTC.timestamp(self) - seconds)
+
+    def __add__(self, seconds: float):
+        return UTC.datetime(UTC.timestamp(self) + seconds)
+
 
 class Timezone(Class):
     # An interface for mapping DateTimes to UTC timestamps (i.e.,
     # unequivocal instants in time and vice versa.
 
-    @Entrypoint
     def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
         """Return a UTC timestamp at the instant a locale's clocks would
         show the inputted `DateTime`.
@@ -317,7 +304,6 @@ class Timezone(Class):
         """
         raise NotImplementedError("Subclasses implement.")
 
-    @Entrypoint
     def datetime(self, timestamp: float) -> DateTime:
         """Return the DateTime a locale's clocks would read at the inputted
         UTC timestamp.
@@ -330,9 +316,9 @@ class Timezone(Class):
         """
         raise NotImplementedError("Subclasses implement.")
 
-    @Entrypoint
+    @staticmethod
     def _datetimeFromTimestampAndOffset(
-        self, timestamp: float, offset_hours: float
+        timestamp: float, offset_hours: float
     ) -> DateTime:
         """Returns a DateTime from a UTC timestamp and an offset (in hours). This
         returns the clock in a locale offset from UTC by `offset_hours`.
@@ -358,16 +344,34 @@ class Timezone(Class):
 
         return DateTime(date.year, date.month, date.day, hour, minute, second)
 
+    @staticmethod
+    def _timestampFromDatetimeAndOffset(
+        dateTime: DateTime, offset_hours: float
+    ) -> float:
+        """Returns a timestamp from a local DateTime and an offset (in hours) from UTC.
+
+        Parameters
+        ----------
+        datetime : DateTime
+            a local DateTime.
+        offset_hours : float
+            the number of hours ahead or behind UTC for a given locale. For example,
+            eastern standard time, EST, has offset_hours = -5
+        """
+        return (
+            dateTime.date.daysSinceEpoch() * 86400
+            - offset_hours * 3600
+            + dateTime.timeOfDay.secondsSinceMidnight()
+        )
+
 
 class DaylightSavingsBoundaryRule(Class):
     # An interface for generating DateTimes in a given year corresponding
     # to the beginning and end of a DaylightSavingsTime period in a given
     # locale.
-    @Entrypoint
     def getDaylightSavingsStart(self, year: int) -> DateTime:
         raise NotImplementedError("Subclasses implement")
 
-    @Entrypoint
     def getDaylightSavingsEnd(self, year: int) -> DateTime:
         raise NotImplementedError("Subclasses implement")
 
@@ -420,7 +424,6 @@ class NthWeekdayRule(DaylightSavingsBoundaryRule, Final):
         self.weekdayEnd = weekdayEnd
         self.monthEnd = monthEnd
 
-    @Entrypoint
     def getDaylightSavingsStart(self, year: int) -> DateTime:
         date = Date.fromDaysSinceEpoch(
             Chrono.get_nth_dow_of_month(
@@ -429,7 +432,6 @@ class NthWeekdayRule(DaylightSavingsBoundaryRule, Final):
         )
         return DateTime(date=date, timeOfDay=TimeOfDay(2, 0, 0))
 
-    @Entrypoint
     def getDaylightSavingsEnd(self, year: int) -> DateTime:
         date = Date.fromDaysSinceEpoch(
             Chrono.get_nth_dow_of_month(self.nEnd, self.weekdayEnd, self.monthEnd, year)
@@ -461,12 +463,10 @@ class LastWeekdayRule(DaylightSavingsBoundaryRule, Final):
         self.weekdayEnd = weekdayEnd
         self.monthEnd = monthEnd
 
-    @Entrypoint
     def getDaylightSavingsStart(self, year: int) -> DateTime:
         date = last_weekday_of_month(year, self.monthStart, self.weekdayStart)
         return DateTime(date=date, timeOfDay=TimeOfDay(2, 0, 0))
 
-    @Entrypoint
     def getDaylightSavingsEnd(self, year: int) -> DateTime:
         date = last_weekday_of_month(year, self.monthEnd, self.weekdayEnd)
         return DateTime(date=date, timeOfDay=TimeOfDay(2, 0, 0))
@@ -506,7 +506,6 @@ class NthToLastWeekdayRule(DaylightSavingsBoundaryRule, Final):
         self.weekdayEnd = weekdayEnd
         self.monthEnd = monthEnd
 
-    @Entrypoint
     def getDaylightSavingsStart(self, year: int) -> DateTime:
         date = Date.fromDaysSinceEpoch(
             Chrono.get_nth_dow_of_month(
@@ -515,7 +514,6 @@ class NthToLastWeekdayRule(DaylightSavingsBoundaryRule, Final):
         )
         return DateTime(date=date, timeOfDay=TimeOfDay(2, 0, 0))
 
-    @Entrypoint
     def getDaylightSavingsEnd(self, year: int) -> DateTime:
         date = last_weekday_of_month(year, self.monthEnd, self.weekdayEnd)
         return DateTime(date=date, timeOfDay=TimeOfDay(2, 0, 0))
@@ -530,14 +528,12 @@ class DateTimeRule(DaylightSavingsBoundaryRule, Final):
         self.dateTimeStart = dateTimeStart
         self.dateTimeEnd = dateTimeEnd
 
-    @Entrypoint
     def getDaylightSavingsStart(self, year: int) -> DateTime:
         if year != self.dateTimeStart.date.year:
             raise Exception("You are probably using the wrong rule for this timezone.")
 
         return self.dateTimeStart
 
-    @Entrypoint
     def getDaylightSavingsEnd(self, year: int) -> DateTime:
         if year != self.dateTimeEnd.date.year:
             raise Exception("You are probably using the wrong rule for this timezone.")
@@ -577,7 +573,6 @@ class DaylightSavingsTimezone(Timezone, Final):
         self.st_offset_hours = st_offset_hours
         self.dst_boundaries = dst_boundaries
 
-    @Entrypoint
     def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
         year = dateTime.date.year
 
@@ -604,13 +599,8 @@ class DaylightSavingsTimezone(Timezone, Final):
             self.dst_offset_hours if is_daylight_savings else self.st_offset_hours
         )
 
-        return (
-            dateTime.date.daysSinceEpoch() * 86400
-            - offset_hours * 3600
-            + dateTime.timeOfDay.secondsSinceMidnight()
-        )
+        return self._timestampFromDatetimeAndOffset(dateTime, offset_hours)
 
-    @Entrypoint
     def datetime(self, timestamp) -> DateTime:
         # Figure out if this timestamp falls within daylight savings or not.
         # Technically this could be off by a day (on Dec 31 or Jan1),
@@ -644,15 +634,9 @@ class FixedOffsetTimezone(Timezone, Final):
 
     offset_hours = Member(float)
 
-    @Entrypoint
     def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
-        return (
-            dateTime.date.daysSinceEpoch() * 86400
-            + dateTime.timeOfDay.secondsSinceMidnight()
-            - self.offset_hours * 3600
-        )
+        return self._timestampFromDatetimeAndOffset(dateTime, self.offset_hours)
 
-    @Entrypoint
     def datetime(self, timestamp: float) -> DateTime:
         return self._datetimeFromTimestampAndOffset(timestamp, self.offset_hours)
 
@@ -678,7 +662,6 @@ class SwitchOffsetTimezone(Timezone, Final):
         self.offset_hours_after = offset_hours_after
         self.switch_datetime = switch_datetime
 
-    @Entrypoint
     def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
         switch = self.switch_datetime
 
@@ -690,18 +673,17 @@ class SwitchOffsetTimezone(Timezone, Final):
         ):
             raise OneFoldOnlyError("There is only one fold.")
 
-        if jumps_forward and dateTime.timeOfDay.hour == switch.timeOfDay.hour:
+        if (
+            jumps_forward
+            and dateTime.date == switch.date
+            and dateTime.timeOfDay.hour == switch.timeOfDay.hour
+        ):
             raise NonexistentDateTime(dateTime)
 
         offset_hours = self.offset_hours_after if is_after else self.offset_hours_before
 
-        return (
-            dateTime.date.daysSinceEpoch() * 86400
-            - offset_hours * 3600
-            + dateTime.timeOfDay.secondsSinceMidnight()
-        )
+        return self._timestampFromDatetimeAndOffset(dateTime, offset_hours)
 
-    @Entrypoint
     def datetime(self, timestamp: float) -> DateTime:
         ts_switch = (
             self.switch_datetime.date.daysSinceEpoch() * 86400
@@ -790,18 +772,15 @@ def UsTimezone(st_offset_hours, dst_offset_hours):
             }
         )
 
-        @Entrypoint
         def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
             return self.chooseTimezone(dateTime.date.year).timestamp(
                 dateTime, afterFold
             )
 
-        @Entrypoint
         def datetime(self, timestamp: float) -> DateTime:
             year = Chrono.civil_from_days(timestamp // 86400).year
             return self.chooseTimezone(year).datetime(timestamp)
 
-        @Entrypoint
         def chooseTimezone(self, year: int):
             if year >= 2007:
                 return self.TIMEZONES_BY_START_YEAR[2007]
@@ -848,35 +827,173 @@ def UsTimezone(st_offset_hours, dst_offset_hours):
     return UsTimezone_
 
 
-NYC = UsTimezone(-5, -4)()
-CHI = UsTimezone(-6, -5)()
 UTC = FixedOffsetTimezone(offset_hours=0)
+
+
+class PytzTimezone(Timezone, Final):
+    transition_timestamps = Member(ListOf(float))
+    transition_datetimes = Member(ListOf(DateTime))
+    transition_offsets_before = Member(ListOf(float))
+    transition_offsets_after = Member(ListOf(float))
+
+    @staticmethod
+    def fromName(timezone_name: str):
+        transition_timestamps = ListOf(float)()
+        transition_datetimes = ListOf(DateTime)()
+        transition_offsets_before = ListOf(float)()
+        transition_offsets_after = ListOf(float)()
+
+        try:
+            pytzTimezone = pytz.timezone(timezone_name)
+        except Exception:
+            raise Exception(f"Could not construct pytz.timezone({timezone_name})")
+
+        if not hasattr(pytzTimezone, "_utc_transition_times") or not hasattr(
+            pytzTimezone, "_transition_info"
+        ):
+            raise Exception(
+                "Either the pytz API changed or this timezone is a fixed offset from UTC, in "
+                "which case you should determine the offset in hours and construct a "
+                "FixedOffsetTimezone(offset_hours=<offset in hours>)."
+            )
+
+        transitions = pytzTimezone._utc_transition_times
+        info = pytzTimezone._transition_info
+
+        if len(transitions) != len(info):
+            raise Exception(
+                "Ambiguous number of transitions from pytz.timezone object."
+            )
+
+        for i in range(1, len(transitions)):
+            dt = transitions[i]
+            ts = UTC.timestamp(
+                DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+            )
+            transition_timestamps.append(ts)
+            offset_hours_before = info[i - 1][0].total_seconds() / 3600
+            offset_hours_after = info[i][0].total_seconds() / 3600
+
+            transition_datetimes.append(
+                Timezone._datetimeFromTimestampAndOffset(ts, offset_hours_before)
+            )
+            transition_offsets_before.append(offset_hours_before)
+            transition_offsets_after.append(offset_hours_after)
+
+        if transition_timestamps != sorted(
+            transition_timestamps
+        ) or transition_datetimes != sorted(transition_datetimes):
+            raise Exception("Expected transition info to be sorted.")
+
+        return PytzTimezone(
+            transition_timestamps=transition_timestamps,
+            transition_datetimes=transition_datetimes,
+            transition_offsets_before=transition_offsets_before,
+            transition_offsets_after=transition_offsets_after,
+        )
+
+    def timestamp(self, dateTime: DateTime, afterFold: bool = False) -> float:
+        """Return a UTC timestamp at the instant a locale's clocks would
+        show the inputted `DateTime`.
+
+        Parameters
+        ----------
+        dateTime : DateTime
+            The date and time a clock would read in a given locale.
+        afterFold : bool
+            Sometimes, the same DateTime corresponds to two different
+            UTC timestamps, e.g., when clocks are rolled backwards in the
+            Autumn for Daylight Savings time. In these cases, 1am to 2am
+            hour repeats. When `afterFold` is True, we return the second
+            occurence. Otherwise we return the first occurence.
+
+        Returns
+        -------
+        float
+
+        """
+        i = searchSorted(dateTime, self.transition_datetimes)
+
+        if i == len(self.transition_datetimes):
+            offset = self.transition_offsets_after[i - 1]
+            return self._timestampFromDatetimeAndOffset(dateTime, offset)
+
+        switch = self.transition_datetimes[i]
+        offset_before = self.transition_offsets_before[i]
+        offset_after = self.transition_offsets_after[i]
+        offset = (
+            offset_after if afterFold else offset_before
+        )  # pytz just uses offset_before
+        res = self._timestampFromDatetimeAndOffset(dateTime, offset)
+
+        # Check for errors.
+        jumps_forward = offset_after > offset_before
+        if afterFold and (dateTime.date != switch.date or jumps_forward):
+            raise OneFoldOnlyError("There is only one fold.")
+
+        if i > 0:
+            last_switch = self.transition_datetimes[i - 1]
+            offset_before_last = self.transition_offsets_before[i - 1]
+            offset_after_last = self.transition_offsets_after[i - 1]
+            jumped_forward = offset_after_last > offset_before_last
+            if (
+                jumped_forward
+                and dateTime.date == last_switch.date
+                and dateTime.timeOfDay.hour == last_switch.timeOfDay.hour
+            ):
+                raise NonexistentDateTime(repr(dateTime))
+
+        return res
+
+    def datetime(self, timestamp: float) -> DateTime:
+        """Return the DateTime a locale's clocks would read at the inputted
+        UTC timestamp.
+
+        Parameters
+        ----------
+        timestamp : float
+            timestamp
+
+        """
+        i = searchSorted(timestamp, self.transition_timestamps)
+        if i == len(self.transition_datetimes):
+            offset = self.transition_offsets_after[i - 1]
+        else:
+            offset = self.transition_offsets_before[i]
+        return self._datetimeFromTimestampAndOffset(timestamp, offset)
+
+
+NYC = PytzTimezone.fromName("America/New_York")
 EST = FixedOffsetTimezone(offset_hours=-5)
 IST = FixedOffsetTimezone(offset_hours=2)
 
 
 class TimezoneChecker(Class, Final):
     TIMEZONES = ConstDict(str, Timezone)(
-        {
-            "": UTC,
-            "+0000": UTC,
-            "nyc": NYC,
-            "utc": UTC,
-            "z": UTC,
-            "est": EST,
-            "edt": NYC,
-            "ist": IST,
-            "chi": CHI,
-        }
+        {"": UTC, "+0000": UTC, "utc": UTC, "z": UTC, "est": EST, "nyc": NYC}
     )
+    PYTZ_TIMEZONES = pytz.all_timezones
 
     @classmethod
-    @Entrypoint
     def isValidTimezone(cls, timeZoneString: str) -> bool:
-        return timeZoneString.lower() in cls.TIMEZONES
+        if timeZoneString.lower() in cls.TIMEZONES:
+            return True
+
+        elif timeZoneString in cls.PYTZ_TIMEZONES:
+            return True
+
+        else:
+            return False
+
+    @classmethod
+    def get(cls, timeZoneString: str) -> Timezone:
+        if timeZoneString.lower() in cls.TIMEZONES:
+            return cls.TIMEZONES[timeZoneString]
+
+        elif timeZoneString in cls.PYTZ_TIMEZONES:
+            return PytzTimezone(timeZoneString)
 
 
-@Entrypoint
 def last_weekday_of_month(year: int, month: int, weekday: int) -> Date:
     """Return the last weekday in a given month.
 

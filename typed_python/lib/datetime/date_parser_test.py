@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import pytz
 import unittest
 import time
 from typed_python.lib.datetime.date_parser import DateParser
@@ -21,7 +22,6 @@ from typed_python import Entrypoint, ListOf
 
 import pytest
 from datetime import datetime, timedelta
-import pytz
 
 
 def get_years_in_range(start, end):
