@@ -15,9 +15,12 @@
 import os
 import uuid
 import shutil
+
+from typing import Optional, List
+
 # from typed_python.compiler.loaded_module import LoadedModule
 from typed_python.compiler.binary_shared_object import LoadedBinarySharedObject, BinarySharedObject
-
+from typed_python.compiler.directed_graph import DirectedGraph
 from typed_python.SerializationContext import SerializationContext
 from typed_python import Dict, ListOf
 
@@ -55,7 +58,7 @@ class CompilerCache:
         self.loadedBinarySharedObjects = Dict(str, LoadedBinarySharedObject)()
         self.nameToModuleHash = Dict(str, str)()
 
-        # self.modulesMarkedValid = set()
+        self.moduleManifestsLoaded = set()
         # self.modulesMarkedInvalid = set()
 
         for moduleHash in os.listdir(self.cacheDir):
@@ -67,6 +70,11 @@ class CompilerCache:
 
         # the function's globals have been linked and validated and it is good to go.
         self.targetsValidated = set()
+
+        # function dependency graph. DirectedGraph?
+        self.function_dependency_graph = DirectedGraph()
+        # dict from function linkname to list of global names (should be llvm keys in serialisedGlobalDefinitions)
+        self.global_dependencies = Dict(str, ListOf(str))()
 
     def hasSymbol(self, linkName: str) -> bool:
         """NB this will return True even if the linkName is ultimately unretrievable."""
@@ -84,6 +92,10 @@ class CompilerCache:
     #     with open(os.path.join(self.cacheDir, hashstr, "marked_invalid"), "w"):
     #         pass
 
+    def dependencies(self, linkName: str) -> Optional[List[str]]:
+        """Returns all the function names that `linkName` depends on"""
+        return list(self.function_dependency_graph.outgoing(linkName))
+
     def loadForSymbol(self, linkName: str) -> None:
         """Loads the whole module, and any submodules, into LoadedBinarySharedObjects"""
         moduleHash = self.nameToModuleHash[linkName]
@@ -92,11 +104,20 @@ class CompilerCache:
 
         # TODO - the linking and validation for the linkName and its dependencies.
         if linkName not in self.targetsValidated:
-            dependentFuncs = self.dependants(linkName)  # optimise - just the unlinked dependents?
-            newGlobalVars = self.getNecessaryGlobals([linkName] + dependentFuncs)
-            self.loadedBinarySharedObjects[moduleHash].linkGlobalVariables(newGlobalVars)  # this doesn't account for cross-module walk.
-            self.loadedBinarySharedObjects[moduleHash].validateGlobalVariables(newGlobalVars)
-            self.targetsValidated.update(dependentFuncs)
+            dependantFuncs = self.dependencies(linkName) + [linkName]
+            globalsToLink = {}  # this is a dict from modulehash to list of globals.
+            for funcName in dependantFuncs:
+                if funcName not in self.targetsValidated:
+                    funcModuleHash = self.nameToModuleHash[funcName]
+                    # append to the list of globals to link for a given module.  TODO: optimise this, don't double-link.
+                    globalsToLink[funcModuleHash] = globalsToLink.get(funcModuleHash, []) + self.global_dependencies.get(funcName, [])
+
+            for hash, globs in globalsToLink.items():  # this works because loadModuleByHash loads submodules too.
+                if globs:
+                    self.loadedBinarySharedObjects[hash].linkGlobalVariables(globs)
+                    self.loadedBinarySharedObjects[hash].validateGlobalVariables(globs)
+
+            self.targetsValidated.update(dependantFuncs)
 
     def loadModuleByHash(self, moduleHash: str) -> None:
         """Load a module by name.
@@ -173,27 +194,27 @@ class CompilerCache:
             self.nameToModuleHash[n] = hashToUse
 
     def loadNameManifestFromStoredModuleByHash(self, moduleHash):
-        if moduleHash in self.modulesMarkedValid:
+        if moduleHash in self.moduleManifestsLoaded:
             return True
 
         targetDir = os.path.join(self.cacheDir, moduleHash)
 
         # ignore 'marked invalid'
-        if os.path.exists(os.path.join(targetDir, "marked_invalid")):
-            # just bail - don't try to read it now
+        # if os.path.exists(os.path.join(targetDir, "marked_invalid")):
+        #     # just bail - don't try to read it now
 
-            # for the moment, we don't try to clean up the cache, because
-            # we can't be sure that some process is not still reading the
-            # old files.
-            self.modulesMarkedInvalid.add(moduleHash)
-            return False
+        #     # for the moment, we don't try to clean up the cache, because
+        #     # we can't be sure that some process is not still reading the
+        #     # old files.
+        #     self.modulesMarkedInvalid.add(moduleHash)
+        #     return False
 
         with open(os.path.join(targetDir, "submodules.dat"), "rb") as f:
             submodules = SerializationContext().deserialize(f.read(), ListOf(str))
 
         for subHash in submodules:
             if not self.loadNameManifestFromStoredModuleByHash(subHash):
-                self.markModuleHashInvalid(subHash)
+                # self.markModuleHashInvalid(subHash)
                 return False
 
         with open(os.path.join(targetDir, "name_manifest.dat"), "rb") as f:
@@ -201,7 +222,7 @@ class CompilerCache:
                 SerializationContext().deserialize(f.read(), Dict(str, str))
             )
 
-        self.modulesMarkedValid.add(moduleHash)
+        self.moduleManifestsLoaded.add(moduleHash)
 
         return True
 
