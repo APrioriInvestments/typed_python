@@ -22,20 +22,26 @@ class Chrono(Class, Final):
 
     @staticmethod
     def days_from_civil(year: int = 0, month: int = 0, day: int = 0) -> int:
+        """Returns the number of days since 1970 January 1.
+
+        Implements the algorithm defined here:
+        https://howardhinnant.github.io/date_algorithms.html#days_from_civil
+
+        Inverts Chrono.civil_from_days.
+
+        Parameters
+        ----------
+        year/month/day : int
+            The year, month, and day in the Gregorian calendar.
+
+        Returns
+        -------
+        int
+            The number of days since the epoch.
         """
-        Creates a unix timestamp from year, month, day values.
-        Parameters:
-            year (int): The year
-            month (int): The month. January: 1, February: 2, ....
-            day (int): The day
-        Returns:
-            seconds(float): The number of seconds
-        """
-        # Implements the days_from_civil algorithm described here:
-        # https://howardhinnant.github.io/date_algorithms.html#days_from_civil
 
         year -= month <= 2
-        era = (year if year >= 0 else year - 399) // 400
+        era = Chrono.div(year if year >= 0 else year - 399, 400)
         # year of the era
         yoe = year - era * 400
 
@@ -52,6 +58,19 @@ class Chrono(Class, Final):
 
     @staticmethod
     def day_of_year(year: int = 0, month: int = 0, day: int = 0) -> int:
+        """Returns the day number of the year since January 1.
+
+        Parameters
+        ----------
+        year/month/day : int
+            The year, month, and day in the Gregorian calendar.
+
+        Returns
+        -------
+        int
+            The day number of the year [1, 366]
+        """
+
         doy = (153 * (month - 3 if month > 2 else month + 9) + 2) // 5 + day - 1 + 60
 
         if doy > 365:
@@ -64,16 +83,36 @@ class Chrono(Class, Final):
         return doy
 
     @staticmethod
+    def div(a: int, b: int) -> int:
+        """Euclidean division rounding towards zero."""
+        return a // b if a > 0 else -(-a // b)
+
+    @staticmethod
     def civil_from_days(
         days_since_epoch: int,
     ) -> NamedTuple(year=int, month=int, day=int):
-        # Implements the days_from_civil algorithm described here:
-        # https://howardhinnant.github.io/date_algorithms.html#civil_from_days
+        """Returns the date in the Gregorian calendar as a NamedTuple.
+
+        Implements the days_from_civil algorithm described here:
+         https://howardhinnant.github.io/date_algorithms.html#civil_from_days
+
+        Inverts Chrono.days_from_civil.
+
+        Parameters
+        ----------
+        days_since_epoch : int
+            The number of days since 1 January 1970
+
+        Returns
+        -------
+        NamedTuple(year=int, month=int, day=int)
+
+        The date in the Gregorian calendar.
+
+        """
         days_since_epoch += 719468
-        era = (
-            days_since_epoch if days_since_epoch >= 0 else days_since_epoch - 146096
-        ) // 146097
-        doe = days_since_epoch - era * 146097
+        era = Chrono.div( days_since_epoch if days_since_epoch >= 0 else days_since_epoch - 146096, 146097)
+        doe = (days_since_epoch - era * 146097)
         yoe = (doe - doe // 1460 + doe // 36524 - doe // 146096) // 365
         y = yoe + era * 400
         doy = doe - (365 * yoe + yoe // 4 - yoe // 100)
@@ -83,33 +122,6 @@ class Chrono(Class, Final):
         return NamedTuple(year=int, month=int, day=int)(
             year=y + (m <= 2), month=m, day=d
         )
-
-    @staticmethod
-    def date_to_seconds(year: int = 0, month: int = 0, day: int = 0) -> float:
-        """
-        Creates a unix timestamp from date values.
-        Parameters:
-            year (int): The year
-            month (int): The month. January: 1, February: 2, ....
-            day (int): The day
-        Returns:
-            seconds(float): The number of seconds
-
-        """
-        return Chrono.days_from_civil(year, month, day) * 86400
-
-    @staticmethod
-    def time_to_seconds(hour: int = 0, minute: int = 0, second: float = 0) -> float:
-        """
-        Converts and hour, min, second combination into seconds
-        Parameters:
-            hour (int): The hour (0-23)
-            minute (int): The minute
-            second (float): The second
-        Returns:
-            (float) the number of seconds
-        """
-        return (hour * 3600) + (minute * 60) + second
 
     @staticmethod
     def weekday_difference(day1: int, day2: int) -> int:
@@ -193,12 +205,7 @@ class Chrono(Class, Final):
         Returns:
             True if the time is valid, False otherwise
         """
-        # '24' is valid alternative to '0' but only when min and sec are both 0
-        if hour < 0 or hour > 24 or (hour == 24 and (minute != 0 or second != 0)):
-            return False
-        elif minute < 0 or minute > 59 or second < 0 or second >= 60:
-            return False
-        return True
+        return (0 <= hour < 24) and (0 <= minute < 60) and (0 <= second < 60)
 
     @staticmethod
     def is_valid_date(year: int, month: int, day: int) -> bool:

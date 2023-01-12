@@ -74,7 +74,6 @@ class TestChrono(unittest.TestCase):
         # h, m, s
         times = [
             (0, 0, 0),  # 00:00:00
-            (24, 0, 0),  # 24:00:00
             (1, 1, 1),  # random time
             (12, 59, 59),  # random time
         ]
@@ -84,7 +83,7 @@ class TestChrono(unittest.TestCase):
     def test_is_time_invalid(self):
         # h, m, s
         times = [
-            (24, 1, 0),  # m and s must be 0 if hour is 24
+            (24, 0, 0),  # hour < 24
             (25, 0, 0),  # hour greater than 24
             (-1, 0, 0),  # hour less than 0
             (1, 0, -1),  # second < 1
@@ -96,14 +95,9 @@ class TestChrono(unittest.TestCase):
             assert not Chrono.is_valid_time(time[0], time[1], time[2]), time
 
     def test_days_from_civil(self):
-        days = Chrono.days_from_civil(1999, 2, 15)
-        res = Chrono.civil_from_days(days)
-        assert res.year == 1999
-        assert res.month == 2
-        assert res.day == 15
-
-        days = Chrono.days_from_civil(2022, 12, 23)
-        res = Chrono.civil_from_days(days)
-        assert res.year == 2022
-        assert res.month == 12
-        assert res.day == 23
+        for (year, month, day) in [(1999, 2, 15), (2022, 12, 23), (0, 1, 1), (-1, 1, 1)]:
+            days = Chrono.days_from_civil(year, month, day)
+            res = Chrono.civil_from_days(days)
+            assert res.year == year
+            assert res.month == month
+            assert res.day == day

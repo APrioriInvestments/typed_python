@@ -21,6 +21,10 @@ class OneFoldOnlyError(Exception):
     pass
 
 
+class NonexistentDate(Exception):
+    pass
+
+
 @Held
 class TimeOfDay(Class, Final):
     # Models a naive, timezone-unaware time of day.
@@ -29,6 +33,12 @@ class TimeOfDay(Class, Final):
     second = Member(float)
 
     def __init__(self, hour: int, minute: int, second: float):
+        if not Chrono.is_valid_time(hour, minute, second):
+            raise Exception(
+                "Invalid arguments to TimeOfDay: (hour, minute, second) "
+                f"= ({hour}, {minute}, {second})"
+            )
+
         self.hour = hour
         self.minute = minute
         self.second = second
@@ -98,6 +108,10 @@ class Date(Class, Final):
     day = Member(int)
 
     def __init__(self, year: int, month: int, day: int):
+        # check that it is valid.
+        if not Chrono.is_valid_date(year, month, day):
+            raise NonexistentDate("%02.f-%02.f-%02.f" % (year, month, day))
+
         self.year = year
         self.month = month
         self.day = day
@@ -170,25 +184,46 @@ class Date(Class, Final):
         2 => Tuesday
         3 => Wednesday
         4 => Thursday
-        6 => Friday
+        5 => Friday
+        6 => Saturday
         """
         daysSinceEpoch = self.daysSinceEpoch()
         return Chrono.weekday_from_days(daysSinceEpoch)
+
+    def weekdayString(self) -> str:
+        weekday = self.weekday()
+        if weekday == 0:
+            return "Sunday"
+        elif weekday == 1:
+            return "Monday"
+        elif weekday == 2:
+            return "Tuesday"
+        elif weekday == 3:
+            return "Wednesday"
+        elif weekday == 4:
+            return "Thursday"
+        elif weekday == 5:
+            return "Friday"
+        elif weekday == 6:
+            return "Saturday"
+        else:
+            raise Exception(f"Invalid weekday: {weekday}. It should be in [0, 6].")
 
     def dayOfYear(self) -> int:
         """Returns an integer [1, 366] indicating the day of the year."""
         return Chrono.day_of_year(self.year, self.month, self.day)
 
-    def nextMonthStart(self):
-        """Returns a Date indicating when the following month begins."""
-        if self.month == 12:
-            year = self.year + 1
-            month = 1
-        else:
-            year = self.year
-            month = self.month + 1
+    def nextMonthStart(self, step: int = 1):
+        """Returns a Date indicating when the following month begins.
 
-        return Date(year, month, 1)
+        Parameters
+        ----------
+        step : int
+            The number of months to increment. Defaults to 1.
+        """
+        months = (self.month - 1) + step
+        month = (months % 12) + 1
+        return Date(self.year + months // 12, month, 1)
 
     def lastDayOfMonth(self):
         """Returns the last Date of the month of `self`."""
@@ -212,7 +247,7 @@ class Date(Class, Final):
 
     def daysInMonth(self) -> int:
         """Returns the number of days in the month."""
-        return self.lastDayOfMonth() - Date(self.year, self.month, 1)
+        return self.lastDayOfMonth() - Date(self.year, self.month, 1) + 1
 
     def firstOfMonth(self):
         """Returns the first of the month"""
@@ -220,6 +255,100 @@ class Date(Class, Final):
 
     def quarterOfYear(self):
         return (self.date.month - 1) // 3 + 1
+
+    def next(self, step: int = 1):
+        """Returns the date `step` days ahead of `self`.
+
+        Parameters
+        ----------
+        step : int
+            How many days to go in the future.
+        """
+        return self.fromDaysSinceEpoch(self.daysSinceEpoch() + step)
+
+    def previous(self, step: int = 1):
+        """Returns the date `step` days before `self`.
+
+        Parameters
+        ----------
+        step : int
+            How many days to go in the past.
+        """
+        if step < 0:
+            raise Exception(
+                "You passed step < 0 `previous`. "
+                "Surely, you meant to call `next` with step > 0."
+            )
+        return self.next(-step)
+
+    def nextWeekday(self, weekday: int):
+        """Returns the next instance of the weekday encoded by `weekday`.
+
+        Parameters
+        ----------
+        weekday : int
+            0 => Sunday
+            1 => Monday, etc.
+        """
+        daysToWeekday = (weekday - self.weekday()) % 7
+        return self.next(step=daysToWeekday)
+
+    def lastWeekday(self, weekday: int):
+        """Returns the last instance of the weekday encoded by `weekday`.
+
+        Parameters
+        ----------
+        weekday : int
+            0 => Sunday
+            1 => Monday, etc.
+        """
+        daysToWeekday = (weekday - self.weekday()) % 7
+        return self.previous(step=daysToWeekday)
+
+    def nextMonth(self, stepSize: int = 1, dayOverride: int = 0):
+        """Returns the date `stepSize` months in the future of `self`..
+
+        Parameters
+        ----------
+        stepSize : int
+            How many months to look ahead.
+        dayOverride : int
+            If not 0, use this instead of self.day to determine the
+            the day to use.
+
+            This is useful for chaining calls, where succeeding months
+            have fewer days, e.g., from, say,  2022-01-31.
+
+            Ordinarily, .nextMonth() would produce 2022-02-28, and another call
+            would produce 2022-03-28. But with an override, you can get
+            2022-03-31, with, e.g.,
+
+            Date(2022, 1, 31).nextMonth(dayOverride=31).nextMonth(dayOverride=31)
+
+
+        """
+        nextMonthStart = self.nextMonthStart(stepSize)
+        day = min(
+            nextMonthStart.daysInMonth(), dayOverride if dayOverride else self.day
+        )
+        return Date(nextMonthStart.year, nextMonthStart.month, day)
+
+    def nextYear(self, stepSize: int = 1, dayOverride: int = 0):
+        """Returns the date `stepSize` years in the future of `self`.
+
+        Parameters
+        ----------
+        stepSize : int
+            How many years to look ahead.
+        dayOverride : int
+            See Date.nextMonth
+        """
+        year = self.year + stepSize
+        day = min(
+            Date(year, self.month, 1).daysInMonth(),
+            dayOverride if dayOverride else self.day,
+        )
+        return Date(year, self.month, day)
 
 
 @Held
@@ -240,6 +369,30 @@ class DateTime(Class, Final):
 
     def __eq__(self, other):
         return self.date == other.date and self.timeOfDay == other.timeOfDay
+
+    @property
+    def year(self):
+        return self.date.year
+
+    @property
+    def month(self):
+        return self.date.month
+
+    @property
+    def day(self):
+        return self.date.day
+
+    @property
+    def hour(self):
+        return self.timeOfDay.hour
+
+    @property
+    def minute(self):
+        return self.timeOfDay.minute
+
+    @property
+    def second(self):
+        return self.timeOfDay.second
 
     def __lt__(self, other):
         if self.date != other.date:
@@ -965,7 +1118,6 @@ class PytzTimezone(Timezone, Final):
 
 NYC = PytzTimezone.fromName("America/New_York")
 EST = FixedOffsetTimezone(offset_hours=-5)
-IST = FixedOffsetTimezone(offset_hours=2)
 
 
 class TimezoneChecker(Class, Final):
@@ -975,23 +1127,25 @@ class TimezoneChecker(Class, Final):
     PYTZ_TIMEZONES = pytz.all_timezones
 
     @classmethod
-    def isValidTimezone(cls, timeZoneString: str) -> bool:
-        if timeZoneString.lower() in cls.TIMEZONES:
+    def isValidTimezone(cls, timezone_string: str) -> bool:
+        if timezone_string.lower() in cls.TIMEZONES:
             return True
 
-        elif timeZoneString in cls.PYTZ_TIMEZONES:
+        elif timezone_string in cls.PYTZ_TIMEZONES:
             return True
 
         else:
             return False
 
     @classmethod
-    def get(cls, timeZoneString: str) -> Timezone:
-        if timeZoneString.lower() in cls.TIMEZONES:
-            return cls.TIMEZONES[timeZoneString]
+    def get(cls, timezone_string: str) -> Timezone:
+        if timezone_string.lower() in cls.TIMEZONES:
+            return cls.TIMEZONES[timezone_string]
 
-        elif timeZoneString in cls.PYTZ_TIMEZONES:
-            return PytzTimezone(timeZoneString)
+        elif timezone_string in cls.PYTZ_TIMEZONES:
+            return PytzTimezone(timezone_string)
+
+        raise Exception(f"Unrecognized timezone: {timezone_string}")
 
 
 def last_weekday_of_month(year: int, month: int, weekday: int) -> Date:
