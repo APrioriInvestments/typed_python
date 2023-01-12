@@ -22,7 +22,7 @@ from typed_python.compiler.native_function_pointer import NativeFunctionPointer
 from typed_python.compiler.binary_shared_object import BinarySharedObject
 
 import ctypes
-from typed_python import _types
+from typed_python import _types, SerializationContext
 
 llvm.initialize()
 llvm.initialize_native_target()
@@ -117,17 +117,20 @@ class Compiler:
 
         self.engine.finalize_object()
 
+        serializedGlobalVariableDefinitions = {x: SerializationContext().serialize(y) for x, y in module.globalVariableDefinitions.items()}
+
         return BinarySharedObject.fromModule(
             mod,
-            module.globalVariableDefinitions,
+            serializedGlobalVariableDefinitions,
             module.functionNameToType,
+            module.globalDependencies
         )
 
     def function_pointer_by_name(self, name):
         return self.functions_by_name.get(name)
 
     def buildModule(self, functions):
-        """Compile a list of functions into a new module.
+        """Compile a list of functions into a new module. Only relevant if there is no compiler cache.
 
         Args:
             functions - a map from name to native_ast.Function
@@ -183,4 +186,5 @@ class Compiler:
             )
         )
 
-        return LoadedModule(native_function_pointers, module.globalVariableDefinitions)
+        serializedGlobalVariableDefinitions = {x: SerializationContext().serialize(y) for x, y in module.globalVariableDefinitions.items()}
+        return LoadedModule(native_function_pointers, serializedGlobalVariableDefinitions)

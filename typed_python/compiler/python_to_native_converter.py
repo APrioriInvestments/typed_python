@@ -17,6 +17,7 @@ import logging
 
 from typed_python.hash import Hash
 from types import ModuleType
+from typing import Dict
 from typed_python import Class
 import typed_python.python_ast as python_ast
 import typed_python._types as _types
@@ -129,10 +130,10 @@ class PythonToNativeConverter:
 
         self._link_name_for_identity = {}
         self._identity_for_link_name = {}
-        self._definitions = {}
-        self._targets = {}
+        self._definitions: Dict[str, native_ast.Function] = {}
+        self._targets: Dict[str, TypedCallTarget] = {}
         self._inflight_definitions = {}
-        self._inflight_function_conversions = {}
+        self._inflight_function_conversions: Dict[str, FunctionConversionContext] = {}
         self._identifier_to_pyfunc = {}
         self._times_calculated = {}
 
@@ -194,12 +195,14 @@ class PythonToNativeConverter:
 
         # get a set of function names that we depend on
         externallyUsed = set()
+        dependency_edgelist = []
 
         for funcName in targets:
             ident = self._identity_for_link_name.get(funcName)
             if ident is not None:
                 for dep in self._dependencies.getNamesDependedOn(ident):
                     depLN = self._link_name_for_identity.get(dep)
+                    dependency_edgelist.append([funcName, depLN])
                     if depLN not in targets:
                         externallyUsed.add(depLN)
 
@@ -208,7 +211,8 @@ class PythonToNativeConverter:
         self.compilerCache.addModule(
             binary,
             {name: self.getTarget(name) for name in targets if self.hasTarget(name)},
-            externallyUsed
+            externallyUsed,
+            dependency_edgelist,
         )
 
     def extract_new_function_definitions(self):
@@ -277,13 +281,14 @@ class PythonToNativeConverter:
         self._targets.pop(linkName)
 
     def setTarget(self, linkName, target):
+        assert(isinstance(target, TypedCallTarget))
         self._targets[linkName] = target
 
     def getTarget(self, linkName):
         if linkName in self._targets:
             return self._targets[linkName]
 
-        if self.compilerCache.hasSymbol(linkName):
+        if self.compilerCache is not None and self.compilerCache.hasSymbol(linkName):
             return self.compilerCache.getTarget(linkName)
 
         return None
@@ -293,7 +298,7 @@ class PythonToNativeConverter:
 
             name - the name to actually give the function.
             identityTuple - a unique (sha)hashable tuple
-            context - a FunctionConvertsionContext lookalike
+            context - a FunctionConversionContext lookalike
 
         returns a TypedCallTarget, or None if it's not known yet
         """
@@ -329,7 +334,7 @@ class PythonToNativeConverter:
         if self._currentlyConverting is None:
             # force the function to resolve immediately
             self._resolveAllInflightFunctions()
-            self._installInflightFunctions(name)
+            self._installInflightFunctions()
             self._inflight_function_conversions.clear()
 
         return self.getTarget(linkName)
@@ -460,7 +465,7 @@ class PythonToNativeConverter:
             return linkName
 
         # # we already defined it in another process so don't do it again
-        if self.compilerCache.hasSymbol(linkName):
+        if self.compilerCache is not None and self.compilerCache.hasSymbol(linkName):
             return linkName
 
         # N.B. there aren't targets for call converters. We make the definition directly.
@@ -883,13 +888,12 @@ class PythonToNativeConverter:
                 output_type,
                 conversionType
             )
-
             self._inflight_function_conversions[identity] = functionConverter
 
         if isRoot:
             try:
                 self._resolveAllInflightFunctions()
-                self._installInflightFunctions(name)
+                self._installInflightFunctions()
                 return self.getTarget(name)
             finally:
                 self._inflight_function_conversions.clear()
@@ -901,10 +905,11 @@ class PythonToNativeConverter:
             # return None, which will cause callers to replace this with a throw
             # until we have had a chance to do a full pass of conversion.
             if self.getTarget(name) is not None:
-                raise Exception("This code looks unreachable to me...")
+                raise RuntimeError(f"Unexpected conversion error for {name}")
             return None
 
-    def _installInflightFunctions(self, name):
+    def _installInflightFunctions(self):
+        """Add all function definitions corresponding to keys in inflight_function_conversions to the relevant dictionaries."""
         if VALIDATE_FUNCTION_DEFINITIONS_STABLE:
             # this should always be true, but its expensive so we have it off by default
             for identifier, functionConverter in self._inflight_function_conversions.items():

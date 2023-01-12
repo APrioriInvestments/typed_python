@@ -26,8 +26,8 @@ from typed_python.hash import sha_hash
 
 
 class LoadedBinarySharedObject(LoadedModule):
-    def __init__(self, binarySharedObject, diskPath, functionPointers, globalVariableDefinitions):
-        super().__init__(functionPointers, globalVariableDefinitions)
+    def __init__(self, binarySharedObject, diskPath, functionPointers, serializedGlobalVariableDefinitions):
+        super().__init__(functionPointers, serializedGlobalVariableDefinitions)
 
         self.binarySharedObject = binarySharedObject
         self.diskPath = diskPath
@@ -36,15 +36,17 @@ class LoadedBinarySharedObject(LoadedModule):
 class BinarySharedObject:
     """Models a shared object library (.so) loadable on linux systems."""
 
-    def __init__(self, binaryForm, functionTypes, globalVariableDefinitions):
+    def __init__(self, binaryForm, functionTypes, serializedGlobalVariableDefinitions, globalDependencies):
         """
         Args:
-            binaryForm - a bytes object containing the actual compiled code for the module
-            globalVariableDefinitions - a map from name to GlobalVariableDefinition
+            binaryForm: a bytes object containing the actual compiled code for the module
+            serializedGlobalVariableDefinitions: a map from name to GlobalVariableDefinition
+            globalDependencies: a dict from function linkname to the list of global variables it depends on
         """
         self.binaryForm = binaryForm
         self.functionTypes = functionTypes
-        self.globalVariableDefinitions = globalVariableDefinitions
+        self.serializedGlobalVariableDefinitions = serializedGlobalVariableDefinitions
+        self.globalDependencies = globalDependencies
         self.hash = sha_hash(binaryForm)
 
     @property
@@ -52,14 +54,14 @@ class BinarySharedObject:
         return self.functionTypes.keys()
 
     @staticmethod
-    def fromDisk(path, globalVariableDefinitions, functionNameToType):
+    def fromDisk(path, serializedGlobalVariableDefinitions, functionNameToType, globalDependencies):
         with open(path, "rb") as f:
             binaryForm = f.read()
 
-        return BinarySharedObject(binaryForm, functionNameToType, globalVariableDefinitions)
+        return BinarySharedObject(binaryForm, functionNameToType, serializedGlobalVariableDefinitions, globalDependencies)
 
     @staticmethod
-    def fromModule(module, globalVariableDefinitions, functionNameToType):
+    def fromModule(module, serializedGlobalVariableDefinitions, functionNameToType, globalDependencies):
         target_triple = llvm.get_process_triple()
         target = llvm.Target.from_triple(target_triple)
         target_machine_shared_object = target.create_target_machine(reloc='pic', codemodel='default')
@@ -80,7 +82,7 @@ class BinarySharedObject:
             )
 
             with open(os.path.join(tf, "module.so"), "rb") as so_file:
-                return BinarySharedObject(so_file.read(), functionNameToType, globalVariableDefinitions)
+                return BinarySharedObject(so_file.read(), functionNameToType, serializedGlobalVariableDefinitions, globalDependencies)
 
     def load(self, storageDir):
         """Instantiate this .so in temporary storage and return a dict from symbol -> integer function pointer"""
@@ -127,8 +129,7 @@ class BinarySharedObject:
             self,
             modulePath,
             functionPointers,
-            self.globalVariableDefinitions
+            self.serializedGlobalVariableDefinitions
         )
-        loadedModule.linkGlobalVariables()
 
         return loadedModule
