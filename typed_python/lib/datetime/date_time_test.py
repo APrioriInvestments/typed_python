@@ -6,6 +6,7 @@ from typed_python.lib.datetime.date_time import (
     DateTime,
     TimeOfDay,
     NonexistentDateTime,
+    NonexistentDate,
     FixedOffsetTimezone,
     EST,
     NYC,
@@ -238,6 +239,15 @@ def test_TimeOfDay():
     assert TimeOfDay(13, 10, 30) > TimeOfDay(12, 3, 31)
     assert str(TimeOfDay(13, 10, 30)) == "13:10:30"
 
+    for (hour, minute, second) in [
+        (24, 0, 0),
+        (0, 60, 0),
+        (0, 0, 60),
+        (0, -1, -0.01),
+    ]:
+        with pytest.raises(Exception):
+            TimeOfDay(hour, minute, second)
+
 
 def test_afterFold_dst_end():
     with pytest.raises(OneFoldOnlyError):
@@ -325,6 +335,13 @@ def test_Date_methods():
     assert Date(2000, 12, 31).nextMonthStart() == Date(2001, 1, 1)
     assert Date(2000, 12, 30).nextMonthStart() == Date(2001, 1, 1)
 
+    with pytest.raises(NonexistentDate):
+        Date(2022, 2, 29)
+
+
+def test_Date_0000():
+    Date(0, 1, 1)
+
 
 def test_DateTime_add_and_subtract():
     assert DateTime(2022, 1, 1, 2, 30, 17) - 17 == DateTime(2022, 1, 1, 2, 30, 0)
@@ -366,3 +383,17 @@ def test_PytzTimezone():
     assert dt_them.hour == dt_us.timeOfDay.hour
     assert dt_them.minute == dt_us.timeOfDay.minute
     assert dt_them.second == dt_us.timeOfDay.second
+
+
+def test_Date_next():
+    assert Date(2023, 1, 12).next() == Date(2023, 1, 13)
+    assert Date(2023, 1, 12).next(2) == Date(2023, 1, 14)
+    assert Date(2023, 1, 12).previous() == Date(2023, 1, 11)
+    assert Date(2023, 1, 12).previous(2) == Date(2023, 1, 10)
+
+    dt = Date(2023, 1, 12)
+    assert dt.weekday() == 4
+    assert dt.nextWeekday(2) == Date(2023, 1, 17)
+    dt.nextWeekday(2).weekdayString() == "Tuesday"
+
+    assert Date(2024, 2, 29).nextYear(-1) == Date(2023, 2, 28)
