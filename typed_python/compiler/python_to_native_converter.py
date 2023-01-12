@@ -283,7 +283,7 @@ class PythonToNativeConverter:
         if linkName in self._targets:
             return self._targets[linkName]
 
-        if self.compilerCache.hasSymbol(linkName):
+        if self.compilerCache is not None and self.compilerCache.hasSymbol(linkName):
             return self.compilerCache.getTarget(linkName)
 
         return None
@@ -460,7 +460,7 @@ class PythonToNativeConverter:
             return linkName
 
         # # we already defined it in another process so don't do it again
-        if self.compilerCache.hasSymbol(linkName):
+        if self.compilerCache is not None and self.compilerCache.hasSymbol(linkName):
             return linkName
 
         # N.B. there aren't targets for call converters. We make the definition directly.

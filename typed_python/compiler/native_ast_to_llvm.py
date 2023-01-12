@@ -1483,7 +1483,7 @@ def populate_needed_externals(external_function_references, module):
 
 
 class Converter:
-    def __init__(self, compilerCache):
+    def __init__(self, compilerCache=None):
         object.__init__(self)
         self._modules = {}
         self._functions_by_name = {}

@@ -395,3 +395,30 @@ def test_ordering_is_stable_under_code_change():
         )
 
         assert names == names2
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_boom():
+    xmodule1 = "\n".join([
+        "@Entrypoint",
+        "def f():",
+        "    return None",
+        "import badModule",
+        "@Entrypoint",
+        "def g():",
+        "    print(badModule)",
+        "    return f()",
+    ])
+
+    xmodule2 = "\n".join([
+        "@Entrypoint",
+        "def f():",
+        "    return",
+    ])
+
+    VERSION1 = {'x.py': xmodule1, 'badModule.py': ''}
+    VERSION2 = {'x.py': xmodule2}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        evaluateExprInFreshProcess(VERSION1, 'x.g()', compilerCacheDir)
+        evaluateExprInFreshProcess(VERSION2, 'x.f()', compilerCacheDir)
