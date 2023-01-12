@@ -119,6 +119,7 @@ def test_compiler_cache_understands_type_changes():
     VERSION1 = {'x.py': xmodule, 'y.py': ymodule}
     VERSION2 = {'x.py': xmodule.replace("1: 2", "1: 3"), 'y.py': ymodule}
     VERSION3 = {'x.py': xmodule.replace("int, int", "int, float").replace('1: 2', '1: 2.5'), 'y.py': ymodule}
+    VERSION4 = {'x.py': xmodule.replace("1: 2", "1: 4"), 'y.py': ymodule}
 
     assert '1: 3' in VERSION2['x.py']
 
@@ -132,6 +133,10 @@ def test_compiler_cache_understands_type_changes():
 
         # this forces a recompile
         assert evaluateExprInFreshProcess(VERSION3, 'y.g(1)', compilerCacheDir) == 2.5
+        assert len(os.listdir(compilerCacheDir)) == 2
+
+        # use the previously compiled module
+        assert evaluateExprInFreshProcess(VERSION4, 'y.g(1)', compilerCacheDir) == 4
         assert len(os.listdir(compilerCacheDir)) == 2
 
 
@@ -362,12 +367,9 @@ def test_compiler_cache_handles_changed_types():
         assert evaluateExprInFreshProcess(VERSION2, 'x.f(1)', compilerCacheDir) == 1
         assert len(os.listdir(compilerCacheDir)) == 2
 
-        badCt = 0
-        for subdir in os.listdir(compilerCacheDir):
-            if 'marked_invalid' in os.listdir(os.path.join(compilerCacheDir, subdir)):
-                badCt += 1
-
-        assert badCt == 1
+        # if we then use g1 again, it should not have been marked invalid and so remains accessible.
+        assert evaluateExprInFreshProcess(VERSION1, 'x.g1(1)', compilerCacheDir) == 1
+        assert len(os.listdir(compilerCacheDir)) == 2
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
@@ -395,3 +397,34 @@ def test_ordering_is_stable_under_code_change():
         )
 
         assert names == names2
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_avoids_deserialization_error():
+    xmodule1 = "\n".join([
+        "@Entrypoint",
+        "def f():",
+        "    return None",
+        "import badModule",
+        "@Entrypoint",
+        "def g():",
+        "    print(badModule)",
+        "    return f()",
+    ])
+
+    xmodule2 = "\n".join([
+        "@Entrypoint",
+        "def f():",
+        "    return",
+    ])
+
+    VERSION1 = {'x.py': xmodule1, 'badModule.py': ''}
+    VERSION2 = {'x.py': xmodule2}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        evaluateExprInFreshProcess(VERSION1, 'x.g()', compilerCacheDir)
+        assert len(os.listdir(compilerCacheDir)) == 1
+        evaluateExprInFreshProcess(VERSION2, 'x.f()', compilerCacheDir)
+        assert len(os.listdir(compilerCacheDir)) == 2
+        evaluateExprInFreshProcess(VERSION1, 'x.g()', compilerCacheDir)
+        assert len(os.listdir(compilerCacheDir)) == 2
