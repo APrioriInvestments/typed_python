@@ -194,12 +194,14 @@ class PythonToNativeConverter:
 
         # get a set of function names that we depend on
         externallyUsed = set()
+        dependency_edgelist = []
 
         for funcName in targets:
             ident = self._identity_for_link_name.get(funcName)
             if ident is not None:
                 for dep in self._dependencies.getNamesDependedOn(ident):
                     depLN = self._link_name_for_identity.get(dep)
+                    dependency_edgelist.append([funcName, depLN])
                     if depLN not in targets:
                         externallyUsed.add(depLN)
 
@@ -208,7 +210,8 @@ class PythonToNativeConverter:
         self.compilerCache.addModule(
             binary,
             {name: self.getTarget(name) for name in targets if self.hasTarget(name)},
-            externallyUsed
+            externallyUsed,
+            dependency_edgelist,
         )
 
     def extract_new_function_definitions(self):

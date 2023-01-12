@@ -501,6 +501,7 @@ class FunctionConverter:
                  module,
                  globalDefinitions,
                  globalDefinitionLlvmValues,
+                 globalDependencies,
                  converter,
                  builder,
                  arg_assignments,
@@ -512,7 +513,8 @@ class FunctionConverter:
         # dict from name to GlobalVariableDefinition
         self.globalDefinitions = globalDefinitions
         self.globalDefinitionLlvmValues = globalDefinitionLlvmValues
-
+        #  a dictionary from function name to the list of global names (from LLVM)  that it depends on.
+        self.globalDependencies = globalDependencies
         self.module = module
         self.converter = converter
         self.builder = builder
@@ -802,6 +804,7 @@ class FunctionConverter:
             return self.stack_slots[expr.name]
 
         if expr.matches.GlobalVariable:
+            self.globalDependencies[self.builder.function.name] = self.globalDependencies.get(self.builder.function.name, []) + [expr.name]
             if expr.name in self.globalDefinitions:
                 assert expr.metadata == self.globalDefinitions[expr.name].metadata
                 assert expr.type == self.globalDefinitions[expr.name].type
@@ -1594,7 +1597,8 @@ class Converter:
 
         globalDefinitions = {}
         globalDefinitionsLlvmValues = {}
-
+        # we need a separate dictionary owing to the possibility of global var reuse across functions.
+        globalDependencies = {}
         while names_to_definitions:
             for name in sorted(names_to_definitions):
                 definition = names_to_definitions.pop(name)
@@ -1618,6 +1622,7 @@ class Converter:
                         module,
                         globalDefinitions,
                         globalDefinitionsLlvmValues,
+                        globalDependencies,
                         self,
                         builder,
                         arg_assignments,
@@ -1665,7 +1670,8 @@ class Converter:
         return ModuleDefinition(
             str(module),
             functionTypes,
-            globalDefinitions
+            globalDefinitions,
+            globalDependencies
         )
 
     def defineGlobalMetadataAccessor(self, module, globalDefinitions, globalDefinitionsLlvmValues):

@@ -121,6 +121,7 @@ class Compiler:
             mod,
             serializedGlobalVariableDefinitions,
             module.functionNameToType,
+            module.globalDependencies
         )
 
     def function_pointer_by_name(self, name):

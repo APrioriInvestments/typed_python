@@ -87,7 +87,7 @@ def test_create_binary_shared_object():
         {'__test_f_2': f}
     )
 
-    assert len(bso.globalVariableDefinitions) == 1
+    assert len(bso.serializedGlobalVariableDefinitions) == 1
 
     with tempfile.TemporaryDirectory() as tf:
         loaded = bso.load(tf)

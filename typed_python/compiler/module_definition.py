@@ -25,8 +25,9 @@ class ModuleDefinition:
     """
     GET_GLOBAL_VARIABLES_NAME = ".get_global_variables"
 
-    def __init__(self, moduleText, functionNameToType, globalVariableDefinitions):
+    def __init__(self, moduleText, functionNameToType, globalVariableDefinitions, globalDependencies):
         self.moduleText = moduleText
         self.functionNameToType = functionNameToType
         self.globalVariableDefinitions = globalVariableDefinitions
+        self.globalDependencies = globalDependencies
         self.hash = sha_hash(moduleText)
