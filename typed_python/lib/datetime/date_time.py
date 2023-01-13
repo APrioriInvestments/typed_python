@@ -60,6 +60,9 @@ class TimeOfDay(Class, Final):
         return self.second + self.minute * 60 + self.hour * 3600
 
     def __eq__(self, other):
+        if not isinstance(other, TimeOfDay):
+            return False
+
         return (
             self.hour == other.hour
             and self.minute == other.minute
@@ -123,6 +126,9 @@ class Date(Class, Final):
         return f"Date(year={self.year}, month={self.month}, day={self.day})"
 
     def __eq__(self, other):
+        if not isinstance(other, Date):
+            return False
+
         return (
             self.year == other.year
             and self.month == other.month
@@ -368,6 +374,9 @@ class DateTime(Class, Final):
         self.timeOfDay = timeOfDay
 
     def __eq__(self, other):
+        if not isinstance(other, DateTime):
+            return False
+
         return self.date == other.date and self.timeOfDay == other.timeOfDay
 
     @property
