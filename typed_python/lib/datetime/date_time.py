@@ -44,7 +44,7 @@ class TimeOfDay(Class, Final):
         self.second = second
 
     def __str__(self):
-        return "%02.f:%02.f:%02.f" % (self.hour, self.minute, self.second)
+        return f"{self.hour:02.0f}:{self.minute:02.0f}:{self.second:02.0f}"
 
     def __repr__(self):
         return (
@@ -117,7 +117,7 @@ class Date(Class, Final):
         self.day = day
 
     def __str__(self):
-        return "%02.f-%02.f-%02.f" % (self.year, self.month, self.day)
+        return f"{self.year:02.0f}-{self.month:02.0f}-{self.day:02.0f}"
 
     def __repr__(self):
         return f"Date(year={self.year}, month={self.month}, day={self.day})"
