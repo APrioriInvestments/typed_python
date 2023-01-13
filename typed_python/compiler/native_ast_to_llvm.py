@@ -501,7 +501,6 @@ class FunctionConverter:
                  module,
                  globalDefinitions,
                  globalDefinitionLlvmValues,
-                 globalDependencies,
                  converter,
                  builder,
                  arg_assignments,
@@ -513,8 +512,8 @@ class FunctionConverter:
         # dict from name to GlobalVariableDefinition
         self.globalDefinitions = globalDefinitions
         self.globalDefinitionLlvmValues = globalDefinitionLlvmValues
-        #  a dictionary from function name to the list of global names (from LLVM)  that it depends on.
-        self.globalDependencies = globalDependencies
+        #  a list of the global LLVM names that the function depends on.
+        self.global_names = []
         self.module = module
         self.converter = converter
         self.builder = builder
@@ -804,7 +803,7 @@ class FunctionConverter:
             return self.stack_slots[expr.name]
 
         if expr.matches.GlobalVariable:
-            self.globalDependencies[self.builder.function.name] = self.globalDependencies.get(self.builder.function.name, []) + [expr.name]
+            self.global_names.append(expr.name)
             if expr.name in self.globalDefinitions:
                 assert expr.metadata == self.globalDefinitions[expr.name].metadata
                 assert expr.type == self.globalDefinitions[expr.name].type
@@ -1622,7 +1621,6 @@ class Converter:
                         module,
                         globalDefinitions,
                         globalDefinitionsLlvmValues,
-                        globalDependencies,
                         self,
                         builder,
                         arg_assignments,
@@ -1636,6 +1634,8 @@ class Converter:
                     res = func_converter.convert(definition.body.body)
 
                     func_converter.finalize()
+
+                    globalDependencies[func.name] = func_converter.global_names
 
                     if res is not None:
                         assert res.llvm_value is None
