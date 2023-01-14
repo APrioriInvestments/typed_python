@@ -15,7 +15,7 @@ from typed_python.lib.datetime.date_time import (
     OneFoldOnlyError,
     PytzTimezone,
 )
-from typed_python import Timestamp
+from typed_python import Timestamp, NamedTuple
 from typed_python.lib.datetime.date_parser_test import get_datetimes_in_range
 
 
@@ -397,3 +397,11 @@ def test_Date_next():
     dt.nextWeekday(2).weekdayString() == "Tuesday"
 
     assert Date(2024, 2, 29).nextYear(-1) == Date(2023, 2, 28)
+
+
+def test_asNamedTuple():
+    x = Date(2023, 1, 12).asNamedTuple()
+    assert isinstance(x, NamedTuple)
+    assert x.year == 2023
+    assert x.month == 1
+    assert x.day == 12

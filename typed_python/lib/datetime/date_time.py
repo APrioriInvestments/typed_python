@@ -8,6 +8,7 @@ from typed_python import (
     Held,
     TypeFunction,
     ListOf,
+    NamedTuple,
 )
 from typed_python.lib.datetime.chrono import Chrono
 from typed_python.lib.sorting import searchSorted
@@ -98,6 +99,11 @@ class TimeOfDay(Class, Final):
 
     def __ge__(self, other):
         return self == other or self > other
+
+    def asNamedTuple(self) -> NamedTuple(hour=int, minute=int, second=float):
+        return NamedTuple(hour=int, minute=int, second=float)(
+            hour=self.hour, minute=self.minute, second=self.second
+        )
 
 
 @Held
@@ -356,6 +362,11 @@ class Date(Class, Final):
         )
         return Date(year, self.month, day)
 
+    def asNamedTuple(self) -> NamedTuple(year=int, month=int, day=int):
+        return NamedTuple(year=int, month=int, day=int)(
+            year=self.year, month=self.month, day=self.day
+        )
+
 
 @Held
 class DateTime(Class, Final):
@@ -438,6 +449,20 @@ class DateTime(Class, Final):
 
     def __add__(self, seconds: float):
         return UTC.datetime(UTC.timestamp(self) + seconds)
+
+    def asNamedTuple(
+        self,
+    ) -> NamedTuple(year=int, month=int, day=int, hour=int, minute=int, second=float):
+        return NamedTuple(
+            year=int, month=int, day=int, hour=int, minute=int, second=float
+        )(
+            year=self.year,
+            month=self.month,
+            day=self.day,
+            hour=self.hour,
+            minute=self.minute,
+            second=self.second,
+        )
 
 
 class Timezone(Class):
