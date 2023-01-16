@@ -2798,6 +2798,22 @@ class TypesTests(unittest.TestCase):
 
         self.assertRaises(TypeError, s.difference, [[]])
 
+    def test_set_union_deleted(self):
+        x = Set(int)()
+        y = Set(int)()
+
+        for i in range(10):
+            x.add(i)
+            y.add(i)
+
+        for i in range(10):
+            if i % 2:
+                x.discard(i)
+            else:
+                y.discard(i)
+
+        assert len(x | y) == 10
+
     def test_set_union_refcounts(self):
         s = Set(int)([1])
         s2 = Set(int)([2])

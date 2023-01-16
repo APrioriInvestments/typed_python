@@ -16,11 +16,11 @@
 #include "PySetInstance.hpp"
 
 void PySetInstance::getDataFromNative(PySetInstance* src, std::function<void(instance_ptr)> func) {
-    for (size_t i = 0; i < src->type()->slotCount(src->dataPtr())
-                       && src->type()->slotPopulated(src->dataPtr(), i);
-         ++i) {
-        instance_ptr key = src->type()->keyAtSlot(src->dataPtr(), i);
-        func(key);
+    for (size_t i = 0; i < src->type()->slotCount(src->dataPtr()); ++i) {
+        if (src->type()->slotPopulated(src->dataPtr(), i)) {
+            instance_ptr key = src->type()->keyAtSlot(src->dataPtr(), i);
+            func(key);
+        }
     }
 }
 
