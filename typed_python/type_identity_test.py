@@ -37,6 +37,14 @@ from typed_python._types import (
 )
 
 
+class A:
+    pass
+
+
+class B:
+    pass
+
+
 @Entrypoint
 def fModuleLevel(x):
     return gModuleLevel(x)
@@ -644,3 +652,7 @@ def test_identity_of_entrypointed_functions():
         return 0
 
     assert identityHash(Function(f)) != identityHash(Entrypoint(f))
+
+
+def test_identity_of_singleton_classes():
+    assert identityHash(A) != identityHash(B)

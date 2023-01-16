@@ -711,6 +711,8 @@ private:
 
             PyTypeObject* tp = (PyTypeObject*)obj.pyobj();
 
+            visitor.visitHash(ShaHash(tp->tp_name));
+
             visitor.visitHash(ShaHash(0));
             if (tp->tp_dict) {
                 visitDict(tp->tp_dict, true);
