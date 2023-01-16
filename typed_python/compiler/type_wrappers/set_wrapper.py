@@ -16,11 +16,13 @@ from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWra
 from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
-from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.hash_table_implementation import table_next_slot, table_clear, \
     set_table_contains, set_add, set_add_or_remove, set_remove, set_discard, set_pop
-from typed_python import PointerTo, Int32, UInt8, ListOf, TupleOf, Set, Tuple, NamedTuple, Dict, ConstDict
+from typed_python import (
+    PointerTo, Int32, UInt8, ListOf, TupleOf, Set, Tuple, NamedTuple, Dict, ConstDict, TypeFunction,
+    Class, Held, Final, Member
+)
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -349,13 +351,13 @@ class SetWrapper(SetWrapperBase):
 
     def convert_attribute(self, context, expr, attr):
         if attr in (
-                "getKeyByIndexUnsafe", "deleteItemByIndexUnsafe",
+                "getKeyPtrByIndexUnsafe", "getKeyByIndexUnsafe", "deleteItemByIndexUnsafe",
                 "initializeKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
                 "_compressItemTableUnsafe",
                 "add", "remove", "discard", "pop", "clear", "copy", "log",
                 "union", "intersection", "difference", "symmetric_difference",
                 "update", "intersection_update", "difference_update", "symmetric_difference_update",
-                "issubset", "issuperset", "isdisjoint"):
+                "issubset", "issuperset", "isdisjoint", "__iter__"):
             return expr.changeType(BoundMethodWrapper.Make(self, attr))
 
         if attr == '_items':
@@ -472,23 +474,14 @@ class SetWrapper(SetWrapperBase):
             return super().convert_method_call(context, instance, methodname, args, kwargs)
 
         if methodname == "__iter__" and not args and not kwargs:
-            res = context.push(
-                SetKeysIteratorWrapper(self.setType),
-                lambda iteratorInstance:
-                iteratorInstance.expr.ElementPtrIntegers(0, 0).store(-1)
-                >> iteratorInstance.expr.ElementPtrIntegers(0, 1).store(
-                    self.convert_len_native(instance)
-                )
-                # we initialize the set pointer below, so technically
-                # if that were to throw, this would leak a bad value.
+            itType = SetIterator(self.typeRepresentation.ElementType)
+
+            return typeWrapper(itType).convert_type_call(
+                context,
+                None,
+                [instance],
+                {}
             )
-
-            context.pushReference(
-                self,
-                res.expr.ElementPtrIntegers(0, 2)
-            ).convert_copy_initialize(instance)
-
-            return res
 
         if methodname == 'union':
             return context.call_py_function(set_union_multiple, (instance, *args), {})
@@ -594,7 +587,9 @@ class SetWrapper(SetWrapperBase):
 
                 return context.call_py_function(set_discard, (instance, key), {})
 
-            if methodname in ("getKeyByIndexUnsafe", "deleteItemByIndexUnsafe"):
+            if methodname in (
+                "getKeyPtrByIndexUnsafe", "getKeyByIndexUnsafe", "deleteItemByIndexUnsafe"
+            ):
                 index = args[0].toInt64()
                 if index is None:
                     return None
@@ -608,6 +603,8 @@ class SetWrapper(SetWrapperBase):
 
                 if methodname == "getKeyByIndexUnsafe":
                     return key
+                elif methodname == "getKeyPtrByIndexUnsafe":
+                    return key.asPointer()
                 elif methodname == "deleteItemByIndexUnsafe":
                     key.convert_destroy()
                     return context.pushVoid()
@@ -826,132 +823,37 @@ class SetWrapper(SetWrapperBase):
         return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
 
-class SetMakeIteratorWrapper(SetWrapperBase):
-    def convert_method_call(self, context, expr, methodname, args, kwargs):
-        if methodname == "__iter__" and not args and not kwargs:
-            res = context.push(
-                # self.iteratorType is inherited from our specialized children
-                # who pick whether we're an iterator over keys, values, items, etc.
-                self.iteratorType,
-                lambda iteratorInstance:
-                    iteratorInstance.expr.ElementPtrIntegers(0, 0).store(-1)
-                    >> iteratorInstance.expr.ElementPtrIntegers(0, 1).store(
-                        self.convert_len_native(expr)
-                    )
-            )
+@TypeFunction
+def SetIterator(T):
+    @Held
+    class SetIterator(Class, Final, __name__=f"SetIterator({T.__name__})"):
+        slotIx = Member(int, nonempty=True)
+        count = Member(int, nonempty=True)
+        instance = Member(Set(T), nonempty=True)
 
-            context.pushReference(
-                self,
-                res.expr.ElementPtrIntegers(0, 2)
-            ).convert_copy_initialize(expr)
+        def __init__(self, instance):
+            self.instance = instance
+            self.slotIx = -1
+            self.count = len(instance)
 
-            return res
+        def __iter__(self):
+            return self
 
-        return super().convert_method_call(context, expr, methodname, args, kwargs)
+        def __next__(self) -> T:
+            res = self.__fastnext__()
+            if res:
+                return res.get()
+            raise StopIteration()
 
+        def __fastnext__(self) -> PointerTo(T):
+            checkSetSizeAndThrowIfChanged(self.instance, self.count)
 
-class SetKeysWrapper(SetMakeIteratorWrapper):
-    def __init__(self, setType):
-        super().__init__(setType, "keys")
-        self.iteratorType = SetKeysIteratorWrapper(setType)
+            nextSlotIx = table_next_slot(self.instance, self.slotIx)
 
+            if nextSlotIx >= 0:
+                self.slotIx = nextSlotIx
+                return self.instance.getKeyPtrByIndexUnsafe(nextSlotIx)
+            else:
+                return PointerTo(T)()
 
-class SetIteratorWrapper(Wrapper):
-    is_pod = False
-    is_empty = False
-    is_pass_by_ref = True
-
-    def __init__(self, setType, iteratorType):
-        self.setType = setType
-        self.iteratorType = iteratorType
-        super().__init__((setType, "iterator", iteratorType))
-
-    def getNativeLayoutType(self):
-        return native_ast.Type.Struct(
-            element_types=(
-                ("pos", native_ast.Int64),
-                ("count", native_ast.Int64),
-                ("set", SetWrapper(self.setType).getNativeLayoutType())
-            ),
-            name="const_set_iterator"
-        )
-
-    def convert_fastnext(self, context, expr):
-        context.call_py_function(
-            checkSetSizeAndThrowIfChanged,
-            (
-                self.refAs(context, expr, 2),
-                self.refAs(context, expr, 1),
-            ),
-            {}
-        )
-
-        nextSlotIx = context.call_py_function(
-            table_next_slot,
-            (
-                self.refAs(context, expr, 2),
-                self.refAs(context, expr, 0)
-            ),
-            {}
-        )
-
-        if nextSlotIx is None:
-            return None
-
-        context.pushEffect(
-            expr.expr.ElementPtrIntegers(0, 0).store(
-                nextSlotIx.nonref_expr
-            )
-        )
-        canContinue = context.pushPod(
-            bool,
-            nextSlotIx.nonref_expr.gte(0)
-        )
-
-        nextIx = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
-
-        return self.iteratedItemForReference(context, expr, nextIx).asPointerIf(canContinue)
-
-    def refAs(self, context, expr, which):
-        assert expr.expr_type == self
-
-        if which == 0:
-            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
-
-        if which == 1:
-            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 1))
-
-        if which == 2:
-            return context.pushReference(
-                self.setType,
-                expr.expr
-                    .ElementPtrIntegers(0, 2)
-                    .cast(SetWrapper(self.setType).getNativeLayoutType().pointer())
-            )
-
-    def convert_assign(self, context, expr, other):
-        assert expr.isReference
-
-        for i in range(3):
-            self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
-
-    def convert_copy_initialize(self, context, expr, other):
-        for i in range(3):
-            self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
-
-    def convert_destroy(self, context, expr):
-        self.refAs(context, expr, 2).convert_destroy()
-
-
-class SetKeysIteratorWrapper(SetIteratorWrapper):
-    def __init__(self, setType):
-        super().__init__(setType, "keys")
-
-    def iteratedItemForReference(self, context, expr, ixExpr):
-        return SetWrapper(self.setType).convert_method_call(
-            context,
-            self.refAs(context, expr, 2),
-            "getKeyByIndexUnsafe",
-            (ixExpr,),
-            {}
-        )
+    return SetIterator

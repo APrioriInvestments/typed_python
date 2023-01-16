@@ -82,6 +82,32 @@ class TestSetCompilation(unittest.TestCase):
 
             self.assertEqual(refcounts, refcounts2)
 
+    def test_compile_iter_call_on_set(self):
+        @Entrypoint
+        def iterate(x: Set(int)):
+            i = x.__iter__()
+
+            res = ListOf(int)()
+
+            while True:
+                try:
+                    res.append(i.__next__())
+                except StopIteration:
+                    return res
+
+        assert set(iterate([1, 2, 3])) == set([1, 2, 3])
+
+    def test_compile_iterate_on_set(self):
+        @Entrypoint
+        def iterate(x: Set(int)):
+            res = ListOf(int)()
+
+            for val in x:
+                res.append(val)
+            return res
+
+        assert set(iterate([1, 2, 3])) == set([1, 2, 3])
+
     def test_set_length(self):
         @Entrypoint
         def set_len(x):

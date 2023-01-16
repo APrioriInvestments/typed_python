@@ -361,6 +361,9 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
         assert isinstance(methodName, str)
         return self.getMethodOrPropertyBody(methodName) is not None
 
+    def convert_fastnext(self, context, instance):
+        return self.convert_method_call(context, instance, "__fastnext__", [], {})
+
     def convert_method_call(self, context, instance, methodName, args, kwargs):
         # figure out which signature we'd want to use on the given args/kwargs
         func = self.getMethodOrPropertyBody(methodName)
