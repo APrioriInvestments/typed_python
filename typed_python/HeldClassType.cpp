@@ -287,6 +287,37 @@ void HeldClass::constructor(instance_ptr self, bool allowEmpty) {
 }
 
 void HeldClass::destroy(instance_ptr self) {
+    if (m_hasDelMagicMethod) {
+        Function* method = m_memberFunctions.find("__del__")->second;
+
+        PyObjectStealer targetArgTuple(PyTuple_New(1));
+
+        PyTuple_SetItem(
+            targetArgTuple,
+            0,
+            PyInstance::initializeTemporaryRef(
+                this,
+                self
+            )
+        ); //steals a reference
+
+        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallAnyOverload(
+            method,
+            nullptr,
+            nullptr,
+            targetArgTuple,
+            nullptr
+        );
+
+        // we just swallow any exceptions that get thrown here
+        // probably we ought to log...
+        if (res.first && !res.second) {
+            PyErr_Clear();
+        } else if (res.second) {
+            decref(res.second);
+        }
+    }
+
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
         Type* member_t = m_members[k].getType();
         if (checkInitializationFlag(self, k)) {

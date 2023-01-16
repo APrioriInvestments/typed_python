@@ -38,7 +38,8 @@ from typed_python import (
     Forward,
     TypeFunction,
     typeKnownToCompiler,
-    SubclassOf
+    SubclassOf,
+    Held,
 )
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime, CountCompilationsVisitor
@@ -2870,3 +2871,36 @@ class TestClassCompilationCompilation(unittest.TestCase):
             return 0
 
         check(C())
+
+    def test_del_works(self):
+        delType = ListOf(type)()
+
+        class C(Class):
+            delType = Member(ListOf(type))
+
+            def __del__(self):
+                self.delType.append(type(self))
+
+        def doIt():
+            C(delType=delType)
+
+        doIt()
+
+        assert len(delType) == 1
+        assert delType[0] == Held(C)
+
+        Entrypoint(doIt)()
+
+        assert len(delType) == 2
+        assert delType[1] == Held(C)
+
+    def test_del_swallows_exception(self):
+        class C(Class):
+            def __del__(self):
+                raise Exception("boo")
+
+        def doIt():
+            C()
+
+        doIt()
+        Entrypoint(doIt)()

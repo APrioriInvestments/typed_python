@@ -407,3 +407,28 @@ class TestHeldClassCompilation(unittest.TestCase):
         t0 = time.time()
         f(100000000)
         print(time.time() - t0)
+
+    def test_del_works(self):
+        delType = ListOf(type)()
+
+        @Held
+        class C(Class):
+            delType = Member(ListOf(type))
+
+            def __del__(self):
+                print("destryoing ", pointerTo(self))
+                self.delType.append(type(self))
+
+        def doIt():
+            C(delType=delType)
+
+        doIt()
+
+        assert len(delType) >= 1
+        assert delType[0] == C
+        delType.clear()
+
+        Entrypoint(doIt)()
+
+        assert len(delType) >= 1
+        assert delType[0] == C

@@ -239,6 +239,15 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
         return self.layoutType
 
     def convert_destroy(self, context, instance):
+        if self.has_method("__del__"):
+            def callDelWithExceptionSuppression(instance):
+                try:
+                    instance.__del__()
+                except Exception:
+                    pass
+
+            context.call_py_function(callDelWithExceptionSuppression, [instance], {})
+
         for i in range(len(self.classType.MemberTypes)):
             if not typeWrapper(self.classType.MemberTypes[i]).is_pod:
                 with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(instance, i))) as (true_block, false_block):

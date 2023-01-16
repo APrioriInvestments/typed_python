@@ -525,6 +525,17 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
     def generateNativeDestructorFunction(self, context, out, instance):
         instance = self.stripClassDispatchIndex(context, instance)
 
+        if self.has_method("__del__"):
+            refToSelf = self.convert_refTo(context, instance)
+
+            def callDelWithExceptionSuppression(instance):
+                try:
+                    instance.__del__()
+                except Exception:
+                    pass
+
+            context.call_py_function(callDelWithExceptionSuppression, [refToSelf], {})
+
         for i in range(len(self.typeRepresentation.MemberTypes)):
             if not typeWrapper(self.typeRepresentation.MemberTypes[i]).is_pod:
                 with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(instance, i))) as (true_block, false_block):

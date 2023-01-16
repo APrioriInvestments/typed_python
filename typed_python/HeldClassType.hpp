@@ -361,6 +361,7 @@ public:
             m_hasGetAttrMagicMethod(false),
             m_hasSetAttrMagicMethod(false),
             m_hasDelAttrMagicMethod(false),
+            m_hasDelMagicMethod(false),
             m_refToType(nullptr)
     {
         m_name = inName;
@@ -759,6 +760,10 @@ public:
         return m_hasDelAttrMagicMethod;
     }
 
+    bool hasDelMagicMethod() const {
+        return m_hasDelMagicMethod;
+    }
+
     // fill out m_mro according to C3 precedence rules
     void _computeMroSequence() {
         m_mro.push_back(this);
@@ -961,6 +966,9 @@ public:
         if (m_memberFunctions.find("__delattr__") != m_memberFunctions.end()) {
             m_hasDelAttrMagicMethod = true;
         }
+        if (m_memberFunctions.find("__del__") != m_memberFunctions.end()) {
+            m_hasDelMagicMethod = true;
+        }
         if (m_memberFunctions.find("__setattr__") != m_memberFunctions.end()) {
             m_hasSetAttrMagicMethod = true;
         }
@@ -1110,4 +1118,5 @@ private:
     bool m_hasGetAttrMagicMethod;
     bool m_hasSetAttrMagicMethod;
     bool m_hasDelAttrMagicMethod;
+    bool m_hasDelMagicMethod;
 };
