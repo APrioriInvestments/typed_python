@@ -33,7 +33,7 @@ import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 from typed_python import (
     _types, Type, ListOf, PointerTo, pointerTo, Set, Dict, Member,
-    OneOf, Function, Tuple, Forward, Class, NamedTuple
+    OneOf, Function, Tuple, Forward, Class, NamedTuple, Value
 )
 from typed_python.generator import Generator
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -997,6 +997,24 @@ class ConversionContextBase:
                 variableStates.restrictTypeFor(
                     condition.args[0].id, typeExpr.expr_type.typeRepresentation.Value, result
                 )
+
+        # check if this is 'is not None' or 'is None'
+        if (
+            condition.matches.Compare
+            and len(condition.ops) == 1
+            and (condition.ops[0].matches.Is or condition.ops[0].matches.IsNot)
+            and condition.left.matches.Name
+            and condition.comparators[0].matches.Constant
+            and condition.comparators[0].value is None
+        ):
+            if condition.ops[0].matches.IsNot:
+                result = not result
+
+            name = condition.left.id
+
+            context = ExpressionConversionContext(self, variableStates)
+
+            variableStates.restrictTypeFor(name, Value(None), result)
 
         # check if we are a 'var.matches.Y' expression
         if (

@@ -14,7 +14,7 @@
 import typed_python
 
 from typed_python import (
-    OneOf, TupleOf, Forward, ConstDict, Class, Final, Member,
+    OneOf, TupleOf, Forward, ConstDict, Class, Final, Member, Tuple,
     ListOf, Compiled, Entrypoint, NamedTuple, UInt16,
     typeKnownToCompiler
 )
@@ -702,3 +702,16 @@ class TestOneOfCompilation(unittest.TestCase):
 
         assert checkIt(1) == "int"
         assert checkIt(1.0) == "float"
+
+    def test_direct_assign_works_with_oneof(self):
+        @Entrypoint
+        def checkIt(x: OneOf(None, Tuple(str, str))):
+            if x is None:
+                return "empty"
+            else:
+                a, b = x
+
+                return a + b
+
+        assert checkIt(('a', 'b')) == 'ab'
+        assert checkIt(None) == 'empty'

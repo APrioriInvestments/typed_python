@@ -381,3 +381,30 @@ class TestTypeInference(unittest.TestCase):
                 return localVariableTypesKnownToCompiler()
 
         assert check3()['y'] == OneOf(float, str)
+
+    def test_restricts_based_on_isinstance(self):
+        # check that the compiler understands how to restrict a OneOf based on 'is None'
+        @Entrypoint
+        def f(x: OneOf(None, str)):
+            if isinstance(x, str):
+                return localVariableTypesKnownToCompiler()
+
+        assert f("hi")['x'] == str
+
+    def test_restricts_based_on_None(self):
+        # check that the compiler understands how to restrict a OneOf based on 'is None'
+        @Entrypoint
+        def f(x: OneOf(None, str)):
+            if x is not None:
+                return localVariableTypesKnownToCompiler()
+
+        assert f("hi")['x'] == str
+
+        @Entrypoint
+        def f(x: OneOf(None, str)):
+            if x is None:
+                pass
+            else:
+                return localVariableTypesKnownToCompiler()
+
+        assert f("hi")['x'] == str
