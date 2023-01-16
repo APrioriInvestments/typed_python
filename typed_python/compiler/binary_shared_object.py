@@ -131,6 +131,5 @@ class BinarySharedObject:
             functionPointers,
             self.serializedGlobalVariableDefinitions
         )
-        # loadedModule.linkGlobalVariables()  WE NOW DEFER THIS TO THE CACHE
 
         return loadedModule

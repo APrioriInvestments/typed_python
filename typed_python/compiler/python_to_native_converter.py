@@ -904,7 +904,7 @@ class PythonToNativeConverter:
             # return None, which will cause callers to replace this with a throw
             # until we have had a chance to do a full pass of conversion.
             if self.getTarget(name) is not None:
-                raise Exception("This code looks unreachable to me...")
+                raise RuntimeError(f"Unexpected conversion error for {name}")
             return None
 
     def _installInflightFunctions(self, name):

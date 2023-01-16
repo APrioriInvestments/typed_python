@@ -18,10 +18,13 @@ from typed_python import sha_hash
 class ModuleDefinition:
     """A single module of compiled llvm code.
 
-    Members:
-        moduleText - a string containing the llvm IR for the module
-        functionList - a list of the names of exported functions
-        globalDefinitions - a dict from name to a GlobalDefinition
+    Attributes:
+        moduleText (str): a string containing the llvm IR for the module
+        functionList (list): a list of the names of exported functions
+        globalDefinitions (dict): a dict from name to a GlobalDefinition
+        globalDependencies (dict): a dict from function link_name to a list of globals the
+            function depends on
+        hash (str): The module hash, generated from the llvm IR.
     """
     GET_GLOBAL_VARIABLES_NAME = ".get_global_variables"
 

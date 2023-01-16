@@ -633,7 +633,35 @@ class FunctionConverter:
         return self.builder.bitcast(exception_ptr, llvm_i8ptr)
 
     def namedCallTargetToLLVM(self, target):
+        """
+        Generate llvm IR code for a given target.
+
+
+        Options for generation:
+        1. The target is external, i.e something like pyobj_len, np_add_traceback, system-level functions.
+            Then we add to external_function_references some Function if not already there, and use that
+
+        2. The function is in function_definitions
+            Then grab the func from functions_by_name, and decide whether we'd like to inline. Either repeat the function,
+            or generate the Function, and use that, stick in external function refs.
+
+        3. We have a compiler cache, and the function is in it.
+            TODO decide about inlining.
+
+
+
+        external_function_references holds things that shouldn't be compiled because they're defined externally,
+        either because they're system-level e.g. malloc or they're defined in a different module.
+
+
+        Args:
+            target: The function to
+
+        """
+        assert isinstance(target, native_ast.NamedCallTarget)
+
         if target.external:
+            print(target.name)
             if target.name not in self.external_function_references:
                 func_type = llvmlite.ir.FunctionType(
                     type_to_llvm_type(target.output_type),
@@ -1614,7 +1642,7 @@ class Converter:
                         TypedLLVMValue(func.args[i], definition.args[i][1])
 
                 block = func.append_basic_block('entry')
-                builder = llvmlite.ir.IRBuilder(block)  # this shares state with func
+                builder = llvmlite.ir.IRBuilder(block)
 
                 try:
                     func_converter = FunctionConverter(

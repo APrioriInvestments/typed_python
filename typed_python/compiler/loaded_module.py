@@ -1,3 +1,4 @@
+from typing import Dict, List
 from typed_python.compiler.module_definition import ModuleDefinition
 from typed_python import PointerTo, ListOf, Class, SerializationContext
 from typed_python import _types
@@ -8,7 +9,7 @@ class LoadedModule:
     Members:
         functionPointers - a map from name to NativeFunctionPointer giving the
             public interface of the module
-        serializedGlobalVariableDefinitions - a map from name to GlobalVariableDefinition
+        serializedGlobalVariableDefinitions - a map from LLVM-assigned global name to serialized GlobalVariableDefinition
             giving the loadable strings
     """
     GET_GLOBAL_VARIABLES_NAME = ModuleDefinition.GET_GLOBAL_VARIABLES_NAME
@@ -28,14 +29,15 @@ class LoadedModule:
         self.functionPointers[ModuleDefinition.GET_GLOBAL_VARIABLES_NAME](self.pointers.pointerUnsafe(0))
 
     @staticmethod
-    def validateGlobalVariables(serializedGlobalVariableDefinitions: dict) -> bool:
+    def validateGlobalVariables(serializedGlobalVariableDefinitions: Dict[str, bytes]) -> bool:
         """Check that each global variable definition is sensible.
         Sometimes we may successfully deserialize a global variable from a cached
         module, but then some dictionary member is not valid because it was removed
         or has the wrong type. In this case, we need to evict this module from
         the cache because it's no longer valid.
+
         Args:
-            serializedGlobalVariableDefinitions - a dict from string to a serialized GlobalVariableMetadata
+            serializedGlobalVariableDefinitions: a dict from string to a serialized GlobalVariableMetadata
         """
         for gvd in serializedGlobalVariableDefinitions.values():
             meta = SerializationContext().deserialize(gvd).metadata
@@ -59,7 +61,7 @@ class LoadedModule:
 
         return True
 
-    def linkGlobalVariables(self, variable_names=None) -> None:
+    def linkGlobalVariables(self, variable_names: List[str] = None) -> None:
         """Walk over all global variables in `variable_names` and make sure they are populated.
         Each module has a bunch of global variables that contain references to things
         like type objects, string objects, python module members, etc.
