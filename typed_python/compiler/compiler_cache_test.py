@@ -13,8 +13,12 @@
 #   limitations under the License.
 
 import tempfile
+import time
 import os
 import pytest
+
+from flaky import flaky
+
 from typed_python.test_util import evaluateExprInFreshProcess
 
 MAIN_MODULE = """
@@ -428,3 +432,49 @@ def test_compiler_cache_avoids_deserialization_error():
         assert len(os.listdir(compilerCacheDir)) == 2
         evaluateExprInFreshProcess(VERSION1, 'x.g()', compilerCacheDir)
         assert len(os.listdir(compilerCacheDir)) == 2
+
+@flaky(max_runs=3, min_passes=3)
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_cached_code_is_inlineable():
+    """If we generate a module containing a low-complexity function, this should be inlined.
+    If we then generate a new module using the cached str decref, it should still be inlined,
+    so the performance should be strictly better.
+    """
+    xmodule = "\n".join([
+        "@Entrypoint",
+        "def f(x):",
+        "    return x+1",
+        "@Entrypoint",
+        "def multi_f_1():",
+        "    x = 0",
+        "    for _ in range(10_000_000):",
+        "        x = f(x)",
+        "    return x",
+    ])
+
+
+    ymodule = "\n".join([
+        "from x import f",
+        "@Entrypoint",
+        "def multi_f_2():",
+        "    x = 0",
+        "    for _ in range(10_000_000):",
+        "        x = f(x)",
+        "    return x",
+    ])
+
+    VERSION1 = {'x.py': xmodule}
+    VERSION2 = {'x.py': xmodule, 'y.py': ymodule}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        t0 = time.time()
+        res =  evaluateExprInFreshProcess(VERSION1, 'x.multi_f_1()', compilerCacheDir)
+        t1 = time.time()
+        elapsed_inmodule = t1 - t0
+
+        t0 = time.time()
+        res =  evaluateExprInFreshProcess(VERSION2, 'y.multi_f_2()', compilerCacheDir)
+        t1 = time.time()
+
+        elapsed_outofmodule = t1 - t0
+        assert elapsed_outofmodule < elapsed_inmodule

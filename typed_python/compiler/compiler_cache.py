@@ -71,6 +71,9 @@ class CompilerCache:
         # the function's globals have been linked and validated and it is good to go.
         self.targetsValidated = set()
 
+        # the total number of instructions for each linkName.
+        self.targetComplexity = {}
+
         # function dependency graph. DirectedGraph?
         self.function_dependency_graph = DirectedGraph()
         # dict from function linkname to list of global names (should be llvm keys in serialisedGlobalDefinitions)
@@ -112,14 +115,21 @@ class CompilerCache:
                     # append to the list of globals to link for a given module.  TODO: optimise this, don't double-link.
                     globalsToLink[funcModuleHash] = globalsToLink.get(funcModuleHash, []) + self.global_dependencies.get(funcName, [])
 
-            for hash, globs in globalsToLink.items():  # this works because loadModuleByHash loads submodules too.
+            for moduleHash, globs in globalsToLink.items():  # this works because loadModuleByHash loads submodules too.
                 if globs:
-                    definitionsToLink = {x: self.loadedBinarySharedObjects[hash].serializedGlobalVariableDefinitions[x] for x in globs}
-                    self.loadedBinarySharedObjects[hash].linkGlobalVariables(definitionsToLink)
-                    if not self.loadedBinarySharedObjects[hash].validateGlobalVariables(definitionsToLink):
+                    definitionsToLink = {x: self.loadedBinarySharedObjects[moduleHash].serializedGlobalVariableDefinitions[x] for x in globs}
+                    self.loadedBinarySharedObjects[moduleHash].linkGlobalVariables(definitionsToLink)
+                    if not self.loadedBinarySharedObjects[moduleHash].validateGlobalVariables(definitionsToLink):
                         raise RuntimeError('failed to validate globals when loading:', linkName)
 
             self.targetsValidated.update(dependantFuncs)
+
+    def complexityForSymbol(self, linkName: str) -> int:
+        """Get the total number of instructions for a given symbol (cached when first compiled)."""
+        try:
+            return self.targetComplexity[linkName]
+        except KeyError as e:
+            raise ValueError(f'No complexity value cached for {linkName}') from e
 
     def loadModuleByHash(self, moduleHash: str) -> None:
         """Load a module by name.
@@ -129,14 +139,11 @@ class CompilerCache:
         have been uncovered.
         """
         if moduleHash in self.loadedBinarySharedObjects:
-            return   # True
+            return
 
         targetDir = os.path.join(self.cacheDir, moduleHash)
 
         # TODO (Will) - store these names as module consts.
-
-        # import pdb; pdb.set_trace()
-
         with open(os.path.join(targetDir, "type_manifest.dat"), "rb") as f:
             callTargets = SerializationContext().deserialize(f.read())
 
@@ -153,16 +160,13 @@ class CompilerCache:
             dependency_edgelist = SerializationContext().deserialize(f.read())
 
         with open(os.path.join(targetDir, "global_dependencies.dat"), "rb") as f:
-            globalDependencies = SerializationContext().deserialize(f.read())  # Dict(str, ListOf(str)))
+            globalDependencies = SerializationContext().deserialize(f.read())
 
-        # if not LoadedModule.validateGlobalVariables(globalVarDefs):
-        #     self.markModuleHashInvalid(moduleHash)
-        #     return False
+        with open(os.path.join(targetDir, "function_complexities.dat"), "rb") as f:
+            functionComplexities = SerializationContext().deserialize(f.read())
 
         # load the submodules first
         for submodule in submodules:
-            # if not self.loadModuleByHash(submodule):
-            #     return False
             self.loadModuleByHash(submodule)
 
         modulePath = os.path.join(targetDir, "module.so")
@@ -171,14 +175,15 @@ class CompilerCache:
             modulePath,
             serializedGlobalVarDefs,
             functionNameToNativeType,
-            globalDependencies
+            globalDependencies,
+            functionComplexities
 
         ).loadFromPath(modulePath)
 
         self.loadedBinarySharedObjects[moduleHash] = loaded
 
         self.targetsLoaded.update(callTargets)
-
+        self.targetComplexity.update(functionComplexities)
         assert not any(key in self.global_dependencies for key in globalDependencies)  # should only happen if there's a hash collision.
         self.global_dependencies.update(globalDependencies)
 
@@ -186,7 +191,6 @@ class CompilerCache:
         for function_name, dependant_function_name in dependency_edgelist:
             self.function_dependency_graph.addEdge(source=function_name, dest=dependant_function_name)
 
-        # return True
 
     def addModule(self, binarySharedObject, nameToTypedCallTarget, linkDependencies, dependencyEdgelist):
         """Add new code to the compiler cache.
@@ -317,6 +321,9 @@ class CompilerCache:
         with open(os.path.join(tempTargetDir, "global_dependencies.dat"), "wb") as f:
             f.write(SerializationContext().serialize(binarySharedObject.globalDependencies))
 
+        with open(os.path.join(tempTargetDir, "function_complexities.dat"), "wb") as f:
+            f.write(SerializationContext().serialize(binarySharedObject.functionComplexities))
+
         try:
             os.rename(tempTargetDir, targetDir)
         except IOError:
@@ -336,57 +343,3 @@ class CompilerCache:
             self.loadForSymbol(linkName)
 
         return self.loadedBinarySharedObjects[moduleHash].functionPointers[linkName]
-
-
-# class CacheDependencyGraph:
-#     """
-#     Holds the directed dependency graph for the functions in the compiler cache.
-#     TODO - annotate the graph with loadable/not loadable, deprecate mark_invalid, account
-#         for required global variables
-#     TODO allow for partial graph creation, by only loading the dependencies as required.
-#     """
-
-#     def __init__(self, compiler_cache):
-#         self._compiler_cache = compiler_cache
-#         self._edgelist = []
-#         self._directed_graph = None
-#         self._module_dependencies_loaded = set()
-
-#     @property
-#     def directed_graph(self):
-#         if self._directed_graph is None:
-#             self._directed_graph = self._compute_full_graph()
-#         return self._directed_graph
-
-#     def _read_module_dependency_graph(self, module_hash: str) -> ListOf(ListOf(str)):
-#         """deserialise the edgelist corresponding to the module_hash in the cache dir."""
-#         target_dir = os.path.join(self._compiler_cache.cacheDir, module_hash)
-
-#         with open(os.path.join(target_dir, "dependency_graph.dat"), "rb") as f:
-#             edge_list = SerializationContext().deserialize(
-#                 f.read(), ListOf(ListOf(str))
-#             )
-#         return edge_list
-
-#     def _compute_full_graph(self) -> nx.DiGraph:
-#         """Read every unread module's dependency graph and collate."""
-#         for module_hash in os.listdir(self._compiler_cache.cacheDir):
-#             if (
-#                 len(module_hash) == 40
-#                 and module_hash not in self._module_dependencies_loaded
-#             ):
-#                 self._edgelist += self._read_module_dependency_graph(module_hash)
-#                 self._module_dependencies_loaded.add(module_hash)
-
-#         full_graph = nx.DiGraph()
-
-#         # add the function/global distinction
-#         for source, dest, edge_type in self._edgelist:
-#             full_graph.add_edge(source, dest)
-#             full_graph.nodes[source]["is_global"] = False
-#             if edge_type == "global":
-#                 full_graph.nodes[dest]["is_global"] = True  # horrendous coding.
-
-#         full_graph.remove_node("None")
-
-#         return full_graph
