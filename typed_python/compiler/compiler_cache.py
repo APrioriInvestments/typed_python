@@ -15,12 +15,14 @@
 import os
 import uuid
 import shutil
+import llvmlite.ir
 
 from typing import Optional, List
 
 from typed_python.compiler.binary_shared_object import LoadedBinarySharedObject, BinarySharedObject
 from typed_python.compiler.directed_graph import DirectedGraph
 from typed_python.compiler.typed_call_target import TypedCallTarget
+import typed_python.compiler.native_ast as native_ast
 from typed_python.SerializationContext import SerializationContext
 from typed_python import Dict, ListOf
 
@@ -67,6 +69,8 @@ class CompilerCache:
         self.targetsLoaded: Dict[str, TypedCallTarget] = {}
         # the set of link_names for functions with linked and validated globals (i.e. ready to be run).
         self.targetsValidated = set()
+        # the total number of instructions for each link_name
+        self.targetComplexity = Dict(str, int)()
         # link_name -> link_name
         self.function_dependency_graph = DirectedGraph()
         # dict from link_name to list of global names (should be llvm keys in serialisedGlobalDefinitions)
@@ -89,6 +93,21 @@ class CompilerCache:
         link_name = self._select_link_name(func_name)
         self.loadForSymbol(link_name)
         return self.targetsLoaded[link_name]
+
+    def getIR(self, func_name: str) -> llvmlite.ir.Function:
+        if not self.hasSymbol(func_name):
+            raise ValueError(f'symbol not found for func_name {func_name}')
+        link_name = self._select_link_name(func_name)
+        module_hash = self.link_name_to_module_hash[link_name]
+        return self.loadedBinarySharedObjects[module_hash].binarySharedObject.functionIRs[func_name]
+
+    def getDefinition(self, func_name: str) -> native_ast.Function:
+        if not self.hasSymbol(func_name):
+            raise ValueError(f'symbol not found for func_name {func_name}')
+        link_name = self._select_link_name(func_name)
+        module_hash = self.link_name_to_module_hash[link_name]
+        serialized_definition = self.loadedBinarySharedObjects[module_hash].binarySharedObject.serializedFunctionDefinitions[func_name]
+        return SerializationContext().deserialize(serialized_definition)
 
     def _generate_link_name(self, func_name: str, module_hash: str) -> str:
         return func_name + "." + module_hash
@@ -126,6 +145,14 @@ class CompilerCache:
                 if not self.loadedBinarySharedObjects[moduleHash].validateGlobalVariables(definitionsToLink):
                     raise RuntimeError('failed to validate globals when loading:', linkName)
 
+    def complexityForSymbol(self, func_name: str) -> int:
+        """Get the total number of LLVM instructions for a given symbol."""
+        try:
+            link_name = self._select_link_name(func_name)
+            return self.targetComplexity[link_name]
+        except KeyError as e:
+            raise ValueError(f'No complexity value cached for {func_name}') from e
+
     def loadModuleByHash(self, moduleHash: str) -> None:
         """Load a module by name.
 
@@ -139,23 +166,23 @@ class CompilerCache:
 
         # TODO (Will) - store these names as module consts, use one .dat only
         with open(os.path.join(targetDir, "type_manifest.dat"), "rb") as f:
-            # func_name -> typedcalltarget
             callTargets = SerializationContext().deserialize(f.read())
-
         with open(os.path.join(targetDir, "globals_manifest.dat"), "rb") as f:
             serializedGlobalVarDefs = SerializationContext().deserialize(f.read())
-
         with open(os.path.join(targetDir, "native_type_manifest.dat"), "rb") as f:
             functionNameToNativeType = SerializationContext().deserialize(f.read())
-
         with open(os.path.join(targetDir, "submodules.dat"), "rb") as f:
             submodules = SerializationContext().deserialize(f.read(), ListOf(str))
-
         with open(os.path.join(targetDir, "function_dependencies.dat"), "rb") as f:
             dependency_edgelist = SerializationContext().deserialize(f.read())
-
         with open(os.path.join(targetDir, "global_dependencies.dat"), "rb") as f:
             globalDependencies = SerializationContext().deserialize(f.read())
+        with open(os.path.join(targetDir, "function_complexities.dat"), "rb") as f:
+            functionComplexities = SerializationContext().deserialize(f.read())
+        with open(os.path.join(targetDir, "function_irs.dat"), "rb") as f:
+            functionIRs = SerializationContext().deserialize(f.read())
+        with open(os.path.join(targetDir, "function_definitions.dat"), "rb") as f:
+            functionDefinitions = SerializationContext().deserialize(f.read())
 
         # load the submodules first
         for submodule in submodules:
@@ -167,7 +194,10 @@ class CompilerCache:
             modulePath,
             serializedGlobalVarDefs,
             functionNameToNativeType,
-            globalDependencies
+            globalDependencies,
+            functionComplexities,
+            functionIRs,
+            functionDefinitions
         ).loadFromPath(modulePath)
 
         self.loadedBinarySharedObjects[moduleHash] = loaded
@@ -177,8 +207,11 @@ class CompilerCache:
             assert link_name not in self.targetsLoaded
             self.targetsLoaded[link_name] = callTarget
 
-        link_name_global_dependencies = {self._generate_link_name(x, moduleHash): y for x, y in globalDependencies.items()}
+        for func_name, complexity in functionComplexities.items():
+            link_name = self._generate_link_name(func_name, moduleHash)
+            self.targetComplexity[link_name] = complexity
 
+        link_name_global_dependencies = {self._generate_link_name(x, moduleHash): y for x, y in globalDependencies.items()}
         assert not any(key in self.global_dependencies for key in link_name_global_dependencies)
 
         self.global_dependencies.update(link_name_global_dependencies)
@@ -221,6 +254,10 @@ class CompilerCache:
             link_name_dependency_edgelist.append([source_link_name, dest_link_name])
 
         path = self.writeModuleToDisk(binarySharedObject, hashToUse, nameToTypedCallTarget, dependentHashes, link_name_dependency_edgelist)
+
+        for func_name, complexity in binarySharedObject.functionComplexities.items():
+            link_name = self._generate_link_name(func_name, hashToUse)
+            self.targetComplexity[link_name] = complexity
 
         self.loadedBinarySharedObjects[hashToUse] = (
             binarySharedObject.loadFromPath(os.path.join(path, "module.so"))
@@ -313,6 +350,15 @@ class CompilerCache:
 
         with open(os.path.join(tempTargetDir, "global_dependencies.dat"), "wb") as f:
             f.write(SerializationContext().serialize(binarySharedObject.globalDependencies))
+
+        with open(os.path.join(tempTargetDir, "function_complexities.dat"), "wb") as f:
+            f.write(SerializationContext().serialize(binarySharedObject.functionComplexities))
+
+        with open(os.path.join(tempTargetDir, "function_irs.dat"), "wb") as f:
+            f.write(SerializationContext().serialize(binarySharedObject.functionIRs))
+
+        with open(os.path.join(tempTargetDir, "function_definitions.dat"), "wb") as f:
+            f.write(SerializationContext().serialize(binarySharedObject.serializedFunctionDefinitions))
 
         try:
             os.rename(tempTargetDir, targetDir)
