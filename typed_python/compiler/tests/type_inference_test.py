@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 typed_python Authors
+#   Copyright 2017-2023 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
+import pytest
 
 from typed_python import (
     Function, OneOf, Alternative,
@@ -391,6 +392,7 @@ class TestTypeInference(unittest.TestCase):
 
         assert f("hi")['x'] == str
 
+    @pytest.mark.skipif("sys.version_info.minor < 8")
     def test_restricts_based_on_None(self):
         # check that the compiler understands how to restrict a OneOf based on 'is None'
         @Entrypoint

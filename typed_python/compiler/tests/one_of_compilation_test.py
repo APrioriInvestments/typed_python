@@ -1,4 +1,4 @@
-#   Copyright 2017-2020 typed_python Authors
+#   Copyright 2017-2023 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
+import pytest
 import typed_python
 
 from typed_python import (
@@ -703,6 +704,7 @@ class TestOneOfCompilation(unittest.TestCase):
         assert checkIt(1) == "int"
         assert checkIt(1.0) == "float"
 
+    @pytest.mark.skipif("sys.version_info.minor < 8")
     def test_direct_assign_works_with_oneof(self):
         @Entrypoint
         def checkIt(x: OneOf(None, Tuple(str, str))):
