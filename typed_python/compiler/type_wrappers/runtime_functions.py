@@ -127,6 +127,8 @@ computeTypeClassDispatchTable = externalCallTarget(
     "computeTypeClassDispatchTable", Void.pointer(), Void.pointer(), Void.pointer()
 )
 
+secondsSinceEpoch = externalCallTarget("np_secondsSinceEpoch", Float64)
+
 acos64 = externalCallTarget("np_acos_float64", Float64, Float64)
 
 acosh64 = externalCallTarget("np_acosh_float64", Float64, Float64)

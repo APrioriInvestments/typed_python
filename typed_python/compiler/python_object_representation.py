@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import threading
+import time
 import _thread
 
 from typed_python.compiler.typed_expression import TypedExpression
@@ -52,6 +53,7 @@ from typed_python.compiler.type_wrappers.len_wrapper import LenWrapper
 from typed_python.compiler.type_wrappers.hash_wrapper import HashWrapper
 from typed_python.compiler.type_wrappers.range_wrapper import range as compilableRange
 from typed_python.compiler.type_wrappers.print_wrapper import PrintWrapper
+from typed_python.compiler.type_wrappers.time_wrapper import TimeWrapper
 from typed_python.compiler.type_wrappers.super_wrapper import SuperWrapper
 from typed_python.compiler.type_wrappers.compiler_introspection_wrappers import (
     IsCompiledWrapper,
@@ -276,6 +278,9 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
 
     if f is print:
         return TypedExpression(context, native_ast.nullExpr, PrintWrapper(), False)
+
+    if f is time.time:
+        return TypedExpression(context, native_ast.nullExpr, TimeWrapper(), False)
 
     if f is super:
         return TypedExpression(context, native_ast.nullExpr, SuperWrapper(), False)

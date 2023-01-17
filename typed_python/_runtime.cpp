@@ -1,3 +1,4 @@
+#include <chrono>
 #include <stdint.h>
 #include <stdarg.h>
 #include <cmath>
@@ -105,6 +106,13 @@ extern "C" {
 
             PyErr_Restore(existingErrorTypePtr, existingErrorValuePtr, existingErrorTracebackPtr);
         }
+    }
+
+    double np_secondsSinceEpoch() {
+        return double(
+            std::chrono::system_clock::now().time_since_epoch()
+            / std::chrono::nanoseconds(1)
+        ) / 1000000000;
     }
 
     Type* np_classTypeAsPointer(VTable* vtable) {
