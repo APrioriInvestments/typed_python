@@ -33,7 +33,7 @@ ReleaseableThreadState* waitingPyThreadState = 0;
 int64_t gilReleaseThreadLoopActive = 0;
 
 
-int64_t gilReleaseThreadLoopSleepMicroseconds = 500;
+int64_t gilReleaseThreadLoopSleepMicroseconds = 50;
 
 
 void PyEnsureGilReleased::setGilReleaseThreadLoopSleepMicroseconds(int64_t ms) {
