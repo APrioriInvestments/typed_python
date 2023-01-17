@@ -450,6 +450,21 @@ def test_deepcopy_typeMap_baseclass():
     assert res.x == 11
 
 
+def test_deepcopy_typeMap_baseclass_tp_type():
+    class C(Class):
+        x = Member(int)
+
+    class D(C):
+        pass
+
+    def mapper(c):
+        return type(c)(x=c.x + 1)
+
+    res = deepcopy(D(x=10), typeMap={C: mapper})
+
+    assert res.x == 11
+
+
 def test_deepcopy_empty_alternatives():
     X = Alternative("X", A=dict(), B=dict())
     Y = Alternative("Y", C=dict(x=X))

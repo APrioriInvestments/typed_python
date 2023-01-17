@@ -150,31 +150,44 @@ void Type::deepcopy(
     DeepcopyContext& context
 ) {
     if (context.tpTypeMap.size()) {
-        auto it = context.tpTypeMap.find(this);
-        if (it != context.tpTypeMap.end()) {
-            PyEnsureGilAcquired getTheGil;
+        bool foundOne = false;
 
-            PyObjectStealer asPyObj(PyInstance::extractPythonObject(src, this));
-
-            PyObjectStealer result(
-                PyObject_CallFunction(
-                    it->second,
-                    "O",
-                    (PyObject*)asPyObj
-                )
-            );
-
-            if (!result) {
-                throw PythonExceptionSet();
+        visitMRO([&](Type* baseType) {
+            if (foundOne) {
+                return;
             }
 
-            PyInstance::copyConstructFromPythonInstance(
-                this,
-                dest,
-                result,
-                ConversionLevel::Signature
-            );
+            auto it = context.tpTypeMap.find(baseType);
 
+            if (it != context.tpTypeMap.end()) {
+                PyEnsureGilAcquired getTheGil;
+
+                PyObjectStealer asPyObj(PyInstance::extractPythonObject(src, this));
+
+                PyObjectStealer result(
+                    PyObject_CallFunction(
+                        it->second,
+                        "O",
+                        (PyObject*)asPyObj
+                    )
+                );
+
+                if (!result) {
+                    throw PythonExceptionSet();
+                }
+
+                PyInstance::copyConstructFromPythonInstance(
+                    this,
+                    dest,
+                    result,
+                    ConversionLevel::Signature
+                );
+
+                foundOne = true;
+            }
+        });
+
+        if (foundOne) {
             return;
         }
     }

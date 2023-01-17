@@ -166,6 +166,12 @@ public:
         return m_which;
     }
 
+    template<class visitor_type>
+    void visitMROConcrete(const visitor_type& v) {
+        v(this);
+        m_alternative->visitMROConcrete(v);
+    }
+
 private:
     Alternative* m_alternative;
 

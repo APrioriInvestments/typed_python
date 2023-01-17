@@ -520,6 +520,13 @@ public:
         return m_classType;
     }
 
+    template<class visitor_type>
+    void visitMROConcrete(const visitor_type& v) {
+        for (HeldClass* h: getMro()) {
+            v(h);
+        }
+    }
+
     RefTo* getRefToType();
 
     HeldClass* renamed(std::string newName) {

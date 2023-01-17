@@ -99,6 +99,13 @@ public:
         return instanceToLayout(self)->vtable;
     }
 
+    template<class visitor_type>
+    void visitMROConcrete(const visitor_type& v) {
+        for (HeldClass* h: getHeldClass()->getMro()) {
+            v(h->getClassType());
+        }
+    }
+
     bool isBinaryCompatibleWithConcrete(Type* other);
 
     template<class visitor_type>

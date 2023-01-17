@@ -624,6 +624,20 @@ public:
         return false;
     }
 
+    // walk the MRO type hierarchy - 'v' gets called with 'this'
+    // and all base classes in the order of method resolution
+    template<class visitor_type>
+    void visitMRO(const visitor_type& v) {
+        this->check([&](auto& subtype) {
+            subtype.visitMROConcrete(v);
+        });
+    }
+
+    template<class visitor_type>
+    void visitMROConcrete(const visitor_type& v) {
+        v(this);
+    }
+
     // if isPOD (Plain Old Data), then there is no constructor / destructor semantic.
     // Instances of the type can just be bitcopied blindly without leaking any memory.
     bool isPOD() {

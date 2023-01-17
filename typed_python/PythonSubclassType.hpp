@@ -102,6 +102,12 @@ public:
         m_base->deepcopy(dest, src, context);
     }
 
+    template<class visitor_type>
+    void visitMROConcrete(const visitor_type& v) {
+        v(this);
+        m_base->visitMROConcrete(v);
+    }
+
     size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         return m_base->deepBytecount(instance, alreadyVisited, outSlabs);
     }
