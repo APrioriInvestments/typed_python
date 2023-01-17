@@ -125,6 +125,9 @@ class Date(Class, Final):
         self.month = month
         self.day = day
 
+    def __hash__(self):
+        return hash((self.year, self.month, self.day))
+
     def __str__(self):
         return f"{self.year:02.0f}-{self.month:02.0f}-{self.day:02.0f}"
 
