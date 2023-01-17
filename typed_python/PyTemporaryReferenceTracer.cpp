@@ -16,20 +16,6 @@
 
 #include "PyTemporaryReferenceTracer.hpp"
 
-class PyErrorStasher {
-public:
-    PyErrorStasher() {
-        PyErr_Fetch(&type, &value, &traceback);
-    }
-
-    ~PyErrorStasher() {
-        PyErr_Restore(type, value, traceback);
-    }
-
-private:
-    PyObject *type, *value, *traceback;
-};
-
 bool PyTemporaryReferenceTracer::isLineNewStatement(PyObject* code, int line) {
     PyErrorStasher stashCurrentException;
 

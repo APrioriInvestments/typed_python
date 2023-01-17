@@ -2872,6 +2872,36 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         check(C())
 
+    def test_del_during_unwind_works(self):
+        class C(Class):
+            def f(self):
+                return 1
+
+            def __del__(self):
+                self.f()
+
+        def inner():
+            raise Exception("thrown")
+
+        def middle():
+            c = C()  # noqa
+            return inner()
+
+        def outer():
+            middle()
+
+        try:
+            outer()
+        except Exception:
+            pass
+
+        outerE = Entrypoint(outer)
+
+        try:
+            outerE()
+        except Exception:
+            pass
+
     def test_del_works(self):
         delType = ListOf(type)()
 

@@ -288,6 +288,11 @@ void HeldClass::constructor(instance_ptr self, bool allowEmpty) {
 
 void HeldClass::destroy(instance_ptr self) {
     if (m_hasDelMagicMethod) {
+        PyEnsureGilAcquired getTheGil;
+
+        // don't suppress errors
+        PyErrorStasher stashErrors;
+
         Function* method = m_memberFunctions.find("__del__")->second;
 
         PyObjectStealer targetArgTuple(PyTuple_New(1));

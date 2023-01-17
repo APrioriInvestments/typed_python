@@ -428,3 +428,18 @@ inline bool startsWith(std::string name, std::string prefix) {
 
     return name.substr(0, prefix.size()) == prefix;
 }
+
+
+class PyErrorStasher {
+public:
+    PyErrorStasher() {
+        PyErr_Fetch(&type, &value, &traceback);
+    }
+
+    ~PyErrorStasher() {
+        PyErr_Restore(type, value, traceback);
+    }
+
+private:
+    PyObject *type, *value, *traceback;
+};
