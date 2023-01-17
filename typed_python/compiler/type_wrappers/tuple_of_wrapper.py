@@ -652,6 +652,9 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             {}
         )
 
+        if res is None:
+            return context.constant(False)
+
         if canConvert is True:
             return context.constant(True)
 

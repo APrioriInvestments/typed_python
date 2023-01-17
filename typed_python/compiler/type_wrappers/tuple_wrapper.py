@@ -182,10 +182,13 @@ class TupleWrapper(Wrapper):
         self.subTypeWrappers = tuple(typeWrapper(sub_t) for sub_t in t.ElementTypes)
         self._unionType = None
 
-        self.byteOffsets = [0]
+        if not self.subTypeWrappers:
+            self.byteOffsets = []
+        else:
+            self.byteOffsets = [0]
 
-        for i in range(len(self.subTypeWrappers)-1):
-            self.byteOffsets.append(self.byteOffsets[-1] + _types.bytecount(t.ElementTypes[i]))
+            for i in range(len(self.subTypeWrappers)-1):
+                self.byteOffsets.append(self.byteOffsets[-1] + _types.bytecount(t.ElementTypes[i]))
 
         self.layoutType = native_ast.Type.Array(element_type=native_ast.UInt8, count=bytecount)
 
@@ -238,6 +241,8 @@ class TupleWrapper(Wrapper):
     def refAs(self, context, expr, which):
         if not expr.isReference:
             expr = context.pushMove(expr)
+
+        assert which < len(self.subTypeWrappers), (which, self)
 
         return context.pushReference(
             self.subTypeWrappers[which],
@@ -490,6 +495,12 @@ class TupleWrapper(Wrapper):
         destT = targetVal.expr_type.typeRepresentation
 
         slots = self._indicesInOtherTypeToRead(sourceVal.expr_type)
+
+        if slots is None:
+            context.pushEffect(
+                native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
+            )
+            return
 
         for destIx, sourceIx in enumerate(slots):
             if sourceIx is not None:
