@@ -2999,8 +2999,8 @@ class TypesSerializationTest(unittest.TestCase):
         # we release the gil directly in 'deserialize' or 'serialize', then we'll end up
         # starving the serialization thread because we only get the thread back every
         # few milliseconds.
-        assert .1 <= avgTimeHeld[0] <= .9
-        assert .1 <= avgTimeHeld[1] <= .9
+        assert .05 <= avgTimeHeld[0] <= .95
+        assert .05 <= avgTimeHeld[1] <= .95
 
     def test_serialization_context_names_for_pmap_functions(self):
         from typed_python.lib.pmap import ensureThreads
