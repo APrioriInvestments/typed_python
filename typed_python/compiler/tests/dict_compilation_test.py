@@ -904,3 +904,54 @@ class TestDictCompilation(unittest.TestCase):
 
         put(aDict, B.B(), 10)
         assert B.B() in aDict
+
+    def test_yield_from_dict(self):
+        def iterateTwice(d):
+            for k in d:
+                yield k
+                yield k
+
+        @Entrypoint
+        def toList(d):
+            res = ListOf(d.KeyType)()
+
+            for k in iterateTwice(d):
+                res.append(k)
+
+            return res
+
+        assert toList(Dict(int, float)({1: 2.2})) == [1, 1]
+
+    def test_yield_from_dict_values(self):
+        def iterateTwice(d):
+            for k in d.values():
+                yield k
+                yield k
+
+        @Entrypoint
+        def toList(d):
+            res = ListOf(d.ValueType)()
+
+            for k in iterateTwice(d):
+                res.append(k)
+
+            return res
+
+        assert toList(Dict(int, float)({1: 2.2})) == [2.2, 2.2]
+
+    def test_yield_from_dict_items(self):
+        def iterateTwice(d):
+            for k in d.items():
+                yield k
+                yield k
+
+        @Entrypoint
+        def toList(d):
+            res = ListOf(Tuple(d.KeyType, d.ValueType))()
+
+            for k in iterateTwice(d):
+                res.append(k)
+
+            return res
+
+        assert toList(Dict(int, float)({1: 2.2})) == [(1, 2.2), (1, 2.2)]

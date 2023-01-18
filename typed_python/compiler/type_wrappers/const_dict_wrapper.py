@@ -12,7 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.conversion_level import ConversionLevel
@@ -20,7 +19,7 @@ from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethod
 from typed_python.compiler.type_wrappers.util import min
 from typed_python.compiler.typed_expression import TypedExpression
 
-from typed_python import Tuple
+from typed_python import Tuple, TypeFunction, Held, Member, Final, Class, ConstDict, PointerTo
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -215,7 +214,19 @@ class ConstDictWrapper(ConstDictWrapperBase):
         super().__init__(constDictType, None)
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("get_key_by_index_unsafe", "get_value_by_index_unsafe", "keys", "values", "items", "get"):
+        if attr in (
+            "__iter__",
+            "get_key_by_index_unsafe",
+            "get_value_by_index_unsafe",
+            "get_item_by_index_unsafe",
+            "get_key_ptr_by_index_unsafe",
+            "get_value_ptr_by_index_unsafe",
+            "get_item_ptr_by_index_unsafe",
+            "keys",
+            "values",
+            "items",
+            "get"
+        ):
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -226,36 +237,50 @@ class ConstDictWrapper(ConstDictWrapperBase):
         )
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        if methodname == "__iter__" and not args and not kwargs:
-            res = context.push(
-                ConstDictKeysIteratorWrapper(self.constDictType),
-                lambda instance:
-                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
-                    # we initialize the dict pointer below, so technically
-                    # if that were to throw, this would leak a bad value.
-            )
-
-            context.pushReference(
-                self,
-                res.expr.ElementPtrIntegers(0, 1)
-            ).convert_copy_initialize(instance)
-
-            return res
-
         if methodname == "get" and not kwargs:
             if len(args) == 1:
                 return self.convert_get(context, instance, args[0], context.constant(None))
             elif len(args) == 2:
                 return self.convert_get(context, instance, args[0], args[1])
 
-        if methodname == "keys" and not args and not kwargs:
-            return instance.changeType(ConstDictKeysWrapper(self.constDictType))
+        if (methodname == "__iter__" or methodname == "keys") and not args and not kwargs:
+            itType = ConstDictKeysIterator(
+                self.keyType.typeRepresentation,
+                self.valueType.typeRepresentation
+            )
+
+            return typeWrapper(itType).convert_type_call(
+                context,
+                None,
+                [instance],
+                {}
+            )
 
         if methodname == "values" and not args and not kwargs:
-            return instance.changeType(ConstDictValuesWrapper(self.constDictType))
+            itType = ConstDictValuesIterator(
+                self.keyType.typeRepresentation,
+                self.valueType.typeRepresentation
+            )
+
+            return typeWrapper(itType).convert_type_call(
+                context,
+                None,
+                [instance],
+                {}
+            )
 
         if methodname == "items" and not args and not kwargs:
-            return instance.changeType(ConstDictItemsWrapper(self.constDictType))
+            itType = ConstDictItemsIterator(
+                self.keyType.typeRepresentation,
+                self.valueType.typeRepresentation
+            )
+
+            return typeWrapper(itType).convert_type_call(
+                context,
+                None,
+                [instance],
+                {}
+            )
 
         if kwargs:
             return super().convert_method_call(context, instance, methodname, args, kwargs)
@@ -268,6 +293,14 @@ class ConstDictWrapper(ConstDictWrapperBase):
 
                 return self.convert_getkey_by_index_unsafe(context, instance, ix)
 
+        if methodname == "get_item_by_index_unsafe":
+            if len(args) == 1:
+                ix = args[0].toInt64()
+                if ix is None:
+                    return
+
+                return self.convert_getitem_by_index_unsafe(context, instance, ix)
+
         if methodname == "get_value_by_index_unsafe":
             if len(args) == 1:
                 ix = args[0].toInt64()
@@ -275,6 +308,30 @@ class ConstDictWrapper(ConstDictWrapperBase):
                     return
 
                 return self.convert_getvalue_by_index_unsafe(context, instance, ix)
+
+        if methodname == "get_key_ptr_by_index_unsafe":
+            if len(args) == 1:
+                ix = args[0].toInt64()
+                if ix is None:
+                    return
+
+                return self.convert_getkey_by_index_unsafe(context, instance, ix).asPointer()
+
+        if methodname == "get_item_ptr_by_index_unsafe":
+            if len(args) == 1:
+                ix = args[0].toInt64()
+                if ix is None:
+                    return
+
+                return self.convert_getitem_by_index_unsafe(context, instance, ix).asPointer()
+
+        if methodname == "get_value_ptr_by_index_unsafe":
+            if len(args) == 1:
+                ix = args[0].toInt64()
+                if ix is None:
+                    return
+
+                return self.convert_getvalue_by_index_unsafe(context, instance, ix).asPointer()
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
@@ -382,136 +439,112 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
 
-class ConstDictMakeIteratorWrapper(ConstDictWrapperBase):
-    def convert_method_call(self, context, expr, methodname, args, kwargs):
-        if methodname == "__iter__" and not args and not kwargs:
-            res = context.push(
-                # self.iteratorType is inherited from our specialized children
-                # who pick whether we're an interator over keys, values, items, etc.
-                self.iteratorType,
-                lambda instance:
-                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
-            )
+@TypeFunction
+def ConstDictKeysIterator(K, V):
+    @Held
+    class ConstDictKeysIterator(
+        Class,
+        Final,
+        __name__=f"ConstDictKeysIterator({K.__name__}, {V.__name__})"
+    ):
+        slotIx = Member(int, nonempty=True)
+        count = Member(int, nonempty=True)
+        instance = Member(ConstDict(K, V), nonempty=True)
 
-            context.pushReference(
-                self,
-                res.expr.ElementPtrIntegers(0, 1)
-            ).convert_copy_initialize(expr)
+        def __init__(self, instance):
+            self.instance = instance
+            self.slotIx = 0
+            self.count = len(instance)
 
-            return res
+        def __iter__(self):
+            return self
 
-        return super().convert_method_call(context, expr, methodname, args, kwargs)
+        def __next__(self) -> K:
+            res = self.__fastnext__()
+            if res:
+                return res.get()
+            raise StopIteration()
 
+        def __fastnext__(self) -> PointerTo(K):
+            if self.slotIx < self.count:
+                slot = self.slotIx
+                self.slotIx += 1
+                return self.instance.get_key_ptr_by_index_unsafe(slot)
+            else:
+                return PointerTo(K)()
 
-class ConstDictKeysWrapper(ConstDictMakeIteratorWrapper):
-    def __init__(self, constDictType):
-        super().__init__(constDictType, "keys")
-        self.iteratorType = ConstDictKeysIteratorWrapper(constDictType)
-
-
-class ConstDictValuesWrapper(ConstDictMakeIteratorWrapper):
-    def __init__(self, constDictType):
-        super().__init__(constDictType, "values")
-        self.iteratorType = ConstDictValuesIteratorWrapper(constDictType)
-
-
-class ConstDictItemsWrapper(ConstDictMakeIteratorWrapper):
-    def __init__(self, constDictType):
-        super().__init__(constDictType, "items")
-        self.iteratorType = ConstDictItemsIteratorWrapper(constDictType)
+    return ConstDictKeysIterator
 
 
-class ConstDictIteratorWrapper(Wrapper):
-    is_pod = False
-    is_empty = False
-    is_pass_by_ref = True
+@TypeFunction
+def ConstDictValuesIterator(K, V):
+    @Held
+    class ConstDictValuesIterator(
+        Class,
+        Final,
+        __name__=f"ConstDictValuesIterator({K.__name__}, {V.__name__})"
+    ):
+        slotIx = Member(int, nonempty=True)
+        count = Member(int, nonempty=True)
+        instance = Member(ConstDict(K, V), nonempty=True)
 
-    def __init__(self, constDictType, iteratorType):
-        self.constDictType = constDictType
-        self.iteratorType = iteratorType
-        super().__init__((constDictType, "iterator", iteratorType))
+        def __init__(self, instance):
+            self.instance = instance
+            self.slotIx = 0
+            self.count = len(instance)
 
-    def getNativeLayoutType(self):
-        return native_ast.Type.Struct(
-            element_types=(("pos", native_ast.Int64), ("dict", ConstDictWrapper(self.constDictType).getNativeLayoutType())),
-            name="const_dict_iterator"
-        )
+        def __iter__(self):
+            return self
 
-    def convert_fastnext(self, context, expr):
-        context.pushEffect(
-            expr.expr.ElementPtrIntegers(0, 0).store(
-                expr.expr.ElementPtrIntegers(0, 0).load().add(1)
-            )
-        )
-        self_len = self.refAs(context, expr, 1).convert_len()
-        canContinue = context.pushPod(
-            bool,
-            expr.expr.ElementPtrIntegers(0, 0).load().lt(self_len.nonref_expr)
-        )
+        def __next__(self) -> V:
+            res = self.__fastnext__()
+            if res:
+                return res.get()
+            raise StopIteration()
 
-        nextIx = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
+        def __fastnext__(self) -> PointerTo(V):
+            if self.slotIx < self.count:
+                slot = self.slotIx
+                self.slotIx += 1
+                return self.instance.get_value_ptr_by_index_unsafe(slot)
+            else:
+                return PointerTo(V)()
 
-        return self.iteratedItemForReference(context, expr, nextIx).asPointerIf(canContinue)
-
-    def refAs(self, context, expr, which):
-        assert expr.expr_type == self
-
-        if which == 0:
-            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
-
-        if which == 1:
-            return context.pushReference(
-                self.constDictType,
-                expr.expr
-                    .ElementPtrIntegers(0, 1)
-                    .cast(ConstDictWrapper(self.constDictType).getNativeLayoutType().pointer())
-            )
-
-    def convert_assign(self, context, expr, other):
-        assert expr.isReference
-
-        for i in range(2):
-            self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
-
-    def convert_copy_initialize(self, context, expr, other):
-        for i in range(2):
-            self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
-
-    def convert_destroy(self, context, expr):
-        self.refAs(context, expr, 1).convert_destroy()
+    return ConstDictValuesIterator
 
 
-class ConstDictKeysIteratorWrapper(ConstDictIteratorWrapper):
-    def __init__(self, constDictType):
-        super().__init__(constDictType, "keys")
+@TypeFunction
+def ConstDictItemsIterator(K, V):
+    @Held
+    class ConstDictItemsIterator(
+        Class,
+        Final,
+        __name__=f"ConstDictItemsIterator({K.__name__}, {V.__name__})"
+    ):
+        slotIx = Member(int, nonempty=True)
+        count = Member(int, nonempty=True)
+        instance = Member(ConstDict(K, V), nonempty=True)
 
-    def iteratedItemForReference(self, context, expr, ixExpr):
-        return ConstDictWrapper(self.constDictType).convert_getkey_by_index_unsafe(
-            context,
-            self.refAs(context, expr, 1),
-            ixExpr
-        )
+        def __init__(self, instance):
+            self.instance = instance
+            self.slotIx = 0
+            self.count = len(instance)
 
+        def __iter__(self):
+            return self
 
-class ConstDictItemsIteratorWrapper(ConstDictIteratorWrapper):
-    def __init__(self, constDictType):
-        super().__init__(constDictType, "items")
+        def __next__(self) -> Tuple(K, V):
+            res = self.__fastnext__()
+            if res:
+                return res.get()
+            raise StopIteration()
 
-    def iteratedItemForReference(self, context, expr, ixExpr):
-        return ConstDictWrapper(self.constDictType).convert_getitem_by_index_unsafe(
-            context,
-            self.refAs(context, expr, 1),
-            ixExpr
-        )
+        def __fastnext__(self) -> PointerTo(Tuple(K, V)):
+            if self.slotIx < self.count:
+                slot = self.slotIx
+                self.slotIx += 1
+                return self.instance.get_item_ptr_by_index_unsafe(slot)
+            else:
+                return PointerTo(Tuple(K, V))()
 
-
-class ConstDictValuesIteratorWrapper(ConstDictIteratorWrapper):
-    def __init__(self, constDictType):
-        super().__init__(constDictType, "values")
-
-    def iteratedItemForReference(self, context, expr, ixExpr):
-        return ConstDictWrapper(self.constDictType).convert_getvalue_by_index_unsafe(
-            context,
-            self.refAs(context, expr, 1),
-            ixExpr
-        )
+    return ConstDictItemsIterator

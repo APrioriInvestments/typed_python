@@ -17,10 +17,9 @@ from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
-from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.hash_table_implementation import table_next_slot, table_clear, \
     dict_table_contains, dict_delitem, dict_getitem, dict_get, dict_setitem
-from typed_python import Tuple, PointerTo, Int32, UInt8, Dict, ConstDict
+from typed_python import Tuple, PointerTo, Int32, UInt8, Dict, ConstDict, TypeFunction, Held, Class, Member, Final
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -177,7 +176,11 @@ class DictWrapper(DictWrapperBase):
 
     def convert_attribute(self, context, expr, attr):
         if attr in (
-                "getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe",
+                "__iter__",
+                "getItemByIndexUnsafe", "getItemPtrByIndexUnsafe",
+                "getKeyByIndexUnsafe", "getKeyPtrByIndexUnsafe",
+                "getValueByIndexUnsafe", "getValuePtrByIndexUnsafe",
+                "deleteItemByIndexUnsafe",
                 "initializeValueByIndexUnsafe", "assignValueByIndexUnsafe",
                 "initializeKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
                 "_top_item_slot", "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault",
@@ -305,33 +308,44 @@ class DictWrapper(DictWrapperBase):
         if kwargs:
             return super().convert_method_call(context, instance, methodname, args, kwargs)
 
-        if methodname == "__iter__" and not args and not kwargs:
-            res = context.push(
-                DictKeysIteratorWrapper(self.dictType),
-                lambda iteratorInstance:
-                iteratorInstance.expr.ElementPtrIntegers(0, 0).store(-1)
-                >> iteratorInstance.expr.ElementPtrIntegers(0, 1).store(
-                    self.convert_len_native(instance)
-                )
-                # we initialize the dict pointer below, so technically
-                # if that were to throw, this would leak a bad value.
+        if (methodname == "__iter__" or methodname == "keys") and not args and not kwargs:
+            itType = DictKeysIterator(
+                self.keyType.typeRepresentation,
+                self.valueType.typeRepresentation
             )
 
-            context.pushReference(
-                self,
-                res.expr.ElementPtrIntegers(0, 2)
-            ).convert_copy_initialize(instance)
-
-            return res
-
-        if methodname == "keys" and not args and not kwargs:
-            return instance.changeType(DictKeysWrapper(self.dictType))
+            return typeWrapper(itType).convert_type_call(
+                context,
+                None,
+                [instance],
+                {}
+            )
 
         if methodname == "values" and not args and not kwargs:
-            return instance.changeType(DictValuesWrapper(self.dictType))
+            itType = DictValuesIterator(
+                self.keyType.typeRepresentation,
+                self.valueType.typeRepresentation
+            )
+
+            return typeWrapper(itType).convert_type_call(
+                context,
+                None,
+                [instance],
+                {}
+            )
 
         if methodname == "items" and not args and not kwargs:
-            return instance.changeType(DictItemsWrapper(self.dictType))
+            itType = DictItemsIterator(
+                self.keyType.typeRepresentation,
+                self.valueType.typeRepresentation
+            )
+
+            return typeWrapper(itType).convert_type_call(
+                context,
+                None,
+                [instance],
+                {}
+            )
 
         if len(args) == 0:
             if methodname == "copy":
@@ -394,7 +408,15 @@ class DictWrapper(DictWrapperBase):
             if methodname == "get":
                 return self.convert_get(context, instance, args[0], context.constant(None))
 
-            if methodname in ("getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe"):
+            if methodname in (
+                "getItemByIndexUnsafe",
+                "getKeyByIndexUnsafe",
+                "getValueByIndexUnsafe",
+                "getItemPtrByIndexUnsafe",
+                "getKeyPtrByIndexUnsafe",
+                "getValuePtrByIndexUnsafe",
+                "deleteItemByIndexUnsafe"
+            ):
                 index = args[0].toInt64()
                 if index is None:
                     return None
@@ -406,17 +428,27 @@ class DictWrapper(DictWrapperBase):
                     ).elemPtr(index.toInt64().nonref_expr)
                 )
 
-                if methodname == "getItemByIndexUnsafe":
-                    return item
-                elif methodname == "deleteItemByIndexUnsafe":
+                if methodname == "deleteItemByIndexUnsafe":
                     item.convert_destroy()
                     return context.pushVoid()
+                elif methodname == "getItemByIndexUnsafe":
+                    return item
+                elif methodname == "getItemPtrByIndexUnsafe":
+                    return item.asPointer()
                 elif methodname == "getKeyByIndexUnsafe":
                     # take the first item in the tuple
                     return item.expr_type.refAs(context, item, 0)
-                else:
-                    # take the second item in the tuple
+                elif methodname == "getKeyPtrByIndexUnsafe":
+                    # take the first item in the tuple
+                    return item.expr_type.refAs(context, item, 0).asPointer()
+                elif methodname == "getValueByIndexUnsafe":
+                    # take the first item in the tuple
                     return item.expr_type.refAs(context, item, 1)
+                elif methodname == "getValuePtrByIndexUnsafe":
+                    # take the first item in the tuple
+                    return item.expr_type.refAs(context, item, 1).asPointer()
+                else:
+                    raise Exception("unreachable")
 
         if len(args) == 2:
             if methodname == "get":
@@ -608,172 +640,121 @@ class DictWrapper(DictWrapperBase):
         return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
 
-class DictMakeIteratorWrapper(DictWrapperBase):
-    def convert_method_call(self, context, expr, methodname, args, kwargs):
-        if methodname == "__iter__" and not args and not kwargs:
-            res = context.push(
-                # self.iteratorType is inherited from our specialized children
-                # who pick whether we're an iterator over keys, values, items, etc.
-                self.iteratorType,
-                lambda instance:
-                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
-                    >> instance.expr.ElementPtrIntegers(0, 1).store(
-                        self.convert_len_native(expr)
-                    )
-            )
+@TypeFunction
+def DictKeysIterator(K, V):
+    @Held
+    class DictKeysIterator(
+        Class,
+        Final,
+        __name__=f"DictKeysIterator({K.__name__}, {V.__name__})"
+    ):
+        slotIx = Member(int, nonempty=True)
+        count = Member(int, nonempty=True)
+        instance = Member(Dict(K, V), nonempty=True)
 
-            context.pushReference(
-                self,
-                res.expr.ElementPtrIntegers(0, 2)
-            ).convert_copy_initialize(expr)
+        def __init__(self, instance):
+            self.instance = instance
+            self.slotIx = -1
+            self.count = len(instance)
 
-            return res
+        def __iter__(self):
+            return self
 
-        return super().convert_method_call(context, expr, methodname, args, kwargs)
+        def __next__(self) -> K:
+            res = self.__fastnext__()
+            if res:
+                return res.get()
+            raise StopIteration()
 
+        def __fastnext__(self) -> PointerTo(K):
+            checkDictSizeAndThrowIfChanged(self.instance, self.count)
 
-class DictKeysWrapper(DictMakeIteratorWrapper):
-    def __init__(self, dictType):
-        super().__init__(dictType, "keys")
-        self.iteratorType = DictKeysIteratorWrapper(dictType)
+            nextSlotIx = table_next_slot(self.instance, self.slotIx)
 
+            if nextSlotIx >= 0:
+                self.slotIx = nextSlotIx
+                return self.instance.getKeyPtrByIndexUnsafe(nextSlotIx)
+            else:
+                return PointerTo(K)()
 
-class DictValuesWrapper(DictMakeIteratorWrapper):
-    def __init__(self, dictType):
-        super().__init__(dictType, "values")
-        self.iteratorType = DictValuesIteratorWrapper(dictType)
-
-
-class DictItemsWrapper(DictMakeIteratorWrapper):
-    def __init__(self, dictType):
-        super().__init__(dictType, "items")
-        self.iteratorType = DictItemsIteratorWrapper(dictType)
+    return DictKeysIterator
 
 
-class DictIteratorWrapper(Wrapper):
-    is_pod = False
-    is_empty = False
-    is_pass_by_ref = True
+@TypeFunction
+def DictValuesIterator(K, V):
+    @Held
+    class DictValuesIterator(
+        Class,
+        Final,
+        __name__=f"DictValuesIterator({K.__name__}, {V.__name__})"
+    ):
+        slotIx = Member(int, nonempty=True)
+        count = Member(int, nonempty=True)
+        instance = Member(Dict(K, V), nonempty=True)
 
-    def __init__(self, dictType, iteratorType):
-        self.dictType = dictType
-        self.iteratorType = iteratorType
-        super().__init__((dictType, "iterator", iteratorType))
+        def __init__(self, instance):
+            self.instance = instance
+            self.slotIx = -1
+            self.count = len(instance)
 
-    def getNativeLayoutType(self):
-        return native_ast.Type.Struct(
-            element_types=(
-                ("pos", native_ast.Int64),
-                ("count", native_ast.Int64),
-                ("dict", DictWrapper(self.dictType).getNativeLayoutType())
-            ),
-            name="const_dict_iterator"
-        )
+        def __iter__(self):
+            return self
 
-    def convert_fastnext(self, context, expr):
-        context.call_py_function(
-            checkDictSizeAndThrowIfChanged,
-            (
-                self.refAs(context, expr, 2),
-                self.refAs(context, expr, 1),
-            ),
-            {}
-        )
+        def __next__(self) -> V:
+            res = self.__fastnext__()
+            if res:
+                return res.get()
+            raise StopIteration()
 
-        nextSlotIx = context.call_py_function(
-            table_next_slot,
-            (
-                self.refAs(context, expr, 2),
-                self.refAs(context, expr, 0)
-            ),
-            {}
-        )
+        def __fastnext__(self) -> PointerTo(V):
+            checkDictSizeAndThrowIfChanged(self.instance, self.count)
 
-        if nextSlotIx is None:
-            return None
+            nextSlotIx = table_next_slot(self.instance, self.slotIx)
 
-        context.pushEffect(
-            expr.expr.ElementPtrIntegers(0, 0).store(
-                nextSlotIx.nonref_expr
-            )
-        )
-        canContinue = context.pushPod(
-            bool,
-            nextSlotIx.nonref_expr.gte(0)
-        )
+            if nextSlotIx >= 0:
+                self.slotIx = nextSlotIx
+                return self.instance.getValuePtrByIndexUnsafe(nextSlotIx)
+            else:
+                return PointerTo(V)()
 
-        nextIx = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
-
-        return self.iteratedItemForReference(context, expr, nextIx).asPointerIf(canContinue)
-
-    def refAs(self, context, expr, which):
-        assert expr.expr_type == self
-
-        if which == 0:
-            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
-
-        if which == 1:
-            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 1))
-
-        if which == 2:
-            return context.pushReference(
-                self.dictType,
-                expr.expr
-                    .ElementPtrIntegers(0, 2)
-                    .cast(DictWrapper(self.dictType).getNativeLayoutType().pointer())
-            )
-
-    def convert_assign(self, context, expr, other):
-        assert expr.isReference
-
-        for i in range(3):
-            self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
-
-    def convert_copy_initialize(self, context, expr, other):
-        for i in range(3):
-            self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
-
-    def convert_destroy(self, context, expr):
-        self.refAs(context, expr, 2).convert_destroy()
+    return DictValuesIterator
 
 
-class DictKeysIteratorWrapper(DictIteratorWrapper):
-    def __init__(self, dictType):
-        super().__init__(dictType, "keys")
+@TypeFunction
+def DictItemsIterator(K, V):
+    @Held
+    class DictItemsIterator(
+        Class,
+        Final,
+        __name__=f"DictItemsIterator({K.__name__}, {V.__name__})"
+    ):
+        slotIx = Member(int, nonempty=True)
+        count = Member(int, nonempty=True)
+        instance = Member(Dict(K, V), nonempty=True)
 
-    def iteratedItemForReference(self, context, expr, ixExpr):
-        return DictWrapper(self.dictType).convert_method_call(
-            context,
-            self.refAs(context, expr, 2),
-            "getKeyByIndexUnsafe",
-            (ixExpr,),
-            {}
-        )
+        def __init__(self, instance):
+            self.instance = instance
+            self.slotIx = -1
+            self.count = len(instance)
 
+        def __iter__(self):
+            return self
 
-class DictItemsIteratorWrapper(DictIteratorWrapper):
-    def __init__(self, dictType):
-        super().__init__(dictType, "items")
+        def __next__(self) -> Tuple(K, V):
+            res = self.__fastnext__()
+            if res:
+                return res.get()
+            raise StopIteration()
 
-    def iteratedItemForReference(self, context, expr, ixExpr):
-        return DictWrapper(self.dictType).convert_method_call(
-            context,
-            self.refAs(context, expr, 2),
-            "getItemByIndexUnsafe",
-            (ixExpr,),
-            {}
-        )
+        def __fastnext__(self) -> PointerTo(Tuple(K, V)):
+            checkDictSizeAndThrowIfChanged(self.instance, self.count)
 
+            nextSlotIx = table_next_slot(self.instance, self.slotIx)
 
-class DictValuesIteratorWrapper(DictIteratorWrapper):
-    def __init__(self, dictType):
-        super().__init__(dictType, "values")
+            if nextSlotIx >= 0:
+                self.slotIx = nextSlotIx
+                return self.instance.getItemPtrByIndexUnsafe(nextSlotIx)
+            else:
+                return PointerTo(Tuple(K, V))()
 
-    def iteratedItemForReference(self, context, expr, ixExpr):
-        return DictWrapper(self.dictType).convert_method_call(
-            context,
-            self.refAs(context, expr, 2),
-            "getValueByIndexUnsafe",
-            (ixExpr,),
-            {}
-        )
+    return DictItemsIterator

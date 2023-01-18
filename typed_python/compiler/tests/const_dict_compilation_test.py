@@ -354,3 +354,54 @@ class TestConstDictCompilation(unittest.TestCase):
         # I get about 70x
         print("ConstDict iteration speedup is ", speedup)
         self.assertGreater(speedup, 2)
+
+    def test_yield_from_const_dict(self):
+        def iterateTwice(d):
+            for k in d:
+                yield k
+                yield k
+
+        @Entrypoint
+        def toList(d):
+            res = ListOf(d.KeyType)()
+
+            for k in iterateTwice(d):
+                res.append(k)
+
+            return res
+
+        assert toList(ConstDict(int, float)({1: 2.2})) == [1, 1]
+
+    def test_yield_from_const_dict_values(self):
+        def iterateTwice(d):
+            for k in d.values():
+                yield k
+                yield k
+
+        @Entrypoint
+        def toList(d):
+            res = ListOf(d.ValueType)()
+
+            for k in iterateTwice(d):
+                res.append(k)
+
+            return res
+
+        assert toList(ConstDict(int, float)({1: 2.2})) == [2.2, 2.2]
+
+    def test_yield_from_const_dict_items(self):
+        def iterateTwice(d):
+            for k in d.items():
+                yield k
+                yield k
+
+        @Entrypoint
+        def toList(d):
+            res = ListOf(Tuple(d.KeyType, d.ValueType))()
+
+            for k in iterateTwice(d):
+                res.append(k)
+
+            return res
+
+        assert toList(ConstDict(int, float)({1: 2.2})) == [(1, 2.2), (1, 2.2)]
