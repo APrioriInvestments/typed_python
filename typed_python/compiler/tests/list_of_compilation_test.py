@@ -799,3 +799,20 @@ class TestListOfCompilation(unittest.TestCase):
 
         assert addIt((1, 2), 3) == [1, 2, 3]
         assert addItLst((1, 2), 3) == [1, 2, 3]
+
+    def test_implicitly_convert_list_of_int_to_tuple(self):
+        @Entrypoint
+        def sumIt(aTup: TupleOf(int)):
+            res = 0
+            for a in aTup:
+                res += a
+            return res
+
+        @Entrypoint
+        def sumThem(aLst: ListOf(ListOf(int))):
+            res = 0
+            for l in aLst:
+                res += sumIt(l)
+            return res
+
+        assert sumThem([[1], [2], [3, 4, 5]]) == 15

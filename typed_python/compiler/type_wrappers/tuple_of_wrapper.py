@@ -645,6 +645,8 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             converter_class = InitializeRefAsImplicit
         elif conversionLevel == ConversionLevel.UpcastContainers:
             converter_class = InitializeRefAsUpcastContainers
+        else:
+            raise Exception("Unreachable")
 
         res = context.call_py_function(
             initialize_tuple_or_list_from_other,
@@ -653,6 +655,14 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         )
 
         if res is None:
+            # if we are told we can definitely convert, then just return True
+            # this can happen if the py_function call has not yet resolved and
+            # the compiler thinks it will be an exception. If it stays an exception
+            # it's not a problem that we tell downstream that this converts since
+            # control flow cannot return here anyways.
+            if canConvert is True:
+                return context.constant(True)
+
             return context.constant(False)
 
         if canConvert is True:
