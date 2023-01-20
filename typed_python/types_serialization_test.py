@@ -15,6 +15,8 @@
 import sys
 import os
 import importlib
+from functools import lru_cache
+
 from abc import ABC, abstractmethod, ABCMeta
 from typed_python.test_util import callFunctionInFreshProcess
 import typed_python.compiler.python_ast_util as python_ast_util
@@ -55,6 +57,13 @@ from typed_python._types import (
 )
 
 module_level_testfun = dummy_test_module.testfunction
+
+
+class GlobalClassWithLruCache:
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def f(x):
+        return x
 
 
 def moduleLevelFunctionUsedByExactlyOneSerializationTest():
@@ -3061,3 +3070,34 @@ class TypesSerializationTest(unittest.TestCase):
         print(x)
         # TODO: make this True
         # assert x[0].f.__closure__[0].cell_contents is x
+
+    def test_serialize_pyobj_with_custom_reduce(self):
+        class CustomReduceObject:
+            def __reduce__(self):
+                return 'CustomReduceObject'
+
+        assert CustomReduceObject == SerializationContext().deserialize(SerializationContext().serialize(CustomReduceObject))
+
+    def test_serialize_pyobj_in_MRTG_with_custom_reduce(self):
+        def getX():
+            class InnerCustomReduceObject:
+                def __reduce__(self):
+                    return 'InnerCustomReduceObject'
+
+                def f(self):
+                    return x
+
+            x = (InnerCustomReduceObject, InnerCustomReduceObject)
+
+            return x
+
+        x = callFunctionInFreshProcess(getX, (), showStdout=True)
+
+        assert x == SerializationContext().deserialize(SerializationContext().serialize(x))
+
+    def test_serialize_class_static_lru_cache(self):
+        s = SerializationContext()
+
+        assert (
+            s.deserialize(s.serialize(GlobalClassWithLruCache.f)) is GlobalClassWithLruCache.f
+        )

@@ -87,5 +87,4 @@ class GlobalVariableDefinition:
         return self.name == other.name and self.type == other.type and self.metadata == other.metadata
 
     def __str__(self):
-        metadata_str = str(self.metadata) if len(str(self.metadata)) < 100 else str(self.metadata)[:100] + "..."
-        return f"GlobalVariableDefinition(name={self.name}, type={self.type}, metadata={metadata_str})"
+        return f"GlobalVariableDefinition(name={self.name}, type={self.type}, metadata={pad(str(self.metadata))})"

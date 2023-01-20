@@ -125,6 +125,12 @@ class PythonToNativeConverter:
         self.llvmCompiler = llvmCompiler
         self.compilerCache = compilerCache
 
+        # all LoadedModule objects that we have created. We need to keep them alive so
+        # that any python metadata objects the've created stay alive as well. Ultimately, this
+        # may not be the place we put these objects (for instance, you could imagine a
+        # 'dummy' compiler cache or something). But for now, we need to keep them alive.
+        self.loadedUncachedModules = []
+
         # if True, then insert additional code to check for undefined behavior.
         self.generateDebugChecks = False
 
@@ -191,6 +197,7 @@ class PythonToNativeConverter:
         if self.compilerCache is None:
             loadedModule = self.llvmCompiler.buildModule(targets)
             loadedModule.linkGlobalVariables()
+            self.loadedUncachedModules.append(loadedModule)
             return
 
         # get a set of function names that we depend on
@@ -926,7 +933,11 @@ class PythonToNativeConverter:
             outboundTargets = []
             for outboundFuncId in self._dependencies.getNamesDependedOn(identifier):
                 name = self._link_name_for_identity[outboundFuncId]
-                outboundTargets.append(self._targets[name])
+                target = self.getTarget(name)
+                if target is not None:
+                    outboundTargets.append(target)
+                else:
+                    raise RuntimeError(f'dependency not found for {name}.')
 
             nativeFunction, actual_output_type = self._inflight_definitions.get(identifier)
 
