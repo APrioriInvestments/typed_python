@@ -28,6 +28,8 @@ class LoadedModule:
 
         self.functionPointers[ModuleDefinition.GET_GLOBAL_VARIABLES_NAME](self.pointers.pointerUnsafe(0))
 
+        self.installedGlobalVariableDefinitions = {}
+
     @staticmethod
     def validateGlobalVariables(serializedGlobalVariableDefinitions: Dict[str, bytes]) -> bool:
         """Check that each global variable definition is sensible.
@@ -82,6 +84,8 @@ class LoadedModule:
             assert self.pointers[i], f"Failed to get a pointer to {self.orderedDefs[i].name}"
 
             meta = SerializationContext().deserialize(self.orderedDefs[i]).metadata
+
+            self.installedGlobalVariableDefinitions[i] = meta
 
             if meta.matches.StringConstant:
                 self.pointers[i].cast(str).initialize(meta.value)

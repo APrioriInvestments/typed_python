@@ -31,9 +31,22 @@ import threading
 import types
 import traceback
 import logging
+import numpy
+import pickle
 
 
 _badModuleCache = set()
+
+
+def pickledByStr(module_name: str, name: str) -> None:
+    """Generate the object given the module_name and name.
+
+    This mimics pickle's behavior when given a string from __reduce__. The
+    string is interpreted as the name of a global variable, and pickle.whichmodules
+    is used to search the module namespace, generating module_name.
+    """
+    module = importlib.import_module(module_name)
+    return getattr(module, name)
 
 
 def createFunctionWithLocalsAndGlobals(code, globals):
@@ -708,26 +721,30 @@ class SerializationContext(Class, Final):
             return (createFunctionWithLocalsAndGlobals, args, representation)
 
         if not isinstance(inst, type) and hasattr(type(inst), '__reduce_ex__'):
-            res = inst.__reduce_ex__(4)
+            if isinstance(inst, numpy.ufunc):
+                res = inst.__name__
+            else:
+                res = inst.__reduce_ex__(4)
 
-            # pickle supports a protocol where __reduce__ can return a string
-            # giving a global name. We'll already find that separately, so we
-            # don't want to handle it here. We ought to look at this in more detail
-            # however
+            # mimic pickle's behaviour when a string is received.
             if isinstance(res, str):
-                return None
+                name_tuple = (inst, res)
+                module_name = pickle.whichmodule(*name_tuple)
+                res = (pickledByStr, (module_name, res,), pickledByStr)
 
             return res
 
         if not isinstance(inst, type) and hasattr(type(inst), '__reduce__'):
-            res = inst.__reduce__()
+            if isinstance(inst, numpy.ufunc):
+                res = inst.__name__
+            else:
+                res = inst.__reduce()
 
-            # pickle supports a protocol where __reduce__ can return a string
-            # giving a global name. We'll already find that separately, so we
-            # don't want to handle it here. We ought to look at this in more detail
-            # however
+            # mimic pickle's behaviour when a string is received.
             if isinstance(res, str):
-                return None
+                name_tuple = (inst, res)
+                module_name = pickle.whichmodule(*name_tuple)
+                res = (pickledByStr, (module_name, res,), pickledByStr)
 
             return res
 
@@ -736,6 +753,9 @@ class SerializationContext(Class, Final):
     def setInstanceStateFromRepresentation(
         self, instance, representation=None, itemIt=None, kvPairIt=None, setStateFun=None
     ):
+        if representation is pickledByStr:
+            return
+
         if representation is reconstructTypeFunctionType:
             return
 
