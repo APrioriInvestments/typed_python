@@ -3061,3 +3061,27 @@ class TypesSerializationTest(unittest.TestCase):
         print(x)
         # TODO: make this True
         # assert x[0].f.__closure__[0].cell_contents is x
+
+    def test_serialize_pyobj_with_custom_reduce(self):
+        class CustomReduceObject:
+            def __reduce__(self):
+                return 'CustomReduceObject'
+
+        assert CustomReduceObject == SerializationContext().deserialize(SerializationContext().serialize(CustomReduceObject))
+
+    def test_serialize_pyobj_in_MRTG_with_custom_reduce(self):
+        def getX():
+            class InnerCustomReduceObject:
+                def __reduce__(self):
+                    return 'InnerCustomReduceObject'
+
+                def f(self):
+                    return x
+
+            x = (InnerCustomReduceObject, InnerCustomReduceObject)
+
+            return x
+
+        x = callFunctionInFreshProcess(getX, (), showStdout=True)
+
+        assert x == SerializationContext().deserialize(SerializationContext().serialize(x))

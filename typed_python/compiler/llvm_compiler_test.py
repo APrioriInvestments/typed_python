@@ -20,6 +20,8 @@ from typed_python import PointerTo, ListOf, Runtime
 from typed_python.compiler.module_definition import ModuleDefinition
 from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
 
+from typed_python.test_util import evaluateExprInFreshProcess
+
 import pytest
 import ctypes
 
@@ -131,3 +133,28 @@ def test_create_binary_shared_object():
         pointers[0].set(5)
 
         assert loaded.functionPointers['__test_f_2']() == 5
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_loaded_modules_persist():
+    """
+    Make sure that loaded modules are persisted in the converter state.
+
+    We have to maintain these references to avoid surprise segfaults - if this test fails,
+    it should be because the GlobalVariableDefinition memory management has been refactored.
+    """
+
+    # compile a module
+    xmodule = "\n".join([
+        "@Entrypoint",
+        "def f(x):",
+        "    return x + 1",
+        "@Entrypoint",
+        "def g(x):",
+        "    return f(x) * 100",
+        "g(1000)",
+        "def get_loaded_modules():",
+        "    return len(Runtime.singleton().converter.loadedUncachedModules)"
+    ])
+    VERSION1 = {'x.py': xmodule}
+    assert evaluateExprInFreshProcess(VERSION1, 'x.get_loaded_modules()') == 1
