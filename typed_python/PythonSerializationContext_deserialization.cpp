@@ -248,7 +248,9 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromName(Deserializ
 
     std::string name = b.readStringObject();
 
-    PyObject* result = PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str());
+    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
+
+    PyObject* result = PyObject_CallMethod(contextAsPyObj, "objectFromName", "s", name.c_str());
 
     if (!result) {
         throw PythonExceptionSet();
@@ -319,9 +321,12 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromRepresentation(
         "setInstanceStateFromRepresentation"
     );
 
+
+    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
+
     res.steal(
         PyObject_CallMethodObjArgs(
-            mContextObj,
+            contextAsPyObj,
             methodName,
             (PyObject*)value,
             (holders.size() > 2 ? (PyObject*)holders[2] : (PyObject*)nullptr),
@@ -819,9 +824,11 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                             "setInstanceStateFromRepresentation"
                         );
 
+                        PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));
+    
                         res.steal(
                             PyObject_CallMethodObjArgs(
-                                mContextObj,
+                                contextAsPyObj,
                                 methodName,
                                 (PyObject*)indicesWrittenAsObjectAndRep[indexInGroup],
                                 argCount > 0 ? PyTuple_GetItem((PyObject*)trailingRepresentationParts, 0) : (PyObject*)nullptr,
@@ -987,7 +994,9 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             // identified by the name of an object inside of the group.
             std::string name = b.readStringObject();
 
-            PyObjectStealer namedObj(PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str()));
+            PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));
+
+            PyObjectStealer namedObj(PyObject_CallMethod(contextAsPyObj, "objectFromName", "s", name.c_str()));
 
             if (!namedObj) {
                 throw PythonExceptionSet();
@@ -1198,7 +1207,9 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             throw std::runtime_error("Invalid inline named concrete alternative: no index.");
         }
 
-        PyObjectStealer namedObj(PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str()));
+        PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
+
+        PyObjectStealer namedObj(PyObject_CallMethod(contextAsPyObj, "objectFromName", "s", name.c_str()));
 
         if (!namedObj) {
             throw PythonExceptionSet();
@@ -1232,7 +1243,9 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             throw std::runtime_error("Invalid inline named type");
         }
 
-        PyObjectStealer namedObj(PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str()));
+        PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
+
+        PyObjectStealer namedObj(PyObject_CallMethod(contextAsPyObj, "objectFromName", "s", name.c_str()));
 
         if (!namedObj) {
             throw PythonExceptionSet();
@@ -1406,7 +1419,9 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             if (wireType == WireType::BYTES) {
                 std::string objectName = b.readStringObject();
 
-                PyObjectStealer namedObj(PyObject_CallMethod(mContextObj, "objectFromName", "s", objectName.c_str()));
+                PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
+    
+                PyObjectStealer namedObj(PyObject_CallMethod(contextAsPyObj, "objectFromName", "s", objectName.c_str()));
 
                 if (!namedObj) {
                     throw PythonExceptionSet();

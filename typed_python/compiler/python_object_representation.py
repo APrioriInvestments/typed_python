@@ -53,6 +53,8 @@ from typed_python.compiler.type_wrappers.len_wrapper import LenWrapper
 from typed_python.compiler.type_wrappers.hash_wrapper import HashWrapper
 from typed_python.compiler.type_wrappers.range_wrapper import range as compilableRange
 from typed_python.compiler.type_wrappers.print_wrapper import PrintWrapper
+from typed_python.compiler.type_wrappers.serialize_wrapper import SerializeWrapper
+from typed_python.compiler.type_wrappers.deserialize_wrapper import DeserializeWrapper
 from typed_python.compiler.type_wrappers.time_wrapper import TimeWrapper
 from typed_python.compiler.type_wrappers.super_wrapper import SuperWrapper
 from typed_python.compiler.type_wrappers.compiler_introspection_wrappers import (
@@ -73,7 +75,8 @@ from typed_python.compiler.type_wrappers.min_max_wrapper import MinWrapper, MaxW
 from typed_python.compiler.type_wrappers.repr_wrapper import ReprWrapper
 from types import ModuleType
 from typed_python._types import (
-    TypeFor, bytecount, prepareArgumentToBePassedToCompiler, allForwardTypesResolved
+    TypeFor, bytecount, prepareArgumentToBePassedToCompiler, allForwardTypesResolved,
+    serialize, deserialize
 )
 from typed_python import (
     Type, Int32, Int16, Int8, UInt64, UInt32, UInt16,
@@ -278,6 +281,12 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
 
     if f is print:
         return TypedExpression(context, native_ast.nullExpr, PrintWrapper(), False)
+
+    if f is serialize:
+        return TypedExpression(context, native_ast.nullExpr, SerializeWrapper(), False)
+
+    if f is deserialize:
+        return TypedExpression(context, native_ast.nullExpr, DeserializeWrapper(), False)
 
     if f is time.time:
         return TypedExpression(context, native_ast.nullExpr, TimeWrapper(), False)

@@ -391,16 +391,6 @@ void HeldClass::clearInitializationFlag(instance_ptr self, int memberIndex) cons
     ((uint8_t*)self)[byte] &= ~mask;
 }
 
-int HeldClass::memberNamed(const char* c) const {
-    for (long k = 0; k < m_members.size(); k++) {
-        if (m_members[k].getName() == c) {
-            return k;
-        }
-    }
-
-    return -1;
-}
-
 BoundMethod* HeldClass::getMemberFunctionMethodType(const char* attr, bool forHeld) {
     auto& methodTypeDict = m_memberFunctionMethodTypes[forHeld ? 1 : 0];
 

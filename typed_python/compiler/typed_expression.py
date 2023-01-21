@@ -356,6 +356,9 @@ class TypedExpression:
     def toStr(self):
         return self.expr_type.toStr(self.context, self)
 
+    def toBytes(self):
+        return self.expr_type.toBytes(self.context, self)
+
     def toIndex(self):
         """Equivalent to __index__"""
         res = self.expr_type.convert_index_cast(self.context, self)

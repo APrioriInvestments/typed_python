@@ -500,10 +500,6 @@ public:
         return m_heldClass->getOwnPropertyFunctions();
     }
 
-    int memberNamed(const char* c) const {
-        return m_heldClass->memberNamed(c);
-    }
-
     HeldClass* getHeldClass() const {
         return m_heldClass;
     }

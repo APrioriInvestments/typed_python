@@ -137,6 +137,9 @@ public:
     //return an increffed bytes object containing a pointer to the requisite bytes
     static layout* createFromPtr(const char* data, int64_t len);
 
+    //return an increffed bytes object with uninitialized data
+    static layout* createUninitialized(int64_t len);
+
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}
 

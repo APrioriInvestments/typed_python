@@ -2711,4 +2711,36 @@ extern "C" {
 
         PyErr_SetString(excType, message);
     }
+
+    BytesType::layout* np_serialize(instance_ptr data, Type* type, Type* serContextType, instance_ptr serializationContext) {
+        PythonSerializationContext context(InstanceRef(serializationContext, serContextType));
+
+        SerializationBuffer b(context);
+
+        type->serialize(data, b, 0);
+
+        b.finalize();
+
+        BytesType::layout* res = BytesType::createUninitialized(b.size());
+        b.copyInto(res->data);
+
+        return res;
+    }
+
+    void np_deserialize(BytesType::layout* bytes, instance_ptr data, Type* type, Type* serContextType, instance_ptr serializationContext) {
+        PythonSerializationContext context(InstanceRef(serializationContext, serContextType));
+
+        DeserializationBuffer buf(bytes->data, bytes->bytecount, context);
+
+        auto fieldAndWireType = buf.readFieldNumberAndWireType();
+
+        try {
+            type->deserialize(data, buf, fieldAndWireType.second);
+        } catch(std::exception& e) {
+            PyEnsureGilAcquired getTheGil;
+
+            PyErr_SetString(PyExc_TypeError, e.what());
+            throw PythonExceptionSet();
+        }
+    }
 }

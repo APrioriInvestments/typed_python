@@ -52,9 +52,18 @@ public:
         int seed = 131;
         int hash = 0;
 
+        int len = strlen(str);
+
         while (*str) {
-            hash = (hash * seed) + (*str);
-            str++;
+            if (len >= 4) {
+                hash = (hash * seed) + (*(int32_t*)str);
+                str += 4;
+                len -= 4;
+            } else {
+                hash = (hash * seed) + (*str);
+                str++;
+                len--;
+            }
         }
 
         return hash & (0x7FFFFFFF);
@@ -744,8 +753,6 @@ public:
     const std::vector<size_t>& getOffsets() const {
         return m_byte_offsets;
     }
-
-    int memberNamed(const char* c) const;
 
     bool hasAnyComparisonOperators() const {
         return m_hasComparisonOperators;

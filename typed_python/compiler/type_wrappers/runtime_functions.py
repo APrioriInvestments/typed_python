@@ -1175,3 +1175,22 @@ raiseAttributeError = externalCallTarget(
     Void,
     UInt8Ptr
 )
+
+serialize = externalCallTarget(
+    "np_serialize",
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer()
+)
+
+deserialize = externalCallTarget(
+    "np_deserialize",
+    Void,
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer()
+)

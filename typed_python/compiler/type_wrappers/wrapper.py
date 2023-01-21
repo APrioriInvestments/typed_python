@@ -485,6 +485,9 @@ class Wrapper:
     def toStr(self, context, expr):
         return self.convert_to_type(context, expr, str, ConversionLevel.New)
 
+    def toBytes(self, context, expr):
+        return self.convert_to_type(context, expr, bytes, ConversionLevel.New)
+
     def convert_to_type_constant(self, context, expr, target_type, level: ConversionLevel):
         """Given that 'expr' is a constant expression, attempt to convert it directly.
 

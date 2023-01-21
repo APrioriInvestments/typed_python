@@ -140,7 +140,7 @@ int PyClassInstance::tpSetattrGeneric(
         }
     }
 
-    int memberIndex = heldClass->memberNamed(PyUnicode_AsUTF8(attrName));
+    int memberIndex = heldClass->getMemberIndex(PyUnicode_AsUTF8(attrName));
 
     if (memberIndex < 0) {
         auto it = heldClass->getClassMembers().find(

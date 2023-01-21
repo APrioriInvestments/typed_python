@@ -9,11 +9,10 @@ bool DeserializationBuffer::decompress() {
         }
 
         //it's all one big uncompressed block
-        m_decompressed_buffer.insert(
-            m_decompressed_buffer.end(),
-            m_compressed_blocks,
-            m_compressed_blocks + m_compressed_block_data_remaining
-        );
+        m_decompressed_buffer.resize(m_compressed_block_data_remaining);
+
+        memcpy(&m_decompressed_buffer[0], m_compressed_blocks, m_compressed_block_data_remaining);
+
         m_size += m_compressed_block_data_remaining;
         m_read_head = &m_decompressed_buffer[0];
         m_compressed_block_data_remaining = 0;

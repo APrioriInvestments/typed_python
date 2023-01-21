@@ -39,8 +39,6 @@ public:
     }
 
     ~DeserializationBuffer() {
-        PyEnsureGilAcquired acquireTheGil;
-
         for (auto& typeAndList: m_needs_decref) {
             typeAndList.first->check([&](auto& concreteType) {
                 for (auto ptr: typeAndList.second) {
@@ -49,8 +47,12 @@ public:
             });
         }
 
-        for (auto p: m_pyobj_needs_decref) {
-            decref(p);
+        if (m_pyobj_needs_decref.size()) {
+            PyEnsureGilAcquired acquireTheGil;
+
+            for (auto p: m_pyobj_needs_decref) {
+                decref(p);
+            }
         }
     }
 

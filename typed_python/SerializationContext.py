@@ -11,8 +11,9 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-from typed_python._types import serialize, deserialize, Type, Alternative, NamedTuple
+from typed_python._types import serialize, deserialize, Type, Alternative, NamedTuple, Class, Dict, OneOf
 from typed_python import _types
+from typed_python.internals import Final, Member
 
 from typed_python.python_ast import (
     convertFunctionToAlgebraicPyAst,
@@ -113,8 +114,22 @@ DEFAULT_NAME_TO_OVERRIDE = {
 }
 
 
-class SerializationContext:
+class SerializationContext(Class, Final):
     """Represents a collection of types with well-specified names that we can use to serialize objects."""
+    nameToObjectOverride = Member(Dict(str, object))
+    objectToNameOverride = Member(Dict(int, str))
+
+    compressionEnabled = Member(bool)
+    encodeLineInformationForCode = Member(bool)
+    serializeFunctionGlobalsAsIs = Member(bool)
+    serializeHashSequence = Member(bool)
+    serializePodListsInline = Member(bool)
+    compressUsingThreads = Member(bool)
+
+    # these are for fault-injection and may be removed in the future
+    nameForObjectOverride = Member(OneOf(None, object))
+    objectFromNameOverride = Member(OneOf(None, object))
+
     def __init__(
         self,
         nameToObjectOverride=None,
@@ -126,9 +141,10 @@ class SerializationContext:
         serializePodListsInline=False,
         compressUsingThreads=True
     ):
-        super().__init__()
+        self.nameForObjectOverride = None
+        self.objectFromNameOverride = None
 
-        self.nameToObjectOverride = dict(nameToObjectOverride or DEFAULT_NAME_TO_OVERRIDE)
+        self.nameToObjectOverride = nameToObjectOverride or DEFAULT_NAME_TO_OVERRIDE
         self.objectToNameOverride = (
             dict(objectToNameOverride)
             if objectToNameOverride is not None else
@@ -270,6 +286,9 @@ class SerializationContext:
 
     def nameForObject(self, t):
         ''' Return a name(string) for an input object t, or None if not found. '''
+        if self.nameForObjectOverride is not None:
+            return self.nameForObjectOverride(t)
+
         if id(t) in self.objectToNameOverride:
             return self.objectToNameOverride[id(t)]
 
@@ -341,6 +360,9 @@ class SerializationContext:
         a reference to an object, then we clearly don't need to import the module
         that contains it to see if it has that name.
         """
+        if self.objectFromNameOverride is not None:
+            return self.objectFromNameOverride(name, allowImport)
+
         if name in self.nameToObjectOverride:
             return self.nameToObjectOverride[name]
 

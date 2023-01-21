@@ -759,8 +759,8 @@ class TypesSerializationTest(unittest.TestCase):
         def throws(*args):
             raise Exception("Test Exception")
 
-        context.nameForObject = throws
-        context2.objectFromName = throws
+        context.nameForObjectOverride = throws
+        context2.objectFromNameOverride = throws
 
         with self.assertRaisesRegex(Exception, "Test Exception"):
             context.serialize(NT)
@@ -2589,7 +2589,6 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert typesAreEquivalent(Base, childVersionOfBase)
 
-        print(type(child1).BaseClasses)
         assert Base in type(child1).BaseClasses
 
         assert callF(child1) == callF(child2)

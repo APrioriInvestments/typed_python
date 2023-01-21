@@ -233,6 +233,12 @@ public:
         return m_typeCategory == catValue;
     }
 
+    bool isBool() const {
+        return (
+            m_typeCategory == catBool
+        );
+    }
+
     bool isRegister() const {
         return (
             m_typeCategory == catBool

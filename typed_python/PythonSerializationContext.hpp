@@ -80,13 +80,36 @@ public:
         };
     };
 
-    PythonSerializationContext(PyObject* typeSetObj) :
-            mContextObj(typeSetObj),
+    PythonSerializationContext(InstanceRef inContext) :
+            mContextObj(inContext),
             mCompressionEnabled(false),
             mSerializePodListsInline(false),
             mSerializeHashSequence(false),
             mCompressUsingThreads(false)
     {
+        if (!inContext.type()->isClass() || inContext.type()->name() != "SerializationContext") {
+            throw std::runtime_error("Expected a SerializationContext, not " + inContext.type()->name());
+        }
+
+        setFlags();
+    }
+
+    PythonSerializationContext(PyObject* inContextPy) :
+            mCompressionEnabled(false),
+            mSerializePodListsInline(false),
+            mSerializeHashSequence(false),
+            mCompressUsingThreads(false)
+    {
+        auto typeAndPtr = PyInstance::extractTypeAndPtrFrom(inContextPy);
+
+        if (typeAndPtr.first) {
+            mContextObj = InstanceRef(typeAndPtr.second, typeAndPtr.first);
+        }
+
+        if (!mContextObj.type()->isClass() || mContextObj.type()->name() != "SerializationContext") {
+            throw std::runtime_error("Expected a SerializationContext, not " + mContextObj.type()->name());
+        }
+
         setFlags();
     }
 
@@ -195,7 +218,7 @@ private:
 
     PyObject* deserializePyFrozenSet(DeserializationBuffer &b, size_t wireType, int64_t memo) const;
 
-    PyObject* mContextObj;
+    InstanceRef mContextObj;
 
     bool mCompressionEnabled;
 

@@ -133,8 +133,6 @@ public:
     }
 
     ~SerializationBuffer() {
-        PyEnsureGilAcquired acquireTheGil;
-
         for (auto& typeAndList: m_pointersNeedingDecref) {
             if (typeAndList.first) {
                 typeAndList.first->check([&](auto& concreteType) {
@@ -145,8 +143,12 @@ public:
             }
         }
 
-        for (auto p: m_pyObjectsNeedingDecref) {
-            decref(p);
+        if (m_pyObjectsNeedingDecref.size()) {
+            PyEnsureGilAcquired acquireTheGil;
+
+            for (auto p: m_pyObjectsNeedingDecref) {
+                decref(p);
+            }
         }
     }
 

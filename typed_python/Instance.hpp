@@ -22,6 +22,43 @@
 typedef uint8_t* instance_ptr;
 
 
+class InstanceRef {
+public:
+    InstanceRef(instance_ptr p, Type* t) :
+        mData(p),
+        mType(t)
+    {
+    }
+
+    InstanceRef() :
+        mData(nullptr),
+        mType(nullptr)
+    {
+        static Type* noneType = NoneType::Make();
+
+        mType = noneType;
+        mData = (instance_ptr)this;
+    }
+
+    Type* type() const {
+        return mType;
+    }
+
+    template<class T>
+    T& cast() {
+        return *(T*)data();
+    }
+
+    instance_ptr data() const {
+        return mData;
+    }
+
+private:
+    instance_ptr mData;
+    Type* mType;
+};
+
+
 class Instance {
 private:
     class layout {

@@ -309,6 +309,10 @@ PyObject* PyInstance::extractPythonObject(const Instance& instance, bool createT
     return extractPythonObject(instance.data(), instance.type(), createTemporaryRef);
 }
 
+PyObject* PyInstance::extractPythonObject(const InstanceRef& instance, bool createTemporaryRef) {
+    return extractPythonObject(instance.data(), instance.type(), createTemporaryRef);
+}
+
 PyObject* PyInstance::extractPythonObjectConcrete(Type* eltType, instance_ptr data) {
     return NULL;
 }

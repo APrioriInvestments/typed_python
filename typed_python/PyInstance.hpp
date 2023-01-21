@@ -430,6 +430,8 @@ public:
 
     static PyObject* extractPythonObject(const Instance& instance, bool createTemporaryRef=true);
 
+    static PyObject* extractPythonObject(const InstanceRef& instance, bool createTemporaryRef=true);
+
     //if we have a python representation that we want to use for this object, override and return not-NULL.
     //otherwise, this version takes over and returns a PyInstance wrapper for the object
     static PyObject* extractPythonObjectConcrete(Type* eltType, instance_ptr data);

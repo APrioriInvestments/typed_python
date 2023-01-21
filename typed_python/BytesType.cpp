@@ -401,6 +401,15 @@ BytesType::layout* BytesType::createFromPtr(const char* data, int64_t length) {
     return new_layout;
 }
 
+BytesType::layout* BytesType::createUninitialized(int64_t length) {
+    layout* new_layout = (layout*)tp_malloc(sizeof(layout) + length);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = length;
+
+    return new_layout;
+}
+
 void BytesType::constructor(instance_ptr self, int64_t count, const char* data) const {
     if (count == 0) {
         *(layout**)self = nullptr;

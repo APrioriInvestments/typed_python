@@ -125,7 +125,7 @@ int PyRefToInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) 
 
     HeldClass* clsType = (HeldClass*)type()->getEltType();
 
-    int i = clsType->memberNamed(PyUnicode_AsUTF8(attrName));
+    int i = clsType->getMemberIndex(PyUnicode_AsUTF8(attrName));
 
     if (i < 0) {
         auto it = clsType->getClassMembers().find(PyUnicode_AsUTF8(attrName));

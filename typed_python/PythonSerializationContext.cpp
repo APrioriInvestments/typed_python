@@ -20,53 +20,45 @@
 #include "MutuallyRecursiveTypeGroup.hpp"
 
 void PythonSerializationContext::setFlags() {
-    PyEnsureGilAcquired acquireTheGil;
+    Class* serContext = (Class*)mContextObj.type();
 
-    PyObjectStealer compressionEnabled(PyObject_GetAttrString(mContextObj, "compressionEnabled"));
+    auto getBool = [&](const char* name) {
+        int i = serContext->getMemberIndex(name);
 
-    if (!compressionEnabled) {
-        throw PythonExceptionSet();
-    }
+        if (i < 0) {
+            throw std::runtime_error(
+                "Somehow this SerializationContext has no member " + std::string(name)
+            );
+        }
 
-    mCompressionEnabled = ((PyObject*)compressionEnabled) == Py_True;
+        if (!serContext->checkInitializationFlag(mContextObj.data(), i)) {
+            throw std::runtime_error(
+                "Somehow this SerializationContext member " + std::string(name) + " is empty"
+            );
+        }
 
-    PyObjectStealer serializeHashSequence(PyObject_GetAttrString(mContextObj, "serializeHashSequence"));
+        if (!serContext->getMemberType(i)->isBool()) {
+            throw std::runtime_error(
+                "Somehow this SerializationContext member " + std::string(name) + " is not a bool"
+            );
+        }
 
-    if (!serializeHashSequence) {
-        throw PythonExceptionSet();
-    }
+        return *(bool*)serContext->eltPtr(mContextObj.data(), i);
+    };
 
-    mSerializeHashSequence = ((PyObject*)serializeHashSequence) == Py_True;
-
-    PyObjectStealer serializePodListsInline(PyObject_GetAttrString(mContextObj, "serializePodListsInline"));
-
-    if (!serializePodListsInline) {
-        throw PythonExceptionSet();
-    }
-
-    mSerializePodListsInline = ((PyObject*)serializePodListsInline) == Py_True;
-
-    PyObjectStealer compressUsingThreads(PyObject_GetAttrString(mContextObj, "compressUsingThreads"));
-
-    if (!compressUsingThreads) {
-        throw PythonExceptionSet();
-    }
-
-    mCompressUsingThreads = ((PyObject*)compressUsingThreads) == Py_True;
-
-    PyObjectStealer encodeLineInformationForCode(PyObject_GetAttrString(mContextObj, "encodeLineInformationForCode"));
-
-    if (!encodeLineInformationForCode) {
-        throw PythonExceptionSet();
-    }
-
-    mSuppressLineInfo = ((PyObject*)encodeLineInformationForCode) == Py_False;
+    mCompressionEnabled = getBool("compressionEnabled");
+    mSerializeHashSequence = getBool("serializeHashSequence");
+    mSerializePodListsInline = getBool("serializePodListsInline");
+    mCompressUsingThreads = getBool("compressUsingThreads");
+    mSuppressLineInfo = !getBool("encodeLineInformationForCode");
 }
 
 std::string PythonSerializationContext::getNameForPyObj(PyObject* o) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    PyObjectStealer nameForObject(PyObject_CallMethod(mContextObj, "nameForObject", "(O)", o));
+    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));
+
+    PyObjectStealer nameForObject(PyObject_CallMethod(contextAsPyObj, "nameForObject", "(O)", o));
 
     if (!nameForObject) {
         throw PythonExceptionSet();
