@@ -224,7 +224,7 @@ void PythonSerializationContext::serializePythonObjectByNameOrRepresentation(PyO
     }
 
     //give the plugin a chance to convert the instance to something else
-    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
+    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj));
 
     PyObjectStealer representation(PyObject_CallMethod(contextAsPyObj, "representationFor", "(O)", o));
 
@@ -444,7 +444,7 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
             }
 
             // see if this object is represented by a perfect factory
-            PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
+            PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj));
 
             PyObjectStealer factory(
                 PyObject_CallMethod(
@@ -545,8 +545,8 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                     // it to python, and may unpack the object itself.
                     representation.set(Py_None);
                 } else {
-                    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
-                    
+                    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj));
+
                     representation.steal(
                         PyObject_CallMethod(
                             contextAsPyObj, "representationFor", "(O)",

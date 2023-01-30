@@ -551,7 +551,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
         }
     });
 
-    return std::pair<bool, PyObject*>(true, (PyObject*)extractPythonObject(result.data(), result.type(), false));
+    return std::pair<bool, PyObject*>(true, (PyObject*)extractPythonObject(result.data(), result.type()));
 }
 
 

@@ -1332,7 +1332,7 @@ PyObject* convertObjectToTypeAtLevel(PyObject* nullValue, PyObject* args, PyObje
             PyInstance::copyConstructFromPythonInstance(t, p, object, intToConversionLevel(level));
         });
 
-        return PyInstance::extractPythonObject(result, false);
+        return PyInstance::extractPythonObject(result);
     });
 }
 
@@ -2195,7 +2195,7 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
             serializeType->deserialize(p, buf, fieldAndWireType.second);
         });
 
-        return PyInstance::extractPythonObject(i.data(), i.type(), false);
+        return PyInstance::extractPythonObject(i.data(), i.type());
     });
 }
 
@@ -2410,7 +2410,7 @@ PyObject *deserializeStream(PyObject* nullValue, PyObject* args) {
             });
         });
 
-        return PyInstance::extractPythonObject(i.data(), i.type(), false);
+        return PyInstance::extractPythonObject(i.data(), i.type());
     } catch(std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;

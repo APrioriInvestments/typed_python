@@ -561,7 +561,8 @@ PyObject* PyTupleOrListOfInstance::sq_item_concrete(Py_ssize_t ix) {
 
     return extractPythonObject(
         type()->eltPtr(dataPtr(), ix),
-        eltType
+        eltType,
+        (PyObject*)this
     );
 }
 
@@ -955,9 +956,9 @@ PyObject* PyListOfInstance::listPop(PyObject* o, PyObject* args) {
     }
 
     PyObject* result = extractPythonObject(
-            self_w->type()->eltPtr(self_w->dataPtr(), which),
-            self_w->type()->getEltType()
-            );
+        self_w->type()->eltPtr(self_w->dataPtr(), which),
+        self_w->type()->getEltType()
+    );
 
     self_w->type()->remove(self_w->dataPtr(), which);
 

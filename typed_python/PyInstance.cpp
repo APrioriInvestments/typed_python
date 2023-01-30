@@ -261,9 +261,9 @@ void PyInstance::constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, Py
  */
 
 // static
-PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType, bool createTemporaryRef) {
+PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType, PyObject* createTemporaryRefOf) {
     return translateExceptionToPyObject([&]() {
-        if (eltType->getTypeCategory() == Type::TypeCategory::catHeldClass && createTemporaryRef) {
+        if (eltType->getTypeCategory() == Type::TypeCategory::catHeldClass && createTemporaryRefOf) {
             // we never return 'held class' instances directly. Instead, we
             // return a 'Temporary' reference to them and install a trace handler
             // that forces them to become non-refto objects on the execution of the
@@ -274,6 +274,8 @@ PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType, bool
             // we can find them.
 
             PyObject* res = PyInstance::initializeTemporaryRef(eltType, data);
+
+            PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(createTemporaryRefOf);
             PyTemporaryReferenceTracer::traceObject(res);
 
             return res;
@@ -305,12 +307,12 @@ PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType, bool
     });
 }
 
-PyObject* PyInstance::extractPythonObject(const Instance& instance, bool createTemporaryRef) {
-    return extractPythonObject(instance.data(), instance.type(), createTemporaryRef);
+PyObject* PyInstance::extractPythonObject(const Instance& instance, PyObject* createTemporaryRefOf) {
+    return extractPythonObject(instance.data(), instance.type(), createTemporaryRefOf);
 }
 
-PyObject* PyInstance::extractPythonObject(const InstanceRef& instance, bool createTemporaryRef) {
-    return extractPythonObject(instance.data(), instance.type(), createTemporaryRef);
+PyObject* PyInstance::extractPythonObject(const InstanceRef& instance, PyObject* createTemporaryRefOf) {
+    return extractPythonObject(instance.data(), instance.type(), createTemporaryRefOf);
 }
 
 PyObject* PyInstance::extractPythonObjectConcrete(Type* eltType, instance_ptr data) {
@@ -411,7 +413,7 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
                 constructFromPythonArguments(tgt, eltType, args, kwds);
             });
 
-            return extractPythonObject(inst.data(), eltType, false);
+            return extractPythonObject(inst.data(), eltType);
         }
     });
 }

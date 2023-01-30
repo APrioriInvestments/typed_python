@@ -116,7 +116,7 @@ PyObject* PyConstDictInstance::constDictValues(PyObject *o) {
 // static
 PyDoc_STRVAR(constDictGet_doc,
     "D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."
-    );
+);
 PyObject* PyConstDictInstance::constDictGet(PyObject* o, PyObject* args) {
     if (((PyInstance*)o)->mIteratorOffset != -1) {
         PyErr_SetString(PyExc_TypeError, "ConstDict iterators don't support 'get'");
@@ -159,7 +159,7 @@ PyObject* PyConstDictInstance::constDictGet(PyObject* o, PyObject* args) {
                     return incref(ifNotFound);
                 }
 
-                return extractPythonObject(i, self_w->type()->valueType());
+                return extractPythonObject(i, self_w->type()->valueType(), o);
             } catch(PythonExceptionSet& e) {
                 return NULL;
             } catch(std::exception& e) {
@@ -399,7 +399,7 @@ PyObject* PyConstDictInstance::mp_subscript_concrete(PyObject* item) {
             return NULL;
         }
 
-        return extractPythonObject(i, type()->valueType());
+        return extractPythonObject(i, type()->valueType(), (PyObject*)this);
     } else {
         Instance key(type()->keyType(), [&](instance_ptr data) {
             copyConstructFromPythonInstance(type()->keyType(), data, item, ConversionLevel::UpcastContainers);
@@ -412,7 +412,7 @@ PyObject* PyConstDictInstance::mp_subscript_concrete(PyObject* item) {
             return NULL;
         }
 
-        return extractPythonObject(i, type()->valueType());
+        return extractPythonObject(i, type()->valueType(), (PyObject*)this);
     }
 
     PyErr_SetObject(PyExc_KeyError, item);

@@ -65,7 +65,12 @@ PyObject* PyRefToInstance::tp_getattr_concrete(PyObject* pyAttrName, const char*
             return NULL;
         }
 
-        return extractPythonObject(clsType->eltPtr(heldClassBody, index), eltType);
+        return extractPythonObject(
+            clsType->eltPtr(heldClassBody, index),
+            eltType,
+            /* not strictly true, but we want this to produce a temporary reference */
+            (PyObject*)this
+        );
     }
 
     BoundMethod* method = clsType->getMemberFunctionMethodType(attrName, true /* forHeld */);

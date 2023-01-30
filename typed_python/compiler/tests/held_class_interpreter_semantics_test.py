@@ -425,3 +425,37 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
                 return self.x + other
 
         assert H(x=12) + 1 == 13
+
+    def test_nested_held_classes(self):
+        @Held
+        class H1(Class, Final):
+            x = Member(int)
+
+        @Held
+        class H2(Class, Final):
+            h = Member(H1)
+
+            def __init__(self, x):
+                self.h = H1(x=x)
+
+        def checkX(h):
+            assert h.x == 10
+
+        checkX(H2(10).h)
+
+    def test_temporary_held_classes_in_lists(self):
+        @Held
+        class H1(Class, Final):
+            x = Member(int)
+
+            def __del__(self):
+                self.x = -1
+
+        def checkX(h, val):
+            assert h.x == val
+
+        l = ListOf(H1)()
+        for i in range(10):
+            l.append(H1(x=i))
+
+        checkX((l + l)[15], 5)

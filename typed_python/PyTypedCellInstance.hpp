@@ -112,7 +112,8 @@ public:
 
         return PyInstance::extractPythonObject(
             self_t->get(self_w->dataPtr()),
-            self_t->getHeldType()
+            self_t->getHeldType(),
+            self
         );
     }
 };

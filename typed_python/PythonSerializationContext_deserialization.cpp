@@ -248,7 +248,7 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromName(Deserializ
 
     std::string name = b.readStringObject();
 
-    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
+    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj));
 
     PyObject* result = PyObject_CallMethod(contextAsPyObj, "objectFromName", "s", name.c_str());
 
@@ -322,7 +322,7 @@ PyObject* PythonSerializationContext::deserializePythonObjectFromRepresentation(
     );
 
 
-    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
+    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj));
 
     res.steal(
         PyObject_CallMethodObjArgs(
@@ -824,8 +824,8 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                             "setInstanceStateFromRepresentation"
                         );
 
-                        PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));
-    
+                        PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj));
+
                         res.steal(
                             PyObject_CallMethodObjArgs(
                                 contextAsPyObj,
@@ -994,7 +994,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             // identified by the name of an object inside of the group.
             std::string name = b.readStringObject();
 
-            PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));
+            PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj));
 
             PyObjectStealer namedObj(PyObject_CallMethod(contextAsPyObj, "objectFromName", "s", name.c_str()));
 
@@ -1207,7 +1207,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             throw std::runtime_error("Invalid inline named concrete alternative: no index.");
         }
 
-        PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
+        PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj));
 
         PyObjectStealer namedObj(PyObject_CallMethod(contextAsPyObj, "objectFromName", "s", name.c_str()));
 
@@ -1243,7 +1243,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             throw std::runtime_error("Invalid inline named type");
         }
 
-        PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
+        PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj));
 
         PyObjectStealer namedObj(PyObject_CallMethod(contextAsPyObj, "objectFromName", "s", name.c_str()));
 
@@ -1419,8 +1419,8 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             if (wireType == WireType::BYTES) {
                 std::string objectName = b.readStringObject();
 
-                PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));    
-    
+                PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj));
+
                 PyObjectStealer namedObj(PyObject_CallMethod(contextAsPyObj, "objectFromName", "s", objectName.c_str()));
 
                 if (!namedObj) {

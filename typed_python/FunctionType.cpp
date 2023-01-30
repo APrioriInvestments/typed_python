@@ -172,8 +172,7 @@ PyObject* Function::Overload::buildFunctionObj(Type* closureType, instance_ptr c
                         newCellContents.steal(
                             PyInstance::extractPythonObject(
                                 ((TypedCellType*)bindingValue.type())->get(bindingValue.data()),
-                                ((TypedCellType*)bindingValue.type())->getHeldType(),
-                                false
+                                ((TypedCellType*)bindingValue.type())->getHeldType()
                             )
                         );
                     } else {

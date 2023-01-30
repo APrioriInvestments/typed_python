@@ -546,7 +546,7 @@ PyObject* PyClassInstance::tpGetattrGeneric(
             return NULL;
         }
 
-        return extractPythonObject(heldClass->eltPtr(heldData, index), eltType);
+        return extractPythonObject(heldClass->eltPtr(heldData, index), eltType, self);
     }
 
     BoundMethod* method = heldClass->getMemberFunctionMethodType(
@@ -573,7 +573,6 @@ PyObject* PyClassInstance::tpGetattrGeneric(
             // function) then this refto could end up pointing at the wrong data.
             ((PyInstance*)res)->setKeepalive(self);
 
-            // ensure that self is kept alive for the duration of the instruction.
             PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(self);
 
             return res;
@@ -679,7 +678,7 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
 
             PyObjectStealer defaultVal(
                 PyInstance::extractPythonObject(i.data(), i.type())
-                );
+            );
 
             PyDict_SetItemString(
                 defaults,

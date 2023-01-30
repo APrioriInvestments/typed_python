@@ -168,7 +168,7 @@ PyObject* PyDictInstance::dictGet(PyObject* o, PyObject* args) {
                 return incref(ifNotFound);
             }
 
-            return extractPythonObject(i, self_w->type()->valueType());
+            return extractPythonObject(i, self_w->type()->valueType(), o);
         } else {
             try {
                 Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
@@ -181,7 +181,7 @@ PyObject* PyDictInstance::dictGet(PyObject* o, PyObject* args) {
                     return incref(ifNotFound);
                 }
 
-                return extractPythonObject(i, self_w->type()->valueType());
+                return extractPythonObject(i, self_w->type()->valueType(), o);
             } catch(PythonExceptionSet& e) {
                 return NULL;
             } catch(std::exception& e) {
@@ -387,7 +387,7 @@ PyObject* PyDictInstance::mp_subscript_concrete(PyObject* item) {
             return NULL;
         }
 
-        return extractPythonObject(i, type()->valueType());
+        return extractPythonObject(i, type()->valueType(), (PyObject*)this);
     } else {
         Instance key(type()->keyType(), [&](instance_ptr data) {
             copyConstructFromPythonInstance(type()->keyType(), data, item, ConversionLevel::UpcastContainers);
@@ -400,7 +400,7 @@ PyObject* PyDictInstance::mp_subscript_concrete(PyObject* item) {
             return NULL;
         }
 
-        return extractPythonObject(i, type()->valueType());
+        return extractPythonObject(i, type()->valueType(), (PyObject*)this);
     }
 
     PyErr_SetObject(PyExc_KeyError, item);
@@ -718,13 +718,13 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
                 instance_ptr valueTgt = self->type()->insertKey(self->dataPtr(), lookupKey);
                 self->type()->valueType()->copy_constructor(valueTgt, i.data());
 
-                return extractPythonObject(valueTgt, self->type()->valueType());
+                return extractPythonObject(valueTgt, self->type()->valueType(), o);
             }
             else if (extractTypeFrom(ifNotFound->ob_type) == self->type()->valueType()) {
                 instance_ptr ifNotFoundValue = ((PyInstance *) (PyObject *) ifNotFound)->dataPtr();
                 instance_ptr valueTgt = self->type()->insertKey(self->dataPtr(), lookupKey);
                 self->type()->valueType()->copy_constructor(valueTgt, ifNotFoundValue);
-                return extractPythonObject(valueTgt, self->type()->valueType());
+                return extractPythonObject(valueTgt, self->type()->valueType(), o);
             } else {
                 Instance i(valueType, [&](instance_ptr data) {
                     copyConstructFromPythonInstance(valueType, data, ifNotFound, ConversionLevel::ImplicitContainers);
@@ -732,12 +732,13 @@ PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
                 instance_ptr ifNotFoundValue = i.data();
                 instance_ptr valueTgt = self->type()->insertKey(self->dataPtr(), lookupKey);
                 self->type()->valueType()->copy_constructor(valueTgt, ifNotFoundValue);
-                return extractPythonObject(valueTgt, self->type()->valueType());
+                return extractPythonObject(valueTgt, self->type()->valueType(), o);
 
             }
         }
+
         // there is this value, we should return the one which is stored
-        return extractPythonObject(i, self->type()->valueType());
+        return extractPythonObject(i, self->type()->valueType(), o);
 
     });
 }

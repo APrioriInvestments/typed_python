@@ -283,7 +283,7 @@ PyObject* PyCompositeTypeInstance::sq_item_concrete(Py_ssize_t ix) {
 
     Type* eltType = type()->getTypes()[ix];
 
-    return extractPythonObject(type()->eltPtr(dataPtr(), ix), eltType);
+    return extractPythonObject(type()->eltPtr(dataPtr(), ix), eltType, (PyObject*)this);
 }
 
 
@@ -395,8 +395,9 @@ PyObject* PyNamedTupleInstance::tp_getattr_concrete(PyObject* pyAttrName, const 
     if (ix >= 0) {
         return extractPythonObject(
             type()->eltPtr(dataPtr(), ix),
-            type()->getTypes()[ix]
-            );
+            type()->getTypes()[ix],
+            (PyObject*)this
+        );
     }
 
     return PyInstance::tp_getattr_concrete(pyAttrName, attrName);

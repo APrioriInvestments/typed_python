@@ -56,7 +56,7 @@ void PythonSerializationContext::setFlags() {
 std::string PythonSerializationContext::getNameForPyObj(PyObject* o) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj, false));
+    PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj));
 
     PyObjectStealer nameForObject(PyObject_CallMethod(contextAsPyObj, "nameForObject", "(O)", o));
 

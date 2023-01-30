@@ -165,7 +165,8 @@ PyObject* PyAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const
     if (ix >= 0) {
         return extractPythonObject(
             heldT->eltPtr(heldData, ix),
-            heldT->getTypes()[ix]
+            heldT->getTypes()[ix],
+            (PyObject*)this
         );
     }
 
@@ -221,8 +222,9 @@ PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrNam
     if (ix >= 0) {
         return extractPythonObject(
             heldT->eltPtr(heldData, ix),
-            heldT->getTypes()[ix]
-            );
+            heldT->getTypes()[ix],
+            (PyObject*)this
+        );
     }
 
     PyObject* ret = PyInstance::tp_getattr_concrete(pyAttrName, attrName);

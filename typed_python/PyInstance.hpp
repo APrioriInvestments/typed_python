@@ -327,7 +327,7 @@ public:
     static PyObject* initializePythonRepresentation(Type* eltType, const init_func& f) {
         Instance instance(eltType, f);
 
-        return extractPythonObject(instance.data(), instance.type(), false);
+        return extractPythonObject(instance.data(), instance.type());
     }
 
     //initialize a PyInstance for 'eltType'. For ints, floats, etc, with
@@ -372,8 +372,8 @@ public:
         mContainingInstance = Instance(type, i);
     }
 
-    static PyObject* fromInstance(const Instance& instance, bool createTemporaryRef=true) {
-        return extractPythonObject(instance.data(), instance.type(), createTemporaryRef);
+    static PyObject* fromInstance(const Instance& instance, PyObject* createTemporaryRefOf=nullptr) {
+        return extractPythonObject(instance.data(), instance.type(), createTemporaryRefOf);
     }
 
     PyInstance* duplicate() {
@@ -424,13 +424,14 @@ public:
     //produce the pythonic representation of this object. for values that have a direct python representation,
     //such as integers, strings, bools, or None, we return an actual python object. Otherwise,
     //we return a pointer to a PyInstance representing the object.
-    //if 'createTemporaryRef' is 'false', then we don't create temporary references to HeldClass
-    //instances.
-    static PyObject* extractPythonObject(instance_ptr data, Type* eltType, bool createTemporaryRef=true);
+    //if 'createTemporaryRefOf' is nonzero, and we're returning a HeldClass,
+    //then create a temporary reference to the HeldClass and ensure that 'createTemporaryRefOf' is
+    //kept alive for the duration of the current instruction.
+    static PyObject* extractPythonObject(instance_ptr data, Type* eltType, PyObject* createTemporaryRefOf=nullptr);
 
-    static PyObject* extractPythonObject(const Instance& instance, bool createTemporaryRef=true);
+    static PyObject* extractPythonObject(const Instance& instance, PyObject* createTemporaryRefOf=nullptr);
 
-    static PyObject* extractPythonObject(const InstanceRef& instance, bool createTemporaryRef=true);
+    static PyObject* extractPythonObject(const InstanceRef& instance, PyObject* createTemporaryRefOf=nullptr);
 
     //if we have a python representation that we want to use for this object, override and return not-NULL.
     //otherwise, this version takes over and returns a PyInstance wrapper for the object

@@ -135,7 +135,12 @@ PyObject* PyPointerToInstance::mp_subscript_concrete(PyObject* key) {
 
         type()->offsetBy((instance_ptr)&output, dataPtr(), offset);
 
-        return extractPythonObject(output, type()->getEltType());
+        return extractPythonObject(
+            output,
+            type()->getEltType(),
+            /* not strictly true, but we want 'get' on a pointer to produce a temporary reference */
+            (PyObject*)this
+        );
     });
 }
 
@@ -180,7 +185,12 @@ PyObject* PyPointerToInstance::pointerGet(PyObject* o, PyObject* args) {
 
     instance_ptr target = (instance_ptr)*(void**)self_w->dataPtr();
 
-    return extractPythonObject(target, pointerT->getEltType());
+    return extractPythonObject(
+        target,
+        pointerT->getEltType(),
+        /* not strictly true, but we want 'get' on a pointer to produce a temporary reference */
+        o
+    );
 }
 
 //static
