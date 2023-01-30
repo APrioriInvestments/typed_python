@@ -20,6 +20,12 @@ import typed_python.compiler
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
+modulesToIgnore = set([
+    'logging',
+    'traceback'
+])
+
+
 class ModuleWrapper(Wrapper):
     is_pod = True
     is_empty = False
@@ -52,6 +58,9 @@ class ModuleWrapper(Wrapper):
                     attribute
                 )
             )
+
+        if self.typeRepresentation.Value.__name__ in modulesToIgnore:
+            return instance.toPyObj().convert_attribute(attribute)
 
         return typed_python.compiler.python_object_representation.pythonObjectRepresentation(
             context,
