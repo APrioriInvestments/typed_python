@@ -405,3 +405,12 @@ def test_asNamedTuple():
     assert x.year == 2023
     assert x.month == 1
     assert x.day == 12
+
+
+def test_printAttributesShouldWork():
+    # This is okay.
+    dt = DateTime(2023, 1, 2, 18, 10, 1.0)
+    print(dt.date)
+
+    # This is not.
+    print(DateTime(2023, 1, 2, 18, 10, 1.0).date)
