@@ -205,3 +205,18 @@ def test_catch_and_return_none():
 
     assert trySplit("a_b") == "ab"
     assert trySplit("a_b_c") is None
+
+
+def test_catch_multiple_types():
+    @Entrypoint
+    def catcher(toRaise):
+        try:
+            raise toRaise()
+        except (ValueError, TypeError):
+            return "OK"
+
+    assert catcher(ValueError) == "OK"
+    assert catcher(TypeError) == "OK"
+
+    with pytest.raises(RuntimeError):
+        catcher(RuntimeError)

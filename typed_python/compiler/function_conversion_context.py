@@ -1729,14 +1729,14 @@ class FunctionConversionContext(ConversionContextBase):
                             cond_context.convert_expression_ast(elt).expr_type.typeRepresentation.Value
                             for elt in h.type.elts
                         ]
-                        exc_type = tuple(types)
-                        # exc_type = OneOf(*[Value(t) for t in types])
+                        exc_match = tuple(types)
                         exc_type = BaseException
                     else:
                         exc_match = cond_context.convert_expression_ast(
                             h.type
                         ).expr_type.typeRepresentation.Value
                         exc_type = exc_match
+
                 cond = cond_context.matchExceptionObject(exc_match)
 
                 handler_context = ExpressionConversionContext(self, variableStatesHandler)
