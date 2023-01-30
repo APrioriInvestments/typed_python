@@ -29,6 +29,12 @@ class NamedTupleMasqueradingAsDict(MasqueradeWrapper):
     def interpreterTypeRepresentation(self):
         return dict
 
+    def convert_getitem(self, context, instance, key):
+        if key.constantValue is not None and isinstance(key.constantValue, str):
+            return self.convert_attribute(context, instance, key.constantValue)
+
+        return self.convert_masquerade_to_untyped(context, instance).convert_getitem(key)
+
     def convert_masquerade_to_untyped(self, context, instance):
         emptyDict = context.constant(dict).convert_call([], {})
 

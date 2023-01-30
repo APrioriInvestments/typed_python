@@ -1204,6 +1204,17 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(callF1(0), 1)
         self.assertEqual(callF2(0, 1), 2)
 
+    def test_compile_star_arg_of_masquerade(self):
+        @Entrypoint
+        def f(**x):
+            return x['z']
+
+        @Entrypoint
+        def g(x: int):
+            return f(z=(x, x))
+
+        assert g(3) == (3, 3)
+
     def test_typed_functions_with_kwargs(self):
         @Function
         def f(x, **kwargs):

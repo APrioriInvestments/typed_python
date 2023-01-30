@@ -49,11 +49,20 @@ class MasqueradeWrapper(Wrapper):
 
     def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         if (
+            targetVal.expr_type.typeRepresentation == self.interpreterTypeRepresentation
+        ):
+            targetVal.convert_copy_initialize(instance.convert_masquerade_to_untyped())
+            return context.constant(True)
+
+        if (
+            targetVal.expr_type.typeRepresentation == self.typeRepresentation
+        ):
+            targetVal.convert_copy_initialize(instance.convert_masquerade_to_typed())
+            return context.constant(True)
+
+        if (
             conversionLevel == ConversionLevel.Signature
-            and (
-                targetVal.expr_type.typeRepresentation == self.interpreterTypeRepresentation
-                or issubclass(self.interpreterTypeRepresentation, targetVal.expr_type.typeRepresentation)
-            )
+            and issubclass(self.interpreterTypeRepresentation, targetVal.expr_type.typeRepresentation)
         ):
             targetVal.convert_copy_initialize(instance.convert_masquerade_to_untyped())
             return context.constant(True)
@@ -149,6 +158,12 @@ class MasqueradeWrapper(Wrapper):
         return self.convert_masquerade_to_default(context, instance).convert_unary_op(op)
 
     def _can_convert_to_type(self, otherType, conversionLevel):
+        if otherType.typeRepresentation is self.typeRepresentation:
+            return True
+
+        if otherType.typeRepresentation is self.interpreterTypeRepresentation:
+            return True
+
         return typeWrapper(
             self.typeRepresentation if self.DEFAULT_IS_TYPED else self.interpreterTypeRepresentation
         )._can_convert_to_type(otherType, conversionLevel)
