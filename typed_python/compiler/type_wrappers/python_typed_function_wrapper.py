@@ -469,10 +469,11 @@ class PythonTypedFunctionWrapper(Wrapper):
             actualArgs = [args[i].convert_to_type(actualArgTypes[i], conversionLevel) for i in range(len(actualArgTypes))]
             actualKwargs = {name: kwargs[name].convert_to_type(actualKwargTypes[name], conversionLevel) for name in kwargs}
 
-            # no conversion should ever fail because we are already guaranteed that this one signature
-            # is the one we should definitely match.
-            assert not any(x is None for x in actualArgs)
-            assert not any(x is None for x in actualKwargs.values())
+            if any(x is None for x in actualArgs) or any(x is None for x in actualKwargs.values()):
+                raise Exception(
+                    f"We were promised that calling {self.typeRepresentation} with {argTypes}, "
+                    f"{kwargTypes} would succeed, but then we ended up with {actualArgs} and {actualKwargs}"
+                )
 
             # build the actual functions
             argsToPass = context.buildFunctionArguments(
@@ -750,15 +751,15 @@ class PythonTypedFunctionWrapper(Wrapper):
 
     @staticmethod
     def pickSingleOverloadForCall(func, argTypes, kwargTypes):
-        """See if there is at most one function overload that could match 'argTypes/kwargTypes'
+        """See if there is exactly one function overload that definitely matches 'argTypes/kwargTypes'
         in our chain.
 
         Returns:
-            None, or a tuple (FunctionOverload, conversionLevel: ConversionLevel) indicating that one single overload
-            is the one version of this function we should try to match.
+            None, or a tuple
+                (FunctionOverload, conversionLevel: ConversionLevel, definitelyMatches: bool)
+            indicating that one single overload is the one version of this function we
+            should try to match and whether it definitely matches.
         """
-        possibleMatches = []
-
         for conversionLevel in ConversionLevel.functionConversionSequence():
             for o in func.overloads:
                 # check each overload that we might match.
@@ -766,23 +767,10 @@ class PythonTypedFunctionWrapper(Wrapper):
                     o, argTypes, kwargTypes, conversionLevel
                 )
 
-                if mightMatch is False:
-                    pass
-                elif mightMatch is True:
-                    # if we matched something else
-                    if possibleMatches:
-                        return None
-
+                if mightMatch is True:
                     return (o, conversionLevel)
-                else:
-                    possibleMatches.append((o, conversionLevel))
-
-                    if len(possibleMatches) > 1:
-                        return None
-
-        # if we had exactly one 'maybe', then that's the one to use.
-        if len(possibleMatches) == 1:
-            return possibleMatches[0]
+                elif mightMatch == "Maybe":
+                    return None
 
         return None
 

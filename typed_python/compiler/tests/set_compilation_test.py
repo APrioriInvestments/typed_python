@@ -1178,3 +1178,16 @@ class TestSetCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "set size changed"):
             checkIt()
+
+    def test_cant_convert_none_to_set(self):
+        from typed_python import Class
+
+        class C(Class):
+            def __init__(self, y: Set(float)):
+                pass
+
+        @Entrypoint
+        def callC(y: OneOf(None, Set(float))):
+            return C(y)
+
+        callC([1])
