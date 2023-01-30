@@ -32,7 +32,10 @@ class PythonFreeFunctionWrapper(Wrapper):
 
     def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         if targetVal.expr_type.typeRepresentation is object:
-            return context.constant(self.typeRepresentation, allowArbitrary=True)
+            targetVal.convert_copy_initialize(
+                context.constant(self.typeRepresentation, allowArbitrary=True)
+            )
+            return context.constant(True)
 
         if conversionLevel.isNewOrHigher() and targetVal.expr_type.typeRepresentation is str:
             targetVal.convert_copy_initialize(

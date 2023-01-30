@@ -840,8 +840,10 @@ class ConversionContextBase:
                         var_expr = context.inputArg(self._argtypes[name], name)
                         converted = var_expr.convert_to_type(slot_type, ConversionLevel.Signature)
                         assert converted is not None, (
-                            "It makes no sense we can't convert an argument to its"
-                            " type representation in the function stack."
+                            f"It makes no sense that we can't convert an argument to its "
+                            f"type representation in the function stack. "
+                            f"We tried to convert {self._argtypes[name]} to {slot_type}. "
+                            f"The function is {self.name}"
                         )
 
                         self.assignToLocalVariable(name, var_expr, variableStates)
