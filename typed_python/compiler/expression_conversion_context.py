@@ -147,16 +147,20 @@ class ExpressionConversionContext:
             # correct version of it.
             globallyVisibleDict, name = owningGlobalScopeAndName
 
-            if SerializationContext().nameForObject(globallyVisibleDict) is not None:
+            globalName = SerializationContext().nameForObject(globallyVisibleDict)
+
+            if globalName is not None:
                 meta = GlobalVariableMetadata.PointerToTypedPythonObjectAsMemberOfDict(
                     sourceDict=globallyVisibleDict, name=name, type=type(x)
                 )
+                gvName = "global_object:" + globalName + "." + name
 
         if meta is None:
             meta = GlobalVariableMetadata.PointerToTypedPythonObject(
                 value=x,
                 type=type(x)
             )
+            gvName = "typed_python_object_" + str(pyInstanceHeldObjectAddress(x))
 
         return TypedExpression(
             self,
@@ -164,7 +168,7 @@ class ExpressionConversionContext:
                 # this is bad - we should be using a formal name for
                 # this object plus its type, which would be enough to
                 # uniquely identify it
-                name="typed_python_object_" + str(pyInstanceHeldObjectAddress(x)),
+                name=gvName,
                 type=wrapper.getNativeLayoutType(),
                 metadata=meta
             ).cast(wrapper.getNativeLayoutType().pointer()),
@@ -184,15 +188,19 @@ class ExpressionConversionContext:
             # correct version of it.
             globallyVisibleDict, name = owningGlobalScopeAndName
 
-            if SerializationContext().nameForObject(globallyVisibleDict) is not None:
+            globalName = SerializationContext().nameForObject(globallyVisibleDict)
+
+            if globalName is not None:
                 meta = GlobalVariableMetadata.PointerToTypedPythonObjectAsMemberOfDict(
                     sourceDict=globallyVisibleDict, name=name, type=object
                 )
+                gvName = "global_object:" + globalName + "." + name
 
         if meta is None:
             meta = GlobalVariableMetadata.PointerToPyObject(
                 value=x
             )
+            gvName = "py_object_" + str(id(x))
 
         return TypedExpression(
             self,
@@ -200,7 +208,7 @@ class ExpressionConversionContext:
                 # this is bad - we should be using a formal name for
                 # this object plus its type, which would be enough to
                 # uniquely identify it
-                name="py_object_" + str(id(x)),
+                name=gvName,
                 type=native_ast.VoidPtr,
                 metadata=meta
             ).cast(wrapper.getNativeLayoutType().pointer()),

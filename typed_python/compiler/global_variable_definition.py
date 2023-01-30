@@ -15,6 +15,21 @@
 from typed_python import Alternative
 
 
+def pad(x):
+    if len(x) < 100:
+        return x
+    return x[:100] + "..."
+
+
+def metadataRepr(self):
+    kvs = {}
+
+    for name in self.ElementType.ElementNames:
+        kvs[name] = pad(repr(getattr(self, name)))
+
+    return type(self).__name__ + "(" + ", ".join(f"{k}={v}" for k, v in kvs.items()) + ")"
+
+
 GlobalVariableMetadata = Alternative(
     "GlobalVariableMetadata",
     StringConstant=dict(value=str),
@@ -40,7 +55,8 @@ GlobalVariableMetadata = Alternative(
         retType=object,
         argTupleType=object,
         kwargTupleType=object
-    )
+    ),
+    __repr__=metadataRepr
 )
 
 

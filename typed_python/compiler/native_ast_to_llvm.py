@@ -802,7 +802,9 @@ class FunctionConverter:
 
         if expr.matches.GlobalVariable:
             if expr.name in self.globalDefinitions:
-                assert expr.metadata == self.globalDefinitions[expr.name].metadata
+                assert expr.metadata == self.globalDefinitions[expr.name].metadata, (
+                    expr.metadata, self.globalDefinitions[expr.name].metadata
+                )
                 assert expr.type == self.globalDefinitions[expr.name].type
             else:
                 llvm_type = type_to_llvm_type(expr.type)
