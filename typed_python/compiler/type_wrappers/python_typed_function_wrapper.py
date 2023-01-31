@@ -800,7 +800,7 @@ class PythonTypedFunctionWrapper(Wrapper):
         overloadIndex = overload.index
 
         testSingleOverloadForm = context.converter.defineNativeFunction(
-            f'check_can_call_overload.{self}.{overloadIndex}.{conversionLevel.LEVEL}.{argTypes}.{kwargTypes}',
+            f'check_can_call_overload.{self}.{overloadIndex}.{conversionLevel}.{argTypes}.{kwargTypes}',
             ('check_can_call_overload', self, overloadIndex, conversionLevel.LEVEL,
                 tuple(argTypes), tuple(kwargTypes.items())),
             list(argTypes) + list(kwargTypes.values()),
@@ -865,12 +865,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                 argNames, provideClosureArgument, forceConvertToSignatureFunc
             )
 
-        for conversionLevel in [
-            ConversionLevel.Signature,
-            ConversionLevel.Upcast,
-            ConversionLevel.UpcastContainers,
-            ConversionLevel.Implicit
-        ]:
+        for conversionLevel in ConversionLevel.functionConversionSequence():
             for overloadIndex, overload in enumerate(func.overloads):
                 mightMatch = self.overloadMatchesSignature(overload, argTypes, kwargTypes, conversionLevel)
 
@@ -899,7 +894,7 @@ class PythonTypedFunctionWrapper(Wrapper):
 
                     if overloadRetType is None:
                         testSingleOverloadForm = context.converter.defineNativeFunction(
-                            f'implement_overload.{self}.{overloadIndex}.{conversionLevel.LEVEL}.{argTypes}.{kwargTypes}-> <exception>',
+                            f'implement_overload.{self}.{overloadIndex}.{conversionLevel}.{argTypes}.{kwargTypes}-> <exception>',
                             ('implement_overload', self, overloadIndex, conversionLevel.LEVEL,
                              overloadRetType, tuple(argTypes), tuple(kwargTypes.items())),
                             ([self] if provideClosureArgument else [])
@@ -920,7 +915,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                         )
                     else:
                         testSingleOverloadForm = context.converter.defineNativeFunction(
-                            f'implement_overload.{self}.{overloadIndex}.{conversionLevel.LEVEL}.{argTypes}'
+                            f'implement_overload.{self}.{overloadIndex}.{conversionLevel}.{argTypes}'
                             f'.{kwargTypes}->{overloadRetType}',
                             ('implement_overload', self, overloadIndex, conversionLevel.LEVEL,
                              overloadRetType, tuple(argTypes), tuple(kwargTypes.items())),

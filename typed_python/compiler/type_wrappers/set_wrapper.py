@@ -798,6 +798,9 @@ class SetWrapper(SetWrapperBase):
         if canConvert is True:
             return context.constant(True)
 
+        if res is None:
+            return context.constant(False)
+
         return res
 
     def _can_convert_to_type(self, targetType, conversionLevel):

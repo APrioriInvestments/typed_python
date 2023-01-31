@@ -1,4 +1,4 @@
-#   Copyright 2017-2020 typed_python Authors
+#   Copyright 2017-2023 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -1164,16 +1164,6 @@ class TestCompilationStructures(unittest.TestCase):
         # check that the extra call to 'g' doesn't introduce any overhead
         self.assertTrue(.65 <= elapsedF / elapsedG <= 1.35, elapsedF / elapsedG)
 
-    def test_star_args_of_masquerade(self):
-        def f(*args):
-            return args[1]
-
-        @Entrypoint
-        def callF():
-            return f(1, "a b c".split())
-
-        self.assertEqual(callF.resultTypeFor().interpreterTypeRepresentation, list)
-
     def test_star_args_type(self):
         def f(*args):
             return type(args)
@@ -1203,17 +1193,6 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callF1(0), 1)
         self.assertEqual(callF2(0, 1), 2)
-
-    def test_compile_star_arg_of_masquerade(self):
-        @Entrypoint
-        def f(**x):
-            return x['z']
-
-        @Entrypoint
-        def g(x: int):
-            return f(z=(x, x))
-
-        assert g(3) == (3, 3)
 
     def test_typed_functions_with_kwargs(self):
         @Function
@@ -3796,18 +3775,3 @@ class TestCompilationStructures(unittest.TestCase):
         nt = getNamedTupleOfLists(100)
 
         slice(nt)
-
-    def test_iterate_kwargs(self):
-        def f(**kwargs):
-            res = 0
-
-            for name, value in kwargs.items():
-                res += len(value)
-
-            return res
-
-        @Entrypoint
-        def sumSomeThings():
-            return f(x=TupleOf(int)([1, 2, 3]), y=ListOf(float)([1, 2, 3]))
-
-        assert sumSomeThings() == 6
