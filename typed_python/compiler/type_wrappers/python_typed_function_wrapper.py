@@ -1196,6 +1196,15 @@ class PythonTypedFunctionWrapper(Wrapper):
 
                 successful = argExpr.convert_to_type_with_target(convertedArg, conversionLevel)
 
+                if successful is None:
+                    raise Exception(
+                        f"Expected converting from {argExpr.expr_type} to "
+                        f"{argType} at level {conversionLevel} would succeed ("
+                        f"{argExpr.expr_type.can_convert_to_type(argType, conversionLevel)}"
+                        f") but instead "
+                        f"it returned 'None'"
+                    )
+
                 if successful.isConstant:
                     if successful.constantValue:
                         context.markUninitializedSlotInitialized(convertedArg)
