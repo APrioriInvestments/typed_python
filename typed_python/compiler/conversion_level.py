@@ -22,6 +22,9 @@ class ConversionLevel:
     def __hash__(self):
         return hash(self.LEVEL)
 
+    def isSignature(self):
+        return self.LEVEL == Signature.LEVEL
+
     def isNewOrHigher(self):
         return self.LEVEL >= New.LEVEL
 

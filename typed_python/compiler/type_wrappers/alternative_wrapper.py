@@ -250,6 +250,26 @@ class ConcreteSimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
     def convert_typeof(self, context, instance):
         return context.constant(self.typeRepresentation)
 
+    def _can_convert_from_type(self, otherType, conversionLevel):
+        if otherType.typeRepresentation is self.alternativeType:
+            return "Maybe"
+
+        return super()._can_convert_from_type(otherType, conversionLevel)
+
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, level: ConversionLevel, mayThrowOnFailure=False):
+        if sourceVal.expr_type.typeRepresentation == self.alternativeType:
+            matches = sourceVal.nonref_expr.cast(native_ast.Int64).eq(self.typeRepresentation.Index)
+
+            with context.ifelse(matches) as (ifTrue, ifFalse):
+                with ifTrue:
+                    targetVal.convert_copy_initialize(
+                        sourceVal.changeType(self)
+                    )
+
+            return context.pushPod(bool, matches)
+
+        return super().convert_to_self_with_target(context, targetVal, sourceVal, level, mayThrowOnFailure)
+
 
 class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
     is_pod = False
@@ -524,6 +544,26 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
 
     def convert_typeof(self, context, instance):
         return context.constant(self.typeRepresentation)
+
+    def _can_convert_from_type(self, otherType, conversionLevel):
+        if otherType.typeRepresentation is self.alternativeType:
+            return "Maybe"
+
+        return super()._can_convert_from_type(otherType, conversionLevel)
+
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, level: ConversionLevel, mayThrowOnFailure=False):
+        if sourceVal.expr_type.typeRepresentation == self.alternativeType:
+            matches = sourceVal.nonref_expr.ElementPtrIntegers(0, 1).load().eq(self.typeRepresentation.Index)
+
+            with context.ifelse(matches) as (ifTrue, ifFalse):
+                with ifTrue:
+                    targetVal.convert_copy_initialize(
+                        sourceVal.changeType(self)
+                    )
+
+            return context.pushPod(bool, matches)
+
+        return super().convert_to_self_with_target(context, targetVal, sourceVal, level, mayThrowOnFailure)
 
 
 class AlternativeMatcherWrapper(Wrapper):

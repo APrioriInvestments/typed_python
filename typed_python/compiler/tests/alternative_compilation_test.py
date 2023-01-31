@@ -1694,3 +1694,33 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         assert checkMatchesX(A.X())
         assert not checkMatchesX(B.Y())
+
+    def test_can_cast_simple_alternative_down(self):
+        A = Alternative("A", X=dict())
+
+        @Entrypoint
+        def f(x: A.X):
+            return 1
+
+        assert f(A.X()) == 1
+
+        @Entrypoint
+        def g(x: A):
+            return f(x)
+
+        assert g(A.X()) == 1
+
+    def test_can_cast_alternative_down(self):
+        A = Alternative("A", X=dict(x=int))
+
+        @Entrypoint
+        def f(x: A.X):
+            return x.x
+
+        assert f(A.X(x=10)) == 10
+
+        @Entrypoint
+        def g(x: A):
+            return f(x)
+
+        assert g(A.X(x=10)) == 10
