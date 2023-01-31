@@ -19,7 +19,7 @@ from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethod
 from typed_python.compiler.type_wrappers.util import min
 from typed_python.compiler.typed_expression import TypedExpression
 
-from typed_python import Tuple, TypeFunction, Held, Member, Final, Class, ConstDict, PointerTo
+from typed_python import Tuple, TypeFunction, Held, Member, Final, Class, ConstDict, PointerTo, Int32
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -230,6 +230,15 @@ class ConstDictWrapper(ConstDictWrapperBase):
             return instance.changeType(BoundMethodWrapper.Make(self, attr))
 
         return super().convert_attribute(context, instance, attr)
+
+    def convert_hash(self, context, expr):
+        return context.pushPod(
+            Int32,
+            runtime_functions.hash_instance.call(
+                expr.expr.cast(native_ast.VoidPtr),
+                context.getTypePointer(self.typeRepresentation)
+            )
+        )
 
     def convert_default_initialize(self, context, instance):
         context.pushEffect(

@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Dict, ListOf, Tuple, TupleOf, Entrypoint, OneOf, Set, Int32, UInt32, Alternative
+from typed_python import Dict, ListOf, Tuple, TupleOf, Entrypoint, OneOf, Set, Int32, UInt32, Alternative, ConstDict
 from typed_python.compiler.type_wrappers.hash_table_implementation import NativeHash
 import typed_python._types as _types
 import unittest
@@ -955,3 +955,17 @@ class TestDictCompilation(unittest.TestCase):
             return res
 
         assert toList(Dict(int, float)({1: 2.2})) == [(1, 2.2), (1, 2.2)]
+
+    def test_dict_with_const_dict_keys(self):
+        d = Dict(ConstDict(int, int), int)()
+
+        @Entrypoint
+        def setItem(d, k, v):
+            d[k] = v
+
+        @Entrypoint
+        def getItem(d, k):
+            return d[k]
+
+        setItem(d, ConstDict(int, int)({1: 2}), 3)
+        assert getItem(d, ConstDict(int, int)({1: 2})) == 3

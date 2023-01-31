@@ -1928,6 +1928,10 @@ extern "C" {
         return BytesType::Make()->hash((instance_ptr)&s);
     }
 
+    int32_t nativepython_hash_instance(instance_ptr data, Type* tp) {
+        return tp->hash((instance_ptr)data);
+    }
+
     int32_t nativepython_hash_alternative(Alternative::layout* s, Alternative* tp) {
         // TODO: assert tp is an Alternative
         //if (tp->getTypeCategory() != Type::TypeCategory::catAlternative)

@@ -996,6 +996,13 @@ hash_bytes = externalCallTarget(
     Void.pointer()
 )
 
+hash_instance = externalCallTarget(
+    "nativepython_hash_instance",
+    Int32,
+    Void.pointer(),
+    Void.pointer()
+)
+
 hash_alternative = externalCallTarget(
     "nativepython_hash_alternative",
     Int32,
