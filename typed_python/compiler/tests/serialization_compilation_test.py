@@ -18,6 +18,10 @@ from typed_python import (
     ListOf,
     Value
 )
+from typed_python._types import (
+    serialize as serializeNative,
+    deserialize as deserializeNative
+)
 
 import threading
 import time
@@ -135,3 +139,21 @@ def test_serialization_perf():
 
     print(f"in the compiler, {TC} threads scaled time by {compiledThreadScaling}")
     assert compiledThreadScaling < 1.5
+
+
+def test_can_serialize_with_or_without_out_context():
+    @Entrypoint
+    def roundtripCompiled(T, x, sc):
+        assert deserializeNative(T, serializeNative(T, x, sc), sc) == x
+
+    @Entrypoint
+    def roundtripCompiledAmbiguous(T, x, sc: object):
+        assert deserializeNative(T, serializeNative(T, x, sc), sc) == x
+
+    s = SerializationContext()
+
+    roundtripCompiled(str, "asdf", None)
+    roundtripCompiledAmbiguous(str, "asdf", None)
+
+    roundtripCompiled(str, "asdf", s)
+    roundtripCompiledAmbiguous(str, "asdf", s)

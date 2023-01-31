@@ -49,24 +49,51 @@ class DeserializeWrapper(Wrapper):
         if data is None:
             return None
 
-        sc = args[2].convert_to_type(SerializationContext, ConversionLevel.New)
-        if sc is None:
-            return
-
         # create an uninitialized slot. if we throw during deserialization
         # it won't be initialized and so we won't try to destroy it.
         inst = context.allocateUninitializedSlot(T)
 
-        context.pushEffect(
-            runtime_functions.deserialize.call(
-                data.nonref_expr.cast(native_ast.VoidPtr),
-                inst.expr.cast(native_ast.VoidPtr),
-                context.getTypePointer(T).cast(native_ast.VoidPtr),
-                context.getTypePointer(SerializationContext).cast(native_ast.VoidPtr),
-                sc.expr.cast(native_ast.VoidPtr)
-            )
+        isNone = args[2].convert_to_type_with_target(
+            context.push(type(None), lambda n: None),
+            ConversionLevel.Signature
         )
 
-        context.markUninitializedSlotInitialized(inst)
+        serContext = context.allocateUninitializedSlot(SerializationContext)
+
+        isSerializationContext = args[2].convert_to_type_with_target(
+            serContext,
+            ConversionLevel.Signature
+        )
+
+        with context.ifelse(isNone.nonref_expr) as (ifTrue, ifFalse):
+            with ifTrue:
+                context.pushEffect(
+                    runtime_functions.deserialize_no_context.call(
+                        data.nonref_expr.cast(native_ast.VoidPtr),
+                        inst.expr.cast(native_ast.VoidPtr),
+                        context.getTypePointer(T).cast(native_ast.VoidPtr)
+                    )
+                )
+                context.markUninitializedSlotInitialized(inst)
+
+            with ifFalse:
+                with context.ifelse(isSerializationContext.nonref_expr) as (ifTrueSc, ifFalseSc):
+                    with ifTrueSc:
+                        context.markUninitializedSlotInitialized(serContext)
+
+                        context.pushEffect(
+                            runtime_functions.deserialize.call(
+                                data.nonref_expr.cast(native_ast.VoidPtr),
+                                inst.expr.cast(native_ast.VoidPtr),
+                                context.getTypePointer(T).cast(native_ast.VoidPtr),
+                                context.getTypePointer(SerializationContext).cast(native_ast.VoidPtr),
+                                serContext.expr.cast(native_ast.VoidPtr)
+                            )
+                        )
+
+                        context.markUninitializedSlotInitialized(inst)
+
+                    with ifFalseSc:
+                        context.pushException(TypeError, "Expected a SerializationContext")
 
         return inst

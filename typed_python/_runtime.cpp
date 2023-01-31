@@ -2716,6 +2716,38 @@ extern "C" {
         PyErr_SetString(excType, message);
     }
 
+    BytesType::layout* np_serialize_no_context(instance_ptr data, Type* type) {
+        NullSerializationContext context;
+
+        SerializationBuffer b(context);
+
+        type->serialize(data, b, 0);
+
+        b.finalize();
+
+        BytesType::layout* res = BytesType::createUninitialized(b.size());
+        b.copyInto(res->data);
+
+        return res;
+    }
+
+    void np_deserialize_no_context(BytesType::layout* bytes, instance_ptr data, Type* type) {
+        NullSerializationContext context;
+
+        DeserializationBuffer buf(bytes->data, bytes->bytecount, context);
+
+        auto fieldAndWireType = buf.readFieldNumberAndWireType();
+
+        try {
+            type->deserialize(data, buf, fieldAndWireType.second);
+        } catch(std::exception& e) {
+            PyEnsureGilAcquired getTheGil;
+
+            PyErr_SetString(PyExc_TypeError, e.what());
+            throw PythonExceptionSet();
+        }
+    }
+
     BytesType::layout* np_serialize(instance_ptr data, Type* type, Type* serContextType, instance_ptr serializationContext) {
         PythonSerializationContext context(InstanceRef(serializationContext, serContextType));
 

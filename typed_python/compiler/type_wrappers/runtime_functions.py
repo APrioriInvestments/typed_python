@@ -1201,3 +1201,18 @@ deserialize = externalCallTarget(
     Void.pointer(),
     Void.pointer()
 )
+
+serialize_no_context = externalCallTarget(
+    "np_serialize_no_context",
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer(),
+)
+
+deserialize_no_context = externalCallTarget(
+    "np_deserialize_no_context",
+    Void,
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer()
+)

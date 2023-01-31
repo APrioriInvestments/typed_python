@@ -49,18 +49,48 @@ class SerializeWrapper(Wrapper):
         if asT is None:
             return
 
-        sc = args[2].convert_to_type(SerializationContext, ConversionLevel.New)
-        if sc is None:
-            return
+        outBytesRef = context.allocateUninitializedSlot(bytes)
 
-        return context.push(
-            bytes,
-            lambda bytesRef: bytesRef.expr.store(
-                runtime_functions.serialize.call(
-                    asT.expr.cast(native_ast.VoidPtr),
-                    context.getTypePointer(T).cast(native_ast.VoidPtr),
-                    context.getTypePointer(SerializationContext).cast(native_ast.VoidPtr),
-                    sc.expr.cast(native_ast.VoidPtr)
-                ).cast(bytesRef.expr_type.layoutType)
-            )
+        isNone = args[2].convert_to_type_with_target(
+            context.push(type(None), lambda n: None),
+            ConversionLevel.Signature
         )
+
+        serContext = context.allocateUninitializedSlot(SerializationContext)
+
+        isSerializationContext = args[2].convert_to_type_with_target(
+            serContext,
+            ConversionLevel.Signature
+        )
+
+        with context.ifelse(isNone.nonref_expr) as (ifTrue, ifFalse):
+            with ifTrue:
+                context.pushEffect(
+                    outBytesRef.expr.store(
+                        runtime_functions.serialize_no_context.call(
+                            asT.expr.cast(native_ast.VoidPtr),
+                            context.getTypePointer(T).cast(native_ast.VoidPtr)
+                        ).cast(outBytesRef.expr_type.layoutType)
+                    )
+                )
+
+            with ifFalse:
+                with context.ifelse(isSerializationContext.nonref_expr) as (ifTrueSc, ifFalseSc):
+                    with ifTrueSc:
+                        context.markUninitializedSlotInitialized(serContext)
+
+                        context.pushEffect(
+                            outBytesRef.expr.store(
+                                runtime_functions.serialize.call(
+                                    asT.expr.cast(native_ast.VoidPtr),
+                                    context.getTypePointer(T).cast(native_ast.VoidPtr),
+                                    context.getTypePointer(SerializationContext).cast(native_ast.VoidPtr),
+                                    serContext.expr.cast(native_ast.VoidPtr)
+                                ).cast(outBytesRef.expr_type.layoutType)
+                            )
+                        )
+
+                    with ifFalseSc:
+                        context.pushException(TypeError, "Expected a SerializationContext")
+
+        return outBytesRef
