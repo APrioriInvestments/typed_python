@@ -200,7 +200,7 @@ class ExpressionConversionContext:
             meta = GlobalVariableMetadata.PointerToPyObject(
                 value=x
             )
-            gvName = "py_object_" + str(id(x))
+            gvName = "py_object_" + str(id(x)) + "_" + repr(x)[:25]
 
         return TypedExpression(
             self,
@@ -342,15 +342,7 @@ class ExpressionConversionContext:
             return TypedExpression(self, native_ast.nullExpr, type(None), False)
 
         if id(x) in builtinValueIdToNameAndValue and builtinValueIdToNameAndValue[id(x)][1] is x:
-            return self.push(
-                object,
-                lambda oPtr:
-                oPtr.expr.store(
-                    runtime_functions.builtin_pyobj_by_name.call(
-                        native_ast.const_utf8_cstr(builtinValueIdToNameAndValue[id(x)][0])
-                    ).cast(oPtr.expr_type.getNativeLayoutType())
-                )
-            )
+            return self.constantPyObject(x)
 
         if isinstance(x, (type, types.ModuleType)):
             return pythonObjectRepresentation(self, x)
