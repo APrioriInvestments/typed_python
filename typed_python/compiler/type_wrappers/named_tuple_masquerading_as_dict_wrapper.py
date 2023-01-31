@@ -13,7 +13,11 @@
 #   limitations under the License.
 
 import typed_python
-
+from typed_python import Tuple
+from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import (
+    TypedTupleMasqueradingAsTuple
+)
+from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.masquerade_wrapper import MasqueradeWrapper
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
@@ -47,3 +51,45 @@ class NamedTupleMasqueradingAsDict(MasqueradeWrapper):
             )
 
         return emptyDict
+
+    def get_iteration_expressions(self, context, instance):
+        return [context.constant(name) for name in self.typeRepresentation.ElementNames]
+
+    def convert_attribute(self, context, instance, attribute):
+        if attribute == "items":
+            return instance.changeType(BoundMethodWrapper.Make(self, attribute))
+
+        return super().convert_attribute(context, instance, attribute)
+
+    def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if methodname == "items" and len(args) == 0 and len(kwargs) == 0:
+            return instance.changeType(
+                ItemsOfNamedTupleMasqueradingAsDict(self.typeRepresentation)
+            )
+
+        return super().convert_method_call(context, instance, methodname, args, kwargs)
+
+
+class ItemsOfNamedTupleMasqueradingAsDict(MasqueradeWrapper):
+    def get_iteration_expressions(self, context, instance):
+        res = []
+
+        for ix in range(len(self.typeRepresentation.ElementNames)):
+            name = self.typeRepresentation.ElementNames[ix]
+            T = Tuple(str, self.typeRepresentation.ElementTypes[ix])
+
+            res.append(
+                typeWrapper(T).createFromArgs(
+                    context,
+                    (
+                        context.constant(name),
+                        instance.changeType(
+                            self.typeRepresentation
+                        ).convert_attribute(name)
+                    ),
+                ).changeType(
+                    TypedTupleMasqueradingAsTuple(T)
+                )
+            )
+
+        return res

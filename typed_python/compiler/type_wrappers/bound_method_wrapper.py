@@ -20,14 +20,33 @@ typeWrapper = lambda x: typed_python.compiler.python_object_representation.typed
 
 
 class BoundMethodWrapper(Wrapper):
-    def __init__(self, t):
+    def __init__(self, t, firstArgTypeWrapper=None):
         super().__init__(t)
 
-        self.firstArgType = typeWrapper(self.typeRepresentation.FirstArgType)
+        self.firstArgType = firstArgTypeWrapper or typeWrapper(self.typeRepresentation.FirstArgType)
 
     @staticmethod
     def Make(wrapperType, attr):
-        return BoundMethodWrapper(_types.BoundMethod(wrapperType.typeRepresentation, attr))
+        return BoundMethodWrapper(
+            _types.BoundMethod(wrapperType.typeRepresentation, attr),
+            wrapperType
+        )
+
+    @property
+    def interpreterTypeRepresentation(self):
+        """Return the typeRepresentation we should use _at the interpreter_ level.
+
+        This can be different than self.typeRepresentation if we are masquerading
+        as another type. This should be the type we would expect if we called
+
+            type(x)
+
+        where x is an instance of the type covered by the wrapper.
+        """
+        return _types.BoundMethod(
+            self.firstArgType.interpreterTypeRepresentation,
+            self.typeRepresentation.FuncName
+        )
 
     def getNativeLayoutType(self):
         return self.firstArgType.getNativeLayoutType()

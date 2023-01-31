@@ -3733,3 +3733,18 @@ class TestCompilationStructures(unittest.TestCase):
         nt = getNamedTupleOfLists(100)
 
         slice(nt)
+
+    def test_iterate_kwargs(self):
+        def f(**kwargs):
+            res = 0
+
+            for name, value in kwargs.items():
+                res += len(value)
+
+            return res
+
+        @Entrypoint
+        def sumSomeThings():
+            return f(x=TupleOf(int)([1, 2, 3]), y=ListOf(float)([1, 2, 3]))
+
+        assert sumSomeThings() == 6
