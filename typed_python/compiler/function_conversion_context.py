@@ -1,4 +1,4 @@
-#   Copyright 2017-2022 typed_python Authors
+#   Copyright 2017-2023 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 from typed_python import (
     _types, Type, ListOf, PointerTo, pointerTo, Set, Dict, Member,
-    OneOf, Function, Tuple, Forward, Class, NamedTuple, Value
+    OneOf, Function, Tuple, Forward, Class, NamedTuple, Value, TupleOf
 )
 from typed_python.generator import Generator
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
@@ -1989,21 +1989,66 @@ class FunctionConversionContext(ConversionContextBase):
             return self.convert_statement_list_ast(statements, variableStates, controlFlowBlocks)
 
         if ast.matches.Import:
-            # TODO: correctly model the side-effectfulness of imports
             context = ExpressionConversionContext(self, variableStates)
 
             for alias in ast.names:
-                if alias.asname is None and len(alias.name.split(".")) > 1:
-                    module = importlib.import_module(alias.name.split("."))[0]
-                    target = alias.name.split(".")
-                elif alias.asname is None:
-                    module = importlib.import_module(alias.name)
-                    target = alias.name
-                else:
-                    module = importlib.import_module(alias.name)
-                    target = alias.asname
+                try:
+                    if alias.asname is None and len(alias.name.split(".")) > 1:
+                        module = importlib.import_module(alias.name.split("."))[0]
+                        target = alias.name.split(".")
+                    elif alias.asname is None:
+                        module = importlib.import_module(alias.name)
+                        target = alias.name
+                    else:
+                        module = importlib.import_module(alias.name)
+                        target = alias.asname
 
-                self.assignToLocalVariable(target, context.constant(module), variableStates)
+                    self.assignToLocalVariable(target, context.constant(module), variableStates)
+                except ImportError as e:
+                    context.pushException(type(e), e.args[0])
+                    return context.finalize(None, exceptionsTakeFrom=ast), False
+
+            return context.finalize(None, exceptionsTakeFrom=ast), True
+
+        if ast.matches.ImportFrom:
+            context = ExpressionConversionContext(self, variableStates)
+
+            if ast.level:
+                raise Exception("Can't compile relative imports yet")
+
+            if not isinstance(ast.module, str):
+                raise Exception("Can't compile non-str module references yet")
+
+            moduleName = ast.module
+
+            names = ast.names
+            if not isinstance(names, TupleOf):
+                names = [names]
+            else:
+                names = list(names)
+
+            try:
+                module = importlib.import_module(moduleName)
+            except ImportError as e:
+                context.pushException(type(e), e.args[0])
+                return context.finalize(None, exceptionsTakeFrom=ast), False
+
+            for name in names:
+                member = name.name
+                asName = name.asname or member
+
+                if not hasattr(module, member):
+                    context.pushException(
+                        ImportError,
+                        f"cannot import name '{member}' from '{moduleName}' ({module.__file__})"
+                    )
+                    return context.finalize(None, exceptionsTakeFrom=ast), False
+
+                self.assignToLocalVariable(
+                    asName,
+                    context.constant(getattr(module, member), allowArbitrary=True),
+                    variableStates
+                )
 
             return context.finalize(None, exceptionsTakeFrom=ast), True
 

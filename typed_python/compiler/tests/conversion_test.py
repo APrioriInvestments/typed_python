@@ -3631,6 +3631,69 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert importSomething() is sys
 
+    def test_import_nonexistent_module(self):
+        def importSomething(doIt):
+            if doIt:
+                import this_module_cannot_exist
+
+        importSomethingCompiled = Entrypoint(importSomething)
+
+        # make sure we can compile
+        assert importSomething(False) is None
+        assert importSomethingCompiled(False) is None
+
+        try:
+            importSomething(True)
+        except ImportError as e:
+            nativeException = e
+
+        try:
+            importSomethingCompiled(True)
+        except ImportError as e:
+            compiledException = e
+
+        assert type(nativeException) == type(compiledException)
+        assert nativeException.args == compiledException.args
+
+    def test_import_from(self):
+        @Entrypoint
+        def importSomething():
+            from os import path
+            from os import _exit as myExit
+
+            return (path, myExit)
+
+        import os
+
+        importedPath, importedExit = importSomething()
+
+        assert importedPath is os.path
+        assert importedExit is os._exit
+
+    def test_import_from_invalid_name(self):
+        def importSomething(doIt):
+            if doIt:
+                from os import thisMemberDoesntExist
+
+        importSomethingCompiled = Entrypoint(importSomething)
+
+        # make sure we can compile
+        assert importSomething(False) is None
+        assert importSomethingCompiled(False) is None
+
+        try:
+            importSomething(True)
+        except ImportError as e:
+            nativeException = e
+
+        try:
+            importSomethingCompiled(True)
+        except ImportError as e:
+            compiledException = e
+
+        assert type(nativeException) == type(compiledException)
+        assert nativeException.args == compiledException.args
+
     def test_class_as_context_manager(self):
         class SimpleCM1():
             def __enter__(self):
