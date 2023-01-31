@@ -3513,3 +3513,26 @@ class TypesTests(unittest.TestCase):
         lst = ListOf(SubclassOf(F))()
         lst.append(F)
         assert lst[0] == F
+
+    def test_call_iter(self):
+        def manualIter(x):
+            iterator = x.__iter__()
+            res = []
+
+            try:
+                while True:
+                    res.append(iterator.__next__())
+            except StopIteration:
+                return res
+
+        def check(container):
+            assert manualIter(container) == list(container)
+
+        check(ListOf(int)([]))
+        check(ListOf(int)([1, 2, 3]))
+        check(TupleOf(int)([]))
+        check(TupleOf(int)([1, 2, 3]))
+        check(Set(int)([]))
+        check(Set(int)([1, 2, 3]))
+        check(Tuple(int, int)((1, 2)))
+        check(NamedTuple(x=int, y=float)((1, 2.5)))

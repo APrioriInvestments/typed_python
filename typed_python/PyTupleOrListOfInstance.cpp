@@ -666,6 +666,30 @@ PyObject* PyTupleOrListOfInstance::pointerUnsafe(PyObject* o, PyObject* args) {
     return extractPythonObject((instance_ptr)&ptr, PointerTo::Make(self_w->type()->getEltType()));
 }
 
+PyObject* PyTupleOrListOfInstance::tp_iter_concrete() {
+    PyInstance* output = (PyInstance*)PyInstance::initialize(type(), [&](instance_ptr data) {
+        type()->copy_constructor(data, dataPtr());
+    });
+
+    output->mIteratorOffset = 0;
+    output->mIteratorFlag = mIteratorFlag;
+
+    return (PyObject*)output;
+}
+
+PyObject* PyTupleOrListOfInstance::tp_iternext_concrete() {
+    if (mIteratorOffset >= type()->count(dataPtr())) {
+        return NULL;
+    }
+
+    mIteratorOffset++;
+
+    return extractPythonObject(
+        type()->eltPtr(dataPtr(), mIteratorOffset - 1),
+        type()->getEltType(),
+        (PyObject*)(type()->isListOf() ? this : nullptr)
+    );
+}
 
 
 PyMethodDef* PyTupleOfInstance::typeMethodsConcrete(Type* t) {
@@ -1123,7 +1147,7 @@ PyDoc_STRVAR(
 );
 
 PyMethodDef* PyListOfInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [14] {
+    return new PyMethodDef [15] {
         {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, ListOf_toArray_doc},
         {"toBytes", (PyCFunction)PyTupleOrListOfInstance::toBytes, METH_VARARGS, LIST_TO_BYTES_DOCSTRING},
         {"fromBytes", (PyCFunction)PyTupleOrListOfInstance::fromBytes, METH_VARARGS | METH_KEYWORDS | METH_CLASS, LIST_FROM_BYTES_DOCSTRING},
@@ -1137,6 +1161,7 @@ PyMethodDef* PyListOfInstance::typeMethodsConcrete(Type* t) {
         {"setSizeUnsafe", (PyCFunction)PyListOfInstance::listSetSizeUnsafe, METH_VARARGS, listSetSizeUnsafe_doc},
         {"pointerUnsafe", (PyCFunction)PyTupleOrListOfInstance::pointerUnsafe, METH_VARARGS, listPointerUnsafe_doc},
         {"transpose", (PyCFunction)PyListOfInstance::listTranspose, METH_VARARGS, listTranspose_doc},
+        {"__iter__", (PyCFunction)PyInstance::tp_iter, METH_VARARGS, NULL},
         {NULL, NULL}
     };
 }

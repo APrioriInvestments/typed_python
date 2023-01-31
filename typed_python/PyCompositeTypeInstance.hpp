@@ -41,6 +41,11 @@ public:
     }
 
     int pyInquiryConcrete(const char* op, const char* opErrRep);
+
+    PyObject* tp_iter_concrete();
+
+    PyObject* tp_iternext_concrete();
+
 };
 
 class PyTupleInstance : public PyCompositeTypeInstance {

@@ -296,6 +296,30 @@ int PyCompositeTypeInstance::pyInquiryConcrete(const char* op, const char* opErr
     return type()->getTypes().size() != 0;
 }
 
+PyObject* PyCompositeTypeInstance::tp_iter_concrete() {
+    PyInstance* output = (PyInstance*)PyInstance::initialize(type(), [&](instance_ptr data) {
+        type()->copy_constructor(data, dataPtr());
+    });
+
+    output->mIteratorOffset = 0;
+    output->mIteratorFlag = mIteratorFlag;
+
+    return (PyObject*)output;
+}
+
+PyObject* PyCompositeTypeInstance::tp_iternext_concrete() {
+    if (mIteratorOffset >= type()->getTypes().size()) {
+        return NULL;
+    }
+
+    mIteratorOffset++;
+
+    return extractPythonObject(
+        type()->eltPtr(dataPtr(), mIteratorOffset - 1),
+        type()->getTypes()[mIteratorOffset - 1]
+    );
+}
+
 void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(
     NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level)
  {

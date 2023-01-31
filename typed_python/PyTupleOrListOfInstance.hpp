@@ -53,6 +53,10 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, ConversionLevel level);
 
     static void mirrorTypeInformationIntoPyTypeConcrete(TupleOrListOfType* inType, PyTypeObject* pyType);
+
+    PyObject* tp_iter_concrete();
+
+    PyObject* tp_iternext_concrete();
 };
 
 class PyListOfInstance : public PyTupleOrListOfInstance {
