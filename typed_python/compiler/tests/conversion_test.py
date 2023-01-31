@@ -3613,7 +3613,7 @@ class TestCompilationStructures(unittest.TestCase):
     def test_import_nonexistent_module(self):
         def importSomething(doIt):
             if doIt:
-                import this_module_cannot_exist
+                import this_module_cannot_exist  # noqa
 
         importSomethingCompiled = Entrypoint(importSomething)
 
@@ -3652,7 +3652,7 @@ class TestCompilationStructures(unittest.TestCase):
     def test_import_from_invalid_name(self):
         def importSomething(doIt):
             if doIt:
-                from os import thisMemberDoesntExist
+                from os import thisMemberDoesntExist  # noqa
 
         importSomethingCompiled = Entrypoint(importSomething)
 
