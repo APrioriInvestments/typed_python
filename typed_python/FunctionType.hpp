@@ -1561,13 +1561,15 @@ public:
     void _visitCompilerVisibleInternals(const visitor_type& v) {
         v.visitHash(
             ShaHash(1, m_typeCategory)
-            + ShaHash(m_name)
-            + ShaHash(mRootName)
-            + ShaHash(mQualname)
-            + ShaHash(mModulename)
             + ShaHash(mIsNocompile ? 2 : 1)
             + ShaHash(mIsEntrypoint ? 2 : 1)
         );
+
+        v.visitName(m_name);
+        v.visitName(mRootName);
+        v.visitName(mQualname);
+        v.visitName(mModulename);
+
         v.visitTopo(mClosureType);
 
         v.visitHash(ShaHash(mOverloads.size()));

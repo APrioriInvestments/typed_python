@@ -173,6 +173,59 @@ public:
         mOnErr(err);
     }
 
+    void visitDict(PyObject* d, bool ignoreSpecialNames=false) const {
+        if (!d) {
+            visitHash(0);
+            return;
+        }
+
+        if (!PyDict_Check(d)) {
+            visitErr(std::string("not a dict: ") + d->ob_type->tp_name);
+            return;
+        }
+
+        // get a list of the names in order. We have to walk them
+        // in lexical order to make sure that our hash is stable.
+        std::map<std::string, PyObject*> names;
+        iterate(d, [&](PyObject* o) {
+            if (PyUnicode_Check(o)) {
+                std::string name = PyUnicode_AsUTF8(o);
+
+                // we don't want module members to hash their file paths
+                // or their module loader info, because then they can't be
+                // moved around without violating the cache (and in fact their
+                // hashes are not stable at all)
+                if (!(ignoreSpecialNames && isSpecialIgnorableName(name))) {
+                    names[name] = o;
+                }
+            }
+        });
+
+        visitHash(ShaHash(names.size()));
+
+        for (auto nameAndO: names) {
+            PyObject* val = PyDict_GetItem(d, nameAndO.second);
+            if (!val) {
+                PyErr_Clear();
+                visitErr("dict getitem empty");
+            } else {
+                visitNamedTopo(nameAndO.first, val);
+            }
+        }
+    }
+
+    void visitTuple(PyObject* t) const {
+        if (!t) {
+            visitHash(ShaHash(0));
+            return;
+        }
+
+        visitHash(ShaHash(PyTuple_Size(t)));
+        for (long k = 0; k < PyTuple_Size(t); k++) {
+            visitTopo(PyTuple_GetItem(t, k));
+        }
+    }
+
 private:
     const visitor_1& mHashVisit;
     const visitor_2& mNameVisit;
@@ -477,59 +530,6 @@ private:
     ) {
         PyEnsureGilAcquired getTheGil;
 
-        auto visitDict = [&](PyObject* d, bool ignoreSpecialNames=false) {
-            if (!d) {
-                visitor.visitHash(0);
-                return;
-            }
-
-            if (!PyDict_Check(d)) {
-                visitor.visitErr(std::string("not a dict: ") + d->ob_type->tp_name);
-                return;
-            }
-
-            // get a list of the names in order. We have to walk them
-            // in lexical order to make sure that our hash is stable.
-            std::map<std::string, PyObject*> names;
-            iterate(d, [&](PyObject* o) {
-                if (PyUnicode_Check(o)) {
-                    std::string name = PyUnicode_AsUTF8(o);
-
-                    // we don't want module members to hash their file paths
-                    // or their module loader info, because then they can't be
-                    // moved around without violating the cache (and in fact their
-                    // hashes are not stable at all)
-                    if (!(ignoreSpecialNames && isSpecialIgnorableName(name))) {
-                        names[name] = o;
-                    }
-                }
-            });
-
-            visitor.visitHash(ShaHash(names.size()));
-
-            for (auto nameAndO: names) {
-                PyObject* val = PyDict_GetItem(d, nameAndO.second);
-                if (!val) {
-                    PyErr_Clear();
-                    visitor.visitErr("dict getitem empty");
-                } else {
-                    visitor.visitNamedTopo(nameAndO.first, val);
-                }
-            }
-        };
-
-        auto visitTuple = [&](PyObject* t) {
-            if (!t) {
-                visitor.visitHash(ShaHash(0));
-                return;
-            }
-
-            visitor.visitHash(ShaHash(PyTuple_Size(t)));
-            for (long k = 0; k < PyTuple_Size(t); k++) {
-                visitor.visitTopo(PyTuple_GetItem(t, k));
-            }
-        };
-
         auto visitDictOrTuple = [&](PyObject* t) {
             if (!t) {
                 visitor.visitHash(ShaHash(0));
@@ -537,12 +537,12 @@ private:
             }
 
             if (PyDict_Check(t)) {
-                visitDict(t);
+                visitor.visitDict(t);
                 return;
             }
 
             if (PyTuple_Check(t)) {
-                visitTuple(t);
+                visitor.visitTuple(t);
                 return;
             }
 
@@ -643,11 +643,11 @@ private:
             // visitor.visitHash(co->co_flags);
             visitor.visitHash(co->co_firstlineno);
             visitor.visitHash(ShaHash::SHA1(PyBytes_AsString(co->co_code), PyBytes_GET_SIZE(co->co_code)));
-            visitTuple(co->co_consts);
-            visitTuple(co->co_names);
-            visitTuple(co->co_varnames);
-            visitTuple(co->co_freevars);
-            visitTuple(co->co_cellvars);
+            visitor.visitTuple(co->co_consts);
+            visitor.visitTuple(co->co_names);
+            visitor.visitTuple(co->co_varnames);
+            visitor.visitTuple(co->co_freevars);
+            visitor.visitTuple(co->co_cellvars);
             // we ignore this, because otherwise, we'd have the hash change
             // whenever we instantiate code in a new location
             // visit(co->co_filename)
@@ -682,7 +682,7 @@ private:
             visitor.visitTopo(f->func_name);
             visitor.visitTopo(PyFunction_GetCode((PyObject*)f));
             visitDictOrTuple(PyFunction_GetAnnotations((PyObject*)f));
-            visitTuple(PyFunction_GetDefaults((PyObject*)f));
+            visitor.visitTuple(PyFunction_GetDefaults((PyObject*)f));
             visitDictOrTuple(PyFunction_GetKwDefaults((PyObject*)f));
 
             visitor.visitHash(ShaHash(1));
@@ -715,7 +715,7 @@ private:
 
             visitor.visitHash(ShaHash(0));
             if (tp->tp_dict) {
-                visitDict(tp->tp_dict, true);
+                visitor.visitDict(tp->tp_dict, true);
             }
             visitor.visitHash(ShaHash(0));
 

@@ -463,6 +463,41 @@ def test_checkHash_mutually_recursive_function_bodies():
     assert checkHash(contents1, 'type(x.h)') != checkHash(contents2, 'type(x.h)')
 
 
+def test_checkHash_methods():
+    contents1 = {"x.py": "class N(Class):\n    def f(self): return 1\n"}
+    contents2 = {"x.py": "class N(Class):\n    def f(self): return 2\n"}
+
+    assert checkHash(contents1, 'x.N.f') != checkHash(contents2, 'x.N.f')
+
+
+def test_checkHash_methods_on_class():
+    contents1 = {"x.py": "class N(Class):\n    def f(self): return 1\n"}
+    contents2 = {"x.py": "class N(Class):\n    def f(self): return 2\n"}
+
+    assert checkHash(contents1, 'x.N') != checkHash(contents2, 'x.N')
+
+
+def test_checkHash_methods_on_empty_python_class():
+    contents1 = {"x.py": "class N1:\n    pass\n"}
+    contents2 = {"x.py": "class N2:\n    pass\n"}
+
+    assert checkHash(contents1, 'x.N1') != checkHash(contents2, 'x.N2')
+
+
+def test_checkHash_methods_on_python_class():
+    contents1 = {"x.py": "class N:\n    def f(self): return 1\n"}
+    contents2 = {"x.py": "class N:\n    def f(self): return 2\n"}
+
+    assert checkHash(contents1, 'x.N') != checkHash(contents2, 'x.N')
+
+
+def test_checkHash_methods_on_named_tuple_subclass():
+    contents1 = {"x.py": "class N(NamedTuple()):\n    def f(self): return 1\n"}
+    contents2 = {"x.py": "class N(NamedTuple()):\n    def f(self): return 2\n"}
+
+    assert checkHash(contents1, 'x.N') != checkHash(contents2, 'x.N')
+
+
 FUNCMAKER = """
 @Entrypoint
 def makeAdder(x):
@@ -656,3 +691,11 @@ def test_identity_of_entrypointed_functions():
 
 def test_identity_of_singleton_classes():
     assert identityHash(A) != identityHash(B)
+
+
+def test_type_walk_for_named_tuple_subclass():
+    class N(NamedTuple()):
+        def f(self):
+            return 0
+
+    print(typeWalkRecord(N))

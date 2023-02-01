@@ -58,6 +58,12 @@ public:
         v.visitName(m_name);
         v.visitTopo(m_base);
         v.visitTopo((PyObject*)mTypeRep);
+        if (mTypeRep->tp_dict) {
+            v.visitHash(ShaHash(1));
+            v.visitDict((PyObject*)mTypeRep->tp_dict);
+        } else {
+            v.visitHash(ShaHash(0));
+        }
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
