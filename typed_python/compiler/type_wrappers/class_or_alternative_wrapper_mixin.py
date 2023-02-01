@@ -179,15 +179,15 @@ class ClassOrAlternativeWrapperMixin:
         if self.has_method("__hash__"):
             return self.convert_method_call(context, expr, "__hash__", (), {})
 
+        expr = expr.ensureIsReference()
+
         return context.pushPod(
             Int32,
-            runtime_functions.hash_alternative.call(
-                expr.nonref_expr.cast(VoidPtr),
-                context.getTypePointer(expr.expr_type.typeRepresentation)
+            runtime_functions.hash_instance.call(
+                expr.expr.cast(VoidPtr),
+                context.getTypePointer(self.typeRepresentation)
             )
         )
-
-        return None
 
     def convert_call(self, context, expr, args, kwargs):
         if self.has_method("__call__"):

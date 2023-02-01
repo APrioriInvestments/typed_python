@@ -232,6 +232,8 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return super().convert_attribute(context, instance, attr)
 
     def convert_hash(self, context, expr):
+        expr = expr.ensureIsReference()
+
         return context.pushPod(
             Int32,
             runtime_functions.hash_instance.call(

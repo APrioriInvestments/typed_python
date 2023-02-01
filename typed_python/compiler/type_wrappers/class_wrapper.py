@@ -29,7 +29,7 @@ from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin impo
     ClassOrAlternativeWrapperMixin
 )
 from typed_python import (
-    _types, PointerTo, Int32, Tuple, NamedTuple, bytecount, RefTo, SubclassOf,
+    _types, PointerTo, Tuple, NamedTuple, bytecount, RefTo, SubclassOf,
     Class, Value, Alternative
 )
 
@@ -1476,20 +1476,6 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
         return context.pushException(TypeError, f"Can't compare instances of {left.expr_type.typeRepresentation}"
                                                 f" and {right.expr_type.typeRepresentation} with {op}")
-
-    def convert_hash(self, context, expr):
-        if self.has_method("__hash__"):
-            return self.convert_method_call(context, expr, "__hash__", (), {})
-
-        layoutPtr = self.get_layout_pointer(expr).cast(native_ast.UInt64)
-
-        return context.pushPod(
-            Int32,
-            runtime_functions.hash_class.call(
-                layoutPtr.cast(native_ast.VoidPtr),
-                context.getTypePointer(expr.expr_type.typeRepresentation)
-            )
-        )
 
     def convert_typeof(self, context, instance):
         if self.typeRepresentation.IsFinal:

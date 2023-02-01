@@ -1016,20 +1016,6 @@ hash_instance = externalCallTarget(
     Void.pointer()
 )
 
-hash_alternative = externalCallTarget(
-    "nativepython_hash_alternative",
-    Int32,
-    Void.pointer(),
-    Void.pointer()
-)
-
-hash_class = externalCallTarget(
-    "nativepython_hash_class",
-    Int32,
-    Void.pointer(),
-    Void.pointer()
-)
-
 isinf_float32 = externalCallTarget("nativepython_isinf_float32", Bool, Float32)
 
 isnan_float32 = externalCallTarget("nativepython_isnan_float32", Bool, Float32)

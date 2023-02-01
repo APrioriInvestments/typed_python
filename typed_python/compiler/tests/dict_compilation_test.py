@@ -905,6 +905,50 @@ class TestDictCompilation(unittest.TestCase):
         put(aDict, B.B(), 10)
         assert B.B() in aDict
 
+    def test_dict_of_alternatives(self):
+        A = Alternative("A", A=dict(x=int), B=dict(x=float))
+
+        aDict = Dict(A, int)()
+
+        @Entrypoint
+        def put(d, k, v):
+            d[k] = v
+
+        @Entrypoint
+        def get(d, k):
+            return d[k]
+
+        for i in range(20):
+            put(aDict, A.A(x=i), i)
+            put(aDict, A.B(x=i), i * 1000)
+
+        for i in range(20):
+            assert get(aDict, A.A(x=i)) == i
+            assert get(aDict, A.B(x=i)) == i * 1000
+
+    def test_dict_of_concrete_alternatives(self):
+        A = Alternative("A", A=dict(), B=dict(), C=dict(), D=dict())
+
+        aDict = Dict(A, int)()
+
+        @Entrypoint
+        def put(d, k, v):
+            d[k] = v
+
+        @Entrypoint
+        def get(d, k):
+            return d[k]
+
+        put(aDict, A.A(), 1)
+        put(aDict, A.B(), 2)
+        put(aDict, A.C(), 3)
+        put(aDict, A.D(), 4)
+
+        assert get(aDict, A.A()) == 1
+        assert get(aDict, A.B()) == 2
+        assert get(aDict, A.C()) == 3
+        assert get(aDict, A.D()) == 4
+
     def test_yield_from_dict(self):
         def iterateTwice(d):
             for k in d:
