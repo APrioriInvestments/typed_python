@@ -364,7 +364,7 @@ class TupleWrapper(Wrapper):
         for i in range(len(args)):
             typeConvertedArg = args[i].convert_to_type(
                 self.typeRepresentation.ElementTypes[i],
-                ConversionLevel.Implicit
+                ConversionLevel.ImplicitContainers
             )
 
             if typeConvertedArg is None:
@@ -662,7 +662,7 @@ class NamedTupleWrapper(TupleWrapper):
             uninitializedNamedTuple = context.allocateUninitializedSlot(self)
 
             for name, expr in kwargs.items():
-                actualExpr = expr.convert_to_type(self.namesToTypes[name], ConversionLevel.Implicit)
+                actualExpr = expr.convert_to_type(self.namesToTypes[name], ConversionLevel.ImplicitContainers)
                 if actualExpr is None:
                     return None
 

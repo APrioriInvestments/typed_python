@@ -17,7 +17,7 @@ import unittest
 
 from typed_python import (
     Tuple, NamedTuple, Class, Member, ListOf, Compiled,
-    Final, Forward, OneOf
+    Final, Forward, OneOf, Dict
 )
 from typed_python import Entrypoint, makeNamedTuple, Function
 
@@ -359,3 +359,11 @@ class TestTupleCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "Can't default initialize member 'c'"):
             checkIt()
+
+    def test_create_tuple_uses_implicit_containers(self):
+        def f():
+            res = Dict(object, object)({1: 2, 3: 4})
+
+            return NamedTuple(x=Dict(int, int))(x=res)
+
+        assert f() == Entrypoint(f)()
