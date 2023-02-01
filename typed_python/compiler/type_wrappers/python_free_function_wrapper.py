@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typed_python import Value
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.native_ast as native_ast
 
@@ -22,31 +23,31 @@ class PythonFreeFunctionWrapper(Wrapper):
     is_pass_by_ref = False
 
     def __init__(self, f):
-        super().__init__(f)
+        super().__init__(Value(f))
 
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
     def convert_call(self, context, left, args, kwargs):
-        return context.call_py_function(self.typeRepresentation, args, kwargs)
+        return context.call_py_function(self.typeRepresentation.Value, args, kwargs)
 
     def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         if targetVal.expr_type.typeRepresentation is object:
             targetVal.convert_copy_initialize(
-                context.constant(self.typeRepresentation, allowArbitrary=True)
+                context.constant(self.typeRepresentation.Value, allowArbitrary=True)
             )
             return context.constant(True)
 
         if conversionLevel.isNewOrHigher() and targetVal.expr_type.typeRepresentation is str:
             targetVal.convert_copy_initialize(
-                context.constant(str(self.typeRepresentation))
+                context.constant(str(self.typeRepresentation.Value))
             )
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 
     def convert_repr(self, context, instance):
-        return context.constant(repr(self.typeRepresentation))
+        return context.constant(repr(self.typeRepresentation.Value))
 
     def convert_typeof(self, context, instance):
-        return context.constant(type(self.typeRepresentation))
+        return context.constant(type(self.typeRepresentation.Value))

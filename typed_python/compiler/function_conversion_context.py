@@ -296,9 +296,9 @@ class ConversionContextBase:
                 if decoratorEval is None:
                     raise Exception("Decorators other than NotCompiled or Entrypoint not supported yet")
 
-                if decoratorEval.expr_type.typeRepresentation is typed_python.NotCompiled:
+                if decoratorEval.expr_type.typeRepresentation is Value(typed_python.NotCompiled):
                     untypedFuncType = untypedFuncType.typeWithNocompile(True)
-                elif decoratorEval.expr_type.typeRepresentation is typed_python.Entrypoint:
+                elif decoratorEval.expr_type.typeRepresentation is Value(typed_python.Entrypoint):
                     untypedFuncType = untypedFuncType.typeWithEntrypoint(True)
                 else:
                     raise Exception("Decorators other than NotCompiled or Entrypoint not supported yet")
@@ -2293,7 +2293,7 @@ class FunctionConversionContext(ConversionContextBase):
         if callRes is None:
             return None, None
 
-        if callRes.expr_type.typeRepresentation is not checkType:
+        if callRes.expr_type.typeRepresentation is not Value(checkType):
             return None, None
 
         return expr.args[0].id, expr.args[1:]
@@ -2323,7 +2323,7 @@ class FunctionConversionContext(ConversionContextBase):
         if callRes is None:
             return None
 
-        if callRes.expr_type.typeRepresentation is not checkOneOfType:
+        if callRes.expr_type.typeRepresentation is not Value(checkOneOfType):
             return None
 
         varname = expr.args[0].id

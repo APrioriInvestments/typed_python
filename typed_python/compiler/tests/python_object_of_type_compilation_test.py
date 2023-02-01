@@ -968,3 +968,10 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         assert isinstanceC(10, int)
         assert not isinstanceC(10, str)
+
+    def test_call_with_global_function(self):
+        @Entrypoint
+        def call(f: object):
+            return f(globalFun)
+
+        assert call(str) == str(globalFun)
