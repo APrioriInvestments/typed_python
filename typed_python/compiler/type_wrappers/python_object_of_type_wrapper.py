@@ -244,19 +244,8 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         return super().convert_builtin(f, context, expr, a1)
 
     def convert_call(self, context, instance, args, kwargs):
-        argsAsObjects = []
-        for a in args:
-            argsAsObjects.append(a.convert_to_type(object, ConversionLevel.Signature))
-            if argsAsObjects[-1] is None:
-                return None
-
-        kwargsAsObjects = {}
-
-        for k, a in kwargs.items():
-            kwargsAsObjects[k] = a.convert_to_type(object, ConversionLevel.Signature)
-
-            if kwargsAsObjects[k] is None:
-                return None
+        args = [a.demasquerade() for a in args]
+        kwargs = {k: v.demasquerade() for k, v in kwargs.items()}
 
         # we converted everything to python objects. We need to pass this
         # ensemble to the interpreter. We use c-style variadic arguments here
@@ -264,11 +253,17 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         arguments = []
         kwarguments = []
 
-        for a in argsAsObjects:
-            arguments.append(a.nonref_expr.cast(VoidPtr))
+        for a in args:
+            a = a.ensureIsReference()
 
-        for kwargName, kwargVal in kwargsAsObjects.items():
-            kwarguments.append(kwargVal.nonref_expr.cast(VoidPtr))
+            arguments.append(a.expr.cast(VoidPtr))
+            arguments.append(context.getTypePointer(a.expr_type.typeRepresentation))
+
+        for kwargName, kwargVal in kwargs.items():
+            kwargVal = kwargVal.ensureIsReference()
+
+            kwarguments.append(kwargVal.expr.cast(VoidPtr))
+            kwarguments.append(context.getTypePointer(kwargVal.expr_type.typeRepresentation))
             kwarguments.append(native_ast.const_utf8_cstr(kwargName))
 
         return context.push(
@@ -277,8 +272,8 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
                 oPtr.expr.store(
                     runtime_functions.call_pyobj.call(
                         instance.nonref_expr.cast(VoidPtr),
-                        native_ast.const_int_expr(len(arguments)),
-                        native_ast.const_int_expr(len(kwargsAsObjects)),
+                        native_ast.const_int_expr(len(args)),
+                        native_ast.const_int_expr(len(kwargs)),
                         *arguments,
                         *kwarguments,
                     ).cast(self.getNativeLayoutType())
@@ -403,11 +398,42 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
 
             return context.pushPod(bool, nativeFun.call(instance.nonref_expr.cast(VoidPtr)))
 
-        method = self.convert_attribute(context, instance, methodname)
-        if method is None:
-            return None
+        args = [a.demasquerade() for a in args]
+        kwargs = {k: v.demasquerade() for k, v in kwargs.items()}
 
-        return method.convert_call(args, kwargs)
+        # we converted everything to python objects. We need to pass this
+        # ensemble to the interpreter. We use c-style variadic arguments here
+        # since everything is a pointer.
+        arguments = []
+        kwarguments = []
+
+        for a in args:
+            a = a.ensureIsReference()
+
+            arguments.append(a.expr.cast(VoidPtr))
+            arguments.append(context.getTypePointer(a.expr_type.typeRepresentation))
+
+        for kwargName, kwargVal in kwargs.items():
+            kwargVal = kwargVal.ensureIsReference()
+
+            kwarguments.append(kwargVal.expr.cast(VoidPtr))
+            kwarguments.append(context.getTypePointer(kwargVal.expr_type.typeRepresentation))
+            kwarguments.append(native_ast.const_utf8_cstr(kwargName))
+
+        return context.push(
+            object,
+            lambda oPtr:
+                oPtr.expr.store(
+                    runtime_functions.call_pyobj_method.call(
+                        instance.nonref_expr.cast(VoidPtr),
+                        native_ast.const_utf8_cstr(methodname),
+                        native_ast.const_int_expr(len(args)),
+                        native_ast.const_int_expr(len(kwargs)),
+                        *arguments,
+                        *kwarguments,
+                    ).cast(self.getNativeLayoutType())
+                )
+        )
 
     def convert_context_manager_enter(self, context, instance):
         if self.typeRepresentation in (_thread.LockType, _thread.RLock):

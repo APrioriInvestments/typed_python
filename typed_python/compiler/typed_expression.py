@@ -168,10 +168,11 @@ class TypedExpression:
         return self.expr_type.ensureNonReference(self)
 
     def ensureIsReference(self):
+        """Return a copy of this where 'isReference' is definitely True"""
         if self.isReference:
             return self
 
-        return self.context.pushReference(self.expr_type, self.expr)
+        return self.context.pushMove(self)
 
     def convert_typeof(self):
         return self.expr_type.convert_typeof(self.context, self)
@@ -328,6 +329,11 @@ class TypedExpression:
 
     def convert_masquerade_to_typed(self):
         return self.expr_type.convert_masquerade_to_typed(self.context, self)
+
+    def demasquerade(self):
+        if self.expr_type.isMasquerade:
+            return self.convert_masquerade_to_untyped()
+        return self
 
     def convert_fastnext(self):
         """Call '__fastnext__' on the object.

@@ -1351,7 +1351,12 @@ extern "C" {
         return PythonObjectOfType::stealToCreateLayout(res);
     }
 
-    PythonObjectOfType::layout_type* nativepython_runtime_call_pyobj(PythonObjectOfType::layout_type* toCall, int argCount, int kwargCount, ...) {
+    PythonObjectOfType::layout_type* nativepython_runtime_call_pyobj(
+        PythonObjectOfType::layout_type* toCall,
+        int argCount,
+        int kwargCount,
+        ...
+    ) {
         PyEnsureGilAcquired getTheGil;
 
         // each of 'argCount' arguments is a PyObject* followed by a const char*
@@ -1362,19 +1367,75 @@ extern "C" {
         PyObjectStealer kwargs(PyDict_New());
 
         for (int i = 0; i < argCount; ++i) {
-            PyTuple_SetItem((PyObject*)args, i, incref(va_arg(va_args, PythonObjectOfType::layout_type*)->pyObj));
+            instance_ptr data = va_arg(va_args, instance_ptr);
+            Type* typ = va_arg(va_args, Type*);
+
+            PyTuple_SetItem((PyObject*)args, i, PyInstance::extractPythonObject(data, typ));
         }
 
         for (int i = 0; i < kwargCount; ++i) {
-            PyObject* kwargVal = va_arg(va_args, PythonObjectOfType::layout_type*)->pyObj;
+            instance_ptr data = va_arg(va_args, instance_ptr);
+            Type* typ = va_arg(va_args, Type*);
             const char* kwargName = va_arg(va_args, const char*);
 
-            PyDict_SetItemString((PyObject*)kwargs, kwargName, kwargVal);
+            PyObjectStealer kwargVal(PyInstance::extractPythonObject(data, typ));
+
+            PyDict_SetItemString((PyObject*)kwargs, kwargName, (PyObject*)kwargVal);
         }
 
         va_end(va_args);
 
         PyObject* res = PyObject_Call(toCall->pyObj, args, kwargs);
+
+        if (!res) {
+            throw PythonExceptionSet();
+        }
+
+        return PythonObjectOfType::stealToCreateLayout(res);
+    }
+
+    PythonObjectOfType::layout_type* nativepython_runtime_call_pyobj_method(
+        PythonObjectOfType::layout_type* toCall,
+        const char* methodName,
+        int argCount,
+        int kwargCount,
+        ...
+    ) {
+        PyEnsureGilAcquired getTheGil;
+
+        // each of 'argCount' arguments is a PyObject* followed by a const char*
+        va_list va_args;
+        va_start(va_args, kwargCount);
+
+        PyObjectStealer method(PyObject_GetAttrString(toCall->pyObj, methodName));
+
+        if (!method) {
+            throw PythonExceptionSet();
+        }
+
+        PyObjectStealer args(PyTuple_New(argCount));
+        PyObjectStealer kwargs(PyDict_New());
+
+        for (int i = 0; i < argCount; ++i) {
+            instance_ptr data = va_arg(va_args, instance_ptr);
+            Type* typ = va_arg(va_args, Type*);
+
+            PyTuple_SetItem((PyObject*)args, i, PyInstance::extractPythonObject(data, typ));
+        }
+
+        for (int i = 0; i < kwargCount; ++i) {
+            instance_ptr data = va_arg(va_args, instance_ptr);
+            Type* typ = va_arg(va_args, Type*);
+            const char* kwargName = va_arg(va_args, const char*);
+
+            PyObjectStealer kwargVal(PyInstance::extractPythonObject(data, typ));
+
+            PyDict_SetItemString((PyObject*)kwargs, kwargName, (PyObject*)kwargVal);
+        }
+
+        va_end(va_args);
+
+        PyObject* res = PyObject_Call((PyObject*)method, args, kwargs);
 
         if (!res) {
             throw PythonExceptionSet();

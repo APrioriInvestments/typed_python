@@ -372,6 +372,19 @@ call_pyobj = externalCallTarget(
     "nativepython_runtime_call_pyobj",
     Void.pointer(),
     Void.pointer(),
+    Int64,
+    Int64,
+    varargs=True,
+    canThrow=True
+)
+
+call_pyobj_method = externalCallTarget(
+    "nativepython_runtime_call_pyobj_method",
+    Void.pointer(),
+    Void.pointer(),
+    UInt8Ptr,
+    Int64,
+    Int64,
     varargs=True,
     canThrow=True
 )

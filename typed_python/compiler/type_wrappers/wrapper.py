@@ -126,6 +126,10 @@ class Wrapper:
         return hash((type(self), self.typeRepresentation))
 
     @property
+    def isMasquerade(self):
+        return self.interpreterTypeRepresentation != self.typeRepresentation
+
+    @property
     def interpreterTypeRepresentation(self):
         """Return the typeRepresentation we should use _at the interpreter_ level.
 
