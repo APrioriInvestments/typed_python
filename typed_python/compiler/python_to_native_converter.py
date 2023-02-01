@@ -58,6 +58,26 @@ class FunctionDependencyGraph:
         # (priority, node) pairs that need to recompute
         self._dirty_inflight_functions_with_order = SortedSet(key=lambda pair: pair[0])
 
+    def reachableInSet(self, rootIdentity, activeSet):
+        """Produce the subset of 'activeSet' that are reachable from 'rootIdentity'"""
+        reachable = set()
+
+        def walk(node):
+            if node in reachable or node not in activeSet:
+                return
+
+            reachable.add(node)
+
+            for child in self._dependencies.outgoing(node):
+                walk(child)
+
+        walk(rootIdentity)
+
+        return reachable
+
+    def clearOutgoingEdgesFor(self, identity):
+        self._dependencies.clearOutgoing(identity)
+
     def dropNode(self, node):
         self._dependencies.dropNode(node, False)
         if node in self._identity_levels:
@@ -341,8 +361,7 @@ class PythonToNativeConverter:
         if self._currentlyConverting is None:
             # force the function to resolve immediately
             self._resolveAllInflightFunctions()
-            self._installInflightFunctions()
-            self._inflight_function_conversions.clear()
+            self._installInflightFunctions(identity)
 
         return self.getTarget(linkName)
 
@@ -540,6 +559,8 @@ class PythonToNativeConverter:
 
                 # this calls back into convert with dependencies
                 # they get registered as dirty
+                self._dependencies.clearOutgoingEdgesFor(identity)
+
                 nativeFunction, actual_output_type = functionConverter.convertToNativeFunction()
 
                 if nativeFunction is not None:
@@ -900,7 +921,7 @@ class PythonToNativeConverter:
         if isRoot:
             try:
                 self._resolveAllInflightFunctions()
-                self._installInflightFunctions()
+                self._installInflightFunctions(identity)
                 return self.getTarget(name)
             finally:
                 self._inflight_function_conversions.clear()
@@ -915,7 +936,7 @@ class PythonToNativeConverter:
                 raise RuntimeError(f"Unexpected conversion error for {name}")
             return None
 
-    def _installInflightFunctions(self):
+    def _installInflightFunctions(self, rootIdentity):
         """Add all function definitions corresponding to keys in inflight_function_conversions to the relevant dictionaries."""
         if VALIDATE_FUNCTION_DEFINITIONS_STABLE:
             # this should always be true, but its expensive so we have it off by default
@@ -929,7 +950,17 @@ class PythonToNativeConverter:
                 finally:
                     self._currentlyConverting = None
 
+        # restrict to the set of inflight functions that are reachable from rootName
+        # we produce copies of functions that we don't actually need to compile during
+        # early phases of type inference
+        reachable = self._dependencies.reachableInSet(
+            rootIdentity,
+            set(self._inflight_function_conversions)
+        )
+
         for identifier, functionConverter in self._inflight_function_conversions.items():
+            if identifier not in reachable:
+                continue
             outboundTargets = []
             for outboundFuncId in self._dependencies.getNamesDependedOn(identifier):
                 name = self._link_name_for_identity[outboundFuncId]
@@ -987,3 +1018,6 @@ class PythonToNativeConverter:
 
             self._definitions[name] = nativeFunction
             self._new_native_functions.add(name)
+
+        self._inflight_definitions.clear()
+        self._inflight_function_conversions.clear()
