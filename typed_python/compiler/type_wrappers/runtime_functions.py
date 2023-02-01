@@ -1215,3 +1215,10 @@ deserialize_no_context = externalCallTarget(
     Void.pointer(),
     Void.pointer()
 )
+
+const_dict_sort_kv_pairs = externalCallTarget(
+    "np_const_dict_sort_kv_pairs",
+    Void,
+    Void.pointer(),
+    Void.pointer()
+)

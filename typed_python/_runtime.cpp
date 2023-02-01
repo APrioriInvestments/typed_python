@@ -2826,4 +2826,15 @@ extern "C" {
             throw PythonExceptionSet();
         }
     }
+
+    void np_const_dict_sort_kv_pairs(ConstDictType::layout* instance, ConstDictType* dictType) {
+        try {
+            dictType->sortKvPairs((instance_ptr)&instance);
+        } catch(std::exception& e) {
+            PyEnsureGilAcquired getTheGil;
+
+            PyErr_SetString(PyExc_TypeError, e.what());
+            throw PythonExceptionSet();
+        }
+    }
 }

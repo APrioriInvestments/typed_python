@@ -17,7 +17,7 @@ import typed_python._types as _types
 import unittest
 
 from flaky import flaky
-from typed_python import ConstDict, TupleOf, ListOf, Tuple, Compiled
+from typed_python import ConstDict, TupleOf, ListOf, Tuple, Compiled, Dict
 from typed_python import Entrypoint
 
 
@@ -405,3 +405,11 @@ class TestConstDictCompilation(unittest.TestCase):
             return res
 
         assert toList(ConstDict(int, float)({1: 2.2})) == [(1, 2.2), (1, 2.2)]
+
+    def test_convert_dict_to_const_dict(self):
+        def f():
+            res = Dict(object, object)({1: '2', 3: '4', -3: '6'})
+
+            return ConstDict(int, str)(res)
+
+        assert f() == Entrypoint(f)()
