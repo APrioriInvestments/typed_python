@@ -182,9 +182,7 @@ public:
         }
     }
 
-
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
-    static bool cmpStatic(Alternative* altT, instance_ptr left, instance_ptr right, int64_t pyComparisonOp);
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {

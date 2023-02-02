@@ -24,6 +24,7 @@ import time
 import psutil
 from math import trunc, floor, ceil
 from typed_python.compiler.type_wrappers.class_wrapper import classCouldBeInstanceOf
+from typed_python.compiler.type_wrappers.hash_table_implementation import NativeHash
 
 
 class TestAlternativeCompilation(unittest.TestCase):
@@ -1724,3 +1725,32 @@ class TestAlternativeCompilation(unittest.TestCase):
             return f(x)
 
         assert g(A.X(x=10)) == 10
+
+    def test_alternative_hashing(self):
+        A = Alternative("A", A=dict(a=int))
+
+        assert NativeHash.callHash(A.A, A.A(a=12)) == hash(A.A(a=12))
+        assert NativeHash.callHash(A, A.A(a=12)) == hash(A.A(a=12))
+
+    def test_alternative_equality(self):
+        AB = Alternative("AB", A=dict(a=int), B=dict(b=str))
+
+        @Entrypoint
+        def eqConcrete(a1: AB.A, a2: AB.A):
+            return a1 == a2
+
+        @Entrypoint
+        def eqMixed(a1: AB, a2: AB.A):
+            return a1 == a2
+
+        @Entrypoint
+        def eq(a1: AB, a2: AB):
+            return a1 == a2
+
+        assert not eq(AB.A(a=1), AB.A(a=2))
+        assert not eqMixed(AB.A(a=1), AB.A(a=2))
+        assert not eqConcrete(AB.A(a=1), AB.A(a=2))
+
+        assert eq(AB.A(a=1), AB.A(a=1))
+        assert eqMixed(AB.A(a=1), AB.A(a=1))
+        assert eqConcrete(AB.A(a=1), AB.A(a=1))

@@ -466,13 +466,15 @@ extern "C" {
         return StringType::cmpStatic(lhs, rhs);
     }
 
-    bool np_runtime_alternative_cmp(Alternative* tp, instance_ptr lhs, instance_ptr rhs, int64_t pyComparisonOp) {
-        return Alternative::cmpStatic(tp, lhs, rhs, pyComparisonOp);
-    }
+    bool np_instance_cmp(Type* t, instance_ptr lhs, instance_ptr rhs, int64_t pyComparisonOp) {
+        try {
+            return t->cmp(lhs, rhs, pyComparisonOp, false);
+        } catch(std::exception& e) {
+            PyEnsureGilAcquired getTheGil;
 
-    bool np_runtime_class_cmp(Class* tp, instance_ptr lhs, instance_ptr rhs, int64_t pyComparisonOp) {
-        PyEnsureGilAcquired acquireTheGil;
-        return Class::cmpStatic(tp, lhs, rhs, pyComparisonOp);
+            PyErr_SetString(PyExc_TypeError, e.what());
+            throw PythonExceptionSet();
+        }
     }
 
     StringType::layout* np_typePtrToName(Type* t) {

@@ -14,7 +14,7 @@
 
 from typed_python import (
     Set, ListOf, Entrypoint, Compiled, Tuple, TupleOf, NamedTuple, Dict, ConstDict, OneOf,
-    UInt8
+    UInt8, Alternative
 )
 from typed_python.compiler.type_wrappers.set_wrapper import (
     set_union, set_intersection, set_difference,
@@ -1191,3 +1191,28 @@ class TestSetCompilation(unittest.TestCase):
             return C(y)
 
         callC([1])
+
+    def test_set_of_specific_alternative(self):
+        A = Alternative(
+            "A",
+            A=dict(a=int),
+            B=dict(b=str),
+        )
+
+        s = Set(A.A)()
+
+        @Entrypoint
+        def add(s, k):
+            s.add(k)
+
+        @Entrypoint
+        def contains(s, k):
+            return k in s
+
+        someInts = [1, 10, 2, 6, 123, 13]
+
+        for i in someInts:
+            add(s, A.A(a=i))
+            assert A.A(a=i) in s
+            assert contains(s, A.A(a=i))
+            assert not contains(s, A.A(a=-i))

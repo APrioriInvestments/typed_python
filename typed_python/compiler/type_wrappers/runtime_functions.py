@@ -526,16 +526,10 @@ string_eq = externalCallTarget(
     Void.pointer(), Void.pointer()
 )
 
-alternative_cmp = externalCallTarget(
-    "np_runtime_alternative_cmp",
+instance_cmp = externalCallTarget(
+    "np_instance_cmp",
     Bool,
     Void.pointer(), Void.pointer(), Void.Pointer(), Int64
-)
-
-class_cmp = externalCallTarget(
-    "np_runtime_class_cmp",
-    Bool,
-    UInt64, Void.pointer(), Void.Pointer(), Int64
 )
 
 string_chr_int64 = externalCallTarget(

@@ -77,6 +77,16 @@ class NativeHash(CompilableBuiltin):
 
         return super().convert_call(context, instance, args, kwargs)
 
+    @staticmethod
+    def callHash(T, x):
+        from typed_python import Entrypoint
+
+        @Entrypoint
+        def hashIt(x):
+            return NativeHash(T)(x)
+
+        return hashIt(x)
+
 
 def table_add_slot(instance, itemHash, slot):
     if (instance._hash_table_count * 2 + 1 > instance._hash_table_size or

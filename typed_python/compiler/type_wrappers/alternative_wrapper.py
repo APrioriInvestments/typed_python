@@ -61,16 +61,13 @@ class AlternativeWrapperMixin(ClassOrAlternativeWrapperMixin):
         if py_code < 0:
             return super().convert_comparison(context, lhs, op, rhs)
 
-        if not lhs.isReference:
-            lhs = context.pushMove(lhs)
+        if _types.isBinaryCompatible(lhs.expr_type.typeRepresentation, rhs.expr_type.typeRepresentation):
+            lhs = lhs.ensureIsReference()
+            rhs = rhs.ensureIsReference()
 
-        if not rhs.isReference:
-            rhs = context.pushMove(rhs)
-
-        if lhs.expr_type.typeRepresentation == rhs.expr_type.typeRepresentation:
             return context.pushPod(
                 bool,
-                runtime_functions.alternative_cmp.call(
+                runtime_functions.instance_cmp.call(
                     context.getTypePointer(lhs.expr_type.typeRepresentation),
                     lhs.expr.cast(VoidPtr),
                     rhs.expr.cast(VoidPtr),
