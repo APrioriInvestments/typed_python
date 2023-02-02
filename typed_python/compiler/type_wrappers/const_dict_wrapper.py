@@ -256,6 +256,10 @@ class ConstDictWrapper(RefcountedWrapper):
             ('data', native_ast.UInt8)
         ), name='ConstDictLayout').pointer()
 
+    def has_fastnext_iter(self):
+        """If we call '__iter__' on instances of this type, will they support __fastnext__?"""
+        return True
+
     def getNativeLayoutType(self):
         return self.layoutType
 

@@ -88,6 +88,13 @@ def readVar(n):
     )
 
 
+def importAs(moduleName, varName, asName):
+    return python_ast.Statement.ImportFrom(
+        module=moduleName,
+        names=(python_ast.Alias.Item(name=varName, asname=asName),)
+    )
+
+
 def assign(n, val):
     return python_ast.Statement.Assign(
         targets=(

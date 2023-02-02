@@ -561,6 +561,11 @@ class NamedTupleWrapper(TupleWrapper):
         self.namesToIndices = {n: i for i, n in enumerate(t.ElementNames)}
         self.namesToTypes = {n: t.ElementTypes[i] for i, n in enumerate(t.ElementNames)}
 
+    def has_fastnext_iter(self):
+        if self.isSubclassOfNamedTuple:
+            return "__iter__" in self.typeRepresentation.__dict__
+        return False
+
     def has_intiter(self):
         """Does this type support the 'intiter' format?"""
         if not self.isSubclassOfNamedTuple:

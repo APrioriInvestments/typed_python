@@ -318,6 +318,10 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             ('data', native_ast.UInt8Ptr)
         ), name='TupleOfLayout' if self.is_tuple else 'ListOfLayout').pointer()
 
+    def has_fastnext_iter(self):
+        """If we call '__iter__' on instances of this type, will they support __fastnext__?"""
+        return True
+
     def getNativeLayoutType(self):
         return self.layoutType
 
@@ -749,7 +753,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
 @TypeFunction
 def TupleOrListOfIterator(T):
-    class TupleOrListOfIterator(Class, Final):
+    class TupleOrListOfIterator(Class, Final, __name__=f"TupleOrListOfIterator({T.__name__})"):
         pos = Member(int)
         tup = Member(T)
 

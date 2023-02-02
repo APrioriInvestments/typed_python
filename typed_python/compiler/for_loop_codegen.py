@@ -35,6 +35,7 @@ introduce a sequence of isinstance branches (equivalent to a
 checkOneOfType call)
 """
 import typed_python.python_ast as python_ast
+from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python.compiler.codegen_helpers import (
     const,
     branch,
@@ -43,8 +44,33 @@ from typed_python.compiler.codegen_helpers import (
     assign,
     compare,
     attr,
+    importAs,
     makeCallExpr,
 )
+
+
+class ExtractIteratorWithFastnext(CompilableBuiltin):
+    """Call __iter__on an argument, but return something with __fastnext__"""
+    def __eq__(self, other):
+        return isinstance(other, ExtractIteratorWithFastnext)
+
+    def __hash__(self):
+        return hash((ExtractIteratorWithFastnext,))
+
+    def convert_call(self, context, instance, args, kwargs):
+        from typed_python.iterator_adaptor import IteratorAdaptor
+
+        if len(args) != 1 or kwargs:
+            return super().convert_call(context, instance, args, kwargs)
+
+        if args[0].expr_type.has_fastnext_iter():
+            return args[0].convert_method_call("__iter__", (), {})
+
+        rawIterator = args[0].convert_method_call("__iter__", (), {})
+        if rawIterator is None:
+            return None
+
+        return context.constant(IteratorAdaptor).convert_call((rawIterator,), {})
 
 
 def rewriteForLoops(statement):
@@ -142,7 +168,17 @@ def rewriteForLoopStatement(s):
     iteratorTrigger = f".for.{s.line_number}.triggerElse"
 
     yield assign(iteratorExpressionVarname, s.iter)
-    yield assign(iteratorVarname, makeCallExpr(attr(readVar(iteratorExpressionVarname), "__iter__")))
+    yield importAs(
+        "typed_python.compiler.for_loop_codegen",
+        "ExtractIteratorWithFastnext",
+        " ExtractIteratorWithFastnext"
+    )
+    yield assign(
+        iteratorVarname,
+        makeCallExpr(
+            makeCallExpr(readVar(" ExtractIteratorWithFastnext")),
+            readVar(iteratorExpressionVarname))
+    )
     yield assign(iteratorTrigger, const(False))
 
     yield python_ast.Statement.While(

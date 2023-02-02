@@ -167,6 +167,10 @@ class DictWrapper(DictWrapperBase):
     def __init__(self, dictType):
         super().__init__(dictType, None)
 
+    def has_fastnext_iter(self):
+        """If we call '__iter__' on instances of this type, will they support __fastnext__?"""
+        return True
+
     def convert_default_initialize(self, context, instance):
         context.pushEffect(
             instance.expr.store(

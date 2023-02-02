@@ -18,8 +18,13 @@ import gc
 import pytest
 from flaky import flaky
 
-from typed_python import Entrypoint, ListOf, TupleOf, Class, Member, Final, Generator, OneOf
+from typed_python import (
+    Entrypoint, ListOf, TupleOf, Class, Member, Final, Generator, OneOf, Set, Dict,
+    ConstDict, Alternative, NamedTuple
+)
 from typed_python.test_util import currentMemUsageMb
+from typed_python.iterator_adaptor import IteratorAdaptor
+from typed_python.compiler.type_wrappers.tuple_of_wrapper import TupleOrListOfIterator
 
 
 def timeIt(f):
@@ -877,3 +882,89 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert firstTime > 0.001
         assert secondTime < 0.0001
         assert thirdTime < 0.0001
+
+    def test_generators_on_object_instances(self):
+        @Entrypoint
+        def callAll(x: object):
+            return list(a for a in x if a)
+
+        assert callAll(['1', '2']) == ['1', '2']
+
+    def test_generator_on_object_instance_type(self):
+        def startIterating(x):
+            for y in x:
+                yield y
+
+        @Entrypoint
+        def returnIter(x: object):
+            return startIterating(x)
+
+        untypedWithAdaptor = returnIter(['1', '2'])
+
+        def returnIterTyped(x, kind=None):
+            if kind is None:
+                @Entrypoint
+                def returnIterTyped(x: type(x)):
+                    return startIterating(x)
+
+            elif kind == "keys":
+                @Entrypoint
+                def returnIterTyped(x: type(x)):
+                    return startIterating(x.keys())
+
+            elif kind == "values":
+                @Entrypoint
+                def returnIterTyped(x: type(x)):
+                    return startIterating(x.values())
+
+            elif kind == "items":
+                @Entrypoint
+                def returnIterTyped(x: type(x)):
+                    return startIterating(x.items())
+
+            return returnIterTyped(x)
+
+        def extractIteratorType(GeneratorType):
+            for memberIx in range(len(GeneratorType.MemberTypes)):
+                if GeneratorType.MemberNames[memberIx].endswith(".iterator"):
+                    return GeneratorType.MemberTypes[memberIx]
+
+        UntypedIterator = extractIteratorType(type(untypedWithAdaptor))
+        assert UntypedIterator is IteratorAdaptor
+
+        typedWithoutAdaptor = returnIterTyped(ListOf(str)(['1', '2']))
+        TypedIterator = extractIteratorType(type(typedWithoutAdaptor))
+        assert TypedIterator is TupleOrListOfIterator(ListOf(str))
+
+        class C(Class):
+            def __iter__(self):
+                yield 1
+
+        def A_iter(self):
+            yield 1
+
+        class N(NamedTuple()):
+            def __iter__(self):
+                yield 1
+
+        A = Alternative("A", A={}, __iter__=A_iter)
+
+        for instance, kind in [
+            (TupleOf(int)([1, 2]), None),
+            (Set(int)([1, 2]), None),
+            (Dict(int, int)({1: 2}), None),
+            (Dict(int, int)({1: 2}), "keys"),
+            (Dict(int, int)({1: 2}), "values"),
+            (Dict(int, int)({1: 2}), "items"),
+            (ConstDict(int, int)({1: 2}), None),
+            (ConstDict(int, int)({1: 2}), "keys"),
+            (ConstDict(int, int)({1: 2}), "values"),
+            (ConstDict(int, int)({1: 2}), "items"),
+            (A(), None),
+            (C(), None),
+            (N(), None),
+        ]:
+            typedWithoutAdaptor = returnIterTyped(instance, kind)
+            TypedIterator = extractIteratorType(type(typedWithoutAdaptor))
+            print(TypedIterator)
+            assert TypedIterator is not IteratorAdaptor

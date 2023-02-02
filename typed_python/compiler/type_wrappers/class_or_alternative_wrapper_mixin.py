@@ -175,6 +175,10 @@ def initialize_bool_from_len_method_call(boolPtr, instance, mayThrowOnFailure):
 
 class ClassOrAlternativeWrapperMixin:
     """A Mixin class that defines conversions on class and alternatives in terms of method calls."""
+    def has_fastnext_iter(self):
+        """If we call '__iter__' on instances of this type, will they support __fastnext__?"""
+        return True
+
     def convert_hash(self, context, expr):
         if self.has_method("__hash__"):
             return self.convert_method_call(context, expr, "__hash__", (), {})

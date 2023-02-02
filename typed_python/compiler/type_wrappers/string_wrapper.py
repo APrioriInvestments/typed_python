@@ -371,6 +371,9 @@ class StringWrapper(RefcountedWrapper):
             ('data', native_ast.UInt8)
         ), name='StringLayout').pointer()
 
+    def has_fastnext_iter(self):
+        return True
+
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:
             return context.push(self, lambda x: x.convert_default_initialize())
@@ -1069,6 +1072,12 @@ class StringIterator(Class, Final):
     pos = Member(int)
     string = Member(str)
     value = Member(str)
+
+    def __next__(self):
+        res = self.__next__()
+        if res:
+            return res.get()
+        raise StopIteration()
 
     def __fastnext__(self):
         self.pos = self.pos + 1

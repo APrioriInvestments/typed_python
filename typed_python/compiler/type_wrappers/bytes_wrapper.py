@@ -1299,6 +1299,9 @@ class BytesWrapper(RefcountedWrapper):
         This function will return a TypedExpression, or None if it set an exception."""
         return self.convert_getitem(context, instance, valueInstance)
 
+    def has_fastnext_iter(self):
+        return True
+
     @Wrapper.unwrapOneOfAndValue
     def convert_method_call(self, context, instance, methodname: str, args, kwargs0):
         """Generates code for bytes method calls.
@@ -1814,6 +1817,12 @@ class BytesIterator(Class, Final):
     pos = Member(int)
     bytesObj = Member(bytes)
     value = Member(int)
+
+    def __iter__(self):
+        res = self.__fastnext__()
+        if not res:
+            return res.get()
+        raise StopIteration()
 
     def __fastnext__(self):
         self.pos = self.pos + 1

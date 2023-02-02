@@ -127,6 +127,7 @@ class Wrapper:
 
     @property
     def isMasquerade(self):
+        """Is this a strongly-typed datastructure masquerading as an untyped one?"""
         return self.interpreterTypeRepresentation != self.typeRepresentation
 
     @property
@@ -156,6 +157,10 @@ class Wrapper:
             return 0
 
         return _types.bytecount(self.typeRepresentation)
+
+    def has_fastnext_iter(self):
+        """If we call '__iter__' on instances of this type, will they support __fastnext__?"""
+        return False
 
     def convert_incref(self, context, expr):
         if self.is_pod:

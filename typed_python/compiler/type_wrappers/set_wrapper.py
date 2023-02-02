@@ -288,14 +288,15 @@ def set_duplicate(s):
     return res
 
 
-class SetWrapperBase(RefcountedWrapper):
+class SetWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
 
-    def __init__(self, t, behavior):
+    def __init__(self, t):
+        super().__init__(t)
+
         assert hasattr(t, '__typed_python_category__')
-        super().__init__(t if behavior is None else (t, behavior))
 
         self.keyType = typeWrapper(t.ElementType)
         self.setType = t
@@ -337,10 +338,9 @@ class SetWrapperBase(RefcountedWrapper):
             expr = expr.nonref_expr
         return expr.ElementPtrIntegers(0, 8).load().cast(native_ast.Int64)
 
-
-class SetWrapper(SetWrapperBase):
-    def __init__(self, setType):
-        super().__init__(setType, None)
+    def has_fastnext_iter(self):
+        """If we call '__iter__' on instances of this type, will they support __fastnext__?"""
+        return True
 
     def convert_default_initialize(self, context, instance):
         context.pushEffect(

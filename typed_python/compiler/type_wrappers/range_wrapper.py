@@ -63,6 +63,12 @@ class RangeCls(NamedTuple(start=int, stop=int, step=int)):
 
 
 class RangeIterator(NamedTuple(start=int, stop=int, step=int)):
+    def __iter__(self) -> int:
+        resPtr = self.__fastnext__()
+        if resPtr:
+            return resPtr.get()
+        raise StopIteration()
+
     def __fastnext__(self) -> PointerTo(int):
         startPtr = pointerTo(self).start
         stopPtr = pointerTo(self).stop
