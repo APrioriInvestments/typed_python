@@ -324,14 +324,38 @@ class Runtime:
                 )
 
     def compileClassDispatch(self, interfaceClass, implementingClass, slotIndex):
+        t0 = time.time()
+
         with self.lock:
-            self.converter.compileSingleClassDispatch(interfaceClass, implementingClass, slotIndex)
+            self.converter.compileSingleClassDispatch(
+                interfaceClass, implementingClass, slotIndex
+            )
+
+        if self.verbosityLevel > 0:
+            name, retType, argTypeTuple, kwargTypeTuple = (
+                _types.getClassMethodDispatchSignature(
+                    interfaceClass, implementingClass, slotIndex
+                )
+            )
+
+            print(
+                f"typed_python runtime spent {time.time()-t0:.3f} seconds compiling dispatch "
+                f"{implementingClass} as {interfaceClass} method {name}"
+            )
 
         return True
 
     def compileClassDestructor(self, cls):
+        t0 = time.time()
+
         with self.lock:
             self.converter.compileClassDestructor(cls)
+
+        if self.verbosityLevel > 0:
+            print(
+                f"typed_python runtime spent {time.time()-t0:.3f} seconds compiling destructor "
+                f"{cls}"
+            )
 
         return True
 
