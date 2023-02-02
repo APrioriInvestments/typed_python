@@ -75,6 +75,32 @@ void PyClassInstance::copyConstructFromPythonInstanceConcrete(Class* eltType, in
         return;
     }
 
+    if (eltType->getHeldClass()->hasConvertFromMagicMethod() && level == ConversionLevel::ImplicitContainers) {
+        Function* convert = eltType->getStaticFunctions().find("__convert_from__")->second;
+
+        PyObjectStealer targetArgTuple(PyTuple_New(1));
+
+        PyTuple_SetItem(targetArgTuple, 0, incref(pyRepresentation)); //steals a reference
+
+        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallAnyOverload(convert, nullptr, nullptr, targetArgTuple, nullptr);
+
+        if (res.first) {
+            if (!res.second) {
+                throw PythonExceptionSet();
+            }
+
+            PyObjectStealer converted(res.second);
+
+            // now unwrap this, but do it at the 'signature' level (which avoids the
+            // possibility of recursion)
+            PyClassInstance::copyConstructFromPythonInstanceConcrete(
+                eltType, tgt, (PyObject*)converted, ConversionLevel::Signature
+            );
+
+            return;
+        }
+    }
+
     PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, level);
 }
 

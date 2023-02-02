@@ -20,7 +20,8 @@ from typed_python.test_util import currentMemUsageMb
 from typed_python._types import is_default_constructible, canConvertToTrivially
 from typed_python import (
     Int16, UInt64, Float32, ListOf, TupleOf, OneOf, NamedTuple, Class, Alternative,
-    ConstDict, Member, _types, Forward, Final, Function, Entrypoint, Tuple, Value
+    ConstDict, Member, _types, Forward, Final, Function, Entrypoint, Tuple, Value,
+    Generator
 )
 
 
@@ -1816,3 +1817,18 @@ class NativeClassTypesTests(unittest.TestCase):
 
         assert B.method.__func__.overloads[0].methodOf.Class is B
         assert B.staticMeth.overloads[0].methodOf.Class is B
+
+    def test_decorating_class_with_generator(self):
+        class C(Class):
+            def __iter__(self) -> Generator(int):
+                yield 1
+
+        def f():
+            c = C()
+            res = ListOf(int)()
+            for r in c:
+                res.append(r)
+            return res
+
+        assert Entrypoint(f)() == [1]
+        assert f() == Entrypoint(f)()

@@ -371,6 +371,7 @@ public:
             m_hasSetAttrMagicMethod(false),
             m_hasDelAttrMagicMethod(false),
             m_hasDelMagicMethod(false),
+            m_hasConvertFromMagicMethod(false),
             m_refToType(nullptr)
     {
         m_name = inName;
@@ -758,6 +759,10 @@ public:
         return m_hasComparisonOperators;
     }
 
+    bool hasConvertFromMagicMethod() const {
+        return m_hasConvertFromMagicMethod;
+    }
+
     bool hasGetAttributeMagicMethod() const {
         return m_hasGetAttributeMagicMethod;
     }
@@ -989,6 +994,9 @@ public:
         if (m_memberFunctions.find("__getattr__") != m_memberFunctions.end()) {
             m_hasGetAttrMagicMethod = true;
         }
+        if (m_staticFunctions.find("__convert_from__") != m_staticFunctions.end()) {
+            m_hasConvertFromMagicMethod = true;
+        }
     }
 
     size_t allocateMethodDispatch(std::string funcName, function_call_signature_type signature) {
@@ -1133,4 +1141,5 @@ private:
     bool m_hasSetAttrMagicMethod;
     bool m_hasDelAttrMagicMethod;
     bool m_hasDelMagicMethod;
+    bool m_hasConvertFromMagicMethod;
 };
