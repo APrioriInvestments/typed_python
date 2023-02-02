@@ -668,7 +668,7 @@ class StringWrapper(RefcountedWrapper):
         return typed_python.compiler.typed_expression.TypedExpression(
             context,
             native_ast.Expression.GlobalVariable(
-                name='string_constant_' + sha_hash(s).hexdigest,
+                name='string_constant_' + sha_hash(s).hexdigest + "_" + s[:20],
                 type=native_ast.VoidPtr,
                 metadata=GlobalVariableMetadata.StringConstant(value=s)
             ).cast(self.layoutType.pointer()),

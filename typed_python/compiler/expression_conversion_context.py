@@ -173,7 +173,8 @@ class ExpressionConversionContext:
                 metadata=meta
             ).cast(wrapper.getNativeLayoutType().pointer()),
             wrapper,
-            True
+            True,
+            constantValue=x
         )
 
     def constantPyObject(self, x, owningGlobalScopeAndName=None):

@@ -265,6 +265,12 @@ class TupleWrapper(Wrapper):
 
         return super().convert_bin_op(context, left, op, right, inplace)
 
+    def convert_bin_op_reverse(self, context, r, op, l, inplace):
+        if op.matches.In:
+            return self.convert_contains(context, r, l)
+
+        return super().convert_bin_op_reverse(context, r, op, l, inplace)
+
     def convert_getitem(self, context, expr, index):
         index = index.toIndex()
         if index is None:
@@ -359,6 +365,10 @@ class TupleWrapper(Wrapper):
 
         This will attempt to convert the tuple.
         """
+        if all(a.constantValue is not None for a in args):
+            constantVal = self.typeRepresentation([a.constantValue for a in args])
+            return context.constantTypedPythonObject(constantVal)
+
         typeConvertedArgs = []
 
         for i in range(len(args)):
@@ -550,6 +560,43 @@ class TupleWrapper(Wrapper):
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
+
+    def convert_contains(self, context, instance, toFind):
+        if instance.constantValue is not None and toFind.constantValue is not None:
+            return context.constant(toFind.constantValue in instance.constantValue)
+
+        def makeContains(context, unused, instance, toFind):
+            for i in range(len(self.typeRepresentation.ElementTypes)):
+                isEq = instance.refAs(i) == toFind
+                if isEq is None:
+                    return
+
+                isEq = isEq.toBool()
+                if isEq is None:
+                    return
+
+                if isEq.constantValue is True:
+                    context.pushReturnValue(context.constant(True))
+                    return
+
+                with context.ifelse(isEq.nonref_expr) as (ifTrue, ifFalse):
+                    with ifTrue:
+                        context.pushReturnValue(context.constant(True))
+
+            context.pushReturnValue(context.constant(False))
+
+        containsMethod = context.converter.defineNativeFunction(
+            f'tuple.contains.{self}.{toFind.expr_type}',
+            ('tuple.contains', self, toFind.expr_type),
+            (self, toFind.expr_type),
+            typeWrapper(bool),
+            makeContains
+        )
+
+        return context.call_typed_call_target(
+            containsMethod,
+            [instance, toFind]
+        )
 
 
 class NamedTupleWrapper(TupleWrapper):
@@ -794,8 +841,6 @@ class NamedTupleWrapper(TupleWrapper):
                 if ret is not None:
                     ret = ret.toBool()
                 return ret
-
-            return super().convert_bin_op_reverse(context, r, op, l, inplace)
 
         magic = (
             "__radd__" if op.matches.Add else

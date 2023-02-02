@@ -129,7 +129,8 @@ class TypedExpression:
             self.context,
             self.expr,
             typeWrapper(newType),
-            self.isReference if isReferenceOverride is None else isReferenceOverride
+            self.isReference if isReferenceOverride is None else isReferenceOverride,
+            constantValue=self.constantValue
         )
 
     def as_native_call_arg(self):

@@ -367,3 +367,34 @@ class TestTupleCompilation(unittest.TestCase):
             return NamedTuple(x=Dict(int, int))(x=res)
 
         assert f() == Entrypoint(f)()
+
+    def test_compile_in(self):
+        for entrypoint in [
+            lambda x: x,
+            Entrypoint
+        ]:
+            def checkIn(x, t):
+                return x in t
+
+            assert checkIn('a', Tuple(str, str)(('a', 'b')))
+            assert not checkIn('c', Tuple(str, str)(('a', 'b')))
+
+            assert checkIn('a', NamedTuple(x=str, y=str)(x='a', y='b'))
+            assert not checkIn('c', NamedTuple(x=str, y=str)(x='a', y='b'))
+
+    def test_compile_in_on_constant(self):
+        @Entrypoint
+        def checkIn(x):
+            return x in ('1', '2', '3')
+
+        assert checkIn('1')
+        assert not checkIn('c')
+
+    def test_compile_in_all_constant(self):
+        @Entrypoint
+        def checkIn():
+            if 'a' in ('a', 'b', 'c'):
+                return 1
+            return None
+
+        assert checkIn.resultTypeFor().typeRepresentation == int
