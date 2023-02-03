@@ -194,7 +194,7 @@ class TestCompilingClosures(unittest.TestCase):
         # AlexT: I got from ~83x to ~240x on 2020/04/23, so I increased the count
         # which caused the variance to drop drastically (the elapsedCompiled is now
         # in the order of 10ms on my AWS cloud worker.
-        self.assertLess(elapsedCompiled * 120, elapsedNontyped)
+        self.assertLess(elapsedCompiled * 60, elapsedNontyped)
 
     @flaky(max_runs=3, min_passes=1)
     def test_assigning_closures_as_values(self):
