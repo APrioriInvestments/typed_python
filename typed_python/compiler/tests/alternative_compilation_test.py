@@ -14,7 +14,7 @@
 
 from typed_python import (
     TypeFunction, Int16, UInt64, Float32, Alternative, Forward,
-    Dict, ConstDict, ListOf, Compiled, OneOf
+    Dict, ListOf, Compiled, OneOf
 )
 import typed_python._types as _types
 from typed_python import Entrypoint
@@ -399,7 +399,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                         )
 
         values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
-                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"})]
+                  ListOf(int)((1, 2))]
         for v in values:
             T = type(v)
 
@@ -1059,7 +1059,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                         )
 
         values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
-                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"})]
+                  ListOf(int)((1, 2))]
         for v in values:
             T = type(v)
 

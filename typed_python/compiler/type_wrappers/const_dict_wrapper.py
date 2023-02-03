@@ -21,7 +21,7 @@ from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.type_wrappers.dict_wrapper import DictWrapper
 from typed_python import (
     Tuple, TypeFunction, Held, Member, Final, Class, ConstDict, PointerTo, Int32, UInt8,
-    bytecount
+    bytecount, TupleOf, Set
 )
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 
@@ -133,7 +133,7 @@ def const_dict_get(constDict, key, default):
     return default
 
 
-def const_dict_contains(constDict, key):
+def const_dict_index_of_key(constDict, key):
     # perform a binary search
     lowIx = 0
     highIx = len(constDict)
@@ -148,9 +148,13 @@ def const_dict_contains(constDict, key):
         elif key < keyAtVal:
             highIx = mid
         else:
-            return True
+            return mid
 
-    return False
+    return -1
+
+
+def const_dict_contains(constDict, key):
+    return const_dict_index_of_key(constDict, key) >= 0
 
 
 class Malloc(CompilableBuiltin):
@@ -176,7 +180,7 @@ class Malloc(CompilableBuiltin):
         return super().convert_call(context, instance, args, kwargs)
 
 
-def initialize_empty_const_dict(ptrToOutDict, kvCount):
+def allocate_empty_const_dict(ptrToOutDict, kvCount):
     byteCount = kvCount * (
         bytecount(ptrToOutDict.ElementType.KeyType)
         + bytecount(ptrToOutDict.ElementType.ValueType)
@@ -193,7 +197,137 @@ def initialize_empty_const_dict(ptrToOutDict, kvCount):
     # subpointers
     (target.cast(UInt8) + 16).cast(Int32).set(0)
 
-    ptrToOutDict.cast(PointerTo(None)).set(target)
+    return target
+
+
+def const_dict_sub(ptrToOutDict, lhs, rhs):
+    # lhs is a dict and rhs is a TupleOf
+    indicesToRemove = Set(int)()
+
+    for toRemove in rhs:
+        ix = const_dict_index_of_key(lhs, toRemove)
+        if ix >= 0:
+            indicesToRemove.add(ix)
+
+    if len(indicesToRemove) == len(lhs):
+        # initialize it to zero
+        ptrToOutDict.cast(PointerTo(None)).set(PointerTo(None)())
+        return
+
+    ptrToOutDict.cast(PointerTo(None)).set(
+        allocate_empty_const_dict(ptrToOutDict, len(lhs) - len(indicesToRemove))
+    )
+
+    outIx = 0
+
+    for i in range(len(lhs)):
+        if i not in indicesToRemove:
+            ptrToOutDict.get().initialize_kv_pair_unsafe(
+                outIx,
+                lhs.get_key_by_index_unsafe(i),
+                lhs.get_value_by_index_unsafe(i)
+            )
+            outIx += 1
+
+    assert outIx == len(lhs) - len(indicesToRemove)
+    ptrToOutDict.get().set_kv_count_unsafe(outIx)
+
+
+def const_dict_add(ptrToOutDict, lhs, rhs):
+    if not lhs:
+        ptrToOutDict.initialize(rhs)
+        return
+
+    if not rhs:
+        ptrToOutDict.initialize(lhs)
+        return
+
+    lhsIx = 0
+    rhsIx = 0
+
+    lenLhs = len(lhs)
+    lenRhs = len(rhs)
+
+    lhsValuesToKeep = 0
+
+    while lhsIx < lenLhs:
+        if rhsIx < lenRhs:
+            lhsKey = lhs.get_key_by_index_unsafe(lhsIx)
+            rhsKey = rhs.get_key_by_index_unsafe(rhsIx)
+
+            if lhsKey < rhsKey:
+                lhsIx += 1
+                lhsValuesToKeep += 1
+            elif rhsKey < lhsKey:
+                rhsIx += 1
+            else:
+                lhsIx += 1
+                rhsIx += 1
+        else:
+            lhsValuesToKeep += 1
+            lhsIx += 1
+
+    try:
+        ptrToOutDict.cast(PointerTo(None)).set(
+            allocate_empty_const_dict(ptrToOutDict, len(rhs) + lhsValuesToKeep)
+        )
+
+        outIx = 0
+        lhsIx = 0
+        rhsIx = 0
+
+        while lhsIx < lenLhs or rhsIx < lenRhs:
+            if rhsIx < lenRhs and lhsIx < lenLhs:
+                lhsKey = lhs.get_key_by_index_unsafe(lhsIx)
+                rhsKey = rhs.get_key_by_index_unsafe(rhsIx)
+
+                if lhsKey < rhsKey:
+                    ptrToOutDict.get().initialize_kv_pair_unsafe(
+                        outIx,
+                        lhsKey,
+                        lhs.get_value_by_index_unsafe(lhsIx)
+                    )
+                    lhsIx += 1
+                    outIx += 1
+                else:
+                    ptrToOutDict.get().initialize_kv_pair_unsafe(
+                        outIx,
+                        rhsKey,
+                        rhs.get_value_by_index_unsafe(rhsIx)
+                    )
+                    rhsIx += 1
+                    outIx += 1
+
+                    if lhsKey == rhsKey:
+                        lhsIx += 1
+            elif lhsIx < lenLhs:
+                lhsKey = lhs.get_key_by_index_unsafe(lhsIx)
+
+                ptrToOutDict.get().initialize_kv_pair_unsafe(
+                    outIx,
+                    lhsKey,
+                    lhs.get_value_by_index_unsafe(lhsIx)
+                )
+                lhsIx += 1
+                outIx += 1
+            else:
+                assert rhsIx < lenRhs
+
+                rhsKey = rhs.get_key_by_index_unsafe(rhsIx)
+                ptrToOutDict.get().initialize_kv_pair_unsafe(
+                    outIx,
+                    rhsKey,
+                    rhs.get_value_by_index_unsafe(rhsIx)
+                )
+                rhsIx += 1
+                outIx += 1
+
+        assert outIx == len(rhs) + lhsValuesToKeep
+        ptrToOutDict.get().set_kv_count_unsafe(outIx)
+
+    except: # noqa
+        ptrToOutDict.destroy()
+        raise
 
 
 def initialize_const_dict_from_mappable(ptrToOutDict, mappable, mayThrow):
@@ -210,7 +344,9 @@ def initialize_const_dict_from_mappable(ptrToOutDict, mappable, mayThrow):
         we failed, and ptrToOutDict will not point to an initialized
         dictionary.
     """
-    initialize_empty_const_dict(ptrToOutDict, len(mappable))
+    ptrToOutDict.cast(PointerTo(None)).set(
+        allocate_empty_const_dict(ptrToOutDict, len(mappable))
+    )
 
     try:
         count = 0
@@ -515,6 +651,41 @@ class ConstDictWrapper(RefcountedWrapper):
                 return context.call_py_function(const_dict_gt, (left, right), {})
             if op.matches.GtE:
                 return context.call_py_function(const_dict_gte, (left, right), {})
+
+            if op.matches.Add:
+                newDict = context.allocateUninitializedSlot(self.typeRepresentation)
+
+                res = context.call_py_function(
+                    const_dict_add, (newDict.asPointer(), left, right), {}
+                )
+
+                if res is None:
+                    return res
+
+                context.markUninitializedSlotInitialized(newDict)
+
+                return newDict
+
+        if op.matches.Sub:
+            right = right.convert_to_type(
+                TupleOf(self.typeRepresentation.KeyType), ConversionLevel.Implicit
+            )
+
+            if right is None:
+                return None
+
+            newDict = context.allocateUninitializedSlot(self.typeRepresentation)
+
+            res = context.call_py_function(
+                const_dict_sub, (newDict.asPointer(), left, right), {}
+            )
+
+            if res is None:
+                return res
+
+            context.markUninitializedSlotInitialized(newDict)
+
+            return newDict
 
         return super().convert_bin_op(context, left, op, right, inplace)
 

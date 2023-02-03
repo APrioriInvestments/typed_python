@@ -413,3 +413,52 @@ class TestConstDictCompilation(unittest.TestCase):
             return ConstDict(int, str)(res)
 
         assert f() == Entrypoint(f)()
+
+    def test_const_dict_add(self):
+        @Entrypoint
+        def addDicts(d1, d2):
+            return d1 + d2
+
+        T = ConstDict(int, int)
+
+        someDicts = [
+            {1: 2, 3: 4},
+            {1: 4},
+            {1: 2, 2: 4, 3: 8},
+            {2: 3, 5: 1, 4: 9, 3: 6},
+            {},
+            {7: 8},
+            {7: 8, 2: 3},
+            {7: 8, 2: 4},
+        ]
+
+        someDicts = [T(x) for x in someDicts]
+
+        for d1 in someDicts:
+            for d2 in someDicts:
+                assert d1 + d2 == addDicts(d1, d2)
+
+    def test_const_dict_sub(self):
+        @Entrypoint
+        def subKey(dct, key):
+            return dct - key
+
+        T = ConstDict(int, int)
+
+        someDicts = [
+            {1: 2, 3: 4},
+            {1: 2, 3: 4, 5: 6},
+            {1: 4},
+            {1: 2, 2: 4, 3: 8},
+            {2: 3, 5: 1, 4: 9, 3: 6},
+            {},
+            {7: 8},
+            {7: 8, 2: 3},
+            {7: 8, 2: 4},
+        ]
+
+        someDicts = [T(x) for x in someDicts]
+
+        for d1 in someDicts:
+            for d2 in someDicts:
+                assert d1 - TupleOf(int)(d2) == subKey(d1, TupleOf(int)(d2))

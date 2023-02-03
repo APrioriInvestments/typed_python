@@ -20,7 +20,6 @@ from flaky import flaky
 from typed_python import (
     Class,
     Dict,
-    ConstDict,
     TupleOf,
     ListOf,
     Member,
@@ -1064,7 +1063,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
             True,
             "abc",
             ListOf(int)((1, 2)),
-            ConstDict(str, str)({"a": "1"}),
         ]
         for v in values:
             T = type(v)
