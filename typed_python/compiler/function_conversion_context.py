@@ -2116,6 +2116,10 @@ class FunctionConversionContext(ConversionContextBase):
                         if msgExpr is not None:
                             expr_context.pushException(AssertionError, msgExpr)
 
+            if not definitelyFails:
+                # we are implicitly the 'True' case of this condition
+                self.restrictByCondition(variableStates, ast.test, result=True)
+
             return expr_context.finalize(None, exceptionsTakeFrom=ast), not definitelyFails
 
         if ast.matches.FunctionDef:

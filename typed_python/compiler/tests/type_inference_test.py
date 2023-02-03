@@ -410,3 +410,24 @@ class TestTypeInference(unittest.TestCase):
                 return localVariableTypesKnownToCompiler()
 
         assert f("hi")['x'] == str
+
+    def test_assertion_prunes_types(self):
+        @Entrypoint
+        def f(x: OneOf(None, str)):
+            assert x is not None
+
+            return x
+
+        assert f.resultTypeFor(str).typeRepresentation is str
+        assert f.resultTypeFor(type(None)).typeRepresentation is str
+
+    def test_branch_with_raise_prunes_types(self):
+        @Entrypoint
+        def f(x: OneOf(None, str)):
+            if x is None:
+                raise Exception("FAIL")
+
+            return x
+
+        assert f.resultTypeFor(str).typeRepresentation is str
+        assert f.resultTypeFor(type(None)).typeRepresentation is str
