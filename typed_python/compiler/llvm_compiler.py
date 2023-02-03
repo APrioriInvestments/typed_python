@@ -119,6 +119,8 @@ class Compiler:
         if self.optimize:
             self.module_pass_manager.run(mod)
 
+        self.engine.finalize_object()
+
         return BinarySharedObject.fromModule(
             mod,
             module.globalVariableDefinitions,
