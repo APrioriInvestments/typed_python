@@ -243,6 +243,7 @@ RefTo* HeldClass::getRefToType() {
 
 void HeldClass::delAttribute(instance_ptr self, int memberIndex) const {
     Type* member_t = m_members[memberIndex].getType();
+
     if (checkInitializationFlag(self, memberIndex)) {
         member_t->destroy(eltPtr(self, memberIndex));
         clearInitializationFlag(self, memberIndex);
@@ -337,6 +338,8 @@ void HeldClass::copy_constructor(instance_ptr self, instance_ptr other) {
         if (checkInitializationFlag(other, k)) {
             member_t->copy_constructor(self+m_byte_offsets[k], other+m_byte_offsets[k]);
             setInitializationFlag(self, k);
+        } else {
+            clearInitializationFlag(self, k);
         }
     }
 }

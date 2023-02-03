@@ -430,7 +430,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         """If this type supports intiter, compute the value of the iterator.
 
         This function will return a TypedExpression, or None if it set an exception."""
-        return self.convert_getitem(context, instance, valueInstance)
+        return self.convert_getitem_unsafe(context, instance, valueInstance)
 
     def convert_attribute(self, context, expr, attr):
         if attr in ("_getItemUnsafe", "_initializeItemUnsafe", "setSizeUnsafe", 'toBytes', '__iter__', 'pointerUnsafe'):
@@ -754,8 +754,14 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 @TypeFunction
 def TupleOrListOfIterator(T):
     class TupleOrListOfIterator(Class, Final, __name__=f"TupleOrListOfIterator({T.__name__})"):
-        pos = Member(int)
-        tup = Member(T)
+        pos = Member(int, nonempty=True)
+        tup = Member(T, nonempty=True)
+
+        def __typed_python_int_iter_size__(self):
+            return len(self.tup)
+
+        def __typed_python_int_iter_value__(self, ix):
+            return self.tup._getItemUnsafe(ix)
 
         def __fastnext__(self):
             posPtr = pointerTo(self).pos

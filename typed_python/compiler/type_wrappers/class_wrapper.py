@@ -196,6 +196,20 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             )
         ).load()
 
+    def convert_hasattr(self, context, instance, attribute):
+        if attribute.constantValue is not None and attribute.constantValue in self.nameToIndex:
+            ix = self.nameToIndex[attribute.constantValue]
+
+            if self.fieldGuaranteedInitialized(ix):
+                return context.constant(True)
+
+            return context.pushPod(
+                bool,
+                self.isInitializedNativeExpr(instance, ix)
+            )
+
+        return super().convert_hasattr(context, instance, attribute)
+
     def fieldGuaranteedInitialized(self, ix):
         if self.classType.MemberNames[ix] not in self.typeRepresentation.ClassMembers:
             raise Exception(

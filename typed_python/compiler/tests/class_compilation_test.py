@@ -2932,3 +2932,72 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         doIt()
         Entrypoint(doIt)()
+
+    def test_class_hasattr(self):
+        class C(Class):
+            x = Member(int)
+
+            def __init__(self):
+                del self.x
+
+            def __init__(self, x):  # noqa
+                self.x = x
+
+        @Entrypoint
+        def compiledHasattr(c):
+            return hasattr(c, 'x')
+
+        @Entrypoint
+        def compiledGenericHasattr(c, attr):
+            return hasattr(c, attr)
+
+        assert compiledGenericHasattr.resultTypeFor(C, str).typeRepresentation is bool
+
+        assert hasattr(C(x=1), 'x')
+        assert compiledHasattr(C(x=1))
+        assert compiledGenericHasattr(C(x=1), 'x')
+
+        assert not hasattr(C(), 'x')
+        assert not compiledHasattr(C())
+        assert not compiledGenericHasattr(C(), 'x')
+
+        @Entrypoint
+        def compiledDel():
+            c = C(x=1)
+            assert hasattr(c, 'x')
+            del c.x
+            assert not hasattr(c, 'x')
+
+        compiledDel()
+
+    def test_class_hasattr_perf(self):
+        class C(Class):
+            x = Member(float)
+
+        @Entrypoint
+        def loopWithoutHasattr(c):
+            res = 0.0
+            for _ in range(10000000):
+                res += c.x
+            return res
+
+        @Entrypoint
+        def loopWithHasattr(c):
+            res = 0.0
+            for _ in range(10000000):
+                if hasattr(c, 'x'):
+                    res += c.x
+            return res
+
+        loopWithHasattr(C())
+        loopWithoutHasattr(C())
+
+        t0 = time.time()
+        loopWithHasattr(C())
+        elapsedWith = time.time() - t0
+
+        t0 = time.time()
+        loopWithoutHasattr(C())
+        elapsedWithout = time.time() - t0
+
+        assert .6 < elapsedWithout / elapsedWith < 1.4

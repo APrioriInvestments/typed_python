@@ -175,6 +175,22 @@ class TypedExpression:
 
         return self.context.pushMove(self)
 
+    def has_intiter(self):
+        """Does this type support the 'intiter' format?"""
+        return self.expr_type.has_intiter(self.context, self)
+
+    def convert_intiter_size(self):
+        """If this type supports intiter, compute the size of the iterator.
+
+        This function will return a TypedExpression(int) or None if it set an exception."""
+        return self.expr_type.convert_intiter_size(self.context, self)
+
+    def convert_intiter_value(self, valueInstance):
+        """If this type supports intiter, compute the value of the iterator.
+
+        This function will return a TypedExpression, or None if it set an exception."""
+        return self.expr_type.convert_intiter_value(valueInstance)
+
     def convert_typeof(self):
         return self.expr_type.convert_typeof(self.context, self)
 
@@ -335,6 +351,9 @@ class TypedExpression:
         if self.expr_type.isMasquerade:
             return self.convert_masquerade_to_untyped()
         return self
+
+    def convert_hasattr(self, attr):
+        return self.expr_type.convert_hasattr(self.context, self, attr)
 
     def convert_fastnext(self):
         """Call '__fastnext__' on the object.

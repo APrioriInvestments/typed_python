@@ -95,3 +95,5 @@ _types.initializeGlobalStatics()
 # when we're acquiring and releasing frequently.
 gilReleaseThreadLoop = threading.Thread(target=_types.gilReleaseThreadLoop, daemon=True)
 gilReleaseThreadLoop.start()
+
+_types.setGilReleaseThreadLoopSleepMicroseconds(500)

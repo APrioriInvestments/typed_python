@@ -432,3 +432,68 @@ class TestHeldClassCompilation(unittest.TestCase):
 
         assert len(delType) >= 1
         assert delType[0] == C
+
+    def test_class_hasattr(self):
+        @Held
+        class C(Class):
+            x = Member(int)
+
+            def __init__(self):
+                assert hasattr(self, 'x')
+                del self.x
+                assert not hasattr(self, 'x')
+
+            def __init__(self, x):  # noqa
+                self.x = x
+
+        @Entrypoint
+        def compiledHasattr(c):
+            return hasattr(c, 'x')
+
+        assert hasattr(C(x=1), 'x')
+        assert compiledHasattr(C(x=1))
+
+        assert not hasattr(C(), 'x')
+        assert not compiledHasattr(C())
+
+        @Entrypoint
+        def compiledDel():
+            c = C(x=1)
+            assert hasattr(c, 'x')
+            del c.x
+            assert not hasattr(c, 'x')
+
+        compiledDel()
+
+    def test_class_hasattr_perf(self):
+        @Held
+        class C(Class):
+            x = Member(float)
+
+        @Entrypoint
+        def loopWithoutHasattr(c):
+            res = 0.0
+            for _ in range(10000000):
+                res += c.x
+            return res
+
+        @Entrypoint
+        def loopWithHasattr(c):
+            res = 0.0
+            for _ in range(10000000):
+                if hasattr(c, 'x'):
+                    res += c.x
+            return res
+
+        loopWithHasattr(C())
+        loopWithoutHasattr(C())
+
+        t0 = time.time()
+        loopWithHasattr(C())
+        elapsedWith = time.time() - t0
+
+        t0 = time.time()
+        loopWithoutHasattr(C())
+        elapsedWithout = time.time() - t0
+
+        assert .6 < elapsedWithout / elapsedWith < 1.4

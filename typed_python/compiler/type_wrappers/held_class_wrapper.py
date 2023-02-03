@@ -60,6 +60,20 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
             count=_types.bytecount(self.heldClassType)
         )
 
+    def convert_hasattr(self, context, instance, attribute):
+        if attribute.constantValue is not None and attribute.constantValue in self.nameToIndex:
+            ix = self.nameToIndex[attribute.constantValue]
+
+            if self.fieldGuaranteedInitialized(ix):
+                return context.constant(True)
+
+            return context.pushPod(
+                bool,
+                self.isInitializedNativeExpr(instance, ix)
+            )
+
+        return super().convert_hasattr(context, instance, attribute)
+
     def convert_pointerTo(self, context, instance):
         assert instance.isReference
         return instance.changeType(self.ptrToType, isReferenceOverride=False)
@@ -295,6 +309,7 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
             .load()
             .rshift(native_ast.const_uint8_expr(bit))
             .bitand(native_ast.const_uint8_expr(1))
+            .neq(0)
         )
 
     def setIsInitializedExpr(self, instance, ix):
@@ -398,6 +413,34 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
             return Wrapper.convert_set_attribute(self, context, instance, attribute, value)
 
         attr_type = typeWrapper(self.classType.MemberTypes[ix])
+
+        if value is None:
+            # we're deleting this attribute
+            if self.fieldGuaranteedInitialized(ix):
+                return context.pushException(
+                    AttributeError,
+                    f"Attribute '{self.classType.MemberNames[ix]}' cannot be deleted"
+                )
+
+            with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(instance, ix))) as (
+                true_block, false_block
+            ):
+                with true_block:
+                    if not attr_type.is_pod:
+                        member = context.pushReference(attr_type, self.memberPtr(instance, ix))
+                        member.convert_destroy()
+
+                    context.pushEffect(
+                        self.clearIsInitializedExpr(instance, ix)
+                    )
+
+                with false_block:
+                    context.pushException(
+                        AttributeError,
+                        f"Attribute '{self.classType.MemberNames[ix]}' is not initialized"
+                    )
+
+            return context.constant(None)
 
         value = value.convert_to_type(attr_type, ConversionLevel.Implicit)
         if value is None:

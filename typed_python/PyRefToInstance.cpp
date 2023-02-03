@@ -129,10 +129,11 @@ int PyRefToInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) 
     }
 
     HeldClass* clsType = (HeldClass*)type()->getEltType();
+    instance_ptr heldClassBody = *(instance_ptr*)dataPtr();
 
-    int i = clsType->getMemberIndex(PyUnicode_AsUTF8(attrName));
+    int memberIndex = clsType->getMemberIndex(PyUnicode_AsUTF8(attrName));
 
-    if (i < 0) {
+    if (memberIndex < 0) {
         auto it = clsType->getClassMembers().find(PyUnicode_AsUTF8(attrName));
         if (it == clsType->getClassMembers().end()) {
             PyErr_Format(
@@ -150,23 +151,44 @@ int PyRefToInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) 
         return -1;
     }
 
-    Type* eltType = clsType->getMemberType(i);
+    if (!attrVal) {
+        if (clsType->getMemberIsNonempty(memberIndex)) {
+            PyErr_Format(
+                PyExc_AttributeError,
+                "Attribute '%S' cannot be deleted",
+                attrName
+            );
+            return -1;
+        }
+
+        if (!clsType->checkInitializationFlag(heldClassBody, memberIndex)) {
+            PyErr_Format(
+                PyExc_AttributeError,
+                "Attribute '%S' is not initialized",
+                attrName
+            );
+            return -1;
+        }
+
+        clsType->delAttribute(heldClassBody, memberIndex);
+        return 0;
+    }
+
+    Type* eltType = clsType->getMemberType(memberIndex);
 
     Type* attrType = extractTypeFrom(attrVal->ob_type);
-
-    instance_ptr heldClassBody = *(instance_ptr*)dataPtr();
 
     if (Type::typesEquivalent(eltType, attrType)) {
         PyInstance* item_w = (PyInstance*)attrVal;
 
-        clsType->setAttribute(heldClassBody, i, item_w->dataPtr());
+        clsType->setAttribute(heldClassBody, memberIndex, item_w->dataPtr());
 
         return 0;
     } else if (attrType && attrType->getTypeCategory() == Type::TypeCategory::catRefTo &&
             ((RefTo*)attrType)->getEltType() == eltType) {
         PyInstance* item_w = (PyInstance*)attrVal;
 
-        clsType->setAttribute(heldClassBody, i, *(instance_ptr*)item_w->dataPtr());
+        clsType->setAttribute(heldClassBody, memberIndex, *(instance_ptr*)item_w->dataPtr());
 
         return 0;
     } else {
@@ -182,7 +204,7 @@ int PyRefToInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) 
             return -1;
         }
 
-        clsType->setAttribute(heldClassBody, i, tempObj);
+        clsType->setAttribute(heldClassBody, memberIndex, tempObj);
 
         eltType->destroy(tempObj);
         tp_free(tempObj);

@@ -57,6 +57,7 @@ from typed_python.compiler.type_wrappers.serialize_wrapper import SerializeWrapp
 from typed_python.compiler.type_wrappers.deserialize_wrapper import DeserializeWrapper
 from typed_python.compiler.type_wrappers.time_wrapper import TimeWrapper
 from typed_python.compiler.type_wrappers.super_wrapper import SuperWrapper
+from typed_python.compiler.type_wrappers.hasattr_wrapper import HasattrWrapper
 from typed_python.compiler.type_wrappers.compiler_introspection_wrappers import (
     IsCompiledWrapper,
     TypeKnownToCompiler,
@@ -239,6 +240,9 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
     """
     if isinstance(f, CompilableBuiltin):
         return TypedExpression(context, native_ast.nullExpr, f, False)
+
+    if f is hasattr:
+        return TypedExpression(context, native_ast.nullExpr, HasattrWrapper(), False)
 
     if f is len:
         return TypedExpression(context, native_ast.nullExpr, LenWrapper(), False)

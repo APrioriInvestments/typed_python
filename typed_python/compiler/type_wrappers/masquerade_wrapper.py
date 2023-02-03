@@ -96,6 +96,22 @@ class MasqueradeWrapper(Wrapper):
             instance.convert_masquerade_to_typed()
         )
 
+    def has_intiter(self):
+        """Does this type support the 'intiter' format?"""
+        return typeWrapper(self.typeRepresentation).has_intiter()
+
+    def convert_intiter_size(self, context, instance):
+        """If this type supports intiter, compute the size of the iterator.
+
+        This function will return a TypedExpression(int) or None if it set an exception."""
+        return self.convert_masquerade_to_typed(context, instance).convert_intiter_size()
+
+    def convert_intiter_value(self, context, instance, valueInstance):
+        """If this type supports intiter, compute the value of the iterator.
+
+        This function will return a TypedExpression, or None if it set an exception."""
+        return self.convert_masquerade_to_typed(context, instance).convert_intiter_value(valueInstance)
+
     def convert_default_initialize(self, context, target):
         raise Exception("This should never be called")
 

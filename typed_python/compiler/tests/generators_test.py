@@ -165,10 +165,14 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
     @flaky(max_runs=3, min_passes=1)
     def test_untyped_tuple_from_listcomp_perf(self):
+        import time
+
         def sum(iterable):
+            t0 = time.time()
             res = 0
             for s in iterable:
                 res += s
+            print("took ", time.time() - t0)
             return res
 
         @Entrypoint

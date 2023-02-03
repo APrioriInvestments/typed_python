@@ -2212,6 +2212,25 @@ class FunctionConversionContext(ConversionContextBase):
 
         self.assignToLocalVariable(iter_varname, iterator_object, variableStates)
 
+        if iterator_object.expr_type.has_intiter():
+            # execute the 'intiter' fastpath for iterators. Classes where iteration
+            # is simply enumerating a list of values indexed by an integer can
+            # be replaced with a simple loop, which downstream compilation steps
+            # can see through better. Eventually, we'd like to be able to pull apart
+            # everything we're doing with classes for optimization purposes,
+            # but at the moment, this is more expedient.
+            iter_varname = ".iterate_over." + str(ast.line_number) + variableSuffix
+
+            self.assignToLocalVariable(iter_varname, iterator_object, variableStates)
+
+            inner, innerReturns = self.convert_statement_list_ast(
+                list(rewriteIntiterForLoop(iter_varname, ast.target, ast.body, ast.orelse)),
+                variableStates,
+                controlFlowBlocks,
+            )
+
+            return context.finalize(inner, exceptionsTakeFrom=ast), innerReturns
+
         while True:
             # track the initial variable states
             initVariableStates = variableStates.clone()

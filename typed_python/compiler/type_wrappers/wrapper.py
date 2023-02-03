@@ -197,6 +197,12 @@ class Wrapper:
 
         return None
 
+    def convert_hasattr(self, context, instance, attribute):
+        # by default, we defer to the interpreter
+        return context.constant(hasattr).toPyObj().convert_call(
+            [instance, attribute], {}
+        ).toBool()
+
     def convert_pointerTo(self, context, instance):
         """Generate code for 'pointerTo(self)'"""
         return context.pushException(TypeError, "Can't call pointerTo with args of type (%s)" % (
