@@ -1286,32 +1286,43 @@ class ExpressionConversionContext:
         Returns:
             None
         """
+        if len(args) == 0 and isinstance(excType, type):
+            self.pushEffect(
+                runtime_functions.np_raise_exception_str.call(
+                    self.constantPyObject(excType).nonref_expr.cast(native_ast.VoidPtr),
+                    native_ast.UInt8.pointer().zero(),
+                )
+            )
+            return None
+
         if len(args) == 1 and isinstance(args[0], str) and isinstance(excType, type):
             # this is the most common pathway
-            if id(excType) in builtinValueIdToNameAndValue:
-                self.pushEffect(
-                    runtime_functions.raise_exception_fastpath.call(
-                        native_ast.const_utf8_cstr(args[0]),
-                        native_ast.const_utf8_cstr(builtinValueIdToNameAndValue[id(excType)][0])
-                    )
+            self.pushEffect(
+                runtime_functions.np_raise_exception_str.call(
+                    self.constantPyObject(excType).nonref_expr.cast(native_ast.VoidPtr),
+                    native_ast.const_utf8_cstr(args[0]),
                 )
-                self.pushEffect(
-                    native_ast.Expression.Throw(
-                        expr=native_ast.Expression.Constant(
-                            val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())
-                        )
-                    )
-                )
-                return None
+            )
+            return None
 
         def toTyped(x):
             if isinstance(x, TypedExpression):
                 return x
             return self.constant(x)
 
+        origExcType = excType
         excType = toTyped(excType)
         args = [toTyped(x) for x in args]
         kwargs = {k: toTyped(v) for k, v in kwargs.items()}
+
+        if len(args) == 1 and isinstance(args[0].constantValue, str) and isinstance(origExcType, type):
+            self.pushEffect(
+                runtime_functions.np_raise_exception_str.call(
+                    self.constantPyObject(origExcType).nonref_expr.cast(native_ast.VoidPtr),
+                    native_ast.const_utf8_cstr(args[0].constantValue),
+                )
+            )
+            return None
 
         if excType is None:
             return None

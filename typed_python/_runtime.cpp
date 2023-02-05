@@ -2754,15 +2754,16 @@ extern "C" {
     }
 
     // set the python exception state, but don't actually throw.
-    void np_raise_exception_fastpath(const char* message, const char* exceptionTypeName) {
+    void np_raise_exception_str(PythonObjectOfType::layout_type* exceptionType, const char* message) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* excType = PyObject_GetAttrString(builtinsModule(), exceptionTypeName);
-        if (!excType) {
-            return;
+        if (message) {
+            PyErr_SetString(exceptionType->pyObj, message);
+        } else {
+            PyErr_SetNone(exceptionType->pyObj);
         }
 
-        PyErr_SetString(excType, message);
+        throw PythonExceptionSet();
     }
 
     BytesType::layout* np_serialize_no_context(instance_ptr data, Type* type) {

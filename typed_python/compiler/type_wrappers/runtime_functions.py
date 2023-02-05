@@ -1163,11 +1163,12 @@ bytes_to_float64 = externalCallTarget(
 )
 
 # sets the python exception state to an exception of type
-raise_exception_fastpath = externalCallTarget(
-    "np_raise_exception_fastpath",
+np_raise_exception_str = externalCallTarget(
+    "np_raise_exception_str",
     Void,
+    Void.pointer(),
     UInt8Ptr,
-    UInt8Ptr
+    canThrow=True
 )
 
 raiseAttributeError = externalCallTarget(

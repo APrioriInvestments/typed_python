@@ -220,3 +220,25 @@ def test_catch_multiple_types():
 
     with pytest.raises(RuntimeError):
         catcher(RuntimeError)
+
+
+def test_convert_assert():
+    @Entrypoint
+    def assertIt(x):
+        assert x
+
+    assertIt(True)
+
+    with pytest.raises(AssertionError):
+        assertIt(False)
+
+
+def test_convert_assert_str():
+    @Entrypoint
+    def assertIt(x):
+        assert x, "failed"
+
+    assertIt(True)
+
+    with pytest.raises(AssertionError):
+        assertIt(False)
