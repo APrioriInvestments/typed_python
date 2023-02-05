@@ -773,7 +773,9 @@ class ExpressionConversionContext:
 
     def call_function_pointer(self, funcPtr, args, returnType):
         # force arguments to a type appropriate for argpassing
-        native_args = [a.as_native_call_arg() for a in args if not a.expr_type.is_empty]
+        args = [a for a in args if not a.expr_type.is_empty]
+
+        native_args = [a.as_native_call_arg() for a in args]
 
         if returnType.is_pass_by_ref:
             nativeFunType = native_ast.Type.Function(

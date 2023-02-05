@@ -3001,3 +3001,18 @@ class TestClassCompilationCompilation(unittest.TestCase):
         elapsedWithout = time.time() - t0
 
         assert .6 < elapsedWithout / elapsedWith < 1.4
+
+    def test_virtual_dispatch_with_none(self):
+        class C(Class):
+            def f(self, x, y):
+                return (x, y, C)
+
+        class B(C):
+            def f(self, x, y):
+                return (x, y, B)
+
+        @Entrypoint
+        def callf(c: C):
+            return c.f(1, None)
+
+        callf(B())
