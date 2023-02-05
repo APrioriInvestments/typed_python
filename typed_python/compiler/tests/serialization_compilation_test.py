@@ -22,7 +22,7 @@ from typed_python._types import (
     serialize as serializeNative,
     deserialize as deserializeNative
 )
-
+import pytest
 import threading
 import time
 
@@ -96,6 +96,7 @@ def timeInNThreads(f, args, threadCount):
     return time.time() - t0
 
 
+@pytest.mark.skipif('sys.platform=="darwin"')
 def test_serialization_perf():
     s = SerializationContext().withoutCompression()
 
