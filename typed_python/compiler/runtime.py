@@ -56,7 +56,8 @@ class RuntimeEventVisitor:
         outputType,
         yieldType,
         variableTypes,
-        conversionType
+        conversionType,
+        calledFunctions,
     ):
         pass
 
@@ -96,7 +97,8 @@ class PrintNewFunctionVisitor(RuntimeEventVisitor):
         outputType,
         yieldType,
         variableTypes,
-        conversionType
+        conversionType,
+        calledFunctions,
     ):
         if self.short:
             print(
@@ -127,6 +129,11 @@ class PrintNewFunctionVisitor(RuntimeEventVisitor):
                 else:
                     print("        ", varname, varVal)
 
+            if calledFunctions:
+                print("    calls:")
+                for callTarget in calledFunctions:
+                    print("        ", callTarget)
+
 
 class CountCompilationsVisitor(RuntimeEventVisitor):
     def __init__(self):
@@ -145,7 +152,8 @@ class CountCompilationsVisitor(RuntimeEventVisitor):
         outputType,
         yieldType,
         variableTypes,
-        conversionType
+        conversionType,
+        calledFunctions,
     ):
         self.count += 1
 

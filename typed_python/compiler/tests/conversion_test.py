@@ -89,7 +89,8 @@ class GetCompiledTypes(RuntimeEventVisitor):
         outputType,
         yieldType,
         variableTypes,
-        conversionType
+        conversionType,
+        calledFunctions,
     ):
         self.types[funcName] = makeNamedTuple(
             inputTypes=inputTypes,
@@ -1405,7 +1406,8 @@ class TestCompilationStructures(unittest.TestCase):
                 outputType,
                 yieldType,
                 variableTypes,
-                conversionType
+                conversionType,
+                calledFunctions,
             ):
                 assert issubclass(outputType.typeRepresentation, Type)
 

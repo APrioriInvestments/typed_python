@@ -355,6 +355,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
                 return self.convert_method_call(context, instance, "__getattr__", (context.constant(attribute),), {})
 
             return super().convert_attribute(context, instance, attribute)
+
         if len(validIndices) == 1:
             with context.ifelse(instance.nonref_expr.ElementPtrIntegers(0, 1).load().neq(validIndices[0])) as (then, otherwise):
                 with then:

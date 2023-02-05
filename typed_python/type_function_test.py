@@ -360,7 +360,8 @@ class TypeFunctionTest(unittest.TestCase):
                 outputType,
                 yieldType,
                 variableTypes,
-                conversionType
+                conversionType,
+                calledFunctions,
             ):
                 if funcName == "do":
                     self.variableTypes = variableTypes

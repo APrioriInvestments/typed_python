@@ -925,6 +925,11 @@ class PythonToNativeConverter:
 
                     nativeFunction, actual_output_type = self._inflight_definitions.get(identifier)
 
+                    outboundTargets = []
+                    for outboundFuncId in self._dependencies.getNamesDependedOn(identifier):
+                        name = self._link_name_for_identity[outboundFuncId]
+                        outboundTargets.append(self._targets[name])
+
                     try:
                         v.onNewFunction(
                             identifier,
@@ -938,7 +943,8 @@ class PythonToNativeConverter:
                             functionConverter._varname_to_type.get(FunctionOutput),
                             functionConverter._varname_to_type.get(FunctionYield),
                             {k: v.typeRepresentation for k, v in functionConverter._varname_to_type.items() if isinstance(k, str)},
-                            conversionType
+                            conversionType,
+                            outboundTargets
                         )
                     except Exception:
                         logging.exception("event handler %s threw an unexpected exception", v.onNewFunction)

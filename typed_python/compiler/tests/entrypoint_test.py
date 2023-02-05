@@ -422,13 +422,18 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
                 outputType,
                 yieldType,
                 variableTypes,
-                conversionType
+                conversionType,
+                calledFunctions,
             ):
-                out[funcName] = (inputTypes, outputType, variableTypes)
+                out[funcName] = (inputTypes, outputType, variableTypes, calledFunctions)
+
+        @Entrypoint
+        def g(x):
+            return x
 
         @Entrypoint
         def f(x):
-            y = x + 1
+            y = x + g(1)
             return str(y)
 
         with Visitor():
@@ -436,6 +441,8 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertTrue('f' in out, out)
         self.assertEqual(out['f'][2]['y'], int)
+        self.assertTrue(out['f'][3])
+        assert type(out['f'][3][0]).__name__ == 'TypedCallTarget'
 
     def test_star_args_on_entrypoint(self):
         @Entrypoint

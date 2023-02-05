@@ -52,7 +52,8 @@ class DidCompileVisitor(RuntimeEventVisitor):
         outputType,
         yieldType,
         variableTypes,
-        conversionType
+        conversionType,
+        calledFunctions,
     ):
         self.didCompile = True
 
