@@ -364,17 +364,40 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
         else:
             outputType = mergeTypeWrappers(possibleTypes)
 
-            output = context.allocateUninitializedSlot(outputType)
+            native = context.converter.defineNativeFunction(
+                'getattr(' + self.typeRepresentation.__name__ + ", " + attribute + ")",
+                ('getattr', self, attribute),
+                [self],
+                outputType,
+                lambda context, out, instance: self.generateNativeGetattr(
+                    context, outputType, validIndices, out, instance, attribute
+                )
+            )
 
-            with context.switch(instance.nonref_expr.ElementPtrIntegers(0, 1).load(), validIndices, False) as indicesAndContexts:
-                for ix, subcontext in indicesAndContexts:
-                    with subcontext:
-                        attr = self.refAs(context, instance, ix).convert_attribute(attribute)
-                        attr = attr.convert_to_type(outputType, ConversionLevel.Signature)
-                        output.convert_copy_initialize(attr)
-                        context.markUninitializedSlotInitialized(output)
+            if outputType.is_pass_by_ref:
+                return context.push(
+                    outputType,
+                    lambda out: native.call(out, instance)
+                )
+            else:
+                return context.pushPod(
+                    outputType,
+                    native.call(instance)
+                )
 
-            return output
+    def generateNativeGetattr(self, context, outputType, validIndices, out, instance, attr):
+        which = instance.nonref_expr.ElementPtrIntegers(0, 1).load()
+        for ix in validIndices:
+            with context.ifelse(which.eq(ix)) as (ifTrue, ifFalse):
+                with ifTrue:
+                    res = self.refAs(context, instance, ix).convert_attribute(attr)
+                    if res is not None:
+                        res = res.convert_to_type(outputType, ConversionLevel.Signature)
+
+                    context.pushReturnValue(res)
+
+        if len(validIndices) != len(self.alternatives):
+            context.pushException(AttributeError, attr)
 
     def convert_check_matches(self, context, instance, typename):
         index = -1

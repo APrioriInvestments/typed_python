@@ -1754,3 +1754,34 @@ class TestAlternativeCompilation(unittest.TestCase):
         assert eq(AB.A(a=1), AB.A(a=1))
         assert eqMixed(AB.A(a=1), AB.A(a=1))
         assert eqConcrete(AB.A(a=1), AB.A(a=1))
+
+    def test_compiled_attribute_access(self):
+        A = Alternative(
+            "A",
+            X=dict(x=int, y=str, z=str),
+            Y=dict(x=int, y=str, z=float),
+            Z=dict(),
+        )
+
+        def getx(a: A):
+            try:
+                return a.x
+            except Exception:
+                return 'None'
+
+        def gety(a: A):
+            try:
+                return a.y
+            except Exception:
+                return 'None'
+
+        def getz(a: A):
+            try:
+                return a.z
+            except Exception:
+                return 'None'
+
+        for a in [A.X(x=1, y='2', z='3'), A.Y(x=1, y='2', z=3), A.Z()]:
+            assert getx(a) == Entrypoint(getx)(a)
+            assert gety(a) == Entrypoint(gety)(a)
+            assert getz(a) == Entrypoint(getz)(a)
