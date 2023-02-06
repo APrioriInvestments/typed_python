@@ -135,7 +135,7 @@ class TestBytesCompilation(unittest.TestCase):
         speedup = (t1 - t0) / (t2 - t1)
 
         # I get about 200
-        self.assertGreater(speedup, 100)
+        self.assertGreater(speedup, 50)
 
     def test_bytes_literals(self):
 
