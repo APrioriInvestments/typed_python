@@ -61,6 +61,16 @@ class RuntimeEventVisitor:
     ):
         pass
 
+    def onNewNonpythonFunction(
+        self,
+        identifier,
+        linkName,
+        functionConverter,
+        nativeFunction,
+        outboundTargets
+    ):
+        pass
+
     def __enter__(self):
         Runtime.singleton().addEventVisitor(self)
         return self
@@ -128,6 +138,30 @@ class PrintNewFunctionVisitor(RuntimeEventVisitor):
                     )
                 else:
                     print("        ", varname, varVal)
+
+            if calledFunctions:
+                print("    calls:")
+                for callTarget in calledFunctions:
+                    print("        ", callTarget)
+
+    def onNewNonpythonFunction(
+        self,
+        identifier,
+        linkName,
+        functionConverter,
+        nativeFunction,
+        calledFunctions
+    ):
+        if self.short:
+            print(
+                f"[complexity={len(str(nativeFunction)):8d}] ",
+                linkName
+            )
+        else:
+            print("compiling ", linkName)
+            print("   identifier ", identifier)
+            print("   inputs: ", functionConverter.getInputTypes())
+            print("   output: ", functionConverter.knownOutputType())
 
             if calledFunctions:
                 print("    calls:")

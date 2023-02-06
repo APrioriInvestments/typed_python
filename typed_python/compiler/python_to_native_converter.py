@@ -916,19 +916,18 @@ class PythonToNativeConverter:
                     self._currentlyConverting = None
 
         for identifier, functionConverter in self._inflight_function_conversions.items():
+            outboundTargets = []
+            for outboundFuncId in self._dependencies.getNamesDependedOn(identifier):
+                name = self._link_name_for_identity[outboundFuncId]
+                outboundTargets.append(self._targets[name])
+
+            nativeFunction, actual_output_type = self._inflight_definitions.get(identifier)
+
             if identifier in self._identifier_to_pyfunc:
                 for v in self._visitors:
-
                     funcName, funcCode, funcGlobals, closureVars, input_types, output_type, conversionType = (
                         self._identifier_to_pyfunc[identifier]
                     )
-
-                    nativeFunction, actual_output_type = self._inflight_definitions.get(identifier)
-
-                    outboundTargets = []
-                    for outboundFuncId in self._dependencies.getNamesDependedOn(identifier):
-                        name = self._link_name_for_identity[outboundFuncId]
-                        outboundTargets.append(self._targets[name])
 
                     try:
                         v.onNewFunction(
@@ -948,6 +947,17 @@ class PythonToNativeConverter:
                         )
                     except Exception:
                         logging.exception("event handler %s threw an unexpected exception", v.onNewFunction)
+            else:
+                for v in self._visitors:
+                    v.onNewNonpythonFunction(
+                        identifier,
+                        self._link_name_for_identity[identifier],
+                        functionConverter,
+                        nativeFunction,
+                        outboundTargets
+                    )
+
+
 
             if identifier not in self._inflight_definitions:
                 raise Exception(

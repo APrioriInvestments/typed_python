@@ -1950,6 +1950,32 @@ class FunctionConversionContext(ConversionContextBase):
             if ast.exc is None:
                 toThrow = None  # means reraise
             else:
+                if (
+                    ast.exc.matches.Call
+                    and len(ast.exc.args) == 1
+                    and not ast.exc.keywords
+                    and not ast.exc.args[0].matches.Starred
+                    and ast.cause is None
+                ):
+                    exceptionT = expr_context.convert_expression_ast(ast.exc.func)
+                    if exceptionT is None:
+                        return (
+                            expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast), False
+                        )
+
+                    exceptionArg = expr_context.convert_expression_ast(ast.exc.args[0])
+                    if exceptionArg is None:
+                        return (
+                            expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast), False
+                        )
+
+                    expr_context.pushException(
+                        exceptionT,
+                        exceptionArg
+                    )
+
+                    return expr_context.finalize(None, exceptionsTakeFrom=None if ast.exc is None else ast), False
+
                 toThrow = expr_context.convert_expression_ast(ast.exc)
 
                 if toThrow is None:

@@ -1021,16 +1021,14 @@ extern "C" {
         return PythonObjectOfType::createLayout(p);
     }
 
-    void np_initialize_exception(PythonObjectOfType::layout_type* layout) {
+    // set the python exception state and return (without throwing)
+    void setExceptionState(PyObject* exception, PyObject* cause) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* prevType;
-        PyObject* prevValue;
-        PyObject* prevTraceback;
-        PyErr_GetExcInfo(&prevType, &prevValue, &prevTraceback);
-
-        if (layout) {
-            PyTypeObject* tp = layout->pyObj->ob_type;
+        // check if the exception is actually an exception. If not,
+        // we can't even raise it.
+        if (exception) {
+            PyTypeObject* tp = exception->ob_type;
             bool hasBaseE = false;
 
             while (tp) {
@@ -1044,64 +1042,31 @@ extern "C" {
                 PyErr_Format(
                     PyExc_TypeError,
                     "exceptions must derive from BaseException, not %S",
-                    (PyObject*)layout->pyObj->ob_type
+                    (PyObject*)exception->ob_type
                 );
 
                 return;
             }
+        }
+
+        if (exception && cause) {
+            // if we have an exception and a cause, just raise directly
+            PyException_SetCause(exception, incref(cause));
+            PyErr_Restore((PyObject*)incref(exception->ob_type), incref(exception), nullptr);
+        }
+        else if (exception) {
+            PyObject* prevType;
+            PyObject* prevValue;
+            PyObject* prevTraceback;
+            PyErr_GetExcInfo(&prevType, &prevValue, &prevTraceback);
 
             if (prevValue) {
-                PyException_SetContext(layout->pyObj, prevValue);
+                PyException_SetContext(exception, prevValue);
             }
             decref(prevType);
             decref(prevTraceback);
 
-            PyErr_SetObject(
-                (PyObject*)layout->pyObj->ob_type,
-                layout->pyObj
-            );
-        }
-        else {
-            if (!prevValue) {
-                decref(prevType);
-                decref(prevValue);
-                decref(prevTraceback);
-                PyErr_SetString(PyExc_RuntimeError, "No active exception to reraise");
-                throw PythonExceptionSet();
-            }
-            PyErr_Restore(prevType, prevValue, prevTraceback);
-        }
-    }
-
-    void np_initialize_exception_w_cause(
-            PythonObjectOfType::layout_type* layoutExc,
-            PythonObjectOfType::layout_type* layoutCause
-            ) {
-        PyEnsureGilAcquired getTheGil;
-
-        if (layoutExc) {
-            PyTypeObject* tp = layoutExc->pyObj->ob_type;
-            bool hasBaseE = false;
-
-            while (tp) {
-                if (tp == (PyTypeObject*)PyExc_BaseException) {
-                    hasBaseE = true;
-                }
-                tp = tp->tp_base;
-            }
-
-            if (!hasBaseE) {
-                PyErr_Format(
-                    PyExc_TypeError,
-                    "exceptions must derive from BaseException, not %S",
-                    (PyObject*)layoutExc->pyObj->ob_type
-                );
-
-                return;
-            }
-
-            PyException_SetCause(layoutExc->pyObj, layoutCause ? incref(layoutCause->pyObj) : NULL);
-            PyErr_Restore((PyObject*)incref(layoutExc->pyObj->ob_type), incref(layoutExc->pyObj), nullptr);
+            PyErr_SetObject((PyObject*)exception->ob_type, exception);
         }
         else {
             PyObject* prevType;
@@ -1116,9 +1081,25 @@ extern "C" {
                 PyErr_SetString(PyExc_RuntimeError, "No active exception to reraise");
                 throw PythonExceptionSet();
             }
-            PyException_SetCause(prevValue, layoutCause ? incref(layoutCause->pyObj) : NULL);
+            if (cause) {
+                PyException_SetCause(prevValue, incref(cause));
+            }
             PyErr_Restore(prevType, prevValue, prevTraceback);
         }
+    }
+
+    void np_initialize_exception(PythonObjectOfType::layout_type* layout) {
+        setExceptionState(layout ? layout->pyObj : nullptr, nullptr);
+    }
+
+    void np_initialize_exception_w_cause(
+            PythonObjectOfType::layout_type* layoutExc,
+            PythonObjectOfType::layout_type* layoutCause
+            ) {
+        setExceptionState(
+            layoutExc ? layoutExc->pyObj : nullptr,
+            layoutCause ? layoutCause->pyObj : nullptr
+        );
     }
 
     void np_clear_exception() {
@@ -1351,6 +1332,58 @@ extern "C" {
         }
 
         return PythonObjectOfType::stealToCreateLayout(res);
+    }
+
+    void nativepython_runtime_call_pyobj_and_raise(
+        int argCount,
+        int kwargCount,
+        ...
+    ) {
+        PyEnsureGilAcquired getTheGil;
+
+        // each of 'argCount' arguments is a PyObject* followed by a const char*
+        va_list va_args;
+        va_start(va_args, kwargCount);
+
+        PyObjectHolder toCall;
+
+        PyObjectStealer args(PyTuple_New(argCount - 1));
+        PyObjectStealer kwargs(PyDict_New());
+
+        for (int i = 0; i < argCount; ++i) {
+            instance_ptr data = va_arg(va_args, instance_ptr);
+            Type* typ = va_arg(va_args, Type*);
+
+            if (i == 0) {
+                toCall.steal(
+                    PyInstance::extractPythonObject(data, typ)
+                );
+            } else {
+                PyTuple_SetItem((PyObject*)args, i - 1, PyInstance::extractPythonObject(data, typ));
+            }
+        }
+
+        for (int i = 0; i < kwargCount; ++i) {
+            instance_ptr data = va_arg(va_args, instance_ptr);
+            Type* typ = va_arg(va_args, Type*);
+            const char* kwargName = va_arg(va_args, const char*);
+
+            PyObjectStealer kwargVal(PyInstance::extractPythonObject(data, typ));
+
+            PyDict_SetItemString((PyObject*)kwargs, kwargName, (PyObject*)kwargVal);
+        }
+
+        va_end(va_args);
+
+        PyObjectStealer res(PyObject_Call((PyObject*)toCall, args, kwargs));
+
+        if (!res) {
+            throw PythonExceptionSet();
+        }
+
+        setExceptionState((PyObject*)res, nullptr);
+
+        throw PythonExceptionSet();
     }
 
     PythonObjectOfType::layout_type* nativepython_runtime_call_pyobj(

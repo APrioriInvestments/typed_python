@@ -368,6 +368,15 @@ create_pyobj = externalCallTarget(
     Void.pointer()
 )
 
+call_pyobj_and_raise = externalCallTarget(
+    "nativepython_runtime_call_pyobj_and_raise",
+    Void,
+    Int64,
+    Int64,
+    varargs=True,
+    canThrow=True
+)
+
 call_pyobj = externalCallTarget(
     "nativepython_runtime_call_pyobj",
     Void.pointer(),

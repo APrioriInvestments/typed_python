@@ -1286,53 +1286,44 @@ class ExpressionConversionContext:
         Returns:
             None
         """
-        if len(args) == 0 and isinstance(excType, type):
-            self.pushEffect(
-                runtime_functions.np_raise_exception_str.call(
-                    self.constantPyObject(excType).nonref_expr.cast(native_ast.VoidPtr),
-                    native_ast.UInt8.pointer().zero(),
-                )
-            )
-            return None
-
-        if len(args) == 1 and isinstance(args[0], str) and isinstance(excType, type):
-            # this is the most common pathway
-            self.pushEffect(
-                runtime_functions.np_raise_exception_str.call(
-                    self.constantPyObject(excType).nonref_expr.cast(native_ast.VoidPtr),
-                    native_ast.const_utf8_cstr(args[0]),
-                )
-            )
-            return None
-
         def toTyped(x):
             if isinstance(x, TypedExpression):
                 return x
             return self.constant(x)
 
-        origExcType = excType
-        excType = toTyped(excType)
-        args = [toTyped(x) for x in args]
+        args = [toTyped(excType)] + [toTyped(x) for x in args]
         kwargs = {k: toTyped(v) for k, v in kwargs.items()}
 
-        if len(args) == 1 and isinstance(args[0].constantValue, str) and isinstance(origExcType, type):
-            self.pushEffect(
-                runtime_functions.np_raise_exception_str.call(
-                    self.constantPyObject(origExcType).nonref_expr.cast(native_ast.VoidPtr),
-                    native_ast.const_utf8_cstr(args[0].constantValue),
-                )
+        args = [a.demasquerade() for a in args]
+        kwargs = {k: v.demasquerade() for k, v in kwargs.items()}
+
+        # we converted everything to python objects. We need to pass this
+        # ensemble to the interpreter. We use c-style variadic arguments here
+        # since everything is a pointer.
+        arguments = []
+        kwarguments = []
+
+        for a in args:
+            a = a.ensureIsReference()
+
+            arguments.append(a.expr.cast(native_ast.VoidPtr))
+            arguments.append(self.getTypePointer(a.expr_type.typeRepresentation))
+
+        for kwargName, kwargVal in kwargs.items():
+            kwargVal = kwargVal.ensureIsReference()
+
+            kwarguments.append(kwargVal.expr.cast(native_ast.VoidPtr))
+            kwarguments.append(self.getTypePointer(kwargVal.expr_type.typeRepresentation))
+            kwarguments.append(native_ast.const_utf8_cstr(kwargName))
+
+        return self.pushEffect(
+            runtime_functions.call_pyobj_and_raise.call(
+                native_ast.const_int_expr(len(args)),
+                native_ast.const_int_expr(len(kwargs)),
+                *arguments,
+                *kwarguments,
             )
-            return None
-
-        if excType is None:
-            return None
-
-        exceptionVal = excType.convert_call(args, kwargs)
-
-        if exceptionVal is None:
-            return None
-
-        return self.pushExceptionObject(exceptionVal)
+        )
 
     def pushExceptionClear(self):
         nativeExpr = (
@@ -1368,8 +1359,7 @@ class ExpressionConversionContext:
         if exceptionObject is None:
             exceptionObject = self.zero(object)
 
-        if causeObject.expr_type.typeRepresentation is type(None):  # noqa
-            causeObject = self.zero(object)
+        causeObject = causeObject.toPyObj()
 
         nativeExpr = (
             runtime_functions.initialize_exception_w_cause.call(
