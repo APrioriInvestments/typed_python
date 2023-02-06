@@ -15,6 +15,7 @@
 import pytest
 import unittest
 import time
+import os
 
 from flaky import flaky
 from typed_python import _types, ListOf, TupleOf, Dict, ConstDict, Compiled, Entrypoint, OneOf
@@ -23,7 +24,7 @@ from typed_python.compiler.type_wrappers.string_wrapper import strJoinIterable, 
     strEndswith, strRangeEndswith, strEndswithTuple, strRangeEndswithTuple, \
     strReplace, strPartition, strRpartition, strCenter, strRjust, strLjust, strExpandtabs, strZfill
 from typed_python.test_util import currentMemUsageMb, compilerPerformanceComparison
-from typed_python.compiler.runtime import PrintNewFunctionVisitor
+from typed_python.compiler.runtime import PrintNewFunctionVisitor, RuntimeEventVisitor
 
 
 someStrings = [
@@ -1500,3 +1501,42 @@ class TestStringCompilation(unittest.TestCase):
         self.assertEqual(strExpandtabs(v, 8), v.expandtabs(8))
         self.assertEqual(strZfill(v, 20), v.zfill(20))
         self.assertEqual(strZfill('+123', 20), '+123'.zfill(20))
+
+    def test_fstring_of_string_doesnt_hit_interpreter(self):
+        # if the cache is on, this won't work
+        if os.getenv("TP_COMPILER_CACHE"):
+            return
+
+        class Visitor(RuntimeEventVisitor):
+            """Base class for a Visitor that gets to see what's going on in the runtime.
+
+            Clients should subclass this and pass it to 'addEventVisitor' in the runtime
+            to find out about events like function typing assignments.
+            """
+            def onNewFunction(
+                self,
+                identifier,
+                functionConverter,
+                nativeFunction,
+                funcName,
+                funcCode,
+                funcGlobals,
+                closureVars,
+                inputTypes,
+                outputType,
+                yieldType,
+                variableTypes,
+                conversionType,
+                calledFunctions,
+            ):
+                if funcName == "toString":
+                    self.nativeFunction = nativeFunction
+
+        @Entrypoint
+        def toString(x: OneOf("hi", "bye")):  # noqa
+            return f"its: {x}"
+
+        with Visitor() as vis:
+            toString("hi")
+
+        assert 'PythonObjectOfTypeWrapper' not in str(vis.nativeFunction)

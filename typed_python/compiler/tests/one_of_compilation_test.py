@@ -766,3 +766,10 @@ class TestOneOfCompilation(unittest.TestCase):
 
         assert checkIt(('a', 'b')) == 'ab'
         assert checkIt(None) == 'empty'
+
+    def test_convert_one_of_constants_to_string(self):
+        @Entrypoint
+        def toString(x: OneOf("hi", "bye")):  # noqa
+            return f"its: {x}"
+
+        toString('hi')

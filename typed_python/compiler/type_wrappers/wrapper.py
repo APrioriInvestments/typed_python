@@ -665,21 +665,6 @@ class Wrapper:
         assert isinstance(level, ConversionLevel)
         assert targetVal.isReference
 
-        if level.isNewOrHigher() and targetVal.expr_type.typeRepresentation is str:
-            if not expr.isReference:
-                expr = context.pushMove(expr)
-
-            expr = expr.convert_to_type(object, ConversionLevel.Signature)
-
-            return context.pushPod(
-                bool,
-                runtime_functions.np_try_pyobj_to_str.call(
-                    expr.expr.cast(VoidPtr),
-                    targetVal.expr.cast(VoidPtr),
-                    context.getTypePointer(expr.expr_type.typeRepresentation)
-                )
-            )
-
         return targetVal.expr_type.convert_to_self_with_target(context, targetVal, expr, level, mayThrowOnFailure)
 
     def convert_to_self_with_target(self, context, targetVal, sourceVal, level: ConversionLevel, mayThrowOnFailure=False):

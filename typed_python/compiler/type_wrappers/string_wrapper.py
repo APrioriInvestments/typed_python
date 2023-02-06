@@ -21,6 +21,7 @@ from typed_python.type_promotion import isInteger
 from typed_python.compiler.type_wrappers.typed_list_masquerading_as_list_wrapper import TypedListMasqueradingAsList
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
+from typed_python.compiler.conversion_level import ConversionLevel
 
 import typed_python.compiler.native_ast as native_ast
 import typed_python.compiler
@@ -1010,7 +1011,31 @@ class StringWrapper(RefcountedWrapper):
             Float32, Int8, Int16, Int32, UInt8, UInt16, UInt32, UInt64, float, int, bool, str
         )
 
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, level: ConversionLevel, mayThrowOnFailure=False):
+        if sourceVal.expr_type.typeRepresentation is str:
+            targetVal.convert_copy_initialize(targetVal)
+            return context.constant(True)
+
+        if level.isNewOrHigher():
+            if not sourceVal.isReference:
+                sourceVal = context.pushMove(sourceVal)
+
+            return context.pushPod(
+                bool,
+                runtime_functions.np_try_pyobj_to_str.call(
+                    sourceVal.expr.cast(VoidPtr),
+                    targetVal.expr.cast(VoidPtr),
+                    context.getTypePointer(sourceVal.expr_type.typeRepresentation)
+                )
+            )
+
+        return super().convert_to_self_with_target(context, targetVal, sourceVal, level, mayThrowOnFailure)
+
     def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
+        if targetVal.expr_type.typeRepresentation is str:
+            targetVal.convert_copy_initialize(instance)
+            return context.constant(True)
+
         if not conversionLevel.isNewOrHigher():
             return super().convert_to_type_with_target(context, instance, targetVal, conversionLevel, mayThrowOnFailure)
 

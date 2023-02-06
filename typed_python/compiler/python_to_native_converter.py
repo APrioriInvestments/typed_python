@@ -957,8 +957,6 @@ class PythonToNativeConverter:
                         outboundTargets
                     )
 
-
-
             if identifier not in self._inflight_definitions:
                 raise Exception(
                     f"Expected a definition for {identifier} depended on by:\n"
