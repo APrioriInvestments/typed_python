@@ -773,3 +773,11 @@ class TestOneOfCompilation(unittest.TestCase):
             return f"its: {x}"
 
         toString('hi')
+
+    def test_unpack_oneof_none_or_tuple(self):
+        @Entrypoint
+        def unpackIt(x: OneOf(None, Tuple(int, int))):
+            a, b = x
+            return a + b
+
+        unpackIt((1, 2))

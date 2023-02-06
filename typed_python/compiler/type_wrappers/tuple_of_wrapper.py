@@ -318,6 +318,9 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             ('data', native_ast.UInt8Ptr)
         ), name='TupleOfLayout' if self.is_tuple else 'ListOfLayout').pointer()
 
+    def isIterable(self):
+        return True
+
     def has_fastnext_iter(self):
         """If we call '__iter__' on instances of this type, will they support __fastnext__?"""
         return True

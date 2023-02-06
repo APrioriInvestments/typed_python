@@ -15,7 +15,8 @@
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.merge_type_wrappers import mergeTypes
 from typed_python import (
-    _types, Int32, Tuple, NamedTuple, Function, Dict, Set, ConstDict, ListOf, TupleOf
+    _types, Int32, Tuple, NamedTuple, Function, Dict, Set, ConstDict, ListOf,
+    TupleOf, PointerTo, pointerTo, TypeFunction, OneOf, Class, Member, Final
 )
 import typed_python._types
 from typed_python.compiler.conversion_level import ConversionLevel
@@ -195,6 +196,9 @@ class TupleWrapper(Wrapper):
         self._is_pod = all(typeWrapper(possibility).is_pod for possibility in self.subTypeWrappers)
         self.is_default_constructible = _types.is_default_constructible(t)
 
+    def isIterable(self):
+        return True
+
     @property
     def unionType(self):
         if self._unionType is None and self.typeRepresentation.ElementTypes:
@@ -219,6 +223,23 @@ class TupleWrapper(Wrapper):
 
     def getNativeLayoutType(self):
         return self.layoutType
+
+    def convert_attribute(self, context, instance, attribute):
+        if attribute in ["__iter__"]:
+            return instance.changeType(BoundMethodWrapper.Make(self, attribute))
+
+        return super().convert_attribute(context, instance, attribute)
+
+    def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if methodname == '__iter__' and not args:
+            return typeWrapper(TupleIterator(self.typeRepresentation)).convert_type_call(
+                context,
+                None,
+                [],
+                dict(pos=context.constant(-1), tup=instance)
+            )
+
+        return super().convert_method_call(context, instance, methodname, args, kwargs)
 
     def convert_initialize_from_args(self, context, target, *args):
         assert len(args) <= len(self.byteOffsets)
@@ -608,6 +629,9 @@ class NamedTupleWrapper(TupleWrapper):
         self.namesToIndices = {n: i for i, n in enumerate(t.ElementNames)}
         self.namesToTypes = {n: t.ElementTypes[i] for i, n in enumerate(t.ElementNames)}
 
+    def isIterable(self):
+        return True
+
     def has_fastnext_iter(self):
         if self.isSubclassOfNamedTuple:
             return "__iter__" in self.typeRepresentation.__dict__
@@ -869,3 +893,24 @@ class NamedTupleWrapper(TupleWrapper):
             return self.convert_method_call(context, r, magic, (l,), {})
 
         return super().convert_bin_op_reverse(context, r, op, l, inplace)
+
+
+@TypeFunction
+def TupleIterator(T):
+    EltT = OneOf(*T.ElementTypes)
+
+    class TupleIterator(Class, Final, __name__=f"TupleIterator({T.__name__})"):
+        pos = Member(int, nonempty=True)
+        elt = Member(EltT)
+        tup = Member(T, nonempty=True)
+
+        def __fastnext__(self):
+            self.pos += 1
+
+            if self.pos < len(self.tup):
+                self.elt = self.tup[self.pos]
+                return pointerTo(self).elt
+            else:
+                return PointerTo(EltT)()
+
+    return TupleIterator

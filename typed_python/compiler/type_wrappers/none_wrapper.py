@@ -29,6 +29,9 @@ class NoneWrapper(Wrapper):
     def getCompileTimeConstant(self):
         return None
 
+    def isIterable(self):
+        return False
+
     def convert_default_initialize(self, context, target):
         pass
 

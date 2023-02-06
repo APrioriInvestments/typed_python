@@ -419,3 +419,18 @@ class TestTupleCompilation(unittest.TestCase):
             return None
 
         assert checkIn.resultTypeFor().typeRepresentation == int
+
+    def test_iterate_tuple(self):
+        T = Tuple(int, float, str)
+
+        @Entrypoint
+        def iterateIt(x: T):
+            res = ListOf(OneOf(int, float, str))()
+
+            for e in x:
+                res.append(e)
+
+            return res
+
+        tup = T((1, 2, '3'))
+        assert iterateIt(tup) == ListOf(OneOf(int, float, str))(tup)
