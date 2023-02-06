@@ -195,7 +195,20 @@ def test_can_capture_exception_and_rethrow():
     assert 'in g' in stringTb
 
     # verify the compiler is the same
-    assert getStringTraceback(f) == getStringTraceback(Entrypoint(f))
+    s1 = getStringTraceback(f)
+    s2 = getStringTraceback(Entrypoint(f))
+
+    if s1 != s2:
+        print()
+        print("interpreter")
+        print(s1)
+        print()
+        print()
+        print()
+        print("compiler")
+        print(s2)
+
+    assert s1 == s2
 
 
 @pytest.mark.group_one
@@ -255,3 +268,12 @@ def test_convert_assert_str():
 
     with pytest.raises(AssertionError):
         assertIt(False)
+
+
+def test_raise_simple_str():
+    @Entrypoint
+    def raiseStringException(x):
+        raise UserWarning(str(x))
+
+    with pytest.raises(UserWarning):
+        raiseStringException(100)
