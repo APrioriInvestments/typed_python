@@ -57,6 +57,34 @@ class OneOfWrapper(Wrapper):
     def convert_which_native(self, expr):
         return expr.ElementPtrIntegers(0, 0).load()
 
+    def get_iteration_expressions(self, context, expr):
+        itExprs = None
+
+        for ix in range(len(self.typeRepresentation.Types)):
+            T = self.typeRepresentation.Types[ix]
+
+            if typeWrapper(T).isIterable == "Maybe":
+                return
+            elif typeWrapper(T).isIterable is False:
+                pass
+            else:
+                # we don't know how to union two sets of iteration expressions
+                if itExprs is not None:
+                    return None
+
+                itExprs = typeWrapper(T).get_iteration_expressions(context, expr.refAs(ix))
+                itExprIx = ix
+
+        if itExprs is not None:
+            with context.ifelse(self.convert_which_native(expr.expr).eq(itExprIx)) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushException(
+                        TypeError,
+                        "Instance of type {self.typeRepresentation.__name__} is not iterable"
+                    )
+
+            return itExprs
+
     def unwrap(self, context, expr, generator):
         """Call 'generator' on 'expr' cast down to each subtype and combine the results.
         """
