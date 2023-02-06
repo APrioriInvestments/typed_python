@@ -411,7 +411,7 @@ class TestTypeInference(unittest.TestCase):
 
         assert f("hi")['x'] == str
 
-    @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.skipif("sys.version_info.minor < 8")
     def test_assertion_prunes_types(self):
         @Entrypoint
         def f(x: OneOf(None, str)):
@@ -422,7 +422,7 @@ class TestTypeInference(unittest.TestCase):
         assert f.resultTypeFor(str).typeRepresentation is str
         assert f.resultTypeFor(type(None)).typeRepresentation is str
 
-    @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.skipif("sys.version_info.minor < 8")
     def test_branch_with_raise_prunes_types(self):
         @Entrypoint
         def f(x: OneOf(None, str)):
