@@ -162,16 +162,23 @@ class PreReservedTupleOrList(CompilableBuiltin):
                 runtime_functions.malloc.call(native_ast.const_int_expr(28))
                     .cast(self.tupleTypeWrapper.getNativeLayoutType())
             ) >>
-            out.expr.load().ElementPtrIntegers(0, 4).store(
-                runtime_functions.malloc.call(
-                    length.nonref_expr
-                    .mul(native_ast.const_int_expr(self.underlyingWrapperType.getBytecount()))
-                ).cast(native_ast.UInt8Ptr)
-            ) >>
-            out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>
-            out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1)) >>
-            out.expr.load().ElementPtrIntegers(0, 2).store(native_ast.const_int32_expr(0)) >>
-            out.expr.load().ElementPtrIntegers(0, 3).store(length.nonref_expr.cast(native_ast.Int32))
+            out.expr.load().ElementPtrIntegers(0).store(
+                native_ast.Expression.MakeStruct(
+                    args=(
+                        ('refcount', native_ast.const_int_expr(1)),
+                        ('hash_cache', native_ast.const_int32_expr(-1)),
+                        ('count', native_ast.const_int32_expr(0)),
+                        ('reserved', length.nonref_expr.cast(native_ast.Int32)),
+                        (
+                            'data',
+                            runtime_functions.malloc.call(
+                                length.nonref_expr
+                                .mul(native_ast.const_int_expr(self.underlyingWrapperType.getBytecount()))
+                            )
+                        ),
+                    )
+                )
+            )
         )
 
 
