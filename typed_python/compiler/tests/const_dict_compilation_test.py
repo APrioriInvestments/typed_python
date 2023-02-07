@@ -462,3 +462,17 @@ class TestConstDictCompilation(unittest.TestCase):
         for d1 in someDicts:
             for d2 in someDicts:
                 assert d1 - TupleOf(int)(d2) == subKey(d1, TupleOf(int)(d2))
+
+    def test_construct_const_dict_from_dict_constant(self):
+        def makeIt0():
+            return ConstDict(int, float)({})
+
+        def makeIt1():
+            return ConstDict(int, float)({1: 2})
+
+        def makeIt2():
+            return ConstDict(int, float)({1: 2, 0: 4})
+
+        assert Entrypoint(makeIt0)() == makeIt0()
+        assert Entrypoint(makeIt1)() == makeIt1()
+        assert Entrypoint(makeIt2)() == makeIt2()

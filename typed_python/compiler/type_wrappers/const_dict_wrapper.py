@@ -180,10 +180,10 @@ class Malloc(CompilableBuiltin):
         return super().convert_call(context, instance, args, kwargs)
 
 
-def allocate_empty_const_dict(ptrToOutDict, kvCount):
+def allocate_empty_const_dict(T, kvCount):
     byteCount = kvCount * (
-        bytecount(ptrToOutDict.ElementType.KeyType)
-        + bytecount(ptrToOutDict.ElementType.ValueType)
+        bytecount(T.KeyType)
+        + bytecount(T.ValueType)
     ) + 20
 
     target = Malloc()(byteCount)
@@ -215,7 +215,7 @@ def const_dict_sub(ptrToOutDict, lhs, rhs):
         return
 
     ptrToOutDict.cast(PointerTo(None)).set(
-        allocate_empty_const_dict(ptrToOutDict, len(lhs) - len(indicesToRemove))
+        allocate_empty_const_dict(ptrToOutDict.ElementType, len(lhs) - len(indicesToRemove))
     )
 
     outIx = 0
@@ -269,7 +269,7 @@ def const_dict_add(ptrToOutDict, lhs, rhs):
 
     try:
         ptrToOutDict.cast(PointerTo(None)).set(
-            allocate_empty_const_dict(ptrToOutDict, len(rhs) + lhsValuesToKeep)
+            allocate_empty_const_dict(ptrToOutDict.ElementType, len(rhs) + lhsValuesToKeep)
         )
 
         outIx = 0
@@ -345,7 +345,7 @@ def initialize_const_dict_from_mappable(ptrToOutDict, mappable, mayThrow):
         dictionary.
     """
     ptrToOutDict.cast(PointerTo(None)).set(
-        allocate_empty_const_dict(ptrToOutDict, len(mappable))
+        allocate_empty_const_dict(ptrToOutDict.ElementType, len(mappable))
     )
 
     try:
@@ -636,6 +636,66 @@ class ConstDictWrapper(RefcountedWrapper):
                 .add(native_ast.const_int_expr(self.keyBytecount))
             ).cast(self.valueType.getNativeLayoutType().pointer())
         )
+
+    def convert_type_call_on_container_expression(self, context, typeInst, argExpr):
+        """Like convert_call_on_container_expression, but on us as a TYPE.
+
+        Args:
+            context - an ExpressionConversionContext
+            typeInst - a TypedExpression giving the instance of the type object itself,
+                which we probably don't care about since most type objects are represented
+                as 'void' and have no actual instance information.
+            argExpr - a python_ast.Expr object representing the expression we're converting
+        """
+        if argExpr.matches.Dict and all(x is not None for x in argExpr.keys):
+            # fastpath for directly constructing a ConstDict from an inline dict
+            itemCount = len(argExpr.keys)
+
+            pointerToNewDict = context.call_py_function(
+                allocate_empty_const_dict,
+                (context.constant(self.typeRepresentation), context.constant(itemCount)),
+                {}
+            )
+
+            if pointerToNewDict is None:
+                return None
+
+            newDict = context.push(
+                self.typeRepresentation,
+                lambda newRef: newRef.expr.cast(
+                    native_ast.Void.pointer().pointer()
+                ).store(pointerToNewDict.nonref_expr)
+            )
+
+            for itemIx in range(itemCount):
+                key = context.convert_expression_ast(argExpr.keys[itemIx])
+                if key is None:
+                    return None
+
+                val = context.convert_expression_ast(argExpr.values[itemIx])
+                if val is None:
+                    return None
+
+                newDict.convert_method_call(
+                    'initialize_kv_pair_unsafe',
+                    (context.constant(itemIx), key, val),
+                    {}
+                )
+                newDict.convert_method_call(
+                    'set_kv_count_unsafe',
+                    (context.constant(itemIx + 1),),
+                    {}
+                )
+
+            if itemCount > 1:
+                newDict.convert_method_call(
+                    'sort_kv_pairs_unsafe',
+                    (), {}
+                )
+
+            return newDict
+
+        return super().convert_type_call_on_container_expression(context, typeInst, argExpr)
 
     def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type == left.expr_type:
