@@ -39,6 +39,7 @@ from typed_python import (
     typeKnownToCompiler,
     SubclassOf,
     Held,
+    NamedTuple
 )
 import typed_python._types as _types
 from typed_python.compiler.runtime import Entrypoint, Runtime, CountCompilationsVisitor
@@ -3016,3 +3017,16 @@ class TestClassCompilationCompilation(unittest.TestCase):
             return c.f(1, None)
 
         callf(B())
+
+    def test_call_method_with_oneof(self):
+        N = NamedTuple(x=int)
+
+        class C(Class):
+            def f(self, x: N) -> int:
+                return x.x
+
+        @Entrypoint
+        def call(c: C, x: OneOf(None, N)):
+            return c.f(x)
+
+        call(C(), N(x=10))

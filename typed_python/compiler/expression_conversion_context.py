@@ -108,7 +108,7 @@ class ExpressionConversionContext:
             raise Exception(f"Can't give a type pointer to {t} because its not a type")
 
         return native_ast.Expression.GlobalVariable(
-            name="type_pointer_" + str(id(t)) + "_" + str(t)[:20],
+            name="type_pointer_" + str(id(t)) + "_" + t.__name__[:50],
             type=native_ast.VoidPtr,
             metadata=GlobalVariableMetadata.RawTypePointer(
                 value=t
