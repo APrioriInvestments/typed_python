@@ -516,10 +516,7 @@ class TupleWrapper(Wrapper):
                     )
                 )
 
-        return sourceVal.convert_to_type(
-            object,
-            ConversionLevel.Signature
-        ).convert_to_type_with_target(targetVal, conversionLevel, mayThrowOnFailure)
+        return super().convert_to_self_with_target(context, targetVal, sourceVal, conversionLevel, mayThrowOnFailure)
 
     def generateConvertOtherTupToSelf(self, context, _, targetVal, sourceVal, conversionLevel):
         convertedValues = []
