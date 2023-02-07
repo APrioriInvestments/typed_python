@@ -849,7 +849,7 @@ class FunctionConverter:
             for i in range(len(exprs)):
                 value = self.builder.insert_value(value, exprs[i], i)
 
-            return TypedLLVMValue(value, native_ast.Type.Struct(names_and_types))
+            return TypedLLVMValue(value, native_ast.Type.Struct(element_types=names_and_types))
 
         if expr.matches.StructElementByIndex:
             val = self.convert(expr.left)

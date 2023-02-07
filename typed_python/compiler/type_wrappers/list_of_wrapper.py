@@ -360,13 +360,17 @@ class ListOfWrapper(TupleOrListOfWrapper):
             out.expr.store(
                 runtime_functions.malloc.call(28).cast(self.getNativeLayoutType())
             )
-            >> out.nonref_expr.ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1))  # refcount
-            >> out.nonref_expr.ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1))  # hash cache
-            >> out.nonref_expr.ElementPtrIntegers(0, 2).store(native_ast.const_int32_expr(0))  # count
-            >> out.nonref_expr.ElementPtrIntegers(0, 3).store(native_ast.const_int32_expr(1))  # reserved
-            >> out.nonref_expr.ElementPtrIntegers(0, 4).store(
-                runtime_functions.malloc.call(self.underlyingWrapperType.getBytecount())
-            )  # data
+            >> out.nonref_expr.ElementPtrIntegers(0).store(
+                native_ast.Expression.MakeStruct(
+                    args=(
+                        ('refcount', native_ast.const_int_expr(1)),
+                        ('hash_cache', native_ast.const_int32_expr(-1)),
+                        ('count', native_ast.const_int32_expr(0)),
+                        ('reserved', native_ast.const_int32_expr(1)),
+                        ('data', runtime_functions.malloc.call(self.underlyingWrapperType.getBytecount())),
+                    )
+                )
+            )
         )
 
     def convert_setitem(self, context, expr, index, item):

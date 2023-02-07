@@ -42,6 +42,16 @@ class TestListOfCompilation(unittest.TestCase):
             self.assertEqual(fastval, slowval)
         return t_py, t_fast
 
+    def test_compiled_empty_list(self):
+        @Entrypoint
+        def f():
+            return ListOf(int)()
+
+        lst = f()
+
+        assert isinstance(lst, ListOf(int))
+        assert lst.reserved() == 1
+
     def test_list_of_list_refcounts(self):
         @Compiled
         def f(x: ListOf(ListOf(int)), z: bool):
