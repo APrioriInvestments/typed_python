@@ -1013,3 +1013,17 @@ class TestDictCompilation(unittest.TestCase):
 
         setItem(d, ConstDict(int, int)({1: 2}), 3)
         assert getItem(d, ConstDict(int, int)({1: 2})) == 3
+
+    def test_dict_popdefault(self):
+        d1 = Dict(int, ListOf(int))()
+        d2 = Dict(int, ListOf(int))()
+
+        @Entrypoint
+        def popdefault(d, k):
+            return d.popdefault(k)
+
+        d1[1] = [2, 3, 4]
+        d2[1] = [2, 3, 4]
+
+        assert popdefault(d1, 0) == d2.popdefault(0)
+        assert popdefault(d1, 1) == d2.popdefault(1)

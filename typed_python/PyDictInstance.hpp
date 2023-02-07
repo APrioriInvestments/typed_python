@@ -90,4 +90,6 @@ public:
     static PyObject* setDefault(PyObject* o, PyObject* args);
 
     static PyObject* pop(PyObject* o, PyObject* args);
+
+    static PyObject* popdefault(PyObject* o, PyObject* args);
 };

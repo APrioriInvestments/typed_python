@@ -90,6 +90,17 @@ def dict_pop_nodefault(dict, item):
     return res
 
 
+def dict_pop_default(dict, item):
+    if item not in dict:
+        return dict.ValueType()
+
+    res = dict[item]
+
+    del dict[item]
+
+    return res
+
+
 def dict_pop(dict, item, defaultValue):
     if item not in dict:
         return defaultValue
@@ -188,7 +199,7 @@ class DictWrapper(DictWrapperBase):
                 "initializeValueByIndexUnsafe", "assignValueByIndexUnsafe",
                 "initializeKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
                 "_top_item_slot", "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault",
-                "pop", "clear", "copy", "update"):
+                "pop", "popdefault", "clear", "copy", "update"):
             return expr.changeType(BoundMethodWrapper.Make(self, attr))
 
         if attr == '_items_populated':
@@ -399,6 +410,10 @@ class DictWrapper(DictWrapperBase):
                 return context.call_py_function(dict_pop_nodefault, (instance, args[0]), {})
             else:
                 return context.call_py_function(dict_pop, (instance, args[0], args[1]), {})
+
+        if methodname == "popdefault":
+            if len(args) == 1:
+                return context.call_py_function(dict_pop_default, (instance, args[0]), {})
 
         if methodname == "clear":
             if len(args) == 0:

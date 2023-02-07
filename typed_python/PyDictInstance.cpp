@@ -748,7 +748,7 @@ PyDoc_STRVAR(pop_doc,
     "D.pop(k[,d]) -> v, remove key k and return corresponding value v.\n"
     "\n"
     "If k is not found, d is returned if given, otherwise KeyError is raised.\n"
-    );
+);
 PyObject* PyDictInstance::pop(PyObject* o, PyObject* args) {
     return translateExceptionToPyObject([&]() {
         const int argsNumber = PyTuple_Size(args);
@@ -812,6 +812,69 @@ PyObject* PyDictInstance::pop(PyObject* o, PyObject* args) {
     });
 }
 
+//static
+PyDoc_STRVAR(popdefault_doc,
+    "D.popdefault(k) -> v, remove key k and return corresponding value v.\n"
+    "\n"
+    "If k is not found, construct and return the default value for the ValueType.\n"
+);
+PyObject* PyDictInstance::popdefault(PyObject* o, PyObject* args) {
+    return translateExceptionToPyObject([&]() {
+        const int argsNumber = PyTuple_Size(args);
+
+        if (argsNumber != 1) {
+            throw std::runtime_error("Dict.popdefault takes one or two arguments.");
+        }
+
+        PyDictInstance *self = (PyDictInstance *) o;
+
+        if (self->mIteratorOffset != -1) {
+            PyErr_SetString(PyExc_TypeError, "dict iterators don't support 'popdefault'");
+            throw PythonExceptionSet();
+        }
+
+        PyObjectHolder item(PyTuple_GetItem(args, 0));
+
+        Type *selfType = extractTypeFrom(o->ob_type);
+        Type *itemType = extractTypeFrom(item->ob_type);
+
+        Type *keyType = self->type()->keyType();
+        Type *valueType = self->type()->valueType();
+
+        if (selfType->getTypeCategory() != Type::TypeCategory::catDict) {
+            throw std::runtime_error("Somehow 'self' was not a Dictionary.");
+        }
+
+        Instance key;
+        instance_ptr keyPtr;
+
+        if (Type::typesEquivalent(itemType, keyType)) {
+            PyInstance *item_w = (PyInstance*)(PyObject*)item;
+            keyPtr = item_w->dataPtr();
+        } else {
+            key = Instance(keyType, [&](instance_ptr data) {
+                copyConstructFromPythonInstance(keyType, data, item, ConversionLevel::UpcastContainers);
+            });
+
+            keyPtr = key.data();
+        }
+
+        instance_ptr valuePtr = self->type()->lookupValueByKey(self->dataPtr(), keyPtr);
+
+        if (valuePtr) {
+            PyObject* result = extractPythonObject(valuePtr, valueType);
+
+            self->type()->deleteKey(self->dataPtr(), keyPtr);
+
+            return result;
+        }
+
+        Instance emptyValue = Instance::create(valueType);
+
+        return PyInstance::fromInstance(emptyValue);
+    });
+}
+
 int PyDictInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
     // op == '__bool__'
     return type()->size(dataPtr()) != 0;
@@ -843,7 +906,7 @@ PyObject* PyDictInstance::tp_repr_concrete() {
 }
 
 PyMethodDef* PyDictInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [9] {
+    return new PyMethodDef [10] {
         {"get", (PyCFunction)PyDictInstance::dictGet, METH_VARARGS, dictGet_doc},
         {"clear", (PyCFunction)PyDictInstance::dictClear, METH_NOARGS, dictClear_doc},
         {"update", (PyCFunction)PyDictInstance::dictUpdate, METH_VARARGS, dictUpdate_doc},
@@ -852,6 +915,7 @@ PyMethodDef* PyDictInstance::typeMethodsConcrete(Type* t) {
         {"values", (PyCFunction)PyDictInstance::dictValues, METH_NOARGS, dictValues_doc},
         {"setdefault", (PyCFunction)PyDictInstance::setDefault, METH_VARARGS, setDefault_doc},
         {"pop", (PyCFunction)PyDictInstance::pop, METH_VARARGS, pop_doc},
+        {"popdefault", (PyCFunction)PyDictInstance::popdefault, METH_VARARGS, popdefault_doc},
         {NULL, NULL}
     };
 }
