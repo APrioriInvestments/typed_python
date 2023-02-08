@@ -34,6 +34,11 @@ pointer_size = 8
 CROSS_MODULE_INLINE_COMPLEXITY = 40
 
 
+_type_to_identified_type_cache = {}
+_type_name_use_count = {}
+_type_args_to_type = {}
+
+
 def llvmBool(i):
     return llvmlite.ir.Constant(llvm_i1, i)
 
@@ -50,6 +55,38 @@ def assertTagDictsSame(left_tags, right_tags):
             )
 
 
+def createOrLookupIdentifiedStruct(elementTypes, packed, nameHint):
+    """create or lookup the single identified struct with a given set of element types.
+
+    If the same struct is used with different name hints, only the first one is used. We do
+    this so that different structs with possibly different names can be used interchangeably,
+    which is not really how llvm thinks of things, since in llvm, two named types are in fact
+    completely separate entities.
+    """
+    key = (tuple(elementTypes), packed)
+
+    if key in _type_args_to_type:
+        return _type_args_to_type[key]
+
+    if nameHint:
+        _type_name_use_count[nameHint] = _type_name_use_count.setdefault(nameHint, 0) + 1
+        name = f"{nameHint}_{_type_name_use_count[nameHint]}"
+    else:
+        name = f'struct_{len(_type_args_to_type)}_unnamed'
+
+    structType = llvmlite.ir.global_context.get_identified_type(name)
+    _type_args_to_type[key] = structType
+
+    structType.set_body(
+        *[type_to_llvm_type(e) for e in elementTypes]
+    )
+    structType.packed = packed
+
+    _type_args_to_type[key] = structType
+
+    return structType
+
+
 def type_to_llvm_type(t):
     if t.matches.Void:
         return llvmlite.ir.VoidType()
@@ -58,10 +95,17 @@ def type_to_llvm_type(t):
         if not t.element_types:
             return llvmlite.ir.LiteralStructType([])
 
-        return llvmlite.ir.LiteralStructType(
-            [type_to_llvm_type(t[1]) for t in t.element_types],
-            packed=t.packed
+        if t in _type_to_identified_type_cache:
+            return _type_to_identified_type_cache[t]
+
+        structType = createOrLookupIdentifiedStruct(
+            [elt[1] for elt in t.element_types],
+            t.packed,
+            t.name
         )
+
+        _type_to_identified_type_cache[t] = structType
+        return structType
 
     if t.matches.Pointer:
         # llvm won't allow a void*, so we model it as a pointer to an empty struct instead
@@ -131,9 +175,10 @@ def constant_to_typed_llvm_value(module, builder, c):
         vals = [constant_to_typed_llvm_value(module, builder, const) for _, const in c.elements]
 
         if vals:
-            llvmType = llvmlite.ir.LiteralStructType(
-                [t.llvm_value.type for t in vals],
-                packed=c.packed
+            llvmType = createOrLookupIdentifiedStruct(
+                [t.native_type for t in vals],
+                c.packed,
+                ''
             )
         else:
             llvmType = llvmlite.ir.LiteralStructType([])
@@ -859,9 +904,15 @@ class FunctionConverter:
             names_and_args = [(a[0], self.convert(a[1])) for a in expr.args]
             names_and_types = [(a[0], a[1].native_type) for a in names_and_args]
             exprs = [a[1].llvm_value for a in names_and_args]
-            types = [a.type for a in exprs]
 
-            value = llvmlite.ir.Constant(llvmlite.ir.LiteralStructType(types, packed=expr.packed and types), None)
+            value = llvmlite.ir.Constant(
+                createOrLookupIdentifiedStruct(
+                    [n[1] for n in names_and_types],
+                    expr.packed,
+                    ''
+                ),
+                None
+            )
 
             for i in range(len(exprs)):
                 value = self.builder.insert_value(value, exprs[i], i)
