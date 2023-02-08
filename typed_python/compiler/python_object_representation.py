@@ -240,101 +240,99 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
             where the object is equivalent to dict[name]
     """
     if isinstance(f, CompilableBuiltin):
-        return TypedExpression(context, native_ast.nullExpr, f, False)
+        return TypedExpression(context, native_ast.emptyStructExpr, f, False)
 
     if f is hasattr:
-        return TypedExpression(context, native_ast.nullExpr, HasattrWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, HasattrWrapper(), False)
 
     if f is len:
-        return TypedExpression(context, native_ast.nullExpr, LenWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, LenWrapper(), False)
 
     if f is hash:
-        return TypedExpression(context, native_ast.nullExpr, HashWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, HashWrapper(), False)
 
     if f is slice:
-        return TypedExpression(context, native_ast.nullExpr, SliceWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, SliceWrapper(), False)
 
     if f is abs:
-        return TypedExpression(context, native_ast.nullExpr, AbsWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, AbsWrapper(), False)
 
     if f is min:
-        return TypedExpression(context, native_ast.nullExpr, MinWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, MinWrapper(), False)
 
     if f is max:
-        return TypedExpression(context, native_ast.nullExpr, MaxWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, MaxWrapper(), False)
 
     if f is any:
-        return TypedExpression(context, native_ast.nullExpr, AnyWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, AnyWrapper(), False)
 
     if f is all:
-        return TypedExpression(context, native_ast.nullExpr, AllWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, AllWrapper(), False)
 
     if f is repr:
-        return TypedExpression(context, native_ast.nullExpr, ReprWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, ReprWrapper(), False)
 
     if f is range:
         return pythonObjectRepresentation(context, compilableRange, owningGlobalScopeAndName)
 
     if f is bytes.maketrans:
-        return TypedExpression(context, native_ast.nullExpr, BytesMaketransWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, BytesMaketransWrapper(), False)
 
     if f is str.maketrans:
-        return TypedExpression(context, native_ast.nullExpr, StringMaketransWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, StringMaketransWrapper(), False)
 
     if f is isinstance:
-        return TypedExpression(context, native_ast.nullExpr, IsinstanceWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, IsinstanceWrapper(), False)
 
     if f is issubclass:
-        return TypedExpression(context, native_ast.nullExpr, IssubclassWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, IssubclassWrapper(), False)
 
     if f is bytecount:
-        return TypedExpression(context, native_ast.nullExpr, BytecountWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, BytecountWrapper(), False)
 
     if f is print:
-        return TypedExpression(context, native_ast.nullExpr, PrintWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, PrintWrapper(), False)
 
     if f is serialize:
-        return TypedExpression(context, native_ast.nullExpr, SerializeWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, SerializeWrapper(), False)
 
     if f is deserialize:
-        return TypedExpression(context, native_ast.nullExpr, DeserializeWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, DeserializeWrapper(), False)
 
     if f is time.time:
-        return TypedExpression(context, native_ast.nullExpr, TimeWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, TimeWrapper(), False)
 
     if f is super:
-        return TypedExpression(context, native_ast.nullExpr, SuperWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, SuperWrapper(), False)
 
     if f is pointerTo:
-        return TypedExpression(context, native_ast.nullExpr, PointerToObjectWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, PointerToObjectWrapper(), False)
 
     if f is refTo:
-        return TypedExpression(context, native_ast.nullExpr, RefToObjectWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, RefToObjectWrapper(), False)
 
     if f is isCompiled:
-        return TypedExpression(context, native_ast.nullExpr, IsCompiledWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, IsCompiledWrapper(), False)
 
     if f is typeKnownToCompiler:
-        return TypedExpression(context, native_ast.nullExpr, TypeKnownToCompiler(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, TypeKnownToCompiler(), False)
 
     if f is localVariableTypesKnownToCompiler:
-        return TypedExpression(context, native_ast.nullExpr, LocalVariableTypesKnownToCompiler(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, LocalVariableTypesKnownToCompiler(), False)
 
     if f is makeNamedTuple:
-        return TypedExpression(context, native_ast.nullExpr, MakeNamedTupleWrapper(), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, MakeNamedTupleWrapper(), False)
 
     if f in MathFunctionWrapper.SUPPORTED_FUNCTIONS:
-        return TypedExpression(context, native_ast.nullExpr, MathFunctionWrapper(f), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, MathFunctionWrapper(f), False)
 
     if f in BuiltinWrapper.SUPPORTED_FUNCTIONS:
-        return TypedExpression(context, native_ast.nullExpr, BuiltinWrapper(f), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, BuiltinWrapper(f), False)
 
     if f is None:
         return TypedExpression(
             context,
-            native_ast.Expression.Constant(
-                val=native_ast.Constant.Void()
-            ),
+            native_ast.emptyStructExpr,
             NoneWrapper(),
             False
         )
@@ -382,7 +380,7 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
         if functionIsCompilable(f):
             return TypedExpression(
                 context,
-                native_ast.nullExpr,
+                native_ast.emptyStructExpr,
                 PythonFreeFunctionWrapper(f),
                 False
             )
@@ -392,7 +390,7 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
     if isinstance(f, method_descriptor):
         return TypedExpression(
             context,
-            native_ast.nullExpr,
+            native_ast.emptyStructExpr,
             MethodDescriptorWrapper(f),
             False
         )
@@ -416,13 +414,13 @@ def pythonObjectRepresentation(context, f, owningGlobalScopeAndName=None):
             return context.constantTypedPythonObject(f, owningGlobalScopeAndName)
 
     if isinstance(f, type) and issubclass(f, TypeFunction) and len(f.MRO) == 2:
-        return TypedExpression(context, native_ast.nullExpr, PythonFreeObjectWrapper(f, False), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, PythonFreeObjectWrapper(f, False), False)
 
     if isinstance(f, type):
-        return TypedExpression(context, native_ast.nullExpr, PythonTypeObjectWrapper(f), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, PythonTypeObjectWrapper(f), False)
 
     if isinstance(f, ModuleType):
-        return TypedExpression(context, native_ast.nullExpr, ModuleWrapper(f), False)
+        return TypedExpression(context, native_ast.emptyStructExpr, ModuleWrapper(f), False)
 
     if isinstance(f, Type):
         # it's a typed python object at module level scope

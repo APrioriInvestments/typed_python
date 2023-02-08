@@ -422,6 +422,7 @@ class StringWrapper(RefcountedWrapper):
                 self.layoutType.zero()
             )
         )
+        return context.constant(None)
 
     def on_refcount_zero(self, context, instance):
         assert instance.isReference
@@ -1123,7 +1124,7 @@ class StringMaketransWrapper(Wrapper):
         super().__init__(str.maketrans)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, expr, args, kwargs):
         if not kwargs:

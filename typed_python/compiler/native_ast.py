@@ -41,7 +41,7 @@ def type_str(c):
     if c.matches.Struct:
         if c.name:
             return c.name
-        return "(" + ",".join("%s=%s"%(k, v) for k, v in c.element_types) + ")"
+        return "(" + ",".join("%s=%s"%(k, v) for k, v in c.element_types) + (", packed" if c.packed else '') + ")"
     if c.matches.Pointer:
         return "*" + str(c.value_type)
     if c.matches.Void:
@@ -56,13 +56,42 @@ def raising(e):
     raise e
 
 
+def typeZeroConstant(self):
+    if self.matches.Void:
+        return Constant.Void()
+
+    if self.matches.Float:
+        return Constant.Float(val=0.0, bits=self.bits)
+
+    if self.matches.Int:
+        return Constant.Int(val=0, bits=self.bits, signed=self.signed)
+
+    if self.matches.Struct:
+        return Constant.Struct(
+            elements=[(name, t.zeroConstant()) for name, t in self.element_types],
+            packed=self.packed
+        )
+
+    if self.matches.Pointer:
+        return Constant.NullPointer(value_type=self.value_type)
+
+    if self.matches.Array:
+        return Constant.Array(
+            value_type=self, values=[self.element_type.zeroConstant()] * self.count
+        )
+
+    raise Exception(f"Can't make a zero value from {self}")
+
+
 Type = Forward("Type")
 Type = Type.define(Alternative(
     "Type",
+    # the 'Void' type. should only be used in function signatures. Use an empty
+    # struct if you want the 'empty' data structure instead.
     Void={},
     Float={'bits': int},
     Int={'bits': int, 'signed': bool},
-    Struct={'element_types': TupleOf(Tuple(str, Type)), 'name': str},
+    Struct={'element_types': TupleOf(Tuple(str, Type)), 'name': str, 'packed': bool},
     Array={'element_type': Type, 'count': int},
     Function={'output': Type, 'args': TupleOf(Type), 'varargs': bool, 'can_throw': bool},
     Pointer={'value_type': Type},
@@ -70,14 +99,11 @@ Type = Type.define(Alternative(
     __str__=type_str,
     pointer=lambda self: Type.Pointer(value_type=self),
     zero=lambda self: Expression.Constant(self.zeroConstant()),
-    zeroConstant=lambda self:
-        Constant.Void() if self.matches.Void else
-        Constant.Float(val=0.0, bits=self.bits) if self.matches.Float else
-        Constant.Int(val=0, bits=self.bits, signed=self.signed) if self.matches.Int else
-        Constant.Struct(elements=[(name, t.zeroConstant()) for name, t in self.element_types]) if self.matches.Struct else
-        Constant.NullPointer(value_type=self.value_type) if self.matches.Pointer else
-        Constant.Array(value_type=self, values=[self.element_type.zeroConstant()] * self.count) if self.matches.Array else
-        raising(Exception("Can't make a zero value from %s" % self))
+    isEmpty=lambda self:
+        True if self.matches.Void else
+        all(valType.isEmpty() for keyType, valType in self.element_types) if self.matches.Struct
+        else False,
+    zeroConstant=typeZeroConstant
 ))
 
 
@@ -103,7 +129,7 @@ def const_str(c):
         else:
             return str(c.val) + ("s" if c.signed else "u") + str(c.bits)
     if c.matches.Struct:
-        return "(" + ",".join("%s=%s"%(k, v) for k, v in c.elements) + ")"
+        return "(" + ",".join("%s=%s"%(k, v) for k, v in c.elements) + (', packed' if c.packed else '') + ")"
     if c.matches.NullPointer:
         return "nullptr"
     if c.matches.Void:
@@ -120,7 +146,7 @@ Constant = Constant.define(Alternative(
     Void={},
     Float={'val': float, 'bits': int},
     Int={'val': int, 'bits': int, 'signed': bool},
-    Struct={'elements': TupleOf(Tuple(str, Constant))},
+    Struct={'elements': TupleOf(Tuple(str, Constant)), 'packed': bool},
     ByteArray={'val': bytes},
     Array={'value_type': Type, 'values': TupleOf(Constant)},
     NullPointer={'value_type': Type},
@@ -349,7 +375,7 @@ def expr_str(self):
             return "((%s) if %s else (%s))" % (t, str(self.cond), f)
     if self.matches.MakeStruct:
         return "struct(" + \
-            ",".join("%s=%s" % (k, str(v)) for k, v in self.args) + ")"
+            ",".join("%s=%s" % (k, str(v)) for k, v in self.args) + (',packed' if self.packed else '') + ")"
     if self.matches.While:
         t = str(self.while_true)
         f = str(self.orelse)
@@ -414,6 +440,8 @@ def expr_str(self):
         return "&func(%s)" % str(self.expr)
     if self.matches.Throw:
         return "throw (%s)" % str(self.expr)
+    if self.matches.Unreachable:
+        return "unreachable()"
     if self.matches.ActivatesTeardown:
         return "mark slot %s initialized" % self.name
     if self.matches.StackSlot:
@@ -543,7 +571,7 @@ Expression = Expression.define(Alternative(
     ElementPtr={'left': Expression, 'offsets': TupleOf(Expression)},
     Call={'target': CallTarget, 'args': TupleOf(Expression)},
     FunctionPointer={'target': NamedCallTarget},
-    MakeStruct={'args': TupleOf(Tuple(str, Expression))},
+    MakeStruct={'args': TupleOf(Tuple(str, Expression)), 'packed': bool},
     Branch={
         'cond': Expression,
         'true': Expression,
@@ -593,6 +621,7 @@ Expression = Expression.define(Alternative(
                 for index in offsets
             )
     ),
+    Unreachable={},
     __rshift__=expr_concatenate,
     __str__=expr_str,
     structElt=lambda self, ix: Expression.StructElementByIndex(left=self, index=ix),
@@ -640,8 +669,13 @@ def ensureExpr(x):
     return x.nonref_expr
 
 
+# 'void', which can only be used in function return types, or to indicate
+# a statement which has no return value
 nullExpr = Expression.Constant(val=Constant.Void())
+
+# used for 'empty' object.
 emptyStructExpr = Expression.Constant(val=Constant.Struct(elements=[]))
+
 trueExpr = Expression.Constant(val=Constant.Int(bits=1, val=1, signed=False))
 falseExpr = Expression.Constant(val=Constant.Int(bits=1, val=0, signed=False))
 

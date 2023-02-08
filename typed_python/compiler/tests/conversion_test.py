@@ -3777,3 +3777,23 @@ class TestCompilationStructures(unittest.TestCase):
         nt = getNamedTupleOfLists(100)
 
         slice(nt)
+
+    def test_while_with_return(self):
+        @Entrypoint
+        def f():
+            while True:
+                return
+
+        f()
+
+    def test_class_staticmethod(self):
+        class C:
+            @staticmethod
+            def f(x):
+                return x + 1
+
+        @Entrypoint
+        def callF(x):
+            return C.f(x)
+
+        assert callF.resultTypeFor(int).typeRepresentation is int

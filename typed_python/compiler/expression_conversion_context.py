@@ -82,7 +82,7 @@ class ExpressionConversionContext:
     def inputArg(self, type, name):
         return TypedExpression(
             self,
-            native_ast.Expression.Variable(name) if not type.is_empty else native_ast.nullExpr,
+            native_ast.Expression.Variable(name) if not type.is_empty else native_ast.emptyStructExpr,
             type,
             type.is_pass_by_ref
         )
@@ -340,7 +340,7 @@ class ExpressionConversionContext:
         if isinstance(x, float):
             return TypedExpression(self, native_ast.const_float_expr(x), float, False, constantValue=x)
         if x is None:
-            return TypedExpression(self, native_ast.nullExpr, type(None), False)
+            return TypedExpression(self, native_ast.emptyStructExpr, type(None), False)
 
         if id(x) in builtinValueIdToNameAndValue and builtinValueIdToNameAndValue[id(x)][1] is x:
             return self.constantPyObject(x)
@@ -358,7 +358,7 @@ class ExpressionConversionContext:
             t = typeWrapper(type(None))
 
         assert t.is_empty, t
-        return TypedExpression(self, native_ast.nullExpr, t, False)
+        return TypedExpression(self, native_ast.emptyStructExpr, t, False)
 
     def pushPod(self, type, expression):
         """stash an expression that generates POD passed as a value"""
@@ -393,6 +393,8 @@ class ExpressionConversionContext:
         """Push a native expression that has a side effect but no value, and that returns control flow."""
         if expression is None:
             return
+
+        assert isinstance(expression, native_ast.Expression)
 
         if expression == native_ast.nullExpr:
             return
@@ -506,21 +508,21 @@ class ExpressionConversionContext:
 
         return native_ast.Expression.StackSlot(name=varname, type=nativeType)
 
-    def push(self, type, callback, wantsTeardown=True):
+    def push(self, slotType, callback, wantsTeardown=True):
         """Allocate a stackvariable of type 'type' and pass it to 'callback' which should return
         a native_ast.Expression or TypedExpression(None) initializing it.
         """
-        type = typeWrapper(type)
+        slotType = typeWrapper(slotType)
 
-        if type.is_pod:
+        if slotType.is_pod:
             wantsTeardown = False
 
         varname = self.functionContext.allocateStackVarname()
 
         resExpr = TypedExpression(
             self,
-            native_ast.Expression.StackSlot(name=varname, type=type.getNativeLayoutType()),
-            type,
+            native_ast.Expression.StackSlot(name=varname, type=slotType.getNativeLayoutType()),
+            slotType,
             True
         )
 
@@ -544,7 +546,7 @@ class ExpressionConversionContext:
 
         if wantsTeardown:
             with self.subcontext() as sc:
-                type.convert_destroy(self, resExpr)
+                slotType.convert_destroy(self, resExpr)
 
             self.teardowns.append(
                 native_ast.Teardown.ByTag(
@@ -1272,6 +1274,11 @@ class ExpressionConversionContext:
             )
         )
 
+    def pushUnreachable(self):
+        self.pushEffect(
+            native_ast.Expression.Unreachable()
+        )
+
     def pushException(self, excType, *args, **kwargs):
         """Push a side-effect that throws an exception of type 'excType'.
 
@@ -1316,7 +1323,7 @@ class ExpressionConversionContext:
             kwarguments.append(self.getTypePointer(kwargVal.expr_type.typeRepresentation))
             kwarguments.append(native_ast.const_utf8_cstr(kwargName))
 
-        return self.pushEffect(
+        self.pushEffect(
             runtime_functions.call_pyobj_and_raise.call(
                 native_ast.const_int_expr(len(args)),
                 native_ast.const_int_expr(len(kwargs)),
@@ -1324,6 +1331,7 @@ class ExpressionConversionContext:
                 *kwarguments,
             )
         )
+        return self.pushEffect(native_ast.Expression.Unreachable())
 
     def pushExceptionClear(self):
         nativeExpr = (

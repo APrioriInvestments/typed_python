@@ -67,6 +67,7 @@ class RefcountedWrapper(Wrapper):
         context.pushEffect(
             expr.expr.store(other.nonref_expr)
         )
+        return context.constant(None)
 
     def convert_copy_initialize(self, context, expr, other):
         expr = expr.expr
@@ -91,17 +92,20 @@ class RefcountedWrapper(Wrapper):
                 native_ast.nullExpr
             )
 
+        return context.constant(None)
+
     def convert_destroy(self, context, target):
         res = context.expressionAsFunctionCall(
             "decref_" + str(self),
             (target,),
             lambda instance: self.convert_destroy_inner(instance.context, instance),
-            ("decref", self),
-            outputType=context.constant(None).expr_type
+            ("decref", self)
         )
 
         if res is not None:
             context.pushEffect(res.expr)
+
+        return context.constant(None)
 
     def convert_destroy_inner(self, context, target):
         assert isinstance(target, TypedExpression)
@@ -119,3 +123,5 @@ class RefcountedWrapper(Wrapper):
             with context.ifelse(self.get_refcount_ptr_expr(targetExpr).atomic_add(-1).eq(1)) as (subtrue, subfalse):
                 with subtrue:
                     context.pushEffect(self.on_refcount_zero(context, target))
+
+        return context.constant(None)

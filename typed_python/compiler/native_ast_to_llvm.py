@@ -55,7 +55,13 @@ def type_to_llvm_type(t):
         return llvmlite.ir.VoidType()
 
     if t.matches.Struct:
-        return llvmlite.ir.LiteralStructType(type_to_llvm_type(t[1]) for t in t.element_types)
+        if not t.element_types:
+            return llvmlite.ir.LiteralStructType([])
+
+        return llvmlite.ir.LiteralStructType(
+            [type_to_llvm_type(t[1]) for t in t.element_types],
+            packed=t.packed
+        )
 
     if t.matches.Pointer:
         # llvm won't allow a void*, so we model it as a pointer to an empty struct instead
@@ -122,13 +128,24 @@ def constant_to_typed_llvm_value(module, builder, c):
         return TypedLLVMValue(llvm_c, nt)
 
     if c.matches.Struct:
-        vals = [constant_to_typed_llvm_value(module, builder, t) for _, t in c.elements]
+        vals = [constant_to_typed_llvm_value(module, builder, const) for _, const in c.elements]
 
-        t = llvmlite.ir.LiteralStructType(type_to_llvm_type(t.llvm_value.type) for t in vals)
-        llvm_c = llvmlite.ir.Constant(t, [t.llvm_value for t in vals])
+        if vals:
+            llvmType = llvmlite.ir.LiteralStructType(
+                [t.llvm_value.type for t in vals],
+                packed=c.packed
+            )
+        else:
+            llvmType = llvmlite.ir.LiteralStructType([])
+
+        llvm_c = llvmlite.ir.Constant(
+            llvmType,
+            [t.llvm_value for t in vals]
+        )
 
         nt = native_ast.Type.Struct(
-            [(c.elements[i][0], vals[i].native_type) for i in range(len(vals))]
+            element_types=[(c.elements[i][0], vals[i].native_type) for i in range(len(vals))],
+            packed=c.packed
         )
 
         return TypedLLVMValue(llvm_c, nt)
@@ -173,10 +190,10 @@ class TypedLLVMValue:
     def __init__(self, llvm_value, native_type):
         object.__init__(self)
 
+        assert isinstance(native_type, native_ast.Type)
+
         if native_type.matches.Void:
-            if llvm_value is not None:
-                assert llvm_value.type == llvm_void
-                llvm_value = None
+            assert llvm_value is None
         else:
             assert llvm_value is not None
 
@@ -844,12 +861,15 @@ class FunctionConverter:
             exprs = [a[1].llvm_value for a in names_and_args]
             types = [a.type for a in exprs]
 
-            value = llvmlite.ir.Constant(llvmlite.ir.LiteralStructType(types), None)
+            value = llvmlite.ir.Constant(llvmlite.ir.LiteralStructType(types, packed=expr.packed and types), None)
 
             for i in range(len(exprs)):
                 value = self.builder.insert_value(value, exprs[i], i)
 
-            return TypedLLVMValue(value, native_ast.Type.Struct(element_types=names_and_types))
+            return TypedLLVMValue(
+                value,
+                native_ast.Type.Struct(element_types=names_and_types, packed=expr.packed)
+            )
 
         if expr.matches.StructElementByIndex:
             val = self.convert(expr.left)
@@ -980,6 +1000,10 @@ class FunctionConverter:
 
                     if not self.output_type.matches.Void:
                         assert self.return_slot is not None
+                        assert arg.llvm_value is not None, (
+                            f"can't return empty instance of {arg.native_type} to {self.output_type}"
+                        )
+
                         self.builder.store(arg.llvm_value, self.return_slot)
 
                 controlFlowSwitch = self.teardown_handler.controlFlowSwitchForReturn(name=None)
@@ -1411,6 +1435,10 @@ class FunctionConverter:
 
             return result
 
+        if expr.matches.Unreachable:
+            self.builder.unreachable()
+            return None
+
         if expr.matches.FunctionPointer:
             return self.namedCallTargetToLLVM(expr.target)
 
@@ -1643,10 +1671,13 @@ class Converter:
                     func_converter.finalize()
 
                     if res is not None:
-                        assert res.llvm_value is None
                         if definition.output_type != native_ast.Void:
-                            if not builder.block.is_terminated:
-                                builder.unreachable()
+                            assert not builder.block.is_terminated
+                            assert definition.output_type == res.native_type, (
+                                definition.output_type, res.native_type
+                            )
+
+                            builder.ret(res.llvm_value)
                         else:
                             builder.ret_void()
                     else:
@@ -1655,6 +1686,8 @@ class Converter:
 
                 except Exception:
                     print("function failing = " + name)
+                    import traceback
+                    traceback.print_exc()
                     raise
 
             # each function listed here was deemed 'inlinable', which means that we

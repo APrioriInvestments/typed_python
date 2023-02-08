@@ -31,7 +31,7 @@ class MethodDescriptorWrapper(Wrapper):
         self.methodName = f.__name__
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, left, args, kwargs):
         if not args:

@@ -26,7 +26,7 @@ class PythonFreeFunctionWrapper(Wrapper):
         super().__init__(Value(f))
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, left, args, kwargs):
         return context.call_py_function(self.typeRepresentation.Value, args, kwargs)

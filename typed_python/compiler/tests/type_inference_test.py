@@ -15,7 +15,7 @@ import pytest
 
 from typed_python import (
     Function, OneOf, Alternative,
-    Value, ListOf, NotCompiled, TupleOf, Tuple, UInt8,
+    Value, ListOf, NotCompiled, TupleOf, Tuple, UInt8, Class, Member,
     typeKnownToCompiler,
     localVariableTypesKnownToCompiler
 )
@@ -433,3 +433,21 @@ class TestTypeInference(unittest.TestCase):
 
         assert f.resultTypeFor(str).typeRepresentation is str
         assert f.resultTypeFor(type(None)).typeRepresentation is str
+
+    @pytest.mark.skipif("sys.version_info.minor < 8")
+    def test_isintance_prunes_subclass(self):
+        class C(Class):
+            pass
+
+        class B(C):
+            x = Member(int)
+
+            def f(self) -> int:
+                pass
+
+        @Entrypoint
+        def f(x: C):
+            assert isinstance(x, B)
+            return x.x
+
+        assert f.resultTypeFor(C).typeRepresentation is int

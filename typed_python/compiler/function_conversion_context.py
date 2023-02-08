@@ -2538,6 +2538,9 @@ class FunctionConversionContext(ConversionContextBase):
 
         seq_expr = native_ast.makeSequence([expr for expr, _ in exprAndReturns])
 
+        if toplevel and flows_off_end is False:
+            seq_expr = seq_expr >> native_ast.Expression.Unreachable()
+
         return seq_expr, exprAndReturns[-1][1] if exprAndReturns else True
 
     def handleFlowsOffEnd(self, variableStates: FunctionStackState):

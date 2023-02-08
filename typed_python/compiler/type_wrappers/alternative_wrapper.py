@@ -133,12 +133,14 @@ class SimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
         context.pushEffect(
             instance.expr.store(native_ast.const_uint8_expr(0))
         )
+        return context.constant(None)
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
         )
+        return context.constant(None)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:
@@ -210,6 +212,7 @@ class ConcreteSimpleAlternativeWrapper(AlternativeWrapperMixin, Wrapper):
         context.pushEffect(
             instance.expr.store(native_ast.const_uint8_expr(self.typeRepresentation.Index))
         )
+        return context.constant(None)
 
     def convert_to_type_with_target(self, context, instance, targetVal, conversionLevel, mayThrowOnFailure=False):
         assert targetVal.isReference
@@ -299,7 +302,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
     def convert_default_initialize(self, context, instance):
         defaultType = self.alternativeType.__typed_python_alternatives__[0]
 
-        typeWrapper(defaultType).convert_default_initialize(
+        return typeWrapper(defaultType).convert_default_initialize(
             context,
             instance.changeType(defaultType)
         )
@@ -310,7 +313,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
                 "destructor_" + str(self.typeRepresentation),
                 ('destructor', self),
                 [self],
-                typeWrapper(type(None)),
+                None,
                 self.generateNativeDestructorFunction
             )
             .call(instance)
@@ -398,6 +401,8 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
 
         if len(validIndices) != len(self.alternatives):
             context.pushException(AttributeError, attr)
+        else:
+            context.pushUnreachable()
 
     def convert_check_matches(self, context, instance, typename):
         index = -1

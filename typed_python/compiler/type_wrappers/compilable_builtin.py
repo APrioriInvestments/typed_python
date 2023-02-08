@@ -45,7 +45,7 @@ class CompilableBuiltin(Wrapper):
         super().__init__(type(None))
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def getCompileTimeConstant(self):
         return self

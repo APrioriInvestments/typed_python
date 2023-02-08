@@ -532,7 +532,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             "destructor_" + str(self.typeRepresentation),
             ('destructor', self),
             [self],
-            typeWrapper(type(None)),
+            None,
             self.generateNativeDestructorFunction
         )
 
@@ -554,9 +554,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             if not typeWrapper(self.typeRepresentation.MemberTypes[i]).is_pod:
                 with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(instance, i))) as (true_block, false_block):
                     with true_block:
-                        context.pushEffect(
-                            self.convert_attribute(context, instance, i, nocheck=True).convert_destroy()
-                        )
+                        self.convert_attribute(context, instance, i, nocheck=True).convert_destroy()
 
         context.pushEffect(runtime_functions.free.call(self.get_layout_pointer(instance).cast(native_ast.UInt8Ptr)))
 

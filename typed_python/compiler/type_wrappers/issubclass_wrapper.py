@@ -25,7 +25,7 @@ class IssubclassWrapper(Wrapper):
         super().__init__(issubclass)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     @Wrapper.unwrapOneOfAndValue
     def convert_call(self, context, expr, args, kwargs):

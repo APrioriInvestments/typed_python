@@ -343,7 +343,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
                 "destructor_" + str(self.typeRepresentation),
                 ('destructor', self),
                 [self],
-                typeWrapper(type(None)),
+                None,
                 self.generateNativeDestructorFunction
             )
             .call(instance)
@@ -791,6 +791,7 @@ class TupleOfWrapper(TupleOrListOfWrapper):
         context.pushEffect(
             tgt.expr.store(tgt.expr_type.getNativeLayoutType().zero())
         )
+        return context.constant(None)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 1 and args[0].expr_type == self and not kwargs:

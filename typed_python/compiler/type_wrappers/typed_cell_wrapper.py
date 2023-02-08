@@ -68,6 +68,7 @@ class TypedCellWrapper(RefcountedWrapper):
             out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>  # refcount
             out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int_expr(0))  # isinitialized
         )
+        return context.constant(None)
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -80,7 +81,7 @@ class TypedCellWrapper(RefcountedWrapper):
                 "destructor_" + str(self.typeRepresentation),
                 ('destructor', self),
                 [self],
-                typeWrapper(type(None)),
+                None,
                 self.generateNativeDestructorFunction
             )
             .call(instance)

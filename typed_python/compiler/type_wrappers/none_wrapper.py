@@ -33,19 +33,19 @@ class NoneWrapper(Wrapper):
         return False
 
     def convert_default_initialize(self, context, target):
-        pass
+        return context.constant(None)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_assign(self, context, target, toStore):
-        pass
+        return context.constant(None)
 
     def convert_copy_initialize(self, context, target, toStore):
-        pass
+        return context.constant(None)
 
     def convert_destroy(self, context, instance):
-        pass
+        return context.constant(None)
 
     def convert_hash(self, context, expr):
         return context.constant(Int32(0))

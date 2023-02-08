@@ -51,19 +51,19 @@ class ValueWrapper(Wrapper):
         return generator(context.constant(self.typeRepresentation.Value))
 
     def convert_default_initialize(self, context, target):
-        pass
+        return context.constant(None)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_assign(self, context, target, toStore):
-        pass
+        return context.constant(None)
 
     def convert_copy_initialize(self, context, target, toStore):
-        pass
+        return context.constant(None)
 
     def convert_destroy(self, context, instance):
-        pass
+        return context.constant(None)
 
     def convert_unary_op(self, context, left, op):
         return context.constant(self.typeRepresentation.Value).convert_unary_op(op)

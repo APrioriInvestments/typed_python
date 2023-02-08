@@ -178,7 +178,6 @@ class TupleWrapper(Wrapper):
     def __init__(self, t):
         assert hasattr(t, '__typed_python_category__')
         super().__init__(t)
-        bytecount = _types.bytecount(t)
 
         self.subTypeWrappers = tuple(typeWrapper(sub_t) for sub_t in t.ElementTypes)
         self._unionType = None
@@ -191,7 +190,21 @@ class TupleWrapper(Wrapper):
             for i in range(len(self.subTypeWrappers)-1):
                 self.byteOffsets.append(self.byteOffsets[-1] + _types.bytecount(t.ElementTypes[i]))
 
-        self.layoutType = native_ast.Type.Array(element_type=native_ast.UInt8, count=bytecount)
+        structArgs = []
+        for i in range(len(self.subTypeWrappers)):
+            nlt = self.subTypeWrappers[i].getNativeLayoutType()
+
+            assert isinstance(nlt, native_ast.Type)
+            assert not nlt.matches.Void, (self.subTypeWrappers[i], type(self.subTypeWrappers[i]))
+
+            structArgs.append(
+                (f'elt_{i}', nlt)
+            )
+
+        self.layoutType = native_ast.Type.Struct(
+            element_types=structArgs,
+            packed=True
+        )
 
         self._is_pod = all(typeWrapper(possibility).is_pod for possibility in self.subTypeWrappers)
         self.is_default_constructible = _types.is_default_constructible(t)
@@ -260,16 +273,19 @@ class TupleWrapper(Wrapper):
                 self.refAs(context, target, i).convert_default_initialize()
 
     def refAs(self, context, expr, which):
+        assert isinstance(which, int)
+
         if not expr.isReference:
             expr = context.pushMove(expr)
 
-        assert which < len(self.subTypeWrappers), (which, self)
+        if which < 0:
+            which += len(self.subTypeWrappers)
+
+        assert 0 <= which < len(self.subTypeWrappers), (which, self)
 
         return context.pushReference(
             self.subTypeWrappers[which],
-            expr.expr.cast(native_ast.UInt8Ptr)
-                .ElementPtrIntegers(self.byteOffsets[which])
-                .cast(self.subTypeWrappers[which].getNativeLayoutType().pointer())
+            expr.expr.ElementPtrIntegers(0, which)
         )
 
     def convert_len(self, context, instance):
@@ -342,15 +358,18 @@ class TupleWrapper(Wrapper):
 
         for i in range(len(self.subTypeWrappers)):
             self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
+        return context.constant(None)
 
     def convert_copy_initialize(self, context, expr, other):
         for i in range(len(self.subTypeWrappers)):
             self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
+        return context.constant(None)
 
     def convert_destroy(self, context, expr):
         if not self.is_pod:
             for i in range(len(self.subTypeWrappers)):
                 self.refAs(context, expr, i).convert_destroy()
+        return context.constant(None)
 
     def get_iteration_expressions(self, context, expr):
         if self.has_intiter() or self.has_method("__iter__"):

@@ -325,7 +325,7 @@ class SetWrapper(RefcountedWrapper):
                 "destructor_" + str(self.typeRepresentation),
                 ('destructor', self),
                 [self],
-                typeWrapper(type(None)),
+                None,
                 self.generateNativeDestructorFunction
             ).call(instance)
         )
@@ -348,6 +348,7 @@ class SetWrapper(RefcountedWrapper):
                 runtime_functions.table_create.call().cast(self.layoutType)
             )
         )
+        return context.constant(None)
 
     def convert_attribute(self, context, expr, attr):
         if attr in (

@@ -1265,6 +1265,7 @@ class BytesWrapper(RefcountedWrapper):
                 self.layoutType.zero()
             )
         )
+        return context.constant(None)
 
     def convert_attribute(self, context, instance, attr: str):
         """Generates code for bytes attribute operation.
@@ -1851,7 +1852,7 @@ class BytesMaketransWrapper(Wrapper):
     def getNativeLayoutType(self):
         """bytes.maketrans has no layout.
         """
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, expr, args, kwargs):
         """Generate code for calling the bytes.maketrans static builtin function.

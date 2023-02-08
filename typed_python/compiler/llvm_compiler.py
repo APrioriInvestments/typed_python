@@ -149,7 +149,7 @@ class Compiler:
             mod = llvm.parse_assembly(module.moduleText)
             mod.verify()
         except Exception:
-            print("failing: ", module)
+            print("failing:\n\n", module.moduleText)
             raise
 
         # Now add the module and make sure it is ready for execution

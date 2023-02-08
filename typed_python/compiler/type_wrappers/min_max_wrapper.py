@@ -145,7 +145,7 @@ class MinMaxWrapper(Wrapper):
         super().__init__(builtin)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, expr, args, kwargs0):
         kwargs = kwargs0.copy()

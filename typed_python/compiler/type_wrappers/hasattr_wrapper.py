@@ -27,7 +27,7 @@ class HasattrWrapper(Wrapper):
         super().__init__(time.time)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, expr, args, kwargs):
         if len(args) == 2 and len(kwargs) == 0:

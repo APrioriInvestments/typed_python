@@ -102,8 +102,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 if count is None:
                     return
 
-                return context.pushPod(
-                    None,
+                context.pushEffect(
                     context.converter.defineNativeFunction(
                         'resize(' + self.typeRepresentation.__name__ + ")",
                         ('util', self, 'resize'),
@@ -112,6 +111,8 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         self.generateResize
                     ).call(instance, count)
                 )
+                return context.constant(None)
+
             if len(args) == 2:
                 count = args[0].toInt64()
                 if count is None:
@@ -121,8 +122,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 if val is None:
                     return
 
-                return context.pushPod(
-                    None,
+                context.pushEffect(
                     context.converter.defineNativeFunction(
                         'resize(' + self.typeRepresentation.__name__ + ")",
                         ('util', self, 'resize'),
@@ -131,6 +131,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         self.generateResize
                     ).call(instance, count, val)
                 )
+                return context.constant(None)
 
         if methodname == "extend":
             if len(args) == 1:
@@ -142,8 +143,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 if val is None:
                     return
 
-                return context.pushPod(
-                    None,
+                context.pushEffect(
                     context.converter.defineNativeFunction(
                         'append(' + self.typeRepresentation.__name__ + ")",
                         ('util', self, 'append'),
@@ -152,6 +152,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         self.generateAppend
                     ).call(instance, val)
                 )
+                return context.constant(None)
 
         if methodname == "copy":
             if len(args) == 0:
@@ -168,8 +169,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 )
         if methodname == "clear":
             if len(args) == 0:
-                return context.pushPod(
-                    None,
+                context.pushEffect(
                     context.converter.defineNativeFunction(
                         'clear(' + self.typeRepresentation.__name__ + ")",
                         ('util', self, 'clear'),
@@ -178,6 +178,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         self.generateClear
                     ).call(instance)
                 )
+                return context.constant(None)
 
         if methodname == "reserve":
             if len(args) == 1:
@@ -185,8 +186,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 if count is None:
                     return
 
-                return context.pushPod(
-                    None,
+                context.pushEffect(
                     context.converter.defineNativeFunction(
                         'reserve(' + self.typeRepresentation.__name__ + ")",
                         ('util', self, 'reserve'),
@@ -195,6 +195,9 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         self.generateReserve
                     ).call(instance, count)
                 )
+
+                return context.constant(None)
+
         if methodname == "reserved":
             if len(args) == 0:
                 return context.pushPod(
@@ -354,6 +357,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 self.createEmptyList
             ).call(tgt)
         )
+        return context.constant(None)
 
     def createEmptyList(self, context, out):
         context.pushEffect(

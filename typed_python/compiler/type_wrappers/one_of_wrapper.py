@@ -120,10 +120,7 @@ class OneOfWrapper(Wrapper):
                         converted_res = exprs[i].convert_to_type(output_type, conversionLevel=ConversionLevel.Signature)
 
                         if converted_res is not None:
-                            context.pushEffect(
-                                out_slot.convert_copy_initialize(converted_res)
-                            )
-
+                            out_slot.convert_copy_initialize(converted_res)
                             context.markUninitializedSlotInitialized(out_slot)
 
         return out_slot
@@ -331,6 +328,7 @@ class OneOfWrapper(Wrapper):
             temp = context.pushMove(expr)
             expr.convert_copy_initialize(other)
             temp.convert_destroy()
+        return context.constant(None)
 
     def unambiguousTypeIndexFor(self, subtype):
         """Given a TP type 'subtype', is there one and only one of our types it could be?
@@ -369,18 +367,19 @@ class OneOfWrapper(Wrapper):
             context.pushEffect(
                 expr.expr.store(other.nonref_expr)
             )
-            return
+            return context.constant(None)
 
         res = context.expressionAsFunctionCall(
             "copy_initialize_" + str(self),
             (expr, other),
             lambda instance, other: self.convert_copy_initialize_inner(instance.context, instance, other),
-            ("copy_initialize_", self),
-            outputType=context.constant(None).expr_type
+            ("copy_initialize_", self)
         )
 
         if res is not None:
             context.pushEffect(res.expr)
+
+        return context.constant(None)
 
     def convert_copy_initialize_inner(self, context, expr, other):
         assert expr.isReference
@@ -396,20 +395,23 @@ class OneOfWrapper(Wrapper):
                         expr.expr.ElementPtrIntegers(0, 0).store(native_ast.const_uint8_expr(ix))
                     )
 
+        return context.constant(None)
+
     def convert_destroy(self, context, target):
         if self.is_pod:
-            return
+            return context.constant(None)
 
         res = context.expressionAsFunctionCall(
             "decref_" + str(self),
             (target,),
             lambda instance: self.convert_destroy_inner(instance.context, instance),
-            ("decref", self),
-            outputType=context.constant(None).expr_type
+            ("decref", self)
         )
 
         if res is not None:
             context.pushEffect(res.expr)
+
+        return context.constant(None)
 
     def convert_destroy_inner(self, context, expr):
         if not self.is_pod:
@@ -419,6 +421,8 @@ class OneOfWrapper(Wrapper):
                 for ix, subcontext in indicesAndContexts:
                     with subcontext:
                         self.refAs(context, expr, ix).convert_destroy()
+
+        return context.constant(None)
 
     def _can_convert_to_type(self, otherType, conversionLevel) -> OneOf(False, True, "Maybe"):  # noqa
         if otherType == self:

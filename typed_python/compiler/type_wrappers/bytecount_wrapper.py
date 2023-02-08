@@ -27,7 +27,7 @@ class BytecountWrapper(Wrapper):
         super().__init__(bytecount)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, expr, args, kwargs):
         if len(args) == 1 and isinstance(args[0].expr_type, PythonTypeObjectWrapper) and not kwargs:

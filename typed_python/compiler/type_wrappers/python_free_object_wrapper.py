@@ -35,13 +35,13 @@ class PythonFreeObjectWrapper(Wrapper):
         self.hasSideEffects = hasSideEffects
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def getCompileTimeConstant(self):
         return self.typeRepresentation.Value
 
     def convert_default_initialize(self, context, instance):
-        pass
+        return context.constant(None)
 
     def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type == self:

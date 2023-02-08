@@ -138,6 +138,7 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
                         with self_true_block:
                             self.memberRef(expr, i).convert_destroy()
                             context.pushEffect(self.clearIsInitializedExpr(expr, i))
+        return context.constant(None)
 
     def convert_copy_initialize(self, context, expr, other):
         for i in range(len(self.classType.MemberTypes)):
@@ -147,6 +148,7 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
                     context.pushEffect(self.setIsInitializedExpr(expr, i))
                 with false_block:
                     context.pushEffect(self.clearIsInitializedExpr(expr, i))
+        return context.constant(None)
 
     def convert_default_initialize(self, context, instance):
         for i in range(len(self.classType.MemberTypes)):
@@ -164,6 +166,7 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
                 context.pushEffect(self.setIsInitializedExpr(instance, i))
             else:
                 context.pushEffect(self.clearIsInitializedExpr(instance, i))
+        return context.constant(None)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         # pack the named arguments onto the back of the call, and pass
@@ -266,9 +269,9 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
             if not typeWrapper(self.classType.MemberTypes[i]).is_pod:
                 with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(instance, i))) as (true_block, false_block):
                     with true_block:
-                        context.pushEffect(
-                            self.memberRef(instance, i).convert_destroy()
-                        )
+                        self.memberRef(instance, i).convert_destroy()
+
+        return context.constant(None)
 
     def memberRef(self, instance, ix):
         return TypedExpression(

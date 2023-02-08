@@ -67,7 +67,7 @@ class ArithmeticTypeWrapper(Wrapper):
         return False
 
     def convert_default_initialize(self, context, target):
-        self.convert_copy_initialize(
+        return self.convert_copy_initialize(
             context,
             target,
             typed_python.compiler.python_object_representation.pythonObjectRepresentation(
@@ -81,15 +81,17 @@ class ArithmeticTypeWrapper(Wrapper):
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
         )
+        return context.constant(None)
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
         )
+        return context.constant(None)
 
     def convert_destroy(self, context, instance):
-        pass
+        return context.constant(None)
 
     def convert_index_cast(self, context, expr):
         if expr.expr_type.typeRepresentation is float:

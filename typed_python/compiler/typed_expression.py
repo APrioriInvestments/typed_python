@@ -44,6 +44,7 @@ class TypedExpression:
 
         assert isinstance(t, Wrapper) or t is None, t
         assert isinstance(expr, native_ast.Expression), expr
+        assert expr != native_ast.nullExpr
 
         self.context = context
         self.expr = expr
@@ -159,8 +160,6 @@ class TypedExpression:
             return self.expr
 
         if self.isReference:
-            if self.expr_type.is_empty:
-                return self.expr >> native_ast.nullExpr
             return self.expr.load()
         else:
             return self.expr

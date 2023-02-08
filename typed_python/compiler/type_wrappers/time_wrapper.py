@@ -28,7 +28,7 @@ class TimeWrapper(Wrapper):
         super().__init__(time.time)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, expr, args, kwargs):
         return context.pushPod(

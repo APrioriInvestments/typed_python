@@ -304,12 +304,13 @@ class Wrapper:
             context.pushEffect(
                 target.expr.store(toStore.nonref_expr)
             )
+            return context.constant(None)
         else:
             raise NotImplementedError()
 
     def convert_destroy(self, context, instance):
         if self.is_pod:
-            pass
+            return context.constant(None)
         else:
             raise NotImplementedError()
 

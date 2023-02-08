@@ -31,7 +31,7 @@ class RefToObjectWrapper(Wrapper):
         super().__init__(refTo)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     @Wrapper.unwrapOneOfAndValue
     def convert_call(self, context, expr, args, kwargs):
@@ -62,12 +62,14 @@ class RefToWrapper(Wrapper):
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
         )
+        return context.constant(None)
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
         )
+        return context.constant(None)
 
     def deref(self, instance):
         return TypedExpression(
@@ -78,7 +80,7 @@ class RefToWrapper(Wrapper):
         )
 
     def convert_destroy(self, context, instance):
-        pass
+        return context.constant(None)
 
     def _can_convert_to_type(self, targetType, conversionLevel):
         return self.underlyingTypeWrapper._can_convert_to_type(targetType, conversionLevel)

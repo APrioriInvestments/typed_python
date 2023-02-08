@@ -65,7 +65,7 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
                     False
                 )
             )
-            return
+            return context.constant(None)
 
         context.pushException(TypeError, "Can't default-initialize %s" % self.typeRepresentation.__qualname__)
 
@@ -143,12 +143,13 @@ class PythonObjectOfTypeWrapper(RefcountedWrapper):
         if itemAsObj is None:
             return None
 
-        return context.pushEffect(
+        context.pushEffect(
             runtime_functions.delitem_pyobj.call(
                 instance.nonref_expr.cast(VoidPtr),
                 itemAsObj.nonref_expr.cast(VoidPtr)
             )
         )
+        return context.constant(None)
 
     def convert_unary_op(self, context, l, op):
         tgt = runtime_functions.pyOpToUnaryCallTarget.get(op)

@@ -26,7 +26,7 @@ class PrintWrapper(Wrapper):
         super().__init__(print)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, expr, args, kwargs):
         sep = context.constant(" ")

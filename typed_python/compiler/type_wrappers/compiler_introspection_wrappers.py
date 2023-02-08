@@ -31,7 +31,7 @@ class IsCompiledWrapper(Wrapper):
         super().__init__(isCompiled)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, expr, args, kwargs):
         if args or kwargs:
@@ -49,7 +49,7 @@ class TypeKnownToCompiler(Wrapper):
         super().__init__(typeKnownToCompiler)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, expr, args, kwargs):
         if len(args) != 1 or kwargs:
@@ -70,7 +70,7 @@ class LocalVariableTypesKnownToCompiler(Wrapper):
         super().__init__(localVariableTypesKnownToCompiler)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, expr, args, kwargs):
         if args or kwargs:

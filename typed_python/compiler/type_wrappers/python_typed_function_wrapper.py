@@ -72,17 +72,17 @@ class PythonTypedFunctionWrapper(Wrapper):
         return self.closureWrapper.is_pass_by_ref
 
     def convert_copy_initialize(self, context, expr, other):
-        expr.changeType(self.closureWrapper).convert_copy_initialize(
+        return expr.changeType(self.closureWrapper).convert_copy_initialize(
             other.changeType(self.closureWrapper)
         )
 
     def convert_assign(self, context, expr, other):
-        expr.changeType(self.closureWrapper).convert_assign(
+        return expr.changeType(self.closureWrapper).convert_assign(
             other.changeType(self.closureWrapper)
         )
 
     def convert_destroy(self, context, expr):
-        expr.changeType(self.closureWrapper).convert_destroy()
+        return expr.changeType(self.closureWrapper).convert_destroy()
 
     def convert_default_initialize(self, context, target):
         # we are only default initializable if our closure has no data.

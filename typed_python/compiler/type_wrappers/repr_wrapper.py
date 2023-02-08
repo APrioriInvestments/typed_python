@@ -25,7 +25,7 @@ class ReprWrapper(Wrapper):
         super().__init__(len)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     def convert_call(self, context, expr, args, kwargs):
         if len(args) == 1 and not kwargs:

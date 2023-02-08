@@ -410,7 +410,7 @@ class ConstDictWrapper(RefcountedWrapper):
                     "destructor_" + str(self.constDictType),
                     ('destructor', self),
                     [self],
-                    typeWrapper(type(None)),
+                    None,
                     self.generateNativeDestructorFunction
                 )
                 .call(instance)
@@ -461,6 +461,7 @@ class ConstDictWrapper(RefcountedWrapper):
         context.pushEffect(
             instance.expr.store(self.layoutType.zero())
         )
+        return context.constant(None)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         if methodname == "get" and not kwargs:

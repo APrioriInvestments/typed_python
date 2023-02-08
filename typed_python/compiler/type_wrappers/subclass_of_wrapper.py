@@ -36,12 +36,14 @@ class SubclassOfWrapper(Wrapper):
         context.pushEffect(
             target.expr.store(context.getTypePointer(self.typeRepresentation.Type))
         )
+        return context.constant(None)
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
         )
+        return context.constant(None)
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
@@ -49,8 +51,10 @@ class SubclassOfWrapper(Wrapper):
             target.expr.store(toStore.nonref_expr)
         )
 
+        return context.constant(None)
+
     def convert_destroy(self, context, instance):
-        pass
+        return context.constant(None)
 
     def _can_convert_to_type(self, otherType, conversionLevel):
         classCouldBeInstanceOf = (

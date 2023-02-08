@@ -34,7 +34,7 @@ class PointerToObjectWrapper(Wrapper):
         super().__init__(pointerTo)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct()
 
     @Wrapper.unwrapOneOfAndValue
     def convert_call(self, context, expr, args, kwargs):
@@ -58,7 +58,7 @@ class PointerToWrapper(Wrapper):
         return self.layoutType
 
     def convert_default_initialize(self, context, target):
-        self.convert_copy_initialize(
+        return self.convert_copy_initialize(
             context,
             target,
             typed_python.compiler.python_object_representation.pythonObjectRepresentation(context, self.typeRepresentation())
@@ -69,15 +69,17 @@ class PointerToWrapper(Wrapper):
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
         )
+        return context.constant(None)
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
         )
+        return context.constant(None)
 
     def convert_destroy(self, context, instance):
-        pass
+        return context.constant(None)
 
     def convert_bin_op(self, context, left, op, right, inplace):
         if op.matches.Add:
