@@ -241,6 +241,10 @@ class Wrapper:
 
             return instance.changeType(BoundMethodWrapper.Make(self, attribute))
 
+        return self.convert_unknown_attribute(context, instance, attribute)
+
+    def convert_unknown_attribute(self, context, instance, attribute):
+        """Convert an attribute call that didn't succeed in a lookup in an normal way."""
         return context.pushException(
             AttributeError,
             "'%s' object has no attribute '%s'" % (self, attribute)

@@ -683,6 +683,13 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             self.memberPtr(instance, ix)
         )
 
+    def convert_unknown_attribute(self, context, instance, attribute):
+        if self.typeRepresentation.IsFinal:
+            return super().convert_unknown_attribute(context, instance, attribute)
+        else:
+            # we're not final - so we can't actually tell whether this attribute exists.
+            return instance.toPyObj().convert_attribute(attribute)
+
     def resultTypesForCall(self, func, argTypes, kwargTypes):
         resultTypes = set()
 

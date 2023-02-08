@@ -3030,3 +3030,36 @@ class TestClassCompilationCompilation(unittest.TestCase):
             return c.f(x)
 
         call(C(), N(x=10))
+
+    def test_class_downcast_in_staticmethod(self):
+        class BaseClass(Class):
+            pass
+
+        class ChildClass(BaseClass):
+            x = Member(int)
+
+        class SomeClass:
+            @staticmethod
+            def f(c):
+                assert isinstance(c, ChildClass)
+                return c.x
+
+        @Entrypoint
+        def callIt(c: BaseClass):
+            return SomeClass.f(c)
+
+        callIt(ChildClass(x=20))
+
+    def test_access_nonexistent_class_attribute_on_nonfinal(self):
+        class BaseClass(Class):
+            pass
+
+        class ChildClass(BaseClass):
+            x = Member(int)
+
+        @Entrypoint
+        def callIt(c: BaseClass):
+            return c.x
+
+        assert callIt(ChildClass(x=20)) == 20
+        assert callIt.resultTypeFor(BaseClass).interpreterTypeRepresentation is object
