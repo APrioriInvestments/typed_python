@@ -256,3 +256,12 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         assert addIt((1, 2), 3) == (3, 1, 2)
         assert addItLst((1, 2), 3) == (3, 1, 2)
+
+    def test_tuple_of_from_str_list_comp(self):
+        @Entrypoint
+        def makeIt(x: list):
+            return TupleOf(str)(val for val in x)
+
+        someStrings = ['a', 'b']
+
+        assert makeIt(someStrings) == tuple(someStrings)

@@ -726,9 +726,31 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         if argExpr.matches.ListComp or argExpr.matches.GeneratorExp:
             # simply build this as a listcomp and remove the masquerade
             res = context.convert_generator_as_list_comprehension(argExpr)
+
             if res is None:
                 return res
-            return res.changeType(self)
+
+            if res.expr_type.isMasquerade:
+                res = res.convert_masquerade_to_typed()
+
+            # if its a tuple and we're a list or vice versa, we can change it directly
+            # since the generator will only allow a single refcount to the object and they
+            # are binary compatible.
+            if (
+                issubclass(self.typeRepresentation, ListOf)
+                and issubclass(res.expr_type.typeRepresentation, TupleOf)
+            ):
+                res = res.changeType(ListOf(res.expr_type.typeRepresentation.ElementType))
+            elif (
+                issubclass(self.typeRepresentation, TupleOf)
+                and issubclass(res.expr_type.typeRepresentation, ListOf)
+            ):
+                res = res.changeType(TupleOf(res.expr_type.typeRepresentation.ElementType))
+
+            if res.expr_type == self:
+                return res
+
+            return res.convert_to_type(self, ConversionLevel.New)
 
         return super().convert_type_call_on_container_expression(context, typeInst, argExpr)
 

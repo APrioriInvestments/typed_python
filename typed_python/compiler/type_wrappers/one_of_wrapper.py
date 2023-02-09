@@ -127,7 +127,7 @@ class OneOfWrapper(Wrapper):
 
     def convert_attribute(self, context, instance, attribute):
         return context.expressionAsFunctionCall(
-            "oneof_attribute",
+            "oneof_attribute_" + attribute,
             (instance,),
             lambda instance: self.unwrap(
                 instance.context,
