@@ -269,7 +269,7 @@ class Date(Class, Final):
         return Date(self.year, self.month, 1)
 
     def quarterOfYear(self):
-        return (self.date.month - 1) // 3 + 1
+        return (self.month - 1) // 3 + 1
 
     def next(self, step: int = 1):
         """Returns the date `step` days ahead of `self`.
