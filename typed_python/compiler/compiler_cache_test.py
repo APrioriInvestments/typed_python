@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import tempfile
+import threading
 import os
 import pytest
 from typed_python.test_util import evaluateExprInFreshProcess
@@ -259,6 +260,72 @@ def test_reference_existing_function_twice():
         # can load it
         assert evaluateExprInFreshProcess(VERSION2, 'x.g(1)', compilerCacheDir) == 4
         assert len(os.listdir(compilerCacheDir)) == 2
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_can_compile_overlapping_code():
+    common = "\n".join([
+        "import time",
+        "import os",
+
+        "t0 = time.time()",
+        "path = os.path.join(os.getenv('TP_COMPILER_CACHE'), 'check.txt')",
+        "while not os.path.exists(path):",
+        "    time.sleep(.01)",
+        "    assert time.time() - t0 < 2",
+    ])
+
+    xmodule1 = "\n".join([
+        "import common",
+        "@Entrypoint",
+        "def f():",
+        "    x = Dict(int, int)()",
+        "    x[3] = 4",
+        "    return x[3]"
+    ])
+
+    xmodule2 = "\n".join([
+        "import common",
+        "@Entrypoint",
+        "def g():",
+        "    x = Dict(int, int)()",
+        "    x[3] = 5",
+        "    return x[3]"
+    ])
+
+    xmodule3 = "\n".join([
+        "from x1 import f",
+        "from x2 import g",
+        "@Entrypoint",
+        "def h():",
+        "    return f() + g()"
+    ])
+
+    MODULES = {'common.py': common, 'x1.py': xmodule1, 'x2.py': xmodule2, 'x3.py': xmodule3}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        # first, compile 'f' and 'g' in two separate processes. Because of the loop
+        # they will wait until we write out the file that lets them start compiling. Then
+        # the'll both compile something that has common code.
+        # we should be able to then use that common code without issue.
+        threads = [
+            threading.Thread(
+                target=evaluateExprInFreshProcess, args=(MODULES, 'x1.f()', compilerCacheDir)
+            ),
+            threading.Thread(
+                target=evaluateExprInFreshProcess, args=(MODULES, 'x2.g()', compilerCacheDir)
+            ),
+        ]
+        for t in threads:
+            t.start()
+
+        with open(os.path.join(compilerCacheDir, "check.txt"), 'w') as f:
+            f.write('start!')
+
+        for t in threads:
+            t.join()
+
+        assert evaluateExprInFreshProcess(MODULES, 'x3.h()', compilerCacheDir) == 9
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
