@@ -44,9 +44,16 @@ def pickledByStr(module_name: str, name: str) -> None:
     This mimics pickle's behavior when given a string from __reduce__. The
     string is interpreted as the name of a global variable, and pickle.whichmodules
     is used to search the module namespace, generating module_name.
+
+    Note that 'name' might contain '.' inside of it, since its a 'local name'.
     """
     module = importlib.import_module(module_name)
-    return getattr(module, name)
+
+    instance = module
+    for subName in name.split('.'):
+        instance = getattr(instance, subName)
+
+    return instance
 
 
 def createFunctionWithLocalsAndGlobals(code, globals):
