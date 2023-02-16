@@ -1339,6 +1339,29 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+.5)
 
+    def test_serialize_class_with_bound_methods(self):
+        class SomeClass:
+            pass
+
+        class SomeSubclass(SomeClass):
+            def __init__(self, x):
+                self.x = x
+
+        class ClassWithBoundMethod(Class, Final):
+            x = Member(OneOf(None, SomeClass))
+
+            def __init__(self):
+                self.x = None
+
+            def increment(self, y):
+                if self.x is None:
+                    self.x = SomeSubclass(y)
+                else:
+                    self.x = SomeSubclass(self.x.x + y)
+
+        self.assertEqual(ClassWithBoundMethod, ping_pong(ClassWithBoundMethod))
+        self.assertEqual(ClassWithBoundMethod.increment, ping_pong(ClassWithBoundMethod.increment))
+
     def test_serialize_named_tuples_with_extra_fields(self):
         T1 = NamedTuple(x=int)
         T2 = NamedTuple(x=int, y=float, z=str)
