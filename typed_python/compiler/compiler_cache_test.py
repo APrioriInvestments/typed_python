@@ -25,6 +25,47 @@ def f(x):
 """
 
 
+class MockDirectory:
+    def __init__(self, tree):
+        self.tree = tree
+
+    @staticmethod
+    def fromPath(path):
+        tree = {}
+
+        def populate(path, tree):
+            for relPath in os.listdir(path):
+                subPath = os.path.join(path, relPath)
+
+                if os.path.isdir(subPath):
+                    populate(os.path.join(path, subPath), tree.setdefault(relPath, {}))
+                elif os.path.isfile(subPath):
+                    with open(subPath, "rb") as file:
+                        tree[relPath] = file.read()
+
+        populate(path, tree)
+
+        return MockDirectory(tree)
+
+    def dumpInto(self, path):
+        def populate(path, tree):
+            if isinstance(tree, dict):
+                if not os.path.isdir(path):
+                    os.mkdir(path)
+
+                for relPath, subtree in tree.items():
+                    subpath = os.path.join(path, relPath)
+
+                    populate(subpath, subtree)
+            elif isinstance(tree, bytes):
+                with open(path, "wb") as file:
+                    file.write(tree)
+            else:
+                raise Exception(f"Can't handle {type(tree)} in the tree.")
+
+        populate(path, self.tree)
+
+
 @pytest.mark.skipif('sys.platform=="darwin"')
 def test_compiler_cache_populates():
     with tempfile.TemporaryDirectory() as compilerCacheDir:
@@ -326,6 +367,98 @@ def test_can_compile_overlapping_code():
             t.join()
 
         assert evaluateExprInFreshProcess(MODULES, 'x3.h()', compilerCacheDir) == 9
+
+
+RACE_CONDITION_MODULES = {'x1.py': "\n".join([
+    "@Entrypoint",
+    "def f():",
+    "    x = Dict(int, int)()",
+    "    x[3] = 4",
+    "    return x[3]"]), 'x2.py': "\n".join([
+        "import x1",
+        "@Entrypoint",
+        "def g():",
+        "    x = Dict(int, int)()",
+        "    x[3] = 5",
+        "    return x[3], x1.f()"
+    ]), 'x3.py': "\n".join([
+        "from x1 import f",
+        "from x2 import g",
+        "@Entrypoint",
+        "def h():",
+        "    return f() + g()[0]"
+    ])}
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_race_condition_triangle():
+    """Given double-compilation of f, and g depends on f, test we can load the cached f and compile g."""
+    # compile a module containing f
+    with tempfile.TemporaryDirectory() as dir1:
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x1.f()", dir1)
+        cache_dir = MockDirectory.fromPath(dir1)
+
+    # recompile the f-module in a new cache.
+    with tempfile.TemporaryDirectory() as dir2:
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x1.f()", dir2)
+        # merge the two caches to simulate a race condition
+        cache_dir.dumpInto(dir2)
+        assert len(os.listdir(dir2)) == 2
+        # compile a module containing g that depends on f. Run f and g in fresh processes.
+        assert evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x2.g()", dir2) == (5, 4)
+        assert evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x1.f()", dir2) == 4
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_race_condition_diamond():
+    """Given single-compilation of f, and double-compilation of g, and h depends on g, test we
+        can load the cached f and g and compile h.
+    """
+    # one module with f
+    with tempfile.TemporaryDirectory() as dir1:
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x1.f()", dir1)
+        cache_dir = MockDirectory.fromPath(dir1)
+    # two gs, both depending on f
+    with tempfile.TemporaryDirectory() as dir2:
+        cache_dir.dumpInto(dir2)
+        assert len(os.listdir(dir2)) == 1
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x2.g()", dir2)
+        cache_dir_2 = MockDirectory.fromPath(dir2)
+    with tempfile.TemporaryDirectory() as dir3:
+        cache_dir.dumpInto(dir3)
+        assert len(os.listdir(dir3)) == 1
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x2.g()", dir3)
+        cache_dir_3 = MockDirectory.fromPath(dir3)
+
+    with tempfile.TemporaryDirectory() as dir4:
+        # we should now have three modules, one with f and two with g.
+        cache_dir_3.dumpInto(dir4)
+        cache_dir_2.dumpInto(dir4)
+        assert len(os.listdir(dir4)) == 3
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x3.h()", dir3) == 9
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x2.g()", dir3) == (5, 4)
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x1.f()", dir3) == 4
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_race_condition_duplicate_edges():
+    """Given two modules that both contain f and g, and h depends on g, test we
+        can load the cached f and g and compile h.
+    """
+    # two modules both with f and g
+    with tempfile.TemporaryDirectory() as dir1:
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x2.g()", dir1)
+        cache_dir = MockDirectory.fromPath(dir1)
+        module = os.listdir(dir1)[0]
+        with open(os.path.join(dir1, module, "name_manifest.txt"), "r") as flines:
+            manifest = flines.read()
+        assert "\ntp.g" in manifest and "\ntp.f" in manifest
+
+    with tempfile.TemporaryDirectory() as dir2:
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x2.g()", dir2)
+        cache_dir.dumpInto(dir2)
+        assert len(os.listdir(dir2)) == 2
+        assert evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x3.h()", dir2) == 9
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
