@@ -15,9 +15,12 @@
 import os
 import uuid
 import shutil
-from typed_python.compiler.loaded_module import LoadedModule
-from typed_python.compiler.binary_shared_object import BinarySharedObject
 
+from typing import Optional, List
+
+from typed_python.compiler.binary_shared_object import LoadedBinarySharedObject, BinarySharedObject
+from typed_python.compiler.directed_graph import DirectedGraph
+from typed_python.compiler.typed_call_target import TypedCallTarget
 from typed_python.SerializationContext import SerializationContext
 from typed_python import Dict, ListOf
 
@@ -52,148 +55,173 @@ class CompilerCache:
 
         ensureDirExists(cacheDir)
 
-        self.loadedModules = Dict(str, LoadedModule)()
+        self.loadedBinarySharedObjects = Dict(str, LoadedBinarySharedObject)()
         self.nameToModuleHash = Dict(str, str)()
 
-        self.modulesMarkedValid = set()
-        self.modulesMarkedInvalid = set()
+        self.moduleManifestsLoaded = set()
 
         for moduleHash in os.listdir(self.cacheDir):
             if len(moduleHash) == 40:
                 self.loadNameManifestFromStoredModuleByHash(moduleHash)
 
-    def hasSymbol(self, linkName):
+        # the set of functions with an associated module in loadedBinarySharedObjects
+        self.targetsLoaded: Dict[str, TypedCallTarget] = {}
+
+        # the set of functions with linked and validated globals (i.e. ready to be run).
+        self.targetsValidated = set()
+
+        self.function_dependency_graph = DirectedGraph()
+        # dict from function linkname to list of global names (should be llvm keys in serialisedGlobalDefinitions)
+        self.global_dependencies = Dict(str, ListOf(str))()
+
+    def hasSymbol(self, linkName: str) -> bool:
+        """NB this will return True even if the linkName is ultimately unretrievable."""
         return linkName in self.nameToModuleHash
 
-    def markModuleHashInvalid(self, hashstr):
-        with open(os.path.join(self.cacheDir, hashstr, "marked_invalid"), "w"):
-            pass
+    def getTarget(self, linkName: str) -> TypedCallTarget:
+        if not self.hasSymbol(linkName):
+            raise ValueError(f'symbol not found for linkName {linkName}')
+        self.loadForSymbol(linkName)
+        return self.targetsLoaded[linkName]
 
-    def loadForSymbol(self, linkName):
+    def dependencies(self, linkName: str) -> Optional[List[str]]:
+        """Returns all the function names that `linkName` depends on"""
+        return list(self.function_dependency_graph.outgoing(linkName))
+
+    def loadForSymbol(self, linkName: str) -> None:
+        """Loads the whole module, and any submodules, into LoadedBinarySharedObjects"""
         moduleHash = self.nameToModuleHash[linkName]
 
-        nameToTypedCallTarget = {}
-        nameToNativeFunctionType = {}
+        self.loadModuleByHash(moduleHash)
 
-        if not self.loadModuleByHash(moduleHash, nameToTypedCallTarget, nameToNativeFunctionType):
-            return None
+        if linkName not in self.targetsValidated:
+            dependantFuncs = self.dependencies(linkName) + [linkName]
+            globalsToLink = {}  # dict from modulehash to list of globals.
+            for funcName in dependantFuncs:
+                if funcName not in self.targetsValidated:
+                    funcModuleHash = self.nameToModuleHash[funcName]
+                    # append to the list of globals to link for a given module.  TODO: optimise this, don't double-link.
+                    globalsToLink[funcModuleHash] = globalsToLink.get(funcModuleHash, []) + self.global_dependencies.get(funcName, [])
 
-        return nameToTypedCallTarget, nameToNativeFunctionType
+            for moduleHash, globs in globalsToLink.items():  # this works because loadModuleByHash loads submodules too.
+                if globs:
+                    definitionsToLink = {x: self.loadedBinarySharedObjects[moduleHash].serializedGlobalVariableDefinitions[x]
+                                         for x in globs
+                                         }
+                    self.loadedBinarySharedObjects[moduleHash].linkGlobalVariables(definitionsToLink)
+                    if not self.loadedBinarySharedObjects[moduleHash].validateGlobalVariables(definitionsToLink):
+                        raise RuntimeError('failed to validate globals when loading:', linkName)
 
-    def loadModuleByHash(self, moduleHash, nameToTypedCallTarget, nameToNativeFunctionType):
+            self.targetsValidated.update(dependantFuncs)
+
+    def loadModuleByHash(self, moduleHash: str) -> None:
         """Load a module by name.
 
         As we load, place all the newly imported typed call targets into
         'nameToTypedCallTarget' so that the rest of the system knows what functions
         have been uncovered.
         """
-        if moduleHash in self.loadedModules:
-            return True
+        if moduleHash in self.loadedBinarySharedObjects:
+            return
 
         targetDir = os.path.join(self.cacheDir, moduleHash)
 
-        try:
-            with open(os.path.join(targetDir, "type_manifest.dat"), "rb") as f:
-                callTargets = SerializationContext().deserialize(f.read())
+        # TODO (Will) - store these names as module consts, use one .dat only
+        with open(os.path.join(targetDir, "type_manifest.dat"), "rb") as f:
+            callTargets = SerializationContext().deserialize(f.read())
 
-            with open(os.path.join(targetDir, "globals_manifest.dat"), "rb") as f:
-                globalVarDefs = SerializationContext().deserialize(f.read())
+        with open(os.path.join(targetDir, "globals_manifest.dat"), "rb") as f:
+            serializedGlobalVarDefs = SerializationContext().deserialize(f.read())
 
-            with open(os.path.join(targetDir, "native_type_manifest.dat"), "rb") as f:
-                functionNameToNativeType = SerializationContext().deserialize(f.read())
+        with open(os.path.join(targetDir, "native_type_manifest.dat"), "rb") as f:
+            functionNameToNativeType = SerializationContext().deserialize(f.read())
 
-            with open(os.path.join(targetDir, "submodules.dat"), "rb") as f:
-                submodules = SerializationContext().deserialize(f.read(), ListOf(str))
-        except Exception:
-            self.markModuleHashInvalid(moduleHash)
-            return False
+        with open(os.path.join(targetDir, "submodules.dat"), "rb") as f:
+            submodules = SerializationContext().deserialize(f.read(), ListOf(str))
 
-        if not LoadedModule.validateGlobalVariables(globalVarDefs):
-            self.markModuleHashInvalid(moduleHash)
-            return False
+        with open(os.path.join(targetDir, "function_dependencies.dat"), "rb") as f:
+            dependency_edgelist = SerializationContext().deserialize(f.read())
+
+        with open(os.path.join(targetDir, "global_dependencies.dat"), "rb") as f:
+            globalDependencies = SerializationContext().deserialize(f.read())
 
         # load the submodules first
         for submodule in submodules:
-            if not self.loadModuleByHash(
-                submodule,
-                nameToTypedCallTarget,
-                nameToNativeFunctionType
-            ):
-                return False
+            self.loadModuleByHash(submodule)
 
         modulePath = os.path.join(targetDir, "module.so")
 
         loaded = BinarySharedObject.fromDisk(
             modulePath,
-            globalVarDefs,
-            functionNameToNativeType
+            serializedGlobalVarDefs,
+            functionNameToNativeType,
+            globalDependencies
+
         ).loadFromPath(modulePath)
 
-        self.loadedModules[moduleHash] = loaded
+        self.loadedBinarySharedObjects[moduleHash] = loaded
 
-        nameToTypedCallTarget.update(callTargets)
-        nameToNativeFunctionType.update(functionNameToNativeType)
+        self.targetsLoaded.update(callTargets)
 
-        return True
+        assert not any(key in self.global_dependencies for key in globalDependencies)  # should only happen if there's a hash collision.
+        self.global_dependencies.update(globalDependencies)
 
-    def addModule(self, binarySharedObject, nameToTypedCallTarget, linkDependencies):
+        # update the cache's dependency graph with our new edges.
+        for function_name, dependant_function_name in dependency_edgelist:
+            self.function_dependency_graph.addEdge(source=function_name, dest=dependant_function_name)
+
+    def addModule(self, binarySharedObject, nameToTypedCallTarget, linkDependencies, dependencyEdgelist):
         """Add new code to the compiler cache.
 
         Args:
-            binarySharedObject - a BinarySharedObject containing the actual assembler
-                we've compiled
-            nameToTypedCallTarget - a dict from linkname to TypedCallTarget telling us
-                the formal python types for all the objects
-            linkDependencies - a set of linknames we depend on directly.
+            binarySharedObject: a BinarySharedObject containing the actual assembler
+                we've compiled.
+            nameToTypedCallTarget: a dict from linkname to TypedCallTarget telling us
+                the formal python types for all the objects.
+            linkDependencies: a set of linknames we depend on directly.
+            dependencyEdgelist (list): a list of source, dest pairs giving the set of dependency graph for the
+                module.
         """
         dependentHashes = set()
 
         for name in linkDependencies:
             dependentHashes.add(self.nameToModuleHash[name])
 
-        path, hashToUse = self.writeModuleToDisk(binarySharedObject, nameToTypedCallTarget, dependentHashes)
+        path, hashToUse = self.writeModuleToDisk(binarySharedObject, nameToTypedCallTarget, dependentHashes, dependencyEdgelist)
 
-        self.loadedModules[hashToUse] = (
+        self.loadedBinarySharedObjects[hashToUse] = (
             binarySharedObject.loadFromPath(os.path.join(path, "module.so"))
         )
 
         for n in binarySharedObject.definedSymbols:
             self.nameToModuleHash[n] = hashToUse
 
-    def loadNameManifestFromStoredModuleByHash(self, moduleHash):
-        if moduleHash in self.modulesMarkedValid:
-            return True
+        # link & validate all globals for the new module
+        self.loadedBinarySharedObjects[hashToUse].linkGlobalVariables()
+        if not self.loadedBinarySharedObjects[hashToUse].validateGlobalVariables(
+                self.loadedBinarySharedObjects[hashToUse].serializedGlobalVariableDefinitions):
+            raise RuntimeError('failed to validate globals in new module:', hashToUse)
+
+    def loadNameManifestFromStoredModuleByHash(self, moduleHash) -> None:
+        if moduleHash in self.moduleManifestsLoaded:
+            return
 
         targetDir = os.path.join(self.cacheDir, moduleHash)
-
-        # ignore 'marked invalid'
-        if os.path.exists(os.path.join(targetDir, "marked_invalid")):
-            # just bail - don't try to read it now
-
-            # for the moment, we don't try to clean up the cache, because
-            # we can't be sure that some process is not still reading the
-            # old files.
-            self.modulesMarkedInvalid.add(moduleHash)
-            return False
 
         with open(os.path.join(targetDir, "submodules.dat"), "rb") as f:
             submodules = SerializationContext().deserialize(f.read(), ListOf(str))
 
         for subHash in submodules:
-            if not self.loadNameManifestFromStoredModuleByHash(subHash):
-                self.markModuleHashInvalid(subHash)
-                return False
+            self.loadNameManifestFromStoredModuleByHash(subHash)
 
         with open(os.path.join(targetDir, "name_manifest.dat"), "rb") as f:
             self.nameToModuleHash.update(
                 SerializationContext().deserialize(f.read(), Dict(str, str))
             )
 
-        self.modulesMarkedValid.add(moduleHash)
+        self.moduleManifestsLoaded.add(moduleHash)
 
-        return True
-
-    def writeModuleToDisk(self, binarySharedObject, nameToTypedCallTarget, submodules):
+    def writeModuleToDisk(self, binarySharedObject, nameToTypedCallTarget, submodules, dependencyEdgelist):
         """Write out a disk representation of this module.
 
         This includes writing both the shared object, a manifest of the function names
@@ -246,10 +274,16 @@ class CompilerCache:
 
         # write the type manifest
         with open(os.path.join(tempTargetDir, "globals_manifest.dat"), "wb") as f:
-            f.write(SerializationContext().serialize(binarySharedObject.globalVariableDefinitions))
+            f.write(SerializationContext().serialize(binarySharedObject.serializedGlobalVariableDefinitions))
 
         with open(os.path.join(tempTargetDir, "submodules.dat"), "wb") as f:
             f.write(SerializationContext().serialize(ListOf(str)(submodules), ListOf(str)))
+
+        with open(os.path.join(tempTargetDir, "function_dependencies.dat"), "wb") as f:
+            f.write(SerializationContext().serialize(dependencyEdgelist))  # might need a listof
+
+        with open(os.path.join(tempTargetDir, "global_dependencies.dat"), "wb") as f:
+            f.write(SerializationContext().serialize(binarySharedObject.globalDependencies))
 
         try:
             os.rename(tempTargetDir, targetDir)
@@ -266,7 +300,7 @@ class CompilerCache:
         if moduleHash is None:
             raise Exception("Can't find a module for " + linkName)
 
-        if moduleHash not in self.loadedModules:
+        if moduleHash not in self.loadedBinarySharedObjects:
             self.loadForSymbol(linkName)
 
-        return self.loadedModules[moduleHash].functionPointers[linkName]
+        return self.loadedBinarySharedObjects[moduleHash].functionPointers[linkName]

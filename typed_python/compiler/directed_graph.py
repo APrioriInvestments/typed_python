@@ -44,6 +44,10 @@ class DirectedGraph:
             return False
         return dest in self.sourceToDest[source]
 
+    def clearOutgoing(self, node):
+        for child in list(self.outgoing(node)):
+            self.dropEdge(node, child)
+
     def outgoing(self, node):
         return self.sourceToDest.get(node, set())
 
