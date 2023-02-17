@@ -189,13 +189,13 @@ class PythonToNativeConverter:
         return self._link_name_for_identity.get(identity)
 
     def buildAndLinkNewModule(self):
-        targets = self.extract_new_function_definitions()
+        definitions = self.extract_new_function_definitions()
 
-        if not targets:
+        if not definitions:
             return
 
         if self.compilerCache is None:
-            loadedModule = self.llvmCompiler.buildModule(targets)
+            loadedModule = self.llvmCompiler.buildModule(definitions)
             loadedModule.linkGlobalVariables()
             self.loadedUncachedModules.append(loadedModule)
             return
@@ -204,22 +204,22 @@ class PythonToNativeConverter:
         externallyUsed = set()
         dependency_edgelist = []
 
-        for funcName in targets:
+        for funcName in definitions:
             ident = self._identity_for_link_name.get(funcName)
             if ident is not None:
                 for dep in self._dependencies.getNamesDependedOn(ident):
                     depLN = self._link_name_for_identity.get(dep)
                     dependency_edgelist.append([funcName, depLN])
-                    if depLN not in targets:
+                    if depLN not in definitions:
                         externallyUsed.add(depLN)
 
-        binary = self.llvmCompiler.buildSharedObject(targets)
+        binary = self.llvmCompiler.buildSharedObject(definitions)
 
         self.compilerCache.addModule(
             binary,
-            {name: self.getTarget(name) for name in targets if self.hasTarget(name)},
+            {name: self.getTarget(name) for name in definitions if self.hasTarget(name)},
             externallyUsed,
-            dependency_edgelist,
+            dependency_edgelist
         )
 
     def extract_new_function_definitions(self):
@@ -233,7 +233,7 @@ class PythonToNativeConverter:
 
         return res
 
-    def identityHashToLinkerName(self, name, identityHash, prefix="tp."):
+    def identityHashToFunctionName(self, name, identityHash, prefix="tp."):
         assert isinstance(name, str)
         assert isinstance(identityHash, str)
         assert isinstance(prefix, str)
@@ -291,7 +291,7 @@ class PythonToNativeConverter:
         assert(isinstance(target, TypedCallTarget))
         self._targets[linkName] = target
 
-    def getTarget(self, linkName):
+    def getTarget(self, linkName) -> TypedCallTarget:
         if linkName in self._targets:
             return self._targets[linkName]
 
@@ -310,7 +310,7 @@ class PythonToNativeConverter:
         returns a TypedCallTarget, or None if it's not known yet
         """
         identity = self.hashObjectToIdentity(identityTuple).hexdigest
-        linkName = self.identityHashToLinkerName(name, identity, "runtime.")
+        linkName = self.identityHashToFunctionName(name, identity, "runtime.")
 
         self.defineLinkName(identity, linkName)
 
@@ -683,22 +683,22 @@ class PythonToNativeConverter:
         _types.installClassDestructor(cls, fp.fp)
         self._installedDestructors.add(cls)
 
-    def functionPointerByName(self, linkerName) -> NativeFunctionPointer:
+    def functionPointerByName(self, func_name) -> NativeFunctionPointer:
         """Find a NativeFunctionPointer for a given link-time name.
 
         Args:
-            linkerName (str) - the name of the compiled symbol we want
+            func_name (str) - the name of the compiled symbol we want.
 
         Returns:
             a NativeFunctionPointer or None
         """
         if self.compilerCache is None:
             # the llvm compiler holds it all
-            return self.llvmCompiler.function_pointer_by_name(linkerName)
+            return self.llvmCompiler.function_pointer_by_name(func_name)
         else:
             # the llvm compiler is just building shared objects, but the
             # compiler cache has all the pointers.
-            return self.compilerCache.function_pointer_by_name(linkerName)
+            return self.compilerCache.function_pointer_by_name(func_name)
 
     def convertTypedFunctionCall(self, functionType, overloadIx, inputWrappers, assertIsRoot=False):
         overload = functionType.overloads[overloadIx]
@@ -859,7 +859,7 @@ class PythonToNativeConverter:
 
         identity = identityHash.hexdigest
 
-        name = self.identityHashToLinkerName(funcName, identity)
+        name = self.identityHashToFunctionName(funcName, identity)
 
         self.defineLinkName(identity, name)
 
