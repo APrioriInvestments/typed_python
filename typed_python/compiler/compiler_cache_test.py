@@ -364,21 +364,34 @@ def test_multiprocessing():
 
             return Directory(tree)
 
-    with tempfile.TemporaryDirectory() as dir1, tempfile.TemporaryDirectory() as dir2:
+        def dumpInto(self, path):
+            def populate(path, tree):
+                if isinstance(tree, dict):
+                    if not os.path.isdir(path):
+                        os.mkdir(path)
+
+                    for relPath, subtree in tree.items():
+                        subpath = os.path.join(path, relPath)
+
+                        populate(subpath, subtree)
+                elif isinstance(tree, bytes):
+                    with open(path, "wb") as file:
+                        file.write(tree)
+                else:
+                    raise Exception(f"Can't handle {type(tree)} in the tree.")
+
+            populate(path, self.tree)
+
+
+    from typed_python import SerializationContext
+
+    with tempfile.TemporaryDirectory() as dir1:
         evaluateExprInFreshProcess(MODULES, "common.f()", dir1)
-
-        moduleName = os.listdir(dir1)[0]
-
-        from typed_python import SerializationContext
-
-        with open(dir1 + "/" + moduleName + "/" + "type_manifest.dat", "rb") as file:
-            print(SerializationContext().deserialize(file.read()))
 
         thing = Directory.fromPath(dir1)
 
-        import pdb;pdb.set_trace()
-
-        pass
+    with tempfile.TemporaryDirectory() as dir2:
+        thing.dumpInto(dir2)
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
