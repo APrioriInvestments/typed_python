@@ -393,6 +393,12 @@ def test_multiprocessing():
     with tempfile.TemporaryDirectory() as dir2:
         thing.dumpInto(dir2)
 
+        assert len(os.listdir(dir2)) == 1
+        module = os.listdir(dir2)[0]
+
+        with open(os.path.join(dir2, module, "name_manifest.txt"), "r") as file:
+            print(file.read())
+
 
 @pytest.mark.skipif('sys.platform=="darwin"')
 def test_compiler_cache_handles_class_destructors_correctly():
