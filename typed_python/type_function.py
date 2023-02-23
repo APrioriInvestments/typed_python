@@ -145,6 +145,7 @@ def makeTypeFunction(f):
         __module__ = f.__module__
         __qualname__ = f.__qualname__
         __name__ = f.__name__
+        __definition__ = f
         __typed_python_template__ = buildType
 
     return TypeFunction_
