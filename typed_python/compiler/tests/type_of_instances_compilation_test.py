@@ -17,13 +17,13 @@ def test_type_of_class_is_specific():
 
 def test_type_of_alternative_is_specific():
     for members in [{}, {'a': int}]:
-        Alt = Alternative("Alt", A=members)
+        A = Alternative("A", A=members)
 
         @Entrypoint
-        def typeOfArg(x: Alt):
+        def typeOfArg(x: A):
             return type(x)
 
-        assert typeOfArg(Alt.A()) is Alt.A
+        assert typeOfArg(A.A()) is A.A
 
 
 def test_type_of_concrete_alternative_is_specific():

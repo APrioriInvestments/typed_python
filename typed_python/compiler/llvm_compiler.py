@@ -22,7 +22,7 @@ from typed_python.compiler.native_function_pointer import NativeFunctionPointer
 from typed_python.compiler.binary_shared_object import BinarySharedObject
 
 import ctypes
-from typed_python import _types, SerializationContext
+from typed_python import _types
 
 llvm.initialize()
 llvm.initialize_native_target()
@@ -84,13 +84,17 @@ def create_execution_engine(inlineThreshold):
 
 
 class Compiler:
-    def __init__(self, inlineThreshold, compilerCache):
+    def __init__(self, inlineThreshold):
         self.engine, self.module_pass_manager = create_execution_engine(inlineThreshold)
-        self.converter = native_ast_to_llvm.Converter(compilerCache)
+        self.converter = native_ast_to_llvm.Converter()
         self.functions_by_name = {}
         self.inlineThreshold = inlineThreshold
         self.verbose = False
         self.optimize = True
+
+    def markExternal(self, functionNameToType):
+        """Provide type signatures for a set of external functions."""
+        self.converter.markExternal(functionNameToType)
 
     def mark_converter_verbose(self):
         self.converter.verbose = True
@@ -117,20 +121,17 @@ class Compiler:
 
         self.engine.finalize_object()
 
-        serializedGlobalVariableDefinitions = {x: SerializationContext().serialize(y) for x, y in module.globalVariableDefinitions.items()}
-
         return BinarySharedObject.fromModule(
             mod,
-            serializedGlobalVariableDefinitions,
+            module.globalVariableDefinitions,
             module.functionNameToType,
-            module.globalDependencies
         )
 
     def function_pointer_by_name(self, name):
         return self.functions_by_name.get(name)
 
     def buildModule(self, functions):
-        """Compile a list of functions into a new module. Only relevant if there is no compiler cache.
+        """Compile a list of functions into a new module.
 
         Args:
             functions - a map from name to native_ast.Function
@@ -186,5 +187,4 @@ class Compiler:
             )
         )
 
-        serializedGlobalVariableDefinitions = {x: SerializationContext().serialize(y) for x, y in module.globalVariableDefinitions.items()}
-        return LoadedModule(native_function_pointers, serializedGlobalVariableDefinitions)
+        return LoadedModule(native_function_pointers, module.globalVariableDefinitions)
