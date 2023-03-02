@@ -654,3 +654,38 @@ def test_compiler_cache_can_handle_cyclic_dependency_graph():
         # run twice to check cached code can be retrieved
         assert evaluateExprInFreshProcess(MODULE, 'x.getX()', compilerCacheDir) == 1
         assert evaluateExprInFreshProcess(MODULE, 'x.getX()', compilerCacheDir) == 1
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_throws_on_import_loop():
+    """It is possible, when compiling a module, to attempt to deserialise
+    a callTarget containing a module import which runs an Entrypointed function.
+    This results in a 'compilation loop' where one iteration of the conversion
+    is waiting on another, which currently breaks our model of the compilation
+    process.
+    """
+    module1 = """
+    @Entrypoint
+    def f(x):
+        return x+1
+    f(1)
+    """.replace('\n    ', '\n')
+    module2 = """
+    @Entrypoint
+    def g():
+        import x
+    """.replace('\n    ', '\n')
+    module3 = """
+    import y
+    def rung():
+        try:
+            y.g()
+        except ImportError as e:
+            return 'ImportError caught'
+    rung()
+    """.replace('\n    ', '\n')
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+
+        evaluateExprInFreshProcess({'x.py': module1}, 'x.f(1)', compilerCacheDir)
+        exception_string = evaluateExprInFreshProcess({'z.py': module3, 'y.py': module2, 'x.py': module1, }, 'z.rung()', compilerCacheDir)
+        assert exception_string == 'ImportError caught'
