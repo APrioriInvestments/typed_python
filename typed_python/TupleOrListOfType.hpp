@@ -420,7 +420,13 @@ public:
         }
 
         if (ct && m_element_type->isPOD() && buffer.getContext().serializePodListsInline()) {
-            if (m_element_type->getTypeCategory() == TypeCategory::catInt64) {
+            if (m_element_type->bytecount() == 0) {
+                // this is for the special case where we are writing
+                // zero bytes, in which case the receiving side cannot infer the
+                // number of elements from the bytecount.
+                buffer.writeUnsignedVarintObject(3, ct);
+            }
+            else if (m_element_type->getTypeCategory() == TypeCategory::catInt64) {
                 buffer.writeUnsignedVarintObject(1, ct);
 
                 serializeIntList(
@@ -553,6 +559,20 @@ public:
                 }
 
                 buffer.read_bytes(this->eltPtr(self, 0), ct);
+            } else
+            if (fieldnum == 3) {
+                if (!m_element_type->isPOD() || m_element_type->bytecount()) {
+                    throw std::runtime_error(
+                        "Zero-body POD data makes no sense for " + m_element_type->name()
+                    );
+                }
+
+                constructor(self, ct, [&](instance_ptr tgt, int k) {});
+
+                if (isListOf()) {
+                    (*(layout**)self)->refcount++;
+                    buffer.addCachedPointer(id, *((layout**)self), this);
+                }
             } else {
                 throw std::runtime_error("Corrupt fieldnum for tuple/listof body");
             }
