@@ -3061,3 +3061,23 @@ class TypesSerializationTest(unittest.TestCase):
         print(x)
         # TODO: make this True
         # assert x[0].f.__closure__[0].cell_contents is x
+
+    def test_roundtrip_listof_none_with_pod_inline(self):
+        x = ListOf(type(None))([None] * 100)
+
+        s = SerializationContext().withSerializePodListsInline()
+
+        assert x == s.deserialize(s.serialize(x))
+
+    def test_roundtrip_listof_none_with_pod_inline_memoizes_correctly(self):
+        x = ListOf(type(None))([None] * 100)
+
+        s = SerializationContext().withSerializePodListsInline()
+
+        copiesOfX = s.deserialize(s.serialize([x, x]))
+
+        assert copiesOfX[0] == x
+        assert copiesOfX[1] == x
+        assert copiesOfX[0] == copiesOfX[1]
+        copiesOfX[0].append(None)
+        assert copiesOfX[0] == copiesOfX[1]
