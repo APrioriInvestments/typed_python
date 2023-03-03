@@ -123,7 +123,10 @@ class Compiler:
             mod,
             serializedGlobalVariableDefinitions,
             module.functionNameToType,
-            module.globalDependencies
+            module.globalDependencies,
+            {name: self.converter.totalFunctionComplexity(name) for name in functions},
+            {name: self.converter._functions_by_name[name] for name in functions},
+            {name: SerializationContext().serialize(self.converter._function_definitions[name]) for name in functions},
         )
 
     def function_pointer_by_name(self, name):

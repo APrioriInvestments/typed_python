@@ -18,6 +18,7 @@ import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.global_variable_definition import GlobalVariableDefinition
 from typed_python.compiler.module_definition import ModuleDefinition
 from typing import Dict
+
 llvm_i8ptr = llvmlite.ir.IntType(8).as_pointer()
 llvm_i8 = llvmlite.ir.IntType(8)
 llvm_i32 = llvmlite.ir.IntType(32)
@@ -642,6 +643,7 @@ class FunctionConverter:
         2. The function is in function_definitions, in which case we grab the function definition and make an inlining decision.
         3. We have a compiler cache, and the function is in it. We add to external_function_references.
         """
+        assert isinstance(target, native_ast.NamedCallTarget)
         if target.external:
             if target.name not in self.external_function_references:
                 func_type = llvmlite.ir.FunctionType(
@@ -673,24 +675,29 @@ class FunctionConverter:
 
                     func = self.external_function_references[target.name]
         else:
-            # TODO (Will): decide whether to inline cached code
             assert self.compilerCache is not None and self.compilerCache.hasSymbol(target.name)
             # this function is defined in a shared object that we've loaded from a prior
-            # invocation
-            if target.name not in self.external_function_references:
-                func_type = llvmlite.ir.FunctionType(
-                    type_to_llvm_type(target.output_type),
-                    [type_to_llvm_type(x) for x in target.arg_types],
-                    var_arg=target.varargs
-                )
+            # invocation. Again, first make an inlining decision.
+            if (
+                self.compilerCache.complexityForSymbol(target.name) < CROSS_MODULE_INLINE_COMPLEXITY
+            ):
+                self.converter.generateDefinition(target.name)
+                func = self.converter.repeatFunctionInModule(target.name, self.module)
+            else:
+                if target.name not in self.external_function_references:
+                    func_type = llvmlite.ir.FunctionType(
+                        type_to_llvm_type(target.output_type),
+                        [type_to_llvm_type(x) for x in target.arg_types],
+                        var_arg=target.varargs
+                    )
 
-                assert target.name not in self.converter._function_definitions, target.name
+                    assert target.name not in self.converter._function_definitions, target.name
 
-                self.external_function_references[target.name] = (
-                    llvmlite.ir.Function(self.module, func_type, target.name)
-                )
+                    self.external_function_references[target.name] = (
+                        llvmlite.ir.Function(self.module, func_type, target.name)
+                    )
 
-            func = self.external_function_references[target.name]
+                func = self.external_function_references[target.name]
 
         return TypedLLVMValue(
             func,
@@ -1528,6 +1535,18 @@ class Converter:
 
         return res
 
+    def generateDefinition(self, name: str) -> None:
+        """Pull the TypedCallTarget matching `name` from the cache, and use to rebuild
+        the function definition. Add to _function_definitions and _functions_by_name.
+        """
+        assert self.compilerCache is not None
+
+        definition = self.compilerCache.getDefinition(name)
+        llvm_func = self.compilerCache.getIR(name)
+
+        self._functions_by_name[name] = llvm_func
+        self._function_definitions[name] = definition
+
     def repeatFunctionInModule(self, name, module):
         """Request that the function given by 'name' be inlined into 'module'.
 
@@ -1580,7 +1599,6 @@ class Converter:
                 [type_to_llvm_type(x[1]) for x in function.args]
             )
             self._functions_by_name[name] = llvmlite.ir.Function(module, func_type, name)
-
             self._functions_by_name[name].linkage = 'external'
             self._function_definitions[name] = function
 
@@ -1664,6 +1682,7 @@ class Converter:
             # want to repeat its definition in this particular module.
             for name in self._inlineRequests:
                 names_to_definitions[name] = self._function_definitions[name]
+
             self._inlineRequests.clear()
 
         # define a function that accepts a pointer and fills it out with a table of pointer values
@@ -1674,7 +1693,6 @@ class Converter:
             output=native_ast.Void,
             args=[native_ast.Void.pointer().pointer()]
         )
-
         return ModuleDefinition(
             str(module),
             functionTypes,

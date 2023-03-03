@@ -17,7 +17,7 @@ import logging
 
 from typed_python.hash import Hash
 from types import ModuleType
-from typing import Dict
+from typing import Dict, Optional
 from typed_python import Class
 import typed_python.python_ast as python_ast
 import typed_python._types as _types
@@ -288,10 +288,10 @@ class PythonToNativeConverter:
         self._targets.pop(linkName)
 
     def setTarget(self, linkName, target):
-        assert(isinstance(target, TypedCallTarget))
+        assert (isinstance(target, TypedCallTarget))
         self._targets[linkName] = target
 
-    def getTarget(self, linkName) -> TypedCallTarget:
+    def getTarget(self, linkName) -> Optional[TypedCallTarget]:
         if linkName in self._targets:
             return self._targets[linkName]
 

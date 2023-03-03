@@ -36,17 +36,31 @@ class LoadedBinarySharedObject(LoadedModule):
 class BinarySharedObject:
     """Models a shared object library (.so) loadable on linux systems."""
 
-    def __init__(self, binaryForm, functionTypes, serializedGlobalVariableDefinitions, globalDependencies):
+    def __init__(self,
+                 binaryForm,
+                 functionTypes,
+                 serializedGlobalVariableDefinitions,
+                 globalDependencies,
+                 functionComplexities,
+                 functionIRs,
+                 serializedFunctionDefinitions
+                 ):
         """
         Args:
             binaryForm: a bytes object containing the actual compiled code for the module
             serializedGlobalVariableDefinitions: a map from name to GlobalVariableDefinition
-            globalDependencies: a dict from function linkname to the list of global variables it depends on
+            globalDependencies: a dict from function name to the list of global variables it depends on
+            functionComplexities: a dict from function name to the total number of llvm instructions in the function (used for inlining)
+            functionIRs: a dict from function name to the llvm IR Functions (used for inlining)
+            functionDefinitions: a dict from function name to the native_ast.Functions (used for inlining)
         """
         self.binaryForm = binaryForm
         self.functionTypes = functionTypes
         self.serializedGlobalVariableDefinitions = serializedGlobalVariableDefinitions
         self.globalDependencies = globalDependencies
+        self.functionComplexities = functionComplexities
+        self.functionIRs = functionIRs
+        self.serializedFunctionDefinitions = serializedFunctionDefinitions
         self.hash = sha_hash(binaryForm)
 
     @property
@@ -54,14 +68,32 @@ class BinarySharedObject:
         return self.functionTypes.keys()
 
     @staticmethod
-    def fromDisk(path, serializedGlobalVariableDefinitions, functionNameToType, globalDependencies):
+    def fromDisk(path,
+                 serializedGlobalVariableDefinitions,
+                 functionNameToType,
+                 globalDependencies,
+                 functionComplexities,
+                 functionIRs,
+                 serializedFunctionDefinitions):
         with open(path, "rb") as f:
             binaryForm = f.read()
 
-        return BinarySharedObject(binaryForm, functionNameToType, serializedGlobalVariableDefinitions, globalDependencies)
+        return BinarySharedObject(binaryForm,
+                                  functionNameToType,
+                                  serializedGlobalVariableDefinitions,
+                                  globalDependencies,
+                                  functionComplexities,
+                                  functionIRs,
+                                  serializedFunctionDefinitions)
 
     @staticmethod
-    def fromModule(module, serializedGlobalVariableDefinitions, functionNameToType, globalDependencies):
+    def fromModule(module,
+                   serializedGlobalVariableDefinitions,
+                   functionNameToType,
+                   globalDependencies,
+                   functionComplexities,
+                   functionIRs,
+                   serializedFunctionDefinitions):
         target_triple = llvm.get_process_triple()
         target = llvm.Target.from_triple(target_triple)
         target_machine_shared_object = target.create_target_machine(reloc='pic', codemodel='default')
@@ -82,7 +114,13 @@ class BinarySharedObject:
             )
 
             with open(os.path.join(tf, "module.so"), "rb") as so_file:
-                return BinarySharedObject(so_file.read(), functionNameToType, serializedGlobalVariableDefinitions, globalDependencies)
+                return BinarySharedObject(so_file.read(),
+                                          functionNameToType,
+                                          serializedGlobalVariableDefinitions,
+                                          globalDependencies,
+                                          functionComplexities,
+                                          functionIRs,
+                                          serializedFunctionDefinitions)
 
     def load(self, storageDir):
         """Instantiate this .so in temporary storage and return a dict from symbol -> integer function pointer"""
