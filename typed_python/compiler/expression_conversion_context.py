@@ -119,7 +119,7 @@ class ExpressionConversionContext:
         # the first argument indicates whether this is an instance or type-level dispatch
         assert argTupleType.ElementTypes[0].Value in ('type', 'instance')
 
-        identHash = self.converter.hashObjectToIdentity(
+        identHash = self.converter.hash_object_to_identity(
             (clsType, methodName, retType, argTupleType, kwargTupleType)
         )
 
@@ -1141,7 +1141,7 @@ class ExpressionConversionContext:
                 funcGlobals[f.__code__.co_freevars[i]] = f.__closure__[i].cell_contents
                 globalsInCells.append(f.__code__.co_freevars[i])
 
-        call_target = self.functionContext.converter.convert(
+        call_target = self.functionContext.converter.convert_python_to_native(
             f.__name__,
             f.__code__,
             funcGlobals,
@@ -1185,7 +1185,7 @@ class ExpressionConversionContext:
         else:
             returnType = typeWrapper(overload.returnType) if overload.returnType is not None else None
 
-        call_target = self.functionContext.converter.convert(
+        call_target = self.functionContext.converter.convert_python_to_native(
             overload.name,
             overload.functionCode,
             overload.realizedGlobals,
@@ -1474,7 +1474,7 @@ class ExpressionConversionContext:
         return None
 
     def expressionAsFunctionCall(self, name, args, generatingFunction, identity, outputType=None, alwaysRaises=False):
-        callTarget = self.converter.defineNonPythonFunction(
+        callTarget = self.converter.define_non_python_function(
             name,
             ("expression", identity),
             typed_python.compiler.function_conversion_context.ExpressionFunctionConversionContext(

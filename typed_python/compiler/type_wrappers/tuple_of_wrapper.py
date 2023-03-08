@@ -339,7 +339,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         assert instance.isReference
 
         return (
-            context.converter.defineNativeFunction(
+            context.converter.define_native_function(
                 "destructor_" + str(self.typeRepresentation),
                 ('destructor', self),
                 [self],

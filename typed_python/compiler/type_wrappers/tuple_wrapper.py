@@ -500,7 +500,7 @@ class TupleWrapper(Wrapper):
 
                 return context.constant(True)
             else:
-                native = context.converter.defineNativeFunction(
+                native = context.converter.define_native_function(
                     f'type_convert({sourceVal.expr_type} -> {targetVal.expr_type}, conversionLevel={conversionLevel.LEVEL})',
                     ('type_convert', sourceVal.expr_type, targetVal.expr_type, conversionLevel.LEVEL),
                     [self.typeRepresentation, sourceVal.expr_type],
@@ -603,7 +603,7 @@ class TupleWrapper(Wrapper):
 
             context.pushReturnValue(context.constant(False))
 
-        containsMethod = context.converter.defineNativeFunction(
+        containsMethod = context.converter.define_native_function(
             f'tuple.contains.{self}.{toFind.expr_type}',
             ('tuple.contains', self, toFind.expr_type),
             (self, toFind.expr_type),

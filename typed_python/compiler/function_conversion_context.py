@@ -621,9 +621,9 @@ class ConversionContextBase:
 
         returnSlot.convert_copy_initialize(output)
 
-        context.converter.triggerVirtualDestructor(generatorSubclass)
+        context.converter.trigger_virtual_destructor(generatorSubclass)
 
-        context.converter.triggerVirtualMethodInstantiation(
+        context.converter.trigger_virtual_method_instantiation(
             generatorSubclass,
             "__fastnext__",
             PointerTo(T),
@@ -631,7 +631,7 @@ class ConversionContextBase:
             NamedTuple()
         )
 
-        context.converter.triggerVirtualMethodInstantiation(
+        context.converter.trigger_virtual_method_instantiation(
             generatorSubclass,
             "__next__",
             T,

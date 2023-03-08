@@ -124,7 +124,7 @@ class Compiler:
             serializedGlobalVariableDefinitions,
             module.functionNameToType,
             module.globalDependencies,
-            {name: self.converter.totalFunctionComplexity(name) for name in functions},
+            {name: self.converter.total_function_complexity(name) for name in functions},
             {name: self.converter._functions_by_name[name] for name in functions},
             {name: SerializationContext().serialize(self.converter._function_definitions[name]) for name in functions},
         )

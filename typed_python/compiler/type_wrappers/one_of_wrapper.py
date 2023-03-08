@@ -474,7 +474,7 @@ class OneOfWrapper(Wrapper):
     def convert_to_self_with_target(self, context, targetVal, otherExpr, conversionLevel, mayThrowOnFailure=False):
         assert targetVal.isReference
 
-        native = context.converter.defineNativeFunction(
+        native = context.converter.define_native_function(
             f'type_convert({otherExpr.expr_type} -> {targetVal.expr_type}, conversionLevel={conversionLevel.LEVEL})',
             ('type_convert', otherExpr.expr_type, targetVal.expr_type, conversionLevel.LEVEL),
             [PointerTo(self.typeRepresentation), otherExpr.expr_type],

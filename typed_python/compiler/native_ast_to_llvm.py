@@ -516,7 +516,7 @@ class FunctionConverter:
         #  a list of the global LLVM names that the function depends on.
         self.global_names = []
         self.module = module
-        self.converter = converter
+        self.converter: Converter = converter
         self.builder = builder
         self.arg_assignments = arg_assignments
         self.output_type = output_type
@@ -665,9 +665,9 @@ class FunctionConverter:
             if func.module is not self.module:
                 # first, see if we'd like to inline this module
                 if (
-                    self.converter.totalFunctionComplexity(target.name) < CROSS_MODULE_INLINE_COMPLEXITY
+                    self.converter.total_function_complexity(target.name) < CROSS_MODULE_INLINE_COMPLEXITY
                 ):
-                    func = self.converter.repeatFunctionInModule(target.name, self.module)
+                    func = self.converter.repeat_function_in_module(target.name, self.module)
                 else:
                     if target.name not in self.external_function_references:
                         self.external_function_references[target.name] = \
@@ -675,14 +675,14 @@ class FunctionConverter:
 
                     func = self.external_function_references[target.name]
         else:
-            assert self.compilerCache is not None and self.compilerCache.hasSymbol(target.name)
+            assert self.compilerCache is not None and self.compilerCache.has_symbol(target.name)
             # this function is defined in a shared object that we've loaded from a prior
             # invocation. Again, first make an inlining decision.
             if (
-                self.compilerCache.complexityForSymbol(target.name) < CROSS_MODULE_INLINE_COMPLEXITY
+                self.compilerCache.complexity_for_symbol(target.name) < CROSS_MODULE_INLINE_COMPLEXITY
             ):
-                self.converter.generateDefinition(target.name)
-                func = self.converter.repeatFunctionInModule(target.name, self.module)
+                self.converter.generate_definition(target.name)
+                func = self.converter.repeat_function_in_module(target.name, self.module)
             else:
                 if target.name not in self.external_function_references:
                     func_type = llvmlite.ir.FunctionType(
@@ -1518,7 +1518,7 @@ class Converter:
 
         self.compilerCache = compilerCache
 
-    def totalFunctionComplexity(self, name):
+    def total_function_complexity(self, name):
         """Return the total number of instructions contained in a function.
 
         The function must already have been defined in a prior pass. We use this
@@ -1535,19 +1535,19 @@ class Converter:
 
         return res
 
-    def generateDefinition(self, name: str) -> None:
+    def generate_definition(self, name: str) -> None:
         """Pull the TypedCallTarget matching `name` from the cache, and use to rebuild
         the function definition. Add to _function_definitions and _functions_by_name.
         """
         assert self.compilerCache is not None
 
-        definition = self.compilerCache.getDefinition(name)
-        llvm_func = self.compilerCache.getIR(name)
+        definition = self.compilerCache.get_definition(name)
+        llvm_func = self.compilerCache.get_IR(name)
 
         self._functions_by_name[name] = llvm_func
         self._function_definitions[name] = definition
 
-    def repeatFunctionInModule(self, name, module):
+    def repeat_function_in_module(self, name, module):
         """Request that the function given by 'name' be inlined into 'module'.
 
         It must already have been defined in another module.

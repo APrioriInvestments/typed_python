@@ -38,7 +38,7 @@ class TypeOf:
 
         converter = typed_python.compiler.runtime.Runtime.singleton().converter
 
-        if callTarget is None and converter.isCurrentlyConverting():
+        if callTarget is None and converter.is_currently_converting():
             # return the 'empty' OneOf, which can't actually be constructed.
             return typed_python.OneOf()
 
@@ -61,11 +61,11 @@ class TypeOf:
 
         converter = typed_python.compiler.runtime.Runtime.singleton().converter
 
-        callTarget = converter.convertTypedFunctionCall(
+        callTarget = converter.convert_typed_function_call(
             type(funcObj),
             0,
             argumentSignature,
-            assertIsRoot=False
+            assert_is_root=False
         )
 
         return callTarget

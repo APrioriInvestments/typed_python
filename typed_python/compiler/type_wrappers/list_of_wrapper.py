@@ -77,7 +77,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 if count is None:
                     return
 
-                native = context.converter.defineNativeFunction(
+                native = context.converter.define_native_function(
                     'pop(' + self.typeRepresentation.__name__ + ")",
                     ('util', self, 'pop'),
                     [self, int],
@@ -104,7 +104,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
                 return context.pushPod(
                     None,
-                    context.converter.defineNativeFunction(
+                    context.converter.define_native_function(
                         'resize(' + self.typeRepresentation.__name__ + ")",
                         ('util', self, 'resize'),
                         [self, int],
@@ -123,7 +123,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
                 return context.pushPod(
                     None,
-                    context.converter.defineNativeFunction(
+                    context.converter.define_native_function(
                         'resize(' + self.typeRepresentation.__name__ + ")",
                         ('util', self, 'resize'),
                         [self, int, self.underlyingWrapperType],
@@ -144,7 +144,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
                 return context.pushPod(
                     None,
-                    context.converter.defineNativeFunction(
+                    context.converter.define_native_function(
                         'append(' + self.typeRepresentation.__name__ + ")",
                         ('util', self, 'append'),
                         [self, self.underlyingWrapperType],
@@ -158,7 +158,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 return context.push(
                     self,
                     lambda out:
-                        context.converter.defineNativeFunction(
+                        context.converter.define_native_function(
                             'copy(' + self.typeRepresentation.__name__ + ")",
                             ('util', self, 'copy'),
                             [self],
@@ -170,7 +170,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
             if len(args) == 0:
                 return context.pushPod(
                     None,
-                    context.converter.defineNativeFunction(
+                    context.converter.define_native_function(
                         'clear(' + self.typeRepresentation.__name__ + ")",
                         ('util', self, 'clear'),
                         [self],
@@ -187,7 +187,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
                 return context.pushPod(
                     None,
-                    context.converter.defineNativeFunction(
+                    context.converter.define_native_function(
                         'reserve(' + self.typeRepresentation.__name__ + ")",
                         ('util', self, 'reserve'),
                         [self, int],
@@ -199,7 +199,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
             if len(args) == 0:
                 return context.pushPod(
                     int,
-                    context.converter.defineNativeFunction(
+                    context.converter.define_native_function(
                         'reserved(' + self.typeRepresentation.__name__ + ")",
                         ('util', self, 'reserved'),
                         [self],
@@ -346,7 +346,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
     def convert_default_initialize(self, context, tgt):
         context.pushEffect(
-            context.converter.defineNativeFunction(
+            context.converter.define_native_function(
                 'empty(' + self.typeRepresentation.__name__ + ")",
                 ('util', self, 'empty'),
                 [],
@@ -399,7 +399,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
             return context.push(
                 self,
                 lambda out:
-                    context.converter.defineNativeFunction(
+                    context.converter.define_native_function(
                         'copy(' + str(self) + "," + str(args[0].expr_type) + ")",
                         ('util', self, 'copy'),
                         [args[0].expr_type],

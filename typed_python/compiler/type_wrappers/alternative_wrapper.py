@@ -103,7 +103,7 @@ class AlternativeWrapperMixin(ClassOrAlternativeWrapperMixin):
             typeWrapper(SubclassOf(self.typeRepresentation)),
             lambda outPtr:
             outPtr.expr.store(
-                context.converter.defineNativeFunction(
+                context.converter.define_native_function(
                     "concrete_typeof_" + str(self.typeRepresentation),
                     ('concrete_typeof', self),
                     [self],
@@ -306,7 +306,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
 
     def on_refcount_zero(self, context, instance):
         return (
-            context.converter.defineNativeFunction(
+            context.converter.define_native_function(
                 "destructor_" + str(self.typeRepresentation),
                 ('destructor', self),
                 [self],
@@ -364,7 +364,7 @@ class AlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
         else:
             outputType = mergeTypeWrappers(possibleTypes)
 
-            native = context.converter.defineNativeFunction(
+            native = context.converter.define_native_function(
                 'getattr(' + self.typeRepresentation.__name__ + ", " + attribute + ")",
                 ('getattr', self, attribute),
                 [self],
@@ -526,7 +526,7 @@ class ConcreteAlternativeWrapper(AlternativeWrapperMixin, RefcountedWrapper):
         return context.push(
             self,
             lambda new_alt:
-                context.converter.defineNativeFunction(
+                context.converter.define_native_function(
                     'construct(' + str(self) + ")",
                     ('util', self, 'construct'),
                     tupletype.ElementTypes,

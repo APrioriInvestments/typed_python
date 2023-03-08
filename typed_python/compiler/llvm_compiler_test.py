@@ -154,7 +154,7 @@ def test_loaded_modules_persist():
         "    return f(x) * 100",
         "g(1000)",
         "def get_loaded_modules():",
-        "    return len(Runtime.singleton().converter.loadedUncachedModules)"
+        "    return len(Runtime.singleton().converter.loaded_uncached_modules)"
     ])
     VERSION1 = {'x.py': xmodule}
     assert evaluateExprInFreshProcess(VERSION1, 'x.get_loaded_modules()') == 1
