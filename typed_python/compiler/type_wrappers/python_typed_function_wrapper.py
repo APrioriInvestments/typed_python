@@ -342,7 +342,7 @@ class PythonTypedFunctionWrapper(Wrapper):
         # import this wrapper. Note that we have to import it here to break the import cycles.
         # there's definitely a better way to organize this code.
 
-        singleConvertedOverload = context.functionContext.converter.convert(
+        singleConvertedOverload = context.functionContext.converter.convert_python_to_native(
             overload.name,
             overload.functionCode,
             overload.realizedGlobals,
@@ -351,7 +351,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             list(overload.closureVarLookups),
             [typeWrapper(self.closurePathToCellType(path, closureType)) for path in overload.closureVarLookups.values()],
             None,
-            conversionType=ConvertionContextType
+            conversion_type=ConvertionContextType
         )
 
         if not singleConvertedOverload:
@@ -507,7 +507,7 @@ class PythonTypedFunctionWrapper(Wrapper):
 
             # just one overload will do. We can just instantiate this particular function
             # with a signature that comes from the method overload signature itself.
-            singleConvertedOverload = context.functionContext.converter.convert(
+            singleConvertedOverload = context.functionContext.converter.convert_python_to_native(
                 overload.name,
                 overload.functionCode,
                 overload.realizedGlobals,
@@ -634,7 +634,7 @@ class PythonTypedFunctionWrapper(Wrapper):
 
         argNames = [None for _ in argTypes] + list(kwargTypes)
 
-        res = converter.defineNativeFunction(
+        res = converter.define_native_function(
             f'implement_function.{self}{argTypes}.{kwargTypes}->{returnType}',
             ('implement_function.', self, returnType, self, tuple(argTypes), tuple(kwargTypes.items())),
             ([self] if provideClosureArgument else []) + list(argTypes) + list(kwargTypes.values()),
@@ -729,7 +729,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                             kwargTypes
                         )
 
-                        callTarget = converter.convert(
+                        callTarget = converter.convert_python_to_native(
                             o.name,
                             o.functionCode,
                             o.realizedGlobals,
@@ -799,7 +799,7 @@ class PythonTypedFunctionWrapper(Wrapper):
 
         overloadIndex = overload.index
 
-        testSingleOverloadForm = context.converter.defineNativeFunction(
+        testSingleOverloadForm = context.converter.define_native_function(
             f'check_can_call_overload.{self}.{overloadIndex}.{conversionLevel}.{argTypes}.{kwargTypes}',
             ('check_can_call_overload', self, overloadIndex, conversionLevel.LEVEL,
                 tuple(argTypes), tuple(kwargTypes.items())),
@@ -893,7 +893,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                             overloadRetType = returnType.typeRepresentation
 
                     if overloadRetType is None:
-                        testSingleOverloadForm = context.converter.defineNativeFunction(
+                        testSingleOverloadForm = context.converter.define_native_function(
                             f'implement_overload.{self}.{overloadIndex}.{conversionLevel}.{argTypes}.{kwargTypes}-> <exception>',
                             ('implement_overload', self, overloadIndex, conversionLevel.LEVEL,
                              overloadRetType, tuple(argTypes), tuple(kwargTypes.items())),
@@ -914,7 +914,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                             + args
                         )
                     else:
-                        testSingleOverloadForm = context.converter.defineNativeFunction(
+                        testSingleOverloadForm = context.converter.define_native_function(
                             f'implement_overload.{self}.{overloadIndex}.{conversionLevel}.{argTypes}'
                             f'.{kwargTypes}->{overloadRetType}',
                             ('implement_overload', self, overloadIndex, conversionLevel.LEVEL,

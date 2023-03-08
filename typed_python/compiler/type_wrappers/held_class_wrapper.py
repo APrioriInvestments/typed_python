@@ -174,7 +174,7 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
         return context.push(
             self,
             lambda new_class:
-                context.converter.defineNativeFunction(
+                context.converter.define_native_function(
                     'construct(' + self.typeRepresentation.__name__ + ")("
                     + ",".join([
                         (argNames[i] + '=' if argNames[i] is not None else "") +
@@ -469,7 +469,7 @@ class HeldClassWrapper(ClassOrAlternativeWrapperMixin, Wrapper):
         if not right.expr_type.can_convert_to_type(left.expr_type, ConversionLevel.Signature):
             return context.constant(False)
 
-        native = context.converter.defineNativeFunction(
+        native = context.converter.define_native_function(
             f'held_class_equality_check({left.expr_type} -> {right.expr_type})',
             ('held_class_equality_check', left.expr_type, right.expr_type),
             [left.expr_type, right.expr_type],

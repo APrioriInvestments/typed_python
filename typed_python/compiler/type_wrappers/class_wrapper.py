@@ -528,7 +528,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
             )
 
     def compileDestructor(self, converter):
-        return converter.defineNativeFunction(
+        return converter.define_native_function(
             "destructor_" + str(self.typeRepresentation),
             ('destructor', self),
             [self],
@@ -841,7 +841,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         argSignatureStrings = [str(x) for x in matchArgTypes[1:]]
         argSignatureStrings.extend([f"{k}={v}" for k, v in kwargTypes.items()])
 
-        dispatchToOverloads = context.converter.defineNativeFunction(
+        dispatchToOverloads = context.converter.define_native_function(
             f'call_method.{self}.{methodName}({",".join(argSignatureStrings)})',
             ('call_method', self, methodName, tuple(matchArgTypes), tuple(kwargTypes.items())),
             list(argTypes) + list(kwargTypes.values()),
@@ -926,7 +926,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
 
                     assert isinstance(overloadRetType, type), type(overloadRetType)
 
-                    testSingleOverloadForm = context.converter.defineNativeFunction(
+                    testSingleOverloadForm = context.converter.define_native_function(
                         f'call_overload.{self}.{methodName}.{overloadIndex}.'
                         f'{conversionLevel.LEVEL}.{argTypes[1:]}.{kwargTypes}->{overloadRetType}',
                         ('call_overload', self, methodName, overloadIndex, conversionLevel.LEVEL,
@@ -1393,7 +1393,7 @@ class ClassWrapper(ClassOrAlternativeWrapperMixin, RefcountedWrapper):
         return context.push(
             self,
             lambda new_class:
-                context.converter.defineNativeFunction(
+                context.converter.define_native_function(
                     'construct(' + self.typeRepresentation.__name__ + ")("
                     + ",".join([
                         (argNames[i] + '=' if argNames[i] is not None else "") +
