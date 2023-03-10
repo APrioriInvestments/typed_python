@@ -22,7 +22,7 @@ import invalid_module_2  # , invalid_module_3
 
 @Entrypoint
 def test_f(x):
-    return invalid_module_2.g1(x) + len([])
+    return invalid_module_2.g1(x)
 
 
 from glob import glob
@@ -63,8 +63,9 @@ if __name__ == "__main__":
 
     # delete_function('test_f')
     invalid_module_2.g1(1)
-    test_f(2)
-    # invalid_module_2.f(1)
+    # test_f(2)
+    invalid_module_2.f(1)
+    invalid_module_2.g2(1)
 
     # inspect
     runtime = Runtime.singleton()
