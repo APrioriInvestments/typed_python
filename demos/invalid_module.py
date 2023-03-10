@@ -15,15 +15,55 @@ from typed_python import (
     ListOf,
     SerializationContext,
 )
-from typed_python.compiler.compiler_cache import CacheDependencyGraph
+# from typed_python.compiler.compiler_cache import CacheDependencyGraph
 import invalid_module_2  # , invalid_module_3
 
 # from invalid_module_3 import g
 
+@Entrypoint
+def test_f(x):
+    return invalid_module_2.g1(x) + len([])
+
+
+from glob import glob
+
+def delete_function(func_name):
+    for folder in glob('compiler_cache/*'):
+        with open(os.path.join(folder, "type_manifest.dat"), "rb") as f:
+            callTargets = SerializationContext().deserialize(f.read())
+
+        with open(os.path.join(folder, "native_type_manifest.dat"), "rb") as f:
+            functionNameToNativeType = SerializationContext().deserialize(f.read())
+
+        deletions = []
+        for key in callTargets:
+            if func_name in key:
+                deletions.append(key)
+
+        for key in deletions:
+            del callTargets[key]
+
+        deletions = []
+        for key in functionNameToNativeType:
+            if func_name in key:
+                deletions.append(key)
+
+        for key in deletions:
+            del functionNameToNativeType[key]
+
+        with open(os.path.join(folder, "type_manifest.dat"), "wb") as f:
+            f.write(SerializationContext().serialize(callTargets))
+
+        # write the nativetype manifest
+        with open(os.path.join(folder, "native_type_manifest.dat"), "wb") as f:
+            f.write(SerializationContext().serialize(functionNameToNativeType))
+
 
 if __name__ == "__main__":
 
+    # delete_function('test_f')
     invalid_module_2.g1(1)
+    test_f(2)
     # invalid_module_2.f(1)
 
     # inspect
@@ -59,18 +99,18 @@ if __name__ == "__main__":
     # print(val.metadata.sourceDict.keys())
     # print(val.metadata.name)
 
-    graph_deps = converter._globals_dependencies
+    # graph_deps = converter._globals_dependencies
 
 
-    cache_graph = CacheDependencyGraph(compiler_cache=compiler_cache)
+    # cache_graph = CacheDependencyGraph(compiler_cache=compiler_cache)
 
-    G = cache_graph.directed_graph
+    # G = cache_graph.directed_graph
 
-    colors = list(nx.get_node_attributes(G, 'is_global').values())
-    # print(colors)
-    import matplotlib.pyplot as plt
-    pos = nx.spring_layout(G)
-    nx.draw_networkx_nodes(G, pos, node_color=colors)
-    nx.draw_networkx_labels(G, pos, font_size=16)
-    nx.draw_networkx_edges(G, pos)
+    # colors = list(nx.get_node_attributes(G, 'is_global').values())
+    # # # print(colors)
+    # import matplotlib.pyplot as plt
+    # pos = nx.spring_layout(G)
+    # nx.draw_networkx_nodes(G, pos, node_color=colors)
+    # nx.draw_networkx_labels(G, pos, font_size=16)
+    # nx.draw_networkx_edges(G, pos)
     # plt.show()

@@ -2,10 +2,10 @@ from typed_python import Entrypoint
 
 """used in invalid_module.py."""
 
-
+cList = []
 @Entrypoint
 def f(x):
-    return x
+    return x + len(cList)
 
 
 @Entrypoint
@@ -19,7 +19,7 @@ bList = []
 
 @Entrypoint
 def g1(x):
-    return len(aList) + f(x)
+    return len(aList) + len(bList) + f(x)
 
 
 """
