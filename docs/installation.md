@@ -49,3 +49,15 @@ Before building the modules in this repository, you will need to make sure that 
   ```
 * Pipenv ([see this link](https://pipenv.readthedocs.io/en/latest/install/#installing-pipenv))
 * Redis Server (`redis-server`)
+
+## Testing ##
+
+### Manual Method ###
+
+1. Install the following additional packages: `pip install scipy pytest flaky`
+2. Navigate to the build directory `cd build`
+3. Run `pytest`
+
+### Automatic Method ###
+
+1. Run the included `install_and_test.sh` script, which will create a temporary virtual environment and run the tests within it.
