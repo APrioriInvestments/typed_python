@@ -2021,7 +2021,7 @@ class TypesTests(unittest.TestCase):
     def test_other_bitness_types(self):
         # verify we can cast around non-64-bit values in a way that matches numpy
         typeAndNumpyType = [
-            (bool, numpy.bool),
+            (bool, numpy.bool_),
             (Int8, numpy.int8),
             (Int16, numpy.int16),
             (Int32, numpy.int32),
