@@ -68,6 +68,9 @@ setuptools.setup(
     author_email='braxton.mckee@gmail.com',
     url='https://github.com/aprioriinvestments/typed_python',
     packages=setuptools.find_packages(),
+    package_data={
+        'typed_python': ['tests/*']
+    },
     cmdclass={'build_ext': TypedPythonBuildExtension},
     ext_modules=ext_modules,
     install_requires=INSTALL_REQUIRES,
