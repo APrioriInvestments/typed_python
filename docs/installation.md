@@ -10,7 +10,7 @@ There are several methods for building and setting up a development environment.
    * Install using Pipenv (which reads from the Pipfile).
 3. Build nativepython libraries using `python setup.py build`
 4. Install typed_python in the site-packages directory using `python setup.py install`
-5. Move out of the typed_python root directory, as the source files can interfere with the installed package.
+5. You might need to move out of the typed_python root directory, as the source files can interfere with the installed package.
 
 ### Pipenv Method ###
 This method is simple, and can take care of virtual environment creation and installation for you.
