@@ -1843,7 +1843,7 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_named_alternative(self):
         self.assertEqual(
             ModuleLevelAlternative.__module__,
-            "typed_python.types_serialization_test"
+            "types_serialization_test"
         )
 
         sc = SerializationContext()
@@ -1866,14 +1866,14 @@ class TypesSerializationTest(unittest.TestCase):
         )
 
     def test_serialize_module_level_class(self):
-        assert ModuleLevelClass.__module__ == 'typed_python.types_serialization_test'
+        assert ModuleLevelClass.__module__ == 'types_serialization_test'
 
         sc = SerializationContext().withoutCompression()
 
         self.assertIs(sc.deserialize(sc.serialize(ModuleLevelClass)), ModuleLevelClass)
 
         self.assertIn(
-            b'typed_python.types_serialization_test.ModuleLevelClass',
+            b'types_serialization_test.ModuleLevelClass',
             sc.serialize(ModuleLevelClass),
         )
 
@@ -1899,7 +1899,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(
             ModuleLevelNamedTupleSubclass.__module__,
-            "typed_python.types_serialization_test"
+            "types_serialization_test"
         )
 
         self.assertEqual(
@@ -2031,7 +2031,7 @@ class TypesSerializationTest(unittest.TestCase):
         def getCellType():
             return type(f.__closure__[0])
 
-        assert callFunctionInFreshProcess(getCellType, ()) is getCellType()
+        assert callFunctionInFreshProcess(getCellType, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)}) is getCellType()
 
     def test_self_visible_base_class_forward_resolved(self):
         Base = Forward("Base")
@@ -2060,7 +2060,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return Base, Child
 
-        Base, Child = callFunctionInFreshProcess(getOptimizer, ())
+        Base, Child = callFunctionInFreshProcess(getOptimizer, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         assert isinstance(Base() + Base() + Base(), Base)
         assert isinstance(Base() + Base() + Base(), Child)
@@ -2082,7 +2082,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return C_
 
-        c = callFunctionInFreshProcess(C(int), ())
+        c = callFunctionInFreshProcess(C(int), (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         assert c.g() == 10
         assert c.s() is type(c)
@@ -2106,7 +2106,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return C_
 
-        c = callFunctionInFreshProcess(C(int), ())
+        c = callFunctionInFreshProcess(C(int), (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
         assert c.g() == 10
         assert c.s() is type(c)
 
@@ -2175,7 +2175,10 @@ class TypesSerializationTest(unittest.TestCase):
         assert lenProxy("asdf") == 4
         assert lenProxyWithNonstandardGlobals("asdf") == 4
 
-        lenProxyDeserialized = callFunctionInFreshProcess(makeLenProxyWeirdGlobals, ())
+        lenProxyDeserialized = callFunctionInFreshProcess(makeLenProxyWeirdGlobals,
+                                                          (),
+                                                          extraEnvs={'PYTHONPATH': os.path.dirname(__file__)}
+                                                          )
 
         assert lenProxyDeserialized("asdf") == 4
 
@@ -2225,7 +2228,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return SeesItself
 
-        SeesItself = callFunctionInFreshProcess(makeSeesItself, ())
+        SeesItself = callFunctionInFreshProcess(makeSeesItself, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         assert SeesItself.seeItself(1, 2, 3, 4, 5) is SeesItself
 
@@ -2275,7 +2278,7 @@ class TypesSerializationTest(unittest.TestCase):
             def f(self):
                 return Cls
 
-        assert callFunctionInFreshProcess(Cls().f, ()) is Cls
+        assert callFunctionInFreshProcess(Cls().f, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)}) is Cls
 
     def test_serialization_preserves_forward_structure_in_classes(self):
         def getCls():
@@ -2289,7 +2292,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return Cls
 
-        Cls = callFunctionInFreshProcess(getCls, (), showStdout=True)
+        Cls = callFunctionInFreshProcess(getCls, (), showStdout=True, extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
         assert Cls.f.__annotations__['return'].__typed_python_category__ == 'Forward'
 
         Cls2 = getCls()
@@ -2304,7 +2307,7 @@ class TypesSerializationTest(unittest.TestCase):
             def f(self) -> Cls:
                 return "HI"
 
-        assert callFunctionInFreshProcess(Cls, ()).f() == "HI"
+        assert callFunctionInFreshProcess(Cls, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)}).f() == "HI"
 
     def test_can_deserialize_untyped_forward_class_methods_2(self):
         def getCls():
@@ -2318,7 +2321,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return Cls
 
-        callFunctionInFreshProcess(getCls, ())
+        callFunctionInFreshProcess(getCls, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
     def test_can_deserialize_forward_class_methods_tp_class(self):
         Cls = Forward("Cls")
@@ -2330,7 +2333,7 @@ class TypesSerializationTest(unittest.TestCase):
             def f(self) -> Cls:
                 return Cls(m='HI')
 
-        assert callFunctionInFreshProcess(Cls, ()).f().m == "HI"
+        assert callFunctionInFreshProcess(Cls, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)}).f().m == "HI"
 
     def test_can_deserialize_forward_class_methods_tp_class_no_self_reference(self):
         Cls = Forward("Cls")
@@ -2342,7 +2345,7 @@ class TypesSerializationTest(unittest.TestCase):
             def f(self) -> str:
                 return "HI"
 
-        assert callFunctionInFreshProcess(Cls, ()).f() == "HI"
+        assert callFunctionInFreshProcess(Cls, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)}).f() == "HI"
 
     def test_deserialize_regular_class_retains_identity(self):
         class Cls:
@@ -2351,7 +2354,7 @@ class TypesSerializationTest(unittest.TestCase):
                 Cls
                 return "HI"
 
-        Cls2 = type(callFunctionInFreshProcess(Cls, ()))
+        Cls2 = type(callFunctionInFreshProcess(Cls, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)}))
 
         assert identityHash(Cls).hex() == identityHash(Cls2).hex()
 
@@ -2367,7 +2370,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return (f, identityHash(f))
 
-        f, identityHashOfF = callFunctionInFreshProcess(makeFunction, ())
+        f, identityHashOfF = callFunctionInFreshProcess(makeFunction, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         assert identityHash(f) == identityHashOfF
 
@@ -2383,7 +2386,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return (f, identityHash(f))
 
-        f, identityHashOfF = callFunctionInFreshProcess(makeFunction, ())
+        f, identityHashOfF = callFunctionInFreshProcess(makeFunction, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         assert identityHash(f) == identityHashOfF
 
@@ -2399,7 +2402,7 @@ class TypesSerializationTest(unittest.TestCase):
             def f(self) -> Cls:
                 return Cls()
 
-        Cls2 = type(callFunctionInFreshProcess(Cls, ()))
+        Cls2 = type(callFunctionInFreshProcess(Cls, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)}))
 
         l = recursiveTypeGroupDeepRepr(Cls).split("\n")
         r = recursiveTypeGroupDeepRepr(Cls2).split("\n")
@@ -2429,7 +2432,7 @@ class TypesSerializationTest(unittest.TestCase):
             def f(self) -> Cls:
                 return Cls()
 
-        Cls2 = type(callFunctionInFreshProcess(Cls, ()))
+        Cls2 = type(callFunctionInFreshProcess(Cls, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)}))
 
         assert identityHash(Cls) == identityHash(Cls2)
 
@@ -2468,7 +2471,7 @@ class TypesSerializationTest(unittest.TestCase):
             else:
                 return "FAILED"
 
-        assert callFunctionInFreshProcess(deserializeAndCall, (aChildBytes,)) == "OK"
+        assert callFunctionInFreshProcess(deserializeAndCall, (aChildBytes,), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)}) == "OK"
 
     def test_call_method_dispatch_on_two_versions_of_self_referential_class_produced_differently(self):
         def deserializeAndCall():
@@ -2492,8 +2495,8 @@ class TypesSerializationTest(unittest.TestCase):
 
             return Child(), callF
 
-        child1, callF1 = callFunctionInFreshProcess(deserializeAndCall, ())
-        child2, callF2 = callFunctionInFreshProcess(deserializeAndCall, ())
+        child1, callF1 = callFunctionInFreshProcess(deserializeAndCall, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
+        child2, callF2 = callFunctionInFreshProcess(deserializeAndCall, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         assert identityHash(child1) == identityHash(child2)
         assert identityHash(callF1) == identityHash(callF2)
@@ -2526,8 +2529,8 @@ class TypesSerializationTest(unittest.TestCase):
 
             return Base, callF
 
-        Base1, callF1 = callFunctionInFreshProcess(deserializeAndCall, ())
-        Base2, callF2 = callFunctionInFreshProcess(deserializeAndCall, ())
+        Base1, callF1 = callFunctionInFreshProcess(deserializeAndCall, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
+        Base2, callF2 = callFunctionInFreshProcess(deserializeAndCall, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         assert identityHash(Base1) == identityHash(Base2)
         assert identityHash(callF1) == identityHash(callF2)
@@ -2578,7 +2581,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return SerializationContext().serialize(Child())
 
-        childBytes = callFunctionInFreshProcess(deserializeAndCall, ())
+        childBytes = callFunctionInFreshProcess(deserializeAndCall, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         child1 = SerializationContext().deserialize(childBytes)
         child2 = SerializationContext().deserialize(childBytes)
@@ -2606,7 +2609,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return s.serialize(aFun)
 
-        childBytes = callFunctionInFreshProcess(returnSerializedForm, ())
+        childBytes = callFunctionInFreshProcess(returnSerializedForm, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         childFun = (
             SerializationContext()
@@ -2657,7 +2660,9 @@ class TypesSerializationTest(unittest.TestCase):
 
             return (BaseClass, ChildClass, ChildClass())
 
-        BaseClass, ChildClass, childInstance = callFunctionInFreshProcess(makeClasses, ())
+        BaseClass, ChildClass, childInstance = callFunctionInFreshProcess(makeClasses,
+                                                                          (),
+                                                                          extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         assert type(BaseClass) is ABCMeta
 
@@ -2695,7 +2700,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return (BaseClass, ChildClass, recursiveTypeGroupDeepRepr(BaseClass))
 
-        BaseClass, ChildClass, deepRepr = callFunctionInFreshProcess(makeClasses, ())
+        BaseClass, ChildClass, deepRepr = callFunctionInFreshProcess(makeClasses, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         assert type(BaseClass.getChild()) is ChildClass
 
@@ -2714,7 +2719,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return f
 
-        f = callFunctionInFreshProcess(makeF, ())
+        f = callFunctionInFreshProcess(makeF, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         assert f(10) == 10
 
@@ -2737,7 +2742,7 @@ class TypesSerializationTest(unittest.TestCase):
             return s.serialize(Child)
 
         Child2 = SerializationContext().deserialize(
-            callFunctionInFreshProcess(serializeIt, ())
+            callFunctionInFreshProcess(serializeIt, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
         )
 
         assert Child2().func() == 10
@@ -2776,7 +2781,7 @@ class TypesSerializationTest(unittest.TestCase):
                 s = SerializationContext()
                 return s.serialize(globals['anF'])
 
-        serializedF = callFunctionInFreshProcess(makeF, ())
+        serializedF = callFunctionInFreshProcess(makeF, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         f = SerializationContext().deserialize(serializedF)
 
@@ -2813,7 +2818,7 @@ class TypesSerializationTest(unittest.TestCase):
                 s = SerializationContext()
                 return s.serialize(globals['C'])
 
-        serializedC = callFunctionInFreshProcess(makeC, ())
+        serializedC = callFunctionInFreshProcess(makeC, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         C = SerializationContext().deserialize(serializedC)
 
@@ -2847,7 +2852,7 @@ class TypesSerializationTest(unittest.TestCase):
                 s = SerializationContext()
                 return s.serialize(globals['C'])
 
-        serializedC = callFunctionInFreshProcess(makeC, ())
+        serializedC = callFunctionInFreshProcess(makeC, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         C = SerializationContext().deserialize(serializedC)
 
@@ -2887,8 +2892,12 @@ class TypesSerializationTest(unittest.TestCase):
                 s = SerializationContext()
                 return s.serialize(globals['f'])
 
-        f1 = SerializationContext().deserialize(callFunctionInFreshProcess(makeF, ('asdf',)))
-        f2 = SerializationContext().deserialize(callFunctionInFreshProcess(makeF, ('asdf2',)))
+        f1 = SerializationContext().deserialize(callFunctionInFreshProcess(makeF,
+                                                                           ('asdf',),
+                                                                           extraEnvs={'PYTHONPATH': os.path.dirname(__file__)}))
+        f2 = SerializationContext().deserialize(callFunctionInFreshProcess(makeF,
+                                                                           ('asdf2',),
+                                                                           extraEnvs={'PYTHONPATH': os.path.dirname(__file__)}))
 
         def checkSame(f1, f2):
             s = SerializationContext().withoutCompression()
@@ -3023,15 +3032,14 @@ class TypesSerializationTest(unittest.TestCase):
 
                 globals = {'__file__': path}
 
-                exec(
-                    compile(CONTENTS, path, "exec"),
-                    globals
-                )
+                exec(compile(CONTENTS, path, "exec"),
+                     globals
+                     )
 
                 s = SerializationContext()
                 return s.serialize(globals['f'])
 
-        serializedF = callFunctionInFreshProcess(makeC, ())
+        serializedF = callFunctionInFreshProcess(makeC, (), extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         f = SerializationContext().deserialize(serializedF)
 
@@ -3056,7 +3064,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             return x
 
-        x = callFunctionInFreshProcess(getX, (), showStdout=True)
+        x = callFunctionInFreshProcess(getX, (), showStdout=True, extraEnvs={'PYTHONPATH': os.path.dirname(__file__)})
 
         print(x)
         # TODO: make this True

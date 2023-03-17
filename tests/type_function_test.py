@@ -98,7 +98,7 @@ class TypeFunctionTest(unittest.TestCase):
 
     def test_name_and_qualname(self):
         assert TfLevelMethod.__name__ == 'TfLevelMethod'
-        assert TfLevelMethod.__module__ == 'typed_python.type_function_test'
+        assert TfLevelMethod.__module__ == 'type_function_test'
         assert TfLevelMethod.__qualname__ == 'TfLevelMethod'
 
     def test_mutually_recursive(self):

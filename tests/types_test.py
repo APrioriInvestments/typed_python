@@ -185,8 +185,8 @@ class RandomValueProducer:
 
 class TypesTests(unittest.TestCase):
     def test_alternative_module(self):
-        assert AnAlternative.__module__ == 'typed_python.types_test'
-        assert AForwardAlternative.__module__ == 'typed_python.types_test'
+        assert AnAlternative.__module__ == 'types_test'
+        assert AForwardAlternative.__module__ == 'types_test'
 
     def test_refcount_bug_with_simple_string(self):
         with self.assertRaisesRegex(TypeError, "first argument to refcount '111' not a permitted Type"):

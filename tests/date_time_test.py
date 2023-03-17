@@ -16,7 +16,7 @@ from typed_python.lib.datetime.date_time import (
     OneFoldOnlyError,
     PytzTimezone,
 )
-from typed_python.lib.datetime.date_parser_test import get_datetimes_in_range
+from date_parser_test import get_datetimes_in_range
 from typed_python.lib.timestamp import Timestamp
 
 

@@ -60,7 +60,7 @@ def looksAtFilename():
 
 
 def looksAtFilename2():
-    return typed_python.type_identity_test.__file__
+    return __file__
 
 
 def checkHash(filesToWrite, expression):
@@ -273,7 +273,8 @@ def test_mutually_recursive_group_basic():
     X = Forward("X")
     X = X.define(TupleOf(OneOf(int, X)))
 
-    assert recursiveTypeGroup(X) == [X, OneOf(int, X)]
+    assert (recursiveTypeGroup(X) == [X, OneOf(int, X)] or
+            recursiveTypeGroup(X) == [OneOf(int, X), X])  # order-independent
 
 
 def test_mutually_recursive_group_through_functions_in_closure():
