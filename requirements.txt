@@ -1,4 +1,5 @@
 llvmlite==0.38
+networkx
 numpy
 psutil
 pytz

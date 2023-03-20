@@ -1,4 +1,5 @@
 #   Copyright 2017-2020 typed_python Authors
+
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -12,6 +13,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import random
+import networkx as nx
 import psutil
 import time
 import threading
@@ -257,3 +260,130 @@ class CodeEvaluator:
             codeFile.write(code.encode("utf8"))
 
         exec(compile(code, filename, "exec"), moduleDict)
+
+
+class CodeGenerator:
+    def __init__(self, num_functions: int, num_connections: int,
+                 max_depth: int):
+        self.num_functions = num_functions
+        self.num_connections = num_connections
+        self._graph = None
+        self._python_code = None
+        self.function_args = {}
+        self.max_depth = max_depth
+        self.supported_types = ['int', 'float', 'str', 'bool', 'None', 'list']
+
+    def __str__(self):
+        return self.python_code
+
+    @property
+    def python_code(self):
+        if not self._python_code:
+            self._python_code = self.generate_python_code()
+        return self._python_code
+
+    @property
+    def graph(self):
+        if not self._graph:
+            self._graph = self.generate_graph()
+        return self._graph
+
+    def generate_graph(self) -> nx.DiGraph:
+        G = nx.DiGraph()
+        nodes = list(range(self.num_functions))
+        G.add_nodes_from(nodes)
+        random.shuffle(nodes)
+
+        loop_counter = 0
+        added_edges = 0
+        while added_edges <= self.num_connections:
+            if loop_counter > 1000:
+                raise RuntimeError(
+                    'params for graph generation are too restrictive')
+            src = random.choice(nodes)
+            dst_candidates = list(
+                filter(lambda x: x != src and not nx.has_path(G, x, src),
+                       nodes))
+            if dst_candidates:
+                dst = random.choice(dst_candidates)
+                G.add_edge(src, dst)
+                if nx.dag_longest_path_length(G) > self.max_depth:
+                    G.remove_edge(src, dst)
+                else:
+                    added_edges += 1
+            else:
+                break
+
+            loop_counter += 1
+
+        return G
+
+    def generate_value(self, var_type):
+        value = None
+        if var_type not in self.supported_types:
+            raise ValueError(f"var_type must be one of {self.supported_types}")
+        if var_type == 'int':
+            value = random.randint(1, 100)
+        elif var_type == 'float':
+            value = round(random.uniform(1, 100), 2)
+        elif var_type == 'str':
+            value = f"'{random.choice(['typed', 'python', 'fuzz'])}'"
+        elif var_type == 'bool':
+            value = random.choice(['True', 'False'])
+        elif var_type == 'None':
+            value = 'None'
+        elif var_type == 'list':
+            value = f"[{random.randint(1, 100)}, {random.randint(1, 100)}, {random.randint(1, 100)}]"
+        assert value is not None
+        return str(value)
+
+    def generate_var_declaration(self, node, var_type):
+        var_name = f"var_{node}"
+        value = self.generate_value(var_type)
+        return f"{var_name} = {value}"
+
+    def generate_function_body(self, node, dependencies):
+        args = [
+            f"arg_{i}: {arg_type}"
+            for i, arg_type in enumerate(self.function_args[node])
+        ]
+        signature = f"def func_{node}({', '.join(args)}):"
+        var_declarations = [
+            self.generate_var_declaration(i,
+                                          random.choice(self.supported_types))
+            for i in range(random.randint(1, 3))
+        ]
+        func_sigs = []
+        for dep in dependencies:
+            func_sig = f"func_{dep}({','.join(self.generate_value(var) for var in self.function_args[dep])})"
+            func_sigs.append(func_sig)
+        func_calls = [
+            f"var_{i+len(var_declarations)} = {sig}"
+            for i, sig in enumerate(func_sigs)
+        ]
+        statements = var_declarations + func_calls
+        random.shuffle(statements)
+        # return_var = f"var_{random.randrange(0, len(statements))}"
+        var_list = '[' + ', '.join(f"var_{i}"
+                                   for i in range(len(statements))) + ']'
+        statements.append(f"return random.choice({var_list})")
+        body = '\n    '.join(statements)
+        return f"{signature}\n    {body}\n"
+
+    def generate_python_code(self) -> str:
+        G = self.graph
+        # need to have specified all function signatures before any body can be generated.
+        for node in G.nodes:
+            args = [
+                random.choice(self.supported_types)
+                for _ in range(random.randint(0, 3))
+            ]
+            self.function_args[node] = args
+
+        codebase = [
+            self.generate_function_body(node, G.successors(node))
+            for node in G.nodes
+        ]
+        # all functions depend on random for their return value
+        codebase_with_import = 'import random\n' + '\n'.join(codebase)
+        return codebase_with_import
