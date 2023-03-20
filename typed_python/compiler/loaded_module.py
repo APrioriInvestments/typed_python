@@ -90,7 +90,7 @@ class LoadedModule:
             if meta.matches.StringConstant:
                 self.pointers[i].cast(str).initialize(meta.value)
 
-            if meta.matches.IntegerConstant:
+            elif meta.matches.IntegerConstant:
                 self.pointers[i].cast(int).initialize(meta.value)
 
             elif meta.matches.BytesConstant:

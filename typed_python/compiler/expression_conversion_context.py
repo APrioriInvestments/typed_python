@@ -107,6 +107,10 @@ class ExpressionConversionContext:
         if not isinstance(t, type):
             raise Exception(f"Can't give a type pointer to {t} because its not a type")
 
+        # if t is not str:
+        #     name="reading type_pointer_" + str(id(t)) + "_" + t.__name__[:50]
+        #     self.logDiagnostic(name)
+
         return native_ast.Expression.GlobalVariable(
             name="type_pointer_" + str(id(t)) + "_" + t.__name__[:50],
             type=native_ast.VoidPtr,

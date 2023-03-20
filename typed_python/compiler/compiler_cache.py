@@ -112,6 +112,12 @@ class CompilerCache:
 
         self.loadModuleByHash(moduleHash)
 
+        print()
+        print()
+        print(f"Loading for {linkName}")
+        if 'runtime.oneof_attribute.7a785' in linkName:
+            import pdb;pdb.set_trace()
+
         if linkName not in self.targetsValidated:
             self.targetsValidated.add(linkName)
             for dependant_func in self.dependencies(linkName):
@@ -122,6 +128,13 @@ class CompilerCache:
                 definitionsToLink = {x: self.loadedBinarySharedObjects[moduleHash].serializedGlobalVariableDefinitions[x]
                                      for x in globalsToLink
                                      }
+
+                print(f"While loading for {linkName}, loaded:")
+                for k, v in definitionsToLink.items():
+                    print(k)
+                    print(SerializationContext().deserialize(v).metadata)
+
+
                 self.loadedBinarySharedObjects[moduleHash].linkGlobalVariables(definitionsToLink)
                 if not self.loadedBinarySharedObjects[moduleHash].validateGlobalVariables(definitionsToLink):
                     raise RuntimeError('failed to validate globals when loading:', linkName)
@@ -330,7 +343,8 @@ class CompilerCache:
         if moduleHash is None:
             raise Exception("Can't find a module for " + linkName)
 
-        if moduleHash not in self.loadedBinarySharedObjects:
+        # if moduleHash not in self.loadedBinarySharedObjects:
+        if linkName not in self.targetsValidated:
             self.loadForSymbol(linkName)
 
         return self.loadedBinarySharedObjects[moduleHash].functionPointers[func_name]
