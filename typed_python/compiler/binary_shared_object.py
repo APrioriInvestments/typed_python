@@ -27,10 +27,13 @@ from typed_python.hash import sha_hash
 
 class LoadedBinarySharedObject(LoadedModule):
     def __init__(self, binarySharedObject, diskPath, functionPointers, serializedGlobalVariableDefinitions):
-        super().__init__(functionPointers, serializedGlobalVariableDefinitions)
-
         self.binarySharedObject = binarySharedObject
         self.diskPath = diskPath
+
+        super().__init__(functionPointers, serializedGlobalVariableDefinitions)
+
+    def __str__(self):
+        return f"LoadedBSO({self.diskPath})"
 
 
 class BinarySharedObject:

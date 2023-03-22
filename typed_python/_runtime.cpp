@@ -55,6 +55,13 @@ extern "C" {
     }
     /******************************/
 
+    void np_check_type_pointer(void** ptrPtr, uint64_t pointerId) {
+        if (!*ptrPtr) {
+            std::cout << "Null pointer at " << (uint64_t)ptrPtr << " for pointer " << pointerId << std::endl;
+            asm("int3");
+        }
+    }
+
     void np_compileClassDispatch(ClassDispatchTable* classDispatchTable, int slot) {
         PyEnsureGilAcquired getTheGil;
 

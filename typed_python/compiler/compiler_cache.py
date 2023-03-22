@@ -64,7 +64,7 @@ class CompilerCache:
         self.link_name_to_module_hash = Dict(str, str)()
         self.moduleManifestsLoaded = set()
         # link_names with an associated module in loadedBinarySharedObjects
-        self.targetsLoaded: Dict[str, TypedCallTarget] = {}
+        self.targetsLoaded = Dict(str, TypedCallTarget)()
         # the set of link_names for functions with linked and validated globals (i.e. ready to be run).
         self.targetsValidated = set()
         # link_name -> link_name
@@ -106,22 +106,22 @@ class CompilerCache:
         """Returns all the function names that `link_name` depends on"""
         return list(self.function_dependency_graph.outgoing(link_name))
 
-    def loadForSymbol(self, linkName: str) -> None:
+    def loadForSymbol(self, linkName: str, parents=()) -> None:
         """Loads the whole module, and any dependant modules, into LoadedBinarySharedObjects"""
         moduleHash = self.link_name_to_module_hash[linkName]
 
         self.loadModuleByHash(moduleHash)
 
-        print()
-        print()
-        print(f"Loading for {linkName}")
-        if 'runtime.oneof_attribute.7a785' in linkName:
-            import pdb;pdb.set_trace()
+        # print()
+        # print()
+        # print(f"Loading for {linkName}")
+        # if 'runtime.oneof_attribute.7a785' in linkName:
+        #     import pdb;pdb.set_trace()
 
         if linkName not in self.targetsValidated:
             self.targetsValidated.add(linkName)
             for dependant_func in self.dependencies(linkName):
-                self.loadForSymbol(dependant_func)
+                self.loadForSymbol(dependant_func, parents=parents + (linkName,))
 
             globalsToLink = self.global_dependencies.get(linkName, [])
             if globalsToLink:
@@ -129,11 +129,19 @@ class CompilerCache:
                                      for x in globalsToLink
                                      }
 
-                print(f"While loading for {linkName}, loaded:")
-                for k, v in definitionsToLink.items():
-                    print(k)
-                    print(SerializationContext().deserialize(v).metadata)
+                # print(f"While loading for {linkName}, loaded:")
+                # for k, v in definitionsToLink.items():
+                #     print(k)
+                #     print(SerializationContext().deserialize(v).metadata)
 
+
+                for k, v in definitionsToLink.items():
+                    if 'type_pointer_' in k and 'ProxyResp' in k:
+                        print("Symbol ", linkName, " defined in module ", moduleHash)
+
+                        for i in range(len(parents)):
+                            print("    " * i + parents[i])
+                        print("    " * len(parents) + "links to ", k)
 
                 self.loadedBinarySharedObjects[moduleHash].linkGlobalVariables(definitionsToLink)
                 if not self.loadedBinarySharedObjects[moduleHash].validateGlobalVariables(definitionsToLink):
@@ -173,6 +181,8 @@ class CompilerCache:
         # load the submodules first
         for submodule in submodules:
             self.loadModuleByHash(submodule)
+
+        print("LOADING ", moduleHash)
 
         modulePath = os.path.join(targetDir, "module.so")
 

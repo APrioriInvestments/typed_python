@@ -30,6 +30,10 @@ class LoadedModule:
 
         self.installedGlobalVariableDefinitions = {}
 
+        for i, o in enumerate(self.orderedDefNames):
+            if 'type_pointer_' in o and 'ProxyRespondWithContents' in o:
+                print("Module ", self, " has ", o, " at ", int(self.pointers[i]))
+
     @staticmethod
     def validateGlobalVariables(serializedGlobalVariableDefinitions: Dict[str, bytes]) -> bool:
         """Check that each global variable definition is sensible.
@@ -124,6 +128,9 @@ class LoadedModule:
                 )
 
             elif meta.matches.RawTypePointer:
+                if 'ProxyRespondWithContents' in str(meta.value):
+                    print(f"module {self} initializing {meta.value} at {int(self.pointers[i])}")
+
                 self.pointers[i].cast(int).initialize(
                     _types.getTypePointer(meta.value)
                 )

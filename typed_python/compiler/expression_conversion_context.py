@@ -107,17 +107,22 @@ class ExpressionConversionContext:
         if not isinstance(t, type):
             raise Exception(f"Can't give a type pointer to {t} because its not a type")
 
-        # if t is not str:
-        #     name="reading type_pointer_" + str(id(t)) + "_" + t.__name__[:50]
-        #     self.logDiagnostic(name)
-
-        return native_ast.Expression.GlobalVariable(
+        res = native_ast.Expression.GlobalVariable(
             name="type_pointer_" + str(id(t)) + "_" + t.__name__[:50],
             type=native_ast.VoidPtr,
             metadata=GlobalVariableMetadata.RawTypePointer(
                 value=t
             )
-        ).load()
+        )
+
+        self.pushEffect(
+            runtime_functions.check_type_pointer.call(
+                res,
+                id(t)
+            )
+        )
+
+        return res.load()
 
     def allocateClassMethodDispatchSlot(self, clsType, methodName, retType, argTupleType, kwargTupleType):
         # the first argument indicates whether this is an instance or type-level dispatch

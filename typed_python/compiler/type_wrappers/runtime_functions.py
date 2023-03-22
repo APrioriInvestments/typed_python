@@ -1186,6 +1186,13 @@ raiseAttributeError = externalCallTarget(
     UInt8Ptr
 )
 
+check_type_pointer = externalCallTarget(
+    "np_check_type_pointer",
+    Void,
+    Void.pointer().pointer(),
+    UInt64
+)
+
 serialize = externalCallTarget(
     "np_serialize",
     Void.pointer(),
