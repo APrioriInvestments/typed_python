@@ -277,11 +277,6 @@ PyObject* PythonObjectOfType::deepcopyPyObject(
             }
         } else if (remainingArgs.size() > 0 && remainingArgs[0] != Py_None) {
             if (!PyObject_HasAttrString((PyObject*)value->ob_type, "__setstate__")) {
-                PyObjectStealer repr(PyObject_Repr(o));
-                if (!repr) {
-                    throw PythonExceptionSet();
-                }
-
                 PyObjectStealer dict(
                     PyObject_GenericGetDict((PyObject*)value, nullptr)
                 );
