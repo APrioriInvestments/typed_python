@@ -4,12 +4,13 @@
 There are several methods for building and setting up a development environment.
 
 ### Manual Method ###
-1. Create a new virtualenv with Python 3.6 (`virtualenv --python=<path-to-py3> venv`) and source it
+1. Create a new virtualenv with Python 3.6 (`virtualenv --python=<path-to-py3> venv`) and source it.
 2. Install requirements via pip. For the moment there are two options:
-   * Install with plain pip using the `requirements`
-   * Install using Pipenv (which reads from the Pipfile)
+   * Install with plain pip using `pip install -r requirements.txt`
+   * Install using Pipenv (which reads from the Pipfile).
 3. Build nativepython libraries using `python setup.py build`
-4. Append the root of this repository to your `PYTHONPATH`
+4. Install typed_python in the site-packages directory using `python setup.py install`
+5. You might need to move out of the typed_python root directory, as the source files can interfere with the installed package.
 
 ### Pipenv Method ###
 This method is simple, and can take care of virtual environment creation and installation for you.
@@ -21,12 +22,10 @@ The included Makefile in this repository contains recipes for building, installi
 
 You can also customize the name and location of any built virtual environments with the `VIRTUAL_ENV` variable.
 
-
-## Installation ##
+## Prerequisites ##
 
 ### OSX ###
 
-#### Prerequisites ####
 * Python 3.6 (recommended installed with homebrew)
   * Currently build is tested against `clang`, not `gcc`. For more information about installing `clang` and configuring your environment see [here](https://embeddedartistry.com/blog/2017/2/20/installing-clangllvm-on-osx)
 * It is recommended you use Pipenv ([see this link](https://pipenv.readthedocs.io/en/latest/install/#installing-pipenv)) to manage the application.
@@ -34,12 +33,9 @@ You can also customize the name and location of any built virtual environments w
 * install Redis (`brew install redis`)
 
 
-
-
 ### Linux ###
 (These instructions are only for Ubuntu for the moment)
 
-#### Prerequisites ####
 Before building the modules in this repository, you will need to make sure that you have the following:
 * Python 3.6 with header files (`python3.6-dev python3.6-dbg`)
   Note that for development you will also install the debug interpreter.
@@ -53,3 +49,15 @@ Before building the modules in this repository, you will need to make sure that 
   ```
 * Pipenv ([see this link](https://pipenv.readthedocs.io/en/latest/install/#installing-pipenv))
 * Redis Server (`redis-server`)
+
+## Testing ##
+
+### Manual Method ###
+
+1. Install the following additional packages: `pip install scipy pytest flaky`
+2. Navigate to the build directory `cd build`
+3. Run `pytest`
+
+### Automatic Method ###
+
+1. Run the included `install_and_test.sh` script, which will create a temporary virtual environment and run the tests within it.
