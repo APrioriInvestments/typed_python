@@ -28,10 +28,14 @@ llvm.initialize()
 llvm.initialize_native_target()
 llvm.initialize_native_asmprinter()  # yes, even this one
 
+features = llvm.get_host_cpu_features()
+
 target_triple = llvm.get_process_triple()
 target = llvm.Target.from_triple(target_triple)
 target_machine = target.create_target_machine()
-target_machine_shared_object = target.create_target_machine(reloc='pic', codemodel='default')
+target_machine_shared_object = target.create_target_machine(
+    reloc='pic', codemodel='default', features=features.flatten()
+)
 
 ctypes.CDLL(_types.__file__, mode=ctypes.RTLD_GLOBAL)
 
