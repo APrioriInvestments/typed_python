@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2020 typed_python Authors
+   Copyright 2017-2023 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -18,17 +18,47 @@
 
 #include "TypeOrPyobj.hpp"
 #include "ShaHash.hpp"
+#include "VisibilityType.hpp"
+
 #include <map>
 #include <unordered_map>
 
 
 class MutuallyRecursiveTypeGroupSearch;
 
+/*****
+MutuallyRecursiveTypeGroup (or MRTG) provides infrstructure for hashing groups of python
+type and module objects.  The primary use cases for this infrastructure are for identifying
+truly identical Type objects that may have been constructed separately (either via deserialization
+or directly via the API) and for hashing Type and function objects so that the compiler cache
+can formally identify that a function will compile to the same code.
 
-// represents a group of Type* and PyObject* instances that can 'see' each other according
-// to the compiler. These instances need to be serialized and hashed as a group.  The hash
-// of the instances depends on the hash of the group, and the hash of the group depends on
-// the set of instances contained inside of it.
+We have multiple angles at which we can look at an object. The simplest is 'identity', where
+we wish to associate a hash with an object so that we are guaranteed that two objects
+with the same hash will behave identically (not including pointer identity).  For instance,
+two instances of the same function object visible at module-level scope in a globally visible
+module would be 'identical', even if the module object changes.
+
+The more stringent hash is the 'compiler' hash, in which two objects that have the same
+hash would look identical to the compiler now and at all points in the future.  In this model,
+we need to deeply walk into the object in the same manner the compiler would.  For this to
+work, we make the same assumption that we make in the main compiler: once we have finished
+the module import process, all of the objects defined in the module are fully defined.
+In particular this means that the identify of module members will not chnage (essentially,
+that the module's dict is immutable), and that class members of classes defined in that module
+will not change (the class dicts are immutable). Mutable objects such as module-level lists
+may change during runtime, and so we don't consider them part of the compiler hash.
+
+In order to hash python objects, we have to find groups of mutually recursive objects. As
+an example, if 'f' and 'g' are mutually recursive functions, then if you change either of
+their code objects, then both of their compiler hashes should change. To this end, we define
+the MutuallyRecursiveTypeGroup (MRTG), which builds the DAG of object cycles. The MRTGs
+are defined either as Identity or Compiler groups, depending on the use case. Objects
+found in MRTGs are memoized in the program and won't ever be released, so be careful what
+you hash.
+
+******/
+
 class MutuallyRecursiveTypeGroup {
 public:
     //return an empty 'builder' group. Builder groups can be built up and then
@@ -41,7 +71,7 @@ public:
     //Regardless, you're guaranteed that after you finalize this group, there will be only
     //one copy of the types or singleton objects it contains. The types you put in may be
     //discarded, so don't keep a reference to them.
-    static MutuallyRecursiveTypeGroup* DeserializerGroup(ShaHash intendedHash);
+    static MutuallyRecursiveTypeGroup* DeserializerGroup(ShaHash intendedHash, VisibilityType visibility);
 
     bool isDeserializerGroup() const {
         return mIsDeserializerGroup;
@@ -61,6 +91,10 @@ public:
         return mHash;
     }
 
+    VisibilityType visibilityType() const {
+        return mVisibilityType;
+    }
+
     const std::map<int32_t, TypeOrPyobj>& getIndexToObject() const {
         return mIndexToObject;
     }
@@ -68,44 +102,44 @@ public:
     std::string repr(bool deep=false);
 
     // if we have an official MRTG for this hash, return it.
-    static MutuallyRecursiveTypeGroup* getGroupFromHash(ShaHash h);
+    static MutuallyRecursiveTypeGroup* getGroupFromHash(ShaHash h, VisibilityType k);
 
     // if we have an MRTG with this 'intended' hash, return that.
-    static MutuallyRecursiveTypeGroup* getGroupFromIntendedHash(ShaHash h);
+    static MutuallyRecursiveTypeGroup* getGroupFromIntendedHash(ShaHash h, VisibilityType k);
 
     // construct an MRTG on this. After this call, this object will be in the type memo
     // and calls to 'groupAndIndexFor' and shaHash will succeed
-    static void ensureRecursiveTypeGroup(TypeOrPyobj root);
+    static void ensureRecursiveTypeGroup(TypeOrPyobj root, VisibilityType k);
 
     // return the current group head, assuming one has been created. If you haven't called
     // ensureRecursiveTypeGroup, you may get a nullptr for the group. Note that creating
     // a TypeOrPyobj will leak a reference to 'o', so don't do it on any old object.
-    static std::pair<MutuallyRecursiveTypeGroup*, int> groupAndIndexFor(TypeOrPyobj o);
+    static std::pair<MutuallyRecursiveTypeGroup*, int> groupAndIndexFor(TypeOrPyobj o, VisibilityType k);
 
     // lookup an object without increffing it
-    static std::pair<MutuallyRecursiveTypeGroup*, int> groupAndIndexFor(PyObject* o);
+    static std::pair<MutuallyRecursiveTypeGroup*, int> groupAndIndexFor(PyObject* o, VisibilityType k);
 
     // return the current sha-hash for this object, or ShaHash() if its not in a type
     // group yet.
-    static ShaHash shaHash(TypeOrPyobj t);
+    static ShaHash shaHash(TypeOrPyobj t, VisibilityType k);
 
     // ensure this object is in a type group and then return the set of reachable instances
-    static void visibleFrom(TypeOrPyobj root, std::vector<TypeOrPyobj>& outReachable);
+    static void visibleFrom(TypeOrPyobj root, std::vector<TypeOrPyobj>& outReachable, VisibilityType k);
 
 private:
-    MutuallyRecursiveTypeGroup();
+    MutuallyRecursiveTypeGroup(VisibilityType visibility);
 
-    MutuallyRecursiveTypeGroup(ShaHash hash);
+    MutuallyRecursiveTypeGroup(ShaHash hash, VisibilityType visibility);
 
     static ShaHash shaHashOfSimplePyObjectConstant(PyObject* h);
 
-    static bool objectIsUnassigned(TypeOrPyobj obj);
+    static bool objectIsUnassigned(TypeOrPyobj obj, VisibilityType visibility);
 
     ShaHash computeTopoHash(TypeOrPyobj t);
 
     void _computeHashAndInstall();
 
-    static void buildCompilerRecursiveGroup(const std::set<TypeOrPyobj>& types);
+    static void buildCompilerRecursiveGroup(const std::set<TypeOrPyobj>& types, VisibilityType visibility);
 
     static void installTypeHash(Type* t);
 
@@ -113,7 +147,10 @@ private:
 
     // given a collection of TypeOrPyobj, figure out which one is the 'root' for the group
     // this must be stable regardless of the ordering.
-    static std::pair<TypeOrPyobj, bool> computeRoot(const std::set<TypeOrPyobj>& types);
+    static std::pair<TypeOrPyobj, bool> computeRoot(
+        const std::set<TypeOrPyobj>& types,
+        VisibilityType visibility
+    );
 
     // static mutex that guards all the relevant data structures. Changes to all static
     // structures below must be made while holding the mutex. You may not hold the mutex
@@ -121,17 +158,26 @@ private:
     static std::recursive_mutex mMutex;
 
     // for each python object that's in a type group, the group and index within the group
-    static std::unordered_map<TypeOrPyobj, std::pair<MutuallyRecursiveTypeGroup*, int> > mTypeGroups;
+    static std::map<
+        VisibilityType,
+        std::unordered_map<TypeOrPyobj, std::pair<MutuallyRecursiveTypeGroup*, int> >
+    > mTypeGroups;
 
-    static std::map<ShaHash, MutuallyRecursiveTypeGroup*> mIntendedHashToGroup;
+    static std::map<
+        VisibilityType,
+        std::map<ShaHash, MutuallyRecursiveTypeGroup*>
+    > mIntendedHashToGroup;
 
-    static std::map<ShaHash, MutuallyRecursiveTypeGroup*> mHashToGroup;
+    static std::map<VisibilityType, std::map<ShaHash, MutuallyRecursiveTypeGroup*> > mHashToGroup;
 
     void computeHash();
 
     // is this a builder group? If so, we can modify it and types may be forwards
     // if not, we can't modify it and it may or may not be officially installed.
     bool mIsDeserializerGroup;
+
+    // what kind of group are we
+    VisibilityType mVisibilityType;
 
     // the sha hash of this group within this codebase
     ShaHash mHash;

@@ -2057,6 +2057,54 @@ PyObject *createPyCell(PyObject* nullValue, PyObject* args) {
     return PyCell_New(PyTuple_GetItem(args, 0));
 }
 
+PyDoc_STRVAR(
+    compilerHash_doc,
+    "compilerHash(T) -> str\n\n"
+    "Compute the 'compiler hash' of a type or function T.\n\n"
+    "The 'compilerHash' of a function or Type is a sha-hash of all objects visible to the\n"
+    "compiler starting from 'T'. If two python objects have the same compiler hash,\n"
+    "then the compiler will produce identical code for them.\n\n"
+    "The compilerHash is computed by walking into a type or function and looking at all\n"
+    "the objects that the compiler would be willing to look at. For instance, if 'f' calls\n"
+    "a function 'g' and 'g' is visibile to 'f' through its module dictionary, the compiler\n"
+    "will know to compile and call 'f' and so 'f' will be included in this walk. In contrast,\n"
+    "if 'f' accesses a list object through its closure, the contents of that list will not be\n"
+    "contained in the cache since the contents of the list could change.\n"
+);
+PyObject *compilerHash(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "compilerHash takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    ShaHash hash;
+
+    return translateExceptionToPyObject([&]() {
+        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(
+            (PyObject*)a1,
+            VisibilityType::Compiler
+        );
+        hash = MutuallyRecursiveTypeGroup::shaHash(
+            (PyObject*)a1,
+            VisibilityType::Compiler
+        );
+
+        return PyBytes_FromStringAndSize((const char*)&hash, sizeof(ShaHash));
+    });
+}
+
+PyDoc_STRVAR(
+    identityHash_doc,
+    "identityHash(T) -> str\n\n"
+    "Compute the 'identity hash' of a type or function T.\n\n"
+    "The 'identityHash' of a function or Type is a sha-hash of all non-mutable content\n"
+    "reachable from the object. If two Type objects have the same identityHash then they\n"
+    "will in fact be identical instances.\n\n"
+    "The identityHash is computed similarly to the compilerHash, except that we don't look\n"
+    "inside of modules. This allows our identity hash to be stable even as a module\n"
+    "is being defined."
+);
 PyObject *identityHash(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "identityHash takes 1 positional argument");
@@ -2067,8 +2115,14 @@ PyObject *identityHash(PyObject* nullValue, PyObject* args) {
     ShaHash hash;
 
     return translateExceptionToPyObject([&]() {
-        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)a1);
-        hash = MutuallyRecursiveTypeGroup::shaHash((PyObject*)a1);
+        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(
+            (PyObject*)a1,
+            VisibilityType::Identity
+        );
+        hash = MutuallyRecursiveTypeGroup::shaHash(
+            (PyObject*)a1,
+            VisibilityType::Identity
+        );
 
         return PyBytes_FromStringAndSize((const char*)&hash, sizeof(ShaHash));
     });
@@ -2682,18 +2736,28 @@ PyObject *touchCompiledSpecializations(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
-PyObject *isRecursive(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "isRecursive takes 1 positional argument");
-        return NULL;
-    }
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
-
-    MutuallyRecursiveTypeGroup* group = nullptr;
-
+PyObject *isRecursive(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() {
-        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)a1);
-        group = MutuallyRecursiveTypeGroup::groupAndIndexFor((PyObject*)a1).first;
+        PyObject* instance;
+        const char* visibility = "compiler";
+        static const char *kwlist[] = {"instance", "visibility", NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|s", (char**)kwlist, &instance, &visibility)) {
+            throw PythonExceptionSet();
+        }
+
+        VisibilityType vis;
+        if (std::string(visibility) == "compiler") {
+            vis = VisibilityType::Compiler;
+        }
+        else if (std::string(visibility) == "identity") {
+            vis = VisibilityType::Identity;
+        } else {
+            throw std::runtime_error("visibility must be 'compiler' or 'identity'");
+        }
+
+        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(instance, vis);
+        MutuallyRecursiveTypeGroup* group = MutuallyRecursiveTypeGroup::groupAndIndexFor(instance, vis).first;
 
         if (!group) {
             return incref(Py_False);
@@ -2731,10 +2795,27 @@ PyDoc_STRVAR(
     "errors while computing hashes because the assumptions of the hasher are violated."
 );
 
-PyObject *checkForHashInstability(PyObject* nullValue, PyObject* args) {
+PyObject *checkForHashInstability(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() {
+        const char* visibility = "compiler";
+        static const char *kwlist[] = {"visibility", NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|s", (char**)kwlist, &visibility)) {
+            throw PythonExceptionSet();
+        }
+
+        VisibilityType vis;
+        if (std::string(visibility) == "compiler") {
+            vis = VisibilityType::Compiler;
+        }
+        else if (std::string(visibility) == "identity") {
+            vis = VisibilityType::Identity;
+        } else {
+            throw std::runtime_error("visibility must be 'compiler' or 'identity'");
+        }
+
         try {
-            CompilerVisibleObjectVisitor::singleton().checkForInstability();
+            CompilerVisibleObjectVisitor::singleton().checkForInstability(vis);
 
             return incref(Py_None);
         } catch(std::runtime_error& err) {
@@ -2743,33 +2824,59 @@ PyObject *checkForHashInstability(PyObject* nullValue, PyObject* args) {
     });
 }
 
-PyObject *typeWalkRecord(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "typeWalkRecord takes 1 positional argument");
-        return NULL;
+PyObject *typeWalkRecord(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    PyObject* instance;
+    const char* visibility = "compiler";
+    static const char *kwlist[] = {"instance", "visibility", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|s", (char**)kwlist, &instance, &visibility)) {
+        throw PythonExceptionSet();
     }
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    VisibilityType vis;
+    if (std::string(visibility) == "compiler") {
+        vis = VisibilityType::Compiler;
+    }
+    else if (std::string(visibility) == "identity") {
+        vis = VisibilityType::Identity;
+    } else {
+        throw std::runtime_error("visibility must be 'compiler' or 'identity'");
+    }
 
     return translateExceptionToPyObject([&]() {
-        TypeOrPyobj obj((PyObject*)a1);
+        TypeOrPyobj obj(instance);
 
         return PyUnicode_FromString(
-            ("Walk of " + obj.name() + ":\n\n" + CompilerVisibleObjectVisitor::recordWalkAsString(obj)).c_str()
+            ("Walk of " + obj.name() + ":\n\n"
+                + CompilerVisibleObjectVisitor::recordWalkAsString(obj, vis)
+            ).c_str()
         );
     });
 }
 
-PyObject *typesAndObjectsVisibleToCompilerFrom(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "typesAndObjectsVisibleToCompilerFrom takes 1 positional argument");
-        return NULL;
-    }
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
-
+PyObject *typesAndObjectsVisibleToCompilerFrom(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() {
+        PyObject* instance;
+        const char* visibility = "compiler";
+        static const char *kwlist[] = {"instance", "visibility", NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|s", (char**)kwlist, &instance, &visibility)) {
+            throw PythonExceptionSet();
+        }
+
+        VisibilityType vis;
+        if (std::string(visibility) == "compiler") {
+            vis = VisibilityType::Compiler;
+        }
+        else if (std::string(visibility) == "identity") {
+            vis = VisibilityType::Identity;
+        } else {
+            throw std::runtime_error("visibility must be 'compiler' or 'identity'");
+        }
+
         std::vector<TypeOrPyobj> visible;
 
-        MutuallyRecursiveTypeGroup::visibleFrom((PyObject*)a1, visible);
+        MutuallyRecursiveTypeGroup::visibleFrom(instance, visible, vis);
 
         PyObjectStealer res(PyList_New(0));
 
@@ -2786,26 +2893,39 @@ PyObject *typesAndObjectsVisibleToCompilerFrom(PyObject* nullValue, PyObject* ar
     });
 }
 
-PyObject *recursiveTypeGroupHash(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "recursiveTypeGroupHash takes 1 positional argument");
-        return NULL;
-    }
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
-
-    MutuallyRecursiveTypeGroup* group = nullptr;
-
+PyObject *recursiveTypeGroupHash(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() {
-        if (PyType_Check(a1)) {
-            Type* typeArg = PyInstance::extractTypeFrom(a1);
+        PyObject* instance;
+        const char* visibility = "compiler";
+        static const char *kwlist[] = {"instance", "visibility", NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|s", (char**)kwlist, &instance, &visibility)) {
+            throw PythonExceptionSet();
+        }
+
+        VisibilityType vis;
+        if (std::string(visibility) == "compiler") {
+            vis = VisibilityType::Compiler;
+        }
+        else if (std::string(visibility) == "identity") {
+            vis = VisibilityType::Identity;
+        } else {
+            throw std::runtime_error("visibility must be 'compiler' or 'identity'");
+        }
+
+        MutuallyRecursiveTypeGroup* group = nullptr;
+
+        if (PyType_Check(instance) && vis == VisibilityType::Identity) {
+            Type* typeArg = PyInstance::extractTypeFrom((PyTypeObject*)instance);
+
             if (typeArg) {
                 group = typeArg->getRecursiveTypeGroup();
             }
         }
 
         if (!group) {
-            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)a1);
-            group = MutuallyRecursiveTypeGroup::groupAndIndexFor((PyObject*)a1).first;
+            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(instance, vis);
+            group = MutuallyRecursiveTypeGroup::groupAndIndexFor(instance, vis).first;
         }
 
         if (!group) {
@@ -2816,18 +2936,30 @@ PyObject *recursiveTypeGroupHash(PyObject* nullValue, PyObject* args) {
     });
 }
 
-PyObject *recursiveTypeGroupReprDeepFlag(PyObject* nullValue, PyObject* args, bool deep) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "recursiveTypeGroupRepr takes 1 positional argument");
-        return NULL;
-    }
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
-
-    MutuallyRecursiveTypeGroup* group = nullptr;
-
+PyObject *recursiveTypeGroupReprDeepFlag(PyObject* nullValue, PyObject* args, PyObject* kwargs, bool deep) {
     return translateExceptionToPyObject([&]() {
-        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)a1);
-        group = MutuallyRecursiveTypeGroup::groupAndIndexFor((PyObject*)a1).first;
+        PyObject* instance;
+        const char* visibility = "compiler";
+        static const char *kwlist[] = {"instance", "visibility", NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|s", (char**)kwlist, &instance, &visibility)) {
+            throw PythonExceptionSet();
+        }
+
+        VisibilityType vis;
+        if (std::string(visibility) == "compiler") {
+            vis = VisibilityType::Compiler;
+        }
+        else if (std::string(visibility) == "identity") {
+            vis = VisibilityType::Identity;
+        } else {
+            throw std::runtime_error("visibility must be 'compiler' or 'identity'");
+        }
+
+        MutuallyRecursiveTypeGroup* group = nullptr;
+
+        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(instance, vis);
+        group = MutuallyRecursiveTypeGroup::groupAndIndexFor(instance, vis).first;
 
         if (!group) {
             return incref(Py_None);
@@ -2837,28 +2969,43 @@ PyObject *recursiveTypeGroupReprDeepFlag(PyObject* nullValue, PyObject* args, bo
     });
 }
 
-PyObject *recursiveTypeGroupRepr(PyObject* nullValue, PyObject* args) {
-    return recursiveTypeGroupReprDeepFlag(nullValue, args, false);
+PyObject *recursiveTypeGroupRepr(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    return recursiveTypeGroupReprDeepFlag(nullValue, args, kwargs, false);
 }
 
 
-PyObject *recursiveTypeGroupDeepRepr(PyObject* nullValue, PyObject* args) {
-    return recursiveTypeGroupReprDeepFlag(nullValue, args, true);
+PyObject *recursiveTypeGroupDeepRepr(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    return recursiveTypeGroupReprDeepFlag(nullValue, args, kwargs, true);
 }
 
 
-PyObject *recursiveTypeGroup(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "recursiveTypeGroup takes 1 positional argument");
-        return NULL;
-    }
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
-
-    MutuallyRecursiveTypeGroup* group = nullptr;
-
+PyObject *recursiveTypeGroup(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() {
-        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)a1);
-        group = MutuallyRecursiveTypeGroup::groupAndIndexFor((PyObject*)a1).first;
+        PyObject* instance;
+        const char* visibility = "compiler";
+        int createIfNotExist = 1;
+        static const char *kwlist[] = {"instance", "visibility", "createIfNotExist", NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|sp", (char**)kwlist, &instance, &visibility, &createIfNotExist)) {
+            throw PythonExceptionSet();
+        }
+
+        VisibilityType vis;
+        if (std::string(visibility) == "compiler") {
+            vis = VisibilityType::Compiler;
+        }
+        else if (std::string(visibility) == "identity") {
+            vis = VisibilityType::Identity;
+        } else {
+            throw std::runtime_error("visibility must be 'compiler' or 'identity'");
+        }
+
+        if (createIfNotExist) {
+            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(instance, vis);
+        }
+
+        MutuallyRecursiveTypeGroup* group =
+            MutuallyRecursiveTypeGroup::groupAndIndexFor(instance, vis).first;
 
         if (!group) {
             return incref(Py_None);
@@ -3289,7 +3436,8 @@ static PyMethodDef module_methods[] = {
     {"decodeSerializedObject", (PyCFunction)decodeSerializedObject, METH_VARARGS, NULL},
     {"validateSerializedObject", (PyCFunction)validateSerializedObject, METH_VARARGS, NULL},
     {"validateSerializedObjectStream", (PyCFunction)validateSerializedObjectStream, METH_VARARGS, NULL},
-    {"identityHash", (PyCFunction)identityHash, METH_VARARGS, NULL},
+    {"compilerHash", (PyCFunction)compilerHash, METH_VARARGS, compilerHash_doc},
+    {"identityHash", (PyCFunction)identityHash, METH_VARARGS, identityHash_doc},
     {"serializeStream", (PyCFunction)serializeStream, METH_VARARGS, NULL},
     {"deserializeStream", (PyCFunction)deserializeStream, METH_VARARGS, NULL},
     {"is_default_constructible", (PyCFunction)is_default_constructible, METH_VARARGS, NULL},
@@ -3301,15 +3449,15 @@ static PyMethodDef module_methods[] = {
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
     {"allForwardTypesResolved", (PyCFunction)allForwardTypesResolved, METH_VARARGS, NULL},
-    {"recursiveTypeGroup", (PyCFunction)recursiveTypeGroup, METH_VARARGS, NULL},
-    {"recursiveTypeGroupRepr", (PyCFunction)recursiveTypeGroupRepr, METH_VARARGS, NULL},
-    {"recursiveTypeGroupDeepRepr", (PyCFunction)recursiveTypeGroupDeepRepr, METH_VARARGS, NULL},
-    {"recursiveTypeGroupHash", (PyCFunction)recursiveTypeGroupHash, METH_VARARGS, NULL},
-    {"checkForHashInstability", (PyCFunction)checkForHashInstability, METH_VARARGS, checkForHashInstability_doc},
+    {"recursiveTypeGroup", (PyCFunction)recursiveTypeGroup, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"recursiveTypeGroupRepr", (PyCFunction)recursiveTypeGroupRepr, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"recursiveTypeGroupDeepRepr", (PyCFunction)recursiveTypeGroupDeepRepr, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"recursiveTypeGroupHash", (PyCFunction)recursiveTypeGroupHash, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"checkForHashInstability", (PyCFunction)checkForHashInstability, METH_VARARGS | METH_KEYWORDS, checkForHashInstability_doc},
     {"resetCompilerVisibleObjectHashCache", (PyCFunction)resetCompilerVisibleObjectHashCache, METH_VARARGS, resetCompilerVisibleObjectHashCache_doc},
-    {"typeWalkRecord", (PyCFunction)typeWalkRecord, METH_VARARGS, NULL},
-    {"typesAndObjectsVisibleToCompilerFrom", (PyCFunction)typesAndObjectsVisibleToCompilerFrom, METH_VARARGS, NULL},
-    {"isRecursive", (PyCFunction)isRecursive, METH_VARARGS, NULL},
+    {"typeWalkRecord", (PyCFunction)typeWalkRecord, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"typesAndObjectsVisibleToCompilerFrom", (PyCFunction)typesAndObjectsVisibleToCompilerFrom, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"isRecursive", (PyCFunction)isRecursive, METH_VARARGS | METH_KEYWORDS, NULL},
     {"referencedTypes", (PyCFunction)referencedTypes, METH_VARARGS, NULL},
     {"wantsToDefaultConstruct", (PyCFunction)wantsToDefaultConstruct, METH_VARARGS, NULL},
     {"all_alternatives_empty", (PyCFunction)all_alternatives_empty, METH_VARARGS, NULL},

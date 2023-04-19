@@ -198,7 +198,7 @@ def evaluateExprInFreshProcess(filesToWrite, expression, compilerCacheDir=None, 
                     "".join(f"import {modname};" for modname in namesToImport) + (
                         f"import pickle;"
                         f"import typed_python;"
-                        f"from typed_python._types import identityHash, recursiveTypeGroup;"
+                        f"from typed_python._types import compilerHash, recursiveTypeGroup;"
                         f"from typed_python import *;"
                         f"print(repr(pickle.dumps({expression})))"
                     )

@@ -19,7 +19,7 @@ import typed_python
 from typed_python.test_util import evaluateExprInFreshProcess
 from typed_python import (
     UInt64, UInt32,
-    ListOf, TupleOf, Tuple, NamedTuple, Dict, OneOf, Forward, identityHash,
+    ListOf, TupleOf, Tuple, NamedTuple, Dict, OneOf, Forward, compilerHash,
     Entrypoint, Class, Member, Final, TypeFunction, SerializationContext,
     Function, NotCompiled
 )
@@ -74,7 +74,7 @@ def checkHash(filesToWrite, expression):
     Returns:
         a bytes object containing the sha-hash of module.thingToGrab.
     """
-    return Hash(evaluateExprInFreshProcess(filesToWrite, f"identityHash({expression})"))
+    return Hash(evaluateExprInFreshProcess(filesToWrite, f"compilerHash({expression})"))
 
 
 def returnSerializedValue(filesToWrite, expression, printComments=False):
@@ -98,8 +98,8 @@ def test_identity_ignores_function_file_accesses():
 
 
 def test_identities_of_basic_types_different():
-    assert identityHash(int) != identityHash(float)
-    assert identityHash(TupleOf(int)) != identityHash(TupleOf(float))
+    assert compilerHash(int) != compilerHash(float)
+    assert compilerHash(TupleOf(int)) != compilerHash(TupleOf(float))
 
 
 def test_object_graph_instability_is_noticed():
@@ -137,8 +137,8 @@ def test_identity_of_function_with_annotation():
     def g(x: int):
         return f(x)
 
-    identityHash(f)
-    identityHash(NotCompiled(f))
+    compilerHash(f)
+    compilerHash(NotCompiled(f))
 
     hashInstability = checkForHashInstability()
 
@@ -158,9 +158,9 @@ def functionAccessingModuleLevelThreadLocal():
 def test_identity_of_function_accessing_thread_local():
     print(typesAndObjectsVisibleToCompilerFrom(type(functionAccessingModuleLevelThreadLocal)))
 
-    identityHash(functionAccessingModuleLevelThreadLocal)
+    compilerHash(functionAccessingModuleLevelThreadLocal)
     moduleLevelThreadLocal.anything = True
-    identityHash(functionAccessingModuleLevelThreadLocal)
+    compilerHash(functionAccessingModuleLevelThreadLocal)
 
     hashInstability = checkForHashInstability()
 
@@ -170,8 +170,8 @@ def test_identity_of_function_accessing_thread_local():
 
 
 def test_identity_of_method_descriptors():
-    assert identityHash(ListOf(int).append) != identityHash(ListOf(float).append)
-    assert identityHash(ListOf(int).append) != identityHash(ListOf(int).extend)
+    assert compilerHash(ListOf(int).append) != compilerHash(ListOf(float).append)
+    assert compilerHash(ListOf(int).append) != compilerHash(ListOf(int).extend)
 
 
 def test_class_and_held_class_in_group():
@@ -188,34 +188,34 @@ def test_class_and_held_class_in_group():
 
 
 def test_identity_of_register_types():
-    assert isinstance(identityHash(UInt64), bytes)
-    assert len(identityHash(UInt64)) == 20
+    assert isinstance(compilerHash(UInt64), bytes)
+    assert len(compilerHash(UInt64)) == 20
 
-    assert identityHash(UInt64) != identityHash(UInt32)
+    assert compilerHash(UInt64) != compilerHash(UInt32)
 
 
 def test_identity_of_list_of():
-    assert identityHash(ListOf(int)) != identityHash(ListOf(float))
-    assert identityHash(ListOf(int)) == identityHash(ListOf(int))
-    assert identityHash(ListOf(int)) != identityHash(TupleOf(int))
+    assert compilerHash(ListOf(int)) != compilerHash(ListOf(float))
+    assert compilerHash(ListOf(int)) == compilerHash(ListOf(int))
+    assert compilerHash(ListOf(int)) != compilerHash(TupleOf(int))
 
 
 def test_identity_of_named_tuple_and_tuple():
-    assert identityHash(NamedTuple(x=int)) != identityHash(NamedTuple(x=float))
-    assert identityHash(NamedTuple(x=int)) == identityHash(NamedTuple(x=int))
-    assert identityHash(NamedTuple(x=int)) != identityHash(Tuple(float))
+    assert compilerHash(NamedTuple(x=int)) != compilerHash(NamedTuple(x=float))
+    assert compilerHash(NamedTuple(x=int)) == compilerHash(NamedTuple(x=int))
+    assert compilerHash(NamedTuple(x=int)) != compilerHash(Tuple(float))
 
-    assert identityHash(NamedTuple(x=int)) != identityHash(NamedTuple(y=int))
-    assert identityHash(NamedTuple(x=int, y=float)) != identityHash(NamedTuple(y=float, x=int))
+    assert compilerHash(NamedTuple(x=int)) != compilerHash(NamedTuple(y=int))
+    assert compilerHash(NamedTuple(x=int, y=float)) != compilerHash(NamedTuple(y=float, x=int))
 
 
 def test_identity_of_dict():
-    assert identityHash(Dict(int, float)) != identityHash(Dict(int, int))
-    assert identityHash(Dict(int, float)) != identityHash(Dict(float, int))
+    assert compilerHash(Dict(int, float)) != compilerHash(Dict(int, int))
+    assert compilerHash(Dict(int, float)) != compilerHash(Dict(float, int))
 
 
 def test_identity_of_oneof():
-    assert identityHash(OneOf(None, int)) != identityHash(OneOf(None, float))
+    assert compilerHash(OneOf(None, int)) != compilerHash(OneOf(None, float))
 
 
 def test_identity_of_recursive_types():
@@ -228,15 +228,15 @@ def test_identity_of_recursive_types():
     X3 = Forward("X")
     X3 = X3.define(TupleOf(OneOf(float, X3)))
 
-    assert identityHash(X2) == identityHash(X)
-    assert identityHash(X3) != identityHash(X)
+    assert compilerHash(X2) == compilerHash(X)
+    assert compilerHash(X3) != compilerHash(X)
 
 
 def test_identity_of_recursive_types_2():
     X = Forward("X")
     X = X.define(TupleOf(OneOf(int, TupleOf(X))))
 
-    identityHash(X)
+    compilerHash(X)
 
 
 def test_identity_of_recursive_types_produced_same_way():
@@ -244,9 +244,9 @@ def test_identity_of_recursive_types_produced_same_way():
         X = Forward(name)
         return X.define(TupleOf(OneOf(T, X)))
 
-    assert identityHash(make("X", int)) == identityHash(make("X", int))
-    assert identityHash(make("X", int)) != identityHash(make("X", float))
-    assert identityHash(make("X", int)) != identityHash(make("X2", int))
+    assert compilerHash(make("X", int)) == compilerHash(make("X", int))
+    assert compilerHash(make("X", int)) != compilerHash(make("X", float))
+    assert compilerHash(make("X", int)) != compilerHash(make("X2", int))
 
 
 def test_identity_of_lambda_functions():
@@ -256,15 +256,15 @@ def test_identity_of_lambda_functions():
 
     # these two have the same closure type
     assert makeAdder(10).ClosureType == makeAdder(11).ClosureType
-    assert identityHash(type(makeAdder(10))) == identityHash(type(makeAdder(10)))
-    assert identityHash(type(makeAdder(10))) == identityHash(type(makeAdder(11)))
+    assert compilerHash(type(makeAdder(10))) == compilerHash(type(makeAdder(10)))
+    assert compilerHash(type(makeAdder(10))) == compilerHash(type(makeAdder(11)))
 
     # these two are different
-    assert identityHash(type(makeAdder(10))) != identityHash(type(makeAdder(10.5)))
+    assert compilerHash(type(makeAdder(10))) != compilerHash(type(makeAdder(10.5)))
 
 
 def test_checkHash_works():
-    assert checkHash({"x.py": "A = TupleOf(int)\n"}, 'x.A') == Hash(identityHash(TupleOf(int)))
+    assert checkHash({"x.py": "A = TupleOf(int)\n"}, 'x.A') == Hash(compilerHash(TupleOf(int)))
 
 
 def test_mutually_recursive_group_basic():
@@ -398,12 +398,12 @@ def test_hash_of_oneof():
         OneOf(None, Tuple(int)((1,))),
     ]
 
-    hashes = set([identityHash(t) for t in oneOfs])
+    hashes = set([compilerHash(t) for t in oneOfs])
     assert len(hashes) == len(oneOfs)
 
 
 def test_identityHash_of_none():
-    assert not Hash(identityHash(type(None))).isPoison()
+    assert not Hash(compilerHash(type(None))).isPoison()
 
 
 def test_identityHash_of_a_typefunction():
@@ -415,7 +415,7 @@ def test_identityHash_of_a_typefunction():
 
     L2(int)
 
-    assert identityHash(L1) == identityHash(L2)
+    assert compilerHash(L1) == compilerHash(L2)
 
 
 def test_hash_of_TP_produced_lambdas_with_different_closure_types():
@@ -429,8 +429,8 @@ def test_hash_of_TP_produced_lambdas_with_different_closure_types():
     returnIt(2)
     returnIt(2.0)
 
-    assert identityHash(returnIt(1)) == identityHash(returnIt(2))
-    assert identityHash(returnIt(1)) != identityHash(returnIt(2.0))
+    assert compilerHash(returnIt(1)) == compilerHash(returnIt(2))
+    assert compilerHash(returnIt(1)) != compilerHash(returnIt(2.0))
 
 
 def test_hash_of_native_lambdas_with_different_closure_types():
@@ -443,8 +443,8 @@ def test_hash_of_native_lambdas_with_different_closure_types():
     t2 = prepareArgumentToBePassedToCompiler(Entrypoint(returnIt(2)))
     t3 = prepareArgumentToBePassedToCompiler(Entrypoint(returnIt(2.0)))
 
-    assert identityHash(t1) == identityHash(t2)
-    assert identityHash(t1) != identityHash(t3)
+    assert compilerHash(t1) == compilerHash(t2)
+    assert compilerHash(t1) != compilerHash(t3)
 
 
 def test_checkHash_type_functions():
@@ -517,15 +517,15 @@ def test_checkHash_references_to_typed_free_objects():
 
 
 def test_hash_of_builtins():
-    assert not Hash(identityHash(isinstance)).isPoison()
+    assert not Hash(compilerHash(isinstance)).isPoison()
 
 
 def test_hash_of_classObj():
     class C(Class, Final):
         x = Member(int)
 
-    assert not Hash(identityHash(Member(int))).isPoison()
-    assert not Hash(identityHash(C)).isPoison()
+    assert not Hash(compilerHash(Member(int))).isPoison()
+    assert not Hash(compilerHash(C)).isPoison()
 
 
 MODULE = {
@@ -582,7 +582,7 @@ def deserializeTwiceAndCall(rep):
 
 
 def deserializeAndReturnHash(rep):
-    return identityHash(SerializationContext().deserialize(rep))
+    return compilerHash(SerializationContext().deserialize(rep))
 
 
 def deserializeTwiceAndConfirmEquivalent(rep):
@@ -638,7 +638,7 @@ def test_serialization_of_anonymous_functions_preserves_references():
 def test_hash_stability():
     idHash = evaluateExprInFreshProcess({
         'x.py': 'from typed_python.compiler.native_ast import NamedCallTarget\n'
-    }, 'identityHash(x.NamedCallTarget)')
+    }, 'compilerHash(x.NamedCallTarget)')
     ser = returnSerializedValue({
         'x.py': 'from typed_python.compiler.native_ast import NamedCallTarget\n'
     }, 'x.NamedCallTarget', printComments=True)
@@ -686,11 +686,11 @@ def test_identity_of_entrypointed_functions():
     def f():
         return 0
 
-    assert identityHash(Function(f)) != identityHash(Entrypoint(f))
+    assert compilerHash(Function(f)) != compilerHash(Entrypoint(f))
 
 
 def test_identity_of_singleton_classes():
-    assert identityHash(A) != identityHash(B)
+    assert compilerHash(A) != compilerHash(B)
 
 
 def test_type_walk_for_named_tuple_subclass():
@@ -699,3 +699,20 @@ def test_type_walk_for_named_tuple_subclass():
             return 0
 
     print(typeWalkRecord(N))
+
+
+def test_recursive_type_groups_separate():
+    class C:
+        pass
+
+    assert recursiveTypeGroup(C, "compiler", False) is None
+    assert recursiveTypeGroup(C, "identity", False) is None
+
+    g1 = recursiveTypeGroup(C, "compiler", True)
+    assert g1
+    assert recursiveTypeGroup(C, "identity", False) is None
+
+    g2 = recursiveTypeGroup(C, "identity", True)
+    assert g2
+
+    print(g1, g2)
