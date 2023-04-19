@@ -613,7 +613,10 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             groupHash = ShaHash::fromDigest(b.readStringObject());
             hasGroupHash = true;
 
-            outGroup = MutuallyRecursiveTypeGroup::getGroupFromIntendedHash(groupHash);
+            outGroup = MutuallyRecursiveTypeGroup::getGroupFromIntendedHash(
+                groupHash,
+                VisibilityType::Identity
+            );
 
             if (memo != -1 && outGroup) {
                 b.addCachedPointer(memo, (void*)outGroup, nullptr);
@@ -625,7 +628,10 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             }
 
             if (!outGroup) {
-                outGroup = MutuallyRecursiveTypeGroup::DeserializerGroup(groupHash);
+                outGroup = MutuallyRecursiveTypeGroup::DeserializerGroup(
+                    groupHash,
+                    VisibilityType::Identity
+                );
 
                 if (memo != -1) {
                     b.addCachedPointer(memo, (void*)outGroup, nullptr);
@@ -1009,10 +1015,16 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                 );
             }
 
-            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)namedObj);
+            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(
+                (PyObject*)namedObj,
+                VisibilityType::Identity
+            );
 
             MutuallyRecursiveTypeGroup* group = (
-                MutuallyRecursiveTypeGroup::groupAndIndexFor((PyObject*)namedObj).first
+                MutuallyRecursiveTypeGroup::groupAndIndexFor(
+                    (PyObject*)namedObj,
+                    VisibilityType::Identity
+                ).first
             );
 
             if (!outGroup) {
@@ -1047,10 +1059,16 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                 throw PythonExceptionSet();
             }
 
-            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup((PyObject*)instance);
+            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(
+                (PyObject*)instance,
+                VisibilityType::Identity
+            );
 
             MutuallyRecursiveTypeGroup* group = (
-                MutuallyRecursiveTypeGroup::groupAndIndexFor((PyObject*)instance).first
+                MutuallyRecursiveTypeGroup::groupAndIndexFor(
+                    (PyObject*)instance,
+                    VisibilityType::Identity
+                ).first
             );
 
             if (!outGroup) {

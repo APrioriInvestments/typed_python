@@ -41,7 +41,10 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
     // because otherwise we'd create a dependency during serialization on _whether_ the
     // group was already created, which would introduce a nondeterminism into serilization
     // based on the compiler state
-    auto groupAndIndex = MutuallyRecursiveTypeGroup::groupAndIndexFor(o);
+    auto groupAndIndex = MutuallyRecursiveTypeGroup::groupAndIndexFor(
+        o,
+        VisibilityType::Identity
+    );
 
     // if we have a group, check whether we've already memoized this group in the stream
     // this prevents us from initiating the serialization of a new group here.
@@ -248,8 +251,14 @@ void PythonSerializationContext::serializePythonObjectByNameOrRepresentation(PyO
     if (PyType_Check(o)) {
         // if its a Type object, this is the place to put it into a mutually recursive type
         // group
-        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(o);
-        auto groupAndIndex = MutuallyRecursiveTypeGroup::groupAndIndexFor(o);
+        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(
+            o,
+            VisibilityType::Identity
+        );
+        auto groupAndIndex = MutuallyRecursiveTypeGroup::groupAndIndexFor(
+            o,
+            VisibilityType::Identity
+        );
 
         b.writeBeginCompound(FieldNumbers::RECURSIVE_OBJECT);
         serializeMutuallyRecursiveTypeGroup(groupAndIndex.first, b, 0);

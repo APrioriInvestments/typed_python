@@ -124,12 +124,12 @@ class PythonToNativeConverter:
 
         return res
 
-    def identityHashToLinkerName(self, name, identityHash, prefix="tp."):
+    def identityHashToLinkerName(self, name, compilerHash, prefix="tp."):
         assert isinstance(name, str)
-        assert isinstance(identityHash, str)
+        assert isinstance(compilerHash, str)
         assert isinstance(prefix, str)
 
-        return prefix + name + "." + identityHash
+        return prefix + name + "." + compilerHash
 
     def createConversionContext(
         self,
@@ -626,9 +626,9 @@ class PythonToNativeConverter:
             return res
 
         if isinstance(hashable, Wrapper):
-            return hashable.identityHash()
+            return hashable.compilerHash()
 
-        return Hash(_types.identityHash(hashable))
+        return Hash(_types.compilerHash(hashable))
 
     def hashGlobals(self, funcGlobals, code, funcGlobalsFromCells):
         """Hash a given piece of code's accesses to funcGlobals.
@@ -704,7 +704,7 @@ class PythonToNativeConverter:
 
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
-        identityHash = (
+        compilerHash = (
             Hash.from_integer(1)
             + self.hashObjectToIdentity((
                 funcCode,
@@ -717,9 +717,9 @@ class PythonToNativeConverter:
             self.hashGlobals(funcGlobals, funcCode, funcGlobalsFromCells)
         )
 
-        assert not identityHash.isPoison()
+        assert not compilerHash.isPoison()
 
-        identity = identityHash.hexdigest
+        identity = compilerHash.hexdigest
 
         # determine the linkName we'll use in the NativeCompiler to identify
         # this particular function

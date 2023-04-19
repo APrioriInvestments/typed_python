@@ -9,7 +9,7 @@
 
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY visibility, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
 ******************************************************************************/
@@ -18,22 +18,30 @@
 #include "MutuallyRecursiveTypeGroup.hpp"
 
 
-MutuallyRecursiveTypeGroup::MutuallyRecursiveTypeGroup() :
+MutuallyRecursiveTypeGroup::MutuallyRecursiveTypeGroup(VisibilityType visibility) :
     mAnyPyObjectsIncorrectlyOrdered(false),
-    mIsDeserializerGroup(false)
+    mIsDeserializerGroup(false),
+    mVisibilityType(visibility)
 {
 }
 
-MutuallyRecursiveTypeGroup::MutuallyRecursiveTypeGroup(ShaHash hash) :
+MutuallyRecursiveTypeGroup::MutuallyRecursiveTypeGroup(
+    ShaHash hash,
+    VisibilityType visibility
+) :
     mAnyPyObjectsIncorrectlyOrdered(false),
     mIntendedHash(hash),
+    mVisibilityType(visibility),
     mIsDeserializerGroup(true)
 {
 }
 
 
-MutuallyRecursiveTypeGroup* MutuallyRecursiveTypeGroup::DeserializerGroup(ShaHash hash) {
-    return new MutuallyRecursiveTypeGroup(hash);
+MutuallyRecursiveTypeGroup* MutuallyRecursiveTypeGroup::DeserializerGroup(
+    ShaHash hash,
+    VisibilityType k
+) {
+    return new MutuallyRecursiveTypeGroup(hash, k);
 }
 
 
@@ -77,11 +85,13 @@ void MutuallyRecursiveTypeGroup::finalizeDeserializerGroup() {
     // and then copy them in
 
     MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(
-        mIndexToObject.begin()->second
+        mIndexToObject.begin()->second,
+        mVisibilityType
     );
 
     MutuallyRecursiveTypeGroup* canonical = MutuallyRecursiveTypeGroup::groupAndIndexFor(
-        mIndexToObject.begin()->second
+        mIndexToObject.begin()->second,
+        mVisibilityType
     ).first;
 
     if (mIndexToObject.size() != canonical->mIndexToObject.size()) {
@@ -118,8 +128,8 @@ void MutuallyRecursiveTypeGroup::finalizeDeserializerGroup() {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
 
         // if this intended hash doesn't match anything, just copy it in
-        if (mIntendedHashToGroup.find(mIntendedHash) == mIntendedHashToGroup.end()) {
-            mIntendedHashToGroup[mIntendedHash] = this;
+        if (mIntendedHashToGroup[mVisibilityType].find(mIntendedHash) == mIntendedHashToGroup[mVisibilityType].end()) {
+            mIntendedHashToGroup[mVisibilityType][mIntendedHash] = this;
         }
     }
 }
@@ -135,22 +145,22 @@ void MutuallyRecursiveTypeGroup::_computeHashAndInstall() {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
 
         // see if this official hash has been seen yet
-        if (mHashToGroup.find(mHash) == mHashToGroup.end()) {
+        if (mHashToGroup[mVisibilityType].find(mHash) == mHashToGroup[mVisibilityType].end()) {
             // this is the official MRTG for this hash, so we install ourselves
             // as the official group and register ourselves in the various type memos.
             // this group will come up in the reverse lookup now.
-            mHashToGroup[mHash] = this;
+            mHashToGroup[mVisibilityType][mHash] = this;
         }
 
         for (auto& typeAndOrder: mObjectToIndex) {
-            auto it = mTypeGroups.find(typeAndOrder.first);
+            auto it = mTypeGroups[mVisibilityType].find(typeAndOrder.first);
 
-            if (it == mTypeGroups.end()) {
+            if (it == mTypeGroups[mVisibilityType].end()) {
                 // this type has never been installed - go ahead and add it. It's possible
                 // there are multiple copies of this type in the system
-                mTypeGroups[typeAndOrder.first] = std::make_pair(this, typeAndOrder.second);
+                mTypeGroups[mVisibilityType][typeAndOrder.first] = std::make_pair(this, typeAndOrder.second);
 
-                if (typeAndOrder.first.type()) {
+                if (typeAndOrder.first.type() && mVisibilityType == VisibilityType::Identity) {
                     Type* t = typeAndOrder.first.type();
                     t->setRecursiveTypeGroup(this, typeAndOrder.second);
                 }
@@ -161,9 +171,14 @@ void MutuallyRecursiveTypeGroup::_computeHashAndInstall() {
 }
 
 //static
-void MutuallyRecursiveTypeGroup::visibleFrom(TypeOrPyobj root, std::vector<TypeOrPyobj>& outReachable) {
+void MutuallyRecursiveTypeGroup::visibleFrom(
+    TypeOrPyobj root,
+    std::vector<TypeOrPyobj>& outReachable,
+    VisibilityType visibility
+) {
     CompilerVisibleObjectVisitor::singleton().visit(
         root,
+        visibility,
         [&](ShaHash h) {},
         [&](const std::string& s) {},
         [&](TypeOrPyobj t) { outReachable.push_back(t); },
@@ -188,16 +203,16 @@ void MutuallyRecursiveTypeGroup::setIndexToObject(int32_t index, TypeOrPyobj obj
     }
 }
 
-bool MutuallyRecursiveTypeGroup::objectIsUnassigned(TypeOrPyobj obj) {
+bool MutuallyRecursiveTypeGroup::objectIsUnassigned(TypeOrPyobj obj, VisibilityType visibility) {
     // we can check if we're installed without hitting the lock
-    if (obj.type() && obj.type()->hasTypeGroup()) {
+    if (visibility == VisibilityType::Identity && obj.type() && obj.type()->hasTypeGroup()) {
         return false;
     }
 
     std::lock_guard<std::recursive_mutex> lock(mMutex);
 
     // if we've already installed this group into 'mTypeGroups'
-    if (mTypeGroups.find(obj) != mTypeGroups.end()) {
+    if (mTypeGroups[visibility].find(obj) != mTypeGroups[visibility].end()) {
         return false;
     }
 
@@ -243,20 +258,22 @@ std::string MutuallyRecursiveTypeGroup::repr(bool deep) {
                 s << levelPrefix << " " << ix << " -> " << obj.name() << "\n";
 
                 if (!deep) {
-                    s << CompilerVisibleObjectVisitor::recordWalkAsString(obj) << "\n";
+                    s << CompilerVisibleObjectVisitor::recordWalkAsString(
+                        obj, mVisibilityType
+                    ) << "\n";
                 }
 
                 if (deep) {
                     std::vector<TypeOrPyobj> visible;
-                    visibleFrom(obj, visible);
+                    visibleFrom(obj, visible, mVisibilityType);
 
                     for (auto v: visible) {
                         MutuallyRecursiveTypeGroup* subgroup;
                         int ixInSubgroup;
 
-                        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(v);
+                        MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(v, mVisibilityType);
                         std::tie(subgroup, ixInSubgroup) =
-                            MutuallyRecursiveTypeGroup::groupAndIndexFor(v);
+                            MutuallyRecursiveTypeGroup::groupAndIndexFor(v, mVisibilityType);
 
                         if (subgroup) {
                             if (seen.find(subgroup) == seen.end()) {
@@ -287,7 +304,10 @@ std::string MutuallyRecursiveTypeGroup::repr(bool deep) {
 // were unable to uniquely pick it.
 
 // static
-std::pair<TypeOrPyobj, bool> MutuallyRecursiveTypeGroup::computeRoot(const std::set<TypeOrPyobj>& topos) {
+std::pair<TypeOrPyobj, bool> MutuallyRecursiveTypeGroup::computeRoot(
+    const std::set<TypeOrPyobj>& topos,
+    VisibilityType visibility
+) {
     // we look at python objects in this function, so we need to be holding the GIL
     PyEnsureGilAcquired getTheGil;
 
@@ -387,13 +407,14 @@ std::pair<TypeOrPyobj, bool> MutuallyRecursiveTypeGroup::computeRoot(const std::
 
             CompilerVisibleObjectVisitor::singleton().visit(
                 t,
+                visibility,
                 [&](ShaHash h) { newHash += h; },
                 [&](const std::string& s) { newHash += ShaHash(s); },
                 [&](TypeOrPyobj t) {
                     if (curHashes.find(t) != curHashes.end()) {
                         newHash += curHashes[t];
                     } else {
-                        newHash += shaHash(t);
+                        newHash += shaHash(t, visibility);
                     }
                 },
                 [&](const std::string& s, TypeOrPyobj t) {
@@ -402,7 +423,7 @@ std::pair<TypeOrPyobj, bool> MutuallyRecursiveTypeGroup::computeRoot(const std::
                     if (curHashes.find(t) != curHashes.end()) {
                         newHash += curHashes[t];
                     } else {
-                        newHash += shaHash(t);
+                        newHash += shaHash(t, visibility);
                     }
                 },
                 [&](const std::string& err) {}
@@ -435,7 +456,10 @@ std::pair<TypeOrPyobj, bool> MutuallyRecursiveTypeGroup::computeRoot(const std::
 }
 
 // static
-void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<TypeOrPyobj>& topos) {
+void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(
+    const std::set<TypeOrPyobj>& topos,
+    VisibilityType visibility
+) {
     // check to see if any of our topos has been installed in a type group already. If so,
     // then they ALL should have been installed in a type group. This can happen if two threads
     // are computing type groups at the same time: imagine a cycle of many objects - both
@@ -447,7 +471,7 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
     bool anyAreNotAssigned = false;
 
     for (auto t: topos) {
-        if (MutuallyRecursiveTypeGroup::objectIsUnassigned(t)) {
+        if (MutuallyRecursiveTypeGroup::objectIsUnassigned(t, visibility)) {
             anyAreNotAssigned = true;
         } else {
             anyAreAssigned = true;
@@ -456,7 +480,7 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
 
     if (anyAreAssigned) {
         if (anyAreNotAssigned) {
-            CompilerVisibleObjectVisitor::singleton().checkForInstability();
+            CompilerVisibleObjectVisitor::singleton().checkForInstability(visibility);
 
             throw std::runtime_error(
                 "Somehow we have an MRTG where some of its members "
@@ -469,14 +493,14 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
     }
 
 
-    MutuallyRecursiveTypeGroup* group = new MutuallyRecursiveTypeGroup();
+    MutuallyRecursiveTypeGroup* group = new MutuallyRecursiveTypeGroup(visibility);
 
     if (topos.size() == 0) {
         throw std::runtime_error("Empty compiler recursive group makes no sense.");
     }
 
     TypeOrPyobj root;
-    std::tie(root, group->mAnyPyObjectsIncorrectlyOrdered) = computeRoot(topos);
+    std::tie(root, group->mAnyPyObjectsIncorrectlyOrdered) = computeRoot(topos, visibility);
 
     std::map<TypeOrPyobj, int32_t> ordering;
 
@@ -493,6 +517,7 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
 
         CompilerVisibleObjectVisitor::singleton().visit(
             parent,
+            visibility,
             [&](ShaHash h) {},
             [&](const std::string& s) {},
             [&](TypeOrPyobj t) { visit(t); },
@@ -516,27 +541,27 @@ void MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(const std::set<Type
 }
 
 
-MutuallyRecursiveTypeGroup* MutuallyRecursiveTypeGroup::getGroupFromHash(ShaHash hash) {
+MutuallyRecursiveTypeGroup* MutuallyRecursiveTypeGroup::getGroupFromHash(ShaHash hash, VisibilityType visibility) {
     std::lock_guard<std::recursive_mutex> lock(mMutex);
 
-    auto it = mHashToGroup.find(hash);
-    if (it == mHashToGroup.end()) {
+    auto it = mHashToGroup[visibility].find(hash);
+    if (it == mHashToGroup[visibility].end()) {
         return nullptr;
     }
 
     return it->second;
 }
 
-MutuallyRecursiveTypeGroup* MutuallyRecursiveTypeGroup::getGroupFromIntendedHash(ShaHash hash) {
+MutuallyRecursiveTypeGroup* MutuallyRecursiveTypeGroup::getGroupFromIntendedHash(ShaHash hash, VisibilityType visibility) {
     std::lock_guard<std::recursive_mutex> lock(mMutex);
 
-    auto it = mIntendedHashToGroup.find(hash);
-    if (it != mIntendedHashToGroup.end()) {
+    auto it = mIntendedHashToGroup[visibility].find(hash);
+    if (it != mIntendedHashToGroup[visibility].end()) {
         return it->second;
     }
 
-    auto it2 = mHashToGroup.find(hash);
-    if (it2 != mHashToGroup.end()) {
+    auto it2 = mHashToGroup[visibility].find(hash);
+    if (it2 != mHashToGroup[visibility].end()) {
         return it2->second;
     }
 
@@ -555,7 +580,7 @@ void MutuallyRecursiveTypeGroup::computeHash() {
     thread_local static MutuallyRecursiveTypeGroup* currentlyHashing = nullptr;
 
     if (currentlyHashing) {
-        CompilerVisibleObjectVisitor::singleton().checkForInstability();
+        CompilerVisibleObjectVisitor::singleton().checkForInstability(mVisibilityType);
 
         std::ostringstream errMsg;
 
@@ -615,17 +640,20 @@ ShaHash MutuallyRecursiveTypeGroup::computeTopoHash(TypeOrPyobj toHash) {
             return;
         }
 
-        auto groupAndIx = groupAndIndexFor(o);
+        auto groupAndIx = groupAndIndexFor(o, mVisibilityType);
 
         if (!groupAndIx.first || groupAndIx.second == -1) {
-            CompilerVisibleObjectVisitor::singleton().checkForInstability();
+            CompilerVisibleObjectVisitor::singleton().checkForInstability(mVisibilityType);
 
             throw std::runtime_error(
                 "All reachable objects should be in this group or hashed already. "
                 "Instead, this object is not hashed and not local: " + o.name() +
                 (groupAndIx.first ? "\n\nhas a group but not an index\n\n":"") +
-                + "\n\nwithin\n\n" + toHash.name() + "\n\nwalk is\n" + CompilerVisibleObjectVisitor::recordWalkAsString(toHash)
-                + "\n\nwalk of not hashed is\n" + CompilerVisibleObjectVisitor::recordWalkAsString(o)
+                + "\n\nwithin\n\n" + toHash.name() + "\n\nwalk is\n"
+                + CompilerVisibleObjectVisitor::recordWalkAsString(toHash, mVisibilityType)
+                + "\n\nwalk of not hashed is\n"
+                + CompilerVisibleObjectVisitor::recordWalkAsString(o, mVisibilityType)
+                + "\nVT = " + visibilityTypeToStr(mVisibilityType)
             );
         }
 
@@ -635,6 +663,7 @@ ShaHash MutuallyRecursiveTypeGroup::computeTopoHash(TypeOrPyobj toHash) {
     // walk one layer deep into our objects
     CompilerVisibleObjectVisitor::singleton().visit(
         toHash,
+        mVisibilityType,
         [&](ShaHash h) { res += ShaHash(1) + h; },
         [&](std::string o) { res += ShaHash(2) + ShaHash(o); },
         [&](TypeOrPyobj o) {
@@ -654,7 +683,9 @@ ShaHash MutuallyRecursiveTypeGroup::computeTopoHash(TypeOrPyobj toHash) {
 // compiler is concerned)
 class MutuallyRecursiveTypeGroupSearch {
 public:
-    MutuallyRecursiveTypeGroupSearch() {}
+    MutuallyRecursiveTypeGroupSearch(VisibilityType visibility) :
+        mVisibilityType(visibility)
+    {}
 
     // this object is new and needs its own group
     void pushGroup(TypeOrPyobj o) {
@@ -681,15 +712,16 @@ public:
         // now recurse into the subtypes
         CompilerVisibleObjectVisitor::singleton().visit(
             o,
+            mVisibilityType,
             [&](ShaHash h) {},
             [&](std::string o) {},
             [&](TypeOrPyobj o) {
-                if (MutuallyRecursiveTypeGroup::objectIsUnassigned(o)) {
+                if (MutuallyRecursiveTypeGroup::objectIsUnassigned(o, mVisibilityType)) {
                     mGroupOutboundEdges.back()->push_back(o);
                 }
             },
             [&](std::string name, TypeOrPyobj o) {
-                if (MutuallyRecursiveTypeGroup::objectIsUnassigned(o)) {
+                if (MutuallyRecursiveTypeGroup::objectIsUnassigned(o, mVisibilityType)) {
                     mGroupOutboundEdges.back()->push_back(o);
                 }
             },
@@ -706,7 +738,7 @@ public:
     void doOneStep() {
         if (mGroupOutboundEdges.back()->size() == 0) {
             // this group is finished....
-            MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(*mGroups.back());
+            MutuallyRecursiveTypeGroup::buildCompilerRecursiveGroup(*mGroups.back(), mVisibilityType);
 
             for (auto gElt: *mGroups.back()) {
                 mInAGroup.erase(gElt);
@@ -717,9 +749,10 @@ public:
         } else {
             // pop an outbound edge and see where does it go?
             TypeOrPyobj o = mGroupOutboundEdges.back()->back();
+
             mGroupOutboundEdges.back()->pop_back();
 
-            if (!MutuallyRecursiveTypeGroup::objectIsUnassigned(o)) {
+            if (!MutuallyRecursiveTypeGroup::objectIsUnassigned(o, mVisibilityType)) {
                 return;
             }
 
@@ -760,14 +793,16 @@ private:
 
     // for each group, the set of things it reaches out to
     std::vector<std::shared_ptr<std::vector<TypeOrPyobj> > > mGroupOutboundEdges;
+
+    VisibilityType mVisibilityType;
 };
 
 // static
-void MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(TypeOrPyobj root) {
+void MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(TypeOrPyobj root, VisibilityType visibility) {
     // we do things with pyobj refcounts, so we need to hold the gil.
     PyEnsureGilAcquired getTheGil;
 
-    MutuallyRecursiveTypeGroupSearch groupFinder;
+    MutuallyRecursiveTypeGroupSearch groupFinder(visibility);
 
     static thread_local int count = 0;
     count++;
@@ -788,12 +823,12 @@ void MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(TypeOrPyobj root) {
     count--;
 }
 
-ShaHash MutuallyRecursiveTypeGroup::shaHash(TypeOrPyobj o) {
+ShaHash MutuallyRecursiveTypeGroup::shaHash(TypeOrPyobj o, VisibilityType visibility) {
     if (o.pyobj() && CompilerVisibleObjectVisitor::isSimpleConstant(o.pyobj())) {
         return shaHashOfSimplePyObjectConstant(o.pyobj());
     }
 
-    auto groupAndIx = MutuallyRecursiveTypeGroup::groupAndIndexFor(o);
+    auto groupAndIx = MutuallyRecursiveTypeGroup::groupAndIndexFor(o, visibility);
 
     if (!groupAndIx.first) {
         return ShaHash();
@@ -803,16 +838,21 @@ ShaHash MutuallyRecursiveTypeGroup::shaHash(TypeOrPyobj o) {
 }
 
 // static
-std::pair<MutuallyRecursiveTypeGroup*, int> MutuallyRecursiveTypeGroup::groupAndIndexFor(PyObject* o) {
-    return groupAndIndexFor(TypeOrPyobj::withoutIntern(o));
+std::pair<MutuallyRecursiveTypeGroup*, int> MutuallyRecursiveTypeGroup::groupAndIndexFor(
+    PyObject* o, VisibilityType visibility
+) {
+    return groupAndIndexFor(TypeOrPyobj::withoutIntern(o), visibility);
 }
 
 // static
-std::pair<MutuallyRecursiveTypeGroup*, int> MutuallyRecursiveTypeGroup::groupAndIndexFor(TypeOrPyobj o) {
+std::pair<MutuallyRecursiveTypeGroup*, int> MutuallyRecursiveTypeGroup::groupAndIndexFor(
+    TypeOrPyobj o,
+    VisibilityType visibility
+) {
     std::lock_guard<std::recursive_mutex> lock(mMutex);
 
-    auto it = mTypeGroups.find(o);
-    if (it != mTypeGroups.end()) {
+    auto it = mTypeGroups[visibility].find(o);
+    if (it != mTypeGroups[visibility].end()) {
         return std::pair<MutuallyRecursiveTypeGroup*, int>(
             it->second.first, it->second.first->indexOfObjectInThisGroup(o)
         );
@@ -1004,13 +1044,22 @@ ShaHash MutuallyRecursiveTypeGroup::shaHashOfSimplePyObjectConstant(PyObject* h)
 }
 
 //static
-std::unordered_map<TypeOrPyobj, std::pair<MutuallyRecursiveTypeGroup*, int> > MutuallyRecursiveTypeGroup::mTypeGroups;
+std::map<
+    VisibilityType,
+    std::unordered_map<TypeOrPyobj, std::pair<MutuallyRecursiveTypeGroup*, int> >
+> MutuallyRecursiveTypeGroup::mTypeGroups;
 
 //static
-std::map<ShaHash, MutuallyRecursiveTypeGroup*> MutuallyRecursiveTypeGroup::mHashToGroup;
+std::map<
+    VisibilityType,
+    std::map<ShaHash, MutuallyRecursiveTypeGroup*>
+> MutuallyRecursiveTypeGroup::mHashToGroup;
 
 //static
-std::map<ShaHash, MutuallyRecursiveTypeGroup*> MutuallyRecursiveTypeGroup::mIntendedHashToGroup;
+std::map<
+    VisibilityType,
+    std::map<ShaHash, MutuallyRecursiveTypeGroup*>
+> MutuallyRecursiveTypeGroup::mIntendedHashToGroup;
 
 //static
 std::recursive_mutex MutuallyRecursiveTypeGroup::mMutex;

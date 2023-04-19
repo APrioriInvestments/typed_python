@@ -611,7 +611,7 @@ public:
             return false;
         }
 
-        return t1->identityHash() == t2->identityHash();
+        return t1->compilerHash() == t2->compilerHash();
     }
 
     //this checks _strict_ subclass. X is not a subclass of itself.
@@ -842,7 +842,10 @@ public:
     *****/
     MutuallyRecursiveTypeGroup* getRecursiveTypeGroup() {
         if (!mTypeGroup) {
-            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(this);
+            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(
+                this,
+                VisibilityType::Identity
+            );
 
             if (!mTypeGroup) {
                 throw std::runtime_error("Somehow, this type is not in a type group!");
@@ -877,18 +880,27 @@ public:
         type that's in our group. This gives us a unique signature for the group. The
         final hash is then that hash plus our id within the group.
     ******/
-    ShaHash identityHash() {
+    ShaHash compilerHash() {
         // if we've never initialized our hash
         if (mIdentityHash == ShaHash()) {
-            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(this);
+            MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(
+                this,
+                VisibilityType::Identity
+            );
 
-            mIdentityHash = MutuallyRecursiveTypeGroup::shaHash(this);
+            mIdentityHash = MutuallyRecursiveTypeGroup::shaHash(
+                this,
+                VisibilityType::Identity
+            );
         }
 
         return mIdentityHash;
     }
 
     void setRecursiveTypeGroup(MutuallyRecursiveTypeGroup* group, int32_t index) {
+        if (group->visibilityType() != VisibilityType::Identity) {
+            throw std::runtime_error("A Type's MutuallyRecursiveTypeGroup needs to be an Identity group");
+        }
         mTypeGroup = group;
         mRecursiveTypeGroupIndex = index;
     }

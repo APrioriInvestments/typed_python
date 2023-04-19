@@ -18,6 +18,7 @@
 
 #include "ShaHash.hpp"
 #include "SpecialModuleNames.hpp"
+#include "VisibilityType.hpp"
 #include "util.hpp"
 #include <unordered_map>
 
@@ -28,6 +29,7 @@ with the same level of detail that the compiler does.  We use this to build a
 unique hash for types and functions.
 
 ******************************/
+
 
 class VisitRecord {
 public:
@@ -265,6 +267,7 @@ public:
     template<class visitor_1, class visitor_2, class visitor_3, class visitor_4, class visitor_5>
     void visit(
         TypeOrPyobj obj,
+        VisibilityType visibility,
         const visitor_1& hashVisit,
         const visitor_2& nameVisit,
         const visitor_3& topoVisitor,
@@ -273,6 +276,7 @@ public:
     ) {
         visit(
             obj,
+            visibility,
             LambdaVisitor<visitor_1, visitor_2, visitor_3, visitor_4, visitor_5>(
                 hashVisit, nameVisit, topoVisitor, namedVisitor, onErr
             )
@@ -282,16 +286,17 @@ public:
     template<class visitor_type>
     void visit(
         TypeOrPyobj obj,
+        VisibilityType visibility,
         const visitor_type& visitor
     ) {
-        std::vector<VisitRecord> records = recordWalk(obj);
+        std::vector<VisitRecord> records = recordWalk(obj, visibility);
 
-        auto it = mPastVisits.find(obj);
-        if (it == mPastVisits.end()) {
-            mPastVisits[obj] = records;
+        auto it = mPastVisits[visibility].find(obj);
+        if (it == mPastVisits[visibility].end()) {
+            mPastVisits[visibility][obj] = records;
         } else {
             if (it->second != records) {
-                checkForInstability();
+                checkForInstability(visibility);
 
                 throw std::runtime_error(
                     "Found unstable object, but somehow our instability check"
@@ -300,24 +305,25 @@ public:
             }
         }
 
-        walk(obj, visitor);
+        walk(obj, visibility, visitor);
     }
 
-    static std::string recordWalkAsString(TypeOrPyobj obj) {
+    static std::string recordWalkAsString(TypeOrPyobj obj, VisibilityType visibility) {
         std::ostringstream s;
 
-        for (auto& record: recordWalk(obj)) {
+        for (auto& record: recordWalk(obj, visibility)) {
             s << record.toString() << "\n";
         }
 
         return s.str();
     }
 
-    static std::vector<VisitRecord> recordWalk(TypeOrPyobj obj) {
+    static std::vector<VisitRecord> recordWalk(TypeOrPyobj obj, VisibilityType visibility) {
         std::vector<VisitRecord> records;
 
         walk(
             obj,
+            visibility,
             [&](ShaHash h) { records.push_back(VisitRecord(h)); },
             [&](std::string h) { records.push_back(VisitRecord(h)); },
             [&](TypeOrPyobj o) { records.push_back(VisitRecord(o)); },
@@ -332,11 +338,11 @@ public:
         mPastVisits.clear();
     }
 
-    void checkForInstability() {
+    void checkForInstability(VisibilityType visibility) {
         std::vector<TypeOrPyobj> unstable;
 
-        for (auto it = mPastVisits.begin(); it != mPastVisits.end(); ++it) {
-            if (it->second != recordWalk(it->first)) {
+        for (auto it = mPastVisits[visibility].begin(); it != mPastVisits[visibility].end(); ++it) {
+            if (it->second != recordWalk(it->first, visibility)) {
                 unstable.push_back(it->first);
             }
         }
@@ -352,8 +358,8 @@ public:
         for (long k = 0; k < unstable.size() && k < 1000; k++) {
             s << k << " -> " << unstable[k].name() << "\n";
 
-            std::vector<std::string> linesLeft = stringifyVisitRecord(recordWalk(unstable[k]));
-            std::vector<std::string> linesRight = stringifyVisitRecord(mPastVisits[unstable[k]]);
+            std::vector<std::string> linesLeft = stringifyVisitRecord(recordWalk(unstable[k], visibility));
+            std::vector<std::string> linesRight = stringifyVisitRecord(mPastVisits[visibility][unstable[k]]);
 
             auto pad = [&](std::string s, int ct) {
                 if (s.size() > ct) {
@@ -510,6 +516,7 @@ private:
     template<class visitor_1, class visitor_2, class visitor_3, class visitor_4, class visitor_5>
     static void walk(
         TypeOrPyobj obj,
+        VisibilityType visibility,
         const visitor_1& hashVisit,
         const visitor_2& nameVisit,
         const visitor_3& topoVisitor,
@@ -517,6 +524,7 @@ private:
         const visitor_5& onErr
     ) {
         walk(obj,
+            visibility,
             LambdaVisitor<visitor_1, visitor_2, visitor_3, visitor_4, visitor_5>(
                 hashVisit, nameVisit, topoVisitor, namedVisitor, onErr
             )
@@ -559,6 +567,7 @@ private:
     template<class visitor_type>
     static void walk(
         TypeOrPyobj obj,
+        VisibilityType visibility,
         const visitor_type& visitor
     ) {
         PyEnsureGilAcquired getTheGil;
@@ -854,5 +863,8 @@ private:
         visitor.visitTopo((PyObject*)obj.pyobj()->ob_type);
     }
 
-    std::unordered_map<TypeOrPyobj, std::vector<VisitRecord> > mPastVisits;
+    std::map<
+        VisibilityType,
+        std::unordered_map<TypeOrPyobj, std::vector<VisitRecord> >
+    > mPastVisits;
 };

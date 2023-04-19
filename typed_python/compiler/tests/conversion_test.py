@@ -25,7 +25,7 @@ from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBui
 from typed_python import (
     Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, NotCompiled, Dict,
     _types, Compiled, Member, Final, isCompiled, ConstDict,
-    makeNamedTuple, UInt32, Int32, Type, identityHash, typeKnownToCompiler, checkOneOfType,
+    makeNamedTuple, UInt32, Int32, Type, compilerHash, typeKnownToCompiler, checkOneOfType,
     refcount, checkType, map
 )
 
@@ -2867,7 +2867,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert newCall.__code__.co_filename == call.__code__.co_filename
 
-        assert identityHash(call.__code__) == identityHash(newCall.__code__)
+        assert compilerHash(call.__code__) == compilerHash(newCall.__code__)
 
     def test_code_with_nested_listcomp(self):
         def call(x):

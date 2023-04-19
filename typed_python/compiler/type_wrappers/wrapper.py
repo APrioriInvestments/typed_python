@@ -110,10 +110,10 @@ class Wrapper:
     def isIterable(self):
         return "Maybe"
 
-    def identityHash(self):
+    def compilerHash(self):
         return (
-            Hash(_types.identityHash(self.typeRepresentation))
-            + Hash(_types.identityHash(self.interpreterTypeRepresentation))
+            Hash(_types.compilerHash(self.typeRepresentation))
+            + Hash(_types.compilerHash(self.interpreterTypeRepresentation))
         )
 
     def __eq__(self, other):

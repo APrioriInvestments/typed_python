@@ -49,7 +49,7 @@ from typed_python import (
 )
 
 from typed_python._types import (
-    refcount, isRecursive, identityHash, buildPyFunctionObject,
+    refcount, isRecursive, compilerHash, buildPyFunctionObject,
     setFunctionClosure, typesAreEquivalent, recursiveTypeGroupDeepRepr,
     recursiveTypeGroupRepr
 )
@@ -1491,7 +1491,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         B2 = sc.deserialize(sc.serialize(B))
 
-        assert identityHash(B) == identityHash(B2)
+        assert compilerHash(B) == compilerHash(B2)
 
         instance = B2()
 
@@ -1621,7 +1621,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         aFunction2 = sc.deserialize(sc.serialize(aFunction))
 
-        assert identityHash(aFunction) == identityHash(aFunction2)
+        assert compilerHash(aFunction) == compilerHash(aFunction2)
 
     def test_serialize_subclasses(self):
         sc = SerializationContext()
@@ -2353,7 +2353,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         Cls2 = type(callFunctionInFreshProcess(Cls, ()))
 
-        assert identityHash(Cls).hex() == identityHash(Cls2).hex()
+        assert compilerHash(Cls).hex() == compilerHash(Cls2).hex()
 
     @pytest.mark.skipif(
         "sys.version_info.minor >= 8",
@@ -2365,11 +2365,11 @@ class TypesSerializationTest(unittest.TestCase):
             def f(x: float):
                 return x + 1
 
-            return (f, identityHash(f))
+            return (f, compilerHash(f))
 
         f, identityHashOfF = callFunctionInFreshProcess(makeFunction, ())
 
-        assert identityHash(f) == identityHashOfF
+        assert compilerHash(f) == identityHashOfF
 
     @pytest.mark.skipif(
         "sys.version_info.minor >= 8",
@@ -2381,11 +2381,11 @@ class TypesSerializationTest(unittest.TestCase):
             def f(x=None):
                 return x + 1
 
-            return (f, identityHash(f))
+            return (f, compilerHash(f))
 
         f, identityHashOfF = callFunctionInFreshProcess(makeFunction, ())
 
-        assert identityHash(f) == identityHashOfF
+        assert compilerHash(f) == identityHashOfF
 
     @pytest.mark.skip(reason='broken')
     def test_deserialize_untyped_class_in_forward_retains_identity(self):
@@ -2418,7 +2418,7 @@ class TypesSerializationTest(unittest.TestCase):
         for i in range(len(l)):
             print(pad(l[i]), "    " if l[i] == r[i] else " != ", pad(r[i]))
 
-        assert identityHash(Cls) == identityHash(Cls2)
+        assert compilerHash(Cls) == compilerHash(Cls2)
 
     def test_deserialize_tp_class_retains_identity(self):
         Cls = Forward("Cls")
@@ -2431,7 +2431,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         Cls2 = type(callFunctionInFreshProcess(Cls, ()))
 
-        assert identityHash(Cls) == identityHash(Cls2)
+        assert compilerHash(Cls) == compilerHash(Cls2)
 
     def test_call_method_dispatch_on_two_versions_of_same_class_with_recursion_defined_in_host(self):
         Base = Forward("Base")
@@ -2461,7 +2461,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             aChild2 = SerializationContext().deserialize(someBytes)
 
-            assert identityHash(aChild) == identityHash(aChild2)
+            assert compilerHash(aChild) == compilerHash(aChild2)
 
             if callF(aChild) == callF(aChild2):
                 return "OK"
@@ -2495,8 +2495,8 @@ class TypesSerializationTest(unittest.TestCase):
         child1, callF1 = callFunctionInFreshProcess(deserializeAndCall, ())
         child2, callF2 = callFunctionInFreshProcess(deserializeAndCall, ())
 
-        assert identityHash(child1) == identityHash(child2)
-        assert identityHash(callF1) == identityHash(callF2)
+        assert compilerHash(child1) == compilerHash(child2)
+        assert compilerHash(callF1) == compilerHash(callF2)
         assert type(child1) is type(child2)
         assert type(callF1) is type(callF2)
 
@@ -2529,8 +2529,8 @@ class TypesSerializationTest(unittest.TestCase):
         Base1, callF1 = callFunctionInFreshProcess(deserializeAndCall, ())
         Base2, callF2 = callFunctionInFreshProcess(deserializeAndCall, ())
 
-        assert identityHash(Base1) == identityHash(Base2)
-        assert identityHash(callF1) == identityHash(callF2)
+        assert compilerHash(Base1) == compilerHash(Base2)
+        assert compilerHash(callF1) == compilerHash(callF2)
         assert Base1 is Base2
         assert type(callF1) is type(callF2)
 
@@ -2546,7 +2546,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         ser1 = s.serialize(f)
 
-        identityHash(f)
+        compilerHash(f)
 
         ser2 = s.serialize(f)
 
@@ -2567,7 +2567,7 @@ class TypesSerializationTest(unittest.TestCase):
         def callF(x: Base):
             return x.f(10)
 
-        identityHash(Base)
+        compilerHash(Base)
 
         def deserializeAndCall():
             class Child(Base, Final):
@@ -2858,7 +2858,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         s1 = s.serialize(moduleLevelFunctionUsedByExactlyOneSerializationTest)
 
-        identityHash(moduleLevelFunctionUsedByExactlyOneSerializationTest)
+        compilerHash(moduleLevelFunctionUsedByExactlyOneSerializationTest)
 
         s2 = s.serialize(moduleLevelFunctionUsedByExactlyOneSerializationTest)
 

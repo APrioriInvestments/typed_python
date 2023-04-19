@@ -1,5 +1,5 @@
 from typed_python import ModuleRepresentation, SerializationContext
-from typed_python import sha_hash, identityHash, ListOf
+from typed_python import sha_hash, compilerHash, ListOf
 
 import tempfile
 import unittest
@@ -223,7 +223,7 @@ class TestModuleRepresentation(unittest.TestCase):
 
             assert mr2.getDict()['f'](10) == 11
 
-            assert identityHash(mr.getDict()['f']) != identityHash(mr2.getDict()['f'])
+            assert compilerHash(mr.getDict()['f']) != compilerHash(mr2.getDict()['f'])
 
     def test_tp_classes(self):
         with tempfile.TemporaryDirectory() as td:

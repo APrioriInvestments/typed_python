@@ -48,7 +48,7 @@ from typed_python._types import (
     Alternative, Value, serialize, deserialize, serializeStream, deserializeStream,
     PointerTo, RefTo, Dict, validateSerializedObject, validateSerializedObjectStream,
     decodeSerializedObject, getOrSetTypeResolver, Set, Class, Type, BoundMethod,
-    TypedCell, pointerTo, refTo, copy, identityHash, PythonObjectOfType,
+    TypedCell, pointerTo, refTo, copy, compilerHash, PythonObjectOfType,
     deepBytecount, deepcopy, deepcopyContiguous, totalBytesAllocatedInSlabs,
     deepBytecountAndSlabs, Slab,
     totalBytesAllocatedOnFreeStore,
