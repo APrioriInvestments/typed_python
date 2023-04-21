@@ -403,6 +403,37 @@ public:
         return lines;
     }
 
+    // check if this is a module's dict object and if that module is globally named.
+    static std::string isPyObjectGloballyIdentifiableModuleDict(PyObject* h) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* sysModuleModules = staticPythonInstance("sys", "modules");
+
+        if (!PyDict_Check(h)) {
+            return std::string();
+        }
+
+        PyObject* package = PyDict_GetItemString(h, "__package__");
+        PyObject* name = PyDict_GetItemString(h, "__name__");
+
+        if (package && name && PyUnicode_Check(name)) {
+            PyObjectStealer moduleObject(PyObject_GetItem(sysModuleModules, name));
+
+            if (!moduleObject) {
+                PyErr_Clear();
+                return std::string();
+            }
+
+            PyObjectStealer dictObj(PyObject_GenericGetDict((PyObject*)moduleObject, nullptr));
+
+            if ((PyObject*)dictObj == h) {
+                return std::string(PyUnicode_AsUTF8(name));
+            }
+        }
+
+        return std::string();
+    }
+
     // is this a 'globally identifiable' py object, where we can just use its name to find it,
     // and where we are guaranteed that it won't change between invocations of the program?
     static bool isPyObjectGloballyIdentifiableAndStable(PyObject* h) {
@@ -667,6 +698,7 @@ private:
     #       else
                 visitor.visitTopo(co->co_lnotab);
     #       endif
+
             return;
         }
 
@@ -697,18 +729,34 @@ private:
             visitor.visitHash(ShaHash(1));
 
             if (f->func_globals && PyDict_Check(f->func_globals)) {
+                bool shouldVisit = true;
 
-                std::vector<std::vector<PyObject*> > dotAccesses;
+                if (visibility == VisibilityType::Identity) {
+                    std::string name = isPyObjectGloballyIdentifiableModuleDict(
+                        f->func_globals
+                    );
+                    if (name.size()) {
+                        visitor.visitHash(ShaHash(2));
+                        visitor.visitName(name);
+                        shouldVisit = false;
+                    }
+                }
 
-                Function::Overload::visitCompilerVisibleGlobals(
-                    [&](std::string name, PyObject* val) {
-                        if (!isSpecialIgnorableName(name)) {
-                            visitor.visitNamedTopo(name, val);
-                        }
-                    },
-                    (PyCodeObject*)f->func_code,
-                    f->func_globals
-                );
+                if (shouldVisit) {
+                    visitor.visitHash(ShaHash(2));
+
+                    std::vector<std::vector<PyObject*> > dotAccesses;
+
+                    Function::Overload::visitCompilerVisibleGlobals(
+                        [&](std::string name, PyObject* val) {
+                            if (!isSpecialIgnorableName(name)) {
+                                visitor.visitNamedTopo(name, val);
+                            }
+                        },
+                        (PyCodeObject*)f->func_code,
+                        f->func_globals
+                    );
+                }
             }
 
             visitor.visitHash(ShaHash(0));
