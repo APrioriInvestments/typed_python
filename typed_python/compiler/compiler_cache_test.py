@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import tempfile
+import threading
 import os
 import pytest
 from typed_python.test_util import evaluateExprInFreshProcess
@@ -22,6 +23,47 @@ MAIN_MODULE = """
 def f(x):
     return x + 1
 """
+
+
+class MockDirectory:
+    def __init__(self, tree):
+        self.tree = tree
+
+    @staticmethod
+    def fromPath(path):
+        tree = {}
+
+        def populate(path, tree):
+            for relPath in os.listdir(path):
+                subPath = os.path.join(path, relPath)
+
+                if os.path.isdir(subPath):
+                    populate(os.path.join(path, subPath), tree.setdefault(relPath, {}))
+                elif os.path.isfile(subPath):
+                    with open(subPath, "rb") as file:
+                        tree[relPath] = file.read()
+
+        populate(path, tree)
+
+        return MockDirectory(tree)
+
+    def dumpInto(self, path):
+        def populate(path, tree):
+            if isinstance(tree, dict):
+                if not os.path.isdir(path):
+                    os.mkdir(path)
+
+                for relPath, subtree in tree.items():
+                    subpath = os.path.join(path, relPath)
+
+                    populate(subpath, subtree)
+            elif isinstance(tree, bytes):
+                with open(path, "wb") as file:
+                    file.write(tree)
+            else:
+                raise Exception(f"Can't handle {type(tree)} in the tree.")
+
+        populate(path, self.tree)
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
@@ -119,6 +161,7 @@ def test_compiler_cache_understands_type_changes():
     VERSION1 = {'x.py': xmodule, 'y.py': ymodule}
     VERSION2 = {'x.py': xmodule.replace("1: 2", "1: 3"), 'y.py': ymodule}
     VERSION3 = {'x.py': xmodule.replace("int, int", "int, float").replace('1: 2', '1: 2.5'), 'y.py': ymodule}
+    VERSION4 = {'x.py': xmodule.replace("1: 2", "1: 4"), 'y.py': ymodule}
 
     assert '1: 3' in VERSION2['x.py']
 
@@ -132,6 +175,10 @@ def test_compiler_cache_understands_type_changes():
 
         # this forces a recompile
         assert evaluateExprInFreshProcess(VERSION3, 'y.g(1)', compilerCacheDir) == 2.5
+        assert len(os.listdir(compilerCacheDir)) == 2
+
+        # use the previously compiled module
+        assert evaluateExprInFreshProcess(VERSION4, 'y.g(1)', compilerCacheDir) == 4
         assert len(os.listdir(compilerCacheDir)) == 2
 
 
@@ -257,6 +304,164 @@ def test_reference_existing_function_twice():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+def test_can_compile_overlapping_code():
+    common = "\n".join([
+        "import time",
+        "import os",
+
+        "t0 = time.time()",
+        "path = os.path.join(os.getenv('TP_COMPILER_CACHE'), 'check.txt')",
+        "while not os.path.exists(path):",
+        "    time.sleep(.01)",
+        "    assert time.time() - t0 < 2",
+    ])
+
+    xmodule1 = "\n".join([
+        "import common",
+        "@Entrypoint",
+        "def f():",
+        "    x = Dict(int, int)()",
+        "    x[3] = 4",
+        "    return x[3]"
+    ])
+
+    xmodule2 = "\n".join([
+        "import common",
+        "@Entrypoint",
+        "def g():",
+        "    x = Dict(int, int)()",
+        "    x[3] = 5",
+        "    return x[3]"
+    ])
+
+    xmodule3 = "\n".join([
+        "from x1 import f",
+        "from x2 import g",
+        "@Entrypoint",
+        "def h():",
+        "    return f() + g()"
+    ])
+
+    MODULES = {'common.py': common, 'x1.py': xmodule1, 'x2.py': xmodule2, 'x3.py': xmodule3}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        # first, compile 'f' and 'g' in two separate processes. Because of the loop
+        # they will wait until we write out the file that lets them start compiling. Then
+        # the'll both compile something that has common code.
+        # we should be able to then use that common code without issue.
+        threads = [
+            threading.Thread(
+                target=evaluateExprInFreshProcess, args=(MODULES, 'x1.f()', compilerCacheDir)
+            ),
+            threading.Thread(
+                target=evaluateExprInFreshProcess, args=(MODULES, 'x2.g()', compilerCacheDir)
+            ),
+        ]
+        for t in threads:
+            t.start()
+
+        with open(os.path.join(compilerCacheDir, "check.txt"), 'w') as f:
+            f.write('start!')
+
+        for t in threads:
+            t.join()
+
+        assert evaluateExprInFreshProcess(MODULES, 'x3.h()', compilerCacheDir) == 9
+
+
+RACE_CONDITION_MODULES = {'x1.py': "\n".join([
+    "@Entrypoint",
+    "def f():",
+    "    x = Dict(int, int)()",
+    "    x[3] = 4",
+    "    return x[3]"]), 'x2.py': "\n".join([
+        "import x1",
+        "@Entrypoint",
+        "def g():",
+        "    x = Dict(int, int)()",
+        "    x[3] = 5",
+        "    return x[3], x1.f()"
+    ]), 'x3.py': "\n".join([
+        "from x1 import f",
+        "from x2 import g",
+        "@Entrypoint",
+        "def h():",
+        "    return f() + g()[0]"
+    ])}
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_race_condition_triangle():
+    """Given double-compilation of f, and g depends on f, test we can load the cached f and compile g."""
+    # compile a module containing f
+    with tempfile.TemporaryDirectory() as dir1:
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x1.f()", dir1)
+        cache_dir = MockDirectory.fromPath(dir1)
+
+    # recompile the f-module in a new cache.
+    with tempfile.TemporaryDirectory() as dir2:
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x1.f()", dir2)
+        # merge the two caches to simulate a race condition
+        cache_dir.dumpInto(dir2)
+        assert len(os.listdir(dir2)) == 2
+        # compile a module containing g that depends on f. Run f and g in fresh processes.
+        assert evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x2.g()", dir2) == (5, 4)
+        assert evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x1.f()", dir2) == 4
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_race_condition_diamond():
+    """Given single-compilation of f, and double-compilation of g, and h depends on g, test we
+        can load the cached f and g and compile h.
+    """
+    # one module with f
+    with tempfile.TemporaryDirectory() as dir1:
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x1.f()", dir1)
+        cache_dir = MockDirectory.fromPath(dir1)
+    # two gs, both depending on f
+    with tempfile.TemporaryDirectory() as dir2:
+        cache_dir.dumpInto(dir2)
+        assert len(os.listdir(dir2)) == 1
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x2.g()", dir2)
+        cache_dir_2 = MockDirectory.fromPath(dir2)
+    with tempfile.TemporaryDirectory() as dir3:
+        cache_dir.dumpInto(dir3)
+        assert len(os.listdir(dir3)) == 1
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x2.g()", dir3)
+        cache_dir_3 = MockDirectory.fromPath(dir3)
+
+    with tempfile.TemporaryDirectory() as dir4:
+        # we should now have three modules, one with f and two with g.
+        cache_dir_3.dumpInto(dir4)
+        cache_dir_2.dumpInto(dir4)
+        assert len(os.listdir(dir4)) == 3
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x3.h()", dir3) == 9
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x2.g()", dir3) == (5, 4)
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x1.f()", dir3) == 4
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_race_condition_duplicate_edges():
+    """Given two modules that both contain f and g, and h depends on g, test we
+        can load the cached f and g and compile h.
+    """
+    # two modules both with f and g
+    with tempfile.TemporaryDirectory() as dir1:
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x2.g()", dir1)
+        cache_dir = MockDirectory.fromPath(dir1)
+        module = os.listdir(dir1)[0]
+        with open(os.path.join(dir1, module, "name_manifest.txt"), "r") as flines:
+            manifest = flines.read()
+        assert "tp.g" in manifest and "tp.f" in manifest
+
+    with tempfile.TemporaryDirectory() as dir2:
+        evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x2.g()", dir2)
+        cache_dir.dumpInto(dir2)
+        assert len(os.listdir(dir2)) == 2
+        assert evaluateExprInFreshProcess(RACE_CONDITION_MODULES, "x3.h()", dir2) == 9
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
 def test_compiler_cache_handles_class_destructors_correctly():
     xmodule = "\n".join([
         "class C(Class):",
@@ -362,12 +567,9 @@ def test_compiler_cache_handles_changed_types():
         assert evaluateExprInFreshProcess(VERSION2, 'x.f(1)', compilerCacheDir) == 1
         assert len(os.listdir(compilerCacheDir)) == 2
 
-        badCt = 0
-        for subdir in os.listdir(compilerCacheDir):
-            if 'marked_invalid' in os.listdir(os.path.join(compilerCacheDir, subdir)):
-                badCt += 1
-
-        assert badCt == 1
+        # if we then use g1 again, it should not have been marked invalid and so remains accessible.
+        assert evaluateExprInFreshProcess(VERSION1, 'x.g1(1)', compilerCacheDir) == 1
+        assert len(os.listdir(compilerCacheDir)) == 2
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
@@ -395,3 +597,95 @@ def test_ordering_is_stable_under_code_change():
         )
 
         assert names == names2
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_avoids_deserialization_error():
+    xmodule1 = "\n".join([
+        "@Entrypoint",
+        "def f():",
+        "    return None",
+        "import badModule",
+        "@Entrypoint",
+        "def g():",
+        "    print(badModule)",
+        "    return f()",
+    ])
+
+    xmodule2 = "\n".join([
+        "@Entrypoint",
+        "def f():",
+        "    return",
+    ])
+
+    VERSION1 = {'x.py': xmodule1, 'badModule.py': ''}
+    VERSION2 = {'x.py': xmodule2}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        evaluateExprInFreshProcess(VERSION1, 'x.g()', compilerCacheDir)
+        assert len(os.listdir(compilerCacheDir)) == 1
+        evaluateExprInFreshProcess(VERSION2, 'x.f()', compilerCacheDir)
+        assert len(os.listdir(compilerCacheDir)) == 2
+        evaluateExprInFreshProcess(VERSION1, 'x.g()', compilerCacheDir)
+        assert len(os.listdir(compilerCacheDir)) == 2
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_can_handle_cyclic_dependency_graph():
+    xmodule = """
+    @Entrypoint
+    def getX():
+        # class C:
+        def f():
+            var = g(0)
+            return var
+
+        def g(x):
+            if x == 0:
+                return 1
+            else:
+                return f()
+
+        return f()
+    """.replace('\n    ', '\n')
+    MODULE = {'x.py': xmodule}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        # run twice to check cached code can be retrieved
+        assert evaluateExprInFreshProcess(MODULE, 'x.getX()', compilerCacheDir) == 1
+        assert evaluateExprInFreshProcess(MODULE, 'x.getX()', compilerCacheDir) == 1
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_throws_on_import_loop():
+    """It is possible, when compiling a module, to attempt to deserialise
+    a callTarget containing a module import which runs an Entrypointed function.
+    This results in a 'compilation loop' where one iteration of the conversion
+    is waiting on another, which currently breaks our model of the compilation
+    process.
+    """
+    module1 = """
+    @Entrypoint
+    def f(x):
+        return x+1
+    f(1)
+    """.replace('\n    ', '\n')
+    module2 = """
+    @Entrypoint
+    def g():
+        import x
+    """.replace('\n    ', '\n')
+    module3 = """
+    import y
+    def rung():
+        try:
+            y.g()
+        except ImportError as e:
+            return 'ImportError caught'
+    rung()
+    """.replace('\n    ', '\n')
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+
+        evaluateExprInFreshProcess({'x.py': module1}, 'x.f(1)', compilerCacheDir)
+        exception_string = evaluateExprInFreshProcess({'z.py': module3, 'y.py': module2, 'x.py': module1, }, 'z.rung()', compilerCacheDir)
+        assert exception_string == 'ImportError caught'
