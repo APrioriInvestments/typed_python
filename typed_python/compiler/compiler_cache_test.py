@@ -51,6 +51,57 @@ def test_compiler_cache_can_handle_conflicting_versions_of_the_same_code():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+def test_compiler_cache_inlining():
+    fListDef = "\n".join([
+        "from typed_python import Entrypoint",
+        "@Entrypoint",
+        "def fList(aList):",
+        "    res = 0",
+        "    for x in aList:",
+        "        res += f(x)",
+        "    return res",
+    ])
+    xmodule = "\n".join([
+        "def f(x):",
+        "    return x",
+        fListDef,
+    ])
+    ymodule = "\n".join([
+        "from x import f",
+        fListDef,
+    ])
+    testmodule = "\n".join([
+        "import time",
+        "from typed_python import Entrypoint, ListOf",
+        "from x import fList",
+        "@Entrypoint",
+        "def makeRange(N):",
+        "    res = ListOf(int)()",
+        "    for i in range(N):",
+        "        res.append(i)",
+        "    return res",
+        "N = 10000000",
+        "bigRange = makeRange(N)",
+        "fList(bigRange)",
+        "t0 = time.time()",
+        "fList(bigRange)",
+        "duration = time.time() - t0",
+    ])
+
+    VERSION1 = {'x.py': xmodule, 'testmodule.py': testmodule}
+    VERSION2 = {'x.py': xmodule, 'y.py': ymodule, 'testmodule.py': testmodule.replace('x', 'y')}
+
+    with tempfile.TemporaryDirectory() as compilerCacheDir:
+        dur1 = evaluateExprInFreshProcess(VERSION1, 'testmodule.duration', compilerCacheDir)
+        dur2 = evaluateExprInFreshProcess(VERSION2, 'testmodule.duration', compilerCacheDir)
+
+        print(dur1)
+        print(dur2)
+
+        assert dur2 < 2 * dur1
+
+
+@pytest.mark.skipif('sys.platform=="darwin"')
 def test_compiler_cache_can_detect_invalidation_through_modules():
     xmodule = "\n".join([
         "def f(x):",
