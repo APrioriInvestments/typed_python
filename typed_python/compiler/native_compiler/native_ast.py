@@ -12,6 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typed_python.compiler.native_compiler.global_variable_definition import (
+    GlobalVariableMetadata
+)
 from typed_python import Tuple, TupleOf, Alternative, NamedTuple, OneOf, Forward
 import textwrap
 
@@ -609,7 +612,7 @@ Expression = Expression.define(Alternative(
     Sequence={'vals': TupleOf(Expression)},
     ActivatesTeardown={'name': str},
     StackSlot={'name': str, 'type': Type},
-    GlobalVariable={'name': str, 'type': Type, 'metadata': object},
+    GlobalVariable={'name': str, 'type': Type, 'metadata': GlobalVariableMetadata},
     ApplyIntermediates={'base': Expression, 'intermediates': TupleOf(ExpressionIntermediate)},
     ElementPtrIntegers=lambda self, *offsets:
         Expression.ElementPtr(

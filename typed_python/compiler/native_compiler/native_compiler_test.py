@@ -33,7 +33,9 @@ def test_global_variable_pointers():
                 arg=Expression.GlobalVariable(
                     name="globalvar",
                     type=Int64,
-                    metadata='aGlobal'
+                    metadata=GlobalVariableMetadata.StringConstant(
+                        value='aGlobal'
+                    )
                 ).load()
             )
         )
@@ -47,7 +49,9 @@ def test_global_variable_pointers():
                 arg=Expression.GlobalVariable(
                     name="globalvar",
                     type=Int64,
-                    metadata='aGlobal'
+                    metadata=GlobalVariableMetadata.StringConstant(
+                        value='aGlobal'
+                    )
                 )
             )
         )
