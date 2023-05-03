@@ -55,9 +55,9 @@ def test_global_variable_pointers():
 
     # we have to use the singleton here because the llvm context
     # is global.
-    llvmCompiler = Runtime.singleton().llvm_compiler
+    nativeCompiler = Runtime.singleton().native_compiler
 
-    loadedModule = llvmCompiler.buildModule(
+    loadedModule = nativeCompiler.buildModule(
         dict(
             _readGlobalVarFunc=readGlobalVarFunc,
             _returnGlobalVarPtrFunc=returnGlobalVarPtrFunc
@@ -109,9 +109,9 @@ def test_create_binary_shared_object():
         )
     )
 
-    llvmCompiler = Runtime.singleton().llvm_compiler
+    nativeCompiler = Runtime.singleton().native_compiler
 
-    bso = llvmCompiler.buildSharedObject(
+    bso = nativeCompiler.buildSharedObject(
         {'__test_f_2': f}
     )
 

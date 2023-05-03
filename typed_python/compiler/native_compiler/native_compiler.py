@@ -83,7 +83,15 @@ def create_execution_engine(inlineThreshold):
     return engine, pass_manager
 
 
-class Compiler:
+class NativeCompiler:
+    """"Engine for compiling bundles of native_ast.Function objects into NativeFunctionPointers.
+
+    This class is responsible for
+        * telling clients what named functions have been defined and what their types are.
+        * compiling functions into a runnable form using llvm
+        * performing any runtime-based performance optimizations
+        * maintaining the compiler cache
+    """
     def __init__(self, inlineThreshold):
         self.engine, self.module_pass_manager = create_execution_engine(inlineThreshold)
         self.converter = native_ast_to_llvm.Converter()

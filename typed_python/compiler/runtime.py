@@ -17,7 +17,7 @@ import os
 import time
 import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
-import typed_python.compiler.native_compiler.llvm_compiler as llvm_compiler
+import typed_python.compiler.native_compiler.native_compiler as native_compiler
 import typed_python
 from typed_python.compiler.runtime_lock import runtimeLock
 from typed_python.compiler.conversion_level import ConversionLevel
@@ -207,9 +207,9 @@ class Runtime:
             )
         else:
             self.compilerCache = None
-        self.llvm_compiler = llvm_compiler.Compiler(inlineThreshold=100)
+        self.native_compiler = native_compiler.NativeCompiler(inlineThreshold=100)
         self.converter = python_to_native_converter.PythonToNativeConverter(
-            self.llvm_compiler,
+            self.native_compiler,
             self.compilerCache
         )
         self.lock = runtimeLock
@@ -223,9 +223,9 @@ class Runtime:
                 else:
                     self.addEventVisitor(PrintNewFunctionVisitor(True))
             if self.verbosityLevel >= 4:
-                self.llvm_compiler.mark_converter_verbose()
+                self.native_compiler.mark_converter_verbose()
             if self.verbosityLevel >= 5:
-                self.llvm_compiler.mark_llvm_codegen_verbose()
+                self.native_compiler.mark_llvm_codegen_verbose()
         else:
             self.verbosityLevel = 0
 

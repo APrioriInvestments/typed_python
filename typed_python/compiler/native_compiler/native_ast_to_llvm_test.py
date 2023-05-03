@@ -16,7 +16,7 @@ from typed_python.compiler.native_compiler.native_ast import (
     Expression, Void, Int32, nullExpr, Function, FunctionBody,
     Teardown, const_int32_expr, CallTarget, NamedCallTarget
 )
-from typed_python.compiler.native_compiler.llvm_compiler import llvm
+import llvmlite.binding as llvm
 import typed_python.compiler.native_compiler.native_ast_to_llvm as native_ast_to_llvm
 import unittest
 
