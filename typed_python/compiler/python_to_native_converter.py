@@ -32,7 +32,7 @@ from typed_python.compiler.type_wrappers.python_typed_function_wrapper import (
     PythonTypedFunctionWrapper, CannotBeDetermined, NoReturnTypeSpecified
 )
 from typed_python.compiler.function_dependency_graph import FunctionDependencyGraph
-from typed_python.compiler.typed_call_target import TypedCallTarget
+from typed_python.compiler.native_compiler.typed_call_target import TypedCallTarget
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
