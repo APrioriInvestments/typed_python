@@ -57,7 +57,7 @@ def test_global_variable_pointers():
     # is global.
     nativeCompiler = Runtime.singleton().native_compiler
 
-    loadedModule = nativeCompiler.buildModule(
+    loadedModule = nativeCompiler._buildModule(
         dict(
             _readGlobalVarFunc=readGlobalVarFunc,
             _returnGlobalVarPtrFunc=returnGlobalVarPtrFunc
@@ -111,7 +111,7 @@ def test_create_binary_shared_object():
 
     nativeCompiler = Runtime.singleton().native_compiler
 
-    bso = nativeCompiler.buildSharedObject(
+    bso = nativeCompiler._buildSharedObject(
         {'__test_f_2': f}
     )
 

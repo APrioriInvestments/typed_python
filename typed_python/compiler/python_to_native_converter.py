@@ -41,11 +41,8 @@ VALIDATE_FUNCTION_DEFINITIONS_STABLE = False
 
 
 class PythonToNativeConverter:
-    def __init__(self, llvmCompiler, compilerCache):
-        object.__init__(self)
-
-        self.llvmCompiler = llvmCompiler
-        self.compilerCache = compilerCache
+    def __init__(self, nativeCompiler):
+        self.nativeCompiler = nativeCompiler
 
         # if True, then insert additional code to check for undefined behavior.
         self.generateDebugChecks = False
@@ -116,11 +113,6 @@ class PythonToNativeConverter:
         if not targets:
             return
 
-        if self.compilerCache is None:
-            loadedModule = self.llvmCompiler.buildModule(targets)
-            loadedModule.linkGlobalVariables()
-            return
-
         # get a set of function names that we depend on
         externallyUsed = set()
 
@@ -132,10 +124,8 @@ class PythonToNativeConverter:
                     if depLN not in targets:
                         externallyUsed.add(depLN)
 
-        binary = self.llvmCompiler.buildSharedObject(targets)
-
-        self.compilerCache.addModule(
-            binary,
+        self.nativeCompiler.addFunctions(
+            targets,
             {name: self._targets[name] for name in targets if name in self._targets},
             externallyUsed
         )
@@ -209,18 +199,16 @@ class PythonToNativeConverter:
         return True
 
     def _loadFromCompilerCache(self, linkName):
-        if self.compilerCache:
-            if self.compilerCache.hasSymbol(linkName):
-                callTargetsAndTypes = self.compilerCache.loadForSymbol(linkName)
+        callTargetsAndTypes = self.nativeCompiler.loadFromCache(linkName)
 
-                if callTargetsAndTypes is not None:
-                    newTypedCallTargets, newNativeFunctionTypes = callTargetsAndTypes
+        if callTargetsAndTypes is not None:
+            newTypedCallTargets, newNativeFunctionTypes = callTargetsAndTypes
 
-                    self._targets.update(newTypedCallTargets)
-                    self.llvmCompiler.markExternal(newNativeFunctionTypes)
+            self._targets.update(newTypedCallTargets)
+            self.nativeCompiler.markExternal(newNativeFunctionTypes)
 
-                    self._allDefinedNames.update(newNativeFunctionTypes)
-                    self._allCachedNames.update(newNativeFunctionTypes)
+            self._allDefinedNames.update(newNativeFunctionTypes)
+            self._allCachedNames.update(newNativeFunctionTypes)
 
     def defineNonPythonFunction(self, name, identityTuple, context):
         """Define a non-python generating function (if we haven't defined it before already)
@@ -604,13 +592,7 @@ class PythonToNativeConverter:
         Returns:
             a NativeFunctionPointer or None
         """
-        if self.compilerCache is None:
-            # the llvm compiler holds it all
-            return self.llvmCompiler.function_pointer_by_name(linkerName)
-        else:
-            # the llvm compiler is just building shared objects, but the
-            # compiler cache has all the pointers.
-            return self.compilerCache.function_pointer_by_name(linkerName)
+        return self.nativeCompiler.functionPointerByName(linkerName)
 
     def convertTypedFunctionCall(self, functionType, overloadIx, inputWrappers, assertIsRoot=False):
         overload = functionType.overloads[overloadIx]

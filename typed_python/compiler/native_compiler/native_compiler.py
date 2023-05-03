@@ -1,4 +1,4 @@
-#   Copyright 2019 typed_python Authors
+#   Copyright 2023 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -13,74 +13,13 @@
 #   limitations under the License.
 
 import llvmlite.binding as llvm
-import llvmlite.ir
 import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.compiler.native_compiler.native_ast_to_llvm as native_ast_to_llvm
-
+from typed_python.compiler.native_compiler.compiler_cache import CompilerCache
+from typed_python.compiler.native_compiler.llvm_execution_engine import create_execution_engine
 from typed_python.compiler.native_compiler.loaded_module import LoadedModule
 from typed_python.compiler.native_compiler.native_function_pointer import NativeFunctionPointer
 from typed_python.compiler.native_compiler.binary_shared_object import BinarySharedObject
-
-import ctypes
-from typed_python import _types
-
-llvm.initialize()
-llvm.initialize_native_target()
-llvm.initialize_native_asmprinter()  # yes, even this one
-
-target_triple = llvm.get_process_triple()
-target = llvm.Target.from_triple(target_triple)
-target_machine = target.create_target_machine()
-target_machine_shared_object = target.create_target_machine(reloc='pic', codemodel='default')
-
-ctypes.CDLL(_types.__file__, mode=ctypes.RTLD_GLOBAL)
-
-
-pointer_size = (
-    llvmlite.ir.PointerType(llvmlite.ir.DoubleType())
-    .get_abi_size(target_machine.target_data)
-)
-
-assert pointer_size == native_ast_to_llvm.pointer_size
-
-
-def sizeof_native_type(native_type):
-    if native_type.matches.Void:
-        return 0
-
-    return (
-        native_ast_to_llvm.type_to_llvm_type(native_type)
-        .get_abi_size(target_machine.target_data)
-    )
-
-
-# there can be only one llvm engine alive at once.
-_engineCache = []
-
-
-def create_execution_engine(inlineThreshold):
-    if _engineCache:
-        return _engineCache[0]
-
-    pmb = llvm.create_pass_manager_builder()
-    pmb.opt_level = 3
-    pmb.size_level = 0
-    pmb.inlining_threshold = inlineThreshold
-    pmb.loop_vectorize = True
-    pmb.slp_vectorize = True
-
-    pass_manager = llvm.create_module_pass_manager()
-    pmb.populate(pass_manager)
-
-    target_machine.add_analysis_passes(pass_manager)
-
-    # And an execution engine with an empty backing module
-    backing_mod = llvm.parse_assembly("")
-    engine = llvm.create_mcjit_compiler(backing_mod, target_machine)
-
-    _engineCache.append((engine, pass_manager))
-
-    return engine, pass_manager
 
 
 class NativeCompiler:
@@ -91,14 +30,22 @@ class NativeCompiler:
         * compiling functions into a runnable form using llvm
         * performing any runtime-based performance optimizations
         * maintaining the compiler cache
+
+    Note that this class is NOT threadsafe and clients are expected to serialize their
+    access through Runtime.
     """
     def __init__(self, inlineThreshold):
+        self.compilerCache = None
         self.engine, self.module_pass_manager = create_execution_engine(inlineThreshold)
         self.converter = native_ast_to_llvm.Converter()
         self.functions_by_name = {}
         self.inlineThreshold = inlineThreshold
         self.verbose = False
         self.optimize = True
+
+    def initializeCompilerCache(self, compilerCacheDir):
+        """Indicate that we should use a compiler cache from disk at 'compilerCacheDir'."""
+        self.compilerCache = CompilerCache(compilerCacheDir)
 
     def markExternal(self, functionNameToType):
         """Provide type signatures for a set of external functions."""
@@ -110,7 +57,65 @@ class NativeCompiler:
     def mark_llvm_codegen_verbose(self):
         self.verbose = True
 
-    def buildSharedObject(self, functions):
+    def addFunctions(
+        self,
+        # map from str to native_ast.Function
+        functionDefinitions,
+        # map from str to the TypedCallTarget for any function that's actually typed
+        typedCallTargets,
+        externallyUsed
+    ):
+        """Add a collection of functions to the compiler.
+
+        Once a function has been added, we can request a NativeFunctionPointer for it.
+        """
+        if self.compilerCache is None:
+            loadedModule = self._buildModule(functionDefinitions)
+            loadedModule.linkGlobalVariables()
+        else:
+            binary = self._buildSharedObject(functionDefinitions)
+
+            self.compilerCache.addModule(
+                binary,
+                typedCallTargets,
+                externallyUsed
+            )
+
+    def functionPointerByName(self, linkerName) -> NativeFunctionPointer:
+        """Find a NativeFunctionPointer for a given link-time name.
+
+        Args:
+            linkerName (str) - the name of the compiled symbol we want.
+
+        Returns:
+            a NativeFunctionPointer or None if the function has never been defined.
+        """
+        if self.compilerCache is not None:
+            # the compiler cache has every shared object and can load them
+            return self.compilerCache.function_pointer_by_name(linkerName)
+
+        # the llvm compiler is just building shared objects, but the
+        # compiler cache has all the pointers.
+        return self.functions_by_name.get(linkerName)
+
+    def loadFromCache(self, linkName):
+        """Attempt to load a cached copy of 'linkName' and all reachable code.
+
+        If it isn't defined, or has already been defined, return None. If we're loading it
+        for the first time, return a pair
+
+            (typedCallTargets, nativeTypes)
+
+        where typedCallTargets is a map from linkName to TypedCallTarget, and nativeTypes is
+        a map from linkName to native_ast.Type.Function giving the native implementation type.
+
+        WARNING: this will return None if you already called 'functionPointerByName' on it
+        """
+        if self.compilerCache:
+            if self.compilerCache.hasSymbol(linkName):
+                return self.compilerCache.loadForSymbol(linkName)
+
+    def _buildSharedObject(self, functions):
         """Add native definitions and return a BinarySharedObject representing the compiled code."""
         module = self.converter.add_functions(functions)
 
@@ -135,10 +140,7 @@ class NativeCompiler:
             module.functionNameToType,
         )
 
-    def function_pointer_by_name(self, name):
-        return self.functions_by_name.get(name)
-
-    def buildModule(self, functions):
+    def _buildModule(self, functions):
         """Compile a list of functions into a new module.
 
         Args:

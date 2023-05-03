@@ -21,7 +21,6 @@ import typed_python.compiler.native_compiler.native_compiler as native_compiler
 import typed_python
 from typed_python.compiler.runtime_lock import runtimeLock
 from typed_python.compiler.conversion_level import ConversionLevel
-from typed_python.compiler.native_compiler.compiler_cache import CompilerCache
 from typed_python.type_function import TypeFunction
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
@@ -201,16 +200,16 @@ class Runtime:
         return _singleton[0]
 
     def __init__(self):
+        self.native_compiler = native_compiler.NativeCompiler(
+            inlineThreshold=100
+        )
         if os.getenv("TP_COMPILER_CACHE"):
-            self.compilerCache = CompilerCache(
+            self.native_compiler.initializeCompilerCache(
                 os.path.abspath(os.getenv("TP_COMPILER_CACHE"))
             )
-        else:
-            self.compilerCache = None
-        self.native_compiler = native_compiler.NativeCompiler(inlineThreshold=100)
+
         self.converter = python_to_native_converter.PythonToNativeConverter(
-            self.native_compiler,
-            self.compilerCache
+            self.native_compiler
         )
         self.lock = runtimeLock
         self.timesCompiled = 0
