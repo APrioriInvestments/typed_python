@@ -12,9 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
+from typed_python.compiler.native_compiler.global_variable_definition import GlobalVariableMetadata
 import typed_python.compiler
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions

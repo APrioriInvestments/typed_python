@@ -6,7 +6,7 @@ from typed_python import Int32, Float32, Entrypoint, PointerTo, ListOf, TupleOf,
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python.compiler.type_wrappers.runtime_functions import externalCallTarget
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 
 
 # search for lapack_lite or 'blas' in the numpy or scipy installation

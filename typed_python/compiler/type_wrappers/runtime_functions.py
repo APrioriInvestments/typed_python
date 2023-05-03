@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.python_ast as python_ast
 
 

@@ -23,7 +23,7 @@ from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin impo
 
 from typed_python import _types, RefTo, PointerTo
 
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.compiler
 
 

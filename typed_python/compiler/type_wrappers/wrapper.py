@@ -17,7 +17,7 @@ from typed_python.python_ast import ComparisonOp, UnaryOp
 from typed_python import _types, OneOf, ListOf, UInt64
 from typed_python.hash import Hash
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python.compiler.native_ast import VoidPtr
+from typed_python.compiler.native_compiler.native_ast import VoidPtr
 from typed_python.compiler.conversion_level import ConversionLevel
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)

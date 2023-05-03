@@ -1,4 +1,4 @@
-from typed_python.compiler.module_definition import ModuleDefinition
+from typed_python.compiler.native_compiler.module_definition import ModuleDefinition
 from typed_python import PointerTo, ListOf, Class
 from typed_python import _types
 

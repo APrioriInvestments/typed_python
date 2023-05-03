@@ -14,7 +14,7 @@
 
 import sys
 from typed_python import sha_hash
-from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
+from typed_python.compiler.native_compiler.global_variable_definition import GlobalVariableMetadata
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python.type_promotion import isInteger
@@ -23,7 +23,7 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.conversion_level import ConversionLevel
 
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.compiler
 
 from typed_python import (
@@ -32,7 +32,7 @@ from typed_python import (
 
 from typed_python import Class, Final, Member, pointerTo, PointerTo
 
-from typed_python.compiler.native_ast import VoidPtr
+from typed_python.compiler.native_compiler.native_ast import VoidPtr
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 

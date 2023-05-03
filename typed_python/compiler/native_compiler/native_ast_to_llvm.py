@@ -12,9 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import typed_python.compiler.native_ast as native_ast
-from typed_python.compiler.module_definition import ModuleDefinition
-from typed_python.compiler.global_variable_definition import GlobalVariableDefinition
+import typed_python.compiler.native_compiler.native_ast as native_ast
+from typed_python.compiler.native_compiler.module_definition import ModuleDefinition
+from typed_python.compiler.native_compiler.global_variable_definition import GlobalVariableDefinition
 import llvmlite.ir
 import os
 

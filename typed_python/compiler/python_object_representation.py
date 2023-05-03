@@ -17,7 +17,7 @@ import time
 import _thread
 
 from typed_python.compiler.typed_expression import TypedExpression
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 from typed_python.type_function import TypeFunction
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin

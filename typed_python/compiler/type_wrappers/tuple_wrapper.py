@@ -23,7 +23,7 @@ from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from typed_python.compiler.type_wrappers.compilable_builtin import CompilableBuiltin
 import types
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.python_ast as python_ast
 import typed_python.compiler
 

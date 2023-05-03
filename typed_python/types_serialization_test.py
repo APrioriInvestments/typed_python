@@ -33,8 +33,8 @@ import tempfile
 import types
 import typed_python.dummy_test_module as dummy_test_module
 
-import typed_python.compiler.native_ast as native_ast
-from typed_python.compiler.native_ast import Expression, NamedCallTarget
+import typed_python.compiler.native_compiler.native_ast as native_ast
+from typed_python.compiler.native_compiler.native_ast import Expression, NamedCallTarget
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python.SerializationContext import createFunctionWithLocalsAndGlobals

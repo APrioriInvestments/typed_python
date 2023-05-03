@@ -14,7 +14,7 @@
 
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.conversion_level import ConversionLevel
-from typed_python.compiler.native_ast import VoidPtr
+from typed_python.compiler.native_compiler.native_ast import VoidPtr
 from typed_python import Int32
 import typed_python.compiler
 

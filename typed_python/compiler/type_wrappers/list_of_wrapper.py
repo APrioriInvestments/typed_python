@@ -20,7 +20,7 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 
 from typed_python import ListOf
 
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.compiler
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)

@@ -24,7 +24,7 @@ from typed_python import (
     Class, Held, Final, Member
 )
 
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.compiler
 from typed_python.compiler.converter_utils import (
     ConvertUpcastContainers,

@@ -19,8 +19,8 @@ from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethod
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python import OneOf
-import typed_python.compiler.native_ast as native_ast
-from typed_python.compiler.native_ast import VoidPtr, UInt64
+import typed_python.compiler.native_compiler.native_ast as native_ast
+from typed_python.compiler.native_compiler.native_ast import VoidPtr, UInt64
 import typed_python
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from math import trunc, floor, ceil

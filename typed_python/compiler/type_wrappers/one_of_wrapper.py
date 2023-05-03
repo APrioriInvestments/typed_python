@@ -17,7 +17,7 @@ from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
 from typed_python import _types, OneOf, PointerTo
 from typed_python.compiler.typed_expression import TypedExpression
 from typed_python.compiler.conversion_level import ConversionLevel
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.compiler
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)

@@ -15,7 +15,7 @@
 from typed_python import Class
 import typed_python
 import typed_python.compiler
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.bound_method_wrapper import BoundMethodWrapper

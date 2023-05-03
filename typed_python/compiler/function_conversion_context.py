@@ -30,7 +30,7 @@ from typed_python.compiler.python_ast_analysis import (
 from typed_python.internals import makeFunctionType, checkOneOfType, checkType
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 from typed_python import (
     _types, Type, ListOf, PointerTo, pointerTo, Set, Dict, Member,
     OneOf, Function, Tuple, Forward, Class, NamedTuple, Value, TupleOf

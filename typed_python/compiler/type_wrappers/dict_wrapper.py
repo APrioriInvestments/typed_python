@@ -21,7 +21,7 @@ from typed_python.compiler.type_wrappers.hash_table_implementation import table_
     dict_table_contains, dict_delitem, dict_getitem, dict_get, dict_setitem
 from typed_python import Tuple, PointerTo, Int32, UInt8, Dict, ConstDict, TypeFunction, Held, Class, Member, Final
 
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.compiler
 
 

@@ -17,11 +17,11 @@ import os
 import time
 import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
-import typed_python.compiler.llvm_compiler as llvm_compiler
+import typed_python.compiler.native_compiler.llvm_compiler as llvm_compiler
 import typed_python
 from typed_python.compiler.runtime_lock import runtimeLock
 from typed_python.compiler.conversion_level import ConversionLevel
-from typed_python.compiler.compiler_cache import CompilerCache
+from typed_python.compiler.native_compiler.compiler_cache import CompilerCache
 from typed_python.type_function import TypeFunction
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict

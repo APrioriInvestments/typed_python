@@ -21,8 +21,8 @@ from typed_python import Class
 import typed_python.python_ast as python_ast
 import typed_python._types as _types
 import typed_python.compiler
-import typed_python.compiler.native_ast as native_ast
-from typed_python.compiler.native_function_pointer import NativeFunctionPointer
+import typed_python.compiler.native_compiler.native_ast as native_ast
+from typed_python.compiler.native_compiler.native_function_pointer import NativeFunctionPointer
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper

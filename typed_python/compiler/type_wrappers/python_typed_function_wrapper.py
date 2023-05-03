@@ -22,7 +22,7 @@ from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.typed_tuple_masquerading_as_tuple_wrapper import TypedTupleMasqueradingAsTuple
 from typed_python.compiler.type_wrappers.named_tuple_masquerading_as_dict_wrapper import NamedTupleMasqueradingAsDict
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
-from typed_python.compiler.native_ast import VoidPtr
+from typed_python.compiler.native_compiler.native_ast import VoidPtr
 from typed_python.compiler.type_wrappers.type_sets import Either, SubclassOf
 from typed_python.compiler.type_wrappers.function_signature_calculator import (
     FunctionSignatureCalculator,
@@ -30,7 +30,7 @@ from typed_python.compiler.type_wrappers.function_signature_calculator import (
     NoReturnTypeSpecified,
     SomeInvalidClassReturnType
 )
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.compiler
 
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)

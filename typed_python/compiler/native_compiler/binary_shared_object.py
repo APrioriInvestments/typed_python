@@ -20,8 +20,8 @@ import subprocess
 import ctypes
 import struct
 
-from typed_python.compiler.native_function_pointer import NativeFunctionPointer
-from typed_python.compiler.loaded_module import LoadedModule
+from typed_python.compiler.native_compiler.native_function_pointer import NativeFunctionPointer
+from typed_python.compiler.native_compiler.loaded_module import LoadedModule
 from typed_python.hash import sha_hash
 
 

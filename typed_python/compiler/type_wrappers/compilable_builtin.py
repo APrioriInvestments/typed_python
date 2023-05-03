@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-from typed_python.compiler import native_ast
+from typed_python.compiler.native_compiler import native_ast
 
 import typed_python
 

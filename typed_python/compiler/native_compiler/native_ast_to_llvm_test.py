@@ -12,12 +12,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python.compiler.native_ast import (
+from typed_python.compiler.native_compiler.native_ast import (
     Expression, Void, Int32, nullExpr, Function, FunctionBody,
     Teardown, const_int32_expr, CallTarget, NamedCallTarget
 )
-from typed_python.compiler.llvm_compiler import llvm
-import typed_python.compiler.native_ast_to_llvm as native_ast_to_llvm
+from typed_python.compiler.native_compiler.llvm_compiler import llvm
+import typed_python.compiler.native_compiler.native_ast_to_llvm as native_ast_to_llvm
 import unittest
 
 

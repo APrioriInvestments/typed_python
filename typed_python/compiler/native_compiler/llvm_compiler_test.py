@@ -12,13 +12,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python.compiler.native_ast import (
+from typed_python.compiler.native_compiler.native_ast import (
     Expression, Int64, Function, FunctionBody
 )
 import tempfile
 from typed_python import PointerTo, ListOf, Runtime
-from typed_python.compiler.module_definition import ModuleDefinition
-from typed_python.compiler.global_variable_definition import GlobalVariableMetadata
+from typed_python.compiler.native_compiler.module_definition import ModuleDefinition
+from typed_python.compiler.native_compiler.global_variable_definition import GlobalVariableMetadata
 
 import pytest
 import ctypes

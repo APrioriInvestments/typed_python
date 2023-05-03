@@ -14,12 +14,12 @@
 
 import llvmlite.binding as llvm
 import llvmlite.ir
-import typed_python.compiler.native_ast as native_ast
-import typed_python.compiler.native_ast_to_llvm as native_ast_to_llvm
+import typed_python.compiler.native_compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast_to_llvm as native_ast_to_llvm
 
-from typed_python.compiler.loaded_module import LoadedModule
-from typed_python.compiler.native_function_pointer import NativeFunctionPointer
-from typed_python.compiler.binary_shared_object import BinarySharedObject
+from typed_python.compiler.native_compiler.loaded_module import LoadedModule
+from typed_python.compiler.native_compiler.native_function_pointer import NativeFunctionPointer
+from typed_python.compiler.native_compiler.binary_shared_object import BinarySharedObject
 
 import ctypes
 from typed_python import _types

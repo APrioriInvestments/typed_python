@@ -15,8 +15,8 @@
 import os
 import uuid
 import shutil
-from typed_python.compiler.loaded_module import LoadedModule
-from typed_python.compiler.binary_shared_object import BinarySharedObject
+from typed_python.compiler.native_compiler.loaded_module import LoadedModule
+from typed_python.compiler.native_compiler.binary_shared_object import BinarySharedObject
 
 from typed_python.SerializationContext import SerializationContext
 from typed_python import Dict, ListOf

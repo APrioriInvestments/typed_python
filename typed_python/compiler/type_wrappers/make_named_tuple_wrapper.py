@@ -16,7 +16,7 @@ import typed_python
 
 from typed_python import NamedTuple
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 
 
 typeWrapper = lambda x: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(x)

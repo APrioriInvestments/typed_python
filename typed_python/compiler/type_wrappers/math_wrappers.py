@@ -14,7 +14,7 @@
 
 import typed_python.compiler
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 from typed_python import ListOf, Tuple, TupleOf, NamedTuple, Dict
 from typed_python.compiler.conversion_level import ConversionLevel
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions

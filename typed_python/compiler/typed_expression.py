@@ -14,7 +14,7 @@
 
 from typed_python import PointerTo
 from typed_python.python_ast import BinaryOp, ComparisonOp, BooleanOp
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.compiler
 from typed_python.compiler.conversion_level import ConversionLevel
 

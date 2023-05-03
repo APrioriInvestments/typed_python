@@ -19,7 +19,7 @@ from typed_python.compiler.conversion_level import ConversionLevel
 
 from typed_python import PointerTo, pointerTo
 
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.compiler
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)

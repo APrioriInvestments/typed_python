@@ -18,7 +18,7 @@ from typed_python.type_promotion import computeArithmeticBinaryResultType, bitne
 from typed_python import _types
 import typed_python.compiler.type_wrappers.runtime_functions as runtime_functions
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 import typed_python.compiler
 from math import trunc, floor, ceil
 

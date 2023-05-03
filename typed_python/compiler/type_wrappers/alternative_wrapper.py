@@ -20,11 +20,11 @@ import typed_python.compiler.type_wrappers.runtime_functions as runtime_function
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python import _types
 import typed_python.compiler
-from typed_python.compiler.native_ast import VoidPtr
+from typed_python.compiler.native_compiler.native_ast import VoidPtr
 from typed_python.compiler.type_wrappers.class_or_alternative_wrapper_mixin import (
     ClassOrAlternativeWrapperMixin
 )
-import typed_python.compiler.native_ast as native_ast
+import typed_python.compiler.native_compiler.native_ast as native_ast
 
 
 from typed_python import SubclassOf
