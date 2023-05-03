@@ -23,8 +23,6 @@ import typed_python._types as _types
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.native_function_pointer import NativeFunctionPointer
-from sortedcontainers import SortedSet
-from typed_python.compiler.directed_graph import DirectedGraph
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
 from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
@@ -33,86 +31,13 @@ from typed_python.compiler.native_function_conversion_context import NativeFunct
 from typed_python.compiler.type_wrappers.python_typed_function_wrapper import (
     PythonTypedFunctionWrapper, CannotBeDetermined, NoReturnTypeSpecified
 )
+from typed_python.compiler.function_dependency_graph import FunctionDependencyGraph
 from typed_python.compiler.typed_call_target import TypedCallTarget
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
 VALIDATE_FUNCTION_DEFINITIONS_STABLE = False
-
-
-class FunctionDependencyGraph:
-    def __init__(self):
-        self._dependencies = DirectedGraph()
-
-        # the search depth in the dependency to find 'identity'
-        # the _first_ time we ever saw it. We prefer to update
-        # nodes with higher search depth, so we don't recompute
-        # earlier nodes until their children are complete.
-        self._identity_levels = {}
-
-        # nodes that need to recompute
-        self._dirty_inflight_functions = set()
-
-        # (priority, node) pairs that need to recompute
-        self._dirty_inflight_functions_with_order = SortedSet(key=lambda pair: pair[0])
-
-    def dropNode(self, node):
-        self._dependencies.dropNode(node, False)
-        if node in self._identity_levels:
-            del self._identity_levels[node]
-        self._dirty_inflight_functions.discard(node)
-
-    def getNextDirtyNode(self):
-        while self._dirty_inflight_functions_with_order:
-            priority, identity = self._dirty_inflight_functions_with_order.pop()
-
-            if identity in self._dirty_inflight_functions:
-                self._dirty_inflight_functions.discard(identity)
-
-                return identity
-
-    def addRoot(self, identity):
-        if identity not in self._identity_levels:
-            self._identity_levels[identity] = 0
-            self.markDirty(identity)
-
-    def addEdge(self, caller, callee):
-        if caller not in self._identity_levels:
-            raise Exception(f"unknown identity {caller} found in the graph")
-
-        if callee not in self._identity_levels:
-            self._identity_levels[callee] = self._identity_levels[caller] + 1
-
-            self.markDirty(callee, isNew=True)
-
-        self._dependencies.addEdge(caller, callee)
-
-    def getNamesDependedOn(self, caller):
-        return self._dependencies.outgoing(caller)
-
-    def markDirtyWithLowPriority(self, callee):
-        # mark this dirty, but call it back after new functions.
-        self._dirty_inflight_functions.add(callee)
-
-        level = self._identity_levels[callee]
-        self._dirty_inflight_functions_with_order.add((-1000000 + level, callee))
-
-    def markDirty(self, callee, isNew=False):
-        self._dirty_inflight_functions.add(callee)
-
-        if isNew:
-            # if its a new node, compute it with higher priority the _higher_ it is in the stack
-            # so that we do a depth-first search on the way down
-            level = 1000000 - self._identity_levels[callee]
-        else:
-            level = self._identity_levels[callee]
-
-        self._dirty_inflight_functions_with_order.add((level, callee))
-
-    def functionReturnSignatureChanged(self, identity):
-        for caller in self._dependencies.incoming(identity):
-            self.markDirty(caller)
 
 
 class PythonToNativeConverter:
