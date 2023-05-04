@@ -359,7 +359,7 @@ def test_compiler_cache_handles_changed_types():
 
         # if we try to use 'f', it should work even though we no longer have
         # a defniition for 'g2'
-        assert evaluateExprInFreshProcess(VERSION2, 'x.f(1)', compilerCacheDir) == 1
+        assert evaluateExprInFreshProcess(VERSION2, 'x.f(1)', compilerCacheDir, printComments=True) == 1
         assert len(os.listdir(compilerCacheDir)) == 2
 
         badCt = 0

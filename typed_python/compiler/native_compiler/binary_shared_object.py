@@ -40,6 +40,8 @@ class BinarySharedObject:
         """
         Args:
             binaryForm - a bytes object containing the actual compiled code for the module
+            functionTypes - a map from linkerName to native_ast.Type.Function containing the native
+                signatures of the functions
             globalVariableDefinitions - a map from name to GlobalVariableDefinition
         """
         self.binaryForm = binaryForm

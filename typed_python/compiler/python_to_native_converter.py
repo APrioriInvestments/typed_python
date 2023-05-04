@@ -47,12 +47,6 @@ class PythonToNativeConverter:
         # if True, then insert additional code to check for undefined behavior.
         self.generateDebugChecks = False
 
-        # all link names for which we have a definition.
-        self._allDefinedNames = set()
-
-        # all names we loaded from the cache
-        self._allCachedNames = set()
-
         self._link_name_for_identity = {}
         self._identity_for_link_name = {}
         self._definitions = {}
@@ -189,27 +183,6 @@ class PythonToNativeConverter:
             self._link_name_for_identity[identity] = linkName
             self._identity_for_link_name[linkName] = identity
 
-        if linkName in self._allDefinedNames:
-            return False
-
-        self._allDefinedNames.add(linkName)
-
-        self._loadFromCompilerCache(linkName)
-
-        return True
-
-    def _loadFromCompilerCache(self, linkName):
-        callTargetsAndTypes = self.nativeCompiler.loadFromCache(linkName)
-
-        if callTargetsAndTypes is not None:
-            newTypedCallTargets, newNativeFunctionTypes = callTargetsAndTypes
-
-            self._targets.update(newTypedCallTargets)
-            self.nativeCompiler.markExternal(newNativeFunctionTypes)
-
-            self._allDefinedNames.update(newNativeFunctionTypes)
-            self._allCachedNames.update(newNativeFunctionTypes)
-
     def defineNonPythonFunction(self, name, identityTuple, context):
         """Define a non-python generating function (if we haven't defined it before already)
 
@@ -229,8 +202,15 @@ class PythonToNativeConverter:
         else:
             self._dependencies.addRoot(identity)
 
+        # if this linkName is in the set of targets we're defining
+        # just go ahead and return it
         if linkName in self._targets:
             return self._targets.get(linkName)
+
+        target = self.nativeCompiler.typedCallTargetFor(linkName)
+        if target is not None:
+            # this function was already defined - go ahead and return the TCT
+            return target
 
         self._inflight_function_conversions[identity] = context
 
@@ -246,7 +226,7 @@ class PythonToNativeConverter:
         if self._currentlyConverting is None:
             # force the function to resolve immediately
             self._resolveAllInflightFunctions()
-            self._installInflightFunctions(name)
+            self._installInflightFunctions()
             self._inflight_function_conversions.clear()
 
         return self._targets.get(linkName)
@@ -372,11 +352,10 @@ class PythonToNativeConverter:
         identifier = "call_converter_" + callTarget.name
         linkName = callTarget.name + ".dispatch"
 
-        if linkName in self._allDefinedNames:
+        if self.nativeCompiler.isFunctionDefined(linkName):
             return linkName
 
-        self._loadFromCompilerCache(linkName)
-        if linkName in self._allDefinedNames:
+        if linkName in self._definitions:
             return linkName
 
         args = []
@@ -416,7 +395,6 @@ class PythonToNativeConverter:
 
         self._link_name_for_identity[identifier] = linkName
         self._identity_for_link_name[linkName] = identifier
-        self._allDefinedNames.add(linkName)
 
         self._definitions[linkName] = definition
         self._new_native_functions.add(linkName)
@@ -430,7 +408,7 @@ class PythonToNativeConverter:
                 return
 
             linkName = self._link_name_for_identity[identity]
-            if linkName in self._allCachedNames:
+            if self.nativeCompiler.isFunctionDefined(linkName):
                 continue
 
             functionConverter = self._inflight_function_conversions[identity]
@@ -452,7 +430,6 @@ class PythonToNativeConverter:
                         name = self._link_name_for_identity[i]
                         if name in self._targets:
                             self._targets.pop(name)
-                        self._allDefinedNames.discard(name)
                         ln = self._link_name_for_identity.pop(i)
                         self._identity_for_link_name.pop(ln)
 
@@ -538,7 +515,9 @@ class PythonToNativeConverter:
         if (interfaceClass, implementingClass, slotIndex) in self._installedVMIs:
             return
 
-        name, retType, argTypeTuple, kwargTypeTuple = _types.getClassMethodDispatchSignature(interfaceClass, implementingClass, slotIndex)
+        name, retType, argTypeTuple, kwargTypeTuple = _types.getClassMethodDispatchSignature(
+            interfaceClass, implementingClass, slotIndex
+        )
 
         # we are compiling the function 'name' in 'implementingClass' to be installed when
         # viewing an instance of 'implementingClass' as 'interfaceClass' that's function
@@ -753,9 +732,11 @@ class PythonToNativeConverter:
 
         identity = identityHash.hexdigest
 
-        name = self.identityHashToLinkerName(funcName, identity)
+        # determine the linkName we'll use in the NativeCompiler to identify
+        # this particular function
+        linkName = self.identityHashToLinkerName(funcName, identity)
 
-        self.defineLinkName(identity, name)
+        self.defineLinkName(identity, linkName)
 
         if identity not in self._identifier_to_pyfunc:
             self._identifier_to_pyfunc[identity] = (
@@ -772,8 +753,19 @@ class PythonToNativeConverter:
         else:
             self._dependencies.addRoot(identity)
 
-        if name in self._targets:
-            return self._targets[name]
+        # check if we already have a TypedCallTarget for this function
+        if self.nativeCompiler.isFunctionDefined(linkName):
+            target = self.nativeCompiler.typedCallTargetFor(linkName)
+            if target is None:
+                raise Exception(
+                    f"Somehow the compiler knows about {linkName} but has no TypedCallTarget for it"
+                )
+            return target
+
+        # see if this linkName is already in the set of targets we're defining
+        # in this group, in which case we can just return it.
+        if linkName in self._targets:
+            return self._targets[linkName]
 
         if identity not in self._inflight_function_conversions:
             functionConverter = self.createConversionContext(
@@ -793,8 +785,8 @@ class PythonToNativeConverter:
         if isRoot:
             try:
                 self._resolveAllInflightFunctions()
-                self._installInflightFunctions(name)
-                return self._targets[name]
+                self._installInflightFunctions()
+                return self._targets[linkName]
             finally:
                 self._inflight_function_conversions.clear()
 
@@ -804,12 +796,12 @@ class PythonToNativeConverter:
             # target with an output type and we can return that. Otherwise we have to
             # return None, which will cause callers to replace this with a throw
             # until we have had a chance to do a full pass of conversion.
-            if name in self._targets:
-                return self._targets[name]
+            if linkName in self._targets:
+                return self._targets[linkName]
             else:
                 return None
 
-    def _installInflightFunctions(self, name):
+    def _installInflightFunctions(self):
         if VALIDATE_FUNCTION_DEFINITIONS_STABLE:
             # this should always be true, but its expensive so we have it off by default
             for identifier, functionConverter in self._inflight_function_conversions.items():
@@ -825,8 +817,15 @@ class PythonToNativeConverter:
         for identifier, functionConverter in self._inflight_function_conversions.items():
             outboundTargets = []
             for outboundFuncId in self._dependencies.getNamesDependedOn(identifier):
-                name = self._link_name_for_identity[outboundFuncId]
-                outboundTargets.append(self._targets[name])
+                linkName = self._link_name_for_identity[outboundFuncId]
+                if linkName in self._targets:
+                    outboundTypedCallTarget = self._targets[linkName]
+                else:
+                    outboundTypedCallTarget = self.nativeCompiler.typedCallTargetFor(linkName)
+
+                if outboundTypedCallTarget is None:
+                    raise Exception(f"Somehow we don't have a TCT for {linkName}")
+                outboundTargets.append(outboundTypedCallTarget)
 
             nativeFunction, actual_output_type = self._inflight_definitions.get(identifier)
 

@@ -19,7 +19,7 @@ from typed_python.compiler.native_compiler.loaded_module import LoadedModule
 from typed_python.compiler.native_compiler.binary_shared_object import BinarySharedObject
 
 from typed_python.SerializationContext import SerializationContext
-from typed_python import Dict, ListOf
+from typed_python import Dict, ListOf, Set
 
 
 def ensureDirExists(cacheDir):
@@ -53,32 +53,65 @@ class CompilerCache:
         ensureDirExists(cacheDir)
 
         self.loadedModules = Dict(str, LoadedModule)()
-        self.nameToModuleHash = Dict(str, str)()
 
+        # for each symbol, the first module we loaded that has that symbol
+        self.symbolToLoadedModuleHash = Dict(str, str)()
+
+        # for each module that we loaded or might load, the contents
+        self.symbolToModuleHashes = Dict(str, Set(str))()
+        self.moduleHashToSymbols = Dict(str, Set(str))()
+
+        # modules we might be able to load
         self.modulesMarkedValid = set()
+
+        # modules we definitely can't load
         self.modulesMarkedInvalid = set()
 
         for moduleHash in os.listdir(self.cacheDir):
             if len(moduleHash) == 40:
                 self.loadNameManifestFromStoredModuleByHash(moduleHash)
 
-    def hasSymbol(self, linkName):
-        return linkName in self.nameToModuleHash
+    def hasSymbol(self, symbol):
+        """Do we have this symbol defined somewhere?
 
-    def markModuleHashInvalid(self, hashstr):
-        with open(os.path.join(self.cacheDir, hashstr, "marked_invalid"), "w"):
+        Note that this can change: if we attempt to laod a symbol and fail,
+        then it may no longer be defined anywhere. To really know if you have
+        a symbol, you have to load it.
+        """
+        return symbol in self.symbolToModuleHashes
+
+    def markModuleHashInvalid(self, moduleHash):
+        """Mark this module unloadable on disk and remove its symbols."""
+        with open(os.path.join(self.cacheDir, moduleHash, "marked_invalid"), "w"):
             pass
 
-    def loadForSymbol(self, linkName):
-        moduleHash = self.nameToModuleHash[linkName]
+        # remove any symbols that we can't see anymore
+        for symbol in self.moduleHashToSymbols.pop(moduleHash, Set(str)()):
+            hashes = self.symbolToModuleHashes[symbol]
+            hashes.discard(moduleHash)
+            if not hashes:
+                del self.symbolToModuleHashes[symbol]
 
-        nameToTypedCallTarget = {}
-        nameToNativeFunctionType = {}
-
-        if not self.loadModuleByHash(moduleHash, nameToTypedCallTarget, nameToNativeFunctionType):
+    def loadForSymbol(self, symbol):
+        # check if this symbol is already loaded
+        if symbol in self.symbolToLoadedModuleHash:
             return None
 
-        return nameToTypedCallTarget, nameToNativeFunctionType
+        while symbol in self.symbolToModuleHashes:
+            moduleHash = list(self.symbolToModuleHashes[symbol])[0]
+
+            nameToTypedCallTarget = {}
+            nameToNativeFunctionType = {}
+
+            if self.loadModuleByHash(moduleHash, nameToTypedCallTarget, nameToNativeFunctionType):
+                return nameToTypedCallTarget, nameToNativeFunctionType
+            else:
+                assert (
+                    # either we can't load this symbol at all anymore
+                    symbol not in self.symbolToModuleHashes
+                    # or confirm we can't try to load this again
+                    or moduleHash not in self.symbolToModuleHashes[symbol]
+                )
 
     def loadModuleByHash(self, moduleHash, nameToTypedCallTarget, nameToNativeFunctionType):
         """Load a module by name.
@@ -134,6 +167,10 @@ class CompilerCache:
         nameToTypedCallTarget.update(callTargets)
         nameToNativeFunctionType.update(functionNameToNativeType)
 
+        for symbol in functionNameToNativeType:
+            if symbol not in self.symbolToLoadedModuleHash:
+                self.symbolToLoadedModuleHash[symbol] = moduleHash
+
         return True
 
     def addModule(self, binarySharedObject, nameToTypedCallTarget, linkDependencies):
@@ -149,7 +186,7 @@ class CompilerCache:
         dependentHashes = set()
 
         for name in linkDependencies:
-            dependentHashes.add(self.nameToModuleHash[name])
+            dependentHashes.add(self.symbolToLoadedModuleHash[name])
 
         path, hashToUse = self.writeModuleToDisk(binarySharedObject, nameToTypedCallTarget, dependentHashes)
 
@@ -157,8 +194,11 @@ class CompilerCache:
             binarySharedObject.loadFromPath(os.path.join(path, "module.so"))
         )
 
-        for n in binarySharedObject.definedSymbols:
-            self.nameToModuleHash[n] = hashToUse
+        for symbol in binarySharedObject.definedSymbols:
+            if symbol not in self.symbolToLoadedModuleHash:
+                self.symbolToLoadedModuleHash[symbol] = hashToUse
+            self.symbolToModuleHashes.setdefault(symbol).add(hashToUse)
+        self.moduleHashToSymbols[hashToUse] = Set(str)(binarySharedObject.definedSymbols)
 
     def loadNameManifestFromStoredModuleByHash(self, moduleHash):
         if moduleHash in self.modulesMarkedValid:
@@ -185,9 +225,11 @@ class CompilerCache:
                 return False
 
         with open(os.path.join(targetDir, "name_manifest.dat"), "rb") as f:
-            self.nameToModuleHash.update(
-                SerializationContext().deserialize(f.read(), Dict(str, str))
-            )
+            manifest = SerializationContext().deserialize(f.read(), Set(str))
+
+            for symbolName in manifest:
+                self.symbolToModuleHashes.setdefault(symbolName).add(moduleHash)
+            self.moduleHashToSymbols[moduleHash] = manifest
 
         self.modulesMarkedValid.add(moduleHash)
 
@@ -225,12 +267,10 @@ class CompilerCache:
 
         # write the manifest. Every TP process using the cache will have to
         # load the manifest every time, so we try to use compiled code to load it
-        manifest = Dict(str, str)()
-        for n in binarySharedObject.functionTypes:
-            manifest[n] = hashToUse
+        manifest = Set(str)(binarySharedObject.functionTypes)
 
         with open(os.path.join(tempTargetDir, "name_manifest.dat"), "wb") as f:
-            f.write(SerializationContext().serialize(manifest, Dict(str, str)))
+            f.write(SerializationContext().serialize(manifest, Set(str)))
 
         with open(os.path.join(tempTargetDir, "name_manifest.txt"), "w") as f:
             for sourceName in manifest:
@@ -262,7 +302,7 @@ class CompilerCache:
         return targetDir, hashToUse
 
     def function_pointer_by_name(self, linkName):
-        moduleHash = self.nameToModuleHash.get(linkName)
+        moduleHash = self.symbolToLoadedModuleHash.get(linkName)
         if moduleHash is None:
             raise Exception("Can't find a module for " + linkName)
 
