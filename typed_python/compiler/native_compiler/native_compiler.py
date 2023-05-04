@@ -42,7 +42,7 @@ class NativeCompiler:
         self.hasEverHadFunctionsAdded = False
 
         self.engine, self.module_pass_manager = create_execution_engine(inlineThreshold)
-        self.converter = native_ast_to_llvm.Converter()
+        self.converter = native_ast_to_llvm.NativeAstToLlvmConverter()
         self.inlineThreshold = inlineThreshold
         self.verbose = False
         self.optimize = True

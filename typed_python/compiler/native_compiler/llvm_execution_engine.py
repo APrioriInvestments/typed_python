@@ -14,7 +14,9 @@
 
 import llvmlite.binding as llvm
 import llvmlite.ir
-import typed_python.compiler.native_compiler.native_ast_to_llvm as native_ast_to_llvm
+import typed_python.compiler.native_compiler.native_ast_to_llvm_function_converter as \
+    native_ast_to_llvm_function_converter
+
 
 import ctypes
 from typed_python import _types
@@ -36,7 +38,7 @@ pointer_size = (
     .get_abi_size(target_machine.target_data)
 )
 
-assert pointer_size == native_ast_to_llvm.pointer_size
+assert pointer_size == native_ast_to_llvm_function_converter.pointer_size
 
 
 def sizeof_native_type(native_type):
@@ -44,7 +46,7 @@ def sizeof_native_type(native_type):
         return 0
 
     return (
-        native_ast_to_llvm.type_to_llvm_type(native_type)
+        native_ast_to_llvm_function_converter.type_to_llvm_type(native_type)
         .get_abi_size(target_machine.target_data)
     )
 
