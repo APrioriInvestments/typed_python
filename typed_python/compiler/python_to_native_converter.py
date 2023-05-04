@@ -108,20 +108,9 @@ class PythonToNativeConverter:
             return
 
         # get a set of function names that we depend on
-        externallyUsed = set()
-
-        for funcName in targets:
-            ident = self._identity_for_link_name.get(funcName)
-            if ident is not None:
-                for dep in self._dependencies.getNamesDependedOn(ident):
-                    depLN = self._link_name_for_identity.get(dep)
-                    if depLN not in targets:
-                        externallyUsed.add(depLN)
-
         self.nativeCompiler.addFunctions(
             targets,
-            {name: self._targets[name] for name in targets if name in self._targets},
-            externallyUsed
+            {name: self._targets[name] for name in targets if name in self._targets}
         )
 
     def extract_new_function_definitions(self):

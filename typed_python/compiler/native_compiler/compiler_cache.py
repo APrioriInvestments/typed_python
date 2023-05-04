@@ -137,6 +137,10 @@ class CompilerCache:
 
             with open(os.path.join(targetDir, "submodules.dat"), "rb") as f:
                 submodules = SerializationContext().deserialize(f.read(), ListOf(str))
+
+            with open(os.path.join(targetDir, "linkDependencies.dat"), "rb") as f:
+                linkDependencies = SerializationContext().deserialize(f.read(), ListOf(str))
+
         except Exception:
             self.markModuleHashInvalid(moduleHash)
             return False
@@ -159,7 +163,8 @@ class CompilerCache:
         loaded = BinarySharedObject.fromDisk(
             modulePath,
             globalVarDefs,
-            functionNameToNativeType
+            functionNameToNativeType,
+            linkDependencies
         ).loadFromPath(modulePath)
 
         self.loadedModules[moduleHash] = loaded
@@ -173,7 +178,7 @@ class CompilerCache:
 
         return True
 
-    def addModule(self, binarySharedObject, nameToTypedCallTarget, linkDependencies):
+    def addModule(self, binarySharedObject, nameToTypedCallTarget):
         """Add new code to the compiler cache.
 
         Args:
@@ -185,10 +190,14 @@ class CompilerCache:
         """
         dependentHashes = set()
 
-        for name in linkDependencies:
+        for name in binarySharedObject.usedExternalFunctions:
             dependentHashes.add(self.symbolToLoadedModuleHash[name])
 
-        path, hashToUse = self.writeModuleToDisk(binarySharedObject, nameToTypedCallTarget, dependentHashes)
+        path, hashToUse = self.writeModuleToDisk(
+            binarySharedObject,
+            nameToTypedCallTarget,
+            dependentHashes
+        )
 
         self.loadedModules[hashToUse] = (
             binarySharedObject.loadFromPath(os.path.join(path, "module.so"))
@@ -290,6 +299,14 @@ class CompilerCache:
 
         with open(os.path.join(tempTargetDir, "submodules.dat"), "wb") as f:
             f.write(SerializationContext().serialize(ListOf(str)(submodules), ListOf(str)))
+
+        with open(os.path.join(tempTargetDir, "linkDependencies.dat"), "wb") as f:
+            f.write(
+                SerializationContext().serialize(
+                    ListOf(str)(binarySharedObject.usedExternalFunctions),
+                    ListOf(str)
+                )
+            )
 
         try:
             os.rename(tempTargetDir, targetDir)

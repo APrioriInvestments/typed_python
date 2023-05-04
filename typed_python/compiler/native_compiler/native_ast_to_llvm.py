@@ -568,7 +568,8 @@ class FunctionConverter:
                  builder,
                  arg_assignments,
                  output_type,
-                 external_function_references
+                 external_function_references,
+                 usedExternalFunctions
                  ):
         self.function = function
 
@@ -582,6 +583,7 @@ class FunctionConverter:
         self.arg_assignments = arg_assignments
         self.output_type = output_type
         self.external_function_references = external_function_references
+        self.usedExternalFunctions = usedExternalFunctions
         self.tags_initialized = {}
         self.stack_slots = {}
 
@@ -712,7 +714,9 @@ class FunctionConverter:
             func = self.external_function_references[target.name]
         elif target.name in self.converter._externallyDefinedFunctionTypes:
             # this function is defined in a shared object that we've loaded from a prior
-            # invocation
+            # invocation. We don't have the code available locally, so we can't inline it.
+            self.usedExternalFunctions.add(target.name)
+
             if target.name not in self.external_function_references:
                 func_type = llvmlite.ir.FunctionType(
                     type_to_llvm_type(target.output_type),
@@ -1683,6 +1687,7 @@ class Converter:
 
         globalDefinitions = {}
         globalDefinitionsLlvmValues = {}
+        usedExternalFunctions = set()
 
         while names_to_definitions:
             for name in sorted(names_to_definitions):
@@ -1712,7 +1717,8 @@ class Converter:
                         builder,
                         arg_assignments,
                         definition.output_type,
-                        external_function_references
+                        external_function_references,
+                        usedExternalFunctions
                     )
 
                     func_converter.setup()
@@ -1759,7 +1765,8 @@ class Converter:
         return ModuleDefinition(
             str(module),
             functionTypes,
-            globalDefinitions
+            globalDefinitions,
+            usedExternalFunctions
         )
 
     def defineGlobalMetadataAccessor(self, module, globalDefinitions, globalDefinitionsLlvmValues):

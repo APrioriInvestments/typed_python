@@ -22,11 +22,20 @@ class ModuleDefinition:
         moduleText - a string containing the llvm IR for the module
         functionList - a list of the names of exported functions
         globalDefinitions - a dict from name to a GlobalDefinition
+        usedExternalFunctions - a set of symbols of functions that were compiled
+            in different modules that we depend on. These will all be in some module.
     """
     GET_GLOBAL_VARIABLES_NAME = ".get_global_variables"
 
-    def __init__(self, moduleText, functionNameToType, globalVariableDefinitions):
+    def __init__(
+        self,
+        moduleText,
+        functionNameToType,
+        globalVariableDefinitions,
+        usedExternalFunctions
+    ):
         self.moduleText = moduleText
         self.functionNameToType = functionNameToType
         self.globalVariableDefinitions = globalVariableDefinitions
         self.hash = sha_hash(moduleText)
+        self.usedExternalFunctions = usedExternalFunctions

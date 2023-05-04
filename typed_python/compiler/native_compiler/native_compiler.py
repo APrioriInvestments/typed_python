@@ -114,8 +114,7 @@ class NativeCompiler:
         # map from str to native_ast.Function
         functionDefinitions,
         # map from str to the TypedCallTarget for any function that's actually typed
-        typedCallTargets,
-        externallyUsed
+        typedCallTargets
     ):
         """Add a collection of functions to the compiler.
 
@@ -131,10 +130,10 @@ class NativeCompiler:
             loadedModule.linkGlobalVariables()
         else:
             binary = self._buildSharedObject(functionDefinitions)
+
             self.compilerCache.addModule(
                 binary,
                 typedCallTargets,
-                externallyUsed
             )
 
     def functionPointerByName(self, linkName) -> NativeFunctionPointer:
@@ -206,6 +205,7 @@ class NativeCompiler:
             mod,
             module.globalVariableDefinitions,
             module.functionNameToType,
+            module.usedExternalFunctions
         )
 
     def _buildModule(self, functions):
