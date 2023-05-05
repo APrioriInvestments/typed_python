@@ -26,16 +26,143 @@ import llvmlite.ir
 import os
 
 
+def computeFunctionComplexity(functionBody):
+    if functionBody is None or isinstance(functionBody, str):
+        return 0
+
+    if functionBody.matches.External:
+        return 0
+
+    if functionBody.matches.Internal:
+        return computeFunctionComplexity(functionBody.body)
+
+    if functionBody.matches.Comment:
+        return computeFunctionComplexity(functionBody.expr)
+
+    if functionBody.matches.Load:
+        return computeFunctionComplexity(functionBody.ptr)
+
+    if functionBody.matches.Store:
+        return (
+            computeFunctionComplexity(functionBody.ptr)
+            + computeFunctionComplexity(functionBody.val)
+        )
+
+    if functionBody.matches.AtomicAdd:
+        return (
+            computeFunctionComplexity(functionBody.ptr)
+            + computeFunctionComplexity(functionBody.val)
+        )
+
+    if functionBody.matches.Cast:
+        return computeFunctionComplexity(functionBody.left)
+
+    if functionBody.matches.Binop:
+        return (
+            computeFunctionComplexity(functionBody.left)
+            + computeFunctionComplexity(functionBody.right)
+        )
+
+    if functionBody.matches.Unaryop:
+        return computeFunctionComplexity(functionBody.operand)
+
+    if functionBody.matches.StructElementByIndex:
+        return computeFunctionComplexity(functionBody.left)
+
+    if functionBody.matches.ElementPtr:
+        return computeFunctionComplexity(functionBody.left) + sum(
+            computeFunctionComplexity(o) for o in functionBody.offsets
+        )
+
+    if functionBody.matches.Call:
+        return sum(
+            computeFunctionComplexity(o) for o in functionBody.args
+        )
+
+    if functionBody.matches.MakeStruct:
+        return sum(
+            computeFunctionComplexity(o[1]) for o in functionBody.args
+        )
+
+    if functionBody.matches.Branch:
+        return (
+            computeFunctionComplexity(functionBody.cond)
+            + computeFunctionComplexity(functionBody.true)
+            + computeFunctionComplexity(functionBody.false)
+        )
+
+    if functionBody.matches.Throw:
+        return (
+            computeFunctionComplexity(functionBody.expr)
+        )
+
+    if functionBody.matches.TryCatch:
+        return (
+            computeFunctionComplexity(functionBody.expr)
+            + computeFunctionComplexity(functionBody.handler)
+        )
+
+    if functionBody.matches.ExceptionPropagator:
+        return (
+            computeFunctionComplexity(functionBody.expr)
+            + computeFunctionComplexity(functionBody.handler)
+        )
+
+    if functionBody.matches.While:
+        return (
+            computeFunctionComplexity(functionBody.cond)
+            + computeFunctionComplexity(functionBody.while_true)
+            + computeFunctionComplexity(functionBody.orelse)
+        )
+
+    if functionBody.matches.Return:
+        return (
+            computeFunctionComplexity(functionBody.arg)
+        )
+
+    if functionBody.matches.Let:
+        return (
+            computeFunctionComplexity(functionBody.val)
+            + computeFunctionComplexity(functionBody.within)
+        )
+
+    if functionBody.matches.Finally:
+        return (
+            computeFunctionComplexity(functionBody.expr)
+            + sum(
+                computeFunctionComplexity(o) for o in functionBody.teardowns
+            )
+        )
+
+    if functionBody.matches.Sequence:
+        return sum(
+            computeFunctionComplexity(o) for o in functionBody.vals
+        )
+
+    if functionBody.matches.ApplyIntermediates:
+        return (
+            computeFunctionComplexity(functionBody.base)
+            + sum(
+                computeFunctionComplexity(o) for o in functionBody.intermediates
+            )
+        )
+
+    # Teardown
+    if functionBody.matches.ByTag or functionBody.matches.Always:
+        return (
+            computeFunctionComplexity(functionBody.expr)
+        )
+
+    return 1
+
+
 class NativeAstToLlvmConverter:
     def __init__(self):
         object.__init__(self)
         self._modules = {}
-        self._functions_by_name = {}
         self._function_definitions = {}
 
-        # a map from function name to function type for functions that
-        # are defined in external shared objects and linked in to this one.
-        self._externallyDefinedFunctionTypes = {}
+        self._functions_by_name = {}
 
         # total number of instructions in each function, by name
         self._function_complexity = {}
@@ -45,12 +172,31 @@ class NativeAstToLlvmConverter:
         self._printAllNativeCalls = os.getenv("TP_COMPILER_LOG_NATIVE_CALLS")
         self.verbose = False
 
-    def markExternal(self, functionNameToType):
+    def addExternallyProvidedFunctions(self, functionNameToDefinition):
         """Provide type signatures for a set of external functions."""
-        self._externallyDefinedFunctionTypes.update(functionNameToType)
 
-    def canBeInlined(self, name):
-        return name not in self._externallyDefinedFunctionTypes
+        # create a new module object - its just a dummy object, but we need the function
+        # objects around
+        module_name = "module_%s" % len(self._modules)
+        module = llvmlite.ir.Module(name=module_name)
+        self._modules[module_name] = module
+
+        functionTypes = {}
+
+        for name, function in functionNameToDefinition.items():
+            functionTypes[name] = native_ast.Type.Function(
+                output=function.output_type,
+                args=[x[1] for x in function.args],
+                varargs=False,
+                can_throw=True
+            )
+            func_type = llvmlite.ir.FunctionType(
+                type_to_llvm_type(function.output_type),
+                [type_to_llvm_type(x[1]) for x in function.args]
+            )
+            self._functions_by_name[name] = llvmlite.ir.Function(module, func_type, name)
+            self._functions_by_name[name].linkage = 'external'
+            self._function_definitions[name] = function
 
     def totalFunctionComplexity(self, name):
         """Return the total number of instructions contained in a function.
@@ -61,13 +207,11 @@ class NativeAstToLlvmConverter:
         if name in self._function_complexity:
             return self._function_complexity[name]
 
-        res = 0
-        for block in self._functions_by_name[name].basic_blocks:
-            res += len(block.instructions)
+        self._function_complexity[name] = computeFunctionComplexity(
+            self._function_definitions[name].body
+        )
 
-        self._function_complexity[name] = res
-
-        return res
+        return self._function_complexity[name]
 
     def repeatFunctionInModule(self, name, module):
         """Request that the function given by 'name' be inlined into 'module'.
@@ -96,6 +240,7 @@ class NativeAstToLlvmConverter:
 
     def add_functions(self, names_to_definitions):
         names_to_definitions = dict(names_to_definitions)
+        functionsDefinedHere = {}
 
         for name in names_to_definitions:
             assert name not in self._functions_by_name, "can't define %s twice" % name
@@ -152,60 +297,60 @@ class NativeAstToLlvmConverter:
         while names_to_definitions:
             for name in sorted(names_to_definitions):
                 definition = names_to_definitions.pop(name)
-                func = self._functions_by_name[name]
-                func.attributes.personality = external_function_references["tp_gxx_personality_v0"]
 
-                # for a in func.args:
-                #     if a.type.is_pointer:
-                #         a.add_attribute("noalias")
+                if name not in functionsDefinedHere:
+                    functionsDefinedHere[name] = definition
 
-                arg_assignments = {}
-                for i in range(len(func.args)):
-                    arg_assignments[definition.args[i][0]] = \
-                        TypedLLVMValue(func.args[i], definition.args[i][1])
+                    func = self._functions_by_name[name]
+                    func.attributes.personality = external_function_references["tp_gxx_personality_v0"]
 
-                block = func.append_basic_block('entry')
-                builder = llvmlite.ir.IRBuilder(block)
+                    arg_assignments = {}
+                    for i in range(len(func.args)):
+                        arg_assignments[definition.args[i][0]] = \
+                            TypedLLVMValue(func.args[i], definition.args[i][1])
 
-                try:
-                    func_converter = FunctionConverter(
-                        module,
-                        globalDefinitions,
-                        globalDefinitionsLlvmValues,
-                        func,
-                        self,
-                        builder,
-                        arg_assignments,
-                        definition.output_type,
-                        external_function_references,
-                        usedExternalFunctions
-                    )
+                    block = func.append_basic_block('entry')
+                    builder = llvmlite.ir.IRBuilder(block)
 
-                    func_converter.setup()
+                    try:
+                        func_converter = FunctionConverter(
+                            module,
+                            globalDefinitions,
+                            globalDefinitionsLlvmValues,
+                            func,
+                            self,
+                            builder,
+                            arg_assignments,
+                            definition.output_type,
+                            external_function_references,
+                            usedExternalFunctions
+                        )
 
-                    res = func_converter.convert(definition.body.body)
+                        func_converter.setup()
 
-                    func_converter.finalize()
+                        res = func_converter.convert(definition.body.body)
 
-                    if res is not None:
-                        if definition.output_type != native_ast.Void:
-                            assert not builder.block.is_terminated
-                            assert definition.output_type == res.native_type, (
-                                definition.output_type, res.native_type
-                            )
+                        func_converter.finalize()
 
-                            builder.ret(res.llvm_value)
+                        if res is not None:
+                            if definition.output_type != native_ast.Void:
+                                assert not builder.block.is_terminated
+                                assert definition.output_type == res.native_type, (
+                                    definition.output_type, res.native_type
+                                )
+
+                                builder.ret(res.llvm_value)
+                            else:
+                                builder.ret_void()
                         else:
-                            builder.ret_void()
-                    else:
-                        if not builder.block.is_terminated:
-                            builder.unreachable()
+                            if not builder.block.is_terminated:
+                                builder.unreachable()
 
-                except Exception:
-                    print("function failing = " + name)
-                    import traceback
-                    traceback.print_exc()
-                    raise
+                    except Exception:
+                        print("function failing = " + name)
+                        import traceback
+                        traceback.print_exc()
+                        raise
 
             # each function listed here was deemed 'inlinable', which means that we
             # want to repeat its definition in this particular module.
@@ -226,7 +371,8 @@ class NativeAstToLlvmConverter:
             str(module),
             functionTypes,
             globalDefinitions,
-            usedExternalFunctions
+            usedExternalFunctions,
+            functionsDefinedHere
         )
 
     def defineGlobalMetadataAccessor(self, module, globalDefinitions, globalDefinitionsLlvmValues):

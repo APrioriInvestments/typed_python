@@ -177,8 +177,10 @@ class NativeCompiler:
         callTargetsAndTypes = self.compilerCache.loadForSymbol(linkName)
 
         if callTargetsAndTypes is not None:
-            newTypedCallTargets, newNativeFunctionTypes = callTargetsAndTypes
-            self.converter.markExternal(newNativeFunctionTypes)
+            newTypedCallTargets, newNativeFunctionTypes, newDefinitions = callTargetsAndTypes
+
+            self.converter.addExternallyProvidedFunctions(newDefinitions)
+
             self._allTypedCallTargets.update(newTypedCallTargets)
             self._allFunctionsDefined.update(newNativeFunctionTypes)
 
@@ -205,7 +207,8 @@ class NativeCompiler:
             mod,
             module.globalVariableDefinitions,
             module.functionNameToType,
-            module.usedExternalFunctions
+            module.usedExternalFunctions,
+            module.functionDefinitions
         )
 
     def _buildModule(self, functions):

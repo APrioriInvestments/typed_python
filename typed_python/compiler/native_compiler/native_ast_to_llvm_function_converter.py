@@ -711,36 +711,20 @@ class FunctionConverter:
                         llvmlite.ir.Function(self.module, func_type, target.name)
 
             func = self.external_function_references[target.name]
-        elif target.name in self.converter._externallyDefinedFunctionTypes:
-            # this function is defined in a shared object that we've loaded from a prior
-            # invocation. We don't have the code available locally, so we can't inline it.
-            self.usedExternalFunctions.add(target.name)
-
-            if target.name not in self.external_function_references:
-                func_type = llvmlite.ir.FunctionType(
-                    type_to_llvm_type(target.output_type),
-                    [type_to_llvm_type(x) for x in target.arg_types],
-                    var_arg=target.varargs
-                )
-
-                assert target.name not in self.converter._function_definitions, target.name
-
-                self.external_function_references[target.name] = (
-                    llvmlite.ir.Function(self.module, func_type, target.name)
-                )
-
-            func = self.external_function_references[target.name]
         else:
             func = self.converter._functions_by_name[target.name]
 
             if func.module is not self.module:
                 # first, see if we'd like to inline this module
                 if (
-                    self.converter.totalFunctionComplexity(target.name) < CROSS_MODULE_INLINE_COMPLEXITY
-                    and self.converter.canBeInlined(target.name)
+                    self.converter.totalFunctionComplexity(target.name) <
+                    CROSS_MODULE_INLINE_COMPLEXITY
                 ):
                     func = self.converter.repeatFunctionInModule(target.name, self.module)
                 else:
+                    # this function is defined in another module.
+                    self.usedExternalFunctions.add(target.name)
+
                     if target.name not in self.external_function_references:
                         self.external_function_references[target.name] = \
                             llvmlite.ir.Function(self.module, func.function_type, func.name)

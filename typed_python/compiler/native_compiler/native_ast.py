@@ -569,7 +569,6 @@ Expression = Expression.define(Alternative(
     Binop={'op': BinaryOp, 'left': Expression, 'right': Expression},
     Unaryop={'op': UnaryOp, 'operand': Expression},
     Variable={'name': str},
-    Attribute={'left': Expression, 'attr': str},
     StructElementByIndex={'left': Expression, 'index': int},
     ElementPtr={'left': Expression, 'offsets': TupleOf(Expression)},
     Call={'target': CallTarget, 'args': TupleOf(Expression)},

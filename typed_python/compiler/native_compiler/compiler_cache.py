@@ -15,6 +15,8 @@
 import os
 import uuid
 import shutil
+from typed_python.compiler.native_compiler.native_ast import Function
+from typed_python.compiler.native_compiler.native_ast_analysis import extractNamedCallTargets
 from typed_python.compiler.native_compiler.loaded_module import LoadedModule
 from typed_python.compiler.native_compiler.binary_shared_object import BinarySharedObject
 
@@ -47,8 +49,9 @@ class CompilerCache:
     by making it possible to determine if a given function is in the cache by organizing
     the manifests by, say, function name.
     """
-    def __init__(self, cacheDir):
+    def __init__(self, cacheDir, checkModuleValidity=True):
         self.cacheDir = cacheDir
+        self.checkModuleValidity = checkModuleValidity
 
         ensureDirExists(cacheDir)
 
@@ -102,9 +105,10 @@ class CompilerCache:
 
             nameToTypedCallTarget = {}
             nameToNativeFunctionType = {}
+            nameToDefinition = {}
 
-            if self.loadModuleByHash(moduleHash, nameToTypedCallTarget, nameToNativeFunctionType):
-                return nameToTypedCallTarget, nameToNativeFunctionType
+            if self.loadModuleByHash(moduleHash, nameToTypedCallTarget, nameToNativeFunctionType, nameToDefinition):
+                return nameToTypedCallTarget, nameToNativeFunctionType, nameToDefinition
             else:
                 assert (
                     # either we can't load this symbol at all anymore
@@ -113,7 +117,13 @@ class CompilerCache:
                     or moduleHash not in self.symbolToModuleHashes[symbol]
                 )
 
-    def loadModuleByHash(self, moduleHash, nameToTypedCallTarget, nameToNativeFunctionType):
+    def loadModuleByHash(
+        self,
+        moduleHash,
+        nameToTypedCallTarget,
+        nameToNativeFunctionType,
+        nameToDefinition
+    ):
         """Load a module by name.
 
         As we load, place all the newly imported typed call targets into
@@ -141,6 +151,11 @@ class CompilerCache:
             with open(os.path.join(targetDir, "linkDependencies.dat"), "rb") as f:
                 linkDependencies = SerializationContext().deserialize(f.read(), ListOf(str))
 
+            with open(os.path.join(targetDir, "functionDefinitions.dat"), "rb") as f:
+                functionDefinitions = SerializationContext().deserialize(
+                    f.read(), Dict(str, Function)
+                )
+
         except Exception:
             self.markModuleHashInvalid(moduleHash)
             return False
@@ -154,7 +169,8 @@ class CompilerCache:
             if not self.loadModuleByHash(
                 submodule,
                 nameToTypedCallTarget,
-                nameToNativeFunctionType
+                nameToNativeFunctionType,
+                nameToDefinition
             ):
                 return False
 
@@ -164,13 +180,15 @@ class CompilerCache:
             modulePath,
             globalVarDefs,
             functionNameToNativeType,
-            linkDependencies
+            linkDependencies,
+            functionDefinitions
         ).loadFromPath(modulePath)
 
         self.loadedModules[moduleHash] = loaded
 
         nameToTypedCallTarget.update(callTargets)
         nameToNativeFunctionType.update(functionNameToNativeType)
+        nameToDefinition.update(functionDefinitions)
 
         for symbol in functionNameToNativeType:
             if symbol not in self.symbolToLoadedModuleHash:
@@ -188,6 +206,37 @@ class CompilerCache:
                 the formal python types for all the objects
             linkDependencies - a set of linknames we depend on directly.
         """
+        if self.checkModuleValidity:
+            externals = extractNamedCallTargets(
+                binarySharedObject.functionDefinitions
+            )
+
+            statedNames = set(binarySharedObject.usedExternalFunctions)
+
+            expectedNames = set(e.name for e in externals if not e.external) - set(
+                binarySharedObject.functionDefinitions
+            )
+
+            if statedNames != expectedNames:
+                if expectedNames - statedNames:
+                    raise Exception(
+                        "Invalid shared object - link dependencies don't match "
+                        + "stated shared object dependencies:\n\n"
+                        + "".join(
+                            ['    ' + x + "\n" for x in sorted(expectedNames - statedNames)]
+                        )
+                        + "\nwere referenced but not claimed in the manifest."
+                    )
+                else:
+                    raise Exception(
+                        "Invalid shared object - link dependencies don't match "
+                        + "stated shared object dependencies:\n\n"
+                        + "".join(
+                            ['    ' + x + "\n" for x in sorted(statedNames - expectedNames)]
+                        )
+                        + "\nwere claimed in the manifest but don't seem to be referenced"
+                    )
+
         dependentHashes = set()
 
         for name in binarySharedObject.usedExternalFunctions:
@@ -308,6 +357,14 @@ class CompilerCache:
                 )
             )
 
+        with open(os.path.join(tempTargetDir, "functionDefinitions.dat"), "wb") as f:
+            f.write(
+                SerializationContext().serialize(
+                    Dict(str, Function)(binarySharedObject.functionDefinitions),
+                    Dict(str, Function)
+                )
+            )
+
         try:
             os.rename(tempTargetDir, targetDir)
         except IOError:
@@ -324,6 +381,6 @@ class CompilerCache:
             raise Exception("Can't find a module for " + linkName)
 
         if moduleHash not in self.loadedModules:
-            self.loadForSymbol(linkName)
+            raise Exception("You need to call 'loadForSymbol' on this linkName first")
 
         return self.loadedModules[moduleHash].functionPointers[linkName]

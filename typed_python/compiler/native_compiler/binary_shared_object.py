@@ -36,18 +36,28 @@ class LoadedBinarySharedObject(LoadedModule):
 class BinarySharedObject:
     """Models a shared object library (.so) loadable on linux systems."""
 
-    def __init__(self, binaryForm, functionTypes, globalVariableDefinitions, usedExternalFunctions):
+    def __init__(
+        self,
+        binaryForm,
+        functionTypes,
+        globalVariableDefinitions,
+        usedExternalFunctions,
+        functionDefinitions,
+    ):
         """
         Args:
             binaryForm - a bytes object containing the actual compiled code for the module
             functionTypes - a map from linkerName to native_ast.Type.Function containing the native
                 signatures of the functions
             globalVariableDefinitions - a map from name to GlobalVariableDefinition
+            usedExternalFunctions - a list of symbols defined in other modules that we need
+            functionDefinitions - dict from symbol to native_ast.Function object
         """
         self.binaryForm = binaryForm
         self.functionTypes = functionTypes
         self.globalVariableDefinitions = globalVariableDefinitions
         self.usedExternalFunctions = usedExternalFunctions
+        self.functionDefinitions = functionDefinitions
         self.hash = sha_hash(binaryForm)
 
     @property
@@ -55,7 +65,7 @@ class BinarySharedObject:
         return self.functionTypes.keys()
 
     @staticmethod
-    def fromDisk(path, globalVariableDefinitions, functionNameToType, usedExternalFunctions):
+    def fromDisk(path, globalVariableDefinitions, functionNameToType, usedExternalFunctions, functionDefinitions):
         with open(path, "rb") as f:
             binaryForm = f.read()
 
@@ -63,11 +73,12 @@ class BinarySharedObject:
             binaryForm,
             functionNameToType,
             globalVariableDefinitions,
-            usedExternalFunctions
+            usedExternalFunctions,
+            functionDefinitions
         )
 
     @staticmethod
-    def fromModule(module, globalVariableDefinitions, functionNameToType, usedExternalFunctions):
+    def fromModule(module, globalVariableDefinitions, functionNameToType, usedExternalFunctions, functionDefinitions):
         target_triple = llvm.get_process_triple()
         target = llvm.Target.from_triple(target_triple)
         target_machine_shared_object = target.create_target_machine(reloc='pic', codemodel='default')
@@ -92,7 +103,8 @@ class BinarySharedObject:
                     so_file.read(),
                     functionNameToType,
                     globalVariableDefinitions,
-                    usedExternalFunctions
+                    usedExternalFunctions,
+                    functionDefinitions
                 )
 
     def load(self, storageDir):

@@ -37,7 +37,7 @@ def externalCallTarget(name, output, *inputs):
 
 class TestNativeAstToLlvm(unittest.TestCase):
     def test_teardowns(self):
-        converter = native_ast_to_llvm.Converter()
+        converter = native_ast_to_llvm.NativeAstToLlvmConverter()
 
         ct = externalCallTarget("thrower", Void)
 

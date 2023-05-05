@@ -24,6 +24,7 @@ class ModuleDefinition:
         globalDefinitions - a dict from name to a GlobalDefinition
         usedExternalFunctions - a set of symbols of functions that were compiled
             in different modules that we depend on. These will all be in some module.
+        functionDefinitions - a dict from name to Function
     """
     GET_GLOBAL_VARIABLES_NAME = ".get_global_variables"
 
@@ -32,10 +33,12 @@ class ModuleDefinition:
         moduleText,
         functionNameToType,
         globalVariableDefinitions,
-        usedExternalFunctions
+        usedExternalFunctions,
+        functionDefinitions
     ):
         self.moduleText = moduleText
         self.functionNameToType = functionNameToType
         self.globalVariableDefinitions = globalVariableDefinitions
         self.hash = sha_hash(moduleText)
         self.usedExternalFunctions = usedExternalFunctions
+        self.functionDefinitions = functionDefinitions
