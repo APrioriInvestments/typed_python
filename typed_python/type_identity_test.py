@@ -14,9 +14,11 @@
 
 import threading
 import pytest
+import tempfile
+import os
 
 import typed_python
-from typed_python.test_util import evaluateExprInFreshProcess
+from typed_python.test_util import evaluateExprInFreshProcess, callFunctionInFreshProcess
 from typed_python import (
     UInt64, UInt32,
     ListOf, TupleOf, Tuple, NamedTuple, Dict, OneOf, Forward, identityHash,
@@ -699,3 +701,86 @@ def test_type_walk_for_named_tuple_subclass():
             return 0
 
     print(typeWalkRecord(N))
+
+
+def test_module_hash_magic_value():
+    with tempfile.TemporaryDirectory() as tempDir:
+
+        def makeFun(mh):
+            """Produce a dummy function with __module_hash__ of 'mh'
+
+            Note that we need to produce this function with 'backing code' so that
+            the AST system can find it and serialize it.
+            """
+            globalsDict = {}
+            fname = os.path.join(tempDir, "code_" + mh + ".py")
+
+            pyCode = (
+                f"from typed_python import Function\n"
+                f"__module_hash__ = '{mh}'\n"
+                f"@Function\n"
+                f"def f(x):\n"
+                f"    return x\n"
+            )
+
+            with open(fname, "w") as f:
+                f.write(pyCode)
+
+            exec(compile(pyCode, fname, "exec"), globalsDict)
+            return globalsDict['f']
+
+        def makeFunIH(mh):
+            return identityHash(type(makeFun(mh)))
+
+        # check that the identity hash depends on the module hash
+        assert identityHash(type(makeFun('A'))) == identityHash(type(makeFun('A')))
+        assert identityHash(type(makeFun('A'))) != identityHash(type(makeFun('B')))
+
+        # functions should have this in their globals
+        f = makeFun('A')
+        assert '__module_hash__' in f.overloads[0].functionGlobals
+        assert '__module_hash__' in f.overloads[0].realizedGlobals
+
+        # even if we execute this in another process, we should get the same function back
+        # and it should have a __module_hash__ in its globals. We have to be careful about
+        # this because we need the serializer to understand that __module_hash__ is special
+        # and that the function implicitly references it.
+        fFromOtherProcess = callFunctionInFreshProcess(makeFun, ('C',))
+        assert fFromOtherProcess.overloads[0].functionGlobals['__module_hash__'] == 'C'
+        assert fFromOtherProcess.overloads[0].realizedGlobals['__module_hash__'] == 'C'
+
+        # check that the identity hash we loaded is the same one we would get from a
+        # subprocess reading it.
+        assert (
+            identityHash(type(fFromOtherProcess))
+            == callFunctionInFreshProcess(makeFunIH, ('C',))
+        )
+
+
+def test_module_hash_magic_value_on_untyped_function_preserved_by_serialization():
+    with tempfile.TemporaryDirectory() as tempDir:
+
+        def makeFun(mh):
+            """Produce a dummy function with __module_hash__ of 'mh'
+
+            Note that we need to produce this function with 'backing code' so that
+            the AST system can find it and serialize it.
+            """
+            globalsDict = {}
+            fname = os.path.join(tempDir, "code_" + mh + ".py")
+
+            pyCode = (
+                f"from typed_python import Entrypoint\n"
+                f"__module_hash__ = '{mh}'\n"
+                f"def f(x):\n"
+                f"    return x\n"
+            )
+
+            with open(fname, "w") as f:
+                f.write(pyCode)
+
+            exec(compile(pyCode, fname, "exec"), globalsDict)
+            return globalsDict['f']
+
+        fFromOtherProcess = callFunctionInFreshProcess(makeFun, ('C',))
+        assert fFromOtherProcess.__globals__['__module_hash__'] == 'C'

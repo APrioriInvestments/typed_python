@@ -484,6 +484,9 @@ class FunctionOverload:
                 if name.split(".")[0] in globalNames:
                     res[name] = self.functionGlobals[name]
 
+            if '__module_hash__' in self.functionGlobals:
+                res['__module_hash__'] = self.functionGlobals['__module_hash__']
+
             for varname, cell in self.funcGlobalsInCells.items():
                 res[varname] = cell.cell_contents
 

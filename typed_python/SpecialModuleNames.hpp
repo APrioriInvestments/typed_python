@@ -91,6 +91,10 @@ inline bool isSpecialIgnorableName(const std::string& name) {
         "__rpow__", "__rrshift__", "__rshift__", "__rsub__",
         "__rtruediv__", "__rxor__", "__setattr__", "__setitem__",
         "__str__", "__sub__", "__truediv__", "__xor__",
+        // this is not a real python magic method, but we want to ensure that
+        // if this is present in a function's globals that we use it to make the
+        // function unique.
+        "__module_hash__"
     });
 
     return (

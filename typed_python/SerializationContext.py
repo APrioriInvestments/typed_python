@@ -130,6 +130,10 @@ class SerializationContext(Class, Final):
     nameForObjectOverride = Member(OneOf(None, object))
     objectFromNameOverride = Member(OneOf(None, object))
 
+    # these are used to control how we serialize specific types
+    representationForOverride = Member(OneOf(None, object))
+    setInstanceStateOverride = Member(OneOf(None, object))
+
     def __init__(
         self,
         nameToObjectOverride=None,
@@ -548,6 +552,11 @@ class SerializationContext(Class, Final):
         Returns:
             a representation tuple, or None
         '''
+        if self.representationForOverride is not None:
+            representation = self.representationForOverride(inst)
+            if representation is not None:
+                return representation
+
         if type(inst) in (tuple, list, dict, set, str, int, bool, float):
             return None
 
@@ -682,7 +691,7 @@ class SerializationContext(Class, Final):
             else:
                 globalsToUse = {}
 
-                all_names = set(['__builtins__'])
+                all_names = set(['__builtins__', '__module_hash__'])
 
                 def walkCodeObject(code):
                     all_names.update(code.co_names)
@@ -736,6 +745,12 @@ class SerializationContext(Class, Final):
     def setInstanceStateFromRepresentation(
         self, instance, representation=None, itemIt=None, kvPairIt=None, setStateFun=None
     ):
+        if self.setInstanceStateOverride is not None:
+            if self.setInstanceStateOverride(
+                instance, representation, itemIt, kvPairIt, setStateFun
+            ):
+                return
+
         if representation is reconstructTypeFunctionType:
             return
 

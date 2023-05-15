@@ -1076,6 +1076,9 @@ public:
             uint8_t* bytes;
             Py_ssize_t bytecount;
 
+            static PyObject* moduleHashName = PyUnicode_FromString("__module_hash__");
+            outSequences.push_back(std::vector<PyObject*>({moduleHashName}));
+
             PyBytes_AsStringAndSize(((PyCodeObject*)code)->co_code, (char**)&bytes, &bytecount);
 
             long opcodeCount = bytecount / 2;
@@ -1172,6 +1175,8 @@ public:
                     extractGlobalAccessesFromCode((PyCodeObject*)o, outAccesses);
                 }
             });
+
+            outAccesses.insert("__module_hash__");
         }
 
         static void extractNamesFromCode(PyCodeObject* code, std::set<PyObject*>& outNames) {
@@ -1183,6 +1188,9 @@ public:
                     extractNamesFromCode((PyCodeObject*)o, outNames);
                 }
             });
+
+            static PyObject* moduleHashName = PyUnicode_FromString("__module_hash__");
+            outNames.insert(moduleHashName);
         }
 
         void setGlobals(PyObject* globals) {
