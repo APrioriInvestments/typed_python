@@ -14,6 +14,7 @@
 
 from typed_python.compiler.native_compiler.module_definition import ModuleDefinition
 from typed_python.compiler.native_compiler.typed_llvm_value import TypedLLVMValue
+from typed_python.compiler.native_compiler.native_ast_analysis import extractNamedCallTargets
 from typed_python.compiler.native_compiler.native_ast_to_llvm_function_converter import (
     type_to_llvm_type,
     FunctionConverter,
@@ -292,7 +293,6 @@ class NativeAstToLlvmConverter:
 
         globalDefinitions = {}
         globalDefinitionsLlvmValues = {}
-        usedExternalFunctions = set()
 
         while names_to_definitions:
             for name in sorted(names_to_definitions):
@@ -322,8 +322,7 @@ class NativeAstToLlvmConverter:
                             builder,
                             arg_assignments,
                             definition.output_type,
-                            external_function_references,
-                            usedExternalFunctions
+                            external_function_references
                         )
 
                         func_converter.setup()
@@ -366,6 +365,15 @@ class NativeAstToLlvmConverter:
             output=native_ast.Void,
             args=[native_ast.Void.pointer().pointer()]
         )
+
+        usedExternalFunctions = [
+            callTarget.name for callTarget in extractNamedCallTargets(functionsDefinedHere)
+            if not callTarget.external and callTarget.name not in functionsDefinedHere
+        ]
+
+        for name in usedExternalFunctions:
+            if name not in self._function_definitions:
+                raise Exception(f"Somehow we depend on {name} but have no definition for it")
 
         return ModuleDefinition(
             str(module),

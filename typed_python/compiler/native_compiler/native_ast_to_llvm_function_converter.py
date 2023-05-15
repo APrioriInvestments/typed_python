@@ -567,8 +567,7 @@ class FunctionConverter:
                  builder,
                  arg_assignments,
                  output_type,
-                 external_function_references,
-                 usedExternalFunctions
+                 external_function_references
                  ):
         self.function = function
 
@@ -582,7 +581,6 @@ class FunctionConverter:
         self.arg_assignments = arg_assignments
         self.output_type = output_type
         self.external_function_references = external_function_references
-        self.usedExternalFunctions = usedExternalFunctions
         self.tags_initialized = {}
         self.stack_slots = {}
 
@@ -722,9 +720,6 @@ class FunctionConverter:
                 ):
                     func = self.converter.repeatFunctionInModule(target.name, self.module)
                 else:
-                    # this function is defined in another module.
-                    self.usedExternalFunctions.add(target.name)
-
                     if target.name not in self.external_function_references:
                         self.external_function_references[target.name] = \
                             llvmlite.ir.Function(self.module, func.function_type, func.name)
