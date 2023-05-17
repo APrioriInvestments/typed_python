@@ -524,6 +524,39 @@ private:
     }
 
     template<class visitor_type>
+    static void walkInstance(
+        Type* objType,
+        instance_ptr instance,
+        const visitor_type& visitor
+    ) {
+        if (objType->isComposite()) {
+            CompositeType* compType = (CompositeType*)objType;
+            for (long k = 0; k < compType->getTypes().size(); k++) {
+                walkInstance(
+                    compType->getTypes()[k],
+                    compType->eltPtr(instance, k),
+                    visitor
+                );
+            }
+            return;
+        }
+
+        if (objType->isPyCell()) {
+            static PyCellType* pct = PyCellType::Make();
+
+            PyObject* o = pct->getPyObj(instance);
+
+            if (!PyCell_Check(o) || !PyCell_Get(o)) {
+                return;
+            }
+
+            visitor.visitTopo(PyCell_Get(o));
+            return;
+        }
+    }
+
+
+    template<class visitor_type>
     static void walk(
         TypeOrPyobj obj,
         const visitor_type& visitor
@@ -576,6 +609,19 @@ private:
         if (argType) {
             visitor.visitHash(ShaHash(2));
             visitor.visitTopo(argType);
+
+            if (argType->isFunction()) {
+                // visit the function's closure
+                Function* funcT = (Function*)argType;
+                instance_ptr dataPtr = ((PyInstance*)obj.pyobj())->dataPtr();
+
+                walkInstance(
+                    funcT->getClosureType(),
+                    dataPtr,
+                    visitor
+                );
+            }
+
             return;
         }
 

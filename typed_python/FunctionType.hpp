@@ -876,7 +876,10 @@ public:
                     );
                 }
 
-                visitor.visitNamedTopo(nameAndGlobal.first, nameAndGlobal.second);
+                visitor.visitNamedTopo(
+                    nameAndGlobal.first,
+                    nameAndGlobal.second
+                );
             }
 
             if (mReturnType) {

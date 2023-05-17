@@ -784,3 +784,51 @@ def test_module_hash_magic_value_on_untyped_function_preserved_by_serialization(
 
         fFromOtherProcess = callFunctionInFreshProcess(makeFun, ('C',))
         assert fFromOtherProcess.__globals__['__module_hash__'] == 'C'
+
+
+@TypeFunction
+def RefsAValueInEntrypointedStaticmethod(i):
+    class C:
+        @staticmethod
+        @Entrypoint
+        def f():
+            return i
+    return C
+
+
+@TypeFunction
+def RefsAValueInStaticmethod(i):
+    class C:
+        @staticmethod
+        def f():
+            return i
+    return C
+
+
+@TypeFunction
+def RefsAValueInStaticmethodOnClass(i):
+    class C(Class):
+        @staticmethod
+        def f():
+            return i
+    return C
+
+
+def test_type_function_identity_referencing_int_in_function_only():
+    assert RefsAValueInEntrypointedStaticmethod(1).f() == 1
+    assert RefsAValueInEntrypointedStaticmethod(2).f() == 2
+
+    assert (
+        identityHash(RefsAValueInStaticmethod(1))
+        != identityHash(RefsAValueInStaticmethod(2))
+    )
+
+    assert (
+        identityHash(RefsAValueInEntrypointedStaticmethod(1))
+        != identityHash(RefsAValueInEntrypointedStaticmethod(2))
+    )
+
+    assert (
+        identityHash(RefsAValueInStaticmethodOnClass(1))
+        != identityHash(RefsAValueInStaticmethodOnClass(2))
+    )

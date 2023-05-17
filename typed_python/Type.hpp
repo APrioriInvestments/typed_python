@@ -197,6 +197,10 @@ public:
         return m_typeCategory == catPythonObjectOfType;
     }
 
+    bool isPyCell() const {
+        return m_typeCategory == catPyCell;
+    }
+
     bool isClass() const {
         return m_typeCategory == catClass;
     }
