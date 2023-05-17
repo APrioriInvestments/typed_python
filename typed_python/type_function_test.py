@@ -414,3 +414,17 @@ class TypeFunctionTest(unittest.TestCase):
         C = RegularPythonClass(int)
 
         assert b'methodName' not in SerializationContext().withoutCompression().serialize(C)
+
+    def test_anonymous_typefunction_is_stateless(self):
+        @TypeFunction
+        def F(T):
+            class C:
+                t = T
+
+            return C
+
+        bytes1 = SerializationContext().withoutCompression().serialize(F)
+        F(int)
+        bytes2 = SerializationContext().withoutCompression().serialize(F)
+
+        assert bytes1 == bytes2

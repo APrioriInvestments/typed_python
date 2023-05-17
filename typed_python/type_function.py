@@ -29,7 +29,7 @@ def isTypeFunctionType(type):
     If so, return a tuple of (func, args, kwargs). otherwise none
     """
     if type in _type_to_typefunction:
-        (func, (args, kwargs)) = _type_to_typefunction[type]
+        (func, args, kwargs) = _type_to_typefunction[type]
         return (func, args, kwargs)
     return None
 
@@ -42,23 +42,10 @@ def reconstructTypeFunctionType(typeFunction, args, kwargs):
     return typeFunction(*args, **dict(kwargs))
 
 
-def makeTypeFunction(f):
-    """Decorate 'f' to be a 'TypeFunction'.
+_typeFunctionMemo = {}
 
-    The resulting function is expected to take a set of hashable arguments and
-    produce a type object.  The function is memoized, so code in the
-    decorated function is executed once only for each distinct set of
-    arguments. The order of keyword arguments is not considered in the memo.
-    The function should not have sideeffects.
 
-    TypeFunctions may call each other recursively and in self-referential
-    cycles. If the function calls back into itself, a Forward will
-    be returned instead of a concrete type, which lets you express recursive
-    types in a natural way.
-
-    Don't stash the type you return, since the actual type returned by the
-    function may not be the one you returned.
-    """
+def _buildTypeFunction(TypeFunction_, f, args, kwargs):
     def nameFor(args, kwargs):
         def toStr(x):
             if isinstance(x, type):
@@ -93,53 +80,71 @@ def makeTypeFunction(f):
 
         raise TypeError("Instance of type '%s' is not a valid argument to a type function" % type(arg))
 
-    _memoForKey = {}
+    args = tuple(mapArg(a) for a in args)
+    kwargs = tuple(sorted([(k, mapArg(v)) for k, v in kwargs.items()]))
 
-    def buildType(*args, **kwargs):
-        args = tuple(mapArg(a) for a in args)
-        kwargs = tuple(sorted([(k, mapArg(v)) for k, v in kwargs.items()]))
+    key = (TypeFunction_, args, kwargs)
 
-        key = (args, kwargs)
+    if key in _typeFunctionMemo:
+        res = _typeFunctionMemo[key]
+        if isinstance(res, Exception):
+            raise res
 
-        if key in _memoForKey:
-            res = _memoForKey[key]
+        if getattr(res, '__typed_python_category__', None) != 'Forward':
+            # only return fully resolved TypeFunction values without
+            # locking.
+            return res
+
+    with runtimeLock:
+        if key in _typeFunctionMemo:
+            res = _typeFunctionMemo[key]
             if isinstance(res, Exception):
                 raise res
+            return res
 
-            if getattr(res, '__typed_python_category__', None) != 'Forward':
-                # only return fully resolved TypeFunction values without
-                # locking.
-                return res
+        forward = Forward(nameFor(args, kwargs))
 
-        with runtimeLock:
-            if key in _memoForKey:
-                res = _memoForKey[key]
-                if isinstance(res, Exception):
-                    raise res
-                return res
+        _typeFunctionMemo[key] = forward
+        _type_to_typefunction[forward] = key
 
-            forward = Forward(nameFor(args, kwargs))
+        try:
+            resultType = f(*args, **dict(kwargs))
 
-            _memoForKey[key] = forward
-            _type_to_typefunction[forward] = (TypeFunction_, key)
+            forward.define(resultType)
 
-            try:
-                resultType = f(*args, **dict(kwargs))
+            _type_to_typefunction.pop(forward)
 
-                forward.define(resultType)
+            if resultType not in _type_to_typefunction:
+                _type_to_typefunction[resultType] = key
 
-                _type_to_typefunction.pop(forward)
+            _typeFunctionMemo[key] = resultType
 
-                if resultType not in _type_to_typefunction:
-                    _type_to_typefunction[resultType] = (TypeFunction_, key)
+            return resultType
+        except Exception as e:
+            _typeFunctionMemo[key] = e
+            logging.exception("TypeFunction errored")
+            raise
 
-                _memoForKey[key] = resultType
 
-                return resultType
-            except Exception as e:
-                _memoForKey[key] = e
-                logging.exception("TypeFunction errored")
-                raise
+def makeTypeFunction(f):
+    """Decorate 'f' to be a 'TypeFunction'.
+
+    The resulting function is expected to take a set of hashable arguments and
+    produce a type object.  The function is memoized, so code in the
+    decorated function is executed once only for each distinct set of
+    arguments. The order of keyword arguments is not considered in the memo.
+    The function should not have sideeffects.
+
+    TypeFunctions may call each other recursively and in self-referential
+    cycles. If the function calls back into itself, a Forward will
+    be returned instead of a concrete type, which lets you express recursive
+    types in a natural way.
+
+    Don't stash the type you return, since the actual type returned by the
+    function may not be the one you returned.
+    """
+    def buildType(*args, **kwargs):
+        return _buildTypeFunction(TypeFunction_, f, args, kwargs)
 
     class TypeFunction_(TypeFunction):
         __module__ = f.__module__
