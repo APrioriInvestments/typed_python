@@ -606,7 +606,7 @@ class SerializationContext(Class, Final):
                 classMembers = {}
                 typeConstructorNamespace = {}
 
-                for name, memb in inst.__dict__.items():
+                for name, memb in sorted(inst.__dict__.items()):
                     getset_descriptor = type(type.__dict__['__doc__'])
                     wrapper_descriptor = type(object.__repr__)
 
@@ -807,6 +807,7 @@ class SerializationContext(Class, Final):
             if representation is not None:
                 for k, v in representation.items():
                     setattr(instance, k, v)
+
             return
 
         if isinstance(instance, ModuleType):

@@ -3081,3 +3081,37 @@ class TypesSerializationTest(unittest.TestCase):
         assert copiesOfX[0] == copiesOfX[1]
         copiesOfX[0].append(None)
         assert copiesOfX[0] == copiesOfX[1]
+
+    def test_serialization_of_type_function_class_is_stable(self):
+        @TypeFunction
+        def F(T):
+            class C:
+                x = T
+            return C
+
+        C_int = F(int)
+
+        s = SerializationContext()
+
+        C_int_2 = s.deserialize(s.serialize(C_int))
+
+        assert C_int is C_int_2
+
+    def test_out_of_proc_deserialization_of_classes_stable(self):
+        def getF():
+            @TypeFunction
+            def F(T):
+                class C:
+                    x = T
+                return C
+
+            return F(int)
+
+        C_int_external = callFunctionInFreshProcess(getF, ())
+        C_int_external_2 = callFunctionInFreshProcess(getF, ())
+
+        assert C_int_external is C_int_external_2
+
+        s = SerializationContext().withoutCompression()
+
+        assert s.serialize(C_int_external) == s.serialize(getF())
