@@ -667,13 +667,13 @@ def test_dot_accesses():
     def f():
         return typed_python._types
 
-    assert getCodeGlobalDotAccesses(f.__code__) == [['typed_python', '_types']]
+    assert getCodeGlobalDotAccesses(f.__code__) == [['__module_hash__'], ['typed_python', '_types']]
 
     def f2():
         typed_python
         return typed_python._types
 
-    assert getCodeGlobalDotAccesses(f2.__code__) == [['typed_python'], ['typed_python', '_types']]
+    assert getCodeGlobalDotAccesses(f2.__code__) == [['__module_hash__'], ['typed_python'], ['typed_python', '_types']]
 
     def f3():
         return typed_python.f()
@@ -681,7 +681,7 @@ def test_dot_accesses():
     import dis
     dis.dis(f3)
 
-    assert getCodeGlobalDotAccesses(f3.__code__) == [['typed_python', 'f']]
+    assert getCodeGlobalDotAccesses(f3.__code__) == [['__module_hash__'], ['typed_python', 'f']]
 
 
 def test_identity_of_entrypointed_functions():
