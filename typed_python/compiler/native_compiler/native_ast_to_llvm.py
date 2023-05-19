@@ -24,6 +24,7 @@ from typed_python.compiler.native_compiler.native_ast_to_llvm_function_converter
 
 import typed_python.compiler.native_compiler.native_ast as native_ast
 import llvmlite.ir
+import re
 import os
 
 
@@ -293,6 +294,7 @@ class NativeAstToLlvmConverter:
 
         globalDefinitions = {}
         globalDefinitionsLlvmValues = {}
+        extraDefinitions = {}
 
         while names_to_definitions:
             for name in sorted(names_to_definitions):
@@ -322,7 +324,8 @@ class NativeAstToLlvmConverter:
                             builder,
                             arg_assignments,
                             definition.output_type,
-                            external_function_references
+                            external_function_references,
+                            extraDefinitions
                         )
 
                         func_converter.setup()
@@ -375,8 +378,21 @@ class NativeAstToLlvmConverter:
             if name not in self._function_definitions:
                 raise Exception(f"Somehow we depend on {name} but have no definition for it")
 
+        moduleText = str(module)
+
+        # substitute in direct LLVM IR function definitions for the 'extraDefinitins'
+        # llvmlite produces 'declare' stubs for these functions which we need to remove
+        # so that we can place a direct declaration. This is obviously very fragile but
+        # gives us an ability to work around llvmlite not having total coverage for all
+        # llvm features we might want (such as vectors).
+        for fName, fDef in extraDefinitions.items():
+            moduleText = moduleText + "\n\n" + fDef
+
+            pattern = '\ndeclare .*@"' + fName + '"\\([^)]*\\)'
+            moduleText = re.sub(pattern, '', moduleText)
+
         return ModuleDefinition(
-            str(module),
+            moduleText,
             functionTypes,
             globalDefinitions,
             usedExternalFunctions,

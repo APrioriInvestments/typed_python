@@ -208,7 +208,8 @@ NamedCallTarget = NamedTuple(
     external=bool,
     varargs=bool,
     intrinsic=bool,
-    can_throw=bool
+    can_throw=bool,
+    inlineLlvmDefinition=OneOf(None, str)
 )
 
 

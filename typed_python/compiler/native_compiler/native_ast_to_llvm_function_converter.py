@@ -567,7 +567,8 @@ class FunctionConverter:
                  builder,
                  arg_assignments,
                  output_type,
-                 external_function_references
+                 external_function_references,
+                 extraDefinitions
                  ):
         self.function = function
 
@@ -583,6 +584,7 @@ class FunctionConverter:
         self.external_function_references = external_function_references
         self.tags_initialized = {}
         self.stack_slots = {}
+        self.extraDefinitions = extraDefinitions
 
     def tags_as(self, new_tags):
         class scoper():
@@ -694,6 +696,9 @@ class FunctionConverter:
 
     def namedCallTargetToLLVM(self, target):
         if target.external:
+            if target.inlineLlvmDefinition:
+                self.extraDefinitions[target.name] = target.inlineLlvmDefinition
+
             if target.name not in self.external_function_references:
                 func_type = llvmlite.ir.FunctionType(
                     type_to_llvm_type(target.output_type),

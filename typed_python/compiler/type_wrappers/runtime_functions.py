@@ -31,7 +31,7 @@ Float32 = native_ast.Float32
 Void = native_ast.Void
 
 
-def externalCallTarget(name, output, *inputs, varargs=False, intrinsic=False, canThrow=False):
+def externalCallTarget(name, output, *inputs, varargs=False, intrinsic=False, canThrow=False, inlineLlvmDefinition=None):
     """Create an object that lets us call C functions.
 
     Note that 'canThrow' really indicates whether we should use llvm 'invoke' instead
@@ -46,7 +46,8 @@ def externalCallTarget(name, output, *inputs, varargs=False, intrinsic=False, ca
             external=True,
             varargs=varargs,
             intrinsic=intrinsic,
-            can_throw=canThrow
+            can_throw=canThrow,
+            inlineLlvmDefinition=inlineLlvmDefinition
         )
     )
 
