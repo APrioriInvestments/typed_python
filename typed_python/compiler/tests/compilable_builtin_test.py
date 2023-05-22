@@ -14,10 +14,10 @@ inlineLlvmFunc = externalCallTarget("inlineLlvmFunc", Float64, Float64, inlineLl
 
 class InlineLlvmFunc(CompilableBuiltin):
     def __eq__(self, other):
-        return isinstance(other, inlineLlvmFunc)
+        return isinstance(other, InlineLlvmFunc)
 
     def __hash__(self):
-        return hash("inlineLlvmFunc")
+        return hash("InlineLlvmFunc")
 
     def convert_call(self, context, instance, args, kwargs):
         return context.pushPod(

@@ -81,7 +81,9 @@ class BinarySharedObject:
     def fromModule(module, globalVariableDefinitions, functionNameToType, usedExternalFunctions, functionDefinitions):
         target_triple = llvm.get_process_triple()
         target = llvm.Target.from_triple(target_triple)
-        target_machine_shared_object = target.create_target_machine(reloc='pic', codemodel='default')
+        features = llvm.get_host_cpu_features()
+
+        target_machine_shared_object = target.create_target_machine(reloc='pic', codemodel='default', features=features.flatten())
 
         # returns the contents of a '.o' file coming out of a c++ compiler like clang
         o_file_contents = target_machine_shared_object.emit_object(module)
