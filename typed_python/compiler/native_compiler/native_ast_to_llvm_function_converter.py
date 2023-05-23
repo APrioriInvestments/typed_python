@@ -32,7 +32,7 @@ exception_type_llvm = llvmlite.ir.LiteralStructType([llvm_i8ptr, llvm_i32])
 pointer_size = 8
 
 
-CROSS_MODULE_INLINE_COMPLEXITY = 8
+CROSS_MODULE_INLINE_COMPLEXITY = 40
 
 
 _type_to_identified_type_cache = {}

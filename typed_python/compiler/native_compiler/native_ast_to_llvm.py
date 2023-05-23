@@ -28,136 +28,6 @@ import re
 import os
 
 
-def computeFunctionComplexity(functionBody):
-    if functionBody is None or isinstance(functionBody, str):
-        return 0
-
-    if functionBody.matches.External:
-        return 0
-
-    if functionBody.matches.Internal:
-        return computeFunctionComplexity(functionBody.body)
-
-    if functionBody.matches.Comment:
-        return computeFunctionComplexity(functionBody.expr)
-
-    if functionBody.matches.Load:
-        return computeFunctionComplexity(functionBody.ptr)
-
-    if functionBody.matches.Store:
-        return (
-            computeFunctionComplexity(functionBody.ptr)
-            + computeFunctionComplexity(functionBody.val)
-        )
-
-    if functionBody.matches.AtomicAdd:
-        return (
-            computeFunctionComplexity(functionBody.ptr)
-            + computeFunctionComplexity(functionBody.val)
-        )
-
-    if functionBody.matches.Cast:
-        return computeFunctionComplexity(functionBody.left)
-
-    if functionBody.matches.Binop:
-        return (
-            computeFunctionComplexity(functionBody.left)
-            + computeFunctionComplexity(functionBody.right)
-        )
-
-    if functionBody.matches.Unaryop:
-        return computeFunctionComplexity(functionBody.operand)
-
-    if functionBody.matches.StructElementByIndex:
-        return computeFunctionComplexity(functionBody.left)
-
-    if functionBody.matches.ElementPtr:
-        return computeFunctionComplexity(functionBody.left) + sum(
-            computeFunctionComplexity(o) for o in functionBody.offsets
-        )
-
-    if functionBody.matches.Call:
-        return sum(
-            computeFunctionComplexity(o) for o in functionBody.args
-        )
-
-    if functionBody.matches.MakeStruct:
-        return sum(
-            computeFunctionComplexity(o[1]) for o in functionBody.args
-        )
-
-    if functionBody.matches.Branch:
-        return (
-            computeFunctionComplexity(functionBody.cond)
-            + computeFunctionComplexity(functionBody.true)
-            + computeFunctionComplexity(functionBody.false)
-        )
-
-    if functionBody.matches.Throw:
-        return (
-            computeFunctionComplexity(functionBody.expr)
-        )
-
-    if functionBody.matches.TryCatch:
-        return (
-            computeFunctionComplexity(functionBody.expr)
-            + computeFunctionComplexity(functionBody.handler)
-        )
-
-    if functionBody.matches.ExceptionPropagator:
-        return (
-            computeFunctionComplexity(functionBody.expr)
-            + computeFunctionComplexity(functionBody.handler)
-        )
-
-    if functionBody.matches.While:
-        return (
-            computeFunctionComplexity(functionBody.cond)
-            + computeFunctionComplexity(functionBody.while_true)
-            + computeFunctionComplexity(functionBody.orelse)
-        )
-
-    if functionBody.matches.Return:
-        return (
-            computeFunctionComplexity(functionBody.arg)
-        )
-
-    if functionBody.matches.Let:
-        return (
-            computeFunctionComplexity(functionBody.val)
-            + computeFunctionComplexity(functionBody.within)
-        )
-
-    if functionBody.matches.Finally:
-        return (
-            computeFunctionComplexity(functionBody.expr)
-            + sum(
-                computeFunctionComplexity(o) for o in functionBody.teardowns
-            )
-        )
-
-    if functionBody.matches.Sequence:
-        return sum(
-            computeFunctionComplexity(o) for o in functionBody.vals
-        )
-
-    if functionBody.matches.ApplyIntermediates:
-        return (
-            computeFunctionComplexity(functionBody.base)
-            + sum(
-                computeFunctionComplexity(o) for o in functionBody.intermediates
-            )
-        )
-
-    # Teardown
-    if functionBody.matches.ByTag or functionBody.matches.Always:
-        return (
-            computeFunctionComplexity(functionBody.expr)
-        )
-
-    return 1
-
-
 class NativeAstToLlvmConverter:
     def __init__(self):
         object.__init__(self)
@@ -173,6 +43,170 @@ class NativeAstToLlvmConverter:
 
         self._printAllNativeCalls = os.getenv("TP_COMPILER_LOG_NATIVE_CALLS")
         self.verbose = False
+
+    def computeFunctionComplexity(self, functionBody, stack=()):
+        def recurse(subFunc):
+            return self.computeFunctionComplexity(subFunc, stack)
+
+        if functionBody is None or isinstance(functionBody, str):
+            return 0
+
+        if functionBody.matches.External:
+            return 0
+
+        if functionBody.matches.Internal:
+            return recurse(functionBody.body)
+
+        if functionBody.matches.Comment:
+            return recurse(functionBody.expr)
+
+        if functionBody.matches.Load:
+            return recurse(functionBody.ptr) + 1
+
+        if functionBody.matches.Store:
+            return (
+                recurse(functionBody.ptr)
+                + recurse(functionBody.val)
+            ) + 1
+
+        if functionBody.matches.AtomicAdd:
+            return (
+                recurse(functionBody.ptr)
+                + recurse(functionBody.val)
+            ) + 1
+
+        if functionBody.matches.Cast:
+            return recurse(functionBody.left) + 1
+
+        if functionBody.matches.Binop:
+            return (
+                recurse(functionBody.left)
+                + recurse(functionBody.right)
+            ) + 1
+
+        if functionBody.matches.Unaryop:
+            return recurse(functionBody.operand) + 1
+
+        if functionBody.matches.StructElementByIndex:
+            return recurse(functionBody.left) + 1
+
+        if functionBody.matches.ElementPtr:
+            return recurse(functionBody.left) + sum(
+                recurse(o) for o in functionBody.offsets
+            ) + 1
+
+        if functionBody.matches.Call:
+            if functionBody.target.matches.Pointer:
+                calleeComplexity = recurse(functionBody.target.expr)
+            elif functionBody.target.target.external:
+                calleeComplexity = 1
+            else:
+                if functionBody.target.target.name in stack:
+                    calleeComplexity = 1e6
+                else:
+                    calleeComplexity = self.totalFunctionComplexity(functionBody.target.target.name, stack)
+
+            return sum(
+                recurse(o) for o in functionBody.args
+            ) + calleeComplexity + 1
+
+        if functionBody.matches.MakeStruct:
+            return sum(
+                recurse(o[1]) for o in functionBody.args
+            ) + 1
+
+        if functionBody.matches.Branch:
+            return (
+                recurse(functionBody.cond)
+                + recurse(functionBody.true)
+                + recurse(functionBody.false)
+            ) + 1
+
+        if functionBody.matches.Throw:
+            return (
+                recurse(functionBody.expr)
+            ) + 1
+
+        if functionBody.matches.TryCatch:
+            return (
+                recurse(functionBody.expr)
+                + recurse(functionBody.handler)
+            ) + 1
+
+        if functionBody.matches.ExceptionPropagator:
+            return (
+                recurse(functionBody.expr)
+                + recurse(functionBody.handler)
+            ) + 1
+
+        if functionBody.matches.While:
+            return (
+                recurse(functionBody.cond)
+                + recurse(functionBody.while_true)
+                + recurse(functionBody.orelse)
+            ) + 1
+
+        if functionBody.matches.Return:
+            return (
+                recurse(functionBody.arg)
+            ) + 1
+
+        if functionBody.matches.Let:
+            return (
+                recurse(functionBody.val)
+                + recurse(functionBody.within)
+            ) + 1
+
+        if functionBody.matches.Finally:
+            return (
+                recurse(functionBody.expr)
+                + sum(
+                    recurse(o) for o in functionBody.teardowns
+                )
+            ) + 1
+
+        if functionBody.matches.Sequence:
+            return sum(
+                recurse(o) for o in functionBody.vals
+            ) + 1
+
+        if functionBody.matches.ApplyIntermediates:
+            return (
+                recurse(functionBody.base)
+                + sum(
+                    recurse(o) for o in functionBody.intermediates
+                )
+            ) + 1
+
+        if functionBody.matches.ActivatesTeardown:
+            return 1
+
+        if functionBody.matches.GlobalVariable:
+            return 1
+
+        if functionBody.matches.StackSlot:
+            if hasattr(functionBody, 'expr'):
+                return recurse(functionBody.expr)
+            else:
+                return 1
+
+        # ExpressionIntermediates
+        if functionBody.matches.Effect:
+            return recurse(functionBody.expr)
+
+        if functionBody.matches.Terminal:
+            return recurse(functionBody.expr)
+
+        if functionBody.matches.Simple:
+            return recurse(functionBody.expr)
+
+        # Teardown
+        if functionBody.matches.ByTag or functionBody.matches.Always:
+            return (
+                recurse(functionBody.expr)
+            ) + 1
+
+        return 1
 
     def addExternallyProvidedFunctions(self, functionNameToDefinition):
         """Provide type signatures for a set of external functions."""
@@ -200,7 +234,7 @@ class NativeAstToLlvmConverter:
             self._functions_by_name[name].linkage = 'external'
             self._function_definitions[name] = function
 
-    def totalFunctionComplexity(self, name):
+    def totalFunctionComplexity(self, name, stack=()):
         """Return the total number of instructions contained in a function.
 
         The function must already have been defined in a prior parss. We use this
@@ -209,8 +243,9 @@ class NativeAstToLlvmConverter:
         if name in self._function_complexity:
             return self._function_complexity[name]
 
-        self._function_complexity[name] = computeFunctionComplexity(
-            self._function_definitions[name].body
+        self._function_complexity[name] = self.computeFunctionComplexity(
+            self._function_definitions[name].body,
+            stack + (name,)
         )
 
         return self._function_complexity[name]
@@ -295,6 +330,7 @@ class NativeAstToLlvmConverter:
         globalDefinitions = {}
         globalDefinitionsLlvmValues = {}
         extraDefinitions = {}
+        totalInlines = 0
 
         while names_to_definitions:
             for name in sorted(names_to_definitions):
@@ -357,7 +393,10 @@ class NativeAstToLlvmConverter:
             # each function listed here was deemed 'inlinable', which means that we
             # want to repeat its definition in this particular module.
             for name in self._inlineRequests:
-                names_to_definitions[name] = self._function_definitions[name]
+                if name not in functionsDefinedHere:
+                    names_to_definitions[name] = self._function_definitions[name]
+                    totalInlines += 1
+
             self._inlineRequests.clear()
 
         # define a function that accepts a pointer and fills it out with a table of pointer values
