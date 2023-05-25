@@ -2493,6 +2493,47 @@ PyObject *allForwardTypesResolved(PyObject* nullValue, PyObject* args) {
     return incref(t->resolved() ? Py_True : Py_False);
 }
 
+PyObject *isForwardDefined(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "isForwardDefined takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'isForwardDefined' must be a type object");
+        return NULL;
+    }
+
+    return incref(t->isForwardDefined() ? Py_True : Py_False);
+}
+
+PyObject *resolveForwardDefinedType(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "resolveForwardDefinedType takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'resolveForwardDefinedType' must be a type object");
+        return NULL;
+    }
+
+    return ::translateExceptionToPyObject([&]() {
+        return incref(
+            (PyObject*)
+            PyInstance::typeObj(
+                t->forwardResolvesTo()
+            )
+        );
+    });
+}
+
 PyObject *isSimple(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "isSimple takes 1 positional argument");
@@ -2589,21 +2630,27 @@ PyObject *wantsToDefaultConstruct(PyObject* nullValue, PyObject* args) {
     return incref(HeldClass::wantsToDefaultConstruct(t) ? Py_True : Py_False);
 }
 
-PyObject *bytecount(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "bytecount takes 1 positional argument");
-        return NULL;
-    }
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+PyObject *bytecount(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    return translateExceptionToPyObject([&]() {
+        PyObject* type;
+        static const char *kwlist[] = {"type", NULL};
 
-    Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist, &type)) {
+            throw PythonExceptionSet();
+        }
 
-    if (!t) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'bytecount' must be a type object");
-        return NULL;
-    }
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(type);
 
-    return PyLong_FromLong(t->bytecount());
+        if (!t) {
+            throw std::runtime_error("type must be a TP type instance");
+        }
+
+        if (t->isForwardDefined()) {
+            throw std::runtime_error("type must not be a ForwardDefined type.");
+        }
+
+        return PyLong_FromLong(t->bytecount());
+    });
 }
 
 PyObject *typesAreEquivalent(PyObject* nullValue, PyObject* args) {
@@ -2825,25 +2872,25 @@ PyObject *checkForHashInstability(PyObject* nullValue, PyObject* args, PyObject*
 }
 
 PyObject *typeWalkRecord(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
-    PyObject* instance;
-    const char* visibility = "compiler";
-    static const char *kwlist[] = {"instance", "visibility", NULL};
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|s", (char**)kwlist, &instance, &visibility)) {
-        throw PythonExceptionSet();
-    }
-
-    VisibilityType vis;
-    if (std::string(visibility) == "compiler") {
-        vis = VisibilityType::Compiler;
-    }
-    else if (std::string(visibility) == "identity") {
-        vis = VisibilityType::Identity;
-    } else {
-        throw std::runtime_error("visibility must be 'compiler' or 'identity'");
-    }
-
     return translateExceptionToPyObject([&]() {
+        PyObject* instance;
+        const char* visibility = "compiler";
+        static const char *kwlist[] = {"instance", "visibility", NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|s", (char**)kwlist, &instance, &visibility)) {
+            throw PythonExceptionSet();
+        }
+
+        VisibilityType vis;
+        if (std::string(visibility) == "compiler") {
+            vis = VisibilityType::Compiler;
+        }
+        else if (std::string(visibility) == "identity") {
+            vis = VisibilityType::Identity;
+        } else {
+            throw std::runtime_error("visibility must be 'compiler' or 'identity'");
+        }
+
         TypeOrPyobj obj(instance);
 
         return PyUnicode_FromString(
@@ -3077,7 +3124,7 @@ PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
     return incref(t1->isBinaryCompatibleWith(t2) ? Py_True : Py_False);
 }
 
-PyObject *MakeForward(PyObject* nullValue, PyObject* args) {
+PyObject *MakeForwardType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     int num_args = PyTuple_Size(args);
 
     PyThreadState * ts = PyThreadState_Get();
@@ -3445,9 +3492,10 @@ static PyMethodDef module_methods[] = {
     {"buildPyFunctionObject", (PyCFunction)buildPyFunctionObject, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isPOD", (PyCFunction)isPOD, METH_VARARGS, NULL},
     {"isSimple", (PyCFunction)isSimple, METH_VARARGS, NULL},
-    {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
+    {"isForwardDefined", (PyCFunction)isForwardDefined, METH_VARARGS, NULL},
+    {"resolveForwardDefinedType", (PyCFunction)resolveForwardDefinedType, METH_VARARGS, NULL},
+    {"bytecount", (PyCFunction)bytecount, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
-    {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
     {"allForwardTypesResolved", (PyCFunction)allForwardTypesResolved, METH_VARARGS, NULL},
     {"recursiveTypeGroup", (PyCFunction)recursiveTypeGroup, METH_VARARGS | METH_KEYWORDS, NULL},
     {"recursiveTypeGroupRepr", (PyCFunction)recursiveTypeGroupRepr, METH_VARARGS | METH_KEYWORDS, NULL},
@@ -3566,6 +3614,7 @@ PyInit__types(void)
     PyModule_AddObject(module, "PythonObjectOfType", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPythonObjectOfType)));
     PyModule_AddObject(module, "PythonSubclass", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPythonSubclass)));
     PyModule_AddObject(module, "SubclassOf", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catSubclassOf)));
+    PyModule_AddObject(module, "Forward", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catForward)));
 
     if (module == NULL)
         return NULL;

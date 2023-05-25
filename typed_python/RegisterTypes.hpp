@@ -281,6 +281,9 @@ public:
     ) {
         copy_constructor(dest, src);
     }
+
+    // no op
+    void postInitializeConcrete() {}
 };
 
 

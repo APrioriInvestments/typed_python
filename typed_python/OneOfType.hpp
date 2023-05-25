@@ -25,10 +25,18 @@ PyDoc_STRVAR(OneOf_doc,
     );
 
 class OneOfType : public Type {
+    OneOfType() noexcept :
+        Type(TypeCategory::catOneOf),
+        m_needs_post_init(true)
+    {
+        m_doc = OneOf_doc;
+    }
+
 public:
     OneOfType(const std::vector<Type*>& types) noexcept :
                     Type(TypeCategory::catOneOf),
-                    m_types(types)
+                    m_types(types),
+                    m_needs_post_init(false)
     {
         if (m_types.size() > 255) {
             throw std::runtime_error("OneOf types are limited to 255 alternatives in this implementation");
@@ -37,6 +45,13 @@ public:
         m_doc = OneOf_doc;
 
         endOfConstructorInitialization(); // finish initializing the type object.
+
+        for (auto t: types) {
+            if (t->isForwardDefined()) {
+                m_is_forward_defined = true;
+                break;
+            }
+        }
     }
 
     template<class visitor_type>
@@ -153,6 +168,18 @@ public:
 
     static OneOfType* Make(const std::vector<Type*>& types, OneOfType* knownType = nullptr);
 
+    Type* cloneForForwardResolutionConcrete();
+
+    void initializeFromConcrete(
+        Type* forwardDefinitionOfSelf,
+        const std::map<Type*, Type*>& groupMap
+    );
+
+    void postInitializeConcrete();
+
+    std::string computeRecursiveNameConcrete(std::map<Type*, std::string>& ioEphemeralNames);
+
 private:
     std::vector<Type*> m_types;
+    bool m_needs_post_init;
 };

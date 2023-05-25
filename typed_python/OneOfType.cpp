@@ -187,3 +187,94 @@ OneOfType* OneOfType::Make(const std::vector<Type*>& types, OneOfType* knownType
 
     return it->second;
 }
+
+Type* OneOfType::cloneForForwardResolutionConcrete() {
+    // create a 'blank' oneof type
+    return new OneOfType();
+}
+
+void OneOfType::initializeFromConcrete(
+    Type* forwardDefinitionOfSelf,
+    const std::map<Type*, Type*>& groupMap
+) {
+    OneOfType* selfT = (OneOfType*)forwardDefinitionOfSelf;
+
+    std::vector<Type*> heldTypes;
+    std::set<Type*> seenTypes;
+
+    std::function<void (Type*)> visit = [&](Type* t) {
+        if (t->getTypeCategory() == catOneOf) {
+            for (auto subt: ((OneOfType*)t)->getTypes()) {
+                visit(subt);
+            }
+        } else {
+            auto it = groupMap.find(t);
+            if (it != groupMap.end()) {
+                visit(it->second);
+            } else {
+                if (seenTypes.find(t) == seenTypes.end()) {
+                    heldTypes.push_back(t);
+                    seenTypes.insert(t);
+                }
+            }
+        }
+    };
+
+    for (auto t: selfT->m_types) {
+        visit(t);
+    }
+
+    m_types = heldTypes;
+}
+
+void OneOfType::postInitializeConcrete() {
+    if (!m_needs_post_init) {
+        return;
+    }
+
+    for (auto t: m_types) {
+        t->postInitialize();
+    }
+
+    std::map<Type*, std::string> ephemeralNames;
+    std::string name = computeRecursiveName(ephemeralNames);
+    m_name = name;
+
+    m_size = computeBytecount();
+    m_name = name;
+
+    m_is_default_constructible = false;
+
+    for (auto typePtr: m_types) {
+        if (typePtr->is_default_constructible()) {
+            m_is_default_constructible = true;
+            break;
+        }
+    }
+
+    m_needs_post_init = false;
+}
+
+std::string OneOfType::computeRecursiveNameConcrete(std::map<Type*, std::string>& ioEphemeralNames) {
+    if (!m_needs_post_init) {
+        return m_name;
+    }
+
+    std::string res = "OneOf(";
+
+    bool first = true;
+
+    for (auto t: m_types) {
+        if (first) {
+            first = false;
+        } else {
+            res += ", ";
+        }
+
+        res += t->computeRecursiveName(ioEphemeralNames);
+    }
+
+    res += ")";
+
+    return res;
+}

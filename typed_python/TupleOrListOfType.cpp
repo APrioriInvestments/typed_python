@@ -156,6 +156,74 @@ bool TupleOrListOfType::cmp(instance_ptr left, instance_ptr right, int pyCompari
     return cmpResultToBoolForPyOrdering(pyComparisonOp,0);
 }
 
+
+
+Type* TupleOrListOfType::cloneForForwardResolutionConcrete() {
+    if (m_is_tuple) {
+        return new TupleOfType();
+    } else {
+        return new ListOfType();
+    }
+}
+
+void TupleOrListOfType::initializeFromConcrete(
+    Type* forwardDefinitionOfSelf,
+    const std::map<Type*, Type*>& groupMap
+) {
+    Type* eltType = ((TupleOrListOfType*)forwardDefinitionOfSelf)->m_element_type;
+
+    if (eltType->isForwardDefined()) {
+        auto it = groupMap.find(eltType);
+
+        if (it == groupMap.end()) {
+            throw std::runtime_error(
+                "Couldn't find a group definition for " + eltType->name()
+            );
+        }
+
+        m_element_type = it->second;
+    } else {
+        m_element_type = eltType;
+    }
+}
+
+void TupleOrListOfType::postInitializeConcrete() {
+    if (!m_needs_post_initialize) {
+        return;
+    }
+
+    // this is wrong because we're not taking into account exactly how we can see ourselves
+    std::map<Type*, std::string> ephemeralNames;
+    std::string name = computeRecursiveName(ephemeralNames);
+
+    m_needs_post_initialize = false;
+
+    m_name = name;
+    m_stripped_name = "";
+}
+
+std::string TupleOrListOfType::computeRecursiveNameConcrete(std::map<Type*, std::string>& ioEphemeralNames) {
+    if (!m_needs_post_initialize) {
+        return m_name;
+    }
+
+    auto it = ioEphemeralNames.find(this);
+
+    if (it != ioEphemeralNames.end()) {
+        return it->second;
+    }
+
+    size_t count = ioEphemeralNames.size();
+
+    ioEphemeralNames[this] = "^" + format(count);
+
+    if (m_is_tuple) {
+        return "ListOf(" + m_element_type->computeRecursiveName(ioEphemeralNames) + ")";
+    } else {
+        return "TupleOf(" + m_element_type->computeRecursiveName(ioEphemeralNames) + ")";
+    }
+}
+
 // static
 TupleOfType* TupleOfType::Make(Type* elt, TupleOfType* knownType) {
     PyEnsureGilAcquired getTheGil;

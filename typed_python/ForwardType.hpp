@@ -36,7 +36,7 @@ public:
     {
         m_name = name;
         m_doc = Forward_doc;
-
+        m_is_forward_defined = true;
         // deliberately don't invoke 'endOfConstructorInitialization'
     }
 
@@ -66,6 +66,36 @@ public:
         int64_t indexVal = index++;
 
         return new Forward(name, indexVal);
+    }
+
+    Type* getTargetTransitive() {
+        if (!mTarget) {
+            return nullptr;
+        }
+
+        if (!mTarget->isForward()) {
+            return mTarget;
+        }
+
+        std::set<Type*> seen;
+
+        Type* curFwd = this;
+
+        while (curFwd->isForward()) {
+            if (seen.find(curFwd) != seen.end()) {
+                throw std::runtime_error("Forward cycle detected.");
+            }
+
+            seen.insert(curFwd);
+
+            curFwd = ((Forward*)curFwd)->getTarget();
+
+            if (!curFwd) {
+                return nullptr;
+            }
+        }
+
+        return curFwd;
     }
 
     Type* define(Type* target) {

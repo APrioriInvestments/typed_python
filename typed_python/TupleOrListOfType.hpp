@@ -20,6 +20,15 @@
 #include "Format.hpp"
 
 class TupleOrListOfType : public Type {
+protected:
+    TupleOrListOfType(bool isTuple) :
+        Type(isTuple ? TypeCategory::catTupleOf : TypeCategory::catListOf),
+        m_element_type(nullptr),
+        m_is_tuple(isTuple),
+        m_needs_post_initialize(true)
+    {
+    }
+
 public:
     class layout {
     public:
@@ -36,10 +45,15 @@ public:
     TupleOrListOfType(Type* type, bool isTuple) :
             Type(isTuple ? TypeCategory::catTupleOf : TypeCategory::catListOf),
             m_element_type(type),
-            m_is_tuple(isTuple)
+            m_is_tuple(isTuple),
+            m_needs_post_initialize(false)
     {
         m_size = sizeof(void*);
         m_is_default_constructible = true;
+
+        if (type->isForwardDefined()) {
+            m_is_forward_defined = true;
+        }
 
         endOfConstructorInitialization(); // finish initializing the type object.
     }
@@ -587,10 +601,21 @@ public:
 
     }
 
+    Type* cloneForForwardResolutionConcrete();
+
+    void initializeFromConcrete(
+        Type* forwardDefinitionOfSelf,
+        const std::map<Type*, Type*>& groupMap
+    );
+
+    void postInitializeConcrete();
+
+    std::string computeRecursiveNameConcrete(std::map<Type*, std::string>& ioEphemeralNames);
+
 protected:
     Type* m_element_type;
-
     bool m_is_tuple;
+    bool m_needs_post_initialize;
 };
 
 PyDoc_STRVAR(ListOf_doc,
@@ -600,6 +625,12 @@ PyDoc_STRVAR(ListOf_doc,
     );
 
 class ListOfType : public TupleOrListOfType {
+    friend class TupleOrListOfType;
+
+    ListOfType() : TupleOrListOfType(false)
+    {
+    }
+
 public:
     ListOfType(Type* type) : TupleOrListOfType(type, false)
     {
@@ -659,6 +690,12 @@ PyDoc_STRVAR(TupleOf_doc,
     );
 
 class TupleOfType : public TupleOrListOfType {
+    friend class TupleOrListOfType;
+
+    TupleOfType() : TupleOrListOfType(true)
+    {
+    }
+
 public:
     TupleOfType(Type* type) : TupleOrListOfType(type, true)
     {

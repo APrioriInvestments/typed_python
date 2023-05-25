@@ -365,6 +365,7 @@ PyObject* PyInstance::tp_new_type(PyTypeObject *subtype, PyObject *args, PyObjec
     if (catToProduce == Type::TypeCategory::catClass ) { return MakeClassType(nullptr, args); }
     if (catToProduce == Type::TypeCategory::catAlternative ) { return MakeAlternativeType(nullptr, args, kwds); }
     if (catToProduce == Type::TypeCategory::catSubclassOf ) { return MakeSubclassOfType(nullptr, args); }
+    if (catToProduce == Type::TypeCategory::catForward ) { return MakeForwardType(nullptr, args, kwds); }
 
     PyErr_Format(PyExc_TypeError, "unknown TypeCategory %S", (PyObject*)subtype);
     return NULL;

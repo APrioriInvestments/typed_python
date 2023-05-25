@@ -917,6 +917,23 @@ public:
         return m_recursive_forward_index;
     }
 
+
+    bool isForwardDefined() const {
+        return m_is_forward_defined;
+    }
+
+    Type* forwardResolvesTo() {
+        if (!m_is_forward_defined) {
+            return this;
+        }
+
+        if (!m_forward_resolves_to) {
+            attemptToResolve();
+        }
+
+        return m_forward_resolves_to;
+    }
+
 protected:
     Type(TypeCategory in_typeCategory) :
             m_typeCategory(in_typeCategory),
@@ -931,7 +948,9 @@ protected:
             m_is_recursive_forward(false),
             m_recursive_forward_index(-1),
             mTypeGroup(nullptr),
-            mRecursiveTypeGroupIndex(-1)
+            mRecursiveTypeGroupIndex(-1),
+            m_is_forward_defined(false),
+            m_forward_resolves_to(nullptr)
         {}
 
     TypeCategory m_typeCategory;
@@ -985,4 +1004,86 @@ protected:
     MutuallyRecursiveTypeGroup* mTypeGroup;
 
     int32_t mRecursiveTypeGroupIndex;
+
+
+
+
+
+
+
+
+    // NEW FORWARD IMPLEMENTATION
+
+    // is there a Forward reachable in our object graph? This is a permanent feature of
+    // the type object
+    bool m_is_forward_defined;
+
+    // if we are a Forward, what do we resolve to? This will be null if we have not
+    // fully resolved ourselves and will, for valid types, become not-null pointing to
+    // the actual type we resolve to.
+    Type* m_forward_resolves_to;
+
+    // try to resolve this forward type. If we can't, we'll throw an exception. On exit,
+    // we will have thrown, or m_forward_resolves_to will be populated.
+    void attemptToResolve();
+
+    // initialize ourself as a copy of 'forwardDefinitionOfSelf' where none of the types
+    // will have a forward definition reference. The instance must have been constructed
+    // using 'cloneForForwardResolution'. If the recursiveNameOverride is not None, then
+    // use that name for the type instead of the computed name.
+    void initializeFrom(
+        Type* forwardDefinitionOfSelf,
+        const std::map<Type*, Type*>& groupMap
+    ) {
+        this->check([&](auto& subtype) {
+            return subtype.initializeFromConcrete(forwardDefinitionOfSelf, groupMap);
+        });
+    }
+
+    void initializeFromConcrete(
+        Type* forwardDefinitionOfSelf,
+        const std::map<Type*, Type*>& groupMap
+    ) {
+        throw std::runtime_error("subclasses implement");
+    }
+
+
+    // produce a copy of ourself
+    Type* cloneForForwardResolution() {
+        return this->check([&](auto& subtype) {
+            return subtype.cloneForForwardResolutionConcrete();
+        });
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        throw std::runtime_error("subclasses implement");
+    }
+
+
+    void postInitializeConcrete() {
+        throw std::runtime_error("Type " + name() + " didn't implement postInitializeConcrete");
+    }
+
+    std::string computeRecursiveNameConcrete(std::map<Type*, std::string>& ioEphemeralNames) {
+        auto it = ioEphemeralNames.find(this);
+
+        if (it == ioEphemeralNames.end()) {
+            return m_name;
+        }
+
+        return it->second;
+    }
+
+public:
+    // finish initializing the type assuming no forward types are reachable
+    void postInitialize() {
+        this->check([&](auto& subtype) {
+            subtype.postInitializeConcrete();
+        });
+    }
+    std::string computeRecursiveName(std::map<Type*, std::string>& ioEphemeralNames) {
+        return this->check([&](auto& subtype) {
+            return subtype.computeRecursiveNameConcrete(ioEphemeralNames);
+        });
+    }
 };

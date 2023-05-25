@@ -52,7 +52,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args);
 PyObject *MakeClassType(PyObject* nullValue, PyObject* args);
 PyObject *MakeSubclassOfType(PyObject* nullValue, PyObject* args);
 PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwargs);
-
+PyObject *MakeForwardType(PyObject* nullValue, PyObject* args, PyObject* kwargs);
 
 typedef struct {
     PyObject_HEAD

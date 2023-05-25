@@ -408,6 +408,105 @@ void Type::forwardResolvedTo(Forward* forward, Type* resolvedTo) {
 }
 
 
+
+// try to resolve this forward type. If we can't, we'll throw an exception. On exit,
+// we will have thrown, or m_forward_resolves_to will be populated.
+void Type::attemptToResolve() {
+    if (m_forward_resolves_to) {
+        return;
+    }
+
+    // do the entire type resolution process while holding the GIL
+    PyEnsureGilAcquired getTheGil;
+
+    std::set<Type*> typesNeedingResolution;
+    std::set<Type*> toVisit;
+    toVisit.insert(this);
+
+    // walk the graph and determine all forwards that are not resolved
+    while (toVisit.size()) {
+        Type* toCheck = *toVisit.begin();
+        toVisit.erase(toCheck);
+
+        if (toCheck->isForwardDefined() && !toCheck->m_forward_resolves_to) {
+            if (typesNeedingResolution.find(toCheck) == typesNeedingResolution.end()) {
+                typesNeedingResolution.insert(toCheck);
+
+                toCheck->visitReferencedTypes([&](Type* subtype) {
+                    if (subtype->isForwardDefined() && !subtype->m_forward_resolves_to) {
+                        toVisit.insert(subtype);
+                    }
+                });
+            }
+        }
+    }
+
+    for (auto t: typesNeedingResolution) {
+        if (t->isForward() && !((Forward*)t)->getTarget()) {
+            throw std::runtime_error(
+                "Forward defined as " + t->nameWithModule() + " has not been defined."
+            );
+        }
+    }
+
+    // for each type that we have defined in our graph, what type are we mapping it to?
+    // for Forwards of primitive types like ListOf or TupleOf that can see themselves, this
+    // this will be a 'named copy' of the type depending on the Forward name.
+    std::map<Type*, Type*> resolutionMapping;
+
+    // for each type we end up defining, which type did it come from and what name
+    // are we giving it?
+    std::map<Type*, Type*> resolutionSource;
+
+    // allocate new target type bodies for all regular types in the graph
+    for (auto t: typesNeedingResolution) {
+        if (!t->isForward()) {
+            // we're resolving to this type directly
+            resolutionMapping[t] = t->cloneForForwardResolution();
+            resolutionSource[resolutionMapping[t]] = t;
+        }
+    }
+
+    // now ensure that the target for any forward is the underlying type
+    // note that we don't need a source for any of these since nobody will end up
+    // actually having a forward in their graph
+    for (auto t: typesNeedingResolution) {
+        if (t->isForward()) {
+            Forward* f = (Forward*)t;
+
+            Type* tgt = f->getTargetTransitive();
+
+            if (!tgt) {
+                throw std::runtime_error("somehow this forward doesn't have a target");
+            }
+
+            if (typesNeedingResolution.find(tgt) == typesNeedingResolution.end()) {
+                resolutionMapping[t] = tgt;
+            } else {
+                // resolve this forward to whatever its target resolves to
+                resolutionMapping[t] = resolutionMapping[tgt];
+            }
+        }
+    }
+
+    for (auto typeAndSource: resolutionSource) {
+        typeAndSource.first->initializeFrom(typeAndSource.second, resolutionMapping);
+    }
+
+    for (auto typeAndTarget: resolutionMapping) {
+        typeAndTarget.first->m_forward_resolves_to = typeAndTarget.second;
+    }
+
+    for (auto typeAndSource: resolutionSource) {
+        typeAndSource.first->postInitialize();
+    }
+
+    if (!m_forward_resolves_to) {
+        throw std::runtime_error("Somehow, we didn't resolve???");
+    }
+}
+
+
 PyObject* getOrSetTypeResolver(PyObject* module, PyObject* args) {
     int num_args = 0;
     if (args)
