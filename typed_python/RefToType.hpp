@@ -22,6 +22,12 @@ class RefTo : public Type {
 protected:
     typedef void* instance;
 
+    // construct a non-forward defined refto
+    RefTo() : Type(TypeCategory::catRefTo)
+    {
+        m_needs_post_init = true;
+    }
+
 public:
     RefTo(Type* t) :
         Type(TypeCategory::catRefTo),
@@ -29,8 +35,7 @@ public:
     {
         m_size = sizeof(instance);
         m_is_default_constructible = false;
-
-        endOfConstructorInitialization(); // finish initializing the type object.
+        m_is_forward_defined = true;
     }
 
     template<class visitor_type>
@@ -39,46 +44,52 @@ public:
         v.visitTopo(m_element_type);
     }
 
-    void _updateTypeMemosAfterForwardResolution() {
-        RefTo::Make(m_element_type, this);
-    }
+    static RefTo* Make(Type* elt) {
+        if (elt->isForwardDefined()) {
+            return new RefTo(elt);
+        }
 
-
-    static RefTo* Make(Type* elt, RefTo* knownType = nullptr) {
         PyEnsureGilAcquired getTheGil;
 
-        if (elt->getTypeCategory() != Type::TypeCategory::catHeldClass) {
-            throw std::runtime_error("RefTo only valid on HeldClass types");
+        static std::map<Type*, RefTo*> memo;
+
+        auto it = memo.find(elt);
+        if (it != memo.end()) {
+            return it->second;
         }
 
-        static std::map<Type*, RefTo*> m;
+        RefTo* res = new RefTo(elt);
+        RefTo* concrete = (RefTo*)res->forwardResolvesTo();
 
-        auto it = m.find(elt);
-        if (it == m.end()) {
-            it = m.insert(std::make_pair(elt, knownType ? knownType : new RefTo(elt))).first;
-        }
-
-        return it->second;
+        memo[elt] = concrete;
+        return concrete;
     }
 
     bool isPODConcrete() {
         return true;
     }
 
-    bool _updateAfterForwardTypesChanged() {
-        std::string name = "RefTo(" + m_element_type->name(true) + ")";
-
-        if (m_is_recursive_forward) {
-            name = m_recursive_name;
-        }
-
-        bool anyChanged = name != m_name;
-
-        m_name = name;
-        m_stripped_name = "";
-
-        return anyChanged;
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
+        return "RefTo(" + m_element_type->computeRecursiveName(typeStack) + ")";
     }
+
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        m_element_type = ((RefTo*)forwardDefinitionOfSelf)->m_element_type;
+    }
+
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        auto it = groupMap.find(m_element_type);
+        if (it != groupMap.end()) {
+            m_element_type = it->second;
+        }
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new RefTo();
+    }
+
+    void postInitializeConcrete() {}
 
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {

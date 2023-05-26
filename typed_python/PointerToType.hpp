@@ -35,11 +35,18 @@ PyDoc_STRVAR(PointerTo_doc,
     "The statement p[3]=v is like the C++ statement 'p[3]=v;'\n"
     "The expression p+3 is of type PointerTo(T), like the C++ expression 'p+3'\n"
     "The expression p1-p2 is of type int, like the C++ expression 'p1-p2'\n"
-    );
+);
 
 class PointerTo : public Type {
 protected:
     typedef void* instance;
+
+    // construct a non-forward defined pointer
+    PointerTo() : Type(TypeCategory::catPointerTo)
+    {
+        m_doc = PointerTo_doc;
+        m_needs_post_init = true;
+    }
 
 public:
     PointerTo(Type* t) :
@@ -49,8 +56,7 @@ public:
         m_size = sizeof(instance);
         m_is_default_constructible = true;
         m_doc = PointerTo_doc;
-
-        endOfConstructorInitialization(); // finish initializing the type object.
+        m_is_forward_defined = true;
     }
 
     template<class visitor_type>
@@ -59,41 +65,52 @@ public:
         v.visitTopo(m_element_type);
     }
 
-    void _updateTypeMemosAfterForwardResolution() {
-        PointerTo::Make(m_element_type, this);
-    }
-
-    static PointerTo* Make(Type* elt, PointerTo* knownType = nullptr) {
-        PyEnsureGilAcquired getTheGil;
-
-        static std::map<Type*, PointerTo*> m;
-
-        auto it = m.find(elt);
-        if (it == m.end()) {
-            it = m.insert(std::make_pair(elt, knownType ? knownType : new PointerTo(elt))).first;
+    static PointerTo* Make(Type* elt) {
+        if (elt->isForwardDefined()) {
+            return new PointerTo(elt);
         }
 
-        return it->second;
+        PyEnsureGilAcquired getTheGil;
+
+        static std::map<Type*, PointerTo*> memo;
+
+        auto it = memo.find(elt);
+        if (it != memo.end()) {
+            return it->second;
+        }
+
+        PointerTo* res = new PointerTo(elt);
+        PointerTo* concrete = (PointerTo*)res->forwardResolvesTo();
+
+        memo[elt] = concrete;
+        return concrete;
     }
 
     bool isPODConcrete() {
         return true;
     }
 
-    bool _updateAfterForwardTypesChanged() {
-        std::string name = "PointerTo(" + m_element_type->name(true) + ")";
-
-        if (m_is_recursive_forward) {
-            name = m_recursive_name;
-        }
-
-        bool anyChanged = name != m_name;
-
-        m_name = name;
-        m_stripped_name = "";
-
-        return anyChanged;
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
+        return "PointerTo(" + m_element_type->computeRecursiveName(typeStack) + ")";
     }
+
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        m_element_type = ((PointerTo*)forwardDefinitionOfSelf)->m_element_type;
+    }
+
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        auto it = groupMap.find(m_element_type);
+        if (it != groupMap.end()) {
+            m_element_type = it->second;
+        }
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new PointerTo();
+    }
+
+    void postInitializeConcrete() {}
 
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {

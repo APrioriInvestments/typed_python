@@ -41,8 +41,6 @@ public:
         m_name = "str";
         m_is_default_constructible = true;
         m_size = sizeof(void*);
-
-        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     template<class visitor_type>
@@ -344,4 +342,6 @@ public:
     static bool to_int64(layout* s, int64_t* value);
 
     static bool to_float64(layout* s, double* value);
+
+    void postInitializeConcrete() {};
 };

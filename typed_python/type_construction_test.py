@@ -2,7 +2,7 @@ import pytest
 
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
-    Tuple, NamedTuple
+    Tuple, NamedTuple, PointerTo, RefTo
 )
 
 
@@ -11,6 +11,8 @@ def test_nonforward_definition():
     assert not isForwardDefined(ListOf(int))
     assert not isForwardDefined(TupleOf(int))
     assert not isForwardDefined(Tuple(int, int))
+    assert not isForwardDefined(PointerTo(int))
+    assert not isForwardDefined(RefTo(int))
     assert not isForwardDefined(NamedTuple(x=int, y=float))
 
 
@@ -24,6 +26,8 @@ def test_forward_definition():
     assert isForwardDefined(ListOf(F))
     assert isForwardDefined(TupleOf(F))
     assert isForwardDefined(Tuple(int, F))
+    assert isForwardDefined(PointerTo(F))
+    assert isForwardDefined(RefTo(F))
     assert isForwardDefined(NamedTuple(x=int, y=F))
 
 
@@ -103,3 +107,23 @@ def test_recursive_list_of_forward_memoizes():
         return resolveForwardDefinedType(F)
 
     assert makeTup() is makeTup()
+
+
+def test_recursive_pointer_to():
+    def makeP():
+        F = Forward()
+        F.define(PointerTo(F))
+        return resolveForwardDefinedType(F)
+
+    assert makeP() is makeP()
+    assert makeP().__name__ == 'PointerTo(^0)'
+
+
+def test_recursive_ref_to():
+    def makeP():
+        F = Forward()
+        F.define(RefTo(F))
+        return resolveForwardDefinedType(F)
+
+    assert makeP() is makeP()
+    assert makeP().__name__ == 'RefTo(^0)'

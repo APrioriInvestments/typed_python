@@ -36,8 +36,6 @@ public:
         m_name = "bytes";
         m_is_default_constructible = true;
         m_size = sizeof(layout*);
-
-        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -203,4 +201,6 @@ public:
     static layout* replace(layout* l, layout* old, layout* the_new, int64_t count);
     static layout* translate(layout* l, layout* table, layout* to_delete);
     static layout* maketrans(layout* from, layout* to);
+
+    void postInitializeConcrete() {}
 };

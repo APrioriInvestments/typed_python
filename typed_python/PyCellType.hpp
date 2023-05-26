@@ -26,10 +26,9 @@ public:
             PyObjectHandleTypeBase(TypeCategory::catPyCell)
     {
         m_name = std::string("PyCell");
-
+        m_size = sizeof(layout_type*);
+        m_is_default_constructible = true;
         m_is_simple = false;
-
-        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other) {
@@ -47,14 +46,6 @@ public:
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
-    }
-
-    bool _updateAfterForwardTypesChanged() {
-        m_size = sizeof(layout_type*);
-
-        m_is_default_constructible = true;
-
-        return false;
     }
 
     typed_python_hash_type hash(instance_ptr left) {
@@ -149,6 +140,8 @@ public:
         PyEnsureGilAcquired getTheGil;
         getPyObj(self) = PyCell_New(nullptr);
     }
+
+    void postInitializeConcrete() {}
 
     static PyCellType* Make() {
         static PyCellType* res = new PyCellType();

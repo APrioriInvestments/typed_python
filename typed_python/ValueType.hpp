@@ -97,6 +97,7 @@ public:
         return mInstance;
     }
 
+    // TODO: should we allow Forward-declared Value types?
     static Type* Make(Instance i) {
         PyEnsureGilAcquired getTheGil;
 
@@ -110,6 +111,8 @@ public:
 
         return it->second;
     }
+
+    void postInitializeConcrete() {}
 
 private:
     Value(const Instance& instance);

@@ -61,5 +61,7 @@ public:
 
         constructor((instance_ptr)self, outBuffer.size(), (const char*)outBuffer.buffer());
     }
+
+    void postInitializeConcrete() {}
 };
 

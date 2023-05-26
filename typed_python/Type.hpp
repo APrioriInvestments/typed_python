@@ -60,7 +60,6 @@ class Float64;
 class StringType;
 class BytesType;
 class OneOfType;
-class SubclassOfType;
 class Value;
 class TupleOfType;
 class PointerTo;
@@ -75,6 +74,7 @@ class ConcreteAlternative;
 class AlternativeMatcher;
 class PythonSubclass;
 class PythonObjectOfType;
+class SubclassOfType;
 class Class;
 class HeldClass;
 class Function;
@@ -959,7 +959,7 @@ protected:
     }
 
     void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
-        throw std::runtime_error("subclasses implement");
+        throw std::runtime_error("Type " + name() + " didn't define initializeFromConcrete");
     }
 
     // update internal Type pointers to point into a new group
@@ -972,7 +972,7 @@ protected:
     void updateInternalTypePointersConcrete(
         const std::map<Type*, Type*>& groupMap
     ) {
-        throw std::runtime_error("subclasses implement");
+        throw std::runtime_error("Type " + name() + " didn't define updateInternalTypePointersConcrete");
     }
 
     // produce a copy of ourself
@@ -983,7 +983,7 @@ protected:
     }
 
     Type* cloneForForwardResolutionConcrete() {
-        throw std::runtime_error("subclasses implement");
+        throw std::runtime_error("Type " + name() + " didn't define cloneForForwardResolutionConcrete");
     }
 
     void postInitializeConcrete() {
