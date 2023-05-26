@@ -339,21 +339,34 @@ public:
 
 //a class held directly inside of another object
 class HeldClass : public Type {
+    HeldClass() :
+            Type(catHeldClass),
+            m_vtable(new VTable(this)),
+            m_classType(nullptr),
+            m_is_final(false),
+            m_hasComparisonOperators(false),
+            m_hasGetAttributeMagicMethod(false),
+            m_hasGetAttrMagicMethod(false),
+            m_hasSetAttrMagicMethod(false),
+            m_hasDelAttrMagicMethod(false),
+            m_hasDelMagicMethod(false),
+            m_hasConvertFromMagicMethod(false),
+            m_refToType(nullptr)
+    {
+        m_needs_post_init = true;
+    }
+
 public:
     HeldClass(std::string inName,
-          const std::vector<HeldClass*>& baseClasses,
-          bool isFinal,
-          const std::vector<MemberDefinition>& members,
-          const std::map<std::string, Function*>& memberFunctions,
-          const std::map<std::string, Function*>& staticFunctions,
-          const std::map<std::string, Function*>& propertyFunctions,
-          const std::map<std::string, PyObject*>& classMembers,
-          const std::map<std::string, Function*>& classMethods,
-          // set to True if this is the first time the class is being created
-          // and we need to make copies of all the function objects so that
-          // they know who their methods are.
-          bool isNew
-          ) :
+        const std::vector<HeldClass*>& baseClasses,
+        bool isFinal,
+        const std::vector<MemberDefinition>& members,
+        const std::map<std::string, Function*>& memberFunctions,
+        const std::map<std::string, Function*>& staticFunctions,
+        const std::map<std::string, Function*>& propertyFunctions,
+        const std::map<std::string, PyObject*>& classMembers,
+        const std::map<std::string, Function*>& classMethods
+    ) :
             Type(catHeldClass),
             m_vtable(new VTable(this)),
             m_bases(baseClasses),
@@ -374,21 +387,64 @@ public:
             m_hasConvertFromMagicMethod(false),
             m_refToType(nullptr)
     {
+        m_is_forward_defined = true;
+
         m_name = inName;
 
-        if (isNew) {
-            for (auto& nameAndF: m_own_memberFunctions) {
-                nameAndF.second = nameAndF.second->withMethodOf(this);
-            }
-
-            for (auto& nameAndF: m_own_classMethods) {
-                nameAndF.second = nameAndF.second->withMethodOf(this);
-            }
-
-            for (auto& nameAndF: m_own_staticFunctions) {
-                nameAndF.second = nameAndF.second->withMethodOf(this);
-            }
+        for (auto& nameAndF: m_own_memberFunctions) {
+            nameAndF.second = nameAndF.second->withMethodOf(this);
         }
+
+        for (auto& nameAndF: m_own_classMethods) {
+            nameAndF.second = nameAndF.second->withMethodOf(this);
+        }
+
+        for (auto& nameAndF: m_own_staticFunctions) {
+            nameAndF.second = nameAndF.second->withMethodOf(this);
+        }
+    }
+
+    void postInitializeConcrete() {
+        m_byte_offsets.clear();
+
+        updateBytesOfInitBits();
+
+        size_t size = mBytesOfInitializationBits;
+
+        for (auto t: m_members) {
+            m_byte_offsets.push_back(size);
+            size += t.getType()->bytecount();
+        }
+
+        m_is_default_constructible = (
+            m_memberFunctions.find("__init__") == m_memberFunctions.end()
+        );
+        m_size = size;
+
+        initializeMRO();
+    }
+
+    void initializeFromConcrete(Type* forwardDef) {
+        HeldClass* fwdCls = (HeldClass*)forwardDef;
+
+        m_bases = fwdCls->m_bases;
+        m_is_final = fwdCls->m_is_final;
+        m_own_members = fwdCls->m_own_members;
+        m_own_memberFunctions = fwdCls->m_own_memberFunctions;
+        m_own_staticFunctions = fwdCls->m_own_staticFunctions;
+        m_own_propertyFunctions = fwdCls->m_own_propertyFunctions;
+        m_own_classMembers = fwdCls->m_own_classMembers;
+        m_own_classMethods = fwdCls->m_own_classMethods;
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new HeldClass();
+    }
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        _visitReferencedTypes([&](Type*& typePtr) {
+            updateTypeRefFromGroupMap(typePtr, groupMap);
+        });
     }
 
     template<class visitor_type>
@@ -502,8 +558,6 @@ public:
         }
     }
 
-    bool _updateAfterForwardTypesChanged();
-
     static HeldClass* Make(
         std::string inName,
         const std::vector<HeldClass*>& bases,
@@ -513,8 +567,7 @@ public:
         const std::map<std::string, Function*>& staticFunctions,
         const std::map<std::string, Function*>& propertyFunctions,
         const std::map<std::string, PyObject*>& classMembers,
-        const std::map<std::string, Function*>& classMethods,
-        bool isNew
+        const std::map<std::string, Function*>& classMethods
     );
 
     // this gets called by Class. These types are always produced in pairs.
@@ -549,8 +602,7 @@ public:
             m_own_staticFunctions,
             m_own_propertyFunctions,
             m_own_classMembers,
-            m_own_classMethods,
-            true
+            m_own_classMethods
         );
     }
 

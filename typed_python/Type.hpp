@@ -590,6 +590,15 @@ public:
         }
     }
 
+    template<class T>
+    static void updateTypeRefFromGroupMap(T*& toUpdate, const std::map<Type*, Type*>& groupMap) {
+        auto it = groupMap.find(toUpdate);
+
+        if (it != groupMap.end()) {
+            toUpdate = (T*)it->second;
+        }
+    }
+
     Type* getBaseType() const {
         return m_base;
     }
@@ -987,7 +996,9 @@ protected:
     }
 
     void postInitializeConcrete() {
-        throw std::runtime_error("Type " + name() + " of cat " + getTypeCategoryString() + " didn't implement postInitializeConcrete");
+        throw std::runtime_error(
+            "Type " + name() + " of cat " + getTypeCategoryString() + " didn't implement postInitializeConcrete"
+        );
     }
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
@@ -1008,6 +1019,8 @@ public:
         if (!m_needs_post_init) {
             return;
         }
+
+        m_needs_post_init = false;
 
         this->check([&](auto& subtype) {
             subtype.postInitializeConcrete();

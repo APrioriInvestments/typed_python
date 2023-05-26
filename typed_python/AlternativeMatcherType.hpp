@@ -21,15 +21,26 @@
 
 // Models an alternatives '.matches' result
 class AlternativeMatcher : public Type {
+    AlternativeMatcher() : Type(TypeCategory::catAlternativeMatcher)
+    {
+        m_needs_post_init = true;
+    }
 public:
     AlternativeMatcher(Type* inAlternative) : Type(TypeCategory::catAlternativeMatcher)
     {
+        m_is_forward_defined = true;
         m_is_default_constructible = false;
         m_alternative = inAlternative;
         m_size = inAlternative->bytecount();
         m_is_simple = false;
 
         endOfConstructorInitialization(); // finish initializing the type object.
+    }
+
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
+        return "AlternativeMatcher("
+            + m_alternative->computeRecursiveName(typeStack)
+            + ")";
     }
 
     template<class visitor_type>
@@ -48,42 +59,42 @@ public:
         visitor(m_alternative);
     }
 
-    bool _updateAfterForwardTypesChanged() {
-        bool anyChanged = false;
-
-        std::string name = "AlternativeMatcher(" + m_alternative->name(true) + ")";
-        size_t size = m_alternative->bytecount();
-
-        anyChanged = (
-            name != m_name ||
-            size != m_size
-        );
-
-        m_name = name;
-        m_stripped_name = "";
-        m_size = size;
-
-        return anyChanged;
+    void postInitializeConcrete() {
+        m_size = m_alternative->bytecount();
     }
 
-    void _updateTypeMemosAfterForwardResolution() {
-        AlternativeMatcher::Make(m_alternative, this);
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        m_alternative = ((AlternativeMatcher*)forwardDefinitionOfSelf)->m_alternative;
     }
 
-    static AlternativeMatcher* Make(Type* alt, AlternativeMatcher* knownType=nullptr) {
-        PyEnsureGilAcquired getTheGil;
+    Type* cloneForForwardResolutionConcrete() {
+        return new AlternativeMatcher();
+    }
 
-        static std::map<Type*, AlternativeMatcher*> m;
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        updateTypeRefFromGroupMap(m_alternative, groupMap);
+    }
 
-        auto it = m.find(alt);
-
-        if (it == m.end()) {
-            it = m.insert(
-                std::make_pair(alt, knownType ? knownType : new AlternativeMatcher(alt))
-            ).first;
+    static AlternativeMatcher* Make(Type* alt) {
+        if (alt->isForwardDefined()) {
+            return new AlternativeMatcher(alt);
         }
 
-        return it->second;
+        PyEnsureGilAcquired getTheGil;
+
+        static std::map<Type*, AlternativeMatcher*> memo;
+
+        auto it = memo.find(alt);
+        if (it != memo.end()) {
+            return it->second;
+        }
+
+        AlternativeMatcher* res = new AlternativeMatcher(alt);
+        AlternativeMatcher* concrete = (AlternativeMatcher*)res->forwardResolvesTo();
+
+        memo[alt] = concrete;
+
+        return concrete;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {

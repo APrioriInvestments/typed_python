@@ -16,35 +16,6 @@
 
 #include "AllTypes.hpp"
 
-bool SubclassOfType::_updateAfterForwardTypesChanged() {
-    size_t size = sizeof(Type*);
-    std::string name = computeName();
-
-    if (m_is_recursive_forward) {
-        name = m_recursive_name;
-    }
-
-    bool is_default_constructible = true;
-
-    bool anyChanged = (
-        size != m_size ||
-        name != m_name ||
-        is_default_constructible != m_is_default_constructible
-    );
-
-    m_size = size;
-    m_name = name;
-    m_stripped_name = "";
-
-    m_is_default_constructible = is_default_constructible;
-
-    return anyChanged;
-}
-
-std::string SubclassOfType::computeName() const {
-    return "SubclassOf(" + m_subclassOf->name(true) + ")";
-}
-
 void SubclassOfType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     stream << "<class '" + ((Type**)self)[0]->name() + "'>";
 }
@@ -89,16 +60,24 @@ void SubclassOfType::assign(instance_ptr self, instance_ptr other) {
 }
 
 // static
-SubclassOfType* SubclassOfType::Make(Type* subclassOf, SubclassOfType* knownType) {
-    PyEnsureGilAcquired getTheGil;
-
-    static std::map<Type*, SubclassOfType*> m;
-
-    auto it = m.find(subclassOf);
-
-    if (it == m.end()) {
-        it = m.insert(std::make_pair(subclassOf, knownType ? knownType : new SubclassOfType(subclassOf))).first;
+SubclassOfType* SubclassOfType::Make(Type* subclassOf) {
+    if (subclassOf->isForwardDefined()) {
+        return new SubclassOfType(subclassOf);
     }
 
-    return it->second;
+    PyEnsureGilAcquired getTheGil;
+
+    static std::map<Type*, SubclassOfType*> memo;
+
+    auto it = memo.find(subclassOf);
+    if (it != memo.end()) {
+        return it->second;
+    }
+
+    SubclassOfType* res = new SubclassOfType(subclassOf);
+    SubclassOfType* concrete = (SubclassOfType*)res->forwardResolvesTo();
+
+    memo[subclassOf] = concrete;
+
+    return concrete;
 }

@@ -20,6 +20,14 @@
 #include "AlternativeType.hpp"
 
 class ConcreteAlternative : public Type {
+    ConcreteAlternative() :
+        Type(TypeCategory::catConcreteAlternative),
+        m_which(0),
+        m_alternative(nullptr)
+    {
+        m_needs_post_init = true;
+    }
+
 public:
     typedef Alternative::layout layout;
 
@@ -28,7 +36,42 @@ public:
             m_alternative(m_alternative),
             m_which(which)
     {
-        endOfConstructorInitialization(); // finish initializing the type object.
+        m_is_forward_defined = true;
+    }
+
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
+        return m_alternative->name() + "." + m_alternative->subtypes()[m_which].first;
+    }
+
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        m_alternative = ((ConcreteAlternative*)forwardDefinitionOfSelf)->m_alternative;
+        m_which = ((ConcreteAlternative*)forwardDefinitionOfSelf)->m_which;
+    }
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        updateTypeRefFromGroupMap(m_alternative, groupMap);
+        updateTypeRefFromGroupMap(m_base, groupMap);
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new ConcreteAlternative();
+    }
+
+    void postInitializeConcrete() {
+        if (m_which < 0 || m_which >= m_alternative->subtypes().size()) {
+            throw std::runtime_error(
+                "invalid alternative index: " +
+                format(m_which) + " not in [0," +
+                format(m_alternative->subtypes().size()) + ")"
+            );
+        }
+
+        m_base = m_alternative;
+        size_t size = m_alternative->bytecount();
+        bool is_default_constructible = m_alternative->subtypes()[m_which].second->is_default_constructible();
+
+        m_size = size;
+        m_is_default_constructible = is_default_constructible;
     }
 
     std::string nameWithModuleConcrete() {
@@ -53,10 +96,6 @@ public:
 
     size_t deepBytecountConcrete(instance_ptr instance, std::unordered_set<void*>& alreadyVisited, std::set<Slab*>* outSlabs) {
         return m_alternative->deepBytecount(instance, alreadyVisited, outSlabs);
-    }
-
-    void _updateTypeMemosAfterForwardResolution() {
-        ConcreteAlternative::Make(m_alternative, m_which, this);
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -152,7 +191,7 @@ public:
         return m_alternative->eltPtr(self);
     }
 
-    static ConcreteAlternative* Make(Alternative* alt, int64_t which, ConcreteAlternative* knownType=nullptr);
+    static ConcreteAlternative* Make(Alternative* alt, int64_t which);
 
     Type* elementType() const {
         return m_alternative->subtypes()[m_which].second;

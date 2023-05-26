@@ -182,10 +182,6 @@ void OneOfType::updateInternalTypePointersConcrete(
 }
 
 void OneOfType::postInitializeConcrete() {
-    if (!m_needs_post_init) {
-        return;
-    }
-
     for (auto t: m_types) {
         t->postInitialize();
     }
@@ -200,8 +196,6 @@ void OneOfType::postInitializeConcrete() {
             break;
         }
     }
-
-    m_needs_post_init = false;
 }
 
 std::string OneOfType::computeRecursiveNameConcrete(TypeStack& typeStack) {

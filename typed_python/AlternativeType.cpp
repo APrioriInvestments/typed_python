@@ -50,51 +50,6 @@ int64_t Alternative::refcount(instance_ptr i) const {
     return ((layout**)i)[0]->refcount;
 }
 
-bool Alternative::_updateAfterForwardTypesChanged() {
-    m_arg_positions.clear();
-    m_default_construction_type = nullptr;
-
-    bool is_default_constructible = false;
-    bool all_alternatives_empty = true;
-    int default_construction_ix = 0;
-
-    for (auto& subtype_pair: m_subtypes) {
-        if (subtype_pair.second->bytecount() > 0) {
-            all_alternatives_empty = false;
-        }
-
-        if (m_arg_positions.find(subtype_pair.first) != m_arg_positions.end()) {
-            throw std::runtime_error("Can't create an alternative with " +
-                    subtype_pair.first + " defined twice.");
-        }
-
-        size_t argPosition = m_arg_positions.size();
-
-        m_arg_positions[subtype_pair.first] = argPosition;
-
-        if (subtype_pair.second->is_default_constructible() && !is_default_constructible) {
-            is_default_constructible = true;
-            default_construction_ix = m_arg_positions[subtype_pair.first];
-        }
-    }
-
-    size_t size = (all_alternatives_empty ? 1 : sizeof(void*));
-
-    bool anyChanged = (
-        size != m_size ||
-        m_default_construction_ix != default_construction_ix ||
-        m_all_alternatives_empty != all_alternatives_empty ||
-        m_is_default_constructible != is_default_constructible
-    );
-
-    m_size = size;
-    m_default_construction_ix = default_construction_ix;
-    m_all_alternatives_empty = all_alternatives_empty;
-    m_is_default_constructible = is_default_constructible;
-
-    return anyChanged;
-}
-
 bool Alternative::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     if (m_all_alternatives_empty) {
         if (*(uint8_t*)left < *(uint8_t*)right) {
@@ -236,12 +191,34 @@ void Alternative::assign(instance_ptr self, instance_ptr other) {
 
 // static
 Alternative* Alternative::Make(
-                            std::string name,
-                            std::string moduleName,
-                            const std::vector<std::pair<std::string, NamedTuple*> >& types,
-                            const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
-                            ) {
-    return new Alternative(name, moduleName, types, methods);
+    std::string name,
+    std::string moduleName,
+    const std::vector<std::pair<std::string, NamedTuple*> >& types,
+    const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
+) {
+    bool anyForward = false;
+
+    for (auto nameAndTup: types) {
+        if (nameAndTup.second->isForwardDefined()) {
+            anyForward = true;
+        }
+    }
+
+    for (auto nameAndMeth: methods) {
+        if (nameAndMeth.second->isForwardDefined()) {
+            anyForward = true;
+        }
+    }
+
+    Alternative* res = new Alternative(name, moduleName, types, methods);
+
+    if (anyForward) {
+        return res;
+    }
+
+    Alternative* concrete = (Alternative*)res->forwardResolvesTo();
+
+    return concrete;
 }
 
 Type* Alternative::concreteSubtype(size_t which) {

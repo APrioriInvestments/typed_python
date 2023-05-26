@@ -306,10 +306,7 @@ public:
                     staticFunctions,
                     propertyFunctions,
                     classMembers,
-                    classMethods,
-                    // we want to ensure the class has appropriate
-                    // methodOf for all of its function types
-                    true
+                    classMethods
                 );
 
                 forwardC->define(outC);

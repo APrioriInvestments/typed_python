@@ -77,6 +77,12 @@ PyDoc_STRVAR(Alternative_doc,
 );
 
 class Alternative : public Type {
+    Alternative() : Type(TypeCategory::catAlternative)
+    {
+        m_doc = Alternative_doc;
+        m_needs_post_init = true;
+    }
+
 public:
     class layout {
     public:
@@ -100,6 +106,8 @@ public:
             m_methods(methods),
             m_hasGetAttributeMagicMethod(false)
     {
+        m_is_forward_defined = true;
+
         m_name = name;
         m_moduleName = moduleName;
         m_is_simple = false;
@@ -110,12 +118,75 @@ public:
         }
 
         m_doc = Alternative_doc;
+    }
 
-        // call this _first_, so that our core properties, (which we know) are created
-        // before we walk down to the ConcreteAlternatives
-        _updateAfterForwardTypesChanged();
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        Alternative* selfT = (Alternative*)forwardDefinitionOfSelf;
 
-        endOfConstructorInitialization(); // finish initializing the type object.
+        m_name = selfT->m_name;
+        m_moduleName = selfT->m_moduleName;
+        m_is_simple = selfT->m_is_simple;
+        m_hasGetAttributeMagicMethod = selfT->m_hasGetAttributeMagicMethod;
+        m_methods = selfT->m_methods;
+        m_subtypes = selfT->m_subtypes;
+        m_default_construction_ix = selfT->m_default_construction_ix;
+        m_default_construction_type = selfT->m_default_construction_type;
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new Alternative();
+    }
+
+    void postInitializeConcrete() {
+        m_arg_positions.clear();
+        m_default_construction_type = nullptr;
+
+        bool is_default_constructible = false;
+        bool all_alternatives_empty = true;
+        int default_construction_ix = 0;
+
+        for (auto& subtype_pair: m_subtypes) {
+            if (subtype_pair.second->bytecount() > 0) {
+                all_alternatives_empty = false;
+            }
+
+            if (m_arg_positions.find(subtype_pair.first) != m_arg_positions.end()) {
+                throw std::runtime_error("Can't create an alternative with " +
+                        subtype_pair.first + " defined twice.");
+            }
+
+            size_t argPosition = m_arg_positions.size();
+
+            m_arg_positions[subtype_pair.first] = argPosition;
+
+            if (subtype_pair.second->is_default_constructible() && !is_default_constructible) {
+                is_default_constructible = true;
+                default_construction_ix = m_arg_positions[subtype_pair.first];
+            }
+        }
+
+        size_t size = (all_alternatives_empty ? 1 : sizeof(void*));
+
+        m_size = size;
+        m_default_construction_ix = default_construction_ix;
+        m_all_alternatives_empty = all_alternatives_empty;
+        m_is_default_constructible = is_default_constructible;
+    }
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        for (auto& nameAndSub: m_subtypes) {
+            updateTypeRefFromGroupMap(nameAndSub.second, groupMap);
+        }
+
+        for (auto& sub: m_subtypes_concrete) {
+            updateTypeRefFromGroupMap(sub, groupMap);
+        }
+
+        updateTypeRefFromGroupMap(m_default_construction_type, groupMap);
+
+        for (auto& nameAndSub: m_methods) {
+            updateTypeRefFromGroupMap(nameAndSub.second, groupMap);
+        }
     }
 
     std::string nameWithModuleConcrete() {
@@ -162,8 +233,6 @@ public:
             assert(t == method_pair.second);
         }
     }
-
-    bool _updateAfterForwardTypesChanged();
 
     template<class visitor_type>
     void _visitCompilerVisibleInternals(const visitor_type& v) {
@@ -304,11 +373,11 @@ public:
     void assign(instance_ptr self, instance_ptr other);
 
     static Alternative* Make(
-                        std::string name,
-                        std::string moduleName,
-                        const std::vector<std::pair<std::string, NamedTuple*> >& types,
-                        const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
-                        );
+        std::string name,
+        std::string moduleName,
+        const std::vector<std::pair<std::string, NamedTuple*> >& types,
+        const std::map<std::string, Function*>& methods
+    );
 
     Alternative* renamed(std::string newName) {
         return Make(newName, m_moduleName, m_subtypes, m_methods);

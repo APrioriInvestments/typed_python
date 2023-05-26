@@ -1516,6 +1516,13 @@ public:
         size_t mMaxPositionalArgs;
     };
 
+    Function() : Type(catFunction)
+    {
+        m_needs_post_init = true;
+        m_is_simple = false;
+        m_doc = Function_doc;
+    }
+
     Function(std::string inName,
             std::string qualname,
             std::string moduleName,
@@ -1530,15 +1537,12 @@ public:
         mIsNocompile(isNocompile),
         mRootName(inName),
         mQualname(qualname),
-        mModulename(moduleName)
+        mModulename(moduleName),
+        mClosureType(closureType)
     {
+        m_is_forward_defined = true;
         m_is_simple = false;
         m_doc = Function_doc;
-
-        mClosureType = closureType;
-
-        _updateAfterForwardTypesChanged();
-        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     std::string moduleNameConcrete() {
@@ -1557,15 +1561,35 @@ public:
         return mModulename + "." + mRootName;
     }
 
-    bool _updateAfterForwardTypesChanged() {
-        m_name = mRootName;
-        m_stripped_name = "";
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
+        return mRootName;
+    }
 
+    void postInitializeConcrete() {
         m_size = mClosureType->bytecount();
-
         m_is_default_constructible = mClosureType->is_default_constructible();
+    }
 
-        return false;
+    void initializeFromConcrete(Type* forwardDef) {
+        Function* fwdFunc = (Function*)forwardDef;
+
+        mClosureType = fwdFunc->mClosureType;
+        mOverloads = fwdFunc->mOverloads;
+        mIsEntrypoint = fwdFunc->mIsEntrypoint;
+        mIsNocompile = fwdFunc->mIsNocompile;
+        mRootName = fwdFunc->mRootName;
+        mQualname = fwdFunc->mQualname;
+        mModulename = fwdFunc->mModulename;
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new Function();
+    }
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        _visitReferencedTypes([&](Type*& typePtr) {
+            updateTypeRefFromGroupMap(typePtr, groupMap);
+        });
     }
 
     template<class visitor_type>
@@ -1590,22 +1614,68 @@ public:
         }
     }
 
-    static Function* Make(std::string inName, std::string qualname, std::string moduleName, const std::vector<Overload>& overloads, Type* closureType, bool isEntrypoint, bool isNocompile) {
-        PyEnsureGilAcquired getTheGil;
+    static Function* Make(
+        std::string inName,
+        std::string qualname,
+        std::string moduleName,
+        std::vector<Overload> overloads,
+        Type* closureType,
+        bool isEntrypoint,
+        bool isNocompile
+    ) {
+        bool anyFwd = false;
 
-        typedef std::tuple<const std::string, const std::string, const std::string, const std::vector<Overload>, Type*, bool, bool> keytype;
-
-        static std::map<keytype, Function*> *m = new std::map<keytype, Function*>();
-
-        auto it = m->find(keytype(inName, qualname, moduleName, overloads, closureType, isEntrypoint, isNocompile));
-        if (it == m->end()) {
-            it = m->insert(std::pair<keytype, Function*>(
-                keytype(inName, qualname, moduleName, overloads, closureType, isEntrypoint, isNocompile),
-                new Function(inName, qualname, moduleName, overloads, closureType, isEntrypoint, isNocompile)
-            )).first;
+        if (closureType->isForwardDefined()) {
+            anyFwd = true;
         }
 
-        return it->second;
+        for (auto& o: overloads) {
+            o._visitReferencedTypes([&](Type* t) {
+                if (t->isForwardDefined()) {
+                    anyFwd = true;
+                }
+            });
+        }
+
+        if (anyFwd) {
+            return new Function(
+                inName, qualname, moduleName, overloads, closureType, isEntrypoint, isNocompile
+            );
+        }
+
+        PyEnsureGilAcquired getTheGil;
+
+        typedef std::tuple<
+            const std::string,
+            const std::string,
+            const std::string,
+            const std::vector<Overload>,
+            Type*,
+            bool,
+            bool
+        > keytype;
+
+        // allocate and leak the memo or else we will crash at process unload time
+        static std::map<keytype, Function*> *memo = new std::map<keytype, Function*>();
+
+        keytype key(
+            inName, qualname, moduleName, overloads, closureType, isEntrypoint, isNocompile
+        );
+
+        auto it = memo->find(key);
+
+        if (it != memo->end()) {
+            return it->second;
+        }
+
+        Function* res = new Function(
+            inName, qualname, moduleName, overloads, closureType, isEntrypoint, isNocompile
+        );
+
+        Function* concrete = (Function*)res->forwardResolvesTo();
+
+        (*memo)[key] = concrete;
+        return concrete;
     }
 
     template<class visitor_type>
@@ -1657,8 +1727,6 @@ public:
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
         return mClosureType->cmp(left, right, pyComparisonOp, suppressExceptions);
     }
-
-
 
     void deepcopyConcrete(
         instance_ptr dest,

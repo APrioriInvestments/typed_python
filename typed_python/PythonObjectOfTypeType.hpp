@@ -128,7 +128,15 @@ public:
 
         m_is_simple = false;
 
-        endOfConstructorInitialization(); // finish initializing the type object.
+        m_size = sizeof(layout_type*);
+
+        int isinst = PyObject_IsInstance(Py_None, (PyObject*)mPyTypePtr);
+        if (isinst == -1) {
+            isinst = 0;
+            PyErr_Clear();
+        }
+
+        m_is_default_constructible = isinst != 0;
     }
 
     template<class visitor_type>
@@ -149,21 +157,7 @@ public:
     void _visitReferencedTypes(const visitor_type& visitor) {
     }
 
-    bool _updateAfterForwardTypesChanged() {
-        m_size = sizeof(layout_type*);
-
-        int isinst = PyObject_IsInstance(Py_None, (PyObject*)mPyTypePtr);
-        if (isinst == -1) {
-            isinst = 0;
-            PyErr_Clear();
-        }
-
-        m_is_default_constructible = isinst != 0;
-
-        //none of these values can ever change, so we can just return
-        //because we don't need to be updated again.
-        return false;
-    }
+    void postInitializeConcrete() {}
 
     int64_t refcount(instance_ptr self) const {
         return getHandlePtr(self)->refcount;

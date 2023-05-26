@@ -164,14 +164,6 @@ void TupleOrListOfType::updateInternalTypePointersConcrete(
     }
 }
 
-
-void TupleOrListOfType::postInitializeConcrete() {
-    if (!m_needs_post_init) {
-        return;
-    }
-    m_needs_post_init = false;
-}
-
 std::string TupleOrListOfType::computeRecursiveNameConcrete(TypeStack& stack) {
     if (m_is_tuple) {
         return "TupleOf(" + m_element_type->computeRecursiveName(stack) + ")";

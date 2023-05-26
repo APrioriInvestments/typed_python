@@ -1284,11 +1284,7 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
                     staticFuncs,
                     propertyFuncs,
                     clsMembers,
-                    classMethodFuncs,
-                    // this is the first time this class exists,
-                    // so we need the constructor to rebuild the
-                    // function objects with apprioriated methodOf
-                    true
+                    classMethodFuncs
                 )
             )
         );

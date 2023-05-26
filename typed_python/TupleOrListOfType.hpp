@@ -596,7 +596,7 @@ public:
 
     void initializeFromConcrete(Type* forwardDefinitionOfSelf);
 
-    void postInitializeConcrete();
+    void postInitializeConcrete() {};
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack);
 

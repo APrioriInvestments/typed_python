@@ -25,14 +25,37 @@ PyDoc_STRVAR(SubclassOf_doc,
     );
 
 class SubclassOfType : public Type {
+    SubclassOfType() : Type(TypeCategory::catSubclassOf)
+    {
+        m_doc = SubclassOf_doc;
+        m_is_default_constructible = true;
+        m_needs_post_init = true;
+        m_size = sizeof(Type*);
+    }
 public:
     SubclassOfType(Type* subclassOf) noexcept :
                     Type(TypeCategory::catSubclassOf),
                     m_subclassOf(subclassOf)
     {
         m_doc = SubclassOf_doc;
+        m_is_forward_defined = true;
+        m_is_default_constructible = true;
+        m_size = sizeof(Type*);
+    }
 
-        endOfConstructorInitialization(); // finish initializing the type object.
+    void postInitializeConcrete() {
+    }
+
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        m_subclassOf = ((SubclassOfType*)forwardDefinitionOfSelf)->m_subclassOf;
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new SubclassOfType();
+    }
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        updateTypeRefFromGroupMap(m_subclassOf, groupMap);
     }
 
     template<class visitor_type>
@@ -55,13 +78,15 @@ public:
         _visitContainedTypes(visitor);
     }
 
-    bool _updateAfterForwardTypesChanged();
-
     bool isPODConcrete() {
         return true;
     }
 
-    std::string computeName() const;
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
+        return "SubclassOf("
+            + m_subclassOf->computeRecursiveName(typeStack)
+            + ")";
+    }
 
     void deepcopyConcrete(
         instance_ptr dest,
@@ -104,11 +129,7 @@ public:
         return m_subclassOf;
     }
 
-    void _updateTypeMemosAfterForwardResolution() {
-        SubclassOfType::Make(m_subclassOf, this);
-    }
-
-    static SubclassOfType* Make(Type* subclassOf, SubclassOfType* knownType = nullptr);
+    static SubclassOfType* Make(Type* subclassOf);
 
 private:
     Type* m_subclassOf;

@@ -32,35 +32,6 @@ bool ConcreteAlternative::isBinaryCompatibleWithConcrete(Type* other) {
     return false;
 }
 
-bool ConcreteAlternative::_updateAfterForwardTypesChanged() {
-    if (m_which < 0 || m_which >= m_alternative->subtypes().size()) {
-      throw std::runtime_error(
-        "invalid alternative index: " +
-        format(m_which) + " not in [0," +
-        format(m_alternative->subtypes().size()) + ")"
-      );
-    }
-
-    m_base = m_alternative;
-
-    std::string name = m_alternative->name() + "." + m_alternative->subtypes()[m_which].first;
-    size_t size = m_alternative->bytecount();
-    bool is_default_constructible = m_alternative->subtypes()[m_which].second->is_default_constructible();
-
-    bool anyChanged = (
-        m_name != name ||
-        m_size != size ||
-        m_is_default_constructible != is_default_constructible
-    );
-
-    m_name = name;
-    m_stripped_name = "";
-    m_size = size;
-    m_is_default_constructible = is_default_constructible;
-
-    return anyChanged;
-}
-
 void ConcreteAlternative::constructor(instance_ptr self) {
     assertForwardsResolvedSufficientlyToInstantiate();
 
@@ -74,31 +45,26 @@ void ConcreteAlternative::constructor(instance_ptr self) {
 }
 
 // static
-ConcreteAlternative* ConcreteAlternative::Make(Alternative* alt, int64_t which, ConcreteAlternative* knownType) {
+ConcreteAlternative* ConcreteAlternative::Make(Alternative* alt, int64_t which) {
+    if (alt->isForwardDefined()) {
+        return new ConcreteAlternative(alt, which);
+    }
+
     PyEnsureGilAcquired getTheGil;
 
     typedef std::pair<Alternative*, int64_t> keytype;
 
-    static std::map<keytype, ConcreteAlternative*> m;
+    static std::map<keytype, ConcreteAlternative*> memo;
 
-    auto it = m.find(keytype(alt ,which));
+    auto it = memo.find(keytype(alt, which));
 
-    if (it == m.end()) {
-        if (which < 0 || which >= alt->subtypes().size()) {
-            throw std::runtime_error(
-                "invalid alternative index: " +
-                format(which) + " not in [0," +
-                format(alt->subtypes().size()) + ")"
-            );
-        }
-
-        it = m.insert(
-            std::make_pair(
-                keytype(alt,which),
-                knownType ? knownType : new ConcreteAlternative(alt,which)
-            )
-        ).first;
+    if (it != memo.end()) {
+        return it->second;
     }
 
-    return it->second;
+    ConcreteAlternative* res = new ConcreteAlternative(alt, which);
+    ConcreteAlternative* concrete = (ConcreteAlternative*)res->forwardResolvesTo();
+
+    memo[keytype(alt, which)] = concrete;
+    return concrete;
 }

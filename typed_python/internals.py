@@ -380,7 +380,7 @@ class ClassMetaclass(type):
         return cls in type(instance).MRO
 
 
-def Function(f, assumeClosuresGlobal=False, returnTypeOverride=None):
+def Function(f, returnTypeOverride=None, assumeClosuresGlobal=False):
     """Turn a normal python function into a 'typed_python.Function' which obeys type restrictions."""
     return makeFunctionType(
         f.__name__, f, assumeClosuresGlobal=assumeClosuresGlobal, returnTypeOverride=returnTypeOverride

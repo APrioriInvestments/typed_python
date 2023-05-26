@@ -26,16 +26,6 @@ bool Class::isBinaryCompatibleWithConcrete(Type* other) {
     return m_heldClass->isBinaryCompatibleWith(otherO->m_heldClass);
 }
 
-bool Class::_updateAfterForwardTypesChanged() {
-    bool is_default_constructible = m_heldClass->is_default_constructible();
-
-    bool anyChanged = m_is_default_constructible != is_default_constructible;
-
-    m_is_default_constructible = is_default_constructible;
-
-    return anyChanged;
-}
-
 instance_ptr Class::eltPtr(instance_ptr self, int64_t ix) const {
     layout& l = *instanceToLayout(self);
     return m_heldClass->eltPtr(l.data, ix);

@@ -63,10 +63,7 @@ public:
     }
 
     void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
-        auto it_key = groupMap.find(m_key_type);
-        if (it_key != groupMap.end()) {
-            m_key_type = it_key->second;
-        }
+        updateTypeRefFromGroupMap(m_key_type, groupMap);
     }
 
     Type* cloneForForwardResolutionConcrete() {

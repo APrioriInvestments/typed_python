@@ -2,7 +2,7 @@ import pytest
 
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
-    Tuple, NamedTuple, PointerTo, RefTo, Dict, Set
+    Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function
 )
 
 
@@ -16,6 +16,9 @@ def test_nonforward_definition():
     assert not isForwardDefined(PointerTo(int))
     assert not isForwardDefined(RefTo(int))
     assert not isForwardDefined(NamedTuple(x=int, y=float))
+    assert not isForwardDefined(Alternative("A", x={}, y={}))
+    assert not isForwardDefined(Alternative("A", x={}, y={}).x)
+    assert not isForwardDefined(Function(lambda x: x))
 
 
 def test_forward_definition():
@@ -33,6 +36,13 @@ def test_forward_definition():
     assert isForwardDefined(PointerTo(F))
     assert isForwardDefined(RefTo(F))
     assert isForwardDefined(NamedTuple(x=int, y=F))
+    assert isForwardDefined(Alternative("A", x={'f': F}))
+    assert isForwardDefined(Alternative("A", x={'f': F}).x)
+
+    func = Function(lambda x: x, F)
+    print(func.overloads[0].returnType)
+
+    assert isForwardDefined(func)
 
 
 def test_forward_one_of():
@@ -151,3 +161,19 @@ def test_recursive_set():
 
     assert makeP() is makeP()
     assert makeP().__name__ == 'Set(^0)'
+
+
+def test_recursive_alternative():
+    def makeA():
+        F = Forward()
+        F.define(
+            Alternative(
+                "F",
+                A={'f': F},
+                B={}
+            )
+        )
+        return resolveForwardDefinedType(F)
+
+    assert makeA() is makeA()
+    assert makeA().__name__ == 'F'

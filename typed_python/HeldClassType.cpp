@@ -66,26 +66,6 @@ void HeldClass::updateBytesOfInitBits() {
     }
 }
 
-bool HeldClass::_updateAfterForwardTypesChanged() {
-    m_byte_offsets.clear();
-
-    updateBytesOfInitBits();
-
-    size_t size = mBytesOfInitializationBits;
-
-    for (auto t: m_members) {
-        m_byte_offsets.push_back(size);
-        size += t.getType()->bytecount();
-    }
-
-    bool anyChanged = size != m_size;
-
-    m_is_default_constructible = m_memberFunctions.find("__init__") == m_memberFunctions.end();
-    m_size = size;
-
-    return anyChanged;
-}
-
 bool HeldClass::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     if (hasAnyComparisonOperators()) {
         auto it = getMemberFunctions().find(Class::pyComparisonOpToMethodName(pyComparisonOp));
@@ -441,9 +421,9 @@ HeldClass* HeldClass::Make(
     const std::map<std::string, Function*>& memberFunctions,
     const std::map<std::string, Function*>& staticFunctions,
     const std::map<std::string, Function*>& propertyFunctions,
+    // TODO: are we accidentally leaking forwards out of this? Probably.
     const std::map<std::string, PyObject*>& classMembers,
-    const std::map<std::string, Function*>& classMethods,
-    bool isNew
+    const std::map<std::string, Function*>& classMethods
 ) {
     //we only allow one base class to have members because we want native code to be
     //able to just find those values in subclasses without hitting the vtable.
@@ -505,16 +485,23 @@ HeldClass* HeldClass::Make(
         staticFunctions,
         propertyFunctions,
         classMembers,
-        classMethods,
-        isNew
+        classMethods
     );
 
-    // we do these outside of the constructor so that if they throw we
-    // don't destroy the HeldClass type object (and just leak it instead) because
-    // we need to ensure we never delete Type objects.
-    result->initializeMRO();
+    // check if the forward has any references to forward types. If not, we can
+    // (and should) resolve it immediately, since our contract is that we only produce forwards
+    // if we refer to forwards.
+    bool anyForward = false;
 
-    result->endOfConstructorInitialization();
+    result->_visitReferencedTypes(
+        [&](Type* t) { if (t->isForwardDefined()) { anyForward = true; } }
+    );
 
+    if (!anyForward) {
+        return (HeldClass*)result->forwardResolvesTo();
+    }
+
+    // we have a forward ref - we have to go through the normal duplicate-and-intern forward
+    // construction process for this to work.
     return result;
 }

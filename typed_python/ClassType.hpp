@@ -35,6 +35,13 @@ PyDoc_STRVAR(Class_doc,
     );
 
 class Class : public Type {
+    // this is the non-forward type resolution version of this
+    Class() : Type(catClass)
+    {
+        m_needs_post_init = true;
+        m_doc = Class_doc;
+    }
+
 public:
     class layout {
     public:
@@ -49,15 +56,34 @@ public:
             Type(catClass),
             m_heldClass(inClass)
     {
+        // if the Held class is not forward, then neither are we!
+        m_is_forward_defined = m_heldClass->isForwardDefined();
         m_size = sizeof(layout*);
         m_is_default_constructible = inClass->is_default_constructible();
         m_name = name;
         m_doc = Class_doc;
         m_is_simple = false;
+    }
 
-        endOfConstructorInitialization(); // finish initializing the type object.
+    void postInitializeConcrete() {
+        m_size = sizeof(layout*);
+        m_is_default_constructible = m_heldClass->is_default_constructible();
+    }
 
-        inClass->setClassType(this);
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        m_heldClass = ((Class*)forwardDefinitionOfSelf)->m_heldClass;
+        m_name = ((Class*)forwardDefinitionOfSelf)->m_name;
+        m_heldClass->setClassType(this);
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new Class();
+    }
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        _visitReferencedTypes([&](Type*& typePtr) {
+            updateTypeRefFromGroupMap(typePtr, groupMap);
+        });
     }
 
     // convert an instance of the class to an actual layout pointer. Because
@@ -123,8 +149,6 @@ public:
         return actualTypeForLayout(self);
     }
 
-    bool _updateAfterForwardTypesChanged();
-
     static Class* Make(
             std::string inName,
             const std::vector<Class*>& bases,
@@ -134,8 +158,7 @@ public:
             const std::map<std::string, Function*>& staticFunctions,
             const std::map<std::string, Function*>& propertyFunctions,
             const std::map<std::string, PyObject*>& classMembers,
-            const std::map<std::string, Function*>& classMethods,
-            bool isNew
+            const std::map<std::string, Function*>& classMethods
         )
     {
         std::vector<HeldClass*> heldClassBases;
@@ -144,21 +167,32 @@ public:
             heldClassBases.push_back(c->getHeldClass());
         }
 
-        return new Class(
+        HeldClass* hc = HeldClass::Make(
             inName,
-            HeldClass::Make(
-                inName,
-                heldClassBases,
-                isFinal,
-                members,
-                memberFunctions,
-                staticFunctions,
-                propertyFunctions,
-                classMembers,
-                classMethods,
-                isNew
-            )
+            heldClassBases,
+            isFinal,
+            members,
+            memberFunctions,
+            staticFunctions,
+            propertyFunctions,
+            classMembers,
+            classMethods
         );
+
+        PyEnsureGilAcquired getTheGil;
+        static std::map<HeldClass*, Class*> memo;
+
+        auto it = memo.find(hc);
+        if (it != memo.end()) {
+            return it->second;
+        }
+
+        Class* result = new Class(inName, hc);
+        hc->setClassType(result);
+
+        memo[hc] = result;
+
+        return result;
     }
 
     static const char* pyComparisonOpToMethodName(int pyComparisonOp) {

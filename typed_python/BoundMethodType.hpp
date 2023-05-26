@@ -20,16 +20,18 @@
 #include "ReprAccumulator.hpp"
 
 class BoundMethod : public Type {
+    BoundMethod() : Type(TypeCategory::catBoundMethod)
+    {
+        m_needs_post_init = true;
+    }
 public:
     BoundMethod(Type* inFirstArg, std::string funcName) : Type(TypeCategory::catBoundMethod)
     {
+        m_is_forward_defined = true;
+
         m_funcName = funcName;
-        m_is_default_constructible = false;
         m_first_arg = inFirstArg;
         m_size = inFirstArg->bytecount();
-        m_is_simple = false;
-
-        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     template<class visitor_type>
@@ -49,48 +51,54 @@ public:
         visitor(m_first_arg);
     }
 
-    bool _updateAfterForwardTypesChanged() {
-        bool anyChanged = false;
-
-        // note that you can't have '.' in the name of a type, so we use '::'.
-        // otherwise, the __name__ attribute of the type gets cut off at the last '.' and
-        // looks like a memory corruption issue. It also prevents you from knowing what
-        // type you're looking at.
-        std::string name = "BoundMethod(" + m_first_arg->name(true) + ", " + m_funcName + ")";
-        size_t size = m_first_arg->bytecount();
-
-        anyChanged = (
-            name != m_name ||
-            size != m_size
-        );
-
-        m_name = name;
-        m_stripped_name = "";
-        m_size = size;
-
-        return anyChanged;
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
+        return "BoundMethod("
+            + m_first_arg->computeRecursiveName(typeStack)
+            + ", " + m_funcName
+            + ")";
     }
 
-    void _updateTypeMemosAfterForwardResolution() {
-        BoundMethod::Make(m_first_arg, m_funcName, this);
+    void postInitializeConcrete() {
+        m_is_simple = false;
+        m_size = m_first_arg->bytecount();
+        m_is_default_constructible = false;
     }
 
-    static BoundMethod* Make(Type* c, std::string funcName, BoundMethod* knownType=nullptr) {
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        m_first_arg = ((BoundMethod*)forwardDefinitionOfSelf)->m_first_arg;
+        m_funcName = ((BoundMethod*)forwardDefinitionOfSelf)->m_funcName;
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new BoundMethod();
+    }
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        updateTypeRefFromGroupMap(m_first_arg, groupMap);
+    }
+
+    static BoundMethod* Make(Type* firstArg, std::string funcName) {
+        if (firstArg->isForwardDefined()) {
+            return new BoundMethod(firstArg, funcName);
+        }
+
         PyEnsureGilAcquired getTheGil;
 
         typedef std::pair<Type*, std::string> keytype;
 
-        static std::map<keytype, BoundMethod*> m;
+        static std::map<keytype, BoundMethod*> memo;
 
-        auto it = m.find(keytype(c, funcName));
-
-        if (it == m.end()) {
-            it = m.insert(
-                std::make_pair(keytype(c, funcName), knownType ? knownType : new BoundMethod(c, funcName))
-            ).first;
+        auto it = memo.find(keytype(firstArg, funcName));
+        if (it != memo.end()) {
+            return it->second;
         }
 
-        return it->second;
+        BoundMethod* res = new BoundMethod(firstArg, funcName);
+        BoundMethod* concrete = (BoundMethod*)res->forwardResolvesTo();
+
+        memo[keytype(firstArg, funcName)] = concrete;
+
+        return concrete;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
