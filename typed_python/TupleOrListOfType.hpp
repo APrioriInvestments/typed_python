@@ -21,12 +21,13 @@
 
 class TupleOrListOfType : public Type {
 protected:
+    // this is the non-forward clone pathway
     TupleOrListOfType(bool isTuple) :
         Type(isTuple ? TypeCategory::catTupleOf : TypeCategory::catListOf),
         m_element_type(nullptr),
-        m_is_tuple(isTuple),
-        m_needs_post_initialize(true)
+        m_is_tuple(isTuple)
     {
+        m_needs_post_init = true;
     }
 
 public:
@@ -45,17 +46,9 @@ public:
     TupleOrListOfType(Type* type, bool isTuple) :
             Type(isTuple ? TypeCategory::catTupleOf : TypeCategory::catListOf),
             m_element_type(type),
-            m_is_tuple(isTuple),
-            m_needs_post_initialize(false)
+            m_is_tuple(isTuple)
     {
-        m_size = sizeof(void*);
-        m_is_default_constructible = true;
-
-        if (type->isForwardDefined()) {
-            m_is_forward_defined = true;
-        }
-
-        endOfConstructorInitialization(); // finish initializing the type object.
+        m_is_forward_defined = true;
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -75,8 +68,6 @@ public:
         v.visitHash(ShaHash(1, m_typeCategory));
         v.visitTopo(m_element_type);
     }
-
-    bool _updateAfterForwardTypesChanged();
 
     //serialize, but don't write a count
     template<class buf_t>
@@ -619,7 +610,6 @@ public:
 protected:
     Type* m_element_type;
     bool m_is_tuple;
-    bool m_needs_post_initialize;
 };
 
 PyDoc_STRVAR(ListOf_doc,
@@ -641,11 +631,7 @@ public:
         m_doc = ListOf_doc;
     }
 
-    static ListOfType* Make(Type* elt, ListOfType* knownType=nullptr);
-
-    void _updateTypeMemosAfterForwardResolution() {
-        ListOfType::Make(m_element_type, this);
-    }
+    static ListOfType* Make(Type* elt);
 
     void setSizeUnsafe(instance_ptr self, size_t count);
 
@@ -696,21 +682,17 @@ PyDoc_STRVAR(TupleOf_doc,
 class TupleOfType : public TupleOrListOfType {
     friend class TupleOrListOfType;
 
+    // clone form
     TupleOfType() : TupleOrListOfType(true)
     {
     }
 
 public:
+    // forward form
     TupleOfType(Type* type) : TupleOrListOfType(type, true)
     {
         m_doc = TupleOf_doc;
     }
 
-    void _updateTypeMemosAfterForwardResolution() {
-        TupleOfType::Make(m_element_type, this);
-    }
-
-    // get a memoized TupleOfType. If 'knownType', then install this type
-    // if not already known.
-    static TupleOfType* Make(Type* elt, TupleOfType* knownType = nullptr);
+    static TupleOfType* Make(Type* elt);
 };

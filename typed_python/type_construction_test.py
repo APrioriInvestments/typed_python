@@ -5,6 +5,11 @@ from typed_python import (
 )
 
 
+def test_nonforward_definition():
+    assert not isForwardDefined(OneOf(int, float))
+    assert not isForwardDefined(ListOf(int))
+
+
 def test_forward_definition():
     F = Forward()
 

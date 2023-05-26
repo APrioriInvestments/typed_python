@@ -34,8 +34,6 @@ public:
         for (long k = 0; k < names.size(); k++) {
             m_nameToIndex[names[k]] = k;
         }
-
-        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     template<class visitor_type>
@@ -65,8 +63,6 @@ public:
     void _visitReferencedTypes(const visitor_type& visitor) {
         _visitContainedTypes(visitor);
     }
-
-    bool _updateAfterForwardTypesChanged();
 
     instance_ptr eltPtr(instance_ptr self, int64_t ix) const {
         return self + m_byte_offsets[ix];
@@ -230,7 +226,7 @@ public:
 
 protected:
     template<class subtype>
-    static subtype* MakeSubtype(const std::vector<Type*>& types, const std::vector<std::string>& names, subtype* knownType = nullptr) {
+    static subtype* MakeSubtype(const std::vector<Type*>& types, const std::vector<std::string>& names) {
         PyEnsureGilAcquired getTheGil;
 
         typedef std::pair<const std::vector<Type*>, const std::vector<std::string> > keytype;
@@ -242,7 +238,7 @@ protected:
             it = m.insert(
                 std::make_pair(
                     keytype(types, names),
-                    knownType ? knownType : new subtype(types, names)
+                    new subtype(types, names)
                 )
             ).first;
         }
@@ -273,22 +269,16 @@ public:
         assert(types.size() == names.size());
 
         m_doc = NamedTuple_doc;
-
-        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
-    bool _updateAfterForwardTypesChanged();
-
-    void _updateTypeMemosAfterForwardResolution() {
-        NamedTuple::Make(m_types, m_names, this);
-    }
-
-    static NamedTuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names, NamedTuple* knownType = nullptr) {
+    static NamedTuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names) {
         if (names.size() != types.size()) {
             throw std::runtime_error("Names mismatched with types!");
         }
-        return MakeSubtype<NamedTuple>(types, names, knownType);
+        return MakeSubtype<NamedTuple>(types, names);
     }
+
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack);
 };
 
 PyDoc_STRVAR(Tuple_doc,
@@ -304,16 +294,11 @@ public:
             CompositeType(TypeCategory::catTuple, types, names)
     {
         m_doc = Tuple_doc;
-        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
-    bool _updateAfterForwardTypesChanged();
-
-    void _updateTypeMemosAfterForwardResolution() {
-        Tuple::Make(m_types, this);
+    static Tuple* Make(const std::vector<Type*>& types) {
+        return MakeSubtype<Tuple>(types, std::vector<std::string>());
     }
 
-    static Tuple* Make(const std::vector<Type*>& types, Tuple* knownType=nullptr) {
-        return MakeSubtype<Tuple>(types, std::vector<std::string>(), knownType);
-    }
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack);
 };

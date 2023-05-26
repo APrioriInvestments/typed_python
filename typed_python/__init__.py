@@ -28,21 +28,21 @@ __fully_typed_serialization_version__ = 1
 # can check this version.
 __untyped_serialization_version__ = 5
 
-from typed_python.internals import (
-    Member, Final, Function, UndefinedBehaviorException,
-    makeNamedTuple, DisableCompiledCode, isCompiled, Held,
-    typeKnownToCompiler,
-    localVariableTypesKnownToCompiler,
-    checkOneOfType,
-    checkType
-)
+# from typed_python.internals import (
+#     Member, Final, Function, UndefinedBehaviorException,
+#     makeNamedTuple, DisableCompiledCode, isCompiled, Held,
+#     typeKnownToCompiler,
+#     localVariableTypesKnownToCompiler,
+#     checkOneOfType,
+#     checkType
+# )
 from typed_python._types import bytecount, refcount
-from typed_python.module import Module
-from typed_python.type_function import TypeFunction
-from typed_python.hash import sha_hash
-from typed_python.SerializationContext import SerializationContext
-from typed_python.type_filter import TypeFilter
-from typed_python.compiler.typeof import TypeOf
+# from typed_python.module import Module
+# from typed_python.type_function import TypeFunction
+# from typed_python.hash import sha_hash
+# from typed_python.SerializationContext import SerializationContext
+# from typed_python.type_filter import TypeFilter
+# from typed_python.compiler.typeof import TypeOf
 from typed_python._types import (
     Forward, TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict, SubclassOf,
     Alternative, Value, serialize, deserialize, serializeStream, deserializeStream,

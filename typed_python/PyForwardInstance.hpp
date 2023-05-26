@@ -81,33 +81,10 @@ public:
         return incref(PyInstance::typePtrToPyTypeRepresentation(result));
     }
 
-
-    static PyObject* forwardGetReferencing(PyObject* o, PyObject* args) {
-        if (PyTuple_Size(args) != 0) {
-            PyErr_SetString(PyExc_TypeError, "Forward.getReferencing takes zero arguments");
-            return NULL;
-        }
-
-        Forward* self_type = (Forward*)PyInstance::unwrapTypeArgToTypePtr(o);
-        if (!self_type) {
-            PyErr_SetString(PyExc_TypeError, "Forward.getReferencing unexpected error");
-            return NULL;
-        }
-
-        PyObject* res = PyList_New(0);
-
-        for (auto t: self_type->getReferencing()) {
-            PyList_Append(res, PyInstance::typePtrToPyTypeRepresentation(t));
-        }
-
-        return res;
-    }
-
     static PyMethodDef* typeMethodsConcrete(Type* t) {
         return new PyMethodDef [4] {
             {"define", (PyCFunction)PyForwardInstance::forwardDefine, METH_VARARGS | METH_CLASS, NULL},
             {"get", (PyCFunction)PyForwardInstance::forwardGet, METH_VARARGS | METH_CLASS, NULL},
-            {"getReferencing", (PyCFunction)PyForwardInstance::forwardGetReferencing, METH_VARARGS | METH_CLASS, NULL},
             {NULL, NULL}
         };
     }

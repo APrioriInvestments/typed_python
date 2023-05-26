@@ -36,59 +36,6 @@ bool OneOfType::isBinaryCompatibleWithConcrete(Type* other) {
     return true;
 }
 
-bool OneOfType::_updateAfterForwardTypesChanged() {
-    size_t size = computeBytecount();
-    std::string name = computeName();
-
-    if (m_is_recursive_forward) {
-        name = m_recursive_name;
-    }
-
-    bool is_default_constructible = false;
-
-    for (auto typePtr: m_types) {
-        if (typePtr->is_default_constructible()) {
-            is_default_constructible = true;
-            break;
-        }
-    }
-
-    bool anyChanged = (
-        size != m_size ||
-        name != m_name ||
-        is_default_constructible != m_is_default_constructible
-    );
-
-    m_size = size;
-    m_stripped_name = "";
-    m_name = name;
-    m_stripped_name = "";
-
-    m_is_default_constructible = is_default_constructible;
-
-    return anyChanged;
-}
-
-std::string OneOfType::computeName() const {
-    std::string res = "OneOf(";
-
-    bool first = true;
-
-    for (auto t: m_types) {
-        if (first) {
-            first = false;
-        } else {
-            res += ", ";
-        }
-
-        res += t->name(true);
-    }
-
-    res += ")";
-
-    return res;
-}
-
 void OneOfType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     m_types[*((uint8_t*)self)]->repr(self+1, stream, isStr);
 }
@@ -156,36 +103,34 @@ void OneOfType::assign(instance_ptr self, instance_ptr other) {
 }
 
 // static
-OneOfType* OneOfType::Make(const std::vector<Type*>& types, OneOfType* knownType) {
-    std::vector<Type*> flat_typelist;
-    std::set<Type*> seen;
+OneOfType* OneOfType::Make(const std::vector<Type*>& types) {
+    bool anyForward = false;
 
-    //make sure we only get each type once and don't have any other 'OneOfType' in there...
-    std::function<void (const std::vector<Type*>)> visit = [&](const std::vector<Type*>& subvec) {
-        for (auto t: subvec) {
-            if (t->getTypeCategory() == catOneOf) {
-                visit( ((OneOfType*)t)->getTypes() );
-            } else if (seen.find(t) == seen.end()) {
-                flat_typelist.push_back(t);
-                seen.insert(t);
-            }
+    for (auto t: types) {
+        if (t->isForwardDefined()) {
+            anyForward = true;
         }
-    };
+    }
 
-    visit(types);
+    if (anyForward) {
+        return new OneOfType(types);
+    }
 
     PyEnsureGilAcquired getTheGil;
 
     typedef const std::vector<Type*> keytype;
+    static std::map<keytype, OneOfType*> memo;
 
-    static std::map<keytype, OneOfType*> m;
-
-    auto it = m.find(flat_typelist);
-    if (it == m.end()) {
-        it = m.insert(std::make_pair(flat_typelist, knownType ? knownType : new OneOfType(flat_typelist))).first;
+    auto it = memo.find(types);
+    if (it != memo.end()) {
+        return it->second;
     }
 
-    return it->second;
+    OneOfType* res = new OneOfType(types);
+    OneOfType* concrete = (OneOfType*)res->forwardResolvesTo();
+
+    memo[types] = concrete;
+    return concrete;
 }
 
 Type* OneOfType::cloneForForwardResolutionConcrete() {
@@ -225,6 +170,10 @@ void OneOfType::initializeFromConcrete(
     }
 
     m_types = heldTypes;
+
+    if (m_types.size() > 255) {
+        throw std::runtime_error("OneOf types are limited to 255 alternatives in this implementation");
+    }
 }
 
 void OneOfType::updateInternalTypePointersConcrete(
@@ -262,18 +211,6 @@ void OneOfType::postInitializeConcrete() {
 }
 
 std::string OneOfType::computeRecursiveNameConcrete(TypeStack& typeStack) {
-    if (!m_needs_post_init) {
-        return m_name;
-    }
-
-    int index = typeStack.indexOf(this);
-
-    if (index != -1) {
-        return "^" + format(index);
-    }
-
-    PushTypeStack addSelf(typeStack, this);
-
     std::string res = "OneOf(";
 
     bool first = true;

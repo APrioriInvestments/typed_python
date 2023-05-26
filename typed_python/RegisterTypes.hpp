@@ -191,8 +191,8 @@ public:
     {
         m_size = sizeof(T);
         m_is_default_constructible = true;
-
-        endOfConstructorInitialization(); // finish initializing the type object.
+        m_is_forward_defined = false;
+        m_needs_post_init = false;
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other) {
@@ -206,8 +206,6 @@ public:
     bool isPODConcrete() {
         return true;
     }
-
-    bool _updateAfterForwardTypesChanged() { return false; }
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}

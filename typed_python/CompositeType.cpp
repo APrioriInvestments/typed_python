@@ -36,6 +36,7 @@ bool CompositeType::isBinaryCompatibleWithConcrete(Type* other) {
     return true;
 }
 
+/*
 bool CompositeType::_updateAfterForwardTypesChanged() {
     bool is_default_constructible = true;
     size_t size = 0;
@@ -70,6 +71,7 @@ bool CompositeType::_updateAfterForwardTypesChanged() {
 
     return anyChanged;
 }
+*/
 
 bool CompositeType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     if (pyComparisonOp == Py_NE) {
@@ -159,6 +161,40 @@ void CompositeType::assign(instance_ptr self, instance_ptr other) {
     }
 }
 
+std::string NamedTuple::computeRecursiveNameConcrete(TypeStack& typeStack) {
+    std::string name = "NamedTuple(";
+
+    if (m_types.size() != m_names.size()) {
+        throw std::logic_error("Names mismatched with types!");
+    }
+
+    for (long k = 0; k < m_types.size();k++) {
+        if (k) {
+            name += ", ";
+        }
+        name += m_names[k] + "=" + m_types[k]->computeRecursiveName(typeStack);
+    }
+    name += ")";
+
+    return name;
+}
+
+std::string Tuple::computeRecursiveNameConcrete(TypeStack& typeStack) {
+    std::string name = "Tuple(";
+
+    for (long k = 0; k < m_types.size();k++) {
+        if (k) {
+            name += ", ";
+        }
+        name += m_types[k]->computeRecursiveName(typeStack);
+    }
+    name += ")";
+
+    return name;
+}
+
+
+/*
 bool NamedTuple::_updateAfterForwardTypesChanged() {
     bool anyChanged  = ((CompositeType*)this)->_updateAfterForwardTypesChanged();
 
@@ -209,3 +245,4 @@ bool Tuple::_updateAfterForwardTypesChanged() {
 
     return anyChanged || m_name != oldName;
 }
+*/

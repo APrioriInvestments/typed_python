@@ -600,19 +600,7 @@ public:
     // some pathways where the identical type object can get created
     // (usually through deserialization)
     static bool typesEquivalent(Type* t1, Type* t2) {
-        if (t1 == t2) {
-            return true;
-        }
-
-        if (!t1 || !t2) {
-            return false;
-        }
-
-        if (t1->m_typeCategory != t2->m_typeCategory) {
-            return false;
-        }
-
-        return t1->identityHash() == t2->identityHash();
+        return t1 == t2;
     }
 
     //this checks _strict_ subclass. X is not a subclass of itself.
@@ -662,19 +650,15 @@ public:
     }
 
     void assertForwardsResolved() const {
-        if (!m_resolved) {
-            throw std::logic_error("Type " + m_name + " has unresolved forwards.");
+        if (m_is_forward_defined) {
+            throw std::logic_error("Type " + m_name + " is a forward");
         }
     }
 
     void assertForwardsResolvedSufficientlyToInstantiate() {
-        this->check([&](auto& subtype) {
-            subtype.assertForwardsResolvedSufficientlyToInstantiateConcrete();
-        });
-    }
-
-    void assertForwardsResolvedSufficientlyToInstantiateConcrete() const {
-        assertForwardsResolved();
+        if (m_is_forward_defined) {
+            throw std::logic_error("Type " + m_name + " is a forward");
+        }
     }
 
     template<class visitor_type>
@@ -739,36 +723,9 @@ public:
         });
     }
 
-    // dispatch to the actual subtype
-    bool updateAfterForwardTypesChanged() {
-        return this->check([&](auto& subtype) {
-            return subtype._updateAfterForwardTypesChanged();
-        });
-    }
-
-    // subtype-specific calculation
-    bool _updateAfterForwardTypesChanged() { return false; }
-
-    // update our T::Make memos to reflect the fact that our
-    // types may have referred to forward that are now replaced.
-    // the type memos will have us listed with the Forward as one
-    // of the arguments to the 'Make' function, but now we'll have
-    // the resolved circular type dependency, and we need that memo
-    // to resolve to 'this' as well.
-    //
-    // subtypes are expected to specialize this function
-    void _updateTypeMemosAfterForwardResolution() {}
-
-    // called when a downstream type has changed in some way.
-    // this may recalculate our on-disk size, our name, or some other
-    // feature of the type that depends on the forward delcarations
-    // below us.
-    void forwardTypesAreResolved();
-
-    void buildMutuallyRecursiveTypeCycle();
-
     // called after each type has initialized its internals
-    void endOfConstructorInitialization();
+    // TODO: remove this
+    void endOfConstructorInitialization() {};
 
     // call subtype.copy_constructor
     void copy_constructor(instance_ptr self, instance_ptr other);
@@ -799,10 +756,6 @@ public:
         return m_is_default_constructible;
     }
 
-    bool resolved() const {
-        return m_resolved;
-    }
-
     bool isBinaryCompatibleWith(Type* other);
 
     bool isBinaryCompatibleWithConcrete(Type* other) {
@@ -811,22 +764,6 @@ public:
 
     bool isSimple() const {
         return m_is_simple;
-    }
-
-    const std::set<Forward*>& getReferencedForwards() const {
-        return m_referenced_forwards;
-    }
-
-    const std::set<Forward*>& getContainedForwards() const {
-        return m_contained_forwards;
-    }
-
-    void forwardResolvedTo(Forward* forward, Type* resolvedTo);
-
-    void setNameAndIndexForRecursiveType(std::string nameOverride, int index) {
-        m_recursive_name = nameOverride;
-        m_is_recursive_forward = true;
-        m_recursive_forward_index = index;
     }
 
     // are we guaranteed we can convert to this other type at the 'Signature' level
@@ -910,15 +847,6 @@ public:
         return mRecursiveTypeGroupIndex;
     }
 
-    int64_t getRecursiveForwardIndex() {
-        if (!m_is_recursive_forward) {
-            return -1;
-        }
-
-        return m_recursive_forward_index;
-    }
-
-
     bool isForwardDefined() const {
         return m_is_forward_defined;
     }
@@ -945,15 +873,16 @@ protected:
             mTypeRep(nullptr),
             m_base(nullptr),
             m_is_simple(true),
-            m_resolved(false),
-            m_is_recursive_forward(false),
-            m_recursive_forward_index(-1),
             mTypeGroup(nullptr),
             mRecursiveTypeGroupIndex(-1),
             m_is_forward_defined(false),
             m_forward_resolves_to(nullptr),
+            m_needs_post_init(false),
             m_is_redundant(false)
         {}
+
+    //todo: remove this
+    bool m_is_recursive_forward;
 
     TypeCategory m_typeCategory;
 
@@ -976,33 +905,9 @@ protected:
     // 'simple' types are those that have no reference to the python interpreter
     bool m_is_simple;
 
-
-
-
-
-
-
-
-    bool m_resolved;
-
-    // were we defined as a recursive Forward type?
-    bool m_is_recursive_forward;
-
-    // if we are recursive, then an integer indicating the order in
-    // which we were resolved, which is useful when trying to
-    // order the type graph
-    int64_t m_recursive_forward_index;
-
     enum BinaryCompatibilityCategory { Incompatible, Checking, Compatible };
 
     std::map<Type*, BinaryCompatibilityCategory> mIsBinaryCompatible;
-
-    // a set of forward types that we need to be resolved before we
-    // could be resolved
-    std::set<Forward*> m_referenced_forwards;
-
-    // a subset of m_referenced_forwards that we directly contain
-    std::set<Forward*> m_contained_forwards;
 
     // a sha-hash that uniquely identifies this type. If this value is
     // the same for two types, then they should be indistinguishable except
@@ -1013,15 +918,6 @@ protected:
     MutuallyRecursiveTypeGroup* mTypeGroup;
 
     int32_t mRecursiveTypeGroupIndex;
-
-
-
-
-
-
-
-
-    // NEW FORWARD IMPLEMENTATION
 
     // is there a Forward reachable in our object graph? This is a permanent feature of
     // the type object
@@ -1034,6 +930,9 @@ protected:
 
     // have we been made 'redundant'?
     bool m_is_redundant;
+
+    // do we need a post-initialization step?
+    bool m_needs_post_init;
 
     // try to resolve this forward type. If we can't, we'll throw an exception. On exit,
     // we will have thrown, or m_forward_resolves_to will be populated.
@@ -1097,7 +996,7 @@ protected:
 
 
     void postInitializeConcrete() {
-        throw std::runtime_error("Type " + name() + " didn't implement postInitializeConcrete");
+        throw std::runtime_error("Type " + name() + " of cat " + getTypeCategoryString() + " didn't implement postInitializeConcrete");
     }
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
@@ -1115,14 +1014,30 @@ protected:
 public:
     // finish initializing the type assuming no forward types are reachable
     void postInitialize() {
+        if (!m_needs_post_init) {
+            return;
+        }
+
         this->check([&](auto& subtype) {
             subtype.postInitializeConcrete();
         });
     }
 
-    std::string computeRecursiveName(TypeStack& typeStack) {
+    std::string computeRecursiveName(TypeStack& stack) {
+        if (!m_needs_post_init) {
+            return m_name;
+        }
+
+        long index = stack.indexOf(this);
+
+        if (index != -1) {
+            return "^" + format(index);
+        }
+
+        PushTypeStack addSelf(stack, this);
+
         return this->check([&](auto& subtype) {
-            return subtype.computeRecursiveNameConcrete(typeStack);
+            return subtype.computeRecursiveNameConcrete(stack);
         });
     }
 };

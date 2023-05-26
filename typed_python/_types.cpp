@@ -41,258 +41,284 @@
 #include "CompilerVisibleObjectVisitor.hpp"
 
 PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
-    std::vector<Type*> types;
+    return translateExceptionToPyObject([&]() {
+        std::vector<Type*> types;
 
-    if (!unpackTupleToTypes(args, types)) {
-        return nullptr;
-    }
-
-    if (types.size() != 1) {
-        if (isTuple) {
-            PyErr_SetString(PyExc_TypeError, "TupleOfType takes 1 positional argument.");
-        } else {
-            PyErr_SetString(PyExc_TypeError, "ListOfType takes 1 positional argument.");
+        if (!unpackTupleToTypes(args, types)) {
+            throw PythonExceptionSet();
         }
-        return NULL;
-    }
 
-    return incref(
-        (PyObject*)PyInstance::typeObj(
-            isTuple ? (TupleOrListOfType*)TupleOfType::Make(types[0]) : (TupleOrListOfType*)ListOfType::Make(types[0])
-            )
-        );
+        if (types.size() != 1) {
+            if (isTuple) {
+                PyErr_SetString(PyExc_TypeError, "TupleOfType takes 1 positional argument.");
+            } else {
+                PyErr_SetString(PyExc_TypeError, "ListOfType takes 1 positional argument.");
+            }
+            throw PythonExceptionSet();
+        }
+
+        return incref(
+            (PyObject*)PyInstance::typeObj(
+                isTuple ? (TupleOrListOfType*)TupleOfType::Make(types[0]) : (TupleOrListOfType*)ListOfType::Make(types[0])
+                )
+            );
+    });
 }
 
 PyObject *MakePointerToType(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "PointerTo takes 1 positional argument.");
-        return NULL;
-    }
+    return translateExceptionToPyObject([&]() {
+        if (PyTuple_Size(args) != 1) {
+            PyErr_SetString(PyExc_TypeError, "PointerTo takes 1 positional argument.");
+            throw PythonExceptionSet();
+        }
 
-    PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
+        PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
 
-    Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
 
-    if (!t) {
-        PyErr_SetString(PyExc_TypeError, "PointerTo needs a type.");
-        return NULL;
-    }
+        if (!t) {
+            PyErr_SetString(PyExc_TypeError, "PointerTo needs a type.");
+            throw PythonExceptionSet();
+        }
 
-    return incref((PyObject*)PyInstance::typeObj(PointerTo::Make(t)));
+        return incref((PyObject*)PyInstance::typeObj(PointerTo::Make(t)));
+    });
 }
 
 PyObject *MakeRefToType(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "RefTo takes 1 positional argument.");
-        return NULL;
-    }
+    return translateExceptionToPyObject([&]() {
+        if (PyTuple_Size(args) != 1) {
+            PyErr_SetString(PyExc_TypeError, "RefTo takes 1 positional argument.");
+            throw PythonExceptionSet();
+        }
 
-    PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
+        PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
 
-    Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
 
-    if (!t) {
-        PyErr_SetString(PyExc_TypeError, "RefTo needs a type.");
-        return NULL;
-    }
+        if (!t) {
+            PyErr_SetString(PyExc_TypeError, "RefTo needs a type.");
+            throw PythonExceptionSet();
+        }
 
-    return translateExceptionToPyObject([&]{
-        return incref((PyObject*)PyInstance::typeObj(RefTo::Make(t)));
+        return translateExceptionToPyObject([&]{
+            return incref((PyObject*)PyInstance::typeObj(RefTo::Make(t)));
+        });
     });
 }
 
 PyObject *MakeSubclassOfType(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "SubclassOf takes 1 positional argument.");
-        return NULL;
-    }
+    return translateExceptionToPyObject([&]() {
+        if (PyTuple_Size(args) != 1) {
+            PyErr_SetString(PyExc_TypeError, "SubclassOf takes 1 positional argument.");
+            throw PythonExceptionSet();
+        }
 
-    PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
+        PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
 
-    Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
 
-    if (!t) {
-        PyErr_SetString(PyExc_TypeError, "SubclassOf needs a type.");
-        return NULL;
-    }
+        if (!t) {
+            PyErr_SetString(PyExc_TypeError, "SubclassOf needs a type.");
+            throw PythonExceptionSet();
+        }
 
-    // types that can't be subclassed just produce values
-    if ((t->isClass() && !((Class*)t)->isFinal()) ||
-            (t->isAlternative() && !((Class*)t)->isConcreteAlternative())) {
-        return translateExceptionToPyObject([&]{
-            return incref((PyObject*)PyInstance::typeObj(SubclassOfType::Make(t)));
-        });
-    }
+        // types that can't be subclassed just produce values
+        if ((t->isClass() && !((Class*)t)->isFinal()) ||
+                (t->isAlternative() && !((Class*)t)->isConcreteAlternative())) {
+            return translateExceptionToPyObject([&]{
+                return incref((PyObject*)PyInstance::typeObj(SubclassOfType::Make(t)));
+            });
+        }
 
-    return MakeValueType(nullValue, args);
+        return MakeValueType(nullValue, args);
+    });
 }
 
 PyObject *MakeTypedCellType(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "TypedCell takes 1 positional argument.");
-        return NULL;
-    }
+    return translateExceptionToPyObject([&]() {
+        if (PyTuple_Size(args) != 1) {
+            PyErr_SetString(PyExc_TypeError, "TypedCell takes 1 positional argument.");
+            throw PythonExceptionSet();
+        }
 
-    PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
+        PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
 
-    Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
 
-    if (!t) {
-        PyErr_SetString(PyExc_TypeError, "TypedCell needs a type.");
-        return NULL;
-    }
+        if (!t) {
+            PyErr_SetString(PyExc_TypeError, "TypedCell needs a type.");
+            throw PythonExceptionSet();
+        }
 
-    return incref((PyObject*)PyInstance::typeObj(TypedCellType::Make(t)));
+        return incref((PyObject*)PyInstance::typeObj(TypedCellType::Make(t)));
+    });
 }
 
 PyObject *MakeTupleOfType(PyObject* nullValue, PyObject* args) {
-    return MakeTupleOrListOfType(nullValue, args, true);
+    return translateExceptionToPyObject([&]() {
+        return MakeTupleOrListOfType(nullValue, args, true);
+    });
 }
 
 PyObject *MakeListOfType(PyObject* nullValue, PyObject* args) {
-    return MakeTupleOrListOfType(nullValue, args, false);
+    return translateExceptionToPyObject([&]() {
+        return MakeTupleOrListOfType(nullValue, args, false);
+    });
 }
 
 PyObject *MakeTupleType(PyObject* nullValue, PyObject* args) {
-    std::vector<Type*> types;
-    if (!unpackTupleToTypes(args, types)) {
-        return NULL;
-    }
+    return translateExceptionToPyObject([&]() {
+        std::vector<Type*> types;
+        if (!unpackTupleToTypes(args, types)) {
+            throw PythonExceptionSet();
+        }
 
-    return incref((PyObject*)PyInstance::typeObj(Tuple::Make(types)));
+        return incref((PyObject*)PyInstance::typeObj(Tuple::Make(types)));
+    });
 }
 
 PyObject *MakeConstDictType(PyObject* nullValue, PyObject* args) {
-    std::vector<Type*> types;
-    for (long k = 0; k < PyTuple_Size(args); k++) {
-        PyObjectHolder item(PyTuple_GetItem(args,k));
-        types.push_back(PyInstance::unwrapTypeArgToTypePtr(item));
-        if (not types.back()) {
-            return NULL;
+    return translateExceptionToPyObject([&]() {
+        std::vector<Type*> types;
+        for (long k = 0; k < PyTuple_Size(args); k++) {
+            PyObjectHolder item(PyTuple_GetItem(args,k));
+            types.push_back(PyInstance::unwrapTypeArgToTypePtr(item));
+            if (not types.back()) {
+                throw PythonExceptionSet();
+            }
         }
-    }
 
-    if (types.size() != 2) {
-        PyErr_SetString(PyExc_TypeError, "ConstDict accepts two arguments");
-        return NULL;
-    }
+        if (types.size() != 2) {
+            PyErr_SetString(PyExc_TypeError, "ConstDict accepts two arguments");
+            throw PythonExceptionSet();
+        }
 
-    PyObject* typeObj = (PyObject*)PyInstance::typeObj(
-        ConstDictType::Make(types[0],types[1])
-        );
+        PyObject* typeObj = (PyObject*)PyInstance::typeObj(
+            ConstDictType::Make(types[0],types[1])
+            );
 
-    return incref(typeObj);
+        return incref(typeObj);
+    });
 }
 
 PyObject* MakeSetType(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args)!=1) {
-        PyErr_SetString(PyExc_TypeError, "Set takes 1 positional arguments");
-        return NULL;
-    }
-    PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
-    Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
-    if (!t) {
-        PyErr_SetString(PyExc_TypeError, "Set needs a type.");
-        return NULL;
-    }
-    SetType* setT = SetType::Make(t);
-    return incref((PyObject*)PyInstance::typeObj(setT));
+    return translateExceptionToPyObject([&]() {
+        if (PyTuple_Size(args)!=1) {
+            PyErr_SetString(PyExc_TypeError, "Set takes 1 positional arguments");
+            throw PythonExceptionSet();
+        }
+        PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
+        if (!t) {
+            PyErr_SetString(PyExc_TypeError, "Set needs a type.");
+            throw PythonExceptionSet();
+        }
+        SetType* setT = SetType::Make(t);
+        return incref((PyObject*)PyInstance::typeObj(setT));
+    });
 }
 
 PyObject *MakeDictType(PyObject* nullValue, PyObject* args) {
-    std::vector<Type*> types;
-    for (long k = 0; k < PyTuple_Size(args); k++) {
-        PyObjectHolder item(PyTuple_GetItem(args,k));
-        types.push_back(PyInstance::unwrapTypeArgToTypePtr(item));
-        if (not types.back()) {
-            return NULL;
+    return translateExceptionToPyObject([&]() {
+        std::vector<Type*> types;
+        for (long k = 0; k < PyTuple_Size(args); k++) {
+            PyObjectHolder item(PyTuple_GetItem(args,k));
+            types.push_back(PyInstance::unwrapTypeArgToTypePtr(item));
+            if (not types.back()) {
+                throw PythonExceptionSet();
+            }
         }
-    }
 
-    if (types.size() != 2) {
-        PyErr_SetString(PyExc_TypeError, "Dict accepts two arguments");
-        return NULL;
-    }
+        if (types.size() != 2) {
+            PyErr_SetString(PyExc_TypeError, "Dict accepts two arguments");
+            throw PythonExceptionSet();
+        }
 
-    return incref(
-        (PyObject*)PyInstance::typeObj(
-            DictType::Make(types[0],types[1])
-            )
-        );
+        return incref(
+            (PyObject*)PyInstance::typeObj(
+                DictType::Make(types[0],types[1])
+                )
+            );
+    });
 }
 
 PyObject *MakeOneOfType(PyObject* nullValue, PyObject* args) {
-    std::vector<Type*> types;
-    for (long k = 0; k < PyTuple_Size(args); k++) {
-        PyObjectHolder item(PyTuple_GetItem(args,k));
+    return translateExceptionToPyObject([&]() {
+        std::vector<Type*> types;
+        for (long k = 0; k < PyTuple_Size(args); k++) {
+            PyObjectHolder item(PyTuple_GetItem(args,k));
 
-        Type* t = PyInstance::tryUnwrapPyInstanceToType(item);
+            Type* t = PyInstance::tryUnwrapPyInstanceToType(item);
 
-        if (t) {
-            types.push_back(t);
-        } else {
-            PyErr_Format(PyExc_TypeError,
-                "Type arguments must be types or simple values (like ints, strings, etc.), not %S. "
-                "If you need a more complex value (such as a type object itself), wrap it in 'Value'.",
-                (PyObject*)item
-            );
+            if (t) {
+                types.push_back(t);
+            } else {
+                PyErr_Format(PyExc_TypeError,
+                    "Type arguments must be types or simple values (like ints, strings, etc.), not %S. "
+                    "If you need a more complex value (such as a type object itself), wrap it in 'Value'.",
+                    (PyObject*)item
+                );
 
-            return NULL;
+                throw PythonExceptionSet();
+            }
         }
-    }
 
-    PyObject* typeObj = (PyObject*)PyInstance::typeObj(OneOfType::Make(types));
+        PyObject* typeObj = (PyObject*)PyInstance::typeObj(OneOfType::Make(types));
 
-    return incref(typeObj);
+        return incref(typeObj);
+    });
 }
 
 PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
-    if (args && PyTuple_Check(args) && PyTuple_Size(args)) {
-        PyErr_SetString(PyExc_TypeError, "NamedTuple takes no positional arguments.");
-        return NULL;
-    }
+    return translateExceptionToPyObject([&]() {
+        if (args && PyTuple_Check(args) && PyTuple_Size(args)) {
+            PyErr_SetString(PyExc_TypeError, "NamedTuple takes no positional arguments.");
+            throw PythonExceptionSet();
+        }
 
-    std::vector<std::pair<std::string, Type*> > namesAndTypes;
+        std::vector<std::pair<std::string, Type*> > namesAndTypes;
 
-    if (kwargs) {
-        PyObject *key, *value;
-        Py_ssize_t pos = 0;
+        if (kwargs) {
+            PyObject *key, *value;
+            Py_ssize_t pos = 0;
 
-        while (PyDict_Next(kwargs, &pos, &key, &value)) {
-            if (!PyUnicode_Check(key)) {
-                PyErr_SetString(PyExc_TypeError, "NamedTuple keywords are supposed to be strings.");
-                return NULL;
-            }
+            while (PyDict_Next(kwargs, &pos, &key, &value)) {
+                if (!PyUnicode_Check(key)) {
+                    PyErr_SetString(PyExc_TypeError, "NamedTuple keywords are supposed to be strings.");
+                    throw PythonExceptionSet();
+                }
 
-            namesAndTypes.push_back(
-                std::make_pair(
-                    PyUnicode_AsUTF8(key),
-                    PyInstance::unwrapTypeArgToTypePtr(value)
-                    )
-                );
+                namesAndTypes.push_back(
+                    std::make_pair(
+                        PyUnicode_AsUTF8(key),
+                        PyInstance::unwrapTypeArgToTypePtr(value)
+                        )
+                    );
 
-            if (not namesAndTypes.back().second) {
-                return NULL;
+                if (not namesAndTypes.back().second) {
+                    throw PythonExceptionSet();
+                }
             }
         }
-    }
 
-    if (PY_MINOR_VERSION <= 5) {
-        //we cannot rely on the ordering of 'kwargs' here because of the python version, so
-        //we sort it. this will be a problem for anyone running some processes using different
-        //python versions that share python code.
-        std::sort(namesAndTypes.begin(), namesAndTypes.end());
-    }
+        if (PY_MINOR_VERSION <= 5) {
+            //we cannot rely on the ordering of 'kwargs' here because of the python version, so
+            //we sort it. this will be a problem for anyone running some processes using different
+            //python versions that share python code.
+            std::sort(namesAndTypes.begin(), namesAndTypes.end());
+        }
 
-    std::vector<std::string> names;
-    std::vector<Type*> types;
+        std::vector<std::string> names;
+        std::vector<Type*> types;
 
-    for (auto p: namesAndTypes) {
-        names.push_back(p.first);
-        types.push_back(p.second);
-    }
+        for (auto p: namesAndTypes) {
+            names.push_back(p.first);
+            types.push_back(p.second);
+        }
 
-    return incref((PyObject*)PyInstance::typeObj(NamedTuple::Make(types, names)));
+        return incref((PyObject*)PyInstance::typeObj(NamedTuple::Make(types, names)));
+    });
 }
 
 
@@ -2473,26 +2499,6 @@ PyObject *deserializeStream(PyObject* nullValue, PyObject* args) {
     }
 }
 
-PyObject *allForwardTypesResolved(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "allForwardTypesResolved takes 1 positional argument");
-        return NULL;
-    }
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
-
-    Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
-
-    if (!t) {
-        PyErr_SetString(
-            PyExc_TypeError,
-            "first argument to 'allForwardTypesResolved' must be a type object"
-        );
-        return NULL;
-    }
-
-    return incref(t->resolved() ? Py_True : Py_False);
-}
-
 PyObject *isForwardDefined(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "isForwardDefined takes 1 positional argument");
@@ -3138,7 +3144,7 @@ PyObject *MakeForwardType(PyObject* nullValue, PyObject* args, PyObject* kwargs)
         }
     }
 
-    if (num_args > 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
+    if (num_args > 1 || (num_args == 1 && !PyUnicode_Check(PyTuple_GetItem(args,0)))) {
         PyErr_SetString(PyExc_TypeError, "Forward takes a zero or one string positional arguments.");
         return NULL;
     }
@@ -3496,7 +3502,6 @@ static PyMethodDef module_methods[] = {
     {"resolveForwardDefinedType", (PyCFunction)resolveForwardDefinedType, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
-    {"allForwardTypesResolved", (PyCFunction)allForwardTypesResolved, METH_VARARGS, NULL},
     {"recursiveTypeGroup", (PyCFunction)recursiveTypeGroup, METH_VARARGS | METH_KEYWORDS, NULL},
     {"recursiveTypeGroupRepr", (PyCFunction)recursiveTypeGroupRepr, METH_VARARGS | METH_KEYWORDS, NULL},
     {"recursiveTypeGroupDeepRepr", (PyCFunction)recursiveTypeGroupDeepRepr, METH_VARARGS | METH_KEYWORDS, NULL},
