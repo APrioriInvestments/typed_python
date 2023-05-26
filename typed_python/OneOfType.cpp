@@ -236,12 +236,10 @@ void OneOfType::postInitializeConcrete() {
         t->postInitialize();
     }
 
-    std::map<Type*, std::string> ephemeralNames;
-    std::string name = computeRecursiveName(ephemeralNames);
+    TypeStack stack;
+    std::string name = computeRecursiveName(stack);
     m_name = name;
-
     m_size = computeBytecount();
-    m_name = name;
 
     m_is_default_constructible = false;
 
@@ -255,10 +253,18 @@ void OneOfType::postInitializeConcrete() {
     m_needs_post_init = false;
 }
 
-std::string OneOfType::computeRecursiveNameConcrete(std::map<Type*, std::string>& ioEphemeralNames) {
+std::string OneOfType::computeRecursiveNameConcrete(TypeStack& typeStack) {
     if (!m_needs_post_init) {
         return m_name;
     }
+
+    int index = typeStack.indexOf(this);
+
+    if (index != -1) {
+        return "^" + format(index);
+    }
+
+    PushTypeStack addSelf(typeStack, this);
 
     std::string res = "OneOf(";
 
@@ -271,7 +277,7 @@ std::string OneOfType::computeRecursiveNameConcrete(std::map<Type*, std::string>
             res += ", ";
         }
 
-        res += t->computeRecursiveName(ioEphemeralNames);
+        res += t->computeRecursiveName(typeStack);
     }
 
     res += ")";

@@ -193,8 +193,8 @@ void TupleOrListOfType::postInitializeConcrete() {
     }
 
     // this is wrong because we're not taking into account exactly how we can see ourselves
-    std::map<Type*, std::string> ephemeralNames;
-    std::string name = computeRecursiveName(ephemeralNames);
+    TypeStack stack;
+    std::string name = computeRecursiveName(stack);
 
     m_needs_post_initialize = false;
 
@@ -202,25 +202,23 @@ void TupleOrListOfType::postInitializeConcrete() {
     m_stripped_name = "";
 }
 
-std::string TupleOrListOfType::computeRecursiveNameConcrete(std::map<Type*, std::string>& ioEphemeralNames) {
+std::string TupleOrListOfType::computeRecursiveNameConcrete(TypeStack& stack) {
     if (!m_needs_post_initialize) {
         return m_name;
     }
 
-    auto it = ioEphemeralNames.find(this);
+    long index = stack.indexOf(this);
 
-    if (it != ioEphemeralNames.end()) {
-        return it->second;
+    if (index != -1) {
+        return "^" + format(index);
     }
 
-    size_t count = ioEphemeralNames.size();
-
-    ioEphemeralNames[this] = "^" + format(count);
+    PushTypeStack addSelf(stack, this);
 
     if (m_is_tuple) {
-        return "ListOf(" + m_element_type->computeRecursiveName(ioEphemeralNames) + ")";
+        return "ListOf(" + m_element_type->computeRecursiveName(stack) + ")";
     } else {
-        return "TupleOf(" + m_element_type->computeRecursiveName(ioEphemeralNames) + ")";
+        return "TupleOf(" + m_element_type->computeRecursiveName(stack) + ")";
     }
 }
 

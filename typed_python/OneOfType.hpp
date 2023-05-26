@@ -177,7 +177,7 @@ public:
 
     void postInitializeConcrete();
 
-    std::string computeRecursiveNameConcrete(std::map<Type*, std::string>& ioEphemeralNames);
+    std::string computeRecursiveNameConcrete(TypeStack& stack);
 
 private:
     std::vector<Type*> m_types;

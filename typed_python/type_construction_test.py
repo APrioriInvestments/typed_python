@@ -5,8 +5,6 @@ from typed_python import (
 )
 
 
-
-
 def test_forward_definition():
     F = Forward("X")
 
@@ -33,6 +31,16 @@ def test_forward_one_of():
     assert not isForwardDefined(O_resolved)
 
     assert bytecount(O_resolved) == 1 + bytecount(float)
+
+
+def test_recursive_definition_of_self():
+    F = Forward("X")
+
+    F.define(ListOf(F))
+
+    F = resolveForwardDefinedType(F)
+
+    assert F.__name__ == 'TupleOf(^0)'
 
 
 def test_recursive_tuple_of_forward():

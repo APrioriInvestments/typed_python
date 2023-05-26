@@ -610,7 +610,7 @@ public:
 
     void postInitializeConcrete();
 
-    std::string computeRecursiveNameConcrete(std::map<Type*, std::string>& ioEphemeralNames);
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack);
 
 protected:
     Type* m_element_type;

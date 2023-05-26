@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2020 typed_python Authors
+   Copyright 2017-2023 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@
 #include "MutuallyRecursiveTypeGroup.hpp"
 #include "Slab.hpp"
 #include "DeepcopyContext.hpp"
+#include "TypeStack.hpp"
 
 class SerializationBuffer;
 class DeserializationBuffer;
@@ -1064,14 +1065,8 @@ protected:
         throw std::runtime_error("Type " + name() + " didn't implement postInitializeConcrete");
     }
 
-    std::string computeRecursiveNameConcrete(std::map<Type*, std::string>& ioEphemeralNames) {
-        auto it = ioEphemeralNames.find(this);
-
-        if (it == ioEphemeralNames.end()) {
-            return m_name;
-        }
-
-        return it->second;
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
+        return m_name;
     }
 
 public:
@@ -1081,9 +1076,10 @@ public:
             subtype.postInitializeConcrete();
         });
     }
-    std::string computeRecursiveName(std::map<Type*, std::string>& ioEphemeralNames) {
+
+    std::string computeRecursiveName(TypeStack& typeStack) {
         return this->check([&](auto& subtype) {
-            return subtype.computeRecursiveNameConcrete(ioEphemeralNames);
+            return subtype.computeRecursiveNameConcrete(typeStack);
         });
     }
 };
