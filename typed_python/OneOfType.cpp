@@ -139,12 +139,17 @@ Type* OneOfType::cloneForForwardResolutionConcrete() {
 }
 
 void OneOfType::initializeFromConcrete(
-    Type* forwardDefinitionOfSelf,
-    const std::map<Type*, Type*>& groupMap
+    Type* forwardDefinitionOfSelf
 ) {
     OneOfType* selfT = (OneOfType*)forwardDefinitionOfSelf;
 
-    std::vector<Type*> heldTypes;
+    m_types = selfT->m_types;
+}
+
+void OneOfType::updateInternalTypePointersConcrete(
+    const std::map<Type*, Type*>& groupMap
+) {
+    std::vector<Type*> newTypes;
     std::set<Type*> seenTypes;
 
     std::function<void (Type*)> visit = [&](Type* t) {
@@ -158,32 +163,21 @@ void OneOfType::initializeFromConcrete(
                 visit(it->second);
             } else {
                 if (seenTypes.find(t) == seenTypes.end()) {
-                    heldTypes.push_back(t);
+                    newTypes.push_back(t);
                     seenTypes.insert(t);
                 }
             }
         }
     };
 
-    for (auto t: selfT->m_types) {
+    for (auto t: m_types) {
         visit(t);
     }
 
-    m_types = heldTypes;
+    m_types = newTypes;
 
     if (m_types.size() > 255) {
         throw std::runtime_error("OneOf types are limited to 255 alternatives in this implementation");
-    }
-}
-
-void OneOfType::updateInternalTypePointersConcrete(
-    const std::map<Type*, Type*>& groupMap
-) {
-    for (long k = 0; k < m_types.size(); k++) {
-        auto it = groupMap.find(m_types[k]);
-        if (it != groupMap.end()) {
-            m_types[k] = it->second;
-        }
     }
 }
 

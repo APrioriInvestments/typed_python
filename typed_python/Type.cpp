@@ -374,7 +374,8 @@ void Type::attemptToResolve() {
     // but none of them is ready to be identity-hashed yet. They all will be in a state of
     // where m_needs_post_init is true.
     for (auto typeAndSource: resolutionSource) {
-        typeAndSource.first->initializeFrom(typeAndSource.second, resolutionMapping);
+        typeAndSource.first->initializeFrom(typeAndSource.second);
+        typeAndSource.first->updateInternalTypePointers(resolutionMapping);
     }
 
     // cause each type to recompute its name. We have to do this in a single pass

@@ -1,13 +1,17 @@
 import pytest
 
 from typed_python import (
-    ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType
+    TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
+    Tuple, NamedTuple
 )
 
 
 def test_nonforward_definition():
     assert not isForwardDefined(OneOf(int, float))
     assert not isForwardDefined(ListOf(int))
+    assert not isForwardDefined(TupleOf(int))
+    assert not isForwardDefined(Tuple(int, int))
+    assert not isForwardDefined(NamedTuple(x=int, y=float))
 
 
 def test_forward_definition():
@@ -15,6 +19,12 @@ def test_forward_definition():
 
     assert issubclass(F, Forward)
     assert isForwardDefined(F)
+
+    assert isForwardDefined(OneOf(int, F))
+    assert isForwardDefined(ListOf(F))
+    assert isForwardDefined(TupleOf(F))
+    assert isForwardDefined(Tuple(int, F))
+    assert isForwardDefined(NamedTuple(x=int, y=F))
 
 
 def test_forward_one_of():
@@ -48,7 +58,7 @@ def test_recursive_definition_of_self():
     assert F.__name__ == 'ListOf(^0)'
 
 
-def test_recursive_tuple_of_forward():
+def test_recursive_list_of_forward():
     F = Forward()
     O = OneOf(None, F)
     F.define(ListOf(O))
@@ -65,7 +75,26 @@ def test_recursive_tuple_of_forward():
     assert O_resolved.__name__ == 'OneOf(None, ListOf(^1))'
 
 
-def test_recursive_tuple_of_forward_memoizes():
+def test_recursive_list_of_tuple_and_forward():
+    F = Forward()
+    NT = NamedTuple(f=F)
+    F.define(ListOf(NT))
+
+    F_resolved = resolveForwardDefinedType(F)
+    NT_resolved = resolveForwardDefinedType(NT)
+
+    assert issubclass(F_resolved, ListOf)
+    assert not isForwardDefined(F_resolved)
+    assert not isForwardDefined(NT_resolved)
+    assert F_resolved.ElementType is NT_resolved
+    assert NT_resolved.ElementTypes == (F_resolved,)
+    assert NT_resolved.ElementNames == ('f',)
+
+    assert F_resolved.__name__ == 'ListOf(NamedTuple(f=^1))'
+    assert NT_resolved.__name__ == 'NamedTuple(f=ListOf(^1))'
+
+
+def test_recursive_list_of_forward_memoizes():
     def makeTup():
         F = Forward()
         O = OneOf(None, F)

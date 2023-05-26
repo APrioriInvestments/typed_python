@@ -151,25 +151,8 @@ Type* TupleOrListOfType::cloneForForwardResolutionConcrete() {
     }
 }
 
-void TupleOrListOfType::initializeFromConcrete(
-    Type* forwardDefinitionOfSelf,
-    const std::map<Type*, Type*>& groupMap
-) {
-    Type* eltType = ((TupleOrListOfType*)forwardDefinitionOfSelf)->m_element_type;
-
-    if (eltType->isForwardDefined()) {
-        auto it = groupMap.find(eltType);
-
-        if (it == groupMap.end()) {
-            throw std::runtime_error(
-                "Couldn't find a group definition for " + eltType->name()
-            );
-        }
-
-        m_element_type = it->second;
-    } else {
-        m_element_type = eltType;
-    }
+void TupleOrListOfType::initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+    m_element_type = ((TupleOrListOfType*)forwardDefinitionOfSelf)->m_element_type;
 }
 
 void TupleOrListOfType::updateInternalTypePointersConcrete(

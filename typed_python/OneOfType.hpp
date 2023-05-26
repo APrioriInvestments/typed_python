@@ -151,10 +151,7 @@ public:
 
     Type* cloneForForwardResolutionConcrete();
 
-    void initializeFromConcrete(
-        Type* forwardDefinitionOfSelf,
-        const std::map<Type*, Type*>& groupMap
-    );
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf);
 
     void postInitializeConcrete();
 

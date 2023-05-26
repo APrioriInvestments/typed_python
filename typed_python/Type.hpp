@@ -942,12 +942,9 @@ protected:
     // will have a forward definition reference. The instance must have been constructed
     // using 'cloneForForwardResolution'. If the recursiveNameOverride is not None, then
     // use that name for the type instead of the computed name.
-    void initializeFrom(
-        Type* forwardDefinitionOfSelf,
-        const std::map<Type*, Type*>& groupMap
-    ) {
+    void initializeFrom(Type* forwardDefinitionOfSelf) {
         this->check([&](auto& subtype) {
-            return subtype.initializeFromConcrete(forwardDefinitionOfSelf, groupMap);
+            return subtype.initializeFromConcrete(forwardDefinitionOfSelf);
         });
     }
 
@@ -961,17 +958,12 @@ protected:
         return m_is_redundant;
     }
 
-    void initializeFromConcrete(
-        Type* forwardDefinitionOfSelf,
-        const std::map<Type*, Type*>& groupMap
-    ) {
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
         throw std::runtime_error("subclasses implement");
     }
 
     // update internal Type pointers to point into a new group
-    void updateInternalTypePointers(
-        const std::map<Type*, Type*>& groupMap
-    ) {
+    void updateInternalTypePointers(const std::map<Type*, Type*>& groupMap) {
         this->check([&](auto& subtype) {
             return subtype.updateInternalTypePointersConcrete(groupMap);
         });
@@ -993,7 +985,6 @@ protected:
     Type* cloneForForwardResolutionConcrete() {
         throw std::runtime_error("subclasses implement");
     }
-
 
     void postInitializeConcrete() {
         throw std::runtime_error("Type " + name() + " of cat " + getTypeCategoryString() + " didn't implement postInitializeConcrete");

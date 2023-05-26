@@ -22,6 +22,14 @@
 
 class CompositeType : public Type {
 public:
+    // construct a non-forward uninitialized type
+    CompositeType(TypeCategory in_typeCategory) :
+            Type(in_typeCategory)
+    {
+        m_needs_post_init = true;
+    }
+
+    // construct a forward-defined CompositeType
     CompositeType(
                 TypeCategory in_typeCategory,
                 const std::vector<Type*>& types,
@@ -31,6 +39,8 @@ public:
             m_types(types),
             m_names(names)
     {
+        m_is_forward_defined = true;
+
         for (long k = 0; k < names.size(); k++) {
             m_nameToIndex[names[k]] = k;
         }
@@ -224,26 +234,79 @@ public:
         return m_nameToIndex;
     }
 
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        m_types = ((CompositeType*)forwardDefinitionOfSelf)->m_types;
+        m_names = ((CompositeType*)forwardDefinitionOfSelf)->m_names;
+    }
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        for (long k = 0; k < m_types.size(); k++) {
+            auto it = groupMap.find(m_types[k]);
+            if (it != groupMap.end()) {
+                m_types[k] = it->second;
+            }
+        }
+    }
+
+    void postInitializeConcrete() {
+        bool is_default_constructible = true;
+        size_t size = 0;
+
+        m_byte_offsets.clear();
+
+        for (auto t: m_types) {
+            m_byte_offsets.push_back(size);
+            size += t->bytecount();
+        }
+
+        for (auto t: m_types) {
+            if (!t->is_default_constructible()) {
+                is_default_constructible = false;
+            }
+        }
+
+        m_serialize_typecodes.clear();
+        m_serialize_typecodes_to_position.clear();
+        for (int i = 0; i < m_types.size(); i++) {
+            m_serialize_typecodes.push_back(i);
+            m_serialize_typecodes_to_position[i] = i;
+        }
+
+        m_size = size;
+        m_is_default_constructible = is_default_constructible;
+    }
+
 protected:
     template<class subtype>
     static subtype* MakeSubtype(const std::vector<Type*>& types, const std::vector<std::string>& names) {
+        bool anyForward = false;
+
+        for (auto t: types) {
+            if (t->isForwardDefined()) {
+                anyForward = true;
+            }
+        }
+
+        if (anyForward) {
+            return new subtype(types, names);
+        }
+
         PyEnsureGilAcquired getTheGil;
 
         typedef std::pair<const std::vector<Type*>, const std::vector<std::string> > keytype;
 
-        static std::map<keytype, subtype*> m;
+        static std::map<keytype, subtype*> memo;
 
-        auto it = m.find(keytype(types, names));
-        if (it == m.end()) {
-            it = m.insert(
-                std::make_pair(
-                    keytype(types, names),
-                    new subtype(types, names)
-                )
-            ).first;
+        auto it = memo.find(keytype(types, names));
+        if (it != memo.end()) {
+            return it->second;
         }
 
-        return it->second;
+        subtype* res = new subtype(types, names);
+        subtype* concrete = (subtype*)res->forwardResolvesTo();
+
+        memo[keytype(types, names)] = concrete;
+        return concrete;
     }
 
     std::vector<Type*> m_types;
@@ -259,10 +322,16 @@ PyDoc_STRVAR(NamedTuple_doc,
     "NamedTuple(kw)(t) -> new typed named tuple with names and types from kw, initialized from tuple t\n"
     "\n"
     "Raises TypeError if types don't match.\n"
-    );
+);
 
 class NamedTuple : public CompositeType {
 public:
+    // construct a non-forward NamedTuple
+    NamedTuple() : CompositeType(TypeCategory::catNamedTuple)
+    {
+        m_doc = NamedTuple_doc;
+    }
+
     NamedTuple(const std::vector<Type*>& types, const std::vector<std::string>& names) :
             CompositeType(TypeCategory::catNamedTuple, types, names)
     {
@@ -278,6 +347,10 @@ public:
         return MakeSubtype<NamedTuple>(types, names);
     }
 
+    Type* cloneForForwardResolutionConcrete() {
+        return new NamedTuple();
+    }
+
     std::string computeRecursiveNameConcrete(TypeStack& typeStack);
 };
 
@@ -286,10 +359,16 @@ PyDoc_STRVAR(Tuple_doc,
     "Tuple(T1, T2, ...)(t) -> new typed tuple with types T1, T2, ..., initialized from tuple t\n"
     "\n"
     "Raises TypeError if types don't match.\n"
-    );
+);
 
 class Tuple : public CompositeType {
 public:
+    // construct a non-forward Tuple
+    Tuple() : CompositeType(TypeCategory::catTuple)
+    {
+
+    }
+
     Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) :
             CompositeType(TypeCategory::catTuple, types, names)
     {
@@ -298,6 +377,10 @@ public:
 
     static Tuple* Make(const std::vector<Type*>& types) {
         return MakeSubtype<Tuple>(types, std::vector<std::string>());
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new Tuple();
     }
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack);
