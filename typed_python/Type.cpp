@@ -419,6 +419,7 @@ void Type::attemptToResolve() {
     // do the entire type resolution process while holding the GIL
     PyEnsureGilAcquired getTheGil;
 
+    std::set<Type*> existingReferencedTypes;
     std::set<Type*> typesNeedingResolution;
     std::set<Type*> toVisit;
     toVisit.insert(this);
@@ -454,11 +455,11 @@ void Type::attemptToResolve() {
     // this will be a 'named copy' of the type depending on the Forward name.
     std::map<Type*, Type*> resolutionMapping;
 
-    // for each type we end up defining, which type did it come from and what name
-    // are we giving it?
+    // for each type we end up defining, which type did it come from
     std::map<Type*, Type*> resolutionSource;
 
     // allocate new target type bodies for all regular types in the graph
+    // that are forward declared.
     for (auto t: typesNeedingResolution) {
         if (!t->isForward()) {
             // we're resolving to this type directly
@@ -482,6 +483,7 @@ void Type::attemptToResolve() {
 
             if (typesNeedingResolution.find(tgt) == typesNeedingResolution.end()) {
                 resolutionMapping[t] = tgt;
+                existingReferencedTypes.insert(tgt);
             } else {
                 // resolve this forward to whatever its target resolves to
                 resolutionMapping[t] = resolutionMapping[tgt];
@@ -489,16 +491,79 @@ void Type::attemptToResolve() {
         }
     }
 
+    // copy all the types. At this point, they all know that they are not forwards
+    // but none of them is ready to be identity-hashed yet. They all will be in a state of
+    // where m_needs_post_init is true.
     for (auto typeAndSource: resolutionSource) {
         typeAndSource.first->initializeFrom(typeAndSource.second, resolutionMapping);
     }
 
-    for (auto typeAndTarget: resolutionMapping) {
-        typeAndTarget.first->m_forward_resolves_to = typeAndTarget.second;
+    // cause each type to recompute its name. We have to do this in a single pass
+    // without any types being aware of their final name before we run the post initialize
+    // step. Otherwise, it's possible for the names to depend on the order of initialization
+    // and we want them to be stable.
+    for (auto typeAndSource: resolutionSource) {
+        typeAndSource.first->recomputeNamePostInitialization();
     }
 
+    // cause each type to post-initialize itself, which lets it update internal bytecounts etc
     for (auto typeAndSource: resolutionSource) {
         typeAndSource.first->postInitialize();
+    }
+
+    // now internalize the types by their hash. For each type, we compute a hash
+    // and then look to see if we've seen it before. We build a lookup table from
+    // each existing type to the internalized type, and then do the same process we did
+    // above to map any roots across.
+
+    std::map<Type*, Type*> resolvedToInternal; // each 'resolved' type what should it be replaced with
+
+    std::set<Type*> newTypes;
+    std::set<Type*> redundantTypes;
+
+    for (auto typeAndSource: resolutionSource) {
+        ShaHash h = typeAndSource.first->identityHash();
+
+        auto it = mInternalizedIdentityHashToType.find(h);
+        if (it == mInternalizedIdentityHashToType.end()) {
+            // this is a new type. We're going to put it in the memo and
+            // update it so that it ponts
+            newTypes.insert(typeAndSource.first);
+        } else {
+            resolvedToInternal[typeAndSource.first] = it->second;
+            redundantTypes.insert(typeAndSource.first);
+        }
+    }
+
+    // update all the new types to no longer look at the redundant types
+    for (auto t: newTypes) {
+        t->updateInternalTypePointers(resolvedToInternal);
+        mInternalizedIdentityHashToType[t->identityHash()] = t;
+        resolvedToInternal[t] = t;
+    }
+
+    for (auto t: redundantTypes) {
+        t->markRedundant();
+    }
+
+    // tell each source type which type it actually resolves to. We're holding the GIL so
+    // nobody should see anything until we finish this process.
+    for (auto typeAndTarget: resolutionMapping) {
+        auto it = resolvedToInternal.find(typeAndTarget.second);
+        if (it == resolvedToInternal.end()) {
+            // this must be an existing type
+            if (existingReferencedTypes.find(typeAndTarget.second) == existingReferencedTypes.end()) {
+                throw std::runtime_error(
+                    "Failed to get an internalization of Type "
+                    + typeAndTarget.second->name() + " and it wasn't a pre-existing type either."
+                );
+            }
+
+            // we resolve to it directly
+            typeAndTarget.first->m_forward_resolves_to = typeAndTarget.second;
+        } else {
+            typeAndTarget.first->m_forward_resolves_to = it->second;
+        }
     }
 
     if (!m_forward_resolves_to) {
@@ -529,3 +594,6 @@ PyObject* getOrSetTypeResolver(PyObject* module, PyObject* args) {
     curResolver = resolver;
     return curResolver;
 }
+
+//static
+std::map<ShaHash, Type*> Type::mInternalizedIdentityHashToType;

@@ -227,6 +227,17 @@ void OneOfType::initializeFromConcrete(
     m_types = heldTypes;
 }
 
+void OneOfType::updateInternalTypePointersConcrete(
+    const std::map<Type*, Type*>& groupMap
+) {
+    for (long k = 0; k < m_types.size(); k++) {
+        auto it = groupMap.find(m_types[k]);
+        if (it != groupMap.end()) {
+            m_types[k] = it->second;
+        }
+    }
+}
+
 void OneOfType::postInitializeConcrete() {
     if (!m_needs_post_init) {
         return;
@@ -236,9 +247,6 @@ void OneOfType::postInitializeConcrete() {
         t->postInitialize();
     }
 
-    TypeStack stack;
-    std::string name = computeRecursiveName(stack);
-    m_name = name;
     m_size = computeBytecount();
 
     m_is_default_constructible = false;

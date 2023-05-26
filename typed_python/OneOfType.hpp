@@ -179,6 +179,10 @@ public:
 
     std::string computeRecursiveNameConcrete(TypeStack& stack);
 
+    void updateInternalTypePointersConcrete(
+        const std::map<Type*, Type*>& groupMap
+    );
+
 private:
     std::vector<Type*> m_types;
     bool m_needs_post_init;

@@ -612,7 +612,7 @@ public:
             return false;
         }
 
-        return t1->compilerHash() == t2->compilerHash();
+        return t1->identityHash() == t2->identityHash();
     }
 
     //this checks _strict_ subclass. X is not a subclass of itself.
@@ -881,7 +881,7 @@ public:
         type that's in our group. This gives us a unique signature for the group. The
         final hash is then that hash plus our id within the group.
     ******/
-    ShaHash compilerHash() {
+    ShaHash identityHash() {
         // if we've never initialized our hash
         if (mIdentityHash == ShaHash()) {
             MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(
@@ -951,7 +951,8 @@ protected:
             mTypeGroup(nullptr),
             mRecursiveTypeGroupIndex(-1),
             m_is_forward_defined(false),
-            m_forward_resolves_to(nullptr)
+            m_forward_resolves_to(nullptr),
+            m_is_redundant(false)
         {}
 
     TypeCategory m_typeCategory;
@@ -974,6 +975,13 @@ protected:
 
     // 'simple' types are those that have no reference to the python interpreter
     bool m_is_simple;
+
+
+
+
+
+
+
 
     bool m_resolved;
 
@@ -1024,6 +1032,9 @@ protected:
     // the actual type we resolve to.
     Type* m_forward_resolves_to;
 
+    // have we been made 'redundant'?
+    bool m_is_redundant;
+
     // try to resolve this forward type. If we can't, we'll throw an exception. On exit,
     // we will have thrown, or m_forward_resolves_to will be populated.
     void attemptToResolve();
@@ -1041,6 +1052,16 @@ protected:
         });
     }
 
+    // this is a fully-resolved type that we created but aren't using.
+    // it should just leak and never be used again.
+    void markRedundant() {
+        m_is_redundant = true;
+    }
+
+    bool isRedundant() {
+        return m_is_redundant;
+    }
+
     void initializeFromConcrete(
         Type* forwardDefinitionOfSelf,
         const std::map<Type*, Type*>& groupMap
@@ -1048,6 +1069,20 @@ protected:
         throw std::runtime_error("subclasses implement");
     }
 
+    // update internal Type pointers to point into a new group
+    void updateInternalTypePointers(
+        const std::map<Type*, Type*>& groupMap
+    ) {
+        this->check([&](auto& subtype) {
+            return subtype.updateInternalTypePointersConcrete(groupMap);
+        });
+    }
+
+    void updateInternalTypePointersConcrete(
+        const std::map<Type*, Type*>& groupMap
+    ) {
+        throw std::runtime_error("subclasses implement");
+    }
 
     // produce a copy of ourself
     Type* cloneForForwardResolution() {
@@ -1067,6 +1102,14 @@ protected:
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
         return m_name;
+    }
+
+    static std::map<ShaHash, Type*> mInternalizedIdentityHashToType;
+
+    void recomputeNamePostInitialization() {
+        TypeStack stack;
+        m_name = computeRecursiveName(stack);
+        m_stripped_name = "";
     }
 
 public:

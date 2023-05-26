@@ -187,19 +187,21 @@ void TupleOrListOfType::initializeFromConcrete(
     }
 }
 
+void TupleOrListOfType::updateInternalTypePointersConcrete(
+    const std::map<Type*, Type*>& groupMap
+) {
+    auto it = groupMap.find(m_element_type);
+    if (it != groupMap.end()) {
+        m_element_type = it->second;
+    }
+}
+
+
 void TupleOrListOfType::postInitializeConcrete() {
     if (!m_needs_post_initialize) {
         return;
     }
-
-    // this is wrong because we're not taking into account exactly how we can see ourselves
-    TypeStack stack;
-    std::string name = computeRecursiveName(stack);
-
     m_needs_post_initialize = false;
-
-    m_name = name;
-    m_stripped_name = "";
 }
 
 std::string TupleOrListOfType::computeRecursiveNameConcrete(TypeStack& stack) {
@@ -216,9 +218,9 @@ std::string TupleOrListOfType::computeRecursiveNameConcrete(TypeStack& stack) {
     PushTypeStack addSelf(stack, this);
 
     if (m_is_tuple) {
-        return "ListOf(" + m_element_type->computeRecursiveName(stack) + ")";
-    } else {
         return "TupleOf(" + m_element_type->computeRecursiveName(stack) + ")";
+    } else {
+        return "ListOf(" + m_element_type->computeRecursiveName(stack) + ")";
     }
 }
 

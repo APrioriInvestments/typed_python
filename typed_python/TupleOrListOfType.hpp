@@ -612,6 +612,10 @@ public:
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack);
 
+    void updateInternalTypePointersConcrete(
+        const std::map<Type*, Type*>& groupMap
+    );
+
 protected:
     Type* m_element_type;
     bool m_is_tuple;

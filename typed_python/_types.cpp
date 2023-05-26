@@ -3152,11 +3152,11 @@ PyObject *MakeForwardType(PyObject* nullValue, PyObject* args, PyObject* kwargs)
 
         return incref((PyObject*)PyInstance::typeObj(
             ::Forward::Make(name)
-            ));
+        ));
     } else {
         return incref((PyObject*)PyInstance::typeObj(
             ::Forward::Make()
-            ));
+        ));
     }
 }
 
