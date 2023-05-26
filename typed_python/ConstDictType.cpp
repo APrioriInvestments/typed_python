@@ -16,32 +16,6 @@
 
 #include "AllTypes.hpp"
 
-bool ConstDictType::_updateAfterForwardTypesChanged() {
-    size_t old_bytes_per_key_value_pair = m_bytes_per_key_value_pair;
-
-    m_size = sizeof(void*);
-    m_is_default_constructible = true;
-    m_bytes_per_key = m_key->bytecount();
-    m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
-    m_bytes_per_key_subtree_pair = m_key->bytecount() + this->bytecount();
-
-    std::string name = "ConstDict(" + m_key->name(true) + "->" + m_value->name(true) + ")";
-
-    if (m_is_recursive_forward) {
-        name = m_recursive_name;
-    }
-
-    bool anyChanged = (
-        name != m_name ||
-        m_bytes_per_key_value_pair != old_bytes_per_key_value_pair
-    );
-
-    m_name = name;
-    m_stripped_name = "";
-
-    return anyChanged;
-}
-
 bool ConstDictType::isBinaryCompatibleWithConcrete(Type* other) {
     if (other->getTypeCategory() != m_typeCategory) {
         return false;
@@ -54,24 +28,28 @@ bool ConstDictType::isBinaryCompatibleWithConcrete(Type* other) {
 }
 
 // static
-ConstDictType* ConstDictType::Make(Type* key, Type* value, ConstDictType* knownType) {
-    PyEnsureGilAcquired getTheGil;
-
-    static std::map<std::pair<Type*, Type*>, ConstDictType*> m;
-
-    auto lookup_key = std::make_pair(key,value);
-
-    auto it = m.find(lookup_key);
-    if (it == m.end()) {
-        it = m.insert(
-            std::make_pair(
-                lookup_key,
-                knownType ? knownType : new ConstDictType(key, value)
-            )
-        ).first;
+ConstDictType* ConstDictType::Make(Type* key, Type* value) {
+    if (key->isForwardDefined() || value->isForwardDefined()) {
+        return new ConstDictType(key, value);
     }
 
-    return it->second;
+    PyEnsureGilAcquired getTheGil;
+
+    static std::map<std::pair<Type*, Type*>, ConstDictType*> memo;
+
+    auto lookup_key = std::make_pair(key, value);
+
+    auto it = memo.find(lookup_key);
+    if (it != memo.end()) {
+        return it->second;
+    }
+
+    ConstDictType* res = new ConstDictType(key, value);
+    ConstDictType* concrete = (ConstDictType*)res->forwardResolvesTo();
+
+    memo[lookup_key] = concrete;
+
+    return concrete;
 }
 
 void ConstDictType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {

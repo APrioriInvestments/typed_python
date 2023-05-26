@@ -30,18 +30,21 @@ PyDoc_STRVAR(DictType_doc,
     );
 
 class DictType : public Type {
+    // construct a non-forward uninitialized dict
+    DictType() : Type(TypeCategory::catDict)
+    {
+        m_doc = DictType_doc;
+        m_needs_post_init = true;
+    }
 public:
+    // declare a forward-defined Dict
     DictType(Type* key, Type* value) :
             Type(TypeCategory::catDict),
             m_key(key),
             m_value(value)
     {
         m_doc = DictType_doc;
-        endOfConstructorInitialization(); // finish initializing the type object.
-    }
-
-    void _updateTypeMemosAfterForwardResolution() {
-        DictType::Make(m_key, m_value, this);
+        m_is_forward_defined = true;
     }
 
     template<class visitor_type>
@@ -61,11 +64,45 @@ public:
         v.visitTopo(m_value);
     }
 
-    bool _updateAfterForwardTypesChanged();
-
     bool isBinaryCompatibleWithConcrete(Type* other);
 
-    static DictType* Make(Type* key, Type* value, DictType* knownType=nullptr);
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
+        return "Dict("
+            + m_key->computeRecursiveName(typeStack)
+            + ", "
+            + m_value->computeRecursiveName(typeStack)
+            + ")";
+    }
+
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        m_key = ((DictType*)forwardDefinitionOfSelf)->m_key;
+        m_value = ((DictType*)forwardDefinitionOfSelf)->m_value;
+    }
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        auto it_key = groupMap.find(m_key);
+        if (it_key != groupMap.end()) {
+            m_key = it_key->second;
+        }
+
+        auto it_val = groupMap.find(m_value);
+        if (it_val != groupMap.end()) {
+            m_value = it_val->second;
+        }
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new DictType();
+    }
+
+    void postInitializeConcrete() {
+        m_size = sizeof(void*);
+        m_is_default_constructible = true;
+        m_bytes_per_key = m_key->bytecount();
+        m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
+    }
+
+    static DictType* Make(Type* key, Type* value);
 
     // hand 'visitor' each an instance_ptr for
     // each value. if it returns 'false', exit early.

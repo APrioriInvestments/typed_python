@@ -16,26 +16,6 @@
 
 #include "AllTypes.hpp"
 
-bool DictType::_updateAfterForwardTypesChanged() {
-    m_size = sizeof(void*);
-    m_is_default_constructible = true;
-    m_bytes_per_key = m_key->bytecount();
-    m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
-
-    std::string name = "Dict(" + m_key->name(true) + "->" + m_value->name(true) + ")";
-
-    if (m_is_recursive_forward) {
-        name = m_recursive_name;
-    }
-
-    bool anyChanged = name != m_name;
-
-    m_name = name;
-    m_stripped_name = "";
-
-    return anyChanged;
-}
-
 bool DictType::isBinaryCompatibleWithConcrete(Type* other) {
     if (other->getTypeCategory() != m_typeCategory) {
         return false;
@@ -48,24 +28,28 @@ bool DictType::isBinaryCompatibleWithConcrete(Type* other) {
 }
 
 // static
-DictType* DictType::Make(Type* key, Type* value, DictType* knownType) {
-    PyEnsureGilAcquired getTheGil;
-
-    static std::map<std::pair<Type*, Type*>, DictType*> m;
-
-    auto lookup_key = std::make_pair(key,value);
-
-    auto it = m.find(lookup_key);
-    if (it == m.end()) {
-        it = m.insert(
-            std::make_pair(
-                lookup_key,
-                knownType ? knownType: new DictType(key, value)
-            )
-        ).first;
+DictType* DictType::Make(Type* key, Type* value) {
+    if (key->isForwardDefined() || value->isForwardDefined()) {
+        return new DictType(key, value);
     }
 
-    return it->second;
+    PyEnsureGilAcquired getTheGil;
+
+    static std::map<std::pair<Type*, Type*>, DictType*> memo;
+
+    auto lookup_key = std::make_pair(key, value);
+
+    auto it = memo.find(lookup_key);
+    if (it != memo.end()) {
+        return it->second;
+    }
+
+    DictType* res = new DictType(key, value);
+    DictType* concrete = (DictType*)res->forwardResolvesTo();
+
+    memo[lookup_key] = concrete;
+
+    return concrete;
 }
 
 void DictType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {

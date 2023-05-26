@@ -3,18 +3,26 @@
 
 #include <map>
 
-SetType* SetType::Make(Type* eltype, SetType* knownType) {
-    PyEnsureGilAcquired getTheGil;
-
-    static std::map<Type*, SetType*> m;
-
-    auto it = m.find(eltype);
-
-    if (it == m.end()) {
-        it = m.insert(std::make_pair(eltype, knownType ? knownType : new SetType(eltype))).first;
+SetType* SetType::Make(Type* eltype) {
+    if (eltype->isForwardDefined()) {
+        return new SetType(eltype);
     }
 
-    return it->second;
+    PyEnsureGilAcquired getTheGil;
+
+    static std::map<Type*, SetType*> memo;
+
+    auto it = memo.find(eltype);
+    if (it != memo.end()) {
+        return it->second;
+    }
+
+    SetType* res = new SetType(eltype);
+    SetType* concrete = (SetType*)res->forwardResolvesTo();
+
+    memo[eltype] = concrete;
+
+    return concrete;
 }
 
 bool SetType::discard(instance_ptr self, instance_ptr key) {
@@ -63,22 +71,6 @@ instance_ptr SetType::lookupKey(instance_ptr self, instance_ptr key) const {
 int64_t SetType::size(instance_ptr self) const {
     hash_table_layout& record = **(hash_table_layout**)self;
     return record.hash_table_count;
-}
-
-bool SetType::_updateAfterForwardTypesChanged() {
-    std::string name = "Set(" + m_key_type->name(true) + ")";
-    m_size = sizeof(void*);
-    m_is_default_constructible = true;
-    m_bytes_per_el = m_key_type->bytecount();
-
-    if (m_is_recursive_forward) {
-        name = m_recursive_name;
-    }
-
-    bool anyChanged = name != m_name;
-    m_name = name;
-    m_stripped_name = "";
-    return anyChanged;
 }
 
 int64_t SetType::refcount(instance_ptr self) const {

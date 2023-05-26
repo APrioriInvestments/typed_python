@@ -2,14 +2,16 @@ import pytest
 
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
-    Tuple, NamedTuple, PointerTo, RefTo
+    Tuple, NamedTuple, PointerTo, RefTo, Dict, Set
 )
 
 
 def test_nonforward_definition():
     assert not isForwardDefined(OneOf(int, float))
     assert not isForwardDefined(ListOf(int))
+    assert not isForwardDefined(Dict(int, int))
     assert not isForwardDefined(TupleOf(int))
+    assert not isForwardDefined(Set(int))
     assert not isForwardDefined(Tuple(int, int))
     assert not isForwardDefined(PointerTo(int))
     assert not isForwardDefined(RefTo(int))
@@ -22,9 +24,11 @@ def test_forward_definition():
     assert issubclass(F, Forward)
     assert isForwardDefined(F)
 
+    assert isForwardDefined(Dict(int, F))
     assert isForwardDefined(OneOf(int, F))
     assert isForwardDefined(ListOf(F))
     assert isForwardDefined(TupleOf(F))
+    assert isForwardDefined(Set(F))
     assert isForwardDefined(Tuple(int, F))
     assert isForwardDefined(PointerTo(F))
     assert isForwardDefined(RefTo(F))
@@ -127,3 +131,23 @@ def test_recursive_ref_to():
 
     assert makeP() is makeP()
     assert makeP().__name__ == 'RefTo(^0)'
+
+
+def test_recursive_dict():
+    def makeP():
+        F = Forward()
+        F.define(Dict(int, F))
+        return resolveForwardDefinedType(F)
+
+    assert makeP() is makeP()
+    assert makeP().__name__ == 'Dict(int, ^0)'
+
+
+def test_recursive_set():
+    def makeP():
+        F = Forward()
+        F.define(Set(F))
+        return resolveForwardDefinedType(F)
+
+    assert makeP() is makeP()
+    assert makeP().__name__ == 'Set(^0)'

@@ -27,13 +27,18 @@ PyDoc_STRVAR(Set_doc,
     );
 
 class SetType : public Type {
-  public:
+    SetType() : Type(TypeCategory::catSet)
+    {
+        m_doc = Set_doc;
+        m_needs_post_init = true;
+    }
+public:
     SetType(Type* eltype)
         : Type(TypeCategory::catSet)
         , m_key_type(eltype)
     {
         m_doc = Set_doc;
-        endOfConstructorInitialization();
+        m_is_forward_defined = true;
     }
 
     template<class visitor_type>
@@ -41,14 +46,37 @@ class SetType : public Type {
         visitor(m_key_type);
     }
 
-    void _updateTypeMemosAfterForwardResolution() {
-        SetType::Make(m_key_type, this);
-    }
-
     template<class visitor_type>
     void _visitCompilerVisibleInternals(const visitor_type& v) {
         v.visitHash(ShaHash(1, m_typeCategory));
         v.visitTopo(m_key_type);
+    }
+
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
+        return "Set("
+            + m_key_type->computeRecursiveName(typeStack)
+            + ")";
+    }
+
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        m_key_type = ((SetType*)forwardDefinitionOfSelf)->m_key_type;
+    }
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        auto it_key = groupMap.find(m_key_type);
+        if (it_key != groupMap.end()) {
+            m_key_type = it_key->second;
+        }
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new SetType();
+    }
+
+    void postInitializeConcrete() {
+        m_size = sizeof(void*);
+        m_is_default_constructible = true;
+        m_bytes_per_el = m_key_type->bytecount();
     }
 
     instance_ptr insertKey(instance_ptr self, instance_ptr key);
@@ -60,7 +88,6 @@ class SetType : public Type {
     void copy_constructor(instance_ptr self, instance_ptr other);
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
     int64_t refcount(instance_ptr self) const;
-    bool _updateAfterForwardTypesChanged();
     int64_t size(instance_ptr self) const;
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp,
              bool suppressExceptions = false);
@@ -87,7 +114,7 @@ class SetType : public Type {
         }
     }
 
-void deepcopyConcrete(
+    void deepcopyConcrete(
         instance_ptr dest,
         instance_ptr src,
         DeepcopyContext& context
@@ -233,10 +260,10 @@ void deepcopyConcrete(
         }
     }
 
-  public:
-    static SetType* Make(Type* eltype, SetType* knownType=nullptr);
+public:
+    static SetType* Make(Type* eltype);
 
-  private:
+private:
     Type* m_key_type;
     size_t m_bytes_per_el;
     bool subset(instance_ptr left, instance_ptr right);
