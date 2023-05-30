@@ -2,7 +2,7 @@ import pytest
 
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
-    Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function
+    Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash
 )
 
 
@@ -175,3 +175,27 @@ def test_recursive_alternative():
 
     assert makeA() is makeA()
     assert makeA().__name__ == 'F'
+
+
+def test_function_types_coalesc():
+    def makeFNonforward(T):
+        @Function
+        def f(x: T):
+            return x
+
+        return type(f)
+
+    def makeFforward(T):
+        t = Forward("T")
+
+        @Function
+        def f(x: t):
+            return x
+
+        t.define(T)
+
+        return resolveForwardDefinedType(type(f))
+
+    assert makeFNonforward(int) is makeFNonforward(int)
+    assert identityHash(makeFforward(int)) == identityHash(makeFforward(int))
+    assert makeFforward(int) is makeFforward(int)

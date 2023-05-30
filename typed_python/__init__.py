@@ -55,7 +55,8 @@ from typed_python._types import (
     ModuleRepresentation,
     setGilReleaseThreadLoopSleepMicroseconds,
     isForwardDefined,
-    resolveForwardDefinedType
+    resolveForwardDefinedType,
+    identityHash
 )
 import typed_python._types as _types
 import threading
