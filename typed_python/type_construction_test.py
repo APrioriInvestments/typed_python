@@ -40,9 +40,7 @@ def test_forward_definition():
     assert isForwardDefined(Alternative("A", x={'f': F}).x)
 
     func = Function(lambda x: x, F)
-    print(func.overloads[0].returnType)
-
-    assert isForwardDefined(func)
+    assert isForwardDefined(type(func))
 
 
 def test_forward_one_of():

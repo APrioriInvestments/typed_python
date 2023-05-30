@@ -665,8 +665,17 @@ public:
     }
 
     void assertForwardsResolvedSufficientlyToInstantiate() {
+        this->check([&](auto& subtype) {
+            subtype.assertForwardsResolvedSufficientlyToInstantiateConcrete();
+        });
+    }
+
+    void assertForwardsResolvedSufficientlyToInstantiateConcrete() const {
         if (m_is_forward_defined) {
-            throw std::logic_error("Type " + m_name + " is a forward");
+            throw std::logic_error(
+                "Type " + m_name + " of cat "
+                + this->getTypeCategoryString() + " is a forward"
+            );
         }
     }
 
@@ -741,7 +750,7 @@ public:
 
     template<class ptr_func_dest, class ptr_func_src>
     void copy_constructor(int64_t count, const ptr_func_dest& ptrToTarget, const ptr_func_src& ptrToSrc) {
-        assertForwardsResolved();
+        assertForwardsResolvedSufficientlyToInstantiate();
 
         this->check([&](auto& subtype) {
             for (long k = 0; k < count; k++) {
