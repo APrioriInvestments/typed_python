@@ -81,6 +81,8 @@ public:
 
     static Instance create(Type*t, instance_ptr data);
 
+    static Instance create(PyObject* o);
+
     static Instance create(Type*t);
 
     Instance();
@@ -92,6 +94,12 @@ public:
     template<class initializer_type>
     static Instance createAndInitialize(Type* t, const initializer_type& initFun) {
         return Instance(t, initFun);
+    }
+
+    Instance clone() const {
+        return Instance::createAndInitialize(type(), [&](instance_ptr newSelf) {
+            type()->copy_constructor(newSelf, data());
+        });
     }
 
     template<class initializer_type>
@@ -133,6 +141,9 @@ public:
 
         return mLayout ? mLayout->type : noneType;
     }
+
+    // if we wrap a Type* as a python object, return it. Otherwise nullptr.
+    Type* extractType(bool includePrimitives=false) const;
 
     template<class T>
     T& cast() {

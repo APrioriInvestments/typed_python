@@ -40,6 +40,25 @@ Instance Instance::create(Type*t, instance_ptr data) {
         t->copy_constructor(tgt, data);
     });
 }
+
+Instance Instance::create(PyObject* inst) {
+    if (PyType_Check(inst)) {
+        return Instance::createAndInitialize(
+            PythonObjectOfType::AnyPyType(),
+            [&](instance_ptr i) {
+                PythonObjectOfType::AnyPyType()->initializeFromPyObject(i, inst);
+            }
+        );
+    }
+
+    return Instance::createAndInitialize(
+        PythonObjectOfType::AnyPyObject(),
+        [&](instance_ptr i) {
+            PythonObjectOfType::AnyPyObject()->initializeFromPyObject(i, inst);
+        }
+    );
+}
+
 Instance Instance::create(Type*t) {
     t->assertForwardsResolvedSufficientlyToInstantiate();
 
@@ -146,4 +165,19 @@ typed_python_hash_type Instance::hash() const {
     }
 
     return mLayout->type->hash(mLayout->data);
+}
+
+Type* Instance::extractType(bool includePrimitives) const {
+    if (
+        type()->isPythonObjectOfType() &&
+        PyType_Check(
+            PyObjectHandleTypeBase::getPyObj(data())
+        )
+    ) {
+        PyObject* obj = PyObjectHandleTypeBase::getPyObj(data());
+
+        return PyInstance::extractTypeFrom((PyTypeObject*)obj, includePrimitives);
+    }
+
+    return nullptr;
 }

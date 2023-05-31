@@ -2,7 +2,7 @@ import pytest
 
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
-    Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash
+    Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash, Value
 )
 
 
@@ -121,6 +121,18 @@ def test_recursive_list_of_forward_memoizes():
     assert makeTup() is makeTup()
 
 
+def test_nonrecursive_list_of_forward_memoizes():
+    def makeTup():
+        F = Forward()
+        O = ListOf(F)
+        F.define(int)
+
+        return resolveForwardDefinedType(O)
+
+    assert makeTup() is makeTup()
+    assert makeTup() is ListOf(int)
+
+
 def test_recursive_pointer_to():
     def makeP():
         F = Forward()
@@ -177,6 +189,19 @@ def test_recursive_alternative():
     assert makeA().__name__ == 'F'
 
 
+def test_cannot_call_forward_function_instances():
+    t = Forward("T")
+
+    @Function
+    def f(x: t):
+        return x
+
+    t.define(int)
+
+    with pytest.raises(TypeError):
+        f(10)
+
+
 def test_function_types_coalesc():
     def makeFNonforward(T):
         @Function
@@ -199,3 +224,17 @@ def test_function_types_coalesc():
     assert makeFNonforward(int) is makeFNonforward(int)
     assert identityHash(makeFforward(int)) == identityHash(makeFforward(int))
     assert makeFforward(int) is makeFforward(int)
+
+
+def test_create_value_type_with_forward():
+    F = Forward("X")
+    T = Value(F)
+    F.define(int)
+
+    assert isForwardDefined(T)
+
+    T_resolved = resolveForwardDefinedType(T)
+
+    assert not isForwardDefined(T_resolved)
+    assert identityHash(T_resolved).hex() == identityHash(Value(int)).hex()
+    assert T_resolved is Value(int)

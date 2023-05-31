@@ -39,6 +39,11 @@ public:
         if (t != mInstance.type()) {
             throw std::runtime_error("visitor shouldn't have changed the type of a Value");
         }
+
+        t = mInstance.extractType();
+        if (t) {
+            visitor(t);
+        }
     }
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
@@ -97,25 +102,27 @@ public:
         return mInstance;
     }
 
-    // TODO: should we allow Forward-declared Value types?
-    static Type* Make(Instance i) {
-        PyEnsureGilAcquired getTheGil;
-
-        static std::map<Instance, Value*> m;
-
-        auto it = m.find(i);
-
-        if (it == m.end()) {
-            it = m.insert(std::make_pair(i, new Value(i))).first;
-        }
-
-        return it->second;
-    }
+    static Type* Make(Instance i);
 
     void postInitializeConcrete() {}
 
+    Type* cloneForForwardResolutionConcrete() {
+        return new Value();
+    }
+
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf);
+
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack);
+
+    void updateInternalTypePointersConcrete(
+        const std::map<Type*, Type*>& groupMap
+    );
+
 private:
     Value(const Instance& instance);
+
+    // this is the clone-pathway
+    Value();
 
     Instance mInstance;
     PyObject* mValueAsPyobj;
