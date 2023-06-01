@@ -22,6 +22,7 @@ TypeOrPyobj::TypeOrPyobj(Type* t) :
     mPyObj(nullptr)
 {
     if (!mType) {
+        asm("int3");
         throw std::runtime_error("Can't construct a TypeOrPyobj with a null Type");
     }
 }

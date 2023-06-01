@@ -590,6 +590,22 @@ public:
         }
     }
 
+    template<class concrete_type, class visitor_type>
+    static void adaptTypeVisitor(const visitor_type& vis, concrete_type*& ioTypePtr) {
+        Type* t = ioTypePtr;
+        vis(t);
+        if (t != (Type*)ioTypePtr) {
+            if (t->getTypeCategory() != ioTypePtr->getTypeCategory() && !ioTypePtr->isForward()) {
+                throw std::runtime_error(
+                    "Somehow, visitor changed the type category from "
+                    + ioTypePtr->getTypeCategoryString() + " to " + t->getTypeCategoryString()
+                );
+            }
+
+            ioTypePtr = (concrete_type*)t;
+        }
+    }
+
     template<class T>
     static void updateTypeRefFromGroupMap(T*& toUpdate, const std::map<Type*, Type*>& groupMap) {
         auto it = groupMap.find(toUpdate);

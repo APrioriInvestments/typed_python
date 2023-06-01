@@ -476,6 +476,7 @@ HeldClass* HeldClass::Make(
         throw PythonExceptionSet();
     }
 
+    // this is a forward-defined HeldClass
     HeldClass* result = new HeldClass(
         "Held(" + inName + ")",
         bases,
@@ -488,13 +489,18 @@ HeldClass* HeldClass::Make(
         classMethods
     );
 
+    Class* clsType = new Class(inName, result);
+
+    // initialize the corresonding Class type
+    result->setClassType(clsType);
+
     // check if the forward has any references to forward types. If not, we can
     // (and should) resolve it immediately, since our contract is that we only produce forwards
     // if we refer to forwards.
     bool anyForward = false;
 
     result->_visitReferencedTypes(
-        [&](Type* t) { if (t->isForwardDefined()) { anyForward = true; } }
+        [&](Type* t) { if (t->isForwardDefined() && t != clsType) { anyForward = true; } }
     );
 
     if (!anyForward) {

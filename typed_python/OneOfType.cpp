@@ -151,8 +151,14 @@ void OneOfType::updateInternalTypePointersConcrete(
 ) {
     std::vector<Type*> newTypes;
     std::set<Type*> seenTypes;
+    std::set<Type*> everVisited;
 
     std::function<void (Type*)> visit = [&](Type* t) {
+        if (everVisited.find(t) != everVisited.end()) {
+            return;
+        }
+        everVisited.insert(t);
+
         if (t->getTypeCategory() == catOneOf) {
             for (auto subt: ((OneOfType*)t)->getTypes()) {
                 visit(subt);

@@ -73,7 +73,6 @@ public:
     void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
         m_heldClass = ((Class*)forwardDefinitionOfSelf)->m_heldClass;
         m_name = ((Class*)forwardDefinitionOfSelf)->m_name;
-        m_heldClass->setClassType(this);
     }
 
     Type* cloneForForwardResolutionConcrete() {
@@ -81,6 +80,8 @@ public:
     }
 
     void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        updateTypeRefFromGroupMap(m_heldClass, groupMap);
+
         _visitReferencedTypes([&](Type*& typePtr) {
             updateTypeRefFromGroupMap(typePtr, groupMap);
         });
@@ -140,9 +141,17 @@ public:
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
-        Type* t = m_heldClass;
-        visitor(t);
-        assert(t == m_heldClass);
+        if (m_heldClass) {
+            Type* hc = m_heldClass;
+            visitor(hc);
+            if (hc != (Type*)m_heldClass) {
+                if (!hc || !hc->isHeldClass()) {
+                    throw std::runtime_error("Can't set a Class's heldClass to a non HeldClass");
+                }
+
+                m_heldClass = (HeldClass*)hc;
+            }
+        }
     }
 
     Type* pickConcreteSubclassConcrete(instance_ptr self) {
@@ -179,20 +188,7 @@ public:
             classMethods
         );
 
-        PyEnsureGilAcquired getTheGil;
-        static std::map<HeldClass*, Class*> memo;
-
-        auto it = memo.find(hc);
-        if (it != memo.end()) {
-            return it->second;
-        }
-
-        Class* result = new Class(inName, hc);
-        hc->setClassType(result);
-
-        memo[hc] = result;
-
-        return result;
+        return hc->getClassType();
     }
 
     static const char* pyComparisonOpToMethodName(int pyComparisonOp) {

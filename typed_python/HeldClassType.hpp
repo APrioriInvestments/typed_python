@@ -405,21 +405,9 @@ public:
     }
 
     void postInitializeConcrete() {
-        m_byte_offsets.clear();
-
-        updateBytesOfInitBits();
-
-        size_t size = mBytesOfInitializationBits;
-
-        for (auto t: m_members) {
-            m_byte_offsets.push_back(size);
-            size += t.getType()->bytecount();
+        for (auto b: m_bases) {
+            b->postInitialize();
         }
-
-        m_is_default_constructible = (
-            m_memberFunctions.find("__init__") == m_memberFunctions.end()
-        );
-        m_size = size;
 
         initializeMRO();
     }
@@ -427,6 +415,7 @@ public:
     void initializeFromConcrete(Type* forwardDef) {
         HeldClass* fwdCls = (HeldClass*)forwardDef;
 
+        m_classType = fwdCls->m_classType;
         m_bases = fwdCls->m_bases;
         m_is_final = fwdCls->m_is_final;
         m_own_members = fwdCls->m_own_members;
@@ -504,57 +493,42 @@ public:
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
-        for (auto& b: m_bases) {
-            Type* baseT = b;
-            visitor(baseT);
-            if (b != baseT) {
-                throw std::runtime_error("Somehow, we modified the base type of a HeldClass?");
-            }
+        if (m_classType) {
+            adaptTypeVisitor(visitor, m_classType);
         }
+
+        for (long k = 0; k < m_bases.size(); k++) {
+            adaptTypeVisitor(visitor, m_bases[k]);
+        }
+
         for (auto& o: m_own_members) {
             // this is expected to actually modify the type
             // if its a forward.
-            visitor(o.getType());
+            adaptTypeVisitor(visitor, o.getType());
         }
         for (auto& o: m_own_memberFunctions) {
-            Type* t = o.second;
-            visitor(t);
-            assert(t == o.second);
+            adaptTypeVisitor(visitor, o.second);
         }
         for (auto& o: m_own_staticFunctions) {
-            Type* t = o.second;
-            visitor(t);
-            assert(t == o.second);
+            adaptTypeVisitor(visitor, o.second);
         }
         for (auto& o: m_own_classMethods) {
-            Type* t = o.second;
-            visitor(t);
-            assert(t == o.second);
+            adaptTypeVisitor(visitor, o.second);
         }
         for (auto& o: m_own_propertyFunctions) {
-            Type* t = o.second;
-            visitor(t);
-            assert(t == o.second);
+            adaptTypeVisitor(visitor, o.second);
         }
         for (auto& o: m_members) {
-            // this is expected to actually modify the type
-            // if its a forward.
-            visitor(o.getType());
+            adaptTypeVisitor(visitor, o.getType());
         }
         for (auto& o: m_memberFunctions) {
-            Type* t = o.second;
-            visitor(t);
-            assert(t == o.second);
+            adaptTypeVisitor(visitor, o.second);
         }
         for (auto& o: m_staticFunctions) {
-            Type* t = o.second;
-            visitor(t);
-            assert(t == o.second);
+            adaptTypeVisitor(visitor, o.second);
         }
         for (auto& o: m_propertyFunctions) {
-            Type* t = o.second;
-            visitor(t);
-            assert(t == o.second);
+            adaptTypeVisitor(visitor, o.second);
         }
     }
 
@@ -941,6 +915,10 @@ public:
     }
 
     void initializeMRO() {
+        if (m_is_forward_defined) {
+            throw std::runtime_error("Makes no sense to initializeMRO on a forward");
+        }
+
         _computeMroSequence();
 
         for (size_t i = 0; i < m_mro.size(); i++) {
@@ -990,6 +968,10 @@ public:
         }
 
         for (HeldClass* ancestor: m_mro) {
+            if (ancestor->isForwardDefined()) {
+                throw std::runtime_error("Makes no sense to be a subclass of a forward");
+            }
+
             ancestor->m_implementors.insert(this);
         }
 
@@ -1008,6 +990,18 @@ public:
         }
 
         setMagicMethodExistConstants();
+
+        size_t size = mBytesOfInitializationBits;
+
+        for (auto t: m_members) {
+            m_byte_offsets.push_back(size);
+            size += t.getType()->bytecount();
+        }
+
+        m_is_default_constructible = (
+            m_memberFunctions.find("__init__") == m_memberFunctions.end()
+        );
+        m_size = size;
     }
 
     void updateBytesOfInitBits();
@@ -1120,6 +1114,7 @@ public:
     ClassDispatchTable* dispatchTableAs(HeldClass* interface) {
         int64_t offset = getMroIndex(interface);
         if (offset < 0) {
+            asm("int3");
             throw std::runtime_error("Interface is not an ancestor.");
         }
 

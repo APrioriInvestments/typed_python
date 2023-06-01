@@ -2,7 +2,8 @@ import pytest
 
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
-    Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash, Value
+    Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash, Value,
+    Class, Member
 )
 
 
@@ -238,3 +239,108 @@ def test_create_value_type_with_forward():
     assert not isForwardDefined(T_resolved)
     assert identityHash(T_resolved).hex() == identityHash(Value(int)).hex()
     assert T_resolved is Value(int)
+
+
+def test_create_class_with_forward():
+    def makeClass(T):
+        F = Forward("X")
+
+        class C(Class):
+            m = Member(F)
+
+        assert isForwardDefined(C)
+
+        F.define(T)
+
+        return resolveForwardDefinedType(C)
+
+    assert makeClass(int) is not makeClass(float)
+    assert makeClass(int) is makeClass(int)
+
+    assert makeClass(int)().m == 0
+    assert makeClass(str)().m == ""
+
+
+def test_create_concrete_class():
+    def makeClass(T):
+        class C(Class):
+            m = Member(T)
+
+        assert not isForwardDefined(C)
+
+        return C
+
+    assert makeClass(int) is makeClass(int)
+    assert makeClass(int) is not makeClass(str)
+
+
+def test_create_class_with_recursion():
+    def makeClass(T):
+        C_fwd = Forward("C")
+
+        class C(Class):
+            c = Member(OneOf(None, C_fwd))
+            m = Member(T)
+
+        assert isForwardDefined(C_fwd)
+        assert isForwardDefined(C)
+
+        C_fwd.define(C)
+
+        return resolveForwardDefinedType(C)
+
+    assert makeClass(int) is not makeClass(float)
+    assert makeClass(int) is makeClass(int)
+
+    assert makeClass(int)().m == 0
+    assert makeClass(str)().m == ""
+
+
+def test_create_class_with_nonforward_base():
+    def makeClass(T):
+        C_child_fwd = Forward("C_child")
+
+        class CBase(Class):
+            m = Member(T)
+
+        class CChild(CBase):
+            pass
+
+        assert not isForwardDefined(CBase)
+        assert isForwardDefined(C_child_fwd)
+
+        C_child_fwd.define(CChild)
+
+        return resolveForwardDefinedType(CChild)
+
+    assert makeClass(int) is not makeClass(float)
+    assert makeClass(int) is makeClass(int)
+
+    assert makeClass(int)().m == 0
+    assert makeClass(str)().m == ""
+
+
+def test_create_class_with_forward_base():
+    def makeClass(T):
+        C_base_fwd = Forward("C_base")
+        C_child_fwd = Forward("C_child")
+
+        class CBase(Class):
+            c = Member(OneOf(None, C_child_fwd))
+
+        class CChild(CBase):
+            m = Member(T)
+
+        assert isForwardDefined(C_base_fwd)
+        assert isForwardDefined(C_child_fwd)
+
+        C_child_fwd.define(CChild)
+        C_base_fwd.define(CBase)
+
+        return resolveForwardDefinedType(CChild)
+
+    assert makeClass(int) is not makeClass(float)
+    assert makeClass(int) is makeClass(int)
+
+    assert makeClass(int)().m == 0
+    assert makeClass(str)().m == ""
