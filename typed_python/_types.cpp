@@ -2502,6 +2502,11 @@ PyObject *isForwardDefined(PyObject* nullValue, PyObject* args) {
     }
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
 
+    Type* typeOfArg = PyInstance::extractTypeFrom(((PyObject*)a1)->ob_type);
+    if (typeOfArg && typeOfArg->isFunction() && typeOfArg->bytecount() == 0) {
+        return incref(typeOfArg->isForwardDefined() ? Py_True : Py_False);
+    }
+
     Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!t) {
@@ -2518,6 +2523,16 @@ PyObject *resolveForwardDefinedType(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* typeOfArg = PyInstance::extractTypeFrom(((PyObject*)a1)->ob_type);
+
+    if (typeOfArg && typeOfArg->isFunction() && typeOfArg->bytecount() == 0) {
+        return ::translateExceptionToPyObject([&]() {
+            Type* newType = typeOfArg->forwardResolvesTo();
+
+            return PyInstance::initialize(newType, [&](instance_ptr data) {});
+        });
+    }
 
     Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
 

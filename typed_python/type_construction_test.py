@@ -227,6 +227,26 @@ def test_function_types_coalesc():
     assert makeFforward(int) is makeFforward(int)
 
 
+def test_instances_of_forward_function_are_forward():
+    T = Forward("T")
+
+    @Function
+    def f(x: T):
+        return x
+
+    assert isForwardDefined(f)
+    T.define(int)
+
+    f2 = resolveForwardDefinedType(f)
+
+    assert not isForwardDefined(f2)
+
+    assert f2(1) == 1
+
+    with pytest.raises(TypeError):
+        f2("hi")
+
+
 def test_create_value_type_with_forward():
     F = Forward("X")
     T = Value(F)
@@ -344,3 +364,47 @@ def test_create_class_with_forward_base():
 
     assert makeClass(int)().m == 0
     assert makeClass(str)().m == ""
+
+
+@pytest.mark.skip(reason='TODO: make this work')
+def test_create_class_with_fully_forward_base():
+    def makeClass(T):
+        C_base_fwd = Forward("C_base")
+        C_child_fwd = Forward("C_child")
+
+        class CBase(Class):
+            c = Member(OneOf(None, C_child_fwd))
+
+        class CChild(C_base_fwd):
+            m = Member(T)
+
+        assert isForwardDefined(C_base_fwd)
+        assert isForwardDefined(C_child_fwd)
+
+        C_child_fwd.define(CChild)
+        C_base_fwd.define(CBase)
+
+        return resolveForwardDefinedType(CChild)
+
+    assert makeClass(int) is not makeClass(float)
+    assert makeClass(int) is makeClass(int)
+
+    assert makeClass(int)().m == 0
+    assert makeClass(str)().m == ""
+
+
+# TODO:
+# 1. can we get better names and info for forward-defined types? what does ther
+#    partially defined state look like
+# 2. the CVOV needs to be able to look into TP instances. Value(TupleOf(int)((1, 2, 3))) for
+#    instance ought to be visible and compilable
+# 3. can regular python classes and functions be 'forward declared'. What do we do if we
+#    forward resolve them?
+# 4. serialization
+# 5. type functions
+# 6. are we accidentally creating and installing forward subclasses in the vtable?
+#    maybe we need a second pass to wire in 'accepted' forward types
+# 7. make sure we thoroughly test the idea that we create a new forward graph with
+#    part of the graph being new, part being old
+# 8. clean-up in the whole Instance/PyInstance layer - kind of nasty
+# 9. we should memoize instances of statless Function objects and instances of regular TP lists/tuple of, etc.
