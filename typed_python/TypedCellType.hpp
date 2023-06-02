@@ -21,6 +21,10 @@
 
 //wraps a python Cell
 class TypedCellType : public Type {
+    TypedCellType() : Type(TypeCategory::catTypedCell)
+    {
+        m_needs_post_init = true;
+    }
 public:
     class layout {
     public:
@@ -35,15 +39,31 @@ public:
             Type(TypeCategory::catTypedCell),
             mHeldType(heldType)
     {
-        m_name = std::string("TypedCell(") + heldType->name(true) + ")";
+        m_is_forward_defined = true;
 
         m_is_simple = false;
 
         m_size = sizeof(layout*);
 
         m_is_default_constructible = true;
+    }
 
-        endOfConstructorInitialization(); // finish initializing the type object.
+    std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
+        return "TypedCell(" + mHeldType->computeRecursiveName(typeStack) + ")";
+    }
+
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        mHeldType = ((TypedCellType*)forwardDefinitionOfSelf)->mHeldType;
+    }
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        updateTypeRefFromGroupMap(mHeldType, groupMap);
+    }
+
+    void postInitializeConcrete() {}
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new TypedCellType();
     }
 
     template<class visitor_type>
@@ -65,23 +85,8 @@ public:
         visitor(mHeldType);
     }
 
-    bool _updateAfterForwardTypesChanged() {
-        std::string newName = std::string("TypedCell(") + mHeldType->name(true) + ")";
-
-        bool nameChanged = newName != m_name;
-
-        m_name = newName;
-        m_stripped_name = "";
-
-        return nameChanged;
-    }
-
     int64_t refcount(instance_ptr self) const {
         return getLayoutPtr(self)->refcount;
-    }
-
-    void _updateTypeMemosAfterForwardResolution() {
-        TypedCellType::Make(mHeldType, this);
     }
 
     layout_ptr& getLayoutPtr(instance_ptr self) const {
@@ -238,24 +243,25 @@ public:
         return getLayoutPtr(self)->data;
     }
 
-    static TypedCellType* Make(Type* t, TypedCellType* knownType = nullptr) {
-        PyEnsureGilAcquired getTheGil;
-
-        typedef Type* keytype;
-
-        static std::map<keytype, TypedCellType*> m;
-
-        auto it = m.find(t);
-        if (it == m.end()) {
-            it = m.insert(
-                std::make_pair(
-                    t,
-                    knownType ? knownType : new TypedCellType(t)
-                )
-            ).first;
+    static TypedCellType* Make(Type* elt) {
+        if (elt->isForwardDefined()) {
+            return new TypedCellType(elt);
         }
 
-        return it->second;
+        PyEnsureGilAcquired getTheGil;
+
+        static std::map<Type*, TypedCellType*> memo;
+
+        auto it = memo.find(elt);
+        if (it != memo.end()) {
+            return it->second;
+        }
+
+        TypedCellType* res = new TypedCellType(elt);
+        TypedCellType* concrete = (TypedCellType*)res->forwardResolvesTo();
+
+        memo[elt] = concrete;
+        return concrete;
     }
 
     Type* getHeldType() const {

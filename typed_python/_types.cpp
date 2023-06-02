@@ -871,237 +871,239 @@ PyObject *MakeAlternativeMatcherType(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 6 && PyTuple_Size(args) != 2) {
-        PyErr_SetString(PyExc_TypeError, "Function takes 2 or 6 arguments");
-        return NULL;
-    }
-
-    Function* resType;
-
-    if (PyTuple_Size(args) == 2) {
-        PyObjectHolder a0(PyTuple_GetItem(args, 0));
-        PyObjectHolder a1(PyTuple_GetItem(args, 1));
-
-        Type* t0 = PyInstance::unwrapTypeArgToTypePtr(a0);
-        Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
-
-        if (!t0 || t0->getTypeCategory() != Type::TypeCategory::catFunction) {
-            PyErr_SetString(PyExc_TypeError, "Expected first argument to be a function");
-            return NULL;
-        }
-        if (!t1 || t1->getTypeCategory() != Type::TypeCategory::catFunction) {
-            PyErr_SetString(PyExc_TypeError, "Expected second argument to be a function");
-            return NULL;
+    return translateExceptionToPyObject([&]() {
+        if (PyTuple_Size(args) != 6 && PyTuple_Size(args) != 2) {
+            PyErr_SetString(PyExc_TypeError, "Function takes 2 or 6 arguments");
+            throw PythonExceptionSet();
         }
 
-        resType = Function::merge((Function*)t0, (Function*)t1);
-    } else {
-        PyObjectHolder nameObj(PyTuple_GetItem(args, 0));
-        if (!PyUnicode_Check(nameObj)) {
-            PyErr_SetString(PyExc_TypeError, "First arg should be a string.");
-            return NULL;
-        }
-        PyObjectHolder qualnameObj(PyTuple_GetItem(args, 1));
-        if (!PyUnicode_Check(qualnameObj)) {
-            PyErr_SetString(PyExc_TypeError, "First arg should be a string.");
-            return NULL;
-        }
-        PyObjectHolder retType(PyTuple_GetItem(args, 2));
-        PyObjectHolder funcObj(PyTuple_GetItem(args, 3));
-        PyObjectHolder argTuple(PyTuple_GetItem(args, 4));
+        Function* resType;
 
-        int assumeClosureGlobal = PyObject_IsTrue(PyTuple_GetItem(args, 5));
+        if (PyTuple_Size(args) == 2) {
+            PyObjectHolder a0(PyTuple_GetItem(args, 0));
+            PyObjectHolder a1(PyTuple_GetItem(args, 1));
 
-        if (assumeClosureGlobal == -1) {
-            return NULL;
-        }
+            Type* t0 = PyInstance::unwrapTypeArgToTypePtr(a0);
+            Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
 
-        if (!PyFunction_Check(funcObj)) {
-            PyErr_SetString(PyExc_TypeError, "Third arg should be a function object");
-            return NULL;
-        }
-
-        Type* rType = 0;
-        PyObject* rSignature = 0;
-
-        if (retType != Py_None) {
-            rType = PyInstance::unwrapTypeArgToTypePtr(retType);
-            if (!rType) {
-                if (!PyCallable_Check(retType)) {
-                    PyErr_SetString(PyExc_TypeError, "Expected second argument to be None, a type, or a callable type signature function");
-                    return NULL;
-                }
-                PyErr_Clear();
-                rSignature = retType;
+            if (!t0 || t0->getTypeCategory() != Type::TypeCategory::catFunction) {
+                PyErr_SetString(PyExc_TypeError, "Expected first argument to be a function");
+                throw PythonExceptionSet();
             }
-        }
-
-        if (!PyTuple_Check(argTuple)) {
-            PyErr_SetString(PyExc_TypeError, "Expected fourth argument to be a tuple of args");
-            return NULL;
-        }
-
-        std::vector<Function::FunctionArg> argList;
-
-        for (long k = 0; k < PyTuple_Size(argTuple); k++) {
-            PyObjectHolder kTup(PyTuple_GetItem(argTuple, k));
-            if (!PyTuple_Check(kTup) || PyTuple_Size(kTup) != 5) {
-                PyErr_SetString(PyExc_TypeError, "Argtuple elements should be tuples of five things.");
-                return NULL;
+            if (!t1 || t1->getTypeCategory() != Type::TypeCategory::catFunction) {
+                PyErr_SetString(PyExc_TypeError, "Expected second argument to be a function");
+                throw PythonExceptionSet();
             }
 
-            PyObjectHolder k0(PyTuple_GetItem(kTup, 0));
-            PyObjectHolder k1(PyTuple_GetItem(kTup, 1));
-            PyObjectHolder k2(PyTuple_GetItem(kTup, 2));
-            PyObjectHolder k3(PyTuple_GetItem(kTup, 3));
-            PyObjectHolder k4(PyTuple_GetItem(kTup, 4));
+            resType = Function::merge((Function*)t0, (Function*)t1);
+        } else {
+            PyObjectHolder nameObj(PyTuple_GetItem(args, 0));
+            if (!PyUnicode_Check(nameObj)) {
+                PyErr_SetString(PyExc_TypeError, "First arg should be a string.");
+                throw PythonExceptionSet();
+            }
+            PyObjectHolder qualnameObj(PyTuple_GetItem(args, 1));
+            if (!PyUnicode_Check(qualnameObj)) {
+                PyErr_SetString(PyExc_TypeError, "First arg should be a string.");
+                throw PythonExceptionSet();
+            }
+            PyObjectHolder retType(PyTuple_GetItem(args, 2));
+            PyObjectHolder funcObj(PyTuple_GetItem(args, 3));
+            PyObjectHolder argTuple(PyTuple_GetItem(args, 4));
 
-            if (!PyUnicode_Check(k0)) {
-                PyErr_Format(PyExc_TypeError, "Argument %S has a name which is not a string.", (PyObject*)k0);
-                return NULL;
+            int assumeClosureGlobal = PyObject_IsTrue(PyTuple_GetItem(args, 5));
+
+            if (assumeClosureGlobal == -1) {
+                throw PythonExceptionSet();
             }
 
-            Type* argT = nullptr;
-            if (k1 != Py_None) {
-                argT = PyInstance::unwrapTypeArgToTypePtr(k1);
-                if (!argT) {
-                    PyErr_Format(PyExc_TypeError, "Argument %S has a type argument %S which should be None or a Type.", k0->ob_type, k1->ob_type);
-                    return NULL;
+            if (!PyFunction_Check(funcObj)) {
+                PyErr_SetString(PyExc_TypeError, "Third arg should be a function object");
+                throw PythonExceptionSet();
+            }
+
+            Type* rType = 0;
+            PyObject* rSignature = 0;
+
+            if (retType != Py_None) {
+                rType = PyInstance::unwrapTypeArgToTypePtr(retType);
+                if (!rType) {
+                    if (!PyCallable_Check(retType)) {
+                        PyErr_SetString(PyExc_TypeError, "Expected second argument to be None, a type, or a callable type signature function");
+                        throw PythonExceptionSet();
+                    }
+                    PyErr_Clear();
+                    rSignature = retType;
                 }
             }
 
-            if ((k3 != Py_True && k3 != Py_False) || (k4 != Py_True && k4 != Py_False)) {
-                PyErr_Format(PyExc_TypeError, "Argument %S has a malformed type tuple", (PyObject*)k0);
-                return NULL;
+            if (!PyTuple_Check(argTuple)) {
+                PyErr_SetString(PyExc_TypeError, "Expected fourth argument to be a tuple of args");
+                throw PythonExceptionSet();
             }
 
-            PyObject* val = nullptr;
-            if (k2 != Py_None) {
-                if (!PyTuple_Check(k2) || PyTuple_Size(k2) != 1) {
+            std::vector<Function::FunctionArg> argList;
+
+            for (long k = 0; k < PyTuple_Size(argTuple); k++) {
+                PyObjectHolder kTup(PyTuple_GetItem(argTuple, k));
+                if (!PyTuple_Check(kTup) || PyTuple_Size(kTup) != 5) {
+                    PyErr_SetString(PyExc_TypeError, "Argtuple elements should be tuples of five things.");
+                    throw PythonExceptionSet();
+                }
+
+                PyObjectHolder k0(PyTuple_GetItem(kTup, 0));
+                PyObjectHolder k1(PyTuple_GetItem(kTup, 1));
+                PyObjectHolder k2(PyTuple_GetItem(kTup, 2));
+                PyObjectHolder k3(PyTuple_GetItem(kTup, 3));
+                PyObjectHolder k4(PyTuple_GetItem(kTup, 4));
+
+                if (!PyUnicode_Check(k0)) {
+                    PyErr_Format(PyExc_TypeError, "Argument %S has a name which is not a string.", (PyObject*)k0);
+                    throw PythonExceptionSet();
+                }
+
+                Type* argT = nullptr;
+                if (k1 != Py_None) {
+                    argT = PyInstance::unwrapTypeArgToTypePtr(k1);
+                    if (!argT) {
+                        PyErr_Format(PyExc_TypeError, "Argument %S has a type argument %S which should be None or a Type.", k0->ob_type, k1->ob_type);
+                        throw PythonExceptionSet();
+                    }
+                }
+
+                if ((k3 != Py_True && k3 != Py_False) || (k4 != Py_True && k4 != Py_False)) {
                     PyErr_Format(PyExc_TypeError, "Argument %S has a malformed type tuple", (PyObject*)k0);
-                    return NULL;
+                    throw PythonExceptionSet();
                 }
 
-                val = PyTuple_GetItem(k2,0);
-            }
-
-            if (val) {
-                incref(val);
-            }
-
-            argList.push_back(Function::FunctionArg(
-                PyUnicode_AsUTF8(k0),
-                argT,
-                val,
-                k3 == Py_True,
-                k4 == Py_True
-                ));
-        }
-
-        std::string moduleName = "<unknown>";
-
-        if (PyObject_HasAttrString(funcObj, "__module__")) {
-            PyObject* pyModulename = PyObject_GetAttrString(funcObj, "__module__");
-
-            if (!pyModulename) {
-                return NULL;
-            }
-
-            if (PyUnicode_Check(pyModulename)) {
-                moduleName = PyUnicode_AsUTF8(pyModulename);
-            }
-
-            decref(pyModulename);
-        }
-
-        std::vector<Function::Overload> overloads;
-
-        std::vector<std::string> closureVarnames;
-        std::vector<Type*> closureVarTypes;
-        std::map<std::string, PyObject*> globalsInCells;
-        std::map<std::string, ClosureVariableBinding> closureBindings;
-
-        PyObject* closure = PyFunction_GetClosure(funcObj);
-
-        if (closure) {
-            PyObjectStealer coFreevars(PyObject_GetAttrString(PyFunction_GetCode(funcObj), "co_freevars"));
-
-            if (!coFreevars) {
-                return NULL;
-            }
-
-            if (!PyTuple_Check(coFreevars)) {
-                PyErr_Format(PyExc_TypeError, "f.__code__.co_freevars was not a tuple");
-                return NULL;
-            }
-
-            if (PyTuple_Size(coFreevars) != PyTuple_Size(closure)) {
-                PyErr_Format(PyExc_TypeError, "f.__code__.co_freevars had a different number of elements than the closure");
-                return NULL;
-            }
-
-            for (long ix = 0; ix < PyTuple_Size(coFreevars); ix++) {
-                PyObject* varname = PyTuple_GetItem(coFreevars, ix);
-                if (!PyUnicode_Check(varname)) {
-                    PyErr_Format(PyExc_TypeError, "f.__code__.co_freevars was not all strings");
-                    return NULL;
-                }
-                closureVarnames.push_back(std::string(PyUnicode_AsUTF8(varname)));
-            }
-
-            if (assumeClosureGlobal) {
-                for (long ix = 0; ix < PyTuple_Size(closure); ix++) {
-                    PyObject* cell = PyTuple_GetItem(closure, ix);
-                    if (!PyCell_Check(cell)) {
-                        PyErr_Format(PyExc_TypeError, "Function closure needs to all be cells.");
-                        return NULL;
+                PyObject* val = nullptr;
+                if (k2 != Py_None) {
+                    if (!PyTuple_Check(k2) || PyTuple_Size(k2) != 1) {
+                        PyErr_Format(PyExc_TypeError, "Argument %S has a malformed type tuple", (PyObject*)k0);
+                        throw PythonExceptionSet();
                     }
 
-                    globalsInCells[closureVarnames[ix]] = incref(cell);
+                    val = PyTuple_GetItem(k2,0);
+                }
+
+                if (val) {
+                    incref(val);
+                }
+
+                argList.push_back(Function::FunctionArg(
+                    PyUnicode_AsUTF8(k0),
+                    argT,
+                    val,
+                    k3 == Py_True,
+                    k4 == Py_True
+                    ));
+            }
+
+            std::string moduleName = "<unknown>";
+
+            if (PyObject_HasAttrString(funcObj, "__module__")) {
+                PyObject* pyModulename = PyObject_GetAttrString(funcObj, "__module__");
+
+                if (!pyModulename) {
+                    throw PythonExceptionSet();
+                }
+
+                if (PyUnicode_Check(pyModulename)) {
+                    moduleName = PyUnicode_AsUTF8(pyModulename);
+                }
+
+                decref(pyModulename);
+            }
+
+            std::vector<Function::Overload> overloads;
+
+            std::vector<std::string> closureVarnames;
+            std::vector<Type*> closureVarTypes;
+            std::map<std::string, PyObject*> globalsInCells;
+            std::map<std::string, ClosureVariableBinding> closureBindings;
+
+            PyObject* closure = PyFunction_GetClosure(funcObj);
+
+            if (closure) {
+                PyObjectStealer coFreevars(PyObject_GetAttrString(PyFunction_GetCode(funcObj), "co_freevars"));
+
+                if (!coFreevars) {
+                    throw PythonExceptionSet();
+                }
+
+                if (!PyTuple_Check(coFreevars)) {
+                    PyErr_Format(PyExc_TypeError, "f.__code__.co_freevars was not a tuple");
+                    throw PythonExceptionSet();
+                }
+
+                if (PyTuple_Size(coFreevars) != PyTuple_Size(closure)) {
+                    PyErr_Format(PyExc_TypeError, "f.__code__.co_freevars had a different number of elements than the closure");
+                    throw PythonExceptionSet();
+                }
+
+                for (long ix = 0; ix < PyTuple_Size(coFreevars); ix++) {
+                    PyObject* varname = PyTuple_GetItem(coFreevars, ix);
+                    if (!PyUnicode_Check(varname)) {
+                        PyErr_Format(PyExc_TypeError, "f.__code__.co_freevars was not all strings");
+                        throw PythonExceptionSet();
+                    }
+                    closureVarnames.push_back(std::string(PyUnicode_AsUTF8(varname)));
+                }
+
+                if (assumeClosureGlobal) {
+                    for (long ix = 0; ix < PyTuple_Size(closure); ix++) {
+                        PyObject* cell = PyTuple_GetItem(closure, ix);
+                        if (!PyCell_Check(cell)) {
+                            PyErr_Format(PyExc_TypeError, "Function closure needs to all be cells.");
+                            throw PythonExceptionSet();
+                        }
+
+                        globalsInCells[closureVarnames[ix]] = incref(cell);
+                    }
+                }
+                else {
+                    for (long ix = 0; ix < PyTuple_Size(closure); ix++) {
+                        closureVarTypes.push_back(PyCellType::Make());
+                        closureBindings[closureVarnames[ix]] = (
+                            ClosureVariableBinding() + 0 + ix + ClosureVariableBindingStep::AccessCell()
+                        );
+                    }
                 }
             }
-            else {
-                for (long ix = 0; ix < PyTuple_Size(closure); ix++) {
-                    closureVarTypes.push_back(PyCellType::Make());
-                    closureBindings[closureVarnames[ix]] = (
-                        ClosureVariableBinding() + 0 + ix + ClosureVariableBindingStep::AccessCell()
-                    );
-                }
-            }
+
+            overloads.push_back(
+                Function::Overload(
+                    PyFunction_GetCode(funcObj),
+                    PyFunction_GetGlobals(funcObj),
+                    PyFunction_GetDefaults(funcObj),
+                    ((PyFunctionObject*)(PyObject*)funcObj)->func_annotations,
+                    globalsInCells,
+                    closureVarnames,
+                    closureBindings,
+                    rType,
+                    rSignature,
+                    argList,
+                    nullptr
+                )
+            );
+
+            resType = Function::Make(
+                PyUnicode_AsUTF8(nameObj),
+                PyUnicode_AsUTF8(qualnameObj),
+                moduleName,
+                overloads,
+                Tuple::Make({
+                    assumeClosureGlobal ?
+                        NamedTuple::Make({}, {}) :
+                        NamedTuple::Make(closureVarTypes, closureVarnames)
+                    }),
+                false,
+                false
+            );
         }
 
-        overloads.push_back(
-            Function::Overload(
-                PyFunction_GetCode(funcObj),
-                PyFunction_GetGlobals(funcObj),
-                PyFunction_GetDefaults(funcObj),
-                ((PyFunctionObject*)(PyObject*)funcObj)->func_annotations,
-                globalsInCells,
-                closureVarnames,
-                closureBindings,
-                rType,
-                rSignature,
-                argList,
-                nullptr
-            )
-        );
-
-        resType = Function::Make(
-            PyUnicode_AsUTF8(nameObj),
-            PyUnicode_AsUTF8(qualnameObj),
-            moduleName,
-            overloads,
-            Tuple::Make({
-                assumeClosureGlobal ?
-                    NamedTuple::Make({}, {}) :
-                    NamedTuple::Make(closureVarTypes, closureVarnames)
-                }),
-            false,
-            false
-        );
-    }
-
-    return incref((PyObject*)PyInstance::typeObj(resType));
+        return incref((PyObject*)PyInstance::typeObj(resType));
+    });
 }
 
 PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
@@ -2502,19 +2504,20 @@ PyObject *isForwardDefined(PyObject* nullValue, PyObject* args) {
     }
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
 
-    Type* typeOfArg = PyInstance::extractTypeFrom(((PyObject*)a1)->ob_type);
-    if (typeOfArg && typeOfArg->isFunction() && typeOfArg->bytecount() == 0) {
-        return incref(typeOfArg->isForwardDefined() ? Py_True : Py_False);
-    }
+    return translateExceptionToPyObject([&]() {
+        Type* typeOfArg = PyInstance::extractTypeFrom(((PyObject*)a1)->ob_type);
+        if (typeOfArg && typeOfArg->isFunction() && typeOfArg->bytecount() == 0) {
+            return incref(typeOfArg->isForwardDefined() ? Py_True : Py_False);
+        }
 
-    Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
 
-    if (!t) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'isForwardDefined' must be a type object");
-        return NULL;
-    }
+        if (!t) {
+            throw std::runtime_error("first argument to 'isForwardDefined' must be a type object");
+        }
 
-    return incref(t->isForwardDefined() ? Py_True : Py_False);
+        return incref(t->isForwardDefined() ? Py_True : Py_False);
+    });
 }
 
 PyObject *resolveForwardDefinedType(PyObject* nullValue, PyObject* args) {

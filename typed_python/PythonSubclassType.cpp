@@ -34,24 +34,13 @@ bool PythonSubclass::isBinaryCompatibleWithConcrete(Type* other) {
 PythonSubclass* PythonSubclass::Make(Type* base, PyTypeObject* pyType) {
     PyEnsureGilAcquired getTheGil;
 
-    static std::map<PyTypeObject*, PythonSubclass*> m;
-
-    auto it = m.find(pyType);
-
-    if (it == m.end()) {
-        it = m.insert(
-            std::make_pair(pyType, new PythonSubclass(base, pyType))
-            ).first;
+    if (base->isForwardDefined()) {
+        return new PythonSubclass(base, pyType);
     }
 
-    if (it->second->getBaseType() != base) {
-        throw std::runtime_error(
-            "Expected to find the same base type. Got "
-                + it->second->getBaseType()->name() + " != " + base->name()
-            );
-    }
+    PythonSubclass* res = new PythonSubclass(base, pyType);
 
-    return it->second;
+    return (PythonSubclass*)res->forwardResolvesTo();
 }
 
 

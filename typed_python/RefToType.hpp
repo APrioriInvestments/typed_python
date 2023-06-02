@@ -77,12 +77,8 @@ public:
         m_element_type = ((RefTo*)forwardDefinitionOfSelf)->m_element_type;
     }
 
-
     void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
-        auto it = groupMap.find(m_element_type);
-        if (it != groupMap.end()) {
-            m_element_type = it->second;
-        }
+        updateTypeRefFromGroupMap(m_element_type, groupMap);
     }
 
     Type* cloneForForwardResolutionConcrete() {

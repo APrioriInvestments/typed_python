@@ -121,8 +121,6 @@ public:
         v.visitTopo(m_alternative);
     }
 
-    bool _updateAfterForwardTypesChanged();
-
     typed_python_hash_type hash(instance_ptr left) {
         return m_alternative->hash(left);
     }

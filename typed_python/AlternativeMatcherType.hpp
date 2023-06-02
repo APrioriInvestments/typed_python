@@ -33,8 +33,6 @@ public:
         m_alternative = inAlternative;
         m_size = inAlternative->bytecount();
         m_is_simple = false;
-
-        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {

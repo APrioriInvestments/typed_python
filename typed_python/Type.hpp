@@ -757,10 +757,6 @@ public:
         });
     }
 
-    // called after each type has initialized its internals
-    // TODO: remove this
-    void endOfConstructorInitialization() {};
-
     // call subtype.copy_constructor
     void copy_constructor(instance_ptr self, instance_ptr other);
 

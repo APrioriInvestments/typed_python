@@ -19,10 +19,17 @@
 #include "Type.hpp"
 
 class PythonSubclass : public Type {
+    PythonSubclass() : Type(TypeCategory::catPythonSubclass)
+    {
+        m_needs_post_init = true;
+    }
+
 public:
     PythonSubclass(Type* base, PyTypeObject* typePtr) :
             Type(TypeCategory::catPythonSubclass)
     {
+        m_is_forward_defined = true;
+
         m_base = base;
         mTypeRep = (PyTypeObject*)incref((PyObject*)typePtr);
         m_name = typePtr->tp_name;
@@ -48,8 +55,6 @@ public:
         if (!PyFunction_Check(m_hashFun)) {
             m_hashFun = nullptr;
         }
-
-        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     template<class visitor_type>
@@ -78,19 +83,29 @@ public:
         visitor(m_base);
     }
 
-    bool _updateAfterForwardTypesChanged() {
-        size_t size = m_base->bytecount();
-        bool is_default_constructible = m_base->is_default_constructible();
+    void postInitializeConcrete() {
+        m_base->postInitialize();
 
-        bool anyChanged = (
-            size != m_size ||
-            m_is_default_constructible != is_default_constructible
-        );
+        m_size = m_base->bytecount();
+        m_is_default_constructible = m_base->is_default_constructible();
+    }
 
-        m_size = size;
-        m_is_default_constructible = is_default_constructible;
+    Type* cloneForForwardResolutionConcrete() {
+        return new PythonSubclass();
+    }
 
-        return anyChanged;
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        PythonSubclass* toDup = (PythonSubclass*)forwardDefinitionOfSelf;
+
+        mTypeRep = incref(toDup->mTypeRep);
+        m_name = toDup->m_name;
+        m_reprFun = toDup->m_reprFun;
+        m_hashFun = toDup->m_hashFun;
+        m_base = toDup->m_base;
+    }
+
+    void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
+        updateTypeRefFromGroupMap(m_base, groupMap);
     }
 
     typed_python_hash_type hash(instance_ptr left);

@@ -3,7 +3,7 @@ import pytest
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
     Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash, Value,
-    Class, Member
+    Class, Member, ConstDict, TypedCell
 )
 
 
@@ -154,6 +154,29 @@ def test_recursive_ref_to():
     assert makeP().__name__ == 'RefTo(^0)'
 
 
+def test_recursive_typed_cell():
+    def makeP():
+        F = Forward()
+        F.define(TypedCell(F))
+        return resolveForwardDefinedType(F)
+
+    assert makeP() is makeP()
+    assert makeP().__name__ == 'TypedCell(^0)'
+
+
+def test_subclass_of_named_tuple():
+    def makeP(T):
+        class N(NamedTuple(x=T)):
+            def f(self):
+                return self.x
+
+        assert not isForwardDefined(N)
+        return N
+
+    assert makeP(int) is makeP(int)
+    assert makeP(int) is not makeP(str)
+
+
 def test_recursive_dict():
     def makeP():
         F = Forward()
@@ -162,6 +185,16 @@ def test_recursive_dict():
 
     assert makeP() is makeP()
     assert makeP().__name__ == 'Dict(int, ^0)'
+
+
+def test_recursive_const_dict():
+    def makeP():
+        F = Forward()
+        F.define(ConstDict(int, F))
+        return resolveForwardDefinedType(F)
+
+    assert makeP() is makeP()
+    assert makeP().__name__ == 'ConstDict(int, ^0)'
 
 
 def test_recursive_set():
