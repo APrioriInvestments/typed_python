@@ -44,6 +44,7 @@ public:
     }
 
     void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        m_base = ((ConcreteAlternative*)forwardDefinitionOfSelf)->m_base;
         m_alternative = ((ConcreteAlternative*)forwardDefinitionOfSelf)->m_alternative;
         m_which = ((ConcreteAlternative*)forwardDefinitionOfSelf)->m_which;
     }

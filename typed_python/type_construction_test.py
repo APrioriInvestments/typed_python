@@ -221,6 +221,8 @@ def test_recursive_alternative():
 
     assert makeA() is makeA()
     assert makeA().__name__ == 'F'
+    assert makeA().A is makeA().A
+    makeA().B()
 
 
 def test_cannot_call_forward_function_instances():
