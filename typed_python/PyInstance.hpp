@@ -52,7 +52,6 @@ class PyFunctionInstance;
 class PyBoundMethodInstance;
 class PyNoneInstance;
 class PyValueInstance;
-class PyPythonSubclassInstance;
 class PyPythonObjectOfTypeInstance;
 class PyOneOfInstance;
 class PySubclassOfInstance;
@@ -166,8 +165,6 @@ public:
                 return f(*(PyConcreteAlternativeInstance*)obj);
             case Type::TypeCategory::catAlternativeMatcher:
                 return f(*(PyAlternativeMatcherInstance*)obj);
-            case Type::TypeCategory::catPythonSubclass:
-                return f(*(PyPythonSubclassInstance*)obj);
             case Type::TypeCategory::catPythonObjectOfType:
                 return f(*(PyPythonObjectOfTypeInstance*)obj);
             case Type::TypeCategory::catClass:
@@ -247,8 +244,6 @@ public:
                 return f((PyAlternativeInstance*)nullptr);
             case Type::TypeCategory::catConcreteAlternative:
                 return f((PyConcreteAlternativeInstance*)nullptr);
-            case Type::TypeCategory::catPythonSubclass:
-                return f((PyPythonSubclassInstance*)nullptr);
             case Type::TypeCategory::catPythonObjectOfType:
                 return f((PyPythonObjectOfTypeInstance*)nullptr);
             case Type::TypeCategory::catClass:
@@ -567,8 +562,6 @@ public:
     PyObject* mp_subscript_concrete(PyObject* item);
 
     static PyMappingMethods* mappingMethods(Type* t);
-
-    static bool isSubclassOfNativeType(PyTypeObject* typeObj);
 
     static Type* rootNativeType(PyTypeObject* typeObj);
 

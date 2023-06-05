@@ -220,10 +220,6 @@ bool Type::isBinaryCompatibleWith(Type* other) {
         return true;
     }
 
-    while (other->getTypeCategory() == TypeCategory::catPythonSubclass) {
-        other = other->getBaseType();
-    }
-
     auto it = mIsBinaryCompatible.find(other);
     if (it != mIsBinaryCompatible.end()) {
         return it->second != BinaryCompatibilityCategory::Incompatible;

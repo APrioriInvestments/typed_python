@@ -40,7 +40,6 @@
 #include "PyNoneInstance.hpp"
 #include "PyRegisterTypeInstance.hpp"
 #include "PyValueInstance.hpp"
-#include "PyPythonSubclassInstance.hpp"
 #include "PyPythonObjectOfTypeInstance.hpp"
 #include "PyOneOfInstance.hpp"
 #include "PySubclassOfInstance.hpp"
@@ -382,40 +381,20 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
 
         eltType->assertForwardsResolvedSufficientlyToInstantiate();
 
-        if (isSubclassOfNativeType(subtype)) {
-            PyInstance* self = (PyInstance*)subtype->tp_alloc(subtype, 0);
-
-            try {
-                self->initializeEmpty();
-
-                self->initialize([&](instance_ptr data) {
-                    constructFromPythonArguments(data, eltType, args, kwds);
-                }, eltType);
-
-                return (PyObject*)self;
-            } catch(...) {
-                subtype->tp_dealloc((PyObject*)self);
-                throw;
-            }
-
-            // not reachable
-            assert(false);
-        } else {
-            if (eltType->isClass() && ((Class*)eltType)->getOwnClassMembers().find("__typed_python_template__")
-                    != ((Class*)eltType)->getOwnClassMembers().end()) {
-                return PyObject_Call(
-                    ((Class*)eltType)->getOwnClassMembers().find("__typed_python_template__")->second,
-                    args,
-                    kwds
-                );
-            }
-
-            Instance inst(eltType, [&](instance_ptr tgt) {
-                constructFromPythonArguments(tgt, eltType, args, kwds);
-            });
-
-            return extractPythonObject(inst.data(), eltType);
+        if (eltType->isClass() && ((Class*)eltType)->getOwnClassMembers().find("__typed_python_template__")
+                != ((Class*)eltType)->getOwnClassMembers().end()) {
+            return PyObject_Call(
+                ((Class*)eltType)->getOwnClassMembers().find("__typed_python_template__")->second,
+                args,
+                kwds
+            );
         }
+
+        Instance inst(eltType, [&](instance_ptr tgt) {
+            constructFromPythonArguments(tgt, eltType, args, kwds);
+        });
+
+        return extractPythonObject(inst.data(), eltType);
     });
 }
 
@@ -914,25 +893,6 @@ bool PyInstance::isNativeType(PyTypeObject* typeObj) {
     return typeObj->tp_as_buffer == bufferProcs();
 }
 
-/**
- *  Return true if the given PyTypeObject* is a subclass of a NativeType.
- *  This will return false when called with a native type
-*/
-// static
-bool PyInstance::isSubclassOfNativeType(PyTypeObject* typeObj) {
-    if (isNativeType(typeObj)) {
-        return false;
-    }
-
-    while (typeObj) {
-        if (isNativeType(typeObj)) {
-            return true;
-        }
-        typeObj = typeObj->tp_base;
-    }
-    return false;
-}
-
 Type* PyInstance::rootNativeType(PyTypeObject* typeObj) {
     PyTypeObject* baseType = typeObj;
 
@@ -949,10 +909,6 @@ Type* PyInstance::rootNativeType(PyTypeObject* typeObj) {
 
 // static
 Type* PyInstance::extractTypeFrom(PyTypeObject* typeObj, bool includePrimitives) {
-    if (isSubclassOfNativeType(typeObj)) {
-        return PythonSubclass::Make(rootNativeType(typeObj), typeObj);
-    }
-
     if (isNativeType(typeObj)) {
         return ((NativeTypeWrapper*)typeObj)->mType;
     }
@@ -1163,9 +1119,6 @@ PyTypeObject* PyInstance::typeCategoryBaseType(Type::TypeCategory category) {
 }
 
 PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
-    if (inType->getTypeCategory() == ::Type::TypeCategory::catPythonSubclass) {
-        return inType->getTypeRep();
-    }
     if (inType->getTypeCategory() == ::Type::TypeCategory::catInt64) {
         return &PyLong_Type;
     }
@@ -1575,7 +1528,6 @@ PyObject* PyInstance::tp_str_concrete() {
 // static
 bool PyInstance::typeCanBeSubclassed(Type* t) {
     return (
-        t->getTypeCategory() == Type::TypeCategory::catNamedTuple ||
         t->getTypeCategory() == Type::TypeCategory::catClass
     );
 }
@@ -1629,7 +1581,6 @@ PyObject* PyInstance::categoryToPyString(Type::TypeCategory cat) {
     if (cat == Type::TypeCategory::catConstDict) { static PyObject* res = PyUnicode_FromString("ConstDict"); return res; }
     if (cat == Type::TypeCategory::catAlternative) { static PyObject* res = PyUnicode_FromString("Alternative"); return res; }
     if (cat == Type::TypeCategory::catConcreteAlternative) { static PyObject* res = PyUnicode_FromString("ConcreteAlternative"); return res; }
-    if (cat == Type::TypeCategory::catPythonSubclass) { static PyObject* res = PyUnicode_FromString("PythonSubclass"); return res; }
     if (cat == Type::TypeCategory::catBoundMethod) { static PyObject* res = PyUnicode_FromString("BoundMethod"); return res; }
     if (cat == Type::TypeCategory::catAlternativeMatcher) { static PyObject* res = PyUnicode_FromString("AlternativeMatcher"); return res; }
     if (cat == Type::TypeCategory::catClass) { static PyObject* res = PyUnicode_FromString("Class"); return res; }
@@ -1812,30 +1763,14 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
             return StringType::Make();
         }
 
-        if (PyInstance::isSubclassOfNativeType(pyType)) {
-            Type* nativeT = PyInstance::rootNativeType(pyType);
+        Type* res = PyInstance::extractTypeFrom(pyType);
 
-            if (!nativeT) {
-                PyErr_SetString(PyExc_TypeError,
-                    ("Type " + std::string(pyType->tp_name) + " looked like a native type subclass, but has no base").c_str()
-                    );
-                return NULL;
-            }
-
-            //this is now a permanent object
-            incref(typearg);
-
-            return PythonSubclass::Make(nativeT, pyType);
+        if (res) {
+            // we have a native type -> return it
+            return res;
         } else {
-            Type* res = PyInstance::extractTypeFrom(pyType);
-
-            if (res) {
-                // we have a native type -> return it
-                return res;
-            } else {
-                // we have a python type -> wrap it
-                return PythonObjectOfType::Make(pyType);
-            }
+            // we have a python type -> wrap it
+            return PythonObjectOfType::Make(pyType);
         }
     }
 

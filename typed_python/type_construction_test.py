@@ -164,19 +164,6 @@ def test_recursive_typed_cell():
     assert makeP().__name__ == 'TypedCell(^0)'
 
 
-def test_subclass_of_named_tuple():
-    def makeP(T):
-        class N(NamedTuple(x=T)):
-            def f(self):
-                return self.x
-
-        assert not isForwardDefined(N)
-        return N
-
-    assert makeP(int) is makeP(int)
-    assert makeP(int) is not makeP(str)
-
-
 def test_recursive_dict():
     def makeP():
         F = Forward()

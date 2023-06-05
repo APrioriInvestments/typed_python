@@ -72,7 +72,6 @@ class ConstDictType;
 class Alternative;
 class ConcreteAlternative;
 class AlternativeMatcher;
-class PythonSubclass;
 class PythonObjectOfType;
 class SubclassOfType;
 class Class;
@@ -130,7 +129,6 @@ public:
         catConstDict = 22,
         catAlternative = 23,
         catConcreteAlternative = 24, //concrete Alternative subclass
-        catPythonSubclass = 25, //subclass of a typed_python type
         catPythonObjectOfType = 26, //a python object that matches 'isinstance' on a particular type
         catBoundMethod = 27,
         catAlternativeMatcher = 37,
@@ -488,7 +486,6 @@ public:
         if (category == Type::TypeCategory::catConstDict) { return "ConstDict"; }
         if (category == Type::TypeCategory::catAlternative) { return "Alternative"; }
         if (category == Type::TypeCategory::catConcreteAlternative) { return "ConcreteAlternative"; }
-        if (category == Type::TypeCategory::catPythonSubclass) { return "PythonSubclass"; }
         if (category == Type::TypeCategory::catBoundMethod) { return "BoundMethod"; }
         if (category == Type::TypeCategory::catAlternativeMatcher) { return "AlternativeMatcher"; }
         if (category == Type::TypeCategory::catClass) { return "Class"; }
@@ -561,8 +558,6 @@ public:
                 return f(*(Alternative*)this);
             case catConcreteAlternative:
                 return f(*(ConcreteAlternative*)this);
-            case catPythonSubclass:
-                return f(*(PythonSubclass*)this);
             case catPythonObjectOfType:
                 return f(*(PythonObjectOfType*)this);
             case catClass:

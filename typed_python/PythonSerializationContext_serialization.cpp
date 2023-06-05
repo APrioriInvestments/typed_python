@@ -879,9 +879,6 @@ void PythonSerializationContext::serializeNativeTypeInner(
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catDict) {
         serializeNativeType(((DictType*)nativeType)->keyType(), b, 1);
         serializeNativeType(((DictType*)nativeType)->valueType(), b, 2);
-    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catPythonSubclass) {
-        serializeNativeType(((PythonSubclass*)nativeType)->baseType(), b, 1);
-        serializePythonObject((PyObject*)((PythonSubclass*)nativeType)->pyType(), b, 2);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
         serializeNativeType(((TupleOfType*)nativeType)->getEltType(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catPointerTo) {

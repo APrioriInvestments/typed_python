@@ -1555,7 +1555,6 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
                 category == Type::TypeCategory::catRefTo ||
                 category == Type::TypeCategory::catSubclassOf ||
                 category == Type::TypeCategory::catTuple ||
-                (category == Type::TypeCategory::catPythonSubclass && fieldNumber == 1) ||
                 //named tuples alternate between strings for names and type values
                 (category == Type::TypeCategory::catNamedTuple && (fieldNumber % 2 == 0)) ||
                 //alternatives encode one type exactly
@@ -1566,8 +1565,6 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             else if (category == Type::TypeCategory::catNamedTuple) {
                 assertWireTypesEqual(wireType, WireType::BYTES);
                 names.push_back(b.readStringObject());
-            } else if (category == Type::TypeCategory::catPythonSubclass && fieldNumber == 2) {
-                obj.steal(deserializePythonObject(b, wireType));
             } else if (category == Type::TypeCategory::catPythonObjectOfType && fieldNumber == 1) {
                 obj.steal(deserializePythonObject(b, wireType));
             } else if (category == Type::TypeCategory::catValue && fieldNumber == 1) {
@@ -1789,17 +1786,6 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             throw std::runtime_error("Invalid native type: ConstDict needs exactly 2 types.");
         }
         resultType = ::ConstDictType::Make(types[0], types[1]);
-    }
-    else if (category == Type::TypeCategory::catPythonSubclass) {
-        if (!obj || !PyType_Check(obj)) {
-            throw std::runtime_error("Invalid native type: PythonSubclass needs a python type.");
-        }
-
-        if (types.size() != 1) {
-            throw std::runtime_error("Invalid native type: PythonSubclass needs a native type.");
-        }
-
-        resultType = ::PythonSubclass::Make(types[0], (PyTypeObject*)(PyObject*)obj);
     }
     else if (category == Type::TypeCategory::catPythonObjectOfType) {
         if (!obj || !PyType_Check(obj)) {

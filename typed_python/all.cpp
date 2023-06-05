@@ -57,7 +57,6 @@ compile the entire group all at once.
 #include "PythonSerializationContext.cpp"
 #include "PythonSerializationContext_serialization.cpp"
 #include "PythonSerializationContext_deserialization.cpp"
-#include "PythonSubclassType.cpp"
 #include "StringType.cpp"
 #include "TupleOrListOfType.cpp"
 #include "Type.cpp"

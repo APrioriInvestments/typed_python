@@ -37,7 +37,6 @@
 #include "ValueType.hpp"
 #include "AlternativeType.hpp"
 #include "ConcreteAlternativeType.hpp"
-#include "PythonSubclassType.hpp"
 #include "PythonObjectOfTypeType.hpp"
 #include "FunctionType.hpp"
 #include "HeldClassType.hpp"
