@@ -237,6 +237,7 @@ public:
     void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
         m_types = ((CompositeType*)forwardDefinitionOfSelf)->m_types;
         m_names = ((CompositeType*)forwardDefinitionOfSelf)->m_names;
+        m_nameToIndex = ((CompositeType*)forwardDefinitionOfSelf)->m_nameToIndex;
     }
 
     void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
@@ -249,6 +250,10 @@ public:
     }
 
     void postInitializeConcrete() {
+        for (auto t: m_types) {
+            t->postInitialize();
+        }
+
         bool is_default_constructible = true;
         size_t size = 0;
 

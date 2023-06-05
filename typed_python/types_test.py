@@ -31,18 +31,22 @@ from typed_python import (
     Float32, SubclassOf,
     TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
     ConstDict, Alternative, serialize, deserialize, Class,
-    TypeFilter, Function, Forward, Set, PointerTo, Entrypoint, Final
+    TypeFilter, Function, Forward, Set, PointerTo,
+    # Entrypoint,
+    Final,
+    resolveForwardDefinedType
 )
 from typed_python.type_promotion import (
     computeArithmeticBinaryResultType, floatness, bitness, isSignedInt
 )
-from typed_python.test_util import currentMemUsageMb
+# from typed_python.test_util import currentMemUsageMb
 
 
 AnAlternative = Alternative("AnAlternative", X={'x': int})
 
-AForwardAlternative = Forward("AForwardAlternative")
+AForwardAlternative = Forward()
 AForwardAlternative.define(Alternative("AForwardAlternative", Y={}, X={'x': AForwardAlternative}))
+AForwardAlternative = resolveForwardDefinedType(AForwardAlternative)
 
 
 def typeFor(t):
@@ -1130,6 +1134,8 @@ class TypesTests(unittest.TestCase):
     def test_alternative_matcher_type(self):
         A = Alternative("A", X=dict(x=int))
 
+        assert type(A.X()).__name__ == "X"
+        assert type(A.X().matches).__qualname__ == "AlternativeMatcher(X)"
         assert type(A.X().matches).__name__ == "AlternativeMatcher(X)"
         assert type(A.X().matches).__typed_python_category__ == "AlternativeMatcher"
         assert type(A.X().matches).Alternative is A

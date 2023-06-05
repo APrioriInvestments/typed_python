@@ -98,6 +98,9 @@ public:
     void postInitializeConcrete() {
         m_size = sizeof(void*);
         m_is_default_constructible = true;
+    }
+
+    void finalizeTypeConcrete() {
         m_bytes_per_key = m_key->bytecount();
         m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
     }

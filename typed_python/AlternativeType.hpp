@@ -138,6 +138,10 @@ public:
     }
 
     void postInitializeConcrete() {
+        for (auto& subtype_pair: m_subtypes) {
+            subtype_pair.second->postInitialize();
+        }
+
         m_arg_positions.clear();
         m_default_construction_type = nullptr;
 

@@ -1566,6 +1566,8 @@ public:
     }
 
     void postInitializeConcrete() {
+        mClosureType->postInitialize();
+
         m_size = mClosureType->bytecount();
         m_is_default_constructible = mClosureType->is_default_constructible();
     }

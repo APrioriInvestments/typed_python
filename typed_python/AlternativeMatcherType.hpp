@@ -37,7 +37,7 @@ public:
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
         return "AlternativeMatcher("
-            + m_alternative->computeRecursiveName(typeStack)
+            + qualname_to_name(m_alternative->computeRecursiveName(typeStack))
             + ")";
     }
 
@@ -58,6 +58,7 @@ public:
     }
 
     void postInitializeConcrete() {
+        m_alternative->postInitialize();
         m_size = m_alternative->bytecount();
     }
 

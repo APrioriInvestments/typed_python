@@ -596,7 +596,9 @@ public:
 
     void initializeFromConcrete(Type* forwardDefinitionOfSelf);
 
-    void postInitializeConcrete() {};
+    void postInitializeConcrete() {
+        m_size = sizeof(layout*);
+    };
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack);
 

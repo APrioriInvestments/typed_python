@@ -201,7 +201,8 @@ def test_recursive_alternative():
             Alternative(
                 "F",
                 A={'f': F},
-                B={}
+                B={},
+                C={'x': int}
             )
         )
         return resolveForwardDefinedType(F)
@@ -210,6 +211,7 @@ def test_recursive_alternative():
     assert makeA().__name__ == 'F'
     assert makeA().A is makeA().A
     makeA().B()
+    makeA().C(x=10)
 
 
 def test_cannot_call_forward_function_instances():

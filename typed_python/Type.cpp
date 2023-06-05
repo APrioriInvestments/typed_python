@@ -387,6 +387,11 @@ void Type::attemptToResolve() {
         typeAndSource.first->postInitialize();
     }
 
+    // let each type update any internal caches it might need before it gets instantiated
+    for (auto typeAndSource: resolutionSource) {
+        typeAndSource.first->finalizeType();
+    }
+
     // now internalize the types by their hash. For each type, we compute a hash
     // and then look to see if we've seen it before. We build a lookup table from
     // each existing type to the internalized type, and then do the same process we did

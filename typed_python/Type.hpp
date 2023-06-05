@@ -1017,6 +1017,8 @@ protected:
         );
     }
 
+    void finalizeTypeConcrete() {}
+
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
         return m_name;
     }
@@ -1040,6 +1042,13 @@ public:
 
         this->check([&](auto& subtype) {
             subtype.postInitializeConcrete();
+        });
+    }
+
+    // update any caches in the type after we've walked over it
+    void finalizeType() {
+        this->check([&](auto& subtype) {
+            subtype.finalizeTypeConcrete();
         });
     }
 

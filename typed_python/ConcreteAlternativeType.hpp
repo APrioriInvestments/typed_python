@@ -59,6 +59,8 @@ public:
     }
 
     void postInitializeConcrete() {
+        m_alternative->postInitialize();
+
         if (m_which < 0 || m_which >= m_alternative->subtypes().size()) {
             throw std::runtime_error(
                 "invalid alternative index: " +

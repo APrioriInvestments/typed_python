@@ -59,6 +59,8 @@ public:
     }
 
     void postInitializeConcrete() {
+        m_first_arg->postInitialize();
+
         m_is_simple = false;
         m_size = m_first_arg->bytecount();
         m_is_default_constructible = false;

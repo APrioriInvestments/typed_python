@@ -15,7 +15,9 @@
 from typed_python.compiler.native_compiler.global_variable_definition import (
     GlobalVariableMetadata
 )
-from typed_python import Tuple, TupleOf, Alternative, NamedTuple, OneOf, Forward
+from typed_python import (
+    Tuple, TupleOf, Alternative, NamedTuple, OneOf, Forward, resolveForwardDefinedType
+)
 import textwrap
 
 
@@ -86,8 +88,8 @@ def typeZeroConstant(self):
     raise Exception(f"Can't make a zero value from {self}")
 
 
-Type = Forward("Type")
-Type = Type.define(Alternative(
+Type = Forward()
+Type.define(Alternative(
     "Type",
     # the 'Void' type. should only be used in function signatures. Use an empty
     # struct if you want the 'empty' data structure instead.
@@ -108,6 +110,7 @@ Type = Type.define(Alternative(
         else False,
     zeroConstant=typeZeroConstant
 ))
+Type = resolveForwardDefinedType(Type)
 
 
 def const_truth_value(c):
@@ -143,8 +146,8 @@ def const_str(c):
     assert False, type(c)
 
 
-Constant = Forward("Constant")
-Constant = Constant.define(Alternative(
+Constant = Forward()
+Constant.define(Alternative(
     "Constant",
     Void={},
     Float={'val': float, 'bits': int},
@@ -156,6 +159,7 @@ Constant = Constant.define(Alternative(
     truth_value=const_truth_value,
     __str__=const_str
 ))
+Constant = resolveForwardDefinedType(Constant)
 
 UnaryOp = Alternative(
     "UnaryOp",
@@ -196,10 +200,6 @@ BinaryOp = Alternative(
         "unknown binary op"
 )
 
-
-# loads and stores - no assignments
-Expression = Forward("Expression")
-Teardown = Forward("Teardown")
 
 NamedCallTarget = NamedTuple(
     name=str,
@@ -244,6 +244,9 @@ def intm_could_throw(intm):
 
     assert False, f"Unrecognized expression intermediate {intm}"
 
+
+Expression = Forward()
+Teardown = Forward()
 
 ExpressionIntermediate = Alternative(
     "ExpressionIntermediate",
@@ -294,7 +297,7 @@ def teardown_str(self):
     assert False, type(self)
 
 
-Teardown = Teardown.define(Alternative(
+Teardown.define(Alternative(
     "Teardown",
     ByTag={'tag': str, 'expr': Expression},
     Always={'expr': Expression},
@@ -558,7 +561,7 @@ def expr_could_throw(self):
     return False
 
 
-Expression = Expression.define(Alternative(
+Expression.define(Alternative(
     "Expression",
     Constant={'val': Constant},
     Comment={'comment': str, 'expr': Expression},
@@ -658,6 +661,12 @@ Expression = Expression.define(Alternative(
     withReturnTargetName=expr_with_return_target_name,
     couldThrow=expr_could_throw
 ))
+
+
+ExpressionIntermediate = resolveForwardDefinedType(ExpressionIntermediate)
+Expression = resolveForwardDefinedType(Expression)
+Teardown = resolveForwardDefinedType(Teardown)
+CallTarget = resolveForwardDefinedType(CallTarget)
 
 
 def ensureExpr(x):
