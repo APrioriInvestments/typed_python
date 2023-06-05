@@ -476,14 +476,6 @@ void BytesType::assign(instance_ptr self, instance_ptr other) {
     destroy((instance_ptr)&old);
 }
 
-bool BytesType::isBinaryCompatibleWithConcrete(Type* other) {
-    if (other->getTypeCategory() != m_typeCategory) {
-        return false;
-    }
-
-    return true;
-}
-
 void BytesType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     stream << "b" << "'";
     long bytes = count(self);

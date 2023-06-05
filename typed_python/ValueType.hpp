@@ -24,10 +24,6 @@ PyDoc_STRVAR(Value_doc,
 
 class Value : public Type {
 public:
-    bool isBinaryCompatibleWithConcrete(Type* other) {
-        return this == other;
-    }
-
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
     }

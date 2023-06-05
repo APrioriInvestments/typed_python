@@ -482,8 +482,6 @@ public:
         }
     }
 
-    bool isBinaryCompatibleWithConcrete(Type* other);
-
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
         for (auto& o: m_members) {

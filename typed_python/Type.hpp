@@ -781,12 +781,6 @@ public:
         return m_is_default_constructible;
     }
 
-    bool isBinaryCompatibleWith(Type* other);
-
-    bool isBinaryCompatibleWithConcrete(Type* other) {
-        return false;
-    }
-
     bool isSimple() const {
         return m_is_simple;
     }

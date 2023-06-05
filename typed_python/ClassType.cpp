@@ -16,16 +16,6 @@
 
 #include "AllTypes.hpp"
 
-bool Class::isBinaryCompatibleWithConcrete(Type* other) {
-    if (other->getTypeCategory() != m_typeCategory) {
-        return false;
-    }
-
-    Class* otherO = (Class*)other;
-
-    return m_heldClass->isBinaryCompatibleWith(otherO->m_heldClass);
-}
-
 instance_ptr Class::eltPtr(instance_ptr self, int64_t ix) const {
     layout& l = *instanceToLayout(self);
     return m_heldClass->eltPtr(l.data, ix);

@@ -61,7 +61,7 @@ class AlternativeWrapperMixin(ClassOrAlternativeWrapperMixin):
         if py_code < 0:
             return super().convert_comparison(context, lhs, op, rhs)
 
-        if _types.isBinaryCompatible(lhs.expr_type.typeRepresentation, rhs.expr_type.typeRepresentation):
+        if lhs.expr_type.typeRepresentation is rhs.expr_type.typeRepresentation:
             lhs = lhs.ensureIsReference()
             rhs = rhs.ensureIsReference()
 

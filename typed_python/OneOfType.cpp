@@ -16,26 +16,6 @@
 
 #include "AllTypes.hpp"
 
-bool OneOfType::isBinaryCompatibleWithConcrete(Type* other) {
-    if (other->getTypeCategory() != TypeCategory::catOneOf) {
-        return false;
-    }
-
-    OneOfType* otherO = (OneOfType*)other;
-
-    if (m_types.size() != otherO->m_types.size()) {
-        return false;
-    }
-
-    for (long k = 0; k < m_types.size(); k++) {
-        if (!m_types[k]->isBinaryCompatibleWith(otherO->m_types[k])) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 void OneOfType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     m_types[*((uint8_t*)self)]->repr(self+1, stream, isStr);
 }

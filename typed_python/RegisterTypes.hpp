@@ -195,14 +195,6 @@ public:
         m_needs_post_init = false;
     }
 
-    bool isBinaryCompatibleWithConcrete(Type* other) {
-        if (other->getTypeCategory() != m_typeCategory) {
-            return false;
-        }
-
-        return true;
-    }
-
     bool isPODConcrete() {
         return true;
     }

@@ -30,27 +30,6 @@ MemberDefinition::MemberDefinition(
     mDefaultValueAsPyobj = PyInstance::extractPythonObject(mDefaultValue);
 }
 
-bool HeldClass::isBinaryCompatibleWithConcrete(Type* other) {
-    if (other->getTypeCategory() != m_typeCategory) {
-        return false;
-    }
-
-    HeldClass* otherO = (HeldClass*)other;
-
-    if (m_members.size() != otherO->m_members.size()) {
-        return false;
-    }
-
-    for (long k = 0; k < m_members.size(); k++) {
-        if (m_members[k].getName() != otherO->m_members[k].getName() ||
-                !m_members[k].getType()->isBinaryCompatibleWith(otherO->m_members[k].getType())) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 void HeldClass::updateBytesOfInitBits() {
     bool anyMembersWithInitializers = false;
     for (auto& m: m_members) {

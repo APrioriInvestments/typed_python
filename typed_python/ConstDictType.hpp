@@ -72,8 +72,6 @@ public:
         v.visitTopo(m_value);
     }
 
-    bool isBinaryCompatibleWithConcrete(Type* other);
-
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
         return "ConstDict("
             + m_key->computeRecursiveName(typeStack)

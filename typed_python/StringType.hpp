@@ -115,14 +115,6 @@ public:
 
     static layout* createFromString(std::string s);
 
-    bool isBinaryCompatibleWithConcrete(Type* other) {
-        if (other->getTypeCategory() != m_typeCategory) {
-            return false;
-        }
-
-        return true;
-    }
-
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}
 

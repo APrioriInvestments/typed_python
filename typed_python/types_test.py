@@ -209,58 +209,6 @@ class TypesTests(unittest.TestCase):
             .format(expected=expected, elapsed=elapsed)
         )
 
-    def test_object_binary_compatibility(self):
-        ibc = _types.isBinaryCompatible
-
-        self.assertTrue(ibc(type(None), type(None)))
-        self.assertTrue(ibc(Int8, Int8))
-
-        NT = NamedTuple(a=int, b=int)
-
-        class X(NamedTuple(a=int, b=int)):
-            pass
-
-        class Y(NamedTuple(a=int, b=int)):
-            pass
-
-        self.assertTrue(ibc(X, X))
-        self.assertTrue(ibc(X, Y))
-        self.assertTrue(ibc(X, NT))
-        self.assertTrue(ibc(Y, NT))
-        self.assertTrue(ibc(NT, Y))
-
-        self.assertFalse(ibc(OneOf(int, float), OneOf(float, int)))
-        self.assertTrue(ibc(OneOf(int, X), OneOf(int, Y)))
-
-    def test_binary_compatibility_incompatible_alternatives(self):
-        ibc = _types.isBinaryCompatible
-
-        A1 = Alternative("A1", X={'a': int}, Y={'b': float})
-        A2 = Alternative("A2", X={'a': int}, Y={'b': str})
-
-        self.assertTrue(ibc(A1, A1.X))
-        self.assertTrue(ibc(A1, A1.Y))
-        self.assertTrue(ibc(A1.Y, A1.Y))
-        self.assertTrue(ibc(A1.Y, A1))
-        self.assertTrue(ibc(A1.X, A1))
-        self.assertFalse(ibc(A1.X, A1.Y))
-
-        self.assertFalse(ibc(A1, A2))
-        self.assertFalse(ibc(A1.X, A2.X))
-        self.assertFalse(ibc(A1.Y, A2.Y))
-
-    def test_binary_compatibility_compatible_alternatives(self):
-        ibc = _types.isBinaryCompatible
-
-        A1 = Alternative("A1", X={'a': int}, Y={'b': float})
-        A2 = Alternative("A2", X={'a': int}, Y={'b': float})
-
-        self.assertTrue(ibc(A1.X, A2.X))
-        self.assertTrue(ibc(A1.Y, A2.Y))
-
-        self.assertFalse(ibc(A1.X, A2.Y))
-        self.assertFalse(ibc(A1.Y, A2.X))
-
     def test_name_of_type_as_value_instances(self):
         T1 = Alternative("T1")
 
@@ -1803,37 +1751,6 @@ class TypesTests(unittest.TestCase):
             for k in x:
                 self.assertTrue(k in x)
                 x[k]
-
-    def test_conversion_of_binary_compatible(self):
-        class T1(NamedTuple(a=int)):
-            pass
-
-        class T2(NamedTuple(a=int)):
-            pass
-
-        class T1Comp(NamedTuple(d=ConstDict(str, T1))):
-            pass
-
-        class T2Comp(NamedTuple(d=ConstDict(str, T1))):
-            pass
-
-        self.assertTrue(_types.isBinaryCompatible(T1Comp, T2Comp))
-        self.assertTrue(_types.isBinaryCompatible(T1, T2))
-
-    def test_binary_compatible_nested(self):
-        def make():
-            class Interior(NamedTuple(a=int)):
-                pass
-
-            class Exterior(NamedTuple(a=Interior)):
-                pass
-
-            return Exterior
-
-        E1 = make()
-        E2 = make()
-
-        self.assertTrue(_types.isBinaryCompatible(E1, E2))
 
     def test_python_objects_in_tuples(self):
         class NormalPyClass:

@@ -27,14 +27,6 @@ public:
         m_is_default_constructible = true;
     }
 
-    bool isBinaryCompatibleWithConcrete(Type* other) {
-        if (other->getTypeCategory() != m_typeCategory) {
-            return false;
-        }
-
-        return true;
-    }
-
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}
 

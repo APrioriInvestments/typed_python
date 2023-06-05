@@ -64,10 +64,6 @@ public:
         v.visitTopo(m_subclassOf);
     }
 
-    bool isBinaryCompatibleWithConcrete(Type* other) {
-        return false;
-    }
-
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
         visitor(m_subclassOf);

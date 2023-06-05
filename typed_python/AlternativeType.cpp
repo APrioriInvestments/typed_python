@@ -16,33 +16,6 @@
 
 #include "AllTypes.hpp"
 
-bool Alternative::isBinaryCompatibleWithConcrete(Type* other) {
-    if (other->getTypeCategory() == TypeCategory::catConcreteAlternative) {
-        other = other->getBaseType();
-    }
-
-    if (other->getTypeCategory() != m_typeCategory) {
-        return false;
-    }
-
-    Alternative* otherO = (Alternative*)other;
-
-    if (m_subtypes.size() != otherO->m_subtypes.size()) {
-        return false;
-    }
-
-    for (long k = 0; k < m_subtypes.size(); k++) {
-        if (m_subtypes[k].first != otherO->m_subtypes[k].first) {
-            return false;
-        }
-        if (!m_subtypes[k].second->isBinaryCompatibleWith(otherO->m_subtypes[k].second)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 int64_t Alternative::refcount(instance_ptr i) const {
     if (m_all_alternatives_empty) {
         return 0;

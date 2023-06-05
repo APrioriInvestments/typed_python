@@ -16,16 +16,6 @@
 
 #include "AllTypes.hpp"
 
-bool TupleOrListOfType::isBinaryCompatibleWithConcrete(Type* other) {
-    if (other->getTypeCategory() != m_typeCategory) {
-        return false;
-    }
-
-    TupleOfType* otherO = (TupleOfType*)other;
-
-    return m_element_type->isBinaryCompatibleWith(otherO->m_element_type);
-}
-
 void TupleOrListOfType::repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
     PushReprState isNew(stream, self);
 

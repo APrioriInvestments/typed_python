@@ -31,10 +31,6 @@ public:
         m_is_simple = false;
     }
 
-    bool isBinaryCompatibleWithConcrete(Type* other) {
-        return other == this;
-    }
-
     template<class visitor_type>
     void _visitCompilerVisibleInternals(const visitor_type& v) {
         v.visitHash(ShaHash(1, m_typeCategory));

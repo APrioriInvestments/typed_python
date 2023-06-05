@@ -16,17 +16,6 @@
 
 #include "AllTypes.hpp"
 
-bool ConstDictType::isBinaryCompatibleWithConcrete(Type* other) {
-    if (other->getTypeCategory() != m_typeCategory) {
-        return false;
-    }
-
-    ConstDictType* otherO = (ConstDictType*)other;
-
-    return m_key->isBinaryCompatibleWith(otherO->m_key) &&
-        m_value->isBinaryCompatibleWith(otherO->m_value);
-}
-
 // static
 ConstDictType* ConstDictType::Make(Type* key, Type* value) {
     if (key->isForwardDefined() || value->isForwardDefined()) {

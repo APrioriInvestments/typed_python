@@ -3121,29 +3121,6 @@ PyObject *referencedTypes(PyObject* nullValue, PyObject* args) {
     });
 }
 
-PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 2) {
-        PyErr_SetString(PyExc_TypeError, "isBinaryCompatible takes 2 positional arguments");
-        return NULL;
-    }
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
-    PyObjectHolder a2(PyTuple_GetItem(args, 1));
-
-    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
-    Type* t2 = PyInstance::unwrapTypeArgToTypePtr(a2);
-
-    if (!t1) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'isBinaryCompatible' must be a type object");
-        return NULL;
-    }
-    if (!t2) {
-        PyErr_SetString(PyExc_TypeError, "second argument to 'isBinaryCompatible' must be a type object");
-        return NULL;
-    }
-
-    return incref(t1->isBinaryCompatibleWith(t2) ? Py_True : Py_False);
-}
-
 PyObject *MakeForwardType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     int num_args = PyTuple_Size(args);
 
@@ -3515,7 +3492,6 @@ static PyMethodDef module_methods[] = {
     {"isForwardDefined", (PyCFunction)isForwardDefined, METH_VARARGS, NULL},
     {"resolveForwardDefinedType", (PyCFunction)resolveForwardDefinedType, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS | METH_KEYWORDS, NULL},
-    {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"recursiveTypeGroup", (PyCFunction)recursiveTypeGroup, METH_VARARGS | METH_KEYWORDS, NULL},
     {"recursiveTypeGroupRepr", (PyCFunction)recursiveTypeGroupRepr, METH_VARARGS | METH_KEYWORDS, NULL},
     {"recursiveTypeGroupDeepRepr", (PyCFunction)recursiveTypeGroupDeepRepr, METH_VARARGS | METH_KEYWORDS, NULL},

@@ -17,21 +17,6 @@
 #include "AllTypes.hpp"
 #include "../typed_python/Format.hpp"
 
-bool ConcreteAlternative::isBinaryCompatibleWithConcrete(Type* other) {
-    if (other->getTypeCategory() == TypeCategory::catConcreteAlternative) {
-        ConcreteAlternative* otherO = (ConcreteAlternative*)other;
-
-        return otherO->m_alternative->isBinaryCompatibleWith(m_alternative) &&
-            m_which == otherO->m_which;
-    }
-
-    if (other->getTypeCategory() == TypeCategory::catAlternative) {
-        return m_alternative->isBinaryCompatibleWith(other);
-    }
-
-    return false;
-}
-
 void ConcreteAlternative::constructor(instance_ptr self) {
     assertForwardsResolvedSufficientlyToInstantiate();
 

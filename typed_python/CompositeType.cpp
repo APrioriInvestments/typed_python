@@ -16,26 +16,6 @@
 
 #include "AllTypes.hpp"
 
-bool CompositeType::isBinaryCompatibleWithConcrete(Type* other) {
-    if (other->getTypeCategory() != m_typeCategory) {
-        return false;
-    }
-
-    CompositeType* otherO = (CompositeType*)other;
-
-    if (m_types.size() != otherO->m_types.size()) {
-        return false;
-    }
-
-    for (long k = 0; k < m_types.size(); k++) {
-        if (!m_types[k]->isBinaryCompatibleWith(otherO->m_types[k])) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 bool CompositeType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     if (pyComparisonOp == Py_NE) {
         return !cmp(left, right, Py_EQ, suppressExceptions);

@@ -38,8 +38,6 @@ public:
         m_size = sizeof(layout*);
     }
 
-    bool isBinaryCompatibleWithConcrete(Type* other);
-
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
 
     template<class buf_t>

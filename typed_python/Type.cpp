@@ -211,36 +211,6 @@ void Type::assign(instance_ptr self, instance_ptr other) {
     this->check([&](auto& subtype) { subtype.assign(self, other); } );
 }
 
-bool Type::isBinaryCompatibleWith(Type* other) {
-    if (other == this) {
-        return true;
-    }
-
-    if (isSubclassOf(other)) {
-        return true;
-    }
-
-    auto it = mIsBinaryCompatible.find(other);
-    if (it != mIsBinaryCompatible.end()) {
-        return it->second != BinaryCompatibilityCategory::Incompatible;
-    }
-
-    //mark that we are recursing through this datastructure. we don't want to
-    //loop indefinitely.
-    mIsBinaryCompatible[other] = BinaryCompatibilityCategory::Checking;
-
-    bool isCompatible = this->check([&](auto& subtype) {
-        return subtype.isBinaryCompatibleWithConcrete(other);
-    });
-
-    mIsBinaryCompatible[other] = isCompatible ?
-        BinaryCompatibilityCategory::Compatible :
-        BinaryCompatibilityCategory::Incompatible
-        ;
-
-    return isCompatible;
-}
-
 bool Type::canConvertToTrivially(Type* otherType) {
     if (typesEquivalent(this, otherType)) {
         return true;
