@@ -3,7 +3,7 @@ import pytest
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
     Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash, Value,
-    Class, Member, ConstDict, TypedCell
+    Class, Member, ConstDict, TypedCell, Final
 )
 
 
@@ -283,6 +283,14 @@ def test_create_value_type_with_forward():
     assert not isForwardDefined(T_resolved)
     assert identityHash(T_resolved).hex() == identityHash(Value(int)).hex()
     assert T_resolved is Value(int)
+
+
+def test_create_class_with_methods():
+    class C(Class):
+        def f(self):
+            return "hi"
+
+    assert not isForwardDefined(C)
 
 
 def test_create_class_with_forward():

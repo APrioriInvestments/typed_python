@@ -568,6 +568,8 @@ private:
         instance_ptr instance,
         const visitor_type& visitor
     ) {
+        visitor.visitTopo(TypeOrPyobj(objType));
+
         if (objType->isComposite()) {
             CompositeType* compType = (CompositeType*)objType;
             for (long k = 0; k < compType->getTypes().size(); k++) {
@@ -577,6 +579,63 @@ private:
                     visitor
                 );
             }
+            return;
+        }
+
+        if (objType->isFunction()) {
+            // visit the function's closure
+            Function* funcT = (Function*)objType;
+            walkInstance(
+                funcT->getClosureType(),
+                instance,
+                visitor
+            );
+            return;
+        }
+
+        if (objType->isOneOf()) {
+            OneOfType* o = (OneOfType*)objType;
+            auto typeAndData = o->unwrap(instance);
+            walkInstance(typeAndData.first, typeAndData.second, visitor);
+            return;
+        }
+
+        if (objType->isAlternative()) {
+            Alternative* a = (Alternative*)objType;
+            visitor.visitHash(ShaHash(a->which(instance)));
+            auto typeAndData = a->unwrap(instance);
+            walkInstance(typeAndData.first, typeAndData.second, visitor);
+            return;
+        }
+
+        if (objType->isConcreteAlternative()) {
+            ConcreteAlternative* a = (ConcreteAlternative*)objType;
+            walkInstance(a->getAlternative(), instance, visitor);
+            return;
+        }
+
+        if (objType->isTupleOf()) {
+            TupleOfType* a = (TupleOfType*)objType;
+            size_t count = a->count(instance);
+
+            visitor.visitHash(ShaHash(count));
+            for (long k = 0; k < count; k++) {
+                walkInstance(a->getEltType(), a->eltPtr(instance, k), visitor);
+            }
+
+            return;
+        }
+
+        if (objType->isConstDict()) {
+            ConstDictType* a = (ConstDictType*)objType;
+            size_t count = a->count(instance);
+
+            visitor.visitHash(ShaHash(count));
+            for (long k = 0; k < count; k++) {
+                walkInstance(a->keyType(), a->kvPairPtrKey(instance, k), visitor);
+                walkInstance(a->valueType(), a->kvPairPtrValue(instance, k), visitor);
+            }
+
             return;
         }
 
@@ -590,6 +649,32 @@ private:
             }
 
             visitor.visitTopo(PyCell_Get(o));
+            return;
+        }
+
+        if (objType->isBool()) {
+            visitor.visitHash(ShaHash(*(bool*)instance ? 1 : 0));
+            return;
+        }
+
+        if (objType->isRegister()) {
+            visitor.visitHash(ShaHash::SHA1((void*)instance, objType->bytecount()));
+            return;
+        }
+        if (objType->isString()) {
+            visitor.visitHash(ShaHash(((StringType*)objType)->toUtf8String(instance)));
+            return;
+        }
+        if (objType->isBytes()) {
+            size_t ct = ((BytesType*)objType)->count(instance);
+            visitor.visitHash(ShaHash(ct));
+
+            if (ct) {
+                visitor.visitHash(ShaHash::SHA1(
+                    ((BytesType*)objType)->eltPtr(instance, 0),
+                    ct
+                ));
+            }
             return;
         }
     }
@@ -642,6 +727,7 @@ private:
 
         // don't visit into constants
         if (isSimpleConstant(obj.pyobj())) {
+            //TODO: this just looks wrong
             return;
         }
 
@@ -650,18 +736,11 @@ private:
             visitor.visitHash(ShaHash(2));
             visitor.visitTopo(argType);
 
-            if (argType->isFunction()) {
-                // visit the function's closure
-                Function* funcT = (Function*)argType;
-                instance_ptr dataPtr = ((PyInstance*)obj.pyobj())->dataPtr();
-
-                walkInstance(
-                    funcT->getClosureType(),
-                    dataPtr,
-                    visitor
-                );
-            }
-
+            walkInstance(
+                argType,
+                ((PyInstance*)obj.pyobj())->dataPtr(),
+                visitor
+            );
             return;
         }
 

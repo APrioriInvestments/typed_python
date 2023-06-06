@@ -28,6 +28,7 @@ protected:
         m_is_tuple(isTuple)
     {
         m_needs_post_init = true;
+        m_is_default_constructible = true;
     }
 
 public:
@@ -49,6 +50,7 @@ public:
             m_is_tuple(isTuple)
     {
         m_is_forward_defined = true;
+        m_is_default_constructible = true;
     }
 
     template<class visitor_type>

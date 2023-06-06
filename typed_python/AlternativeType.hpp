@@ -129,6 +129,7 @@ public:
         m_hasGetAttributeMagicMethod = selfT->m_hasGetAttributeMagicMethod;
         m_methods = selfT->m_methods;
         m_subtypes = selfT->m_subtypes;
+        m_subtypes_concrete = selfT->m_subtypes_concrete;
         m_default_construction_ix = selfT->m_default_construction_ix;
         m_default_construction_type = selfT->m_default_construction_type;
     }
@@ -138,10 +139,6 @@ public:
     }
 
     void postInitializeConcrete() {
-        for (auto& subtype_pair: m_subtypes) {
-            subtype_pair.second->postInitialize();
-        }
-
         m_arg_positions.clear();
         m_default_construction_type = nullptr;
 
@@ -212,6 +209,8 @@ public:
     bool hasGetAttributeMagicMethod() const {
         return m_hasGetAttributeMagicMethod;
     }
+
+    bool isBinaryCompatibleWithConcrete(Type* other);
 
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
@@ -359,6 +358,11 @@ public:
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr);
 
     typed_python_hash_type hash(instance_ptr left);
+
+    std::pair<Type*, instance_ptr> unwrap(instance_ptr self) {
+        size_t ix = which(self);
+        return std::make_pair(m_subtypes[ix].second, eltPtr(self));
+    }
 
     instance_ptr eltPtr(instance_ptr self) const;
 

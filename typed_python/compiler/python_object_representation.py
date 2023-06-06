@@ -77,7 +77,7 @@ from typed_python.compiler.type_wrappers.min_max_wrapper import MinWrapper, MaxW
 from typed_python.compiler.type_wrappers.repr_wrapper import ReprWrapper
 from types import ModuleType
 from typed_python._types import (
-    TypeFor, bytecount, prepareArgumentToBePassedToCompiler, allForwardTypesResolved,
+    TypeFor, bytecount, prepareArgumentToBePassedToCompiler,
     serialize, deserialize
 )
 from typed_python import (
@@ -152,8 +152,8 @@ def _typedPythonTypeToTypeWrapper(t):
 
     assert isinstance(t, type), t
 
-    if not allForwardTypesResolved(t):
-        return UnresolvedForwardTypeWrapper(t)
+    if isinstance(t, Forward):
+        raise Exception("Can't compile against Forward types")
 
     if not hasattr(t, '__typed_python_category__'):
         # this is will be a PythonObjectOfType, but we never actually return such an object

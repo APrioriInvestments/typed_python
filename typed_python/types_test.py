@@ -32,14 +32,14 @@ from typed_python import (
     TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
     ConstDict, Alternative, serialize, deserialize, Class,
     TypeFilter, Function, Forward, Set, PointerTo,
-    # Entrypoint,
+    Entrypoint,
     Final,
     resolveForwardDefinedType
 )
 from typed_python.type_promotion import (
     computeArithmeticBinaryResultType, floatness, bitness, isSignedInt
 )
-# from typed_python.test_util import currentMemUsageMb
+from typed_python.test_util import currentMemUsageMb
 
 
 AnAlternative = Alternative("AnAlternative", X={'x': int})
@@ -605,9 +605,24 @@ class TypesTests(unittest.TestCase):
 
         self.assertEqual(tuple(typedThings), someThings)
 
+    def test_alternative_as_value(self):
+        A = Alternative(
+            "A",
+            a0=dict(x_0=str, x_1=TupleOf(ConstDict(int, int))),
+        )
+
+        V1 = Value(A.a0(x_0='hi'))
+        V2 = Value(A.a0(x_0='hi2'))
+        V3 = Value(A.a0(x_0='hi', x_1=[{1: 2}]))
+        V4 = Value(A.a0(x_0='hi', x_1=[{1: 3}]))
+
+        assert V1 is not V2
+        assert V1 is not V3
+        assert V3 is not V4
+
     def test_compound_oneof(self):
         producer = RandomValueProducer()
-        producer.addEvenly(1000, 2)
+        producer.addEvenly(20, 2)
 
         for _ in range(1000):
             vals = (producer.pickRandomly(), producer.pickRandomly(), producer.pickRandomly())

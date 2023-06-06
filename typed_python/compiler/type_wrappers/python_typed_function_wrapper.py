@@ -13,9 +13,12 @@
 #   limitations under the License.
 
 
-from typed_python import PointerTo, bytecount, NamedTuple, Class, OneOf, ListOf, TupleOf, Tuple, Set, ConstDict, Dict, Value
+from typed_python import (
+    PointerTo, bytecount, NamedTuple, Class, OneOf, ListOf, TupleOf, Tuple, Set,
+    ConstDict, Dict, Value, isForwardDefined
+)
 from typed_python.compiler.merge_type_wrappers import mergeTypeWrappers
-from typed_python._types import is_default_constructible, allForwardTypesResolved
+from typed_python._types import is_default_constructible
 from typed_python.internals import CellAccess
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
@@ -118,8 +121,9 @@ class PythonTypedFunctionWrapper(Wrapper):
         Returns:
             NoReturnTypeSpecified, a type, CannotBeDetermined, or SomeInvalidClassReturnType
         """
-        if not allForwardTypesResolved(overload.functionTypeObject):
-            return NoReturnTypeSpecified
+        # TODO: what should we be doing here?
+        if isForwardDefined(overload.functionTypeObject):
+            raise Exception("Can't compile against forward defined types.")
 
         return typeWrapper(overload.functionTypeObject).signatureCalculator.returnTypeForOverload(
             overload.index, argTypes, kwargTypes

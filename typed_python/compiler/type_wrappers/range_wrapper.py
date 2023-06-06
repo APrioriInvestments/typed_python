@@ -12,8 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import NamedTuple, Class, Final, PointerTo
-from typed_python import pointerTo
+from typed_python import Class, Final, PointerTo, Held, Member, pointerTo
 
 
 class Range(Class, Final, __name__='range'):
@@ -36,7 +35,12 @@ class Range(Class, Final, __name__='range'):
 range = Range()
 
 
-class RangeCls(NamedTuple(start=int, stop=int, step=int)):
+@Held
+class RangeCls(Class, Final):
+    start = Member(int, nonempty=True)
+    stop = Member(int, nonempty=True)
+    step = Member(int, nonempty=True)
+
     def __str__(self):
         return repr(self)
 
@@ -62,7 +66,12 @@ class RangeCls(NamedTuple(start=int, stop=int, step=int)):
         return self.start + self.step * x
 
 
-class RangeIterator(NamedTuple(start=int, stop=int, step=int)):
+@Held
+class RangeIterator(Class, Final):
+    start = Member(int, nonempty=True)
+    stop = Member(int, nonempty=True)
+    step = Member(int, nonempty=True)
+
     def __iter__(self) -> int:
         resPtr = self.__fastnext__()
         if resPtr:

@@ -20,7 +20,7 @@
 
 PyDoc_STRVAR(Value_doc,
     "Value(x) -> type representing the single immutable value x"
-    );
+);
 
 class Value : public Type {
 public:

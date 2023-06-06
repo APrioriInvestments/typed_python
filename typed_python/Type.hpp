@@ -271,6 +271,15 @@ public:
         );
     }
 
+    bool isUInt8() const { return m_typeCategory == catUInt8; }
+    bool isUInt16() const { return m_typeCategory == catUInt16; }
+    bool isUInt32() const { return m_typeCategory == catUInt32; }
+    bool isUInt64() const { return m_typeCategory == catUInt64; }
+    bool isInt8() const { return m_typeCategory == catInt8; }
+    bool isInt16() const { return m_typeCategory == catInt16; }
+    bool isInt32() const { return m_typeCategory == catInt32; }
+    bool isInt() const { return m_typeCategory == catInt64; }
+
     bool isRecursive() {
         return getRecursiveTypeGroupMembers().size() != 1;
     }

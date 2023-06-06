@@ -478,9 +478,46 @@ HeldClass* HeldClass::Make(
     // if we refer to forwards.
     bool anyForward = false;
 
-    result->_visitReferencedTypes(
-        [&](Type* t) { if (t->isForwardDefined() && t != clsType) { anyForward = true; } }
-    );
+    for (auto h: bases) {
+        if (h->isForwardDefined()) {
+            anyForward = true;
+        }
+    }
+    for (auto& m: members) {
+        if (m.getType() && m.getType()->isForwardDefined()) {
+            // TODO: could ehte member _instance_ be forward?
+            anyForward = true;
+        }
+    }
+
+    for (auto& nameAndT: memberFunctions) {
+        if (nameAndT.second->isForwardDefined()) {
+            anyForward = true;
+        }
+    }
+    for (auto& nameAndT: staticFunctions) {
+        if (nameAndT.second->isForwardDefined()) {
+            anyForward = true;
+        }
+    }
+    for (auto& nameAndT: propertyFunctions) {
+        if (nameAndT.second->isForwardDefined()) {
+            anyForward = true;
+        }
+    }
+
+    // TODO: a classMember could contain a forward reference!
+    // for (auto& nameAndT: classMembers) {
+    //     if (nameAndT.second->isForwardDefined()) {
+    //         anyForward = true;
+    //     }
+    // }
+
+    for (auto& nameAndT: classMethods) {
+        if (nameAndT.second->isForwardDefined()) {
+            anyForward = true;
+        }
+    }
 
     if (!anyForward) {
         return (HeldClass*)result->forwardResolvesTo();

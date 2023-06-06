@@ -1543,6 +1543,7 @@ public:
         m_is_forward_defined = true;
         m_is_simple = false;
         m_doc = Function_doc;
+        m_name = mRootName;
     }
 
     std::string moduleNameConcrete() {
