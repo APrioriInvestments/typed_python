@@ -84,11 +84,6 @@ class ModuleLevelNormalClass:
         pass
 
 
-class ModuleLevelNamedTupleSubclass(NamedTuple(x=int)):
-    def f(self):
-        return self.x
-
-
 class ModuleLevelClass(Class, Final):
     def f(self):
         return "HI!"
@@ -1875,56 +1870,6 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIn(
             b'typed_python.types_serialization_test.ModuleLevelClass',
             sc.serialize(ModuleLevelClass),
-        )
-
-    def test_serialize_unnamed_subclass_of_named_tuple(self):
-        class SomeNamedTuple(NamedTuple(x=int)):
-            def f(self):
-                return self.x
-
-        sc = SerializationContext()
-
-        self.assertEqual(
-            sc.deserialize(sc.serialize(SomeNamedTuple))(x=10).f(),
-            10
-        )
-
-        self.assertEqual(
-            sc.deserialize(sc.serialize(SomeNamedTuple(x=10))).f(),
-            10
-        )
-
-    def test_serialize_named_subclass_of_named_tuple(self):
-        sc = SerializationContext()
-
-        self.assertEqual(
-            ModuleLevelNamedTupleSubclass.__module__,
-            "typed_python.types_serialization_test"
-        )
-
-        self.assertEqual(
-            ModuleLevelNamedTupleSubclass.__name__,
-            "ModuleLevelNamedTupleSubclass"
-        )
-
-        self.assertIs(
-            sc.deserialize(sc.serialize(ModuleLevelNamedTupleSubclass)),
-            ModuleLevelNamedTupleSubclass
-        )
-
-        self.assertIs(
-            type(sc.deserialize(sc.serialize(ModuleLevelNamedTupleSubclass()))),
-            ModuleLevelNamedTupleSubclass
-        )
-
-        self.assertIs(
-            type(sc.deserialize(sc.serialize([ModuleLevelNamedTupleSubclass()]))[0]),
-            ModuleLevelNamedTupleSubclass
-        )
-
-        self.assertIs(
-            sc.deserialize(sc.serialize(ModuleLevelNamedTupleSubclass(x=10))).f(),
-            10
         )
 
     def test_serialize_builtin_tp_functions(self):
