@@ -163,6 +163,8 @@ public:
 
     void deserializeClassClassMemberDict(std::map<std::string, PyObjectHolder>& dict, DeserializationBuffer& b, int wireType) const;
 
+    static Type* constructBlankInstanceOfType(Type::TypeCategory typeCat);
+
     Type* deserializeNativeTypeInner(DeserializationBuffer& b, size_t wireType, bool actuallyProduceResult) const;
 
     Instance deserializeNativeInstance(DeserializationBuffer& b, size_t wireType) const;

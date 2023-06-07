@@ -19,7 +19,7 @@
 #include "Type.hpp"
 
 class RefTo : public Type {
-protected:
+public:
     typedef void* instance;
 
     // construct a non-forward defined refto
@@ -29,7 +29,6 @@ protected:
         m_is_default_constructible = true;
     }
 
-public:
     RefTo(Type* t) :
         Type(TypeCategory::catRefTo),
         m_element_type(t)

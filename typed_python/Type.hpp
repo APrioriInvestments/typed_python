@@ -271,15 +271,6 @@ public:
         );
     }
 
-    bool isUInt8() const { return m_typeCategory == catUInt8; }
-    bool isUInt16() const { return m_typeCategory == catUInt16; }
-    bool isUInt32() const { return m_typeCategory == catUInt32; }
-    bool isUInt64() const { return m_typeCategory == catUInt64; }
-    bool isInt8() const { return m_typeCategory == catInt8; }
-    bool isInt16() const { return m_typeCategory == catInt16; }
-    bool isInt32() const { return m_typeCategory == catInt32; }
-    bool isInt() const { return m_typeCategory == catInt64; }
-
     bool isRecursive() {
         return getRecursiveTypeGroupMembers().size() != 1;
     }
@@ -957,16 +948,6 @@ protected:
     // we will have thrown, or m_forward_resolves_to will be populated.
     void attemptToResolve();
 
-    // initialize ourself as a copy of 'forwardDefinitionOfSelf' where none of the types
-    // will have a forward definition reference. The instance must have been constructed
-    // using 'cloneForForwardResolution'. If the recursiveNameOverride is not None, then
-    // use that name for the type instead of the computed name.
-    void initializeFrom(Type* forwardDefinitionOfSelf) {
-        this->check([&](auto& subtype) {
-            return subtype.initializeFromConcrete(forwardDefinitionOfSelf);
-        });
-    }
-
     // this is a fully-resolved type that we created but aren't using.
     // it should just leak and never be used again.
     void markRedundant() {
@@ -1026,6 +1007,16 @@ protected:
     }
 
 public:
+    // initialize ourself as a copy of 'forwardDefinitionOfSelf' where none of the types
+    // will have a forward definition reference. The instance must have been constructed
+    // using 'cloneForForwardResolution'. If the recursiveNameOverride is not None, then
+    // use that name for the type instead of the computed name.
+    void initializeFrom(Type* forwardDefinitionOfSelf) {
+        this->check([&](auto& subtype) {
+            return subtype.initializeFromConcrete(forwardDefinitionOfSelf);
+        });
+    }
+
     // finish initializing the type assuming no forward types are reachable
     bool postInitialize() {
         size_t oldSize = m_size;

@@ -24,6 +24,11 @@ PyDoc_STRVAR(Value_doc,
 
 class Value : public Type {
 public:
+    Value(const Instance& instance);
+
+    // this is the clone-pathway
+    Value();
+
     const char* docConcrete() {
         return Value_doc;
     }
@@ -117,12 +122,6 @@ public:
     void updateInternalTypePointersConcrete(
         const std::map<Type*, Type*>& groupMap
     );
-
-private:
-    Value(const Instance& instance);
-
-    // this is the clone-pathway
-    Value();
 
     Instance mInstance;
     PyObject* mValueAsPyobj;

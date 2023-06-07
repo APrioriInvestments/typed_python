@@ -20,16 +20,6 @@
 #include "Format.hpp"
 
 class TupleOrListOfType : public Type {
-protected:
-    // this is the non-forward clone pathway
-    TupleOrListOfType(bool isTuple) :
-        Type(isTuple ? TypeCategory::catTupleOf : TypeCategory::catListOf),
-        m_element_type(nullptr),
-        m_is_tuple(isTuple)
-    {
-        m_is_default_constructible = true;
-    }
-
 public:
     class layout {
     public:
@@ -42,7 +32,15 @@ public:
 
     typedef layout* layout_ptr;
 
-public:
+    // this is the non-forward clone pathway
+    TupleOrListOfType(bool isTuple) :
+        Type(isTuple ? TypeCategory::catTupleOf : TypeCategory::catListOf),
+        m_element_type(nullptr),
+        m_is_tuple(isTuple)
+    {
+        m_is_default_constructible = true;
+    }
+
     TupleOrListOfType(Type* type, bool isTuple) :
             Type(isTuple ? TypeCategory::catTupleOf : TypeCategory::catListOf),
             m_element_type(type),
@@ -619,11 +617,11 @@ PyDoc_STRVAR(ListOf_doc,
 class ListOfType : public TupleOrListOfType {
     friend class TupleOrListOfType;
 
+public:
     ListOfType() : TupleOrListOfType(false)
     {
     }
 
-public:
     ListOfType(Type* type) : TupleOrListOfType(type, false)
     {
     }
@@ -684,12 +682,11 @@ PyDoc_STRVAR(TupleOf_doc,
 class TupleOfType : public TupleOrListOfType {
     friend class TupleOrListOfType;
 
-    // clone form
+public:
     TupleOfType() : TupleOrListOfType(true)
     {
     }
 
-public:
     // forward form
     TupleOfType(Type* type) : TupleOrListOfType(type, true)
     {

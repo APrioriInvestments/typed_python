@@ -38,7 +38,7 @@ PyDoc_STRVAR(PointerTo_doc,
 );
 
 class PointerTo : public Type {
-protected:
+public:
     typedef void* instance;
 
     // construct a non-forward defined pointer
@@ -48,7 +48,6 @@ protected:
         m_is_default_constructible = true;
     }
 
-public:
     PointerTo(Type* t) :
         Type(TypeCategory::catPointerTo),
         m_element_type(t)
@@ -100,7 +99,6 @@ public:
     void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
         m_element_type = ((PointerTo*)forwardDefinitionOfSelf)->m_element_type;
     }
-
 
     void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
         auto it = groupMap.find(m_element_type);

@@ -25,6 +25,7 @@ PyDoc_STRVAR(OneOf_doc,
     );
 
 class OneOfType : public Type {
+public:
     // clone initialization
     OneOfType() noexcept :
         Type(TypeCategory::catOneOf)
@@ -39,7 +40,6 @@ class OneOfType : public Type {
         m_is_forward_defined = true;
     }
 
-public:
     const char* docConcrete() {
         return OneOf_doc;
     }

@@ -35,11 +35,6 @@ PyDoc_STRVAR(Class_doc,
 );
 
 class Class : public Type {
-    // this is the non-forward type resolution version of this
-    Class() : Type(catClass)
-    {
-    }
-
 public:
     class layout {
     public:
@@ -49,6 +44,10 @@ public:
     };
 
     typedef layout* layout_ptr;
+
+    Class() : Type(catClass)
+    {
+    }
 
     Class(std::string name, HeldClass* inClass) :
             Type(catClass),

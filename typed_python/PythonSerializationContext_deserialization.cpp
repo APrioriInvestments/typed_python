@@ -573,6 +573,126 @@ PyObject* prepareBlankInstanceOfType(MutuallyRecursiveTypeGroup* outGroup, PyTyp
     return obj;
 }
 
+/* static */
+Type* PythonSerializationContext::constructBlankInstanceOfType(Type::TypeCategory typeCat) {
+    if (typeCat == Type::TypeCategory::catNone) {
+        return NoneType::Make();
+    }
+    if (typeCat == Type::TypeCategory::catBool) {
+        return Bool::Make();
+    }
+    if (typeCat == Type::TypeCategory::catUInt8) {
+        return UInt8::Make();
+    }
+    if (typeCat == Type::TypeCategory::catUInt16) {
+        return UInt16::Make();
+    }
+    if (typeCat == Type::TypeCategory::catUInt32) {
+        return UInt32::Make();
+    }
+    if (typeCat == Type::TypeCategory::catUInt64) {
+        return UInt64::Make();
+    }
+    if (typeCat == Type::TypeCategory::catInt8) {
+        return Int8::Make();
+    }
+    if (typeCat == Type::TypeCategory::catInt16) {
+        return Int16::Make();
+    }
+    if (typeCat == Type::TypeCategory::catInt32) {
+        return Int32::Make();
+    }
+    if (typeCat == Type::TypeCategory::catInt64) {
+        return Int64::Make();
+    }
+    if (typeCat == Type::TypeCategory::catString) {
+        return StringType::Make();
+    }
+    if (typeCat == Type::TypeCategory::catBytes) {
+        return BytesType::Make();
+    }
+    if (typeCat == Type::TypeCategory::catFloat32) {
+        return Float32::Make();
+    }
+    if (typeCat == Type::TypeCategory::catFloat64) {
+        return Float64::Make();
+    }
+    if (typeCat == Type::TypeCategory::catValue) {
+        return new Value();
+    }
+    if (typeCat == Type::TypeCategory::catOneOf) {
+        return new OneOfType();
+    }
+    if (typeCat == Type::TypeCategory::catTupleOf) {
+        return new TupleOfType();
+    }
+    if (typeCat == Type::TypeCategory::catPointerTo) {
+        return new PointerTo();
+    }
+    if (typeCat == Type::TypeCategory::catListOf) {
+        return new ListOfType();
+    }
+    if (typeCat == Type::TypeCategory::catNamedTuple) {
+        return new NamedTuple();
+    }
+    if (typeCat == Type::TypeCategory::catTuple) {
+        return new Tuple();
+    }
+    if (typeCat == Type::TypeCategory::catDict) {
+        return new DictType();
+    }
+    if (typeCat == Type::TypeCategory::catConstDict) {
+        return new ConstDictType();
+    }
+    if (typeCat == Type::TypeCategory::catAlternative) {
+        return new Alternative();
+    }
+    if (typeCat == Type::TypeCategory::catConcreteAlternative) {
+        return new ConcreteAlternative();
+    }
+    if (typeCat == Type::TypeCategory::catPythonObjectOfType) {
+        return new PythonObjectOfType();
+    }
+    if (typeCat == Type::TypeCategory::catBoundMethod) {
+        return new BoundMethod();
+    }
+    if (typeCat == Type::TypeCategory::catAlternativeMatcher) {
+        return new AlternativeMatcher();
+    }
+    if (typeCat == Type::TypeCategory::catClass) {
+        return new Class();
+    }
+    if (typeCat == Type::TypeCategory::catHeldClass) {
+        return new HeldClass();
+    }
+    if (typeCat == Type::TypeCategory::catFunction) {
+        return new Function();
+    }
+    if (typeCat == Type::TypeCategory::catForward) {
+        throw std::runtime_error("Can't deserialize actual forwards!");
+    }
+    if (typeCat == Type::TypeCategory::catEmbeddedMessage) {
+        return new EmbeddedMessageType();
+    }
+    if (typeCat == Type::TypeCategory::catSet) {
+        return new SetType();
+    }
+    if (typeCat == Type::TypeCategory::catTypedCell) {
+        return new TypedCellType();
+    }
+    if (typeCat == Type::TypeCategory::catPyCell) {
+        return PyCellType::Make();
+    }
+    if (typeCat == Type::TypeCategory::catRefTo) {
+        return new RefTo();
+    }
+    if (typeCat == Type::TypeCategory::catSubclassOf) {
+        return new SubclassOfType();
+    }
+
+    throw std::runtime_error("Corrupt TypeCategory: can't produce a blank instance");
+}
+
 MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecursiveTypeGroup(
         DeserializationBuffer& b, size_t inWireType
 ) const {
@@ -590,7 +710,10 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
     std::map<int32_t, int32_t> indexOfObjToIndexOfType;
 
     std::map<int32_t, Type*> indicesOfNativeTypes;
-    std::map<int32_t, Type::TypeCategory> indicesOfNativeTypeCategories;
+    std::set<int32_t> indicesOfForwardsNeedingResolution;
+
+    std::map<int32_t, std::string> indicesOfNativeTypeNames;
+
     std::map<int32_t, PyObject*> indicesWrittenAsObjectAndRep;
 
     std::map<int32_t, PyObject*> indicesWithSerializedBodies;
@@ -657,21 +780,22 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                         assertWireTypesEqual(subSubWireType, WireType::BYTES);
                         std::string fwdName = b.readStringObject();
 
-                        if (actuallyBuildGroup) {
-                            Forward* f = Forward::Make(fwdName);
-
-                            outGroup->setIndexToObject(indexInGroup, f);
-                            indicesOfNativeTypes[indexInGroup] = f;
-                        } else {
-                            indicesOfNativeTypes[indexInGroup] = nullptr;
-                        }
+                        indicesOfNativeTypeNames[indexInGroup] = fwdName;
                         setSomething = true;
                     } else
                     if (fieldInIndex == 2 && kind == 0) {
                         assertWireTypesEqual(subSubWireType, WireType::VARINT);
-                        indicesOfNativeTypeCategories[indexInGroup] = Type::TypeCategory(
-                            b.readUnsignedVarint()
-                        );
+
+                        auto typeCat = Type::TypeCategory(b.readUnsignedVarint());
+
+                        if (actuallyBuildGroup) {
+                            Type* type = constructBlankInstanceOfType(typeCat);
+                            outGroup->setIndexToObject(indexInGroup, type);
+                            indicesOfNativeTypes[indexInGroup] = type;
+                        } else {
+                            indicesOfNativeTypes[indexInGroup] = nullptr;
+                        }
+
                     } else
                     if (fieldInIndex == 1 && kind == 1) {
                         // this is the now-deprecated field code for sending a named object.
@@ -944,12 +1068,12 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                                 ((Forward*)t)->getTarget()
                             );
                         } else {
-                            ((Forward*)indicesOfNativeTypes[indexInGroup])->define(t);
-                            indicesOfNativeTypes[indexInGroup] = t;
+                            if (t->getTypeCategory() != indicesOfNativeTypes[indexInGroup]->getTypeCategory()) {
+                                throw std::runtime_error("Somehow, type categories didn't match!");
+                            }
 
-                            // update the mutually recursive group or we'll end up with
-                            // downstream consumers actually pulling out the forwards
-                            outGroup->setIndexToObject(indexInGroup, t);
+                            // initialize the real funtion from the function stub
+                            indicesOfNativeTypes[indexInGroup]->initializeFrom(t);
                         }
                     }
                 } else {

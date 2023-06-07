@@ -20,15 +20,15 @@
 #include "AlternativeType.hpp"
 
 class ConcreteAlternative : public Type {
+public:
+    typedef Alternative::layout layout;
+
     ConcreteAlternative() :
         Type(TypeCategory::catConcreteAlternative),
         m_which(0),
         m_alternative(nullptr)
     {
     }
-
-public:
-    typedef Alternative::layout layout;
 
     ConcreteAlternative(Alternative* m_alternative, int64_t which) :
             Type(TypeCategory::catConcreteAlternative),

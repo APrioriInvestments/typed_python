@@ -352,6 +352,7 @@ PyDoc_STRVAR(HeldClass_doc,
 
 //a class held directly inside of another object
 class HeldClass : public Type {
+public:
     HeldClass() :
             Type(catHeldClass),
             m_vtable(new VTable(this)),
@@ -368,7 +369,6 @@ class HeldClass : public Type {
     {
     }
 
-public:
     HeldClass(std::string inName,
         const std::vector<HeldClass*>& baseClasses,
         bool isFinal,

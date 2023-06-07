@@ -21,9 +21,6 @@
 
 //wraps a python Cell
 class TypedCellType : public Type {
-    TypedCellType() : Type(TypeCategory::catTypedCell)
-    {
-    }
 public:
     class layout {
     public:
@@ -33,6 +30,10 @@ public:
     };
 
     typedef layout* layout_ptr;
+
+    TypedCellType() : Type(TypeCategory::catTypedCell)
+    {
+    }
 
     TypedCellType(Type* heldType) :
             Type(TypeCategory::catTypedCell),

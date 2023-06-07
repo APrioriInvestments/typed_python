@@ -25,12 +25,13 @@ PyDoc_STRVAR(SubclassOf_doc,
     );
 
 class SubclassOfType : public Type {
+public:
     SubclassOfType() : Type(TypeCategory::catSubclassOf)
     {
         m_is_default_constructible = true;
         m_size = sizeof(Type*);
     }
-public:
+
     SubclassOfType(Type* subclassOf) noexcept :
                     Type(TypeCategory::catSubclassOf),
                     m_subclassOf(subclassOf)

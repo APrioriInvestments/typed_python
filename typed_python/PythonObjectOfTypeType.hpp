@@ -113,6 +113,11 @@ public:
 //refcount when we completely release a handle to a python object).
 class PythonObjectOfType : public PyObjectHandleTypeBase {
 public:
+    // clone pathway
+    PythonObjectOfType() : PyObjectHandleTypeBase(TypeCategory::catPythonObjectOfType)
+    {
+    }
+
     PythonObjectOfType(PyTypeObject* typePtr, PyObject* givenType) :
             PyObjectHandleTypeBase(TypeCategory::catPythonObjectOfType)
     {
@@ -135,6 +140,23 @@ public:
         }
 
         m_is_default_constructible = isinst != 0;
+        m_is_forward_defined = true;
+    }
+
+    void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
+        mPyTypePtr = ((PythonObjectOfType*)forwardDefinitionOfSelf)->mPyTypePtr;
+        mGivenType = ((PythonObjectOfType*)forwardDefinitionOfSelf)->mGivenType;
+        m_name = ((PythonObjectOfType*)forwardDefinitionOfSelf)->m_name;
+        m_size = ((PythonObjectOfType*)forwardDefinitionOfSelf)->m_size;
+    }
+
+    void updateInternalTypePointersConcrete(
+        const std::map<Type*, Type*>& groupMap
+    ) {
+    }
+
+    Type* cloneForForwardResolutionConcrete() {
+        return new PythonObjectOfType();
     }
 
     template<class visitor_type>

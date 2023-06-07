@@ -27,10 +27,11 @@ PyDoc_STRVAR(Set_doc,
     );
 
 class SetType : public Type {
+public:
     SetType() : Type(TypeCategory::catSet)
     {
     }
-public:
+
     SetType(Type* eltype)
         : Type(TypeCategory::catSet)
         , m_key_type(eltype)

@@ -27,10 +27,6 @@ PyDoc_STRVAR(ConstDictType_doc,
     );
 
 class ConstDictType : public Type {
-    ConstDictType() : Type(TypeCategory::catConstDict)
-    {
-    }
-
 public:
     class layout {
     public:
@@ -43,6 +39,10 @@ public:
     };
 
     typedef layout* layout_ptr;
+
+    ConstDictType() : Type(TypeCategory::catConstDict)
+    {
+    }
 
     ConstDictType(Type* key, Type* value) :
             Type(TypeCategory::catConstDict),

@@ -26,10 +26,11 @@ PyDoc_STRVAR(AlternativeMatcher_doc,
 
 // Models an alternatives '.matches' result
 class AlternativeMatcher : public Type {
+public:
     AlternativeMatcher() : Type(TypeCategory::catAlternativeMatcher)
     {
     }
-public:
+
     AlternativeMatcher(Type* inAlternative) : Type(TypeCategory::catAlternativeMatcher)
     {
         m_is_forward_defined = true;

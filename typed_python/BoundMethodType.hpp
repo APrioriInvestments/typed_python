@@ -26,10 +26,11 @@ PyDoc_STRVAR(BoundMethod_doc,
 
 
 class BoundMethod : public Type {
+public:
     BoundMethod() : Type(TypeCategory::catBoundMethod)
     {
     }
-public:
+
     BoundMethod(Type* inFirstArg, std::string funcName) : Type(TypeCategory::catBoundMethod)
     {
         m_is_forward_defined = true;

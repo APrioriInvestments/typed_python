@@ -77,10 +77,6 @@ PyDoc_STRVAR(Alternative_doc,
 );
 
 class Alternative : public Type {
-    Alternative() : Type(TypeCategory::catAlternative)
-    {
-    }
-
 public:
     class layout {
     public:
@@ -91,6 +87,10 @@ public:
     };
 
     typedef layout* layout_ptr;
+
+    Alternative() : Type(TypeCategory::catAlternative)
+    {
+    }
 
     Alternative(std::string name,
                 std::string moduleName,

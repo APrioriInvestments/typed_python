@@ -30,11 +30,12 @@ PyDoc_STRVAR(DictType_doc,
     );
 
 class DictType : public Type {
+public:
     // construct a non-forward uninitialized dict
     DictType() : Type(TypeCategory::catDict)
     {
     }
-public:
+
     // declare a forward-defined Dict
     DictType(Type* key, Type* value) :
             Type(TypeCategory::catDict),
