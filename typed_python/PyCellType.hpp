@@ -19,6 +19,11 @@
 #include "util.hpp"
 #include "Type.hpp"
 
+
+PyDoc_STRVAR(PyCell_doc,
+    "PyCell: represents a python-native cell instance.\n"
+);
+
 //wraps a python Cell
 class PyCellType : public PyObjectHandleTypeBase {
 public:
@@ -28,7 +33,10 @@ public:
         m_name = std::string("PyCell");
         m_size = sizeof(layout_type*);
         m_is_default_constructible = true;
-        m_is_simple = false;
+    }
+
+    const char* docConcrete() {
+        return PyCell_doc;
     }
 
     template<class visitor_type>

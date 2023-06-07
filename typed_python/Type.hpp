@@ -342,8 +342,16 @@ public:
         return name();
     }
 
-    const char* doc() const {
-        return m_doc;
+    const char* doc() {
+        return this->check([&](auto& subtype) {
+            return subtype.docConcrete();
+        });
+    }
+
+    const char* docConcrete() {
+        throw std::runtime_error(
+            "No docstring provided for " + name() + " of category " + getTypeCategoryString()
+        );
     }
 
     size_t bytecount() const {
@@ -790,10 +798,6 @@ public:
         return m_is_default_constructible;
     }
 
-    bool isSimple() const {
-        return m_is_simple;
-    }
-
     // are we guaranteed we can convert to this other type at the 'Signature' level
     bool canConvertToTrivially(Type* otherType);
 
@@ -897,15 +901,12 @@ protected:
             m_size(0),
             m_is_default_constructible(false),
             m_name("Undefined"),
-            m_doc(nullptr),
             mTypeRep(nullptr),
             m_base(nullptr),
-            m_is_simple(true),
             mTypeGroup(nullptr),
             mRecursiveTypeGroupIndex(-1),
             m_is_forward_defined(false),
             m_forward_resolves_to(nullptr),
-            m_needs_post_init(false),
             m_is_redundant(false)
         {}
 
@@ -924,18 +925,11 @@ protected:
 
     mutable std::string m_stripped_name;
 
-    const char* m_doc;
-
     PyTypeObject* mTypeRep;
 
     Type* m_base;
 
-    // 'simple' types are those that have no reference to the python interpreter
-    bool m_is_simple;
-
     enum BinaryCompatibilityCategory { Incompatible, Checking, Compatible };
-
-    std::map<Type*, BinaryCompatibilityCategory> mIsBinaryCompatible;
 
     // a sha-hash that uniquely identifies this type. If this value is
     // the same for two types, then they should be indistinguishable except
@@ -958,9 +952,6 @@ protected:
 
     // have we been made 'redundant'?
     bool m_is_redundant;
-
-    // do we need a post-initialization step?
-    bool m_needs_post_init;
 
     // try to resolve this forward type. If we can't, we'll throw an exception. On exit,
     // we will have thrown, or m_forward_resolves_to will be populated.
@@ -1036,16 +1027,16 @@ protected:
 
 public:
     // finish initializing the type assuming no forward types are reachable
-    void postInitialize() {
-        if (!m_needs_post_init) {
-            return;
-        }
-
-        m_needs_post_init = false;
+    bool postInitialize() {
+        size_t oldSize = m_size;
+        bool oldIsDefaultInit = m_is_default_constructible;
 
         this->check([&](auto& subtype) {
             subtype.postInitializeConcrete();
         });
+
+        // return whether we changed
+        return m_size != oldSize || m_is_default_constructible != oldIsDefaultInit;
     }
 
     // update any caches in the type after we've walked over it
@@ -1056,10 +1047,6 @@ public:
     }
 
     std::string computeRecursiveName(TypeStack& stack) {
-        if (!m_needs_post_init) {
-            return m_name;
-        }
-
         long index = stack.indexOf(this);
 
         if (index != -1) {

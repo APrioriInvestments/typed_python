@@ -29,8 +29,6 @@ class OneOfType : public Type {
     OneOfType() noexcept :
         Type(TypeCategory::catOneOf)
     {
-        m_needs_post_init = true;
-        m_doc = OneOf_doc;
     }
 
     // forward initialization
@@ -39,10 +37,13 @@ class OneOfType : public Type {
         m_types(types)
     {
         m_is_forward_defined = true;
-        m_doc = OneOf_doc;
     }
 
 public:
+    const char* docConcrete() {
+        return OneOf_doc;
+    }
+
     template<class visitor_type>
     void _visitCompilerVisibleInternals(const visitor_type& v) {
         v.visitHash(ShaHash(1, m_typeCategory));

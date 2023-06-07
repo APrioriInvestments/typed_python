@@ -25,7 +25,8 @@ protected:
     // construct a non-forward defined refto
     RefTo() : Type(TypeCategory::catRefTo)
     {
-        m_needs_post_init = true;
+        m_size = sizeof(instance);
+        m_is_default_constructible = true;
     }
 
 public:

@@ -337,6 +337,19 @@ public:
     Type* mClassType;
 };
 
+
+PyDoc_STRVAR(HeldClass_doc,
+    "HeldClass: subclass Class and decorate with @Held to produce 'held' TP classes.\n"
+    "\n"
+    "These behave like TP classes except that their storage is owned not by the heap but\n"
+    "by the container of the reference. This means that they are faster (because they don't\n"
+    "have a refcount) but have different semantics. In particular if H is a held class and\n"
+    "you write\n\n"
+    "    h1 = H()\n"
+    "    h2 = h1\n"
+    "\nThen h1 and h2 will refer to different instances of the class.\n"
+);
+
 //a class held directly inside of another object
 class HeldClass : public Type {
     HeldClass() :
@@ -353,7 +366,6 @@ class HeldClass : public Type {
             m_hasConvertFromMagicMethod(false),
             m_refToType(nullptr)
     {
-        m_needs_post_init = true;
     }
 
 public:
@@ -404,12 +416,26 @@ public:
         }
     }
 
+    const char* docConcrete() {
+        return HeldClass_doc;
+    }
+
     void postInitializeConcrete() {
-        for (auto b: m_bases) {
-            b->postInitialize();
+        // ensure our bases have their MROs initialized as well
+        for (auto h: m_bases) {
+            h->initializeMRO();
         }
 
         initializeMRO();
+
+        size_t size = mBytesOfInitializationBits;
+
+        for (auto t: m_members) {
+            m_byte_offsets.push_back(size);
+            size += t.getType()->bytecount();
+        }
+
+        m_size = size;
     }
 
     void initializeFromConcrete(Type* forwardDef) {
@@ -917,7 +943,12 @@ public:
             throw std::runtime_error("Makes no sense to initializeMRO on a forward");
         }
 
+        if (m_mro.size()) {
+            return;
+        }
+
         _computeMroSequence();
+
 
         for (size_t i = 0; i < m_mro.size(); i++) {
             m_ancestor_to_mro_index[m_mro[i]] = i;
@@ -989,17 +1020,9 @@ public:
 
         setMagicMethodExistConstants();
 
-        size_t size = mBytesOfInitializationBits;
-
-        for (auto t: m_members) {
-            m_byte_offsets.push_back(size);
-            size += t.getType()->bytecount();
-        }
-
         m_is_default_constructible = (
             m_memberFunctions.find("__init__") == m_memberFunctions.end()
         );
-        m_size = size;
     }
 
     void updateBytesOfInitBits();

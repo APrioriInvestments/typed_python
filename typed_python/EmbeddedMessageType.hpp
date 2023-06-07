@@ -20,6 +20,17 @@
 #include "NullSerializationContext.hpp"
 #include "SerializationBuffer.hpp"
 
+PyDoc_STRVAR(EmbeddedMessage_doc,
+    "EmbeddedMessage: represents an embedded message in a serialization graph.\n\n"
+    "If you have a type T in a type graph and you replace it with EmbeddedMessage and \n"
+    "deserialize an instance of that type, instead of the actual instance you'll get a\n"
+    "block of bytes representing the embedded type. This can be used in some circumstances\n"
+    "to build tooling that can handle messages without knowing their full type. It cannot\n"
+    "be used in contexts where there may be embedded memos within the subgraph, so use with\n"
+    "care. This will probably get deprecated at some point.\n"
+);
+
+
 class EmbeddedMessageType : public BytesType {
 public:
     EmbeddedMessageType()
@@ -28,6 +39,10 @@ public:
         m_is_default_constructible = true;
         m_size = sizeof(layout*);
         m_typeCategory = TypeCategory::catEmbeddedMessage;
+    }
+
+    const char* docConcrete() {
+        return EmbeddedMessage_doc;
     }
 
     static EmbeddedMessageType* Make() {
@@ -64,4 +79,3 @@ public:
 
     void postInitializeConcrete() {}
 };
-

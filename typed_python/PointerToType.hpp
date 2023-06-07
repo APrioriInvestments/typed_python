@@ -44,8 +44,8 @@ protected:
     // construct a non-forward defined pointer
     PointerTo() : Type(TypeCategory::catPointerTo)
     {
-        m_doc = PointerTo_doc;
-        m_needs_post_init = true;
+        m_size = sizeof(instance);
+        m_is_default_constructible = true;
     }
 
 public:
@@ -53,10 +53,13 @@ public:
         Type(TypeCategory::catPointerTo),
         m_element_type(t)
     {
+        m_is_forward_defined = true;
         m_size = sizeof(instance);
         m_is_default_constructible = true;
-        m_doc = PointerTo_doc;
-        m_is_forward_defined = true;
+    }
+
+    const char* docConcrete() {
+        return PointerTo_doc;
     }
 
     template<class visitor_type>

@@ -27,7 +27,6 @@ protected:
         m_element_type(nullptr),
         m_is_tuple(isTuple)
     {
-        m_needs_post_init = true;
         m_is_default_constructible = true;
     }
 
@@ -627,7 +626,11 @@ class ListOfType : public TupleOrListOfType {
 public:
     ListOfType(Type* type) : TupleOrListOfType(type, false)
     {
-        m_doc = ListOf_doc;
+    }
+
+
+    const char* docConcrete() {
+        return ListOf_doc;
     }
 
     static ListOfType* Make(Type* elt);
@@ -690,7 +693,10 @@ public:
     // forward form
     TupleOfType(Type* type) : TupleOrListOfType(type, true)
     {
-        m_doc = TupleOf_doc;
+    }
+
+    const char* docConcrete() {
+        return TupleOf_doc;
     }
 
     static TupleOfType* Make(Type* elt);

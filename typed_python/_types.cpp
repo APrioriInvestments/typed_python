@@ -2554,23 +2554,6 @@ PyObject *resolveForwardDefinedType(PyObject* nullValue, PyObject* args) {
     });
 }
 
-PyObject *isSimple(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "isSimple takes 1 positional argument");
-        return NULL;
-    }
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
-
-    Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
-
-    if (!t) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'isSimple' must be a type object");
-        return NULL;
-    }
-
-    return incref(t->isSimple() ? Py_True : Py_False);
-}
-
 PyObject *isPOD(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "isPOD takes 1 positional argument");
@@ -3488,7 +3471,6 @@ static PyMethodDef module_methods[] = {
     {"buildCodeObject", (PyCFunction)buildCodeObject, METH_VARARGS | METH_KEYWORDS, NULL},
     {"buildPyFunctionObject", (PyCFunction)buildPyFunctionObject, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isPOD", (PyCFunction)isPOD, METH_VARARGS, NULL},
-    {"isSimple", (PyCFunction)isSimple, METH_VARARGS, NULL},
     {"isForwardDefined", (PyCFunction)isForwardDefined, METH_VARARGS, NULL},
     {"resolveForwardDefinedType", (PyCFunction)resolveForwardDefinedType, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS | METH_KEYWORDS, NULL},

@@ -20,10 +20,8 @@ Value::Value() :
     Type(TypeCategory::catValue),
     mValueAsPyobj(nullptr)
 {
-    m_needs_post_init = true;
     m_size = 0;
     m_is_default_constructible = true;
-    m_doc = Value_doc;
 }
 
 
@@ -35,7 +33,6 @@ Value::Value(const Instance& instance) :
     m_size = 0;
     m_is_default_constructible = true;
 
-    m_doc = Value_doc;
     mValueAsPyobj = PyInstance::extractPythonObject(mInstance);
     m_is_forward_defined = true;
 }

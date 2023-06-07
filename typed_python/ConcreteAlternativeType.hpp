@@ -25,7 +25,6 @@ class ConcreteAlternative : public Type {
         m_which(0),
         m_alternative(nullptr)
     {
-        m_needs_post_init = true;
     }
 
 public:
@@ -37,6 +36,11 @@ public:
             m_which(which)
     {
         m_is_forward_defined = true;
+        m_name = m_alternative->name() + "." + m_alternative->subtypes()[m_which].first;
+    }
+
+    const char* docConcrete() {
+        return m_alternative->doc();
     }
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
@@ -59,8 +63,6 @@ public:
     }
 
     void postInitializeConcrete() {
-        m_alternative->postInitialize();
-
         if (m_which < 0 || m_which >= m_alternative->subtypes().size()) {
             throw std::runtime_error(
                 "invalid alternative index: " +

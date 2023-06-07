@@ -24,6 +24,10 @@ PyDoc_STRVAR(Value_doc,
 
 class Value : public Type {
 public:
+    const char* docConcrete() {
+        return Value_doc;
+    }
+
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
     }

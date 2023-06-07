@@ -29,8 +29,6 @@ PyDoc_STRVAR(ConstDictType_doc,
 class ConstDictType : public Type {
     ConstDictType() : Type(TypeCategory::catConstDict)
     {
-        m_doc = ConstDictType_doc;
-        m_needs_post_init = true;
     }
 
 public:
@@ -51,8 +49,11 @@ public:
             m_key(key),
             m_value(value)
     {
-        m_doc = ConstDictType_doc;
         m_is_forward_defined = true;
+    }
+
+    const char* docConcrete() {
+        return ConstDictType_doc;
     }
 
     template<class visitor_type>

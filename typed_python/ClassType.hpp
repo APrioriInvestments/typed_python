@@ -32,14 +32,12 @@ PyDoc_STRVAR(Class_doc,
     "\n"
     "Methods become TypedFunction instances, and support overloading.\n"
     "Define data members with Member.\n"
-    );
+);
 
 class Class : public Type {
     // this is the non-forward type resolution version of this
     Class() : Type(catClass)
     {
-        m_needs_post_init = true;
-        m_doc = Class_doc;
     }
 
 public:
@@ -61,8 +59,10 @@ public:
         m_size = sizeof(layout*);
         m_is_default_constructible = inClass->is_default_constructible();
         m_name = name;
-        m_doc = Class_doc;
-        m_is_simple = false;
+    }
+
+    const char* docConcrete() {
+        return Class_doc;
     }
 
     void postInitializeConcrete() {

@@ -352,9 +352,25 @@ void Type::attemptToResolve() {
         typeAndSource.first->recomputeNamePostInitialization();
     }
 
-    // cause each type to post-initialize itself, which lets it update internal bytecounts etc
-    for (auto typeAndSource: resolutionSource) {
-        typeAndSource.first->postInitialize();
+    // cause each type to post-initialize itself, which lets it update internal bytecounts and
+    // default initialization flags
+    bool anyUpdated = true;
+    size_t passCt = 0;
+    while (anyUpdated) {
+        anyUpdated = false;
+        for (auto typeAndSource: resolutionSource) {
+            if (typeAndSource.first->postInitialize()) {
+                anyUpdated = true;
+            }
+        }
+        passCt += 1;
+
+        // we can run this algorithm until all type sizes have stabilized. Conceivably we
+        // could introduce an error that would cause this to not converge - this should
+        // detect that.
+        if (passCt > resolutionSource.size() * 2 + 10) {
+            throw std::runtime_error("Type size graph is not stabilizing.");
+        }
     }
 
     // let each type update any internal caches it might need before it gets instantiated

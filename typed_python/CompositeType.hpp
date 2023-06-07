@@ -26,7 +26,6 @@ public:
     CompositeType(TypeCategory in_typeCategory) :
             Type(in_typeCategory)
     {
-        m_needs_post_init = true;
     }
 
     // construct a forward-defined CompositeType
@@ -248,10 +247,6 @@ public:
     }
 
     void postInitializeConcrete() {
-        for (auto t: m_types) {
-            t->postInitialize();
-        }
-
         bool is_default_constructible = true;
         size_t size = 0;
 
@@ -332,15 +327,16 @@ public:
     // construct a non-forward NamedTuple
     NamedTuple() : CompositeType(TypeCategory::catNamedTuple)
     {
-        m_doc = NamedTuple_doc;
     }
 
     NamedTuple(const std::vector<Type*>& types, const std::vector<std::string>& names) :
             CompositeType(TypeCategory::catNamedTuple, types, names)
     {
         assert(types.size() == names.size());
+    }
 
-        m_doc = NamedTuple_doc;
+    const char* docConcrete() {
+        return NamedTuple_doc;
     }
 
     static NamedTuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names) {
@@ -369,13 +365,15 @@ public:
     // construct a non-forward Tuple
     Tuple() : CompositeType(TypeCategory::catTuple)
     {
-
     }
 
     Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) :
             CompositeType(TypeCategory::catTuple, types, names)
     {
-        m_doc = Tuple_doc;
+    }
+
+    const char* docConcrete() {
+        return Tuple_doc;
     }
 
     static Tuple* Make(const std::vector<Type*>& types) {

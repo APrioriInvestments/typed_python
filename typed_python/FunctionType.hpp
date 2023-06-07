@@ -1518,9 +1518,10 @@ public:
 
     Function() : Type(catFunction)
     {
-        m_needs_post_init = true;
-        m_is_simple = false;
-        m_doc = Function_doc;
+    }
+
+    const char* docConcrete() {
+        return Function_doc;
     }
 
     Function(std::string inName,
@@ -1541,8 +1542,6 @@ public:
         mClosureType(closureType)
     {
         m_is_forward_defined = true;
-        m_is_simple = false;
-        m_doc = Function_doc;
         m_name = mRootName;
     }
 
@@ -1567,8 +1566,6 @@ public:
     }
 
     void postInitializeConcrete() {
-        mClosureType->postInitialize();
-
         m_size = mClosureType->bytecount();
         m_is_default_constructible = mClosureType->is_default_constructible();
     }

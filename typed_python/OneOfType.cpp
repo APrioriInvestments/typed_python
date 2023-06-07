@@ -168,10 +168,6 @@ void OneOfType::updateInternalTypePointersConcrete(
 }
 
 void OneOfType::postInitializeConcrete() {
-    for (auto t: m_types) {
-        t->postInitialize();
-    }
-
     m_size = computeBytecount();
 
     m_is_default_constructible = false;

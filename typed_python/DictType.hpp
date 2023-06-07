@@ -33,8 +33,6 @@ class DictType : public Type {
     // construct a non-forward uninitialized dict
     DictType() : Type(TypeCategory::catDict)
     {
-        m_doc = DictType_doc;
-        m_needs_post_init = true;
     }
 public:
     // declare a forward-defined Dict
@@ -43,8 +41,11 @@ public:
             m_key(key),
             m_value(value)
     {
-        m_doc = DictType_doc;
         m_is_forward_defined = true;
+    }
+
+    const char* docConcrete() {
+        return DictType_doc;
     }
 
     template<class visitor_type>

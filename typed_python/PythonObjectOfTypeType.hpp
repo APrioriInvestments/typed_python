@@ -126,8 +126,6 @@ public:
 
         m_name = std::string("PythonObjectOfType(") + mPyTypePtr->tp_name + ")";
 
-        m_is_simple = false;
-
         m_size = sizeof(layout_type*);
 
         int isinst = PyObject_IsInstance(Py_None, (PyObject*)mPyTypePtr);

@@ -23,7 +23,6 @@
 class TypedCellType : public Type {
     TypedCellType() : Type(TypeCategory::catTypedCell)
     {
-        m_needs_post_init = true;
     }
 public:
     class layout {
@@ -40,8 +39,6 @@ public:
             mHeldType(heldType)
     {
         m_is_forward_defined = true;
-
-        m_is_simple = false;
 
         m_size = sizeof(layout*);
 

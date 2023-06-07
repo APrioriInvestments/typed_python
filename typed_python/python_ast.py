@@ -24,7 +24,7 @@ import typed_python.compiler.python_ast_util as python_ast_util
 import types
 import traceback
 
-from typed_python._types import Forward, Alternative, TupleOf, OneOf
+from typed_python._types import Forward, Alternative, TupleOf, OneOf, resolveForwardDefinedType
 
 
 # forward declarations.
@@ -46,7 +46,7 @@ Alias = Forward("Alias")
 WithItem = Forward("WithItem")
 TypeIgnore = Forward("TypeIgnore")
 
-Module = Module.define(Alternative(
+Module.define(Alternative(
     "Module",
     Module={
         "body": TupleOf(Statement),
@@ -57,7 +57,7 @@ Module = Module.define(Alternative(
     Suite={"body": TupleOf(Statement)}
 ))
 
-TypeIgnore = TypeIgnore.define(Alternative(
+TypeIgnore.define(Alternative(
     "TypeIgnore",
     Item={'lineno': int, 'tag': str}
 ))
@@ -161,7 +161,7 @@ def StatementStr(self):
     return "\n".join(list(statementStrLines(self)))
 
 
-Statement = Statement.define(Alternative(
+Statement.define(Alternative(
     "Statement",
     FunctionDef={
         "name": str,
@@ -475,7 +475,7 @@ def ExpressionStr(self):
     return str(type(self))
 
 
-Expr = Expr.define(Alternative(
+Expr.define(Alternative(
     "Expr",
     BoolOp={
         "op": BooleanOp,
@@ -684,7 +684,7 @@ Expr = Expr.define(Alternative(
     __str__=ExpressionStr
 ))
 
-NumericConstant = NumericConstant.define(Alternative(
+NumericConstant.define(Alternative(
     "NumericConstant",
     Int={"value": int},
     Long={"value": str},
@@ -702,7 +702,7 @@ NumericConstant = NumericConstant.define(Alternative(
     )
 ))
 
-ExprContext = ExprContext.define(Alternative(
+ExprContext.define(Alternative(
     "ExprContext",
     Load={},
     Store={},
@@ -712,13 +712,13 @@ ExprContext = ExprContext.define(Alternative(
     Param={}
 ))
 
-BooleanOp = BooleanOp.define(Alternative(
+BooleanOp.define(Alternative(
     "BooleanOp",
     And={},
     Or={}
 ))
 
-BinaryOp = BinaryOp.define(Alternative(
+BinaryOp.define(Alternative(
     "BinaryOp",
     Add={},
     Sub={},
@@ -735,7 +735,7 @@ BinaryOp = BinaryOp.define(Alternative(
     MatMult={}
 ))
 
-UnaryOp = UnaryOp.define(Alternative(
+UnaryOp.define(Alternative(
     "UnaryOp",
     Invert={},
     Not={},
@@ -743,7 +743,7 @@ UnaryOp = UnaryOp.define(Alternative(
     USub={}
 ))
 
-ComparisonOp = ComparisonOp.define(Alternative(
+ComparisonOp.define(Alternative(
     "ComparisonOp",
     Eq={},
     NotEq={},
@@ -757,7 +757,7 @@ ComparisonOp = ComparisonOp.define(Alternative(
     NotIn={}
 ))
 
-Comprehension = Comprehension.define(Alternative(
+Comprehension.define(Alternative(
     "Comprehension",
     Item={
         "target": Expr,
@@ -767,7 +767,7 @@ Comprehension = Comprehension.define(Alternative(
     }
 ))
 
-ExceptionHandler = ExceptionHandler.define(Alternative(
+ExceptionHandler.define(Alternative(
     "ExceptionHandler",
     Item={
         "type": OneOf(Expr, None),
@@ -779,7 +779,7 @@ ExceptionHandler = ExceptionHandler.define(Alternative(
     }
 ))
 
-Arguments = Arguments.define(Alternative(
+Arguments.define(Alternative(
     "Arguments",
     Item={
         **({'posonlyargs': TupleOf(Arg)} if sys.version_info.minor >= 8 else {}),
@@ -802,7 +802,7 @@ Arguments = Arguments.define(Alternative(
         + ([self.kwarg.arg] if self.kwarg else [])
 ))
 
-Arg = Arg.define(Alternative(
+Arg.define(Alternative(
     "Arg",
     Item={
         'arg': str,
@@ -813,7 +813,7 @@ Arg = Arg.define(Alternative(
     }
 ))
 
-Keyword = Keyword.define(Alternative(
+Keyword.define(Alternative(
     "Keyword",
     Item={
         "arg": OneOf(None, str),
@@ -822,7 +822,7 @@ Keyword = Keyword.define(Alternative(
     }
 ))
 
-Alias = Alias.define(Alternative(
+Alias.define(Alternative(
     "Alias",
     Item={
         "name": str,
@@ -835,7 +835,7 @@ Alias = Alias.define(Alternative(
     }
 ))
 
-WithItem = WithItem.define(Alternative(
+WithItem.define(Alternative(
     "WithItem",
     Item={
         "context_expr": Expr,
@@ -884,123 +884,6 @@ def makeEllipsis(*args):
 
 def makeExtSlice(dims):
     return Expr.Tuple(elts=dims)
-
-
-# map Python AST types to our syntax-tree types (defined `ove)
-converters = {
-    ast.Module: Module.Module,
-    ast.Expression: Module.Expression,
-    ast.Interactive: Module.Interactive,
-    ast.Suite: Module.Suite,
-    ast.FunctionDef: Statement.FunctionDef,
-    ast.ClassDef: Statement.ClassDef,
-    ast.Return: Statement.Return,
-    ast.Delete: Statement.Delete,
-    ast.Assign: Statement.Assign,
-    ast.AugAssign: Statement.AugAssign,
-    ast.AnnAssign: Statement.AnnAssign,
-    ast.For: Statement.For,
-    ast.While: Statement.While,
-    ast.If: Statement.If,
-    ast.With: Statement.With,
-    ast.Raise: Statement.Raise,
-    ast.Try: Statement.Try,
-    ast.Assert: Statement.Assert,
-    ast.Import: Statement.Import,
-    ast.ImportFrom: Statement.ImportFrom,
-    ast.Global: Statement.Global,
-    ast.Nonlocal: Statement.NonLocal,
-    ast.Expr: Statement.Expr,
-    ast.Pass: Statement.Pass,
-    ast.Break: Statement.Break,
-    ast.Continue: Statement.Continue,
-    ast.BoolOp: Expr.BoolOp,
-    ast.BinOp: Expr.BinOp,
-    ast.UnaryOp: Expr.UnaryOp,
-    ast.Lambda: Expr.Lambda,
-    ast.IfExp: Expr.IfExp,
-    ast.Dict: Expr.Dict,
-    ast.Set: Expr.Set,
-    ast.JoinedStr: Expr.JoinedStr,
-    ast.Bytes: Expr.Bytes,
-    ast.Constant: Expr.Constant,
-    ast.FormattedValue: Expr.FormattedValue,
-    ast.ListComp: Expr.ListComp,
-    ast.AsyncFunctionDef: Statement.AsyncFunctionDef,
-    ast.AsyncWith: Statement.AsyncWith,
-    ast.AsyncFor: Statement.AsyncFor,
-    ast.Await: Expr.Await,
-    ast.SetComp: Expr.SetComp,
-    ast.DictComp: Expr.DictComp,
-    ast.GeneratorExp: Expr.GeneratorExp,
-    ast.Yield: Expr.Yield,
-    ast.YieldFrom: Expr.YieldFrom,
-    ast.Compare: Expr.Compare,
-    ast.Call: Expr.Call,
-    ast.Num: createPythonAstConstant,
-    ast.Str: createPythonAstString,
-    ast.Attribute: Expr.Attribute,
-    ast.Subscript: Expr.Subscript,
-    ast.Name: Expr.Name,
-    ast.NameConstant: makeNameConstant,
-    ast.List: Expr.List,
-    ast.Tuple: Expr.Tuple,
-    ast.Starred: Expr.Starred,
-    ast.Load: ExprContext.Load,
-    ast.Store: ExprContext.Store,
-    ast.Del: ExprContext.Del,
-    ast.AugLoad: ExprContext.AugLoad,
-    ast.AugStore: ExprContext.AugStore,
-    ast.Param: ExprContext.Param,
-    ast.Ellipsis: makeEllipsis,
-    ast.Slice: Expr.Slice,
-    ast.ExtSlice: makeExtSlice,
-    ast.Index: lambda value: value,
-    ast.And: BooleanOp.And,
-    ast.Or: BooleanOp.Or,
-    ast.Add: BinaryOp.Add,
-    ast.Sub: BinaryOp.Sub,
-    ast.Mult: BinaryOp.Mult,
-    ast.MatMult: BinaryOp.MatMult,
-    ast.Div: BinaryOp.Div,
-    ast.Mod: BinaryOp.Mod,
-    ast.Pow: BinaryOp.Pow,
-    ast.LShift: BinaryOp.LShift,
-    ast.RShift: BinaryOp.RShift,
-    ast.BitOr: BinaryOp.BitOr,
-    ast.BitXor: BinaryOp.BitXor,
-    ast.BitAnd: BinaryOp.BitAnd,
-    ast.FloorDiv: BinaryOp.FloorDiv,
-    ast.Invert: UnaryOp.Invert,
-    ast.Not: UnaryOp.Not,
-    ast.UAdd: UnaryOp.UAdd,
-    ast.USub: UnaryOp.USub,
-    ast.Eq: ComparisonOp.Eq,
-    ast.NotEq: ComparisonOp.NotEq,
-    ast.Lt: ComparisonOp.Lt,
-    ast.LtE: ComparisonOp.LtE,
-    ast.Gt: ComparisonOp.Gt,
-    ast.GtE: ComparisonOp.GtE,
-    ast.Is: ComparisonOp.Is,
-    ast.IsNot: ComparisonOp.IsNot,
-    ast.In: ComparisonOp.In,
-    ast.NotIn: ComparisonOp.NotIn,
-    ast.comprehension: Comprehension.Item,
-    ast.excepthandler: lambda x: x,
-    ast.ExceptHandler: ExceptionHandler.Item,
-    ast.arguments: Arguments.Item,
-    ast.arg: Arg.Item,
-    ast.keyword: Keyword.Item,
-    ast.alias: Alias.Item,
-    ast.withitem: WithItem.Item,
-    **({'ast.type_ignore': TypeIgnore.Item} if sys.version_info.minor >= 8 else {}),
-}
-
-# most converters map to an alternative type
-reverseConverters = {
-    t: v for v, t in converters.items()
-    if hasattr(t, '__typed_python_category__') and t.__typed_python_category__ == "ConcreteAlternative"
-}
 
 
 def convertAlgebraicArgs(pyAst, *members):
@@ -1501,3 +1384,140 @@ def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals, stripAnnotation
     cacheAstForCode(inner.__code__, pyAst)
 
     return inner
+
+
+Module = resolveForwardDefinedType(Module)
+Statement = resolveForwardDefinedType(Statement)
+Expr = resolveForwardDefinedType(Expr)
+Arg = resolveForwardDefinedType(Arg)
+NumericConstant = resolveForwardDefinedType(NumericConstant)
+ExprContext = resolveForwardDefinedType(ExprContext)
+BooleanOp = resolveForwardDefinedType(BooleanOp)
+BinaryOp = resolveForwardDefinedType(BinaryOp)
+UnaryOp = resolveForwardDefinedType(UnaryOp)
+ComparisonOp = resolveForwardDefinedType(ComparisonOp)
+Comprehension = resolveForwardDefinedType(Comprehension)
+ExceptionHandler = resolveForwardDefinedType(ExceptionHandler)
+Arguments = resolveForwardDefinedType(Arguments)
+Keyword = resolveForwardDefinedType(Keyword)
+Alias = resolveForwardDefinedType(Alias)
+WithItem = resolveForwardDefinedType(WithItem)
+TypeIgnore = resolveForwardDefinedType(TypeIgnore)
+
+
+
+# map Python AST types to our syntax-tree types
+converters = {
+    ast.Module: Module.Module,
+    ast.Expression: Module.Expression,
+    ast.Interactive: Module.Interactive,
+    ast.Suite: Module.Suite,
+    ast.FunctionDef: Statement.FunctionDef,
+    ast.ClassDef: Statement.ClassDef,
+    ast.Return: Statement.Return,
+    ast.Delete: Statement.Delete,
+    ast.Assign: Statement.Assign,
+    ast.AugAssign: Statement.AugAssign,
+    ast.AnnAssign: Statement.AnnAssign,
+    ast.For: Statement.For,
+    ast.While: Statement.While,
+    ast.If: Statement.If,
+    ast.With: Statement.With,
+    ast.Raise: Statement.Raise,
+    ast.Try: Statement.Try,
+    ast.Assert: Statement.Assert,
+    ast.Import: Statement.Import,
+    ast.ImportFrom: Statement.ImportFrom,
+    ast.Global: Statement.Global,
+    ast.Nonlocal: Statement.NonLocal,
+    ast.Expr: Statement.Expr,
+    ast.Pass: Statement.Pass,
+    ast.Break: Statement.Break,
+    ast.Continue: Statement.Continue,
+    ast.BoolOp: Expr.BoolOp,
+    ast.BinOp: Expr.BinOp,
+    ast.UnaryOp: Expr.UnaryOp,
+    ast.Lambda: Expr.Lambda,
+    ast.IfExp: Expr.IfExp,
+    ast.Dict: Expr.Dict,
+    ast.Set: Expr.Set,
+    ast.JoinedStr: Expr.JoinedStr,
+    ast.Bytes: Expr.Bytes,
+    ast.Constant: Expr.Constant,
+    ast.FormattedValue: Expr.FormattedValue,
+    ast.ListComp: Expr.ListComp,
+    ast.AsyncFunctionDef: Statement.AsyncFunctionDef,
+    ast.AsyncWith: Statement.AsyncWith,
+    ast.AsyncFor: Statement.AsyncFor,
+    ast.Await: Expr.Await,
+    ast.SetComp: Expr.SetComp,
+    ast.DictComp: Expr.DictComp,
+    ast.GeneratorExp: Expr.GeneratorExp,
+    ast.Yield: Expr.Yield,
+    ast.YieldFrom: Expr.YieldFrom,
+    ast.Compare: Expr.Compare,
+    ast.Call: Expr.Call,
+    ast.Num: createPythonAstConstant,
+    ast.Str: createPythonAstString,
+    ast.Attribute: Expr.Attribute,
+    ast.Subscript: Expr.Subscript,
+    ast.Name: Expr.Name,
+    ast.NameConstant: makeNameConstant,
+    ast.List: Expr.List,
+    ast.Tuple: Expr.Tuple,
+    ast.Starred: Expr.Starred,
+    ast.Load: ExprContext.Load,
+    ast.Store: ExprContext.Store,
+    ast.Del: ExprContext.Del,
+    ast.AugLoad: ExprContext.AugLoad,
+    ast.AugStore: ExprContext.AugStore,
+    ast.Param: ExprContext.Param,
+    ast.Ellipsis: makeEllipsis,
+    ast.Slice: Expr.Slice,
+    ast.ExtSlice: makeExtSlice,
+    ast.Index: lambda value: value,
+    ast.And: BooleanOp.And,
+    ast.Or: BooleanOp.Or,
+    ast.Add: BinaryOp.Add,
+    ast.Sub: BinaryOp.Sub,
+    ast.Mult: BinaryOp.Mult,
+    ast.MatMult: BinaryOp.MatMult,
+    ast.Div: BinaryOp.Div,
+    ast.Mod: BinaryOp.Mod,
+    ast.Pow: BinaryOp.Pow,
+    ast.LShift: BinaryOp.LShift,
+    ast.RShift: BinaryOp.RShift,
+    ast.BitOr: BinaryOp.BitOr,
+    ast.BitXor: BinaryOp.BitXor,
+    ast.BitAnd: BinaryOp.BitAnd,
+    ast.FloorDiv: BinaryOp.FloorDiv,
+    ast.Invert: UnaryOp.Invert,
+    ast.Not: UnaryOp.Not,
+    ast.UAdd: UnaryOp.UAdd,
+    ast.USub: UnaryOp.USub,
+    ast.Eq: ComparisonOp.Eq,
+    ast.NotEq: ComparisonOp.NotEq,
+    ast.Lt: ComparisonOp.Lt,
+    ast.LtE: ComparisonOp.LtE,
+    ast.Gt: ComparisonOp.Gt,
+    ast.GtE: ComparisonOp.GtE,
+    ast.Is: ComparisonOp.Is,
+    ast.IsNot: ComparisonOp.IsNot,
+    ast.In: ComparisonOp.In,
+    ast.NotIn: ComparisonOp.NotIn,
+    ast.comprehension: Comprehension.Item,
+    ast.excepthandler: lambda x: x,
+    ast.ExceptHandler: ExceptionHandler.Item,
+    ast.arguments: Arguments.Item,
+    ast.arg: Arg.Item,
+    ast.keyword: Keyword.Item,
+    ast.alias: Alias.Item,
+    ast.withitem: WithItem.Item,
+    **({'ast.type_ignore': TypeIgnore.Item} if sys.version_info.minor >= 8 else {}),
+}
+
+# most converters map to an alternative type
+reverseConverters = {
+    t: v for v, t in converters.items()
+    if hasattr(t, '__typed_python_category__') and t.__typed_python_category__ == "ConcreteAlternative"
+}

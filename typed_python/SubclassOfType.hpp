@@ -27,9 +27,7 @@ PyDoc_STRVAR(SubclassOf_doc,
 class SubclassOfType : public Type {
     SubclassOfType() : Type(TypeCategory::catSubclassOf)
     {
-        m_doc = SubclassOf_doc;
         m_is_default_constructible = true;
-        m_needs_post_init = true;
         m_size = sizeof(Type*);
     }
 public:
@@ -37,10 +35,13 @@ public:
                     Type(TypeCategory::catSubclassOf),
                     m_subclassOf(subclassOf)
     {
-        m_doc = SubclassOf_doc;
         m_is_forward_defined = true;
         m_is_default_constructible = true;
         m_size = sizeof(Type*);
+    }
+
+    const char* docConcrete() {
+        return SubclassOf_doc;
     }
 
     void postInitializeConcrete() {

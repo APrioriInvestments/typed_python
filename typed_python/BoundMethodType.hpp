@@ -19,10 +19,15 @@
 #include "Type.hpp"
 #include "ReprAccumulator.hpp"
 
+PyDoc_STRVAR(BoundMethod_doc,
+    "BoundMethod(T, name)\n\n"
+    "Holds an instance of 'T' as 't' and has a call method that dispatches to t.name(...)\n"
+);
+
+
 class BoundMethod : public Type {
     BoundMethod() : Type(TypeCategory::catBoundMethod)
     {
-        m_needs_post_init = true;
     }
 public:
     BoundMethod(Type* inFirstArg, std::string funcName) : Type(TypeCategory::catBoundMethod)
@@ -32,6 +37,10 @@ public:
         m_funcName = funcName;
         m_first_arg = inFirstArg;
         m_size = inFirstArg->bytecount();
+    }
+
+    const char* docConcrete() {
+        return BoundMethod_doc;
     }
 
     template<class visitor_type>
@@ -59,9 +68,6 @@ public:
     }
 
     void postInitializeConcrete() {
-        m_first_arg->postInitialize();
-
-        m_is_simple = false;
         m_size = m_first_arg->bytecount();
         m_is_default_constructible = false;
     }

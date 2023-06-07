@@ -29,16 +29,17 @@ PyDoc_STRVAR(Set_doc,
 class SetType : public Type {
     SetType() : Type(TypeCategory::catSet)
     {
-        m_doc = Set_doc;
-        m_needs_post_init = true;
     }
 public:
     SetType(Type* eltype)
         : Type(TypeCategory::catSet)
         , m_key_type(eltype)
     {
-        m_doc = Set_doc;
         m_is_forward_defined = true;
+    }
+
+    const char* docConcrete() {
+        return Set_doc;
     }
 
     template<class visitor_type>

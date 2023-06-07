@@ -191,8 +191,6 @@ public:
     {
         m_size = sizeof(T);
         m_is_default_constructible = true;
-        m_is_forward_defined = false;
-        m_needs_post_init = false;
     }
 
     bool isPODConcrete() {
@@ -285,7 +283,10 @@ public:
     Bool() : RegisterType(TypeCategory::catBool)
     {
         m_name = "bool";
-        m_doc = Bool_doc;
+    }
+
+    const char* docConcrete() {
+        return Bool_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -306,7 +307,10 @@ public:
     UInt8() : RegisterType(TypeCategory::catUInt8)
     {
         m_name = "UInt8";
-        m_doc = UInt8_doc;
+    }
+
+    const char* docConcrete() {
+        return UInt8_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -327,7 +331,10 @@ public:
     UInt16() : RegisterType(TypeCategory::catUInt16)
     {
         m_name = "UInt16";
-        m_doc = UInt16_doc;
+    }
+
+    const char* docConcrete() {
+        return UInt16_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -345,7 +352,10 @@ public:
     UInt32() : RegisterType(TypeCategory::catUInt32)
     {
         m_name = "UInt32";
-        m_doc = UInt32_doc;
+    }
+
+    const char* docConcrete() {
+        return UInt32_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -363,7 +373,10 @@ public:
     UInt64() : RegisterType(TypeCategory::catUInt64)
     {
         m_name = "UInt64";
-        m_doc = UInt64_doc;
+    }
+
+    const char* docConcrete() {
+        return UInt64_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -380,9 +393,12 @@ class Int8 : public RegisterType<int8_t> {
 public:
     Int8() : RegisterType(TypeCategory::catInt8)
     {
-        m_name = "Int8";
-        m_doc = Int8_doc;
         m_size = 1; // Why only specify this here and not in other specializations?
+        m_name = "Int8";
+    }
+
+    const char* docConcrete() {
+        return Int8_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -400,7 +416,10 @@ public:
     Int16() : RegisterType(TypeCategory::catInt16)
     {
         m_name = "Int16";
-        m_doc = Int16_doc;
+    }
+
+    const char* docConcrete() {
+        return Int16_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -418,7 +437,10 @@ public:
     Int32() : RegisterType(TypeCategory::catInt32)
     {
         m_name = "Int32";
-        m_doc = Int32_doc;
+    }
+
+    const char* docConcrete() {
+        return Int32_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -436,7 +458,10 @@ public:
     Int64() : RegisterType(TypeCategory::catInt64)
     {
         m_name = "int";
-        m_doc = Int64_doc;
+    }
+
+    const char* docConcrete() {
+        return Int64_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -454,7 +479,10 @@ public:
     Float32() : RegisterType(TypeCategory::catFloat32)
     {
         m_name = "Float32";
-        m_doc = Float32_doc;
+    }
+
+    const char* docConcrete() {
+        return Float32_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {
@@ -472,7 +500,10 @@ public:
     Float64() : RegisterType(TypeCategory::catFloat64)
     {
         m_name = "float";
-        m_doc = Float64_doc;
+    }
+
+    const char* docConcrete() {
+        return Float64_doc;
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream, bool isStr) {

@@ -19,11 +19,15 @@
 #include "Type.hpp"
 #include "ReprAccumulator.hpp"
 
+
+PyDoc_STRVAR(AlternativeMatcher_doc,
+    "AlternativeMatcher: an instance of 'A.matches' where 'A' is an alternative.\n"
+);
+
 // Models an alternatives '.matches' result
 class AlternativeMatcher : public Type {
     AlternativeMatcher() : Type(TypeCategory::catAlternativeMatcher)
     {
-        m_needs_post_init = true;
     }
 public:
     AlternativeMatcher(Type* inAlternative) : Type(TypeCategory::catAlternativeMatcher)
@@ -32,7 +36,10 @@ public:
         m_is_default_constructible = false;
         m_alternative = inAlternative;
         m_size = inAlternative->bytecount();
-        m_is_simple = false;
+    }
+
+    const char* docConcrete() {
+        return AlternativeMatcher_doc;
     }
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
@@ -58,7 +65,6 @@ public:
     }
 
     void postInitializeConcrete() {
-        m_alternative->postInitialize();
         m_size = m_alternative->bytecount();
     }
 

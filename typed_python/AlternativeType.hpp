@@ -79,8 +79,6 @@ PyDoc_STRVAR(Alternative_doc,
 class Alternative : public Type {
     Alternative() : Type(TypeCategory::catAlternative)
     {
-        m_doc = Alternative_doc;
-        m_needs_post_init = true;
     }
 
 public:
@@ -110,14 +108,15 @@ public:
 
         m_name = name;
         m_moduleName = moduleName;
-        m_is_simple = false;
         m_hasGetAttributeMagicMethod = m_methods.find("__getattribute__") != m_methods.end();
 
         if (m_subtypes.size() > 255) {
             throw std::runtime_error("Can't have an alternative with more than 255 subelements");
         }
+    }
 
-        m_doc = Alternative_doc;
+    const char* docConcrete() {
+        return Alternative_doc;
     }
 
     void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
@@ -125,7 +124,6 @@ public:
 
         m_name = selfT->m_name;
         m_moduleName = selfT->m_moduleName;
-        m_is_simple = selfT->m_is_simple;
         m_hasGetAttributeMagicMethod = selfT->m_hasGetAttributeMagicMethod;
         m_methods = selfT->m_methods;
         m_subtypes = selfT->m_subtypes;

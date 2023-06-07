@@ -34,8 +34,11 @@ public:
         mTarget(nullptr)
     {
         m_name = name;
-        m_doc = Forward_doc;
         m_is_forward_defined = true;
+    }
+
+    const char* docConcrete() {
+        return Forward_doc;
     }
 
     std::string moduleNameConcrete() {
