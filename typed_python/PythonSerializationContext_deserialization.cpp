@@ -575,48 +575,6 @@ PyObject* prepareBlankInstanceOfType(MutuallyRecursiveTypeGroup* outGroup, PyTyp
 
 /* static */
 Type* PythonSerializationContext::constructBlankInstanceOfType(Type::TypeCategory typeCat) {
-    if (typeCat == Type::TypeCategory::catNone) {
-        return NoneType::Make();
-    }
-    if (typeCat == Type::TypeCategory::catBool) {
-        return Bool::Make();
-    }
-    if (typeCat == Type::TypeCategory::catUInt8) {
-        return UInt8::Make();
-    }
-    if (typeCat == Type::TypeCategory::catUInt16) {
-        return UInt16::Make();
-    }
-    if (typeCat == Type::TypeCategory::catUInt32) {
-        return UInt32::Make();
-    }
-    if (typeCat == Type::TypeCategory::catUInt64) {
-        return UInt64::Make();
-    }
-    if (typeCat == Type::TypeCategory::catInt8) {
-        return Int8::Make();
-    }
-    if (typeCat == Type::TypeCategory::catInt16) {
-        return Int16::Make();
-    }
-    if (typeCat == Type::TypeCategory::catInt32) {
-        return Int32::Make();
-    }
-    if (typeCat == Type::TypeCategory::catInt64) {
-        return Int64::Make();
-    }
-    if (typeCat == Type::TypeCategory::catString) {
-        return StringType::Make();
-    }
-    if (typeCat == Type::TypeCategory::catBytes) {
-        return BytesType::Make();
-    }
-    if (typeCat == Type::TypeCategory::catFloat32) {
-        return Float32::Make();
-    }
-    if (typeCat == Type::TypeCategory::catFloat64) {
-        return Float64::Make();
-    }
     if (typeCat == Type::TypeCategory::catValue) {
         return new Value();
     }
@@ -671,23 +629,39 @@ Type* PythonSerializationContext::constructBlankInstanceOfType(Type::TypeCategor
     if (typeCat == Type::TypeCategory::catForward) {
         throw std::runtime_error("Can't deserialize actual forwards!");
     }
-    if (typeCat == Type::TypeCategory::catEmbeddedMessage) {
-        return new EmbeddedMessageType();
-    }
     if (typeCat == Type::TypeCategory::catSet) {
         return new SetType();
     }
     if (typeCat == Type::TypeCategory::catTypedCell) {
         return new TypedCellType();
     }
-    if (typeCat == Type::TypeCategory::catPyCell) {
-        return PyCellType::Make();
-    }
     if (typeCat == Type::TypeCategory::catRefTo) {
         return new RefTo();
     }
     if (typeCat == Type::TypeCategory::catSubclassOf) {
         return new SubclassOfType();
+    }
+
+
+
+    if (typeCat == Type::TypeCategory::catPyCell
+        || typeCat == Type::TypeCategory::catEmbeddedMessage
+        || typeCat == Type::TypeCategory::catNone
+        || typeCat == Type::TypeCategory::catBool
+        || typeCat == Type::TypeCategory::catUInt8
+        || typeCat == Type::TypeCategory::catUInt16
+        || typeCat == Type::TypeCategory::catUInt32
+        || typeCat == Type::TypeCategory::catUInt64
+        || typeCat == Type::TypeCategory::catInt8
+        || typeCat == Type::TypeCategory::catInt16
+        || typeCat == Type::TypeCategory::catInt32
+        || typeCat == Type::TypeCategory::catInt64
+        || typeCat == Type::TypeCategory::catString
+        || typeCat == Type::TypeCategory::catBytes
+        || typeCat == Type::TypeCategory::catFloat32
+        || typeCat == Type::TypeCategory::catFloat64
+    ) {
+        throw std::runtime_error("Can't produce a blank instance of a simple type");
     }
 
     throw std::runtime_error("Corrupt TypeCategory: can't produce a blank instance");
@@ -710,7 +684,6 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
     std::map<int32_t, int32_t> indexOfObjToIndexOfType;
 
     std::map<int32_t, Type*> indicesOfNativeTypes;
-    std::set<int32_t> indicesOfForwardsNeedingResolution;
 
     std::map<int32_t, std::string> indicesOfNativeTypeNames;
 
@@ -1046,36 +1019,22 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                     }
                 } else
                 if (indicesOfNativeTypes.find(indexInGroup) != indicesOfNativeTypes.end()) {
-                    Type* t = deserializeNativeTypeInner(b, subWireType, actuallyBuildGroup);
+                    Type* targetType = nullptr;
 
                     if (actuallyBuildGroup) {
-                        if (!t) {
-                            throw std::runtime_error("Somehow, deserializeNativeTypeInner didn't return a type.");
-                        }
-
                         if (!indicesOfNativeTypes[indexInGroup]) {
                             throw std::runtime_error("indicesOfNativeTypes[indexInGroup] is somehow none");
                         }
-                        if (!indicesOfNativeTypes[indexInGroup]->isForward()) {
-                            throw std::runtime_error("indicesOfNativeTypes[indexInGroup] was already resolved");
-                        }
 
-                        if (t->isForward()) {
-                            // we actually deserialized a forward here! this means everyone
-                            // else is expecting this actual instance to be a forward, so we
-                            // don't want to swap it out
-                            ((Forward*)indicesOfNativeTypes[indexInGroup])->define(
-                                ((Forward*)t)->getTarget()
-                            );
-                        } else {
-                            if (t->getTypeCategory() != indicesOfNativeTypes[indexInGroup]->getTypeCategory()) {
-                                throw std::runtime_error("Somehow, type categories didn't match!");
-                            }
-
-                            // initialize the real funtion from the function stub
-                            indicesOfNativeTypes[indexInGroup]->initializeFrom(t);
-                        }
+                        targetType = indicesOfNativeTypes[indexInGroup];
                     }
+
+                    deserializeNativeTypeIntoBlank(
+                        b,
+                        subWireType,
+                        targetType,
+                        indicesOfNativeTypeNames[indexInGroup]
+                    );
                 } else {
                     throw std::runtime_error("Corrupt MutuallyRecursiveTypeGroup group");
                 }
@@ -1225,6 +1184,35 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
     }
 
     if (actuallyBuildGroup) {
+        // recompute type names
+        for (auto ixAndType: indicesOfNativeTypes) {
+            ixAndType.second->recomputeName();
+        }
+
+        // do post-initialization
+        bool anyUpdated = true;
+        size_t passCt = 0;
+        while (anyUpdated) {
+            anyUpdated = false;
+            for (auto ixAndType: indicesOfNativeTypes) {
+                if (ixAndType.second->postInitialize()) {
+                    anyUpdated = true;
+                }
+            }
+            passCt += 1;
+
+            // we can run this algorithm until all type sizes have stabilized. Conceivably we
+            // could introduce an error that would cause this to not converge - this should
+            // detect that.
+            if (passCt > indicesOfNativeTypes.size() * 2 + 10) {
+                throw std::runtime_error("Type size graph is not stabilizing.");
+            }
+        }
+
+        for (auto ixAndType: indicesOfNativeTypes) {
+            ixAndType.second->finalizeType();
+        }
+
         outGroup->finalizeDeserializerGroup();
     }
 
@@ -1525,15 +1513,16 @@ Instance PythonSerializationContext::deserializeNativeInstance(DeserializationBu
     return result;
 }
 
-// if actuallyProduceResult == false, then we still need to walk over the objects to make sure
-// that our memos are correctly populated, but we don't need to construct objects, which will prevent us
-// from creating new objects and leaking them when deserializing classes we already hold.
-Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuffer& b, size_t inWireType, bool actuallyProduceResult) const {
+/* deserialize a native type of the apropriate category into an empty Type* that's been constructed */
+void PythonSerializationContext::deserializeNativeTypeIntoBlank(
+    DeserializationBuffer& b,
+    size_t inWireType,
+    Type* blankShell,
+    std::string inName
+) const {
     PyEnsureGilAcquired acquireTheGil;
 
     int category = -1;
-
-    Type* namedType = nullptr;
 
     std::vector<Type*> types;
     std::vector<std::string> names;
@@ -1559,23 +1548,7 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
                 category = b.readUnsignedVarint();
             } else
             if (wireType == WireType::BYTES) {
-                std::string objectName = b.readStringObject();
-
-                PyObjectStealer contextAsPyObj(PyInstance::extractPythonObject(mContextObj));
-
-                PyObjectStealer namedObj(PyObject_CallMethod(contextAsPyObj, "objectFromName", "s", objectName.c_str()));
-
-                if (!namedObj) {
-                    throw PythonExceptionSet();
-                }
-
-                if (!PyType_Check(namedObj)) {
-                    throw std::runtime_error("Corrupt native type found: object named " + objectName + " was not a type.");
-                }
-                namedType = PyInstance::extractTypeFrom((PyTypeObject*)(PyObject*)namedObj);
-                if (!namedType) {
-                    throw std::runtime_error("Corrupt native type found: object named " + objectName + " was not a native type.");
-                }
+                throw std::runtime_error("We shouldn't be using named serialization in an MRTG");
             } else {
                 throw std::runtime_error("Corrupt native type found: 0 field should be a category or a name");
             }
@@ -1608,6 +1581,13 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
                     deserializeAlternativeMembers(alternativeMembers, b, wireType);
                 } else if (fieldNumber == 4) {
                     deserializeClassFunDict(names.back(), classMethods, b, wireType);
+                } else if (fieldNumber == 5) {
+                    b.consumeCompoundMessage(wireType, [&](int which, size_t wireType2) {
+                        types.push_back(deserializeNativeType(b, wireType2));
+                        if (!types.back()->isConcreteAlternative()) {
+                            throw std::runtime_error("Expected a concrete alternative");
+                        }
+                    });
                 }
             } else
             if (category == Type::TypeCategory::catHeldClass) {
@@ -1644,6 +1624,8 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
                 } else if (fieldNumber == 8) {
                     assertWireTypesEqual(wireType, WireType::VARINT);
                     classIsFinal = b.readUnsignedVarint();
+                } else if (fieldNumber == 9) {
+                    types.push_back(deserializeNativeType(b, wireType));
                 }
             } else
             if (category == Type::TypeCategory::catFunction) {
@@ -1702,48 +1684,52 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
         }
     });
 
-    // if the type was just named in the codebase, return it
-    if (namedType) {
-        return namedType;
+    if (!blankShell) {
+        // we don't actually need to construct this thing
+        return;
     }
-
-    if (!actuallyProduceResult) {
-        return nullptr;
-    }
-
-    // otherwise, construct it from the pieces we were given.
-    Type* resultType = nullptr;
 
     if (category == Type::TypeCategory::catClass) {
         if (types.size() != 1) {
             throw std::runtime_error("Corrupt 'Class' encountered: can't have multiple corresponding HeldClass objects.");
         }
-        if (types[0]->getTypeCategory() != Type::TypeCategory::catHeldClass) {
+        if (!types[0]->isHeldClass()) {
             throw std::runtime_error(
-                "Corrupt 'Class' encountered: HeldClass is a " +
-                Type::categoryToString(types[0]->getTypeCategory()) + " not a HeldClass"
+                "Corrupt 'Class' encountered: HeldClass is a " + types[0]->getTypeCategoryString()
+                + " not a HeldClass"
             );
         }
-        resultType = ((HeldClass*)types[0])->getClassType();
+        if (!blankShell->isClass()) {
+            throw std::runtime_error("Shell is not a Class");
+        }
+
+        ((Class*)blankShell)->initializeDuringDeserialization(inName, (HeldClass*)types[0]);
     }
     else if (category == Type::TypeCategory::catAlternative) {
         if (names.size() != 2) {
             throw std::runtime_error("Corrupt 'Alternative' encountered: invalid number of names");
         }
 
-        resultType = Alternative::Make(
+        if (!blankShell->isAlternative()) {
+            throw std::runtime_error("Shell is not an Alternative");
+        }
+
+        ((Alternative*)blankShell)->initializeDuringDeserialization(
             names[0],
             names[1],
             alternativeMembers,
-            classMethods
+            classMethods,
+            types
         );
     }
     else if (category == Type::TypeCategory::catForward) {
         if (names.size() != 1 || types.size() != 1) {
             throw std::runtime_error("Corrupt Forward");
         }
-        resultType = Forward::Make(names[0]);
-        ((Forward*)resultType)->define(types[0]);
+        if (!blankShell->isForward()) {
+            throw std::runtime_error("Shell is not a Forward");
+        }
+        ((Forward*)blankShell)->define(types[0]);
     }
     else if (category == Type::TypeCategory::catHeldClass) {
         if (names.size() != 1) {
@@ -1755,24 +1741,45 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             classClassMembersRaw[nameAndObj.first] = incref((PyObject*)nameAndObj.second);
         }
 
-        resultType = Class::Make(
+        if (!blankShell->isForward()) {
+            throw std::runtime_error("Shell is not a HeldClass");
+        }
+
+        if (types.size() != 1 || !types[0]->isClass()) {
+            throw std::runtime_error("Corrupt 'HeldClass' - needed a Class");
+        }
+
+        std::vector<HeldClass*> heldBases;
+        for (auto b: classBases) {
+            if (!b->isHeldClass()) {
+                throw std::runtime_error("Non-held base encountered!");
+            }
+            heldBases.push_back((HeldClass*)b);
+        }
+
+        ((HeldClass*)blankShell)->initializeDuringDeserialization(
             names[0],
-            classBases,
+            heldBases,
             classIsFinal,
             classMembers,
             classMethods,
             classStatics,
             classPropertyFunctions,
             classClassMembersRaw,
-            classClassMethods
-        )->getHeldClass();
+            classClassMethods,
+            (Class*)types[0]
+        );
     }
     else if (category == Type::TypeCategory::catFunction) {
         if (names.size() != 3) {
             throw std::runtime_error("Badly structured 'Function' encountered.");
         }
 
-        resultType = Function::Make(
+        if (!blankShell->isForward()) {
+            throw std::runtime_error("Shell is not a Function");
+        }
+
+        ((Function*)blankShell)->initializeDuringDeserialization(
             names[0],
             names[1],
             names[2],
@@ -1782,83 +1789,50 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             isNocompile
         );
     }
-    else if (category == Type::TypeCategory::catUInt8) {
-        resultType = ::UInt8::Make();
-    }
-    else if (category == Type::TypeCategory::catUInt16) {
-        resultType = ::UInt16::Make();
-    }
-    else if (category == Type::TypeCategory::catUInt32) {
-        resultType = ::UInt32::Make();
-    }
-    else if (category == Type::TypeCategory::catUInt64) {
-        resultType = ::UInt64::Make();
-    }
-    else if (category == Type::TypeCategory::catInt8) {
-        resultType = ::Int8::Make();
-    }
-    else if (category == Type::TypeCategory::catInt16) {
-        resultType = ::Int16::Make();
-    }
-    else if (category == Type::TypeCategory::catInt32) {
-        resultType = ::Int32::Make();
-    }
-    else if (category == Type::TypeCategory::catInt64) {
-        resultType = ::Int64::Make();
-    }
-    else if (category == Type::TypeCategory::catEmbeddedMessage) {
-        resultType = ::EmbeddedMessageType::Make();
-    }
-    else if (category == Type::TypeCategory::catFloat32) {
-        resultType = ::Float32::Make();
-    }
-    else if (category == Type::TypeCategory::catFloat64) {
-        resultType = ::Float64::Make();
-    }
-    else if (category == Type::TypeCategory::catNone) {
-        resultType = ::NoneType::Make();
-    }
-    else if (category == Type::TypeCategory::catBytes) {
-        resultType = ::BytesType::Make();
-    }
-    else if (category == Type::TypeCategory::catString) {
-        resultType = ::StringType::Make();
-    }
-    else if (category == Type::TypeCategory::catPyCell) {
-        resultType = ::PyCellType::Make();
-    }
-    else if (category == Type::TypeCategory::catBool) {
-        resultType = ::Bool::Make();
-    }
-    else if (category == Type::TypeCategory::catOneOf) {
-        resultType = ::OneOfType::Make(types);
-    }
-    else if (category == Type::TypeCategory::catValue) {
-        resultType = ::Value::Make(instance);
-    }
     else if (category == Type::TypeCategory::catTupleOf) {
         if (types.size() != 1) {
             throw std::runtime_error("Invalid native type: TupleOf needs exactly 1 type.");
         }
-        resultType = ::TupleOfType::Make(types[0]);
+
+        if (!blankShell->isTupleOf()) {
+            throw std::runtime_error("Shell is not a TupleOf");
+        }
+
+        ((TupleOfType*)blankShell)->initializeDuringDeserialization(types[0]);
     }
     else if (category == Type::TypeCategory::catListOf) {
         if (types.size() != 1) {
             throw std::runtime_error("Invalid native type: ListOf needs exactly 1 type.");
         }
-        resultType = ::ListOfType::Make(types[0]);
+
+        if (!blankShell->isListOf()) {
+            throw std::runtime_error("Shell is not a ListOf");
+        }
+
+        ((ListOfType*)blankShell)->initializeDuringDeserialization(types[0]);
     }
     else if (category == Type::TypeCategory::catTypedCell) {
         if (types.size() != 1) {
             throw std::runtime_error("Invalid native type: TypedCell needs exactly 1 type.");
         }
-        resultType = ::TypedCellType::Make(types[0]);
+
+        if (!blankShell->isTypedCell()) {
+            throw std::runtime_error("Shell is not a TypedCell");
+        }
+
+        ((TypedCellType*)blankShell)->initializeDuringDeserialization(types[0]);
+
     }
     else if (category == Type::TypeCategory::catPointerTo) {
         if (types.size() != 1) {
             throw std::runtime_error("Invalid native type: PointerTo needs exactly 1 type.");
         }
-        resultType = ::PointerTo::Make(types[0]);
+
+        if (!blankShell->isPointerTo()) {
+            throw std::runtime_error("Shell is not a PointerTo");
+        }
+
+        ((PointerTo*)blankShell)->initializeDuringDeserialization(types[0]);
     }
     else if (category == Type::TypeCategory::catBoundMethod) {
         if (types.size() != 1) {
@@ -1867,56 +1841,105 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
         if (names.size() != 1) {
             throw std::runtime_error("Invalid native type: BoundMethod needs exactly 1 name.");
         }
-        resultType = ::BoundMethod::Make(types[0], names[0]);
+
+        if (!blankShell->isBoundMethod()) {
+            throw std::runtime_error("Shell is not a BoundMethod");
+        }
+
+        ((BoundMethod*)blankShell)->initializeDuringDeserialization(names[0], types[0]);
     }
     else if (category == Type::TypeCategory::catAlternativeMatcher) {
         if (types.size() != 1) {
             throw std::runtime_error("Invalid native type: AternativeMatcher needs exactly 1 type.");
         }
-        resultType = ::AlternativeMatcher::Make(types[0]);
+
+        if (!blankShell->isAlternativeMatcher()) {
+            throw std::runtime_error("Shell is not a AlternativeMatcher");
+        }
+
+        ((AlternativeMatcher*)blankShell)->initializeDuringDeserialization(types[0]);
     }
     else if (category == Type::TypeCategory::catSubclassOf) {
         if (types.size() != 1) {
             throw std::runtime_error("Invalid native type: SubclassOf needs exactly 1 type.");
         }
-        resultType = ::SubclassOfType::Make(types[0]);
+
+        if (!blankShell->isSubclassOf()) {
+            throw std::runtime_error("Shell is not a SubclassOf");
+        }
+
+        ((SubclassOfType*)blankShell)->initializeDuringDeserialization(types[0]);
     }
     else if (category == Type::TypeCategory::catRefTo) {
         if (types.size() != 1) {
             throw std::runtime_error("Invalid native type: RefTo needs exactly 1 type.");
         }
-        resultType = ::RefTo::Make(types[0]);
+
+        if (!blankShell->isRefTo()) {
+            throw std::runtime_error("Shell is not a RefTo");
+        }
+
+        ((RefTo*)blankShell)->initializeDuringDeserialization(types[0]);
     }
     else if (category == Type::TypeCategory::catNamedTuple) {
-        resultType = ::NamedTuple::Make(types, names);
+        if (!blankShell->isNamedTuple()) {
+            throw std::runtime_error("Shell is not a NamedTuple");
+        }
+
+        ((NamedTuple*)blankShell)->initializeDuringDeserialization(types, names);
     }
     else if (category == Type::TypeCategory::catTuple) {
-        resultType = ::Tuple::Make(types);
+        if (!blankShell->isTuple()) {
+            throw std::runtime_error("Shell is not a Tuple");
+        }
+
+        ((Tuple*)blankShell)->initializeDuringDeserialization(types);
     }
     else if (category == Type::TypeCategory::catSet) {
         if (types.size() != 1) {
             throw std::runtime_error("Invalid native type: Set needs exactly 1 type.");
         }
-        resultType = ::SetType::Make(types[0]);
+
+        if (!blankShell->isSet()) {
+            throw std::runtime_error("Shell is not a Set");
+        }
+
+        ((SetType*)blankShell)->initializeDuringDeserialization(types[0]);
     }
     else if (category == Type::TypeCategory::catDict) {
         if (types.size() != 2) {
             throw std::runtime_error("Invalid native type: Dict needs exactly 2 types.");
         }
-        resultType = ::DictType::Make(types[0], types[1]);
+
+        if (!blankShell->isDict()) {
+            throw std::runtime_error("Shell is not a Dict");
+        }
+
+        ((DictType*)blankShell)->initializeDuringDeserialization(types[0], types[1]);
     }
     else if (category == Type::TypeCategory::catConstDict) {
         if (types.size() != 2) {
             throw std::runtime_error("Invalid native type: ConstDict needs exactly 2 types.");
         }
-        resultType = ::ConstDictType::Make(types[0], types[1]);
+
+        if (!blankShell->isConstDict()) {
+            throw std::runtime_error("Shell is not a ConstDict");
+        }
+
+        ((ConstDictType*)blankShell)->initializeDuringDeserialization(types[0], types[1]);
     }
     else if (category == Type::TypeCategory::catPythonObjectOfType) {
         if (!obj || !PyType_Check(obj)) {
             throw std::runtime_error("Invalid native type: PythonObjectOfType needs a python type.");
         }
 
-        resultType = ::PythonObjectOfType::Make((PyTypeObject*)(PyObject*)obj);
+        if (!blankShell->isPythonObjectOfType()) {
+            throw std::runtime_error("Shell is not a PythonObjectOfType");
+        }
+
+        ((PythonObjectOfType*)blankShell)->initializeDuringDeserialization(
+            (PyTypeObject*)(PyObject*)obj
+        );
     }
     else if (category == Type::TypeCategory::catConcreteAlternative) {
         if (types.size() != 1) {
@@ -1936,16 +1959,16 @@ Type* PythonSerializationContext::deserializeNativeTypeInner(DeserializationBuff
             throw std::runtime_error("corrupt data: invalid alternative specified");
         }
 
-        resultType = a->concreteSubtype(whichIndex);
+        if (!blankShell->isConcreteAlternative()) {
+            throw std::runtime_error("Shell is not a ConcreteAlternative");
+        }
+
+        ((ConcreteAlternative*)blankShell)->initializeDuringDeserialization(whichIndex, a);
     } else {
-        throw std::runtime_error("Invalid native type category");
+        throw std::runtime_error(
+            "Cant initialize a blank instance of " + blankShell->getTypeCategoryString()
+        );
     }
-
-    if (!resultType) {
-        throw std::runtime_error("Corrupt nativeType.");
-    }
-
-    return resultType;
 }
 
 template<class Factory_Fn, class SetItem_Fn>

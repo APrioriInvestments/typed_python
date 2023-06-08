@@ -61,6 +61,11 @@ public:
         visitor(m_first_arg);
     }
 
+    void initializeDuringDeserialization(std::string funcName, Type* firstArgType) {
+        m_first_arg = firstArgType;
+        m_funcName = funcName;
+    }
+
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
         return "BoundMethod("
             + m_first_arg->computeRecursiveName(typeStack)

@@ -64,6 +64,11 @@ public:
         return Class_doc;
     }
 
+    void initializeDuringDeserialization(std::string inName, HeldClass* held) {
+        m_heldClass = held;
+        m_name = inName;
+    }
+
     void postInitializeConcrete() {
         m_size = sizeof(layout*);
         m_is_default_constructible = m_heldClass->is_default_constructible();

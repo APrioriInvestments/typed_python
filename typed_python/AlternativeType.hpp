@@ -19,6 +19,8 @@
 #include "Type.hpp"
 #include "CompositeType.hpp"
 
+class ConcreteAlternative;
+
 PyDoc_STRVAR(Alternative_doc,
     "Alternative(\n"
     "    name,\n"
@@ -108,7 +110,6 @@ public:
 
         m_name = name;
         m_moduleName = moduleName;
-        m_hasGetAttributeMagicMethod = m_methods.find("__getattribute__") != m_methods.end();
 
         if (m_subtypes.size() > 255) {
             throw std::runtime_error("Can't have an alternative with more than 255 subelements");
@@ -117,6 +118,20 @@ public:
 
     const char* docConcrete() {
         return Alternative_doc;
+    }
+
+    void initializeDuringDeserialization(
+        std::string name,
+        std::string moduleName,
+        const std::vector<std::pair<std::string, NamedTuple*> >& types,
+        const std::map<std::string, Function*>& methods,
+        const std::vector<Type*>& subtypes_concrete
+    ) {
+        m_name = name;
+        m_moduleName = moduleName;
+        m_methods = methods;
+        m_subtypes = types;
+        m_subtypes_concrete = subtypes_concrete;
     }
 
     void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
@@ -137,6 +152,8 @@ public:
     }
 
     void postInitializeConcrete() {
+        m_hasGetAttributeMagicMethod = m_methods.find("__getattribute__") != m_methods.end();
+
         m_arg_positions.clear();
         m_default_construction_type = nullptr;
 
@@ -216,20 +233,16 @@ public:
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
-        for (auto& subtype_pair: m_subtypes) {
-            Type* t = (Type*)subtype_pair.second;
-            visitor(t);
-            assert(t == subtype_pair.second);
+        for (auto subtype_pair: m_subtypes) {
+            visitor(subtype_pair.second);
         }
-        for (long k = 0; k < m_subtypes.size(); k++) {
-            Type* t = concreteSubtype(k);
+
+        for (auto t: m_subtypes_concrete) {
             visitor(t);
         }
 
-        for (auto& method_pair: m_methods) {
-            Type* t = (Type*)method_pair.second;
-            visitor(t);
-            assert(t == method_pair.second);
+        for (auto method_pair: m_methods) {
+            visitor(method_pair.second);
         }
     }
 
@@ -405,9 +418,11 @@ public:
         return m_methods;
     }
 
-    Type* concreteSubtype(size_t which);
+    ConcreteAlternative* concreteSubtype(size_t which);
 
 private:
+    void initializeConcreteSubclasses();
+
     //name of the module in which this Alternative was defined.
     std::string m_moduleName;
 

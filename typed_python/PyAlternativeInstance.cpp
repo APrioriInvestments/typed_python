@@ -245,7 +245,7 @@ void PyAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Alternative*
     PyObjectStealer alternatives(PyTuple_New(alt->subtypes().size()));
 
     for (long k = 0; k < alt->subtypes().size(); k++) {
-        ConcreteAlternative* concrete = ConcreteAlternative::Make(alt, k);
+        ConcreteAlternative* concrete = alt->concreteSubtype(k);
 
         PyDict_SetItemString(
             pyType->tp_dict,

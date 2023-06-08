@@ -183,7 +183,12 @@ Alternative* Alternative::Make(
         }
     }
 
+    // initialize a forward Alternative
     Alternative* res = new Alternative(name, moduleName, types, methods);
+
+    // construct its subtypes - we are always mutually recursive with these so we need
+    // to instantiate them directly in the case of the forward
+    res->initializeConcreteSubclasses();
 
     if (anyForward) {
         return res;
@@ -194,25 +199,34 @@ Alternative* Alternative::Make(
     return concrete;
 }
 
-Type* Alternative::concreteSubtype(size_t which) {
-    if (!m_subtypes_concrete.size()) {
-        for (long k = 0; k < m_subtypes.size(); k++) {
-            m_subtypes_concrete.push_back(ConcreteAlternative::Make(this, k));
-        }
+void Alternative::initializeConcreteSubclasses() {
+    if (!m_is_forward_defined) {
+        throw std::runtime_error(
+            "Alternative::initializeConcreteSubclasses only makes sense for Forward-defined "
+            "Alternatives."
+        );
+    }
+
+    for (long k = 0; k < m_subtypes.size(); k++) {
+        m_subtypes_concrete.push_back(new ConcreteAlternative(this, k));
+    }
+}
+
+ConcreteAlternative* Alternative::concreteSubtype(size_t which) {
+    if (m_subtypes_concrete.size() != m_subtypes.size()) {
+        throw std::runtime_error("Corrupt Alternative - somehow we don't have a subtype.");
     }
 
     if (which < 0 || which >= m_subtypes_concrete.size()) {
         throw std::runtime_error("Invalid alternative index.");
     }
 
-    return m_subtypes_concrete[which];
+    return (ConcreteAlternative*)m_subtypes_concrete[which];
 }
 
 Type* Alternative::pickConcreteSubclassConcrete(instance_ptr data) {
-    if (!m_subtypes_concrete.size()) {
-        for (long k = 0; k < m_subtypes.size(); k++) {
-            m_subtypes_concrete.push_back(ConcreteAlternative::Make(this, k));
-        }
+    if (m_subtypes_concrete.size() != m_subtypes.size()) {
+        throw std::runtime_error("Corrupt Alternative - somehow we don't have a subtype.");
     }
 
     uint8_t i = which(data);
@@ -224,7 +238,7 @@ void Alternative::constructor(instance_ptr self) {
     assertForwardsResolvedSufficientlyToInstantiate();
 
     if (!m_default_construction_type) {
-        m_default_construction_type = ConcreteAlternative::Make(this, m_default_construction_ix);
+        m_default_construction_type = concreteSubtype(m_default_construction_ix);
     }
 
     m_default_construction_type->constructor(self);

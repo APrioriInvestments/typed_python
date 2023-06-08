@@ -96,7 +96,8 @@ bool Class::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool 
         pyComparisonOp == Py_GE ? ">=" : "?",
         name().c_str(),
         name().c_str()
-        );
+    );
+
     throw PythonExceptionSet();
 }
 

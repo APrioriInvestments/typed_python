@@ -118,36 +118,23 @@ public:
     {
     }
 
-    PythonObjectOfType(PyTypeObject* typePtr, PyObject* givenType) :
+    PythonObjectOfType(PyTypeObject* typePtr) :
             PyObjectHandleTypeBase(TypeCategory::catPythonObjectOfType)
     {
         mPyTypePtr = (PyTypeObject*)incref((PyObject*)typePtr);
-
-        if (givenType) {
-            mGivenType = incref(givenType);
-        } else {
-            mGivenType = nullptr;
-        }
-
-        m_name = std::string("PythonObjectOfType(") + mPyTypePtr->tp_name + ")";
-
-        m_size = sizeof(layout_type*);
-
-        int isinst = PyObject_IsInstance(Py_None, (PyObject*)mPyTypePtr);
-        if (isinst == -1) {
-            isinst = 0;
-            PyErr_Clear();
-        }
-
-        m_is_default_constructible = isinst != 0;
         m_is_forward_defined = true;
+        recomputeName();
     }
 
     void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
         mPyTypePtr = ((PythonObjectOfType*)forwardDefinitionOfSelf)->mPyTypePtr;
-        mGivenType = ((PythonObjectOfType*)forwardDefinitionOfSelf)->mGivenType;
         m_name = ((PythonObjectOfType*)forwardDefinitionOfSelf)->m_name;
         m_size = ((PythonObjectOfType*)forwardDefinitionOfSelf)->m_size;
+        m_is_default_constructible = ((PythonObjectOfType*)forwardDefinitionOfSelf)->m_is_default_constructible;
+    }
+
+    void initializeDuringDeserialization(PyTypeObject* typePtr) {
+        mPyTypePtr = (PyTypeObject*)incref((PyObject*)typePtr);
     }
 
     void updateInternalTypePointersConcrete(
@@ -173,7 +160,21 @@ public:
     void _visitReferencedTypes(const visitor_type& visitor) {
     }
 
-    void postInitializeConcrete() {}
+    std::string computeRecursiveNameConcrete(TypeStack& types) {
+        return std::string("PythonObjectOfType(") + mPyTypePtr->tp_name + ")";
+    }
+
+    void postInitializeConcrete() {
+        m_size = sizeof(layout_type*);
+
+        int isinst = PyObject_IsInstance(Py_None, (PyObject*)mPyTypePtr);
+        if (isinst == -1) {
+            isinst = 0;
+            PyErr_Clear();
+        }
+
+        m_is_default_constructible = isinst != 0;
+    }
 
     int64_t refcount(instance_ptr self) const {
         return getHandlePtr(self)->refcount;
@@ -223,7 +224,7 @@ public:
 
     // construct a new Type. If 'givenType' is not NULL, then it's the type the user
     // gave us (and we inferred a real type from it based on the lookup table in internals.py)
-    static PythonObjectOfType* Make(PyTypeObject* pyType, PyObject* givenType=NULL);
+    static PythonObjectOfType* Make(PyTypeObject* pyType);
 
     static PythonObjectOfType* AnyPyObject();
 
@@ -235,9 +236,4 @@ public:
 
 private:
     PyTypeObject* mPyTypePtr;
-
-    // this is the object we were given, which in some cases might not really
-    // be a type, but which users expect to refer to a type (for instance, a threading.RLock,
-    // or anything else in internals._nonTypesAcceptedAsTypes);
-    PyObject* mGivenType;
 };

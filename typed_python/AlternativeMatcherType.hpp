@@ -34,9 +34,7 @@ public:
     AlternativeMatcher(Type* inAlternative) : Type(TypeCategory::catAlternativeMatcher)
     {
         m_is_forward_defined = true;
-        m_is_default_constructible = false;
         m_alternative = inAlternative;
-        m_size = inAlternative->bytecount();
     }
 
     const char* docConcrete() {
@@ -47,6 +45,10 @@ public:
         return "AlternativeMatcher("
             + qualname_to_name(m_alternative->computeRecursiveName(typeStack))
             + ")";
+    }
+
+    void initializeDuringDeserialization(Type* altType) {
+        m_alternative = altType;
     }
 
     template<class visitor_type>
@@ -66,6 +68,7 @@ public:
     }
 
     void postInitializeConcrete() {
+        m_is_default_constructible = false;
         m_size = m_alternative->bytecount();
     }
 

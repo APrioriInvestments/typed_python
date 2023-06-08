@@ -45,6 +45,11 @@ public:
         m_is_forward_defined = true;
     }
 
+    void initializeDuringDeserialization(Type* keyType, Type* valType) {
+        m_key = keyType;
+        m_value = valType;
+    }
+
     const char* docConcrete() {
         return DictType_doc;
     }

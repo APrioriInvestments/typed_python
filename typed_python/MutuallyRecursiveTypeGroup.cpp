@@ -132,6 +132,13 @@ void MutuallyRecursiveTypeGroup::finalizeDeserializerGroup() {
             mIntendedHashToGroup[mVisibilityType][mIntendedHash] = this;
         }
     }
+
+    // now internalize any types in here
+    for (auto indexAndTopo: mIndexToObject) {
+        if (indexAndTopo.second.type()) {
+            indexAndTopo.second.type()->internalize();
+        }
+    }
 }
 
 void MutuallyRecursiveTypeGroup::_computeHashAndInstall() {

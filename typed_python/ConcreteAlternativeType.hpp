@@ -39,6 +39,12 @@ public:
         m_name = m_alternative->name() + "." + m_alternative->subtypes()[m_which].first;
     }
 
+    void initializeDuringDeserialization(int64_t which, Alternative* base) {
+        m_alternative = base;
+        m_base = base;
+        m_which = which;
+    }
+
     const char* docConcrete() {
         return m_alternative->doc();
     }
@@ -191,8 +197,6 @@ public:
     instance_ptr eltPtr(instance_ptr self) const {
         return m_alternative->eltPtr(self);
     }
-
-    static ConcreteAlternative* Make(Alternative* alt, int64_t which);
 
     Type* elementType() const {
         return m_alternative->subtypes()[m_which].second;

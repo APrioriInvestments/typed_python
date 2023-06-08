@@ -57,6 +57,10 @@ public:
         m_is_default_constructible = true;
     }
 
+    void initializeDuringDeserialization(Type* eltType) {
+        m_element_type = eltType;
+    }
+
     const char* docConcrete() {
         return PointerTo_doc;
     }

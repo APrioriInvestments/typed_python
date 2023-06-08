@@ -22,8 +22,12 @@ TypeOrPyobj::TypeOrPyobj(Type* t) :
     mPyObj(nullptr)
 {
     if (!mType) {
-        asm("int3");
         throw std::runtime_error("Can't construct a TypeOrPyobj with a null Type");
+    }
+
+    if (mType->isForward() || mType->isForwardDefined()) {
+        asm("int3");
+        throw std::runtime_error("Can't construct a TOPO on a Forward-defined type");
     }
 }
 
@@ -35,7 +39,13 @@ TypeOrPyobj::TypeOrPyobj(PyObject* o) :
 
     if (PyType_Check(mPyObj)) {
         mType = PyInstance::extractTypeFrom((PyTypeObject*)mPyObj, true);
+
         if (mType) {
+            if (mType->isForward() || mType->isForwardDefined()) {
+                asm("int3");
+                throw std::runtime_error("Can't construct a TOPO on a Forward-defined type");
+            }
+
             mPyObj = nullptr;
             return;
         }
@@ -59,6 +69,11 @@ TypeOrPyobj::TypeOrPyobj(PyTypeObject* o) :
 
     mType = PyInstance::extractTypeFrom(o, true);
     if (mType) {
+        if (mType->isForward() || mType->isForwardDefined()) {
+            asm("int3");
+            throw std::runtime_error("Can't construct a TOPO on a Forward-defined type");
+        }
+
         mPyObj = nullptr;
         return;
     }
@@ -81,6 +96,11 @@ TypeOrPyobj TypeOrPyobj::withoutIntern(PyObject* o) {
     if (PyType_Check(o)) {
         obj.mType = PyInstance::extractTypeFrom((PyTypeObject*)o, true);
         if (obj.mType) {
+            if (obj.mType->isForward() || obj.mType->isForwardDefined()) {
+                asm("int3");
+                throw std::runtime_error("Can't construct a TOPO on a Forward-defined type");
+            }
+
             obj.mPyObj = nullptr;
             return obj;
         }

@@ -43,6 +43,8 @@ public:
         for (long k = 0; k < names.size(); k++) {
             m_nameToIndex[names[k]] = k;
         }
+
+        recomputeName();
     }
 
     template<class visitor_type>
@@ -335,6 +337,14 @@ public:
         assert(types.size() == names.size());
     }
 
+    void initializeDuringDeserialization(
+        const std::vector<Type*>& types,
+        const std::vector<std::string>& names
+    ) {
+        m_names = names;
+        m_types = types;
+    }
+
     const char* docConcrete() {
         return NamedTuple_doc;
     }
@@ -370,6 +380,12 @@ public:
     Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) :
             CompositeType(TypeCategory::catTuple, types, names)
     {
+    }
+
+    void initializeDuringDeserialization(
+        const std::vector<Type*>& types
+    ) {
+        m_types = types;
     }
 
     const char* docConcrete() {

@@ -50,6 +50,10 @@ public:
         return "TypedCell(" + mHeldType->computeRecursiveName(typeStack) + ")";
     }
 
+    void initializeDuringDeserialization(Type* heldType) {
+        mHeldType = heldType;
+    }
+
     void initializeFromConcrete(Type* forwardDefinitionOfSelf) {
         mHeldType = ((TypedCellType*)forwardDefinitionOfSelf)->mHeldType;
     }

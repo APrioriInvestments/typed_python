@@ -506,20 +506,22 @@ bool PythonObjectOfType::cmp(instance_ptr left, instance_ptr right, int pyCompar
 }
 
 // static
-PythonObjectOfType* PythonObjectOfType::Make(PyTypeObject* pyType, PyObject* givenType) {
+PythonObjectOfType* PythonObjectOfType::Make(PyTypeObject* pyType) {
     PyEnsureGilAcquired getTheGil;
 
-    typedef std::pair<PyTypeObject*, PyObject*> keytype;
+    typedef PyTypeObject* keytype;
 
     static std::map<keytype, PythonObjectOfType*> m;
 
-    keytype key(pyType, givenType);
+    keytype key(pyType);
 
     auto it = m.find(key);
 
     if (it == m.end()) {
+        Type* t = new PythonObjectOfType(pyType);
+
         it = m.insert(
-            std::make_pair(key, new PythonObjectOfType(pyType, givenType))
+            std::make_pair(key, (PythonObjectOfType*)t->forwardResolvesTo())
         ).first;
     }
 

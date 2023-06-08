@@ -50,6 +50,10 @@ public:
         m_is_default_constructible = true;
     }
 
+    void initializeDuringDeserialization(Type* elementType) {
+        m_element_type = elementType;
+    }
+
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
 

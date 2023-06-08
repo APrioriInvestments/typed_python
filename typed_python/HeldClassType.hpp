@@ -416,6 +416,29 @@ public:
         }
     }
 
+    void initializeDuringDeserialization(
+        std::string inName,
+        const std::vector<HeldClass*>& bases,
+        bool isFinal,
+        const std::vector<MemberDefinition>& members,
+        const std::map<std::string, Function*>& memberFunctions,
+        const std::map<std::string, Function*>& staticFunctions,
+        const std::map<std::string, Function*>& propertyFunctions,
+        const std::map<std::string, PyObject*>& classMembers,
+        const std::map<std::string, Function*>& classMethods,
+        Class* clsType
+    ) {
+        m_name = inName;
+        m_bases = bases;
+        m_is_final = isFinal;
+        m_own_members = members;
+        m_own_staticFunctions = staticFunctions;
+        m_own_propertyFunctions = propertyFunctions;
+        m_own_classMembers = classMembers;
+        m_own_classMethods = classMethods;
+        m_classType = clsType;
+    }
+
     const char* docConcrete() {
         return HeldClass_doc;
     }

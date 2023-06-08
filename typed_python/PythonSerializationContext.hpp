@@ -165,7 +165,7 @@ public:
 
     static Type* constructBlankInstanceOfType(Type::TypeCategory typeCat);
 
-    Type* deserializeNativeTypeInner(DeserializationBuffer& b, size_t wireType, bool actuallyProduceResult) const;
+    void deserializeNativeTypeIntoBlank(DeserializationBuffer& b, size_t wireType, Type* blankShell, std::string inName) const;
 
     Instance deserializeNativeInstance(DeserializationBuffer& b, size_t wireType) const;
 

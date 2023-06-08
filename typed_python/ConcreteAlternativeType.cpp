@@ -28,28 +28,3 @@ void ConcreteAlternative::constructor(instance_ptr self) {
         });
     }
 }
-
-// static
-ConcreteAlternative* ConcreteAlternative::Make(Alternative* alt, int64_t which) {
-    if (alt->isForwardDefined()) {
-        return new ConcreteAlternative(alt, which);
-    }
-
-    PyEnsureGilAcquired getTheGil;
-
-    typedef std::pair<Alternative*, int64_t> keytype;
-
-    static std::map<keytype, ConcreteAlternative*> memo;
-
-    auto it = memo.find(keytype(alt, which));
-
-    if (it != memo.end()) {
-        return it->second;
-    }
-
-    ConcreteAlternative* res = new ConcreteAlternative(alt, which);
-    ConcreteAlternative* concrete = (ConcreteAlternative*)res->forwardResolvesTo();
-
-    memo[keytype(alt, which)] = concrete;
-    return concrete;
-}

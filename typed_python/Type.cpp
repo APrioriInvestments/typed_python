@@ -349,7 +349,7 @@ void Type::attemptToResolve() {
     // step. Otherwise, it's possible for the names to depend on the order of initialization
     // and we want them to be stable.
     for (auto typeAndSource: resolutionSource) {
-        typeAndSource.first->recomputeNamePostInitialization();
+        typeAndSource.first->recomputeName();
     }
 
     // cause each type to post-initialize itself, which lets it update internal bytecounts and
@@ -438,6 +438,18 @@ void Type::attemptToResolve() {
     }
 }
 
+void Type::internalize() {
+    if (mIdentityHash == ShaHash()) {
+        throw std::runtime_error("This type should already have been hashed!");
+    }
+
+    if (mInternalizedIdentityHashToType.find(mIdentityHash)
+            != mInternalizedIdentityHashToType.end()) {
+        throw std::runtime_error("This type is already internalized!");
+    }
+
+    mInternalizedIdentityHashToType[mIdentityHash] = this;
+}
 
 PyObject* getOrSetTypeResolver(PyObject* module, PyObject* args) {
     int num_args = 0;

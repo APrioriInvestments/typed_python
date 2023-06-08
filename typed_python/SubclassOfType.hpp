@@ -28,8 +28,6 @@ class SubclassOfType : public Type {
 public:
     SubclassOfType() : Type(TypeCategory::catSubclassOf)
     {
-        m_is_default_constructible = true;
-        m_size = sizeof(Type*);
     }
 
     SubclassOfType(Type* subclassOf) noexcept :
@@ -37,15 +35,19 @@ public:
                     m_subclassOf(subclassOf)
     {
         m_is_forward_defined = true;
-        m_is_default_constructible = true;
-        m_size = sizeof(Type*);
     }
 
     const char* docConcrete() {
         return SubclassOf_doc;
     }
 
+    void initializeDuringDeserialization(Type* subclassOf) {
+        m_subclassOf = subclassOf;
+    }
+
     void postInitializeConcrete() {
+        m_is_default_constructible = true;
+        m_size = sizeof(Type*);
     }
 
     void initializeFromConcrete(Type* forwardDefinitionOfSelf) {

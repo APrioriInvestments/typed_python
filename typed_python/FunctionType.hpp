@@ -1545,6 +1545,24 @@ public:
         m_name = mRootName;
     }
 
+    void initializeDuringDeserialization(
+        std::string inName,
+        std::string qualname,
+        std::string moduleName,
+        std::vector<Overload> overloads,
+        Type* closureType,
+        bool isEntrypoint,
+        bool isNocompile
+    ) {
+        mRootName = inName;
+        mQualname = qualname;
+        mModulename = moduleName;
+        mOverloads = overloads;
+        mClosureType = closureType;
+        mIsEntrypoint = isEntrypoint;
+        mIsNocompile = isNocompile;
+    }
+
     std::string moduleNameConcrete() {
         if (mModulename.size() == 0) {
             return "builtins";

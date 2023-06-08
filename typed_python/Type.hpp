@@ -176,8 +176,20 @@ public:
         return m_typeCategory == catSet;
     }
 
+    bool isPointerTo() const {
+        return m_typeCategory == catPointerTo;
+    }
+
     bool isConstDict() const {
         return m_typeCategory == catConstDict;
+    }
+
+    bool isAlternativeMatcher() const {
+        return m_typeCategory == catAlternativeMatcher;
+    }
+
+    bool isBoundMethod() const {
+        return m_typeCategory == catBoundMethod;
     }
 
     bool isNamedTuple() const {
@@ -1000,13 +1012,15 @@ protected:
 
     static std::map<ShaHash, Type*> mInternalizedIdentityHashToType;
 
-    void recomputeNamePostInitialization() {
+public:
+    void recomputeName() {
         TypeStack stack;
         m_name = computeRecursiveName(stack);
         m_stripped_name = "";
     }
 
-public:
+    void internalize();
+
     // initialize ourself as a copy of 'forwardDefinitionOfSelf' where none of the types
     // will have a forward definition reference. The instance must have been constructed
     // using 'cloneForForwardResolution'. If the recursiveNameOverride is not None, then

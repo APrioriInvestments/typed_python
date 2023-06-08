@@ -45,7 +45,7 @@ from typed_python import (
     Dict, Set, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject,
     Forward, Final, Function, Entrypoint, TypeFunction, PointerTo,
-    SubclassOf, NotCompiled
+    SubclassOf, NotCompiled, resolveForwardDefinedType
 )
 
 from typed_python._types import (
@@ -560,11 +560,13 @@ class TypesSerializationTest(unittest.TestCase):
         ts = SerializationContext({'f': f})
         self.assertIs(ping_pong(f, ts), f)
 
-    def test_serialize_alternatives_as_types(self):
+    def test_serialize_recursive_alternative(self):
         A = Forward("A")
-        A = A.define(Alternative("A", X={'a': int}, Y={'a': A}))
+        A.define(Alternative("A", X={'a': int}, Y={'a': A}))
+        # A = resolveForwardDefinedType(A)
 
-        ts = SerializationContext({'A': A})
+
+        ts = SerializationContext()
         self.assertIs(ping_pong(A, ts), A)
         self.assertIs(ping_pong(A.X, ts), A.X)
 

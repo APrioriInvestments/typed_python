@@ -65,6 +65,10 @@ public:
         return concrete;
     }
 
+    void initializeDuringDeserialization(Type* eltType) {
+        m_element_type = eltType;
+    }
+
     bool isPODConcrete() {
         return true;
     }

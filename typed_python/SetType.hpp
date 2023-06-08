@@ -43,6 +43,10 @@ public:
         return Set_doc;
     }
 
+    void initializeDuringDeserialization(Type* keyType) {
+        m_key_type = keyType;
+    }
+
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
         visitor(m_key_type);

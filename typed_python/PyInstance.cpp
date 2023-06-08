@@ -1727,8 +1727,7 @@ Type* PyInstance::tryUnwrapPyInstanceToType(PyObject* arg) {
         }
 
         return PythonObjectOfType::Make(
-            (PyTypeObject*)nonType,
-            arg
+            (PyTypeObject*)nonType
         );
     }
 
@@ -1781,8 +1780,7 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
         }
 
         return PythonObjectOfType::Make(
-            (PyTypeObject*)nonType,
-            typearg
+            (PyTypeObject*)nonType
         );
     }
 
