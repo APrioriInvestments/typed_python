@@ -81,10 +81,34 @@ public:
         return incref(PyInstance::typePtrToPyTypeRepresentation(result));
     }
 
+    static PyObject* forwardResolve(PyObject* o, PyObject* args) {
+        if (PyTuple_Size(args) != 0) {
+            PyErr_SetString(PyExc_TypeError, "Forward.get takes zero arguments");
+            return NULL;
+        }
+
+        Forward* self_type = (Forward*)PyInstance::unwrapTypeArgToTypePtr(o);
+        if (!self_type) {
+            PyErr_SetString(PyExc_TypeError, "Forward.get unexpected error");
+            return NULL;
+        }
+
+        return translateExceptionToPyObject([&]() {
+            Type* result = self_type->getTarget()->forwardResolvesTo();
+
+            if (!result) {
+                return incref(Py_None);
+            }
+
+            return incref(PyInstance::typePtrToPyTypeRepresentation(result));
+        });
+    }
+
     static PyMethodDef* typeMethodsConcrete(Type* t) {
         return new PyMethodDef [4] {
             {"define", (PyCFunction)PyForwardInstance::forwardDefine, METH_VARARGS | METH_CLASS, NULL},
             {"get", (PyCFunction)PyForwardInstance::forwardGet, METH_VARARGS | METH_CLASS, NULL},
+            {"resolve", (PyCFunction)PyForwardInstance::forwardResolve, METH_VARARGS | METH_CLASS, NULL},
             {NULL, NULL}
         };
     }

@@ -1775,7 +1775,7 @@ void PythonSerializationContext::deserializeNativeTypeIntoBlank(
             throw std::runtime_error("Badly structured 'Function' encountered.");
         }
 
-        if (!blankShell->isForward()) {
+        if (!blankShell->isFunction()) {
             throw std::runtime_error("Shell is not a Function");
         }
 

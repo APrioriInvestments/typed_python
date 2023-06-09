@@ -23,7 +23,7 @@ PyDoc_STRVAR(Forward_doc,
     "Forward(n) -> new forward type named n\n"
     "\n"
     "Forward types must be resolved before any types that contain them can be used.\n"
-    );
+);
 
 // forward types must be resolved (removed from the graph) before
 // any types that contain them can be used.

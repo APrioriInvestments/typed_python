@@ -31,7 +31,7 @@ from typed_python import (
     Float32, SubclassOf,
     TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
     ConstDict, Alternative, serialize, deserialize, Class,
-    TypeFilter, Function, Forward, Set, PointerTo,
+    Function, Forward, Set, PointerTo,
     Entrypoint,
     Final,
     resolveForwardDefinedType
@@ -534,24 +534,6 @@ class TypesTests(unittest.TestCase):
 
     def test_one_of_order_matters(self):
         self.assertNotEqual(OneOf(1.0, 2.0), OneOf(2.0, 1.0))
-
-    def test_type_filter(self):
-        EvenInt = TypeFilter(int, lambda i: i % 2 == 0)
-
-        self.assertTrue(isinstance(2, EvenInt))
-        self.assertFalse(isinstance(1, EvenInt))
-        self.assertFalse(isinstance(2.0, EvenInt))
-
-        EvenIntegers = TupleOf(EvenInt)
-
-        e = EvenIntegers(())
-        e2 = e + (2, 4, 0)
-
-        with self.assertRaises(TypeError):
-            EvenIntegers((1,))
-
-        with self.assertRaises(TypeError):
-            e2 + (1,)
 
     def test_tuple_of_one_of_fixed_size(self):
         t = TupleOf(OneOf(0, 1, 2, 3, 4))

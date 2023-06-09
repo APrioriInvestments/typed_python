@@ -639,13 +639,8 @@ def test_serialization_of_anonymous_functions_preserves_references():
 
 def test_hash_stability():
     idHash = evaluateExprInFreshProcess({
-<<<<<<< HEAD
         'x.py': 'from typed_python.compiler.native_compiler.native_ast import NamedCallTarget\n'
-    }, 'identityHash(x.NamedCallTarget)')
-=======
-        'x.py': 'from typed_python.compiler.native_ast import NamedCallTarget\n'
     }, 'compilerHash(x.NamedCallTarget)')
->>>>>>> d4b04a6d... Add a 'VisibilityType' flag to MRTG. Refs #439.
     ser = returnSerializedValue({
         'x.py': 'from typed_python.compiler.native_compiler.native_ast import NamedCallTarget\n'
     }, 'x.NamedCallTarget', printComments=True)

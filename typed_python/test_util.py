@@ -15,6 +15,7 @@
 import psutil
 import time
 import threading
+import textwrap
 import tempfile
 import pickle
 import subprocess
@@ -22,7 +23,7 @@ import sys
 import os
 
 from typed_python import sha_hash
-from typed_python import Entrypoint, SerializationContext
+# from typed_python import Entrypoint, SerializationContext
 
 
 def currentMemUsageMb(residentOnly=True):
@@ -94,7 +95,7 @@ def instantiateFiles(filesToWrite, tf):
             )
 
 
-def callFunctionInFreshProcess(func, argTup, compilerCacheDir=None, showStdout=False, extraEnvs={}):
+def callFunctionInFreshProcess(func, argTup=(), compilerCacheDir=None, showStdout=False, extraEnvs={}):
     """Return the value of a function evaluated on some arguments in a subprocess.
 
     We use this to test the semantics of anonymous functions and classes in a process
@@ -244,6 +245,14 @@ class CodeEvaluator:
         self.dir = tempfile.TemporaryDirectory()
 
     def evaluateInto(self, code, moduleDict):
+        # strip any blank lines at the end of 'code' and dedent it
+        codeLines = code.split("\n")
+        while codeLines and not codeLines[-1].strip():
+            codeLines = codeLines[:-1]
+        code = "\n".join(codeLines)
+
+        code = textwrap.dedent(code)
+
         filename = os.path.abspath(
             os.path.join(self.dir.name, sha_hash(code).hexdigest)
         )

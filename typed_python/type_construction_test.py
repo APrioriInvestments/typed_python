@@ -6,6 +6,31 @@ from typed_python import (
     Class, Member, ConstDict, TypedCell, Final
 )
 
+from typed_python.test_util import CodeEvaluator
+
+
+def test_identity_hash_of_alternative_stable():
+    e = CodeEvaluator()
+    m = {}
+
+    e.evaluateInto("""
+        from typed_python._types import identityHash, Alternative
+
+        A = Alternative(
+            "A",
+            f=lambda x: (A, g)
+        )
+
+        h1 = identityHash(A)
+
+        def g():
+            pass
+
+        h2 = identityHash(A)
+    """, m)
+
+    assert m['h1'] == m['h2']
+
 
 def test_nonforward_definition():
     assert not isForwardDefined(OneOf(int, float))
@@ -63,6 +88,11 @@ def test_forward_one_of():
     assert not isForwardDefined(O_resolved)
 
     assert bytecount(O_resolved) == 1 + bytecount(float)
+
+
+def test_oneof():
+    assert OneOf(int, float) is OneOf(int, float)
+    assert OneOf(int, float) is not OneOf(int, None)
 
 
 def test_recursive_definition_of_self():
@@ -398,6 +428,37 @@ def test_create_class_with_forward_base():
     assert makeClass(str)().m == ""
 
 
+def test_identity_of_leaked_forward():
+    def makeClass():
+        A = Forward("A")
+        A_fwd = A
+
+        A.define(
+            Alternative(
+                "A",
+                X={},
+                getA=lambda self: A,
+                getAForward=lambda self: A_fwd
+            )
+        )
+        A = resolveForwardDefinedType(A)
+
+        return A, A_fwd
+
+    A1, A1_fwd = makeClass()
+    A2, A2_fwd = makeClass()
+
+    # the identity of 'A' should be stable
+    assert A1 is A2
+
+    # but the forwards we used to create them could be separate
+    assert A1_fwd is not A2_fwd
+
+    # they have to point to the same concrete instance
+    assert A1_fwd.get() is A2_fwd.get()
+    assert A1_fwd.get() is A1
+
+
 @pytest.mark.skip(reason='TODO: make this work')
 def test_create_class_with_fully_forward_base():
     def makeClass(T):
@@ -440,3 +501,4 @@ def test_create_class_with_fully_forward_base():
 #    part of the graph being new, part being old
 # 8. clean-up in the whole Instance/PyInstance layer - kind of nasty
 # 9. we should memoize instances of statless Function objects and instances of regular TP lists/tuple of, etc.
+

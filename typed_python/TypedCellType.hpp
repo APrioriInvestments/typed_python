@@ -40,14 +40,15 @@ public:
             mHeldType(heldType)
     {
         m_is_forward_defined = true;
-
-        m_size = sizeof(layout*);
-
-        m_is_default_constructible = true;
+        recomputeName();
     }
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
         return "TypedCell(" + mHeldType->computeRecursiveName(typeStack) + ")";
+    }
+
+    const char* docConcrete() {
+        return "TypedCell: a cell held in a fully-typed function closure.";
     }
 
     void initializeDuringDeserialization(Type* heldType) {
@@ -62,7 +63,10 @@ public:
         updateTypeRefFromGroupMap(mHeldType, groupMap);
     }
 
-    void postInitializeConcrete() {}
+    void postInitializeConcrete() {
+        m_size = sizeof(layout*);
+        m_is_default_constructible = true;
+    }
 
     Type* cloneForForwardResolutionConcrete() {
         return new TypedCellType();

@@ -44,8 +44,6 @@ public:
     // construct a non-forward defined pointer
     PointerTo() : Type(TypeCategory::catPointerTo)
     {
-        m_size = sizeof(instance);
-        m_is_default_constructible = true;
     }
 
     PointerTo(Type* t) :
@@ -53,8 +51,7 @@ public:
         m_element_type(t)
     {
         m_is_forward_defined = true;
-        m_size = sizeof(instance);
-        m_is_default_constructible = true;
+        recomputeName();
     }
 
     void initializeDuringDeserialization(Type* eltType) {
@@ -115,7 +112,10 @@ public:
         return new PointerTo();
     }
 
-    void postInitializeConcrete() {}
+    void postInitializeConcrete() {
+        m_size = sizeof(instance);
+        m_is_default_constructible = true;
+    }
 
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {

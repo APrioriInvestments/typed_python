@@ -33,9 +33,8 @@ public:
         Type(TypeCategory::catRefTo),
         m_element_type(t)
     {
-        m_size = sizeof(instance);
-        m_is_default_constructible = false;
         m_is_forward_defined = true;
+        recomputeName();
     }
 
     template<class visitor_type>
@@ -65,6 +64,10 @@ public:
         return concrete;
     }
 
+    const char* docConcrete() {
+        return "RefTo is deprecated.";
+    }
+
     void initializeDuringDeserialization(Type* eltType) {
         m_element_type = eltType;
     }
@@ -89,7 +92,10 @@ public:
         return new RefTo();
     }
 
-    void postInitializeConcrete() {}
+    void postInitializeConcrete() {
+        m_size = sizeof(instance);
+        m_is_default_constructible = false;
+    }
 
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
