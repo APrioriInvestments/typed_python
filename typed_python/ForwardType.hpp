@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2023 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -29,9 +29,10 @@ PyDoc_STRVAR(Forward_doc,
 // any types that contain them can be used.
 class Forward : public Type {
 public:
-    Forward(std::string name) :
+    Forward(std::string name, PyObject* cellOrDict=nullptr) :
         Type(TypeCategory::catForward),
-        mTarget(nullptr)
+        mTarget(nullptr),
+        mCellOrDict(incref(cellOrDict))
     {
         m_name = name;
         m_is_forward_defined = true;
@@ -63,6 +64,65 @@ public:
 
     static Forward* Make(std::string name) {
         return new Forward(name);
+    }
+
+    static Forward* MakeFromFunction(PyObject* funcObj) {
+        if (!PyFunction_Check(funcObj)) {
+            throw std::runtime_error(
+                "Forwards can only be made from functions which return a single variable lookup."
+            );
+        }
+
+        PyCodeObject* code = (PyCodeObject*)PyFunction_GetCode(funcObj);
+        PyObject* closure = PyFunction_GetClosure(funcObj);
+
+        if (!PyTuple_Check(code->co_names)) {
+            throw std::runtime_error("Corrupt Forward lookup function: Code object co_names is not a tuple");
+        }
+
+        if (closure) {
+            PyObjectStealer coFreevars(PyObject_GetAttrString(PyFunction_GetCode(funcObj), "co_freevars"));
+
+            if (PyTuple_Size(code->co_names)) {
+                throw std::runtime_error("Corrupt Forward lookup function: can't have more than one name");
+            }
+
+            if (!PyTuple_Check(coFreevars)) {
+                throw std::runtime_error("Corrupt Forward lookup function: co_freevars was not a tuple");
+            }
+
+            if (PyTuple_Size(coFreevars) != PyTuple_Size(closure)) {
+                throw std::runtime_error("Corrupt Forward lookup function: co_freevars not the same size as closure");
+            }
+
+            if (PyTuple_Size(coFreevars) != 1) {
+                throw std::runtime_error("Corrupt Forward lookup function: can't have more than 1 free variable");
+            }
+
+            PyObject* varname = PyTuple_GetItem(coFreevars, 0);
+            if (!PyUnicode_Check(varname)) {
+                throw std::runtime_error("Corrupt Forward lookup function: closure varnames need to be strings");
+            }
+
+            std::string name = PyUnicode_AsUTF8(varname);
+
+            if (!PyCell_Check(PyTuple_GetItem(closure, 0))) {
+                throw std::runtime_error("Corrupt Forward lookup function: closure was not a cell");
+            }
+
+            return new Forward(name, PyTuple_GetItem(closure, 0));
+        }
+
+        if (PyTuple_Size(code->co_names) != 1) {
+            throw std::runtime_error("Corrupt Forward lookup function: Code object co_names refers to more than 1 name");
+        }
+
+        if (!PyUnicode_Check(PyTuple_GetItem(code->co_names, 0))) {
+            throw std::runtime_error("Corrupt Forward lookup function: Code object co_names refers to more than 1 name");
+        }
+
+        std::string name = PyUnicode_AsUTF8(PyTuple_GetItem(code->co_names, 0));
+        return new Forward(name, PyFunction_GetGlobals(funcObj));
     }
 
     Type* getTargetTransitive() {
@@ -126,9 +186,32 @@ public:
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {
-        if (mTarget)
+        if (mTarget) {
             v(mTarget);
+        }
     }
+
+    bool hasLambdaDefinition() {
+        return mCellOrDict != nullptr;
+    }
+
+    bool lambdaDefinitionPopulated() {
+        if (!mCellOrDict) {
+            return false;
+        }
+
+        if (PyCell_Check(mCellOrDict)) {
+            return PyCell_Get(mCellOrDict) != nullptr;
+        }
+
+        if (PyDict_Check(mCellOrDict)) {
+            return PyDict_GetItemString(mCellOrDict, m_name.c_str());
+        }
+
+        return false;
+    }
+
+    Type* lambdaDefinition();
 
     void constructor(instance_ptr self) {
         throw std::runtime_error("Forward types should never be explicity instantiated.");
@@ -158,4 +241,9 @@ public:
 
 private:
     Type* mTarget;
+
+    // if we are a recursive forward defined by a simple lambda function encoded by name,
+    // then this will contain either a PyCell from the closure, or a PyDict in which
+    // we are supposed to look to find a 'name'.
+    PyObject* mCellOrDict;
 };

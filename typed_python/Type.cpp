@@ -293,7 +293,7 @@ bool Type::looksResolvable(bool unambiguously) {
     reachableUnresolvedTypes(this, typesNeedingResolution);
 
     for (auto t: typesNeedingResolution) {
-        if (t->isForward() && !((Forward*)t)->getTarget()) {
+        if (t->isForward() && !((Forward*)t)->getTarget() && !((Forward*)t)->lambdaDefinition()) {
             return false;
         }
     }
@@ -329,9 +329,17 @@ void Type::attemptToResolve() {
     std::set<Type*> existingReferencedTypes;
 
     for (auto t: typesNeedingResolution) {
-        if (t->isForward() && !((Forward*)t)->getTarget()) {
+        if (t->isForward() && !((Forward*)t)->getTarget() && !((Forward*)t)->lambdaDefinition()) {
             throw std::runtime_error(
                 "Forward defined as " + t->nameWithModule() + " has not been defined."
+            );
+        }
+    }
+
+    for (auto t: typesNeedingResolution) {
+        if (t->isForward() && !((Forward*)t)->getTarget()) {
+            ((Forward*)t)->define(
+                ((Forward*)t)->lambdaDefinition()
             );
         }
     }

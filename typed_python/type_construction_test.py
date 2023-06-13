@@ -63,12 +63,30 @@ def test_untyped_functions_are_not_forward():
     assert not isForwardDefined(type(g))
 
 
-def test_recursive_types():
-    # define a forward
-    O = Forward("O")
+def test_invalid_forwards():
+    with pytest.raises(TypeError):
+        Forward(lambda: 1)
 
-    # give the forward a definition. the thing that comes out is the resolved type
-    O = O.define(ListOf(OneOf(int, O)))
+    with pytest.raises(TypeError):
+        Forward(lambda: A + B)  # noqa
+
+    X = 10
+    with pytest.raises(TypeError):
+        Forward(lambda: X + B)  # noqa
+
+
+def test_implicitly_recursive_types():
+    O_fwd = ListOf(OneOf(int, Forward(lambda: O)))
+
+    assert isForwardDefined(O_fwd)
+    assert not typeLooksResolvable(O_fwd)
+
+    O = O_fwd
+
+    assert typeLooksResolvable(O_fwd)
+
+    O = resolveForwardDefinedType(O)
+    O([O()])
 
 
 def test_dual_recursive_types_direct_instantiation():

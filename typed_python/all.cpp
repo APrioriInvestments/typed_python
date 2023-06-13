@@ -61,6 +61,7 @@ compile the entire group all at once.
 #include "TupleOrListOfType.cpp"
 #include "Type.cpp"
 #include "FunctionType.cpp"
+#include "ForwardType.cpp"
 #include "ValueType.cpp"
 
 #include "SerializationBuffer.cpp"

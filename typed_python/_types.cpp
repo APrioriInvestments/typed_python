@@ -3134,39 +3134,37 @@ PyObject *referencedTypes(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *MakeForwardType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
-    int num_args = PyTuple_Size(args);
+    return translateExceptionToPyObject([&]() {
+        int num_args = PyTuple_Size(args);
 
-    PyThreadState * ts = PyThreadState_Get();
-    std::string moduleName;
-    PyObject* pyModuleName;
-
-    if (ts->frame && ts->frame->f_globals &&
-            (pyModuleName = PyDict_GetItemString(ts->frame->f_globals, "__name__"))) {
-        if (PyUnicode_Check(pyModuleName)) {
-            moduleName = PyUnicode_AsUTF8(pyModuleName);
-        }
-    }
-
-    if (num_args > 1 || (num_args == 1 && !PyUnicode_Check(PyTuple_GetItem(args,0)))) {
-        PyErr_SetString(PyExc_TypeError, "Forward takes a zero or one string positional arguments.");
-        return NULL;
-    }
-
-    if (num_args == 1) {
-        std::string name = PyUnicode_AsUTF8(PyTuple_GetItem(args,0));
-
-        if (moduleName.size()) {
-            name = moduleName + "." + name;
+        if (num_args == 1 && PyUnicode_Check(PyTuple_GetItem(args, 0))) {
+            return incref((PyObject*)PyInstance::typeObj(
+                Forward::Make(
+                    PyUnicode_AsUTF8(PyTuple_GetItem(args,0))
+                )
+            ));
         }
 
-        return incref((PyObject*)PyInstance::typeObj(
-            ::Forward::Make(name)
-        ));
-    } else {
-        return incref((PyObject*)PyInstance::typeObj(
-            ::Forward::Make()
-        ));
-    }
+        if (num_args == 1 && PyFunction_Check(PyTuple_GetItem(args, 0))) {
+            return incref((PyObject*)PyInstance::typeObj(
+                Forward::MakeFromFunction(PyTuple_GetItem(args, 0))
+            ));
+        }
+
+        if (num_args == 0) {
+            return incref((PyObject*)PyInstance::typeObj(
+                Forward::Make()
+            ));
+        }
+
+        if (num_args > 1) {
+            throw std::runtime_error("Can't make a Forward with more than 1 argument.");
+        }
+
+        throw std::runtime_error(
+            "Forward requires either a string or a function with a simple name lookup."
+        );
+    });
 }
 
 /*********
