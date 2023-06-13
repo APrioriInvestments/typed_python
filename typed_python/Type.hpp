@@ -886,6 +886,16 @@ public:
         return m_is_forward_defined;
     }
 
+    bool isResolved() const {
+        if (!m_is_forward_defined) {
+            return true;
+        }
+
+        return m_forward_resolves_to != nullptr;
+    }
+
+    bool looksResolvable(bool unambiguously);
+
     Type* forwardResolvesTo() {
         if (!m_is_forward_defined) {
             return this;
@@ -912,9 +922,6 @@ protected:
             m_forward_resolves_to(nullptr),
             m_is_redundant(false)
         {}
-
-    //todo: remove this
-    bool m_is_recursive_forward;
 
     TypeCategory m_typeCategory;
 

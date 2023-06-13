@@ -34,6 +34,12 @@ Value::Value(const Instance& instance) :
     m_is_default_constructible = true;
 
     mValueAsPyobj = PyInstance::extractPythonObject(mInstance);
+
+    if (!mValueAsPyobj) {
+        PyErr_Clear();
+        throw std::runtime_error("Failed to convert an instance of type " + mInstance.type()->name() + " to a PyObject!");
+    }
+
     m_is_forward_defined = true;
 }
 
@@ -125,10 +131,18 @@ void Value::updateInternalTypePointersConcrete(
             (PyObject*)PyInstance::typeObj(it->second)
         );
         mValueAsPyobj = PyInstance::extractPythonObject(mInstance);
+        if (!mValueAsPyobj) {
+            PyErr_Clear();
+            throw std::runtime_error("Failed to convert an instance of type " + mInstance.type()->name() + " to a PyObject!");
+        }
     }
 }
 
 void Value::initializeFromConcrete(Type* forwardDefinitionOfSelf) {
     mInstance = ((Value*)forwardDefinitionOfSelf)->mInstance.clone();
     mValueAsPyobj = PyInstance::extractPythonObject(mInstance);
+    if (!mValueAsPyobj) {
+        PyErr_Clear();
+        throw std::runtime_error("Failed to convert an instance of type " + mInstance.type()->name() + " to a PyObject!");
+    }
 }

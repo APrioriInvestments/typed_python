@@ -178,7 +178,7 @@ Alternative* Alternative::Make(
     }
 
     for (auto nameAndMeth: methods) {
-        if (nameAndMeth.second->isForwardDefined()) {
+        if (nameAndMeth.second->isForwardDefined() || nameAndMeth.second->hasUnresolvedSymbols()) {
             anyForward = true;
         }
     }

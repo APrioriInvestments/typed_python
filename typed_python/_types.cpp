@@ -2505,10 +2505,10 @@ PyObject *isForwardDefined(PyObject* nullValue, PyObject* args) {
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
 
     return translateExceptionToPyObject([&]() {
-        Type* typeOfArg = PyInstance::extractTypeFrom(((PyObject*)a1)->ob_type);
-        if (typeOfArg && typeOfArg->isFunction() && typeOfArg->bytecount() == 0) {
-            return incref(typeOfArg->isForwardDefined() ? Py_True : Py_False);
-        }
+        // Type* typeOfArg = PyInstance::extractTypeFrom(((PyObject*)a1)->ob_type);
+        // if (typeOfArg && typeOfArg->isFunction()) {
+        //     return incref(typeOfArg->isForwardDefined() ? Py_True : Py_False);
+        // }
 
         Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
 
@@ -2520,6 +2520,33 @@ PyObject *isForwardDefined(PyObject* nullValue, PyObject* args) {
     });
 }
 
+PyObject *typeLooksResolvable(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    return translateExceptionToPyObject([&]() {
+        PyObject* type;
+        int unambiguously = 0;
+
+        static const char *kwlist[] = {"type", "unambiguously", NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|p", (char**)kwlist, &type, &unambiguously)) {
+            throw PythonExceptionSet();
+        }
+
+        // see first if its an unclosured function object
+        // Type* typeOfArg = PyInstance::extractTypeFrom(type->ob_type, false);
+        // if (typeOfArg && typeOfArg->isFunction()) {
+        //     return incref(typeOfArg->looksResolvable(unambiguously) ? Py_True : Py_False);
+        // }
+
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(type);
+
+        if (!t) {
+            throw std::runtime_error("type must be a TP type instance");
+        }
+
+        return incref(t->looksResolvable(unambiguously) ? Py_True : Py_False);
+    });
+}
+
 PyObject *resolveForwardDefinedType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "resolveForwardDefinedType takes 1 positional argument");
@@ -2527,15 +2554,17 @@ PyObject *resolveForwardDefinedType(PyObject* nullValue, PyObject* args) {
     }
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
 
-    Type* typeOfArg = PyInstance::extractTypeFrom(((PyObject*)a1)->ob_type);
+    // Type* typeOfArg = PyInstance::extractTypeFrom(((PyObject*)a1)->ob_type, false);
 
-    if (typeOfArg && typeOfArg->isFunction() && typeOfArg->bytecount() == 0) {
-        return ::translateExceptionToPyObject([&]() {
-            Type* newType = typeOfArg->forwardResolvesTo();
+    // if (typeOfArg && typeOfArg->isFunction()) {
+    //     return ::translateExceptionToPyObject([&]() {
+    //         Type* newType = typeOfArg->forwardResolvesTo();
 
-            return PyInstance::initialize(newType, [&](instance_ptr data) {});
-        });
-    }
+    //         return PyInstance::initialize(newType, [&](instance_ptr data) {
+    //             ((Function*)newType)->getClosureType()->copy_constructor(data, ((PyInstance*)(PyObject*)a1)->dataPtr());
+    //         });
+    //     });
+    // }
 
     Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
 
@@ -3473,6 +3502,7 @@ static PyMethodDef module_methods[] = {
     {"isPOD", (PyCFunction)isPOD, METH_VARARGS, NULL},
     {"isForwardDefined", (PyCFunction)isForwardDefined, METH_VARARGS, NULL},
     {"resolveForwardDefinedType", (PyCFunction)resolveForwardDefinedType, METH_VARARGS, NULL},
+    {"typeLooksResolvable", (PyCFunction)typeLooksResolvable, METH_VARARGS | METH_KEYWORDS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS | METH_KEYWORDS, NULL},
     {"recursiveTypeGroup", (PyCFunction)recursiveTypeGroup, METH_VARARGS | METH_KEYWORDS, NULL},
     {"recursiveTypeGroupRepr", (PyCFunction)recursiveTypeGroupRepr, METH_VARARGS | METH_KEYWORDS, NULL},

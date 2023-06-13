@@ -915,7 +915,6 @@ public:
             visitor.visitHash(ShaHash(1));
         }
 
-
         template<class visitor_type>
         static void visitCompilerVisibleGlobals(
             const visitor_type& visitor,
@@ -1064,7 +1063,7 @@ public:
             return mFunctionGlobals;
         }
 
-        const std::map<std::string, PyObject*> getFunctionGlobalsInCells() const {
+        const std::map<std::string, PyObject*>& getFunctionGlobalsInCells() const {
             return mFunctionGlobalsInCells;
         }
 
@@ -1199,6 +1198,43 @@ public:
         void setGlobals(PyObject* globals) {
             decref(mFunctionGlobals);
             mFunctionGlobals = incref(globals);
+        }
+
+        bool symbolIsUnresolved(std::string name) {
+            if (mClosureBindings.find(name) != mClosureBindings.end()) {
+                return false;
+            }
+
+            auto it = mFunctionGlobalsInCells.find(name);
+            if (it != mFunctionGlobalsInCells.end()) {
+                if (PyCell_Check(it->second) && PyCell_GET(it->second)) {
+                    return false;
+                }
+            }
+
+            if (mFunctionGlobals && PyDict_Check(mFunctionGlobals)
+                    && PyDict_GetItemString(mFunctionGlobals, name.c_str())) {
+                return false;
+            }
+
+            return true;
+        }
+
+        bool hasUnresolvedSymbols() {
+            std::set<PyObject*> allNames;
+            extractNamesFromCode((PyCodeObject*)mFunctionCode, allNames);
+
+            for (auto name: allNames) {
+                if (PyUnicode_Check(name)) {
+                    std::string nameStr = PyUnicode_AsUTF8(name);
+
+                    if (nameStr != "__module_hash__" && symbolIsUnresolved(nameStr)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         PyObject* getUsedGlobals() const {
@@ -1579,6 +1615,16 @@ public:
         return mModulename + "." + mRootName;
     }
 
+    bool hasUnresolvedSymbols() {
+        for (auto& o: mOverloads) {
+            if (o.hasUnresolvedSymbols()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
         return mRootName;
     }
@@ -1653,6 +1699,10 @@ public:
                     anyFwd = true;
                 }
             });
+
+            if (o.hasUnresolvedSymbols()) {
+                anyFwd = true;
+            }
         }
 
         if (anyFwd) {
@@ -1937,11 +1987,11 @@ public:
         return true;
     }
 
-    //Function types can be instantiated even if forwards are not resolved
-    //in their annotations.
-    void assertForwardsResolvedSufficientlyToInstantiateConcrete() const {
-        mClosureType->assertForwardsResolvedSufficientlyToInstantiate();
-    }
+    // //Function types can be instantiated even if forwards are not resolved
+    // //in their annotations.
+    // void assertForwardsResolvedSufficientlyToInstantiateConcrete() const {
+    //     mClosureType->assertForwardsResolvedSufficientlyToInstantiate();
+    // }
 
     Function* replaceClosure(Type* closureType) const {
         return Function::Make(mRootName, mQualname, mModulename, mOverloads, closureType, mIsEntrypoint, mIsNocompile);

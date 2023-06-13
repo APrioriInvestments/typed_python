@@ -3,7 +3,7 @@ import pytest
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
     Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash, Value,
-    Class, Member, ConstDict, TypedCell, Final
+    Class, Member, ConstDict, TypedCell, Final, typeLooksResolvable
 )
 
 from typed_python.test_util import CodeEvaluator
@@ -30,6 +30,74 @@ def test_identity_hash_of_alternative_stable():
     """, m)
 
     assert m['h1'] == m['h2']
+
+
+def test_type_looks_resolvable_alternative():
+    # note that these types are not autoresolvable because of their names
+    A = Alternative("A_", X={}, f=lambda self: B)
+
+    assert typeLooksResolvable(A, unambiguously=False)
+    assert not typeLooksResolvable(A, unambiguously=True)
+
+    B = Alternative("B_", X={}, g=lambda self: A)
+
+    assert typeLooksResolvable(A, unambiguously=False)
+    assert typeLooksResolvable(A, unambiguously=True)
+    assert typeLooksResolvable(B, unambiguously=False)
+    assert typeLooksResolvable(B, unambiguously=True)
+
+    A = resolveForwardDefinedType(A)
+    B = resolveForwardDefinedType(B)
+
+    assert A().f() is B
+    assert B().g() is A
+
+
+def test_untyped_functions_are_not_forward():
+    # this type is not forward defined because it should be holding 'g' in the closure of
+    # 'f' itself
+    f = Function(lambda: g())
+    assert not isForwardDefined(type(f))
+
+    g = Function(lambda: f())
+    assert not isForwardDefined(type(g))
+
+
+def test_recursive_types():
+    # define a forward
+    O = Forward("O")
+
+    # give the forward a definition. the thing that comes out is the resolved type
+    O = O.define(ListOf(OneOf(int, O)))
+
+
+def test_dual_recursive_types_direct_instantiation():
+    O1 = Forward("O1")
+    O2 = Forward("O2")
+
+    O1.define(ListOf(OneOf(int, O2)))
+    O2.define(ListOf(OneOf(int, O1)))
+
+    O1 = resolveForwardDefinedType(O1)
+    O2 = resolveForwardDefinedType(O2)
+
+
+def test_dual_recursive_types_direct_instantiation_with_alternatives():
+    O1 = Forward("O1")
+    O2 = Forward("O2")
+
+    O1.define(Alternative("O1", X={}, Y={'a': O2}, f=lambda self: O2))
+    O2.define(Alternative("O2", X={}, Y={'a': O1}, f=lambda self: O1))
+
+    O1 = resolveForwardDefinedType(O1)
+    O2 = resolveForwardDefinedType(O2)
+
+
+def test_dual_recursive_types_implicit_instantiation_with_alternatives():
+    O1 = Alternative("O1", X={}, Y={'a': lambda: O2}, f=lambda self: O2)
+
+    # this assignment triggers a resolution
+    O2 = Alternative("O2", X={}, Y={'a': lambda: O1}, f=lambda self: O1)
 
 
 def test_nonforward_definition():
@@ -501,4 +569,3 @@ def test_create_class_with_fully_forward_base():
 #    part of the graph being new, part being old
 # 8. clean-up in the whole Instance/PyInstance layer - kind of nasty
 # 9. we should memoize instances of statless Function objects and instances of regular TP lists/tuple of, etc.
-

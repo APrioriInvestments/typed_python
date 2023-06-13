@@ -54,6 +54,7 @@ from typed_python._types import (
     ModuleRepresentation,
     setGilReleaseThreadLoopSleepMicroseconds,
     isForwardDefined,
+    typeLooksResolvable,
     resolveForwardDefinedType,
     identityHash
 )

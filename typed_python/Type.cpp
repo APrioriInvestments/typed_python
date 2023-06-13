@@ -254,6 +254,61 @@ bool Type::canConvertToTrivially(Type* otherType) {
     return false;
 }
 
+void reachableUnresolvedTypes(Type* root, std::set<Type*>& outTypes) {
+    std::set<Type*> toVisit;
+    toVisit.insert(root);
+
+    // walk the graph and determine all forwards that are not resolved
+    while (toVisit.size()) {
+        Type* toCheck = *toVisit.begin();
+        toVisit.erase(toCheck);
+
+        if (toCheck->isForwardDefined() && !toCheck->isResolved()) {
+            if (outTypes.find(toCheck) == outTypes.end()) {
+                outTypes.insert(toCheck);
+
+                toCheck->visitReferencedTypes([&](Type* subtype) {
+                    if (subtype->isForwardDefined() && !subtype->isResolved()) {
+                        toVisit.insert(subtype);
+                    }
+                });
+            }
+        }
+    }
+}
+
+bool Type::looksResolvable(bool unambiguously) {
+    if (!m_is_forward_defined) {
+        return true;
+    }
+
+    if (m_forward_resolves_to) {
+        return true;
+    }
+
+    // do the entire type resolution process while holding the GIL
+    PyEnsureGilAcquired getTheGil;
+
+    std::set<Type*> typesNeedingResolution;
+    reachableUnresolvedTypes(this, typesNeedingResolution);
+
+    for (auto t: typesNeedingResolution) {
+        if (t->isForward() && !((Forward*)t)->getTarget()) {
+            return false;
+        }
+    }
+
+    if (unambiguously) {
+        for (auto t: typesNeedingResolution) {
+            if (t->isFunction() && ((Function*)t)->hasUnresolvedSymbols()) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 // try to resolve this forward type. If we can't, we'll throw an exception. On exit,
 // we will have thrown, or m_forward_resolves_to will be populated.
 void Type::attemptToResolve() {
@@ -261,31 +316,17 @@ void Type::attemptToResolve() {
         return;
     }
 
+    if (!m_is_forward_defined) {
+        return;
+    }
+
     // do the entire type resolution process while holding the GIL
     PyEnsureGilAcquired getTheGil;
 
-    std::set<Type*> existingReferencedTypes;
     std::set<Type*> typesNeedingResolution;
-    std::set<Type*> toVisit;
-    toVisit.insert(this);
+    reachableUnresolvedTypes(this, typesNeedingResolution);
 
-    // walk the graph and determine all forwards that are not resolved
-    while (toVisit.size()) {
-        Type* toCheck = *toVisit.begin();
-        toVisit.erase(toCheck);
-
-        if (toCheck->isForwardDefined() && !toCheck->m_forward_resolves_to) {
-            if (typesNeedingResolution.find(toCheck) == typesNeedingResolution.end()) {
-                typesNeedingResolution.insert(toCheck);
-
-                toCheck->visitReferencedTypes([&](Type* subtype) {
-                    if (subtype->isForwardDefined() && !subtype->m_forward_resolves_to) {
-                        toVisit.insert(subtype);
-                    }
-                });
-            }
-        }
-    }
+    std::set<Type*> existingReferencedTypes;
 
     for (auto t: typesNeedingResolution) {
         if (t->isForward() && !((Forward*)t)->getTarget()) {
