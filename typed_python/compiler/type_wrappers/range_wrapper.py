@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Class, Final, PointerTo, Held, Member, pointerTo
+from typed_python import Class, Final, PointerTo, Held, Member, pointerTo, resolveForwardDefinedType
 
 
 class Range(Class, Final, __name__='range'):
@@ -30,9 +30,6 @@ class Range(Class, Final, __name__='range'):
 
     def __call__(self, start, stop, step):  # noqa
         return RangeCls(start=start, stop=stop, step=step)
-
-
-range = Range()
 
 
 @Held
@@ -93,3 +90,11 @@ class RangeIterator(Class, Final):
                 return startPtr
 
         return PointerTo(int)()
+
+
+RangeCls = resolveForwardDefinedType(RangeCls)
+RangeIterator = resolveForwardDefinedType(RangeIterator)
+Range = resolveForwardDefinedType(Range)
+
+
+range = Range()

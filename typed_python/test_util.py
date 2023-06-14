@@ -23,7 +23,7 @@ import sys
 import os
 
 from typed_python import sha_hash
-# from typed_python import Entrypoint, SerializationContext
+from typed_python import Entrypoint, SerializationContext
 
 
 def currentMemUsageMb(residentOnly=True):

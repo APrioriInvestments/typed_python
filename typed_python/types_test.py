@@ -33,8 +33,7 @@ from typed_python import (
     ConstDict, Alternative, serialize, deserialize, Class,
     Function, Forward, Set, PointerTo,
     Entrypoint,
-    Final,
-    resolveForwardDefinedType
+    Final
 )
 from typed_python.type_promotion import (
     computeArithmeticBinaryResultType, floatness, bitness, isSignedInt
@@ -44,9 +43,7 @@ from typed_python.test_util import currentMemUsageMb
 
 AnAlternative = Alternative("AnAlternative", X={'x': int})
 
-AForwardAlternative = Forward()
-AForwardAlternative.define(Alternative("AForwardAlternative", Y={}, X={'x': AForwardAlternative}))
-AForwardAlternative = resolveForwardDefinedType(AForwardAlternative)
+AForwardAlternative = Alternative("AForwardAlternative", Y={}, X={'x': lambda: AForwardAlternative})
 
 
 def typeFor(t):
@@ -1162,6 +1159,9 @@ class TypesTests(unittest.TestCase):
                         __delattr__=A_delattr,
                         )
 
+        from typed_python import resolveForwardDefinedType
+        A = resolveForwardDefinedType(A)
+
         self.assertEqual(A.a().__bool__(), False)
         self.assertEqual(bool(A.a()), False)
         self.assertEqual(A.b().__bool__(), True)
@@ -1244,26 +1244,54 @@ class TypesTests(unittest.TestCase):
         d = dir(A.a())
         self.assertGreater(len(d), 50)
 
-        A2_items = dict()
+    def test_alternative_magic_methods_2(self):
+        A2_attrs = {"q": "value-q", "z": "value-z"}
+
+        def A2_getattr(s, n):
+            if n not in A2_attrs:
+                raise AttributeError(f"no attribute {n}")
+            return A2_attrs[n]
+
+        def A2_setattr(s, n, v):
+            A2_attrs[n] = v
+
+        def A2_delattr(s, n):
+            A2_attrs.pop(n, None)
+
+        A2_items = {'blah': 'blah'}
 
         def A2_setitem(self, i, v):
             A2_items[i] = v
-            return 0
 
-        A2 = Alternative("A2", a={'a': int}, b={'b': str},
-                         __getattribute__=A_getattr,
-                         __setattr__=A_setattr,
-                         __delattr__=A_delattr,
-                         __dir__=lambda self: list(A_attrs.keys()),
-                         __getitem__=lambda self, i: A2_items.get(i, i),
-                         __setitem__=A2_setitem
-                         )
+        def A2_delitem(self, i):
+            A2_items.pop(i)
 
+        A2 = Alternative(
+            "A2",
+            a={'a': int},
+            b={'b': str},
+             __getattribute__=A2_getattr,
+             __setattr__=A2_setattr,
+             __delattr__=A2_delattr,
+             __dir__=lambda self: list(A2_attrs.keys()),
+             __getitem__=lambda self, i: A2_items.get(i, i),
+             __setitem__=A2_setitem,
+             __delitem__=A2_delitem
+        )
+
+        assert 'blah' in A2_items
+        del A2.b()['blah']
+        assert 'blah' not in A2_items
+
+        self.assertEqual(A2.b().q, "value-q")
+        A2.b().q = "changedvalue for q"
         self.assertEqual(A2.b().q, "changedvalue for q")
         A2.a().Name = "can change Name"
         self.assertEqual(A2.b().Name, "can change Name")
-        self.assertEqual(dir(A2.b()), ["Name", "q"])
+        self.assertEqual(dir(A2.b()), ["Name", "q", "z"])
+
         self.assertEqual(A2.b()[123], 123)
+
         A2.b()[123] = 7
         self.assertEqual(A2.b()[123], 7)
 

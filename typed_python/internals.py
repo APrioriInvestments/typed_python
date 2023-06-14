@@ -520,8 +520,16 @@ class FunctionOverload:
 
     def __str__(self):
         if self.methodOf:
-            return "FunctionOverload(%s, returns %s, %s)" % (self.methodOf.Class.__name__, self.returnType, self.args)
-        return "FunctionOverload(returns %s, %s)" % (self.returnType, self.args)
+            return "FunctionOverload(%s, returns %s, %s)" % (
+                self.methodOf.Class.__name__,
+                self.returnType if self.returnType is not None else 'anything',
+                self.args
+            )
+
+        return "FunctionOverload(returns %s, %s)" % (
+            self.returnType if self.returnType is not None else 'anything',
+            self.args
+        )
 
     def _installNativePointer(self, fp, returnType, argumentTypes):
         typed_python._types.installNativeFunctionPointer(

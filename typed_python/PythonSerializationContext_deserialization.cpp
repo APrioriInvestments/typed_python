@@ -1624,7 +1624,7 @@ void PythonSerializationContext::deserializeNativeTypeIntoBlank(
                 } else if (fieldNumber == 8) {
                     assertWireTypesEqual(wireType, WireType::VARINT);
                     classIsFinal = b.readUnsignedVarint();
-                } else if (fieldNumber == 9) {
+                } else if (fieldNumber == 10) {
                     types.push_back(deserializeNativeType(b, wireType));
                 }
             } else

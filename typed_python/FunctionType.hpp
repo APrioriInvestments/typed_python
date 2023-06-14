@@ -1364,8 +1364,11 @@ public:
             extractGlobalAccessesFromCodeIncludingCells(allNamesString);
 
             for (auto nameStr: allNamesString) {
-                if (mClosureBindings.find(nameStr) == mClosureBindings.end()) {
-                    throw std::runtime_error("Somehow we have a closure binding and a global");
+                if (nameStr != "__module_hash__" && mClosureBindings.find(nameStr) == mClosureBindings.end()) {
+                    throw std::runtime_error(
+                        "Somehow we have both a closure binding and a global for "
+                        + nameStr
+                    );
                 }
             }
 
@@ -2125,7 +2128,7 @@ public:
 
     // //Function types can be instantiated even if forwards are not resolved
     // //in their annotations.
-    // void assertForwardsResolvedSufficientlyToInstantiateConcrete() const {
+    // void assertForwardsResolvedSufficientlyToInstantiateConcrete() {
     //     mClosureType->assertForwardsResolvedSufficientlyToInstantiate();
     // }
 

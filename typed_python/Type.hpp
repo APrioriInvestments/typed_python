@@ -701,14 +701,7 @@ public:
         });
     }
 
-    void assertForwardsResolvedSufficientlyToInstantiateConcrete() const {
-        if (m_is_forward_defined) {
-            throw std::logic_error(
-                "Type " + m_name + " of cat "
-                + this->getTypeCategoryString() + " is a forward"
-            );
-        }
-    }
+    void assertForwardsResolvedSufficientlyToInstantiateConcrete();
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}

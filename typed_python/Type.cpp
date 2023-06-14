@@ -309,6 +309,51 @@ bool Type::looksResolvable(bool unambiguously) {
     return true;
 }
 
+void Type::assertForwardsResolvedSufficientlyToInstantiateConcrete() {
+    if (!m_is_forward_defined) {
+        return;
+    }
+
+    if (m_forward_resolves_to) {
+        throw std::logic_error(
+            nameWithModule() + " is forward-declared and cannot be instantiated. However, "
+                + "has already been resolved, so it needs only to be replaced with a concrete "
+                + "type by calling resolveForwardDeclaredType and it can be used."
+        );
+    }
+
+    // do the entire type resolution process while holding the GIL
+    PyEnsureGilAcquired getTheGil;
+
+    std::set<Type*> typesNeedingResolution;
+    reachableUnresolvedTypes(this, typesNeedingResolution);
+
+    for (auto t: typesNeedingResolution) {
+        if (t->isForward() && !((Forward*)t)->getTarget() && !((Forward*)t)->lambdaDefinition()) {
+            throw std::logic_error(
+                nameWithModule()  + " is forward-declared and cannot be autoresolved because "
+                + "it refers to forward " + t->nameWithModule() + " which has no definition."
+            );
+        }
+    }
+
+    for (auto t: typesNeedingResolution) {
+        if (t->isFunction() && ((Function*)t)->hasUnresolvedSymbols(false)) {
+            throw std::logic_error(
+                nameWithModule()  + " is forward-declared and cannot be autoresolved because "
+                + "it refers to forward " + t->nameWithModule() + " which has a reference to "
+                + "symbol '" + ((Function*)t)->firstUnresolvedSymbol(false) + "' which is "
+                + "unresolved."
+            );
+        }
+    }
+
+    throw std::logic_error(
+        nameWithModule() + " is forward-declared and cannot be instantiated. However, "
+            + "it is resolvable, so it needs only to be replaced with a concrete "
+            + "type by calling resolveForwardDeclaredType and it can be used."
+    );
+}
 
 bool Type::assertResolvable(bool unambiguously) {
     if (!m_is_forward_defined) {

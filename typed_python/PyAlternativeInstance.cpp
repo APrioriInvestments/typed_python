@@ -422,9 +422,11 @@ std::pair<bool, PyObject*> PyConcreteAlternativeInstance::callMethod(const char*
     }
 
     auto res = PyFunctionInstance::tryToCallAnyOverload(method, nullptr, nullptr, targetArgTuple, nullptr);
+
     if (res.first) {
         return res;
     }
+
     PyErr_Format(
         PyExc_TypeError,
         "'%s.%s' cannot find a valid overload with these arguments",
@@ -459,6 +461,10 @@ Py_ssize_t PyConcreteAlternativeInstance::mp_and_sq_length_concrete() {
     if (!p.first) {
         return -1;
     }
+    if (!p.second) {
+        return -1;
+    }
+
     if (!PyLong_Check(p.second)) {
         return -1;
     }
@@ -475,11 +481,28 @@ PyObject* PyConcreteAlternativeInstance::mp_subscript_concrete(PyObject* item) {
 }
 
 int PyConcreteAlternativeInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* v) {
-    auto p = callMethod("__setitem__", item, v);
-    if (!p.first) {
-        PyErr_Format(PyExc_TypeError, "__setitem__ not defined for type %s", type()->name().c_str());
+    std::pair<bool, PyObject*> res;
+
+    if (!v) {
+        res = callMethod("__delitem__", item);
+    } else {
+        res = callMethod("__setitem__", item, v);
+    }
+
+    if (!res.first) {
+        if (v) {
+            PyErr_Format(PyExc_TypeError, "__setitem__ not defined for type %s", type()->name().c_str());
+        } else {
+            PyErr_Format(PyExc_TypeError, "__delitem__ not defined for type %s", type()->name().c_str());
+        }
+
         return -1;
     }
+
+    if (!res.second) {
+        return -1;
+    }
+
     return 0;
 }
 

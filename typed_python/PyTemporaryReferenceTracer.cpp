@@ -184,6 +184,10 @@ void PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(PyObject* o, PyF
 }
 
 void PyTemporaryReferenceTracer::autoresolveOnNextInstruction(Type* t, PyFrameObject* f) {
+    if (!globalTracer.autoresolutionEnabled) {
+        return;
+    }
+
     // mark that we're going to trace
     globalTracer.frameToActions[f].push_back(
         FrameAction(
@@ -210,6 +214,10 @@ void PyTemporaryReferenceTracer::traceObject(PyObject* o) {
 }
 
 Type* PyTemporaryReferenceTracer::autoresolveOnNextInstruction(Type* o) {
+    if (!globalTracer.autoresolutionEnabled) {
+        return o;
+    }
+
     if (!o->isForwardDefined() || o->isResolved()) {
         return o;
     }

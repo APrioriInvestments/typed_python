@@ -205,10 +205,10 @@ def extractLineNumbersWithStatements(astNode):
 
     def visit(x):
         if isinstance(x, Statement):
+            res.add(x.line_number)
+
             if x.matches.FunctionDef or x.matches.ClassDef or x.matches.AsyncFunctionDef:
                 return False
-
-            res.add(x.line_number)
 
         if isinstance(x, Expr):
             if (

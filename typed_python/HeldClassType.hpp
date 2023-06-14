@@ -414,6 +414,8 @@ public:
         for (auto& nameAndF: m_own_staticFunctions) {
             nameAndF.second = nameAndF.second->withMethodOf(this);
         }
+
+        initializeMRO();
     }
 
     void initializeDuringDeserialization(
@@ -962,10 +964,6 @@ public:
     }
 
     void initializeMRO() {
-        if (m_is_forward_defined) {
-            throw std::runtime_error("Makes no sense to initializeMRO on a forward");
-        }
-
         if (m_mro.size()) {
             return;
         }
@@ -980,6 +978,10 @@ public:
         if (m_ancestor_to_mro_index.find(this) == m_ancestor_to_mro_index.end() ||
                 m_ancestor_to_mro_index.find(this)->second != 0) {
             throw std::runtime_error("Somehow " + m_name + " doesn't have itself as MRO 0");
+        }
+
+        if (m_is_forward_defined) {
+            return;
         }
 
         // build our own method resolution table directly from our parents.

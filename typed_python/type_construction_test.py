@@ -3,7 +3,7 @@ import pytest
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
     Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash, Value,
-    Class, Member, ConstDict, TypedCell, typeLooksResolvable
+    Class, Member, ConstDict, TypedCell, typeLooksResolvable, Held
 )
 
 from typed_python.test_util import CodeEvaluator
@@ -66,6 +66,56 @@ def test_autoresolve_unnamed_type_with_named_forward():
     # the system was able to autoresolve both F and G because they were assigned
     assert not isForwardDefined(F)
     assert not isForwardDefined(G)
+
+
+def test_held_of_forward_class():
+    class C(Class):
+        def f(self):
+            return H
+
+    assert isForwardDefined(C)
+
+    @Held
+    class H(Class):
+        def f(self):
+            return C
+
+    assert not isForwardDefined(H)
+    assert not isForwardDefined(C)
+
+
+def test_autoresolve_on_decorator():
+    B = Forward(lambda: B)
+
+    class B(Class):
+        def blah(self) -> B:
+            return self
+
+    @Function
+    def callIt(x: B):
+        pass
+
+    assert not isForwardDefined(B)
+    assert not isForwardDefined(type(callIt))
+
+
+def test_autoresolve_forwards_with_nonforwards():
+    class C(Class):
+        def f(self):
+            return T
+
+    assert isForwardDefined(C)
+
+    with pytest.raises(TypeError):
+        C()
+
+    T = int
+
+    assert typeLooksResolvable(C, unambiguously=True)
+
+    C = resolveForwardDefinedType(C)
+
+    C()
 
 
 def test_autoresolve_unnamed_type_with_anonymous_forward():
