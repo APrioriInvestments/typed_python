@@ -430,6 +430,15 @@ inline bool startsWith(std::string name, std::string prefix) {
 }
 
 
+inline bool endsWith(std::string name, std::string suffix) {
+    if (name.size() < suffix.size()) {
+        return false;
+    }
+
+    return name.substr(name.size() - suffix.size(), suffix.size()) == suffix;
+}
+
+
 class PyErrorStasher {
 public:
     PyErrorStasher() {

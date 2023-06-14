@@ -84,14 +84,14 @@ int PyTemporaryReferenceTracer::globalTraceFun(PyObject* dummyObj, PyFrameObject
                         }
                         else if (frameAction.action == TraceAction::Decref) {
                             decref(frameAction.obj);
-                        } 
+                        }
                         else if (frameAction.action == TraceAction::Autoresolve) {
                             PyErrorStasher stashCurrentException;
 
                             // attempt to autoresolve the type.  Note that if we
                             // fail to do so, we just swallow the exception, which
                             // is not great, but we can't be throwing exceptions
-                            // in here... 
+                            // in here...
                             try {
                                 frameAction.typ->tryToAutoresolve();
                             } catch(std::exception& e) {
@@ -213,6 +213,22 @@ Type* PyTemporaryReferenceTracer::autoresolveOnNextInstruction(Type* o) {
 
     PyThreadState *tstate = PyThreadState_GET();
     PyFrameObject *f = tstate->frame;
+
+    // search upwards until we find a frame that's not running in typed_python.internals
+    auto isInternals = [&]() {
+        if (!PyUnicode_Check(f->f_code->co_filename)) {
+            return false;
+        }
+
+        return endsWith(PyUnicode_AsUTF8(f->f_code->co_filename), "typed_python/internals.py");
+    };
+
+    while (isInternals()) {
+        f = PyFrame_GetBack(f);
+        if (!f) {
+            throw std::runtime_error("Frame failed");
+        }
+    }
 
     if (f) {
         PyTemporaryReferenceTracer::autoresolveOnNextInstruction(o, f);

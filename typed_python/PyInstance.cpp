@@ -1720,6 +1720,17 @@ Type* PyInstance::tryUnwrapPyInstanceToType(PyObject* arg) {
         return possibleType;
     }
 
+    if (PyFunction_Check(arg)) {
+        try {
+            return Forward::MakeFromFunction(arg);
+        } catch(std::exception& e) {
+            return nullptr;
+        } catch(PythonExceptionSet& e) {
+            PyErr_Clear();
+            return nullptr;
+        }
+    }
+
     if (PyDict_Contains(nonTypesAcceptedAsTypes(), arg)) {
         PyObject* nonType = PyDict_GetItem(nonTypesAcceptedAsTypes(), arg);
         if (!nonType) {
@@ -1788,7 +1799,8 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
         try {
             return Forward::MakeFromFunction(typearg);
         } catch(std::exception& e) {
-            // do nothing
+            PyErr_Format(PyExc_TypeError, e.what());
+            return NULL;
         }
     }
 

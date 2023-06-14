@@ -80,6 +80,9 @@ def pyAstForCode(codeObject):
 
     wholeFileAst = pyAstFromText(sourceText)
 
+    if codeObject.co_name == '<module>':
+        return wholeFileAst
+
     defs = functionDefsOrLambdaAtLineNumber(sourceText, wholeFileAst, codeObject.co_firstlineno)
 
     if len(defs) == 0:
@@ -177,6 +180,7 @@ class AtLineNumberVisitor(ast.NodeVisitor):
     def __init__(self, lineNumber):
         self.funcDefSubnodesAtLineNumber = []
         self.lambdaSubnodesAtLineNumber = []
+        self.classDefSubnodesAtLineNumber = []
         self.lineNumber = lineNumber
 
     def visit_FunctionDef(self, node):
@@ -186,6 +190,17 @@ class AtLineNumberVisitor(ast.NodeVisitor):
             for d in node.decorator_list:
                 if d.lineno == self.lineNumber:
                     self.funcDefSubnodesAtLineNumber.append(node)
+                    break
+
+        ast.NodeVisitor.generic_visit(self, node)
+
+    def visit_ClassDef(self, node):
+        if node.lineno == self.lineNumber:
+            self.classDefSubnodesAtLineNumber.append(node)
+        else:
+            for d in node.decorator_list:
+                if d.lineno == self.lineNumber:
+                    self.classDefSubnodesAtLineNumber.append(node)
                     break
 
         ast.NodeVisitor.generic_visit(self, node)
@@ -208,5 +223,6 @@ def functionDefsOrLambdaAtLineNumber(sourceText, sourceAst, lineNumber):
 
     return (
         visitor.funcDefSubnodesAtLineNumber +
-        visitor.lambdaSubnodesAtLineNumber
+        visitor.lambdaSubnodesAtLineNumber +
+        visitor.classDefSubnodesAtLineNumber
     )

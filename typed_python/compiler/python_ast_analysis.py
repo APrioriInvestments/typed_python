@@ -233,7 +233,11 @@ def extractFunctionDefsInOrder(astNode):
     def visit(x):
         if isinstance(x, Statement):
             if x.matches.FunctionDef or x.matches.ClassDef or x.matches.AsyncFunctionDef:
+                if x.matches.FunctionDef:
+                    visitPyAstChildren(x.returns, visit)
+
                 res.append(x)
+
                 return False
 
         if isinstance(x, Expr):

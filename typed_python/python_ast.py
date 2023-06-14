@@ -1255,7 +1255,7 @@ def cacheAstForCode(code, pyAst):
 
     codeConstants = [c for c in code.co_consts if isinstance(c, types.CodeType)]
 
-    if isinstance(pyAst, (Statement.FunctionDef, Expr.Lambda, Statement.ClassDef, Statement.AsyncFunctionDef)):
+    if isinstance(pyAst, (Statement.FunctionDef, Expr.Lambda, Statement.ClassDef, Statement.AsyncFunctionDef, Module)):
         funcDefs = extractFunctionDefsInOrder(pyAst.body)
     else:
         funcDefs = extractFunctionDefsInOrder(pyAst.generators)

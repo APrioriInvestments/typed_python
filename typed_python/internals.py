@@ -637,7 +637,7 @@ def extractCodeObjectNewStatementLineNumbers(codeObject):
 
         res = set()
 
-        if ast.matches.FunctionDef:
+        if ast.matches.FunctionDef or ast.matches.Module:
             res = extractLineNumbersWithStatements(ast.body)
 
         return res
@@ -645,5 +645,8 @@ def extractCodeObjectNewStatementLineNumbers(codeObject):
         # nasty to swallow the exception like this. At least we report it...
         import traceback
         traceback.print_exc()
+
+        print("BAAD!")
+        print(codeObject)
 
         return []

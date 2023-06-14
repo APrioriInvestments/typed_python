@@ -118,6 +118,9 @@ def test_dual_recursive_types_direct_instantiation():
     O1.define(ListOf(OneOf(int, O2)))
     O2.define(ListOf(OneOf(int, O1)))
 
+    assert isForwardDefined(O1)
+    assert isForwardDefined(O2)
+
     O1 = resolveForwardDefinedType(O1)
     O2 = resolveForwardDefinedType(O2)
 
@@ -129,15 +132,8 @@ def test_dual_recursive_types_direct_instantiation_with_alternatives():
     O1.define(Alternative("O1", X={}, Y={'a': O2}, f=lambda self: O2))
     O2.define(Alternative("O2", X={}, Y={'a': O1}, f=lambda self: O1))
 
-    O1 = resolveForwardDefinedType(O1)
-    O2 = resolveForwardDefinedType(O2)
-
-
-def test_dual_recursive_types_implicit_instantiation_with_alternatives():
-    O1 = Alternative("O1", X={}, Y={'a': lambda: O2}, f=lambda self: O2)
-
-    # this assignment triggers a resolution
-    O2 = Alternative("O2", X={}, Y={'a': lambda: O1}, f=lambda self: O1)
+    assert not isForwardDefined(O1)
+    assert not isForwardDefined(O2)
 
 
 def test_nonforward_definition():
@@ -225,19 +221,13 @@ def test_make_recursive_list_of_autoresolve():
 
 
 def test_autoresolve_nonstorage_forwards():
-    print("START")
     A = Alternative("A", X={}, fA=lambda: B)
-    print("A is defined")
-
-    # this is failing because we are resolving fB without
-    # looking through to the full graph because we are using
-    # 'reachableTypes' in the function definition which is
-    # just wrong and incorrectly implemented...
     B = Alternative("B", X={}, fB=lambda: A)
 
     assert not isForwardDefined(B)
     assert not isForwardDefined(A)
-    
+
+
 def test_recursive_list_of_forward():
     F = Forward()
     O = OneOf(None, F)
@@ -253,6 +243,59 @@ def test_recursive_list_of_forward():
 
     assert F_resolved.__name__ == 'ListOf(OneOf(None, ^1))'
     assert O_resolved.__name__ == 'OneOf(None, ListOf(^1))'
+
+
+def test_define_class_holding_self():
+    class C(Class):
+        anotherC = Member(OneOf(None, lambda: C))
+
+        def f(self) -> Forward(lambda: C):
+            return self
+
+    assert not isForwardDefined(C)
+
+    c = C()
+    assert type(c.f()) is C
+
+
+def test_define_class_holding_self_defined_as_forward():
+    C = Forward(lambda: C)
+
+    assert isForwardDefined(C)
+    assert not typeLooksResolvable(C, True)
+
+    class C(Class):
+        anotherC = Member(OneOf(None, C))
+
+        def f(self) -> C:
+            return self
+
+    assert not isForwardDefined(C)
+
+    c = C()
+    assert type(c.f()) is C
+
+
+def test_two_mutually_recursive_classes():
+    C1 = Forward(lambda: C1)
+    C2 = Forward(lambda: C2)
+
+    class C1(Class):
+        holdsC2 = Member(OneOf(None, C2))
+
+        def f(self) -> C1:
+            return self
+
+    assert isForwardDefined(C1)
+
+    class C2(Class):
+        holdsC1 = Member(OneOf(None, C1))
+
+        def f(self) -> C2:
+            return self
+
+    assert not isForwardDefined(C1)
+    assert not isForwardDefined(C2)
 
 
 def test_recursive_list_of_tuple_and_forward():
@@ -588,8 +631,11 @@ def test_identity_of_leaked_forward():
     assert A1_fwd is not A2_fwd
 
     # they have to point to the same concrete instance
-    assert A1_fwd.get() is A2_fwd.get()
-    assert A1_fwd.get() is A1
+    assert isForwardDefined(A1_fwd.get())
+    assert isForwardDefined(A2_fwd.get())
+
+    assert resolveForwardDefinedType(A1_fwd.get()) is A1
+    assert resolveForwardDefinedType(A2_fwd.get()) is A1
 
 
 @pytest.mark.skip(reason='TODO: make this work')
@@ -638,7 +684,9 @@ def test_create_class_with_fully_forward_base():
 # CHECK:
 # OneOfs containing forwards that resolve to other oneofs changing the number
 #     of items - this needs to work
+# Forwards resolving to simple types like ints/floats
 # MRTG should be completely ignoring Forwards - ideally they go away entirely
 #     - if they get leaked, that should be an error!
 # how does this play with the ModuleRepresentation stuff?
 # how does this play with TypeFunction?
+# mutually recursive across modules?

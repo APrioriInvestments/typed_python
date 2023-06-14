@@ -518,17 +518,14 @@ void Type::tryToAutoresolve() {
     std::set<Type*> typesNeedingResolution;
     reachableUnresolvedTypes(this, typesNeedingResolution);
 
-    std::cout << "autoresolving " << TypeOrPyobj(this).name() << "\n";
-    for (auto t: typesNeedingResolution) {
-        std::cout << "    -> " << TypeOrPyobj(t).name() << "\n";
-        if (t->isFunction()) {
-            std::cout << "    " << (((Function*)t)->hasUnresolvedSymbols(false) ? "true":"false") << "\n";
-            std::cout << "    " << (((Function*)t)->hasUnresolvedSymbols(true) ? "true":"false") << "\n";
+    if (::getenv("TP_AUTORESOLVE_VERBOSE") && ::getenv("TP_AUTORESOLVE_VERBOSE")[0]) {
+        std::cout << "try to autoresolve " << TypeOrPyobj(this).name() << ":\n";
+        for (auto t: typesNeedingResolution) {
+            std::cout << "    " << TypeOrPyobj(t).name() << "\n";
         }
     }
-    
-    attemptToResolve();
 
+    attemptToResolve();
 
     // if we're here, we didn't throw, so we must be resolved
     // now walk each of our types and see if it wants to be

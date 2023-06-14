@@ -778,18 +778,13 @@ public:
             return mArgs;
         }
 
-        template<class visitor_type>
-        void _visitReferencedTypes(const visitor_type& visitor) {
-            // we need to keep mArgs and mReturnType in sync with
-            // mAnnotations, so if we change one of our types we
-            // need to update the resulting dictionary as well.
+        void finalizeTypeConcrete() {
+            // ensure that the Function object we represent is in sync with
+            // our actual return and argument types. It would be better to not have
+            // any direct references to the python interpreter in this class and
+            // rebuild the concrete function object on demand later...
             if (mReturnType) {
-                Type* retType = mReturnType;
-
-                visitor(mReturnType);
-
-                if (mReturnType != retType
-                    && mFunctionAnnotations
+                if (mFunctionAnnotations
                     && PyDict_Check(mFunctionAnnotations)
                 ) {
                     PyDict_SetItemString(
@@ -802,9 +797,7 @@ public:
             for (auto& a: mArgs) {
                 Type* typeFilter = a.getTypeFilter();
 
-                a._visitReferencedTypes(visitor);
-
-                if (a.getTypeFilter() != typeFilter
+                if (typeFilter
                     && mFunctionAnnotations
                     && PyDict_Check(mFunctionAnnotations)
                 ) {
@@ -815,13 +808,53 @@ public:
                     );
                 }
             }
+        }
+
+        template<class visitor_type>
+        void _visitReferencedTypes(const visitor_type& visitor) {
+            // we need to keep mArgs and mReturnType in sync with
+            // mAnnotations, so if we change one of our types we
+            // need to update the resulting dictionary as well.
+            if (mReturnType) {
+                visitor(mReturnType);
+            }
+            for (auto& a: mArgs) {
+                a._visitReferencedTypes(visitor);
+            }
 
             for (auto& varnameAndBinding: mClosureBindings) {
                 varnameAndBinding.second._visitReferencedTypes(visitor);
             }
+
             if (mMethodOf) {
                 visitor(mMethodOf);
             }
+
+            for (auto nameAndGlobal: mFunctionGlobalsInCells) {
+                if (!PyCell_Check(nameAndGlobal.second)) {
+                    throw std::runtime_error(
+                        "A global in mFunctionGlobalsInCells is somehow not a cell"
+                    );
+                }
+
+                PyObject* cellContents = PyCell_Get(nameAndGlobal.second);
+
+                if (cellContents && PyType_Check(cellContents)) {
+                    Type* t = PyInstance::extractTypeFrom(cellContents);
+                    if (t) {
+                        visitor(t);
+                    }
+                }
+            }
+
+            _visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
+                if (PyType_Check(val)) {
+                    Type* t = PyInstance::extractTypeFrom(val);
+                    if (t) {
+                        visitor(t);
+                    }
+                }
+            });
         }
 
         template<class visitor_type>
@@ -1239,25 +1272,18 @@ public:
         }
 
         void autoresolveGlobal(
-            std::string name, 
+            std::string name,
             const std::set<Type*>& resolvedForwards
         ) {
-            std::cout << "want to autoresolve  " << name << "\n";
-
             auto it = mFunctionGlobalsInCells.find(name);
             if (it != mFunctionGlobalsInCells.end()) {
-                std::cout << "considering " << name << "\n";
                 if (PyCell_Check(it->second) && PyCell_GET(it->second)) {
                     if (PyType_Check(PyCell_GET(it->second))) {
                         Type* cellContents = PyInstance::extractTypeFrom(
                             (PyTypeObject*)PyCell_Get(it->second)
                         );
 
-                        std::cout << "look at " << TypeOrPyobj(cellContents).name() << "\n";
-                        
                         if (resolvedForwards.find(cellContents) != resolvedForwards.end()) {
-                            std::cout << "autoresvole  " << name << " as cell\n";
-                    
                             PyCell_Set(
                                 it->second,
                                 (PyObject*)PyInstance::typeObj(
@@ -1278,8 +1304,6 @@ public:
                 );
 
                 if (resolvedForwards.find(cellContents) != resolvedForwards.end()) {
-                    std::cout << "autoresvole  " << name << "\n";
-
                     PyDict_SetItemString(
                         mFunctionGlobals,
                         name.c_str(),
@@ -1718,6 +1742,12 @@ public:
     void autoresolveGlobals(const std::set<Type*>& resolvedForwards) {
         for (auto& o: mOverloads) {
             o.autoresolveGlobals(resolvedForwards);
+        }
+    }
+
+    void finalizeTypeConcrete() {
+        for (auto& o: mOverloads) {
+            o.finalizeTypeConcrete();
         }
     }
 
