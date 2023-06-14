@@ -2584,6 +2584,45 @@ PyObject *isForwardDefined(PyObject* nullValue, PyObject* args) {
     });
 }
 
+PyObject *isResolved(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "isResolved takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    return translateExceptionToPyObject([&]() {
+        // Type* typeOfArg = PyInstance::extractTypeFrom(((PyObject*)a1)->ob_type);
+        // if (typeOfArg && typeOfArg->isFunction()) {
+        //     return incref(typeOfArg->isResolved() ? Py_True : Py_False);
+        // }
+
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+        if (!t) {
+            throw std::runtime_error("first argument to 'isResolved' must be a type object");
+        }
+
+        return incref(t->isResolved() ? Py_True : Py_False);
+    });
+}
+
+PyObject *enableTypeAutoresolution(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    return translateExceptionToPyObject([&]() {
+        int enabled = 1;
+
+        static const char *kwlist[] = {"enabled", NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|p", (char**)kwlist, &enabled)) {
+            throw PythonExceptionSet();
+        }
+
+        PyTemporaryReferenceTracer::globalTracer.enableTypeAutoresolution(enabled);
+
+        return incref(Py_None);
+    });
+}
+
 PyObject *typeLooksResolvable(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() {
         PyObject* type;
@@ -2608,6 +2647,33 @@ PyObject *typeLooksResolvable(PyObject* nullValue, PyObject* args, PyObject* kwa
         }
 
         return incref(t->looksResolvable(unambiguously) ? Py_True : Py_False);
+    });
+}
+
+PyObject *assertTypeResolvable(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    return translateExceptionToPyObject([&]() {
+        PyObject* type;
+        int unambiguously = 0;
+
+        static const char *kwlist[] = {"type", "unambiguously", NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|p", (char**)kwlist, &type, &unambiguously)) {
+            throw PythonExceptionSet();
+        }
+
+        // see first if its an unclosured function object
+        // Type* typeOfArg = PyInstance::extractTypeFrom(type->ob_type, false);
+        // if (typeOfArg && typeOfArg->isFunction()) {
+        //     return incref(typeOfArg->looksResolvable(unambiguously) ? Py_True : Py_False);
+        // }
+
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(type);
+
+        if (!t) {
+            throw std::runtime_error("type must be a TP type instance");
+        }
+
+        return incref(t->assertResolvable(unambiguously) ? Py_True : Py_False);
     });
 }
 
@@ -3448,7 +3514,13 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
         std::string fieldName(PyUnicode_AsUTF8(key));
 
         if (PyFunction_Check(value)) {
-            functions[fieldName] = PyFunctionInstance::convertPythonObjectToFunctionType(key, value, true, false);
+            functions[fieldName] = PyFunctionInstance::convertPythonObjectToFunctionType(
+                key,
+                PyTuple_GetItem(args, 0),
+                value,
+                true,
+                false
+            );
 
             if (functions[fieldName] == nullptr) {
                 //error code is already set
@@ -3567,8 +3639,11 @@ static PyMethodDef module_methods[] = {
     {"buildPyFunctionObject", (PyCFunction)buildPyFunctionObject, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isPOD", (PyCFunction)isPOD, METH_VARARGS, NULL},
     {"isForwardDefined", (PyCFunction)isForwardDefined, METH_VARARGS, NULL},
+    {"isResolved", (PyCFunction)isResolved, METH_VARARGS, NULL},
+    {"_enableTypeAutoresolution", (PyCFunction)enableTypeAutoresolution, METH_VARARGS, NULL},
     {"resolveForwardDefinedType", (PyCFunction)resolveForwardDefinedType, METH_VARARGS, NULL},
     {"typeLooksResolvable", (PyCFunction)typeLooksResolvable, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"assertTypeResolvable", (PyCFunction)assertTypeResolvable, METH_VARARGS | METH_KEYWORDS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS | METH_KEYWORDS, NULL},
     {"recursiveTypeGroup", (PyCFunction)recursiveTypeGroup, METH_VARARGS | METH_KEYWORDS, NULL},
     {"recursiveTypeGroupRepr", (PyCFunction)recursiveTypeGroupRepr, METH_VARARGS | METH_KEYWORDS, NULL},

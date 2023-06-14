@@ -96,6 +96,9 @@ int PyTemporaryReferenceTracer::globalTraceFun(PyObject* dummyObj, PyFrameObject
                                 frameAction.typ->tryToAutoresolve();
                             } catch(std::exception& e) {
                                 // just swallow it
+                                std::cout << "Warning: autoresolve on "
+                                    << frameAction.typ->name() << " failed: " << e.what() << "\n";
+
                             } catch(PythonExceptionSet& e) {
                                 PyErr_Clear();
                             }
@@ -232,6 +235,7 @@ Type* PyTemporaryReferenceTracer::autoresolveOnNextInstruction(Type* o) {
 
     if (f) {
         PyTemporaryReferenceTracer::autoresolveOnNextInstruction(o, f);
+        o->registerContainingFrameForAutoresolve(f);
     }
 
     return o;

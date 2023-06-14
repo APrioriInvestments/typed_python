@@ -24,29 +24,30 @@ import typed_python.compiler.python_ast_util as python_ast_util
 import types
 import traceback
 
-from typed_python._types import Forward, Alternative, TupleOf, OneOf, resolveForwardDefinedType
-
+from typed_python._types import (
+    Forward, Alternative, TupleOf, OneOf, resolveForwardDefinedType
+)
 
 # forward declarations.
-Module = Forward("Module")
-Statement = Forward("Statement")
-Expr = Forward("Expr")
-Arg = Forward("Arg")
-NumericConstant = Forward("NumericConstant")
-ExprContext = Forward("ExprContext")
-BooleanOp = Forward("BooleanOp")
-BinaryOp = Forward("BinaryOp")
-UnaryOp = Forward("UnaryOp")
-ComparisonOp = Forward("ComparisonOp")
-Comprehension = Forward("Comprehension")
-ExceptionHandler = Forward("ExceptionHandler")
-Arguments = Forward("Arguments")
-Keyword = Forward("Keyword")
-Alias = Forward("Alias")
-WithItem = Forward("WithItem")
-TypeIgnore = Forward("TypeIgnore")
+Module = Forward(lambda: Module)
+Statement = Forward(lambda: Statement)
+Expr = Forward(lambda: Expr)
+Arg = Forward(lambda: Arg)
+NumericConstant = Forward(lambda: NumericConstant)
+ExprContext = Forward(lambda: ExprContext)
+BooleanOp = Forward(lambda: BooleanOp)
+BinaryOp = Forward(lambda: BinaryOp)
+UnaryOp = Forward(lambda: UnaryOp)
+ComparisonOp = Forward(lambda: ComparisonOp)
+Comprehension = Forward(lambda: Comprehension)
+ExceptionHandler = Forward(lambda: ExceptionHandler)
+Arguments = Forward(lambda: Arguments)
+Keyword = Forward(lambda: Keyword)
+Alias = Forward(lambda: Alias)
+WithItem = Forward(lambda: WithItem)
+TypeIgnore = Forward(lambda: TypeIgnore)
 
-Module.define(Alternative(
+Module = Alternative(
     "Module",
     Module={
         "body": TupleOf(Statement),
@@ -55,12 +56,12 @@ Module.define(Alternative(
     Expression={'body': Expr},
     Interactive={'body': TupleOf(Statement)},
     Suite={"body": TupleOf(Statement)}
-))
+)
 
-TypeIgnore.define(Alternative(
+TypeIgnore = Alternative(
     "TypeIgnore",
     Item={'lineno': int, 'tag': str}
-))
+)
 
 
 def statementStrLines(self):
@@ -161,7 +162,7 @@ def StatementStr(self):
     return "\n".join(list(statementStrLines(self)))
 
 
-Statement.define(Alternative(
+Statement = Alternative(
     "Statement",
     FunctionDef={
         "name": str,
@@ -356,7 +357,7 @@ Statement.define(Alternative(
         'filename': str
     },
     __str__=StatementStr
-))
+)
 
 
 def ExpressionStr(self):
@@ -475,7 +476,7 @@ def ExpressionStr(self):
     return str(type(self))
 
 
-Expr.define(Alternative(
+Expr = Alternative(
     "Expr",
     BoolOp={
         "op": BooleanOp,
@@ -682,9 +683,9 @@ Expr.define(Alternative(
         'filename': str
     },
     __str__=ExpressionStr
-))
+)
 
-NumericConstant.define(Alternative(
+NumericConstant = Alternative(
     "NumericConstant",
     Int={"value": int},
     Long={"value": str},
@@ -700,9 +701,9 @@ NumericConstant.define(Alternative(
         ) else "None" if self.matches.None_ else
         f"{self.real} + {self.imag}j" if self.matches.Complex else "Unknown"
     )
-))
+)
 
-ExprContext.define(Alternative(
+ExprContext = Alternative(
     "ExprContext",
     Load={},
     Store={},
@@ -710,15 +711,15 @@ ExprContext.define(Alternative(
     AugLoad={},
     AugStore={},
     Param={}
-))
+)
 
-BooleanOp.define(Alternative(
+BooleanOp = Alternative(
     "BooleanOp",
     And={},
     Or={}
-))
+)
 
-BinaryOp.define(Alternative(
+BinaryOp = Alternative(
     "BinaryOp",
     Add={},
     Sub={},
@@ -733,17 +734,17 @@ BinaryOp.define(Alternative(
     BitAnd={},
     FloorDiv={},
     MatMult={}
-))
+)
 
-UnaryOp.define(Alternative(
+UnaryOp = Alternative(
     "UnaryOp",
     Invert={},
     Not={},
     UAdd={},
     USub={}
-))
+)
 
-ComparisonOp.define(Alternative(
+ComparisonOp = Alternative(
     "ComparisonOp",
     Eq={},
     NotEq={},
@@ -755,9 +756,9 @@ ComparisonOp.define(Alternative(
     IsNot={},
     In={},
     NotIn={}
-))
+)
 
-Comprehension.define(Alternative(
+Comprehension = Alternative(
     "Comprehension",
     Item={
         "target": Expr,
@@ -765,9 +766,9 @@ Comprehension.define(Alternative(
         "ifs": TupleOf(Expr),
         "is_async": bool
     }
-))
+)
 
-ExceptionHandler.define(Alternative(
+ExceptionHandler = Alternative(
     "ExceptionHandler",
     Item={
         "type": OneOf(Expr, None),
@@ -777,9 +778,9 @@ ExceptionHandler.define(Alternative(
         'col_offset': int,
         'filename': str
     }
-))
+)
 
-Arguments.define(Alternative(
+Arguments = Alternative(
     "Arguments",
     Item={
         **({'posonlyargs': TupleOf(Arg)} if sys.version_info.minor >= 8 else {}),
@@ -800,9 +801,9 @@ Arguments.define(Alternative(
         + ([self.vararg.arg] if self.vararg else [])
         + [a.arg for a in self.kwonlyargs]
         + ([self.kwarg.arg] if self.kwarg else [])
-))
+)
 
-Arg.define(Alternative(
+Arg = Alternative(
     "Arg",
     Item={
         'arg': str,
@@ -811,18 +812,18 @@ Arg.define(Alternative(
         'col_offset': int,
         'filename': str
     }
-))
+)
 
-Keyword.define(Alternative(
+Keyword = Alternative(
     "Keyword",
     Item={
         "arg": OneOf(None, str),
         "value": Expr,
         **({'line_number': int, 'col_offset': int, 'filename': str} if sys.version_info.minor >= 9 else {})
     }
-))
+)
 
-Alias.define(Alternative(
+Alias = Alternative(
     "Alias",
     Item={
         "name": str,
@@ -833,15 +834,37 @@ Alias.define(Alternative(
             'filename': str
         } if sys.version_info.minor >= 10 else {})
     }
-))
+)
 
-WithItem.define(Alternative(
+WithItem = Alternative(
     "WithItem",
     Item={
         "context_expr": Expr,
         "optional_vars": OneOf(Expr, None),
     }
-))
+)
+
+
+# because this module is defined inside of typed_python, the autoresolver will not be
+# enabled yet.
+Module = resolveForwardDefinedType(Module)
+Statement = resolveForwardDefinedType(Statement)
+Expr = resolveForwardDefinedType(Expr)
+Arg = resolveForwardDefinedType(Arg)
+NumericConstant = resolveForwardDefinedType(NumericConstant)
+ExprContext = resolveForwardDefinedType(ExprContext)
+BooleanOp = resolveForwardDefinedType(BooleanOp)
+BinaryOp = resolveForwardDefinedType(BinaryOp)
+UnaryOp = resolveForwardDefinedType(UnaryOp)
+ComparisonOp = resolveForwardDefinedType(ComparisonOp)
+Comprehension = resolveForwardDefinedType(Comprehension)
+ExceptionHandler = resolveForwardDefinedType(ExceptionHandler)
+Arguments = resolveForwardDefinedType(Arguments)
+Keyword = resolveForwardDefinedType(Keyword)
+Alias = resolveForwardDefinedType(Alias)
+WithItem = resolveForwardDefinedType(WithItem)
+TypeIgnore = resolveForwardDefinedType(TypeIgnore)
+
 
 numericConverters = {
     int: lambda x: NumericConstant.Int(value=x),
@@ -1384,25 +1407,6 @@ def evaluateFunctionDefWithLocalsInCells(pyAst, globals, locals, stripAnnotation
     cacheAstForCode(inner.__code__, pyAst)
 
     return inner
-
-
-Module = resolveForwardDefinedType(Module)
-Statement = resolveForwardDefinedType(Statement)
-Expr = resolveForwardDefinedType(Expr)
-Arg = resolveForwardDefinedType(Arg)
-NumericConstant = resolveForwardDefinedType(NumericConstant)
-ExprContext = resolveForwardDefinedType(ExprContext)
-BooleanOp = resolveForwardDefinedType(BooleanOp)
-BinaryOp = resolveForwardDefinedType(BinaryOp)
-UnaryOp = resolveForwardDefinedType(UnaryOp)
-ComparisonOp = resolveForwardDefinedType(ComparisonOp)
-Comprehension = resolveForwardDefinedType(Comprehension)
-ExceptionHandler = resolveForwardDefinedType(ExceptionHandler)
-Arguments = resolveForwardDefinedType(Arguments)
-Keyword = resolveForwardDefinedType(Keyword)
-Alias = resolveForwardDefinedType(Alias)
-WithItem = resolveForwardDefinedType(WithItem)
-TypeIgnore = resolveForwardDefinedType(TypeIgnore)
 
 
 # map Python AST types to our syntax-tree types

@@ -48,6 +48,8 @@ public:
     {
         m_is_forward_defined = true;
         m_is_default_constructible = true;
+
+        recomputeName();
     }
 
     void initializeDuringDeserialization(Type* elementType) {

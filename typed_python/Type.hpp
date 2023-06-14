@@ -895,6 +895,7 @@ public:
     }
 
     bool looksResolvable(bool unambiguously);
+    bool assertResolvable(bool unambiguously);
 
     Type* forwardResolvesTo() {
         if (!m_is_forward_defined) {
@@ -915,6 +916,13 @@ public:
     bool isRedundant() {
         return m_is_redundant;
     }
+
+    // indicate that this frame may contain a reference to this object in its locals
+    void registerContainingFrameForAutoresolve(PyFrameObject* frame) {
+        mAutoresolveFrameOwners.push_back(incref((PyObject*)frame));
+    }
+
+    void attemptAutoresolveWrite();
 
 protected:
     Type(TypeCategory in_typeCategory) :
@@ -947,7 +955,7 @@ protected:
 
     Type* m_base;
 
-    enum BinaryCompatibilityCategory { Incompatible, Checking, Compatible };
+    std::vector<PyObject*> mAutoresolveFrameOwners;
 
     // a sha-hash that uniquely identifies this type. If this value is
     // the same for two types, then they should be indistinguishable except

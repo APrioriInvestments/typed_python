@@ -30,7 +30,8 @@ public:
     PyTemporaryReferenceTracer() :
         mostRecentEmptyFrame(nullptr),
         priorTraceFunc(nullptr),
-        priorTraceFuncArg(nullptr)
+        priorTraceFuncArg(nullptr),
+        autoresolutionEnabled(false)
     {}
 
     // perform an action on the first instruction where a
@@ -60,6 +61,10 @@ public:
         int lineNumber;
     };
 
+    void enableTypeAutoresolution(bool enabled) {
+        autoresolutionEnabled = enabled;
+    }
+
     std::unordered_map<PyFrameObject*, std::vector<FrameAction> > frameToActions;
 
     std::unordered_map<PyObject*, std::set<int> > codeObjectToExpressionLines;
@@ -68,6 +73,8 @@ public:
     PyFrameObject* mostRecentEmptyFrame;
 
     Py_tracefunc priorTraceFunc;
+
+    bool autoresolutionEnabled;
 
     PyObject* priorTraceFuncArg;
 

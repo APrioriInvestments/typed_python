@@ -41,6 +41,7 @@ Value::Value(const Instance& instance) :
     }
 
     m_is_forward_defined = true;
+    recomputeName();
 }
 
 Type* Value::Make(Instance i) {

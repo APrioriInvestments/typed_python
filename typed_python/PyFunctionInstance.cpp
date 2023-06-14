@@ -934,7 +934,7 @@ PyObject* PyFunctionInstance::overload(PyObject* funcObj, PyObject* args, PyObje
                     throw PythonExceptionSet();
                 }
 
-                argT = convertPythonObjectToFunctionType(name, arg, false, false);
+                argT = convertPythonObjectToFunctionType(name, nullptr, arg, false, false);
             }
 
             if (!argT) {
@@ -1106,6 +1106,7 @@ PyObject* PyFunctionInstance::withOverloadVariableBindings(PyObject* cls, PyObje
 
 Function* PyFunctionInstance::convertPythonObjectToFunctionType(
     PyObject* name,
+    PyObject* classname,
     PyObject *funcObj,
     bool assumeClosuresGlobal,
     bool ignoreAnnotations
@@ -1124,7 +1125,13 @@ Function* PyFunctionInstance::convertPythonObjectToFunctionType(
 
     PyObject* makeFunctionType = staticPythonInstance("typed_python.internals", "makeFunctionType");
 
-    PyObjectStealer args(PyTuple_Pack(2, name, funcObj));
+    PyObjectHolder args;
+    if (classname) {
+        args.steal(PyTuple_Pack(3, name, funcObj, classname));
+    } else {
+        args.steal(PyTuple_Pack(2, name, funcObj));
+    }
+
     PyObjectStealer kwargs(PyDict_New());
 
     if (assumeClosuresGlobal) {

@@ -61,6 +61,8 @@ from typed_python._types import (
 import typed_python._types as _types
 import threading
 
+_types._enableTypeAutoresolution(True)
+
 # in the c module, these are functions, but because they're not parametrized,
 # we want them to be actual values.
 Int8 = _types.Int8()

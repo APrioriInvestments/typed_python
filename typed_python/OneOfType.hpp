@@ -38,6 +38,7 @@ public:
         m_types(types)
     {
         m_is_forward_defined = true;
+        recomputeName();
     }
 
     const char* docConcrete() {

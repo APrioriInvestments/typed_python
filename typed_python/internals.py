@@ -646,7 +646,4 @@ def extractCodeObjectNewStatementLineNumbers(codeObject):
         import traceback
         traceback.print_exc()
 
-        print("BAAD!")
-        print(codeObject)
-
         return []

@@ -309,6 +309,42 @@ bool Type::looksResolvable(bool unambiguously) {
     return true;
 }
 
+
+bool Type::assertResolvable(bool unambiguously) {
+    if (!m_is_forward_defined) {
+        return true;
+    }
+
+    if (m_forward_resolves_to) {
+        return true;
+    }
+
+    // do the entire type resolution process while holding the GIL
+    PyEnsureGilAcquired getTheGil;
+
+    std::set<Type*> typesNeedingResolution;
+    reachableUnresolvedTypes(this, typesNeedingResolution);
+
+    for (auto t: typesNeedingResolution) {
+        if (t->isForward() && !((Forward*)t)->getTarget() && !((Forward*)t)->lambdaDefinition()) {
+            throw std::runtime_error("Forward " + t->name() + " has no definition.");
+        }
+    }
+
+    if (unambiguously) {
+        for (auto t: typesNeedingResolution) {
+            if (t->isFunction() && ((Function*)t)->hasUnresolvedSymbols(false)) {
+                throw std::runtime_error(
+                    "Function " + t->nameWithModule() + " has unresolved symbol '" +
+                        ((Function*)t)->firstUnresolvedSymbol(false) + "'"
+                );
+            }
+        }
+    }
+
+    return true;
+}
+
 // try to resolve this forward type. If we can't, we'll throw an exception. On exit,
 // we will have thrown, or m_forward_resolves_to will be populated.
 void Type::attemptToResolve() {
@@ -527,10 +563,10 @@ void Type::tryToAutoresolve() {
 
     attemptToResolve();
 
-    // if we're here, we didn't throw, so we must be resolved
-    // now walk each of our types and see if it wants to be
-    // installed somewhere specific. we can do this by looking
-    // for unstallable forwards and forcing them to resolve
+    for (auto t: typesNeedingResolution) {
+        t->attemptAutoresolveWrite();
+    }
+
     for (auto t: typesNeedingResolution) {
         if (t->isForward()) {
             ((Forward*)t)->installDefinitionIfLambda();
@@ -539,6 +575,54 @@ void Type::tryToAutoresolve() {
         if (t->isFunction()) {
             ((Function*)t)->autoresolveGlobals(typesNeedingResolution);
         }
+    }
+}
+
+void Type::attemptAutoresolveWrite() {
+    if (!m_is_forward_defined || !m_forward_resolves_to) {
+        return;
+    }
+
+    if (!mAutoresolveFrameOwners.size()) {
+        return;
+    }
+
+    long updateCount = 0;
+
+    for (auto f: mAutoresolveFrameOwners) {
+        // force the locals to be populated with a dict so we can muck with them
+        PyFrame_FastToLocals((PyFrameObject*)f);
+
+        PyObject* locals = ((PyFrameObject*)f)->f_locals;
+
+        if (locals && PyDict_Check(locals)) {
+            PyObject *key, *value;
+            Py_ssize_t pos = 0;
+
+            PyObject* ownTypeObj = (PyObject*)PyInstance::typeObj(this);
+            PyObject* resolvedTypeObj = (PyObject*)PyInstance::typeObj(m_forward_resolves_to);
+
+            bool updated = false;
+            while (PyDict_Next(locals, &pos, &key, &value)) {
+                if (value == ownTypeObj) {
+                    PyDict_SetItem(locals, key, resolvedTypeObj);
+                    updated = true;
+                }
+            }
+
+            if (updated) {
+                updateCount += 1;
+                PyFrame_LocalsToFast((PyFrameObject*)f, 0);
+            }
+        }
+
+        decref(f);
+    }
+
+    mAutoresolveFrameOwners.clear();
+
+    if (::getenv("TP_AUTORESOLVE_VERBOSE") && ::getenv("TP_AUTORESOLVE_VERBOSE")[0]) {
+        std::cout << "Autoresolve wrote " << name() << " into " << updateCount << " stackframe slots\n";
     }
 }
 

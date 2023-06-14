@@ -38,6 +38,8 @@ public:
         m_funcName = funcName;
         m_first_arg = inFirstArg;
         m_size = inFirstArg->bytecount();
+
+        recomputeName();
     }
 
     const char* docConcrete() {

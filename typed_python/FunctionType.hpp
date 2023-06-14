@@ -1214,18 +1214,16 @@ public:
             outAccesses.insert("__module_hash__");
         }
 
-        static void extractNamesFromCode(PyCodeObject* code, std::set<PyObject*>& outNames) {
-            iterate(code->co_names, [&](PyObject* o) { outNames.insert(o); });
-            iterate(code->co_freevars, [&](PyObject* o) { outNames.insert(o); });
+        void extractGlobalAccessesFromCodeIncludingCells(
+            std::set<std::string>& outNames
+        ) const {
+            for (auto nameAndGlobal: mFunctionGlobalsInCells) {
+                outNames.insert(nameAndGlobal.first);
+            }
 
-            iterate(code->co_consts, [&](PyObject* o) {
-                if (PyCode_Check(o)) {
-                    extractNamesFromCode((PyCodeObject*)o, outNames);
-                }
-            });
+            outNames.insert("__module_hash__");
 
-            static PyObject* moduleHashName = PyUnicode_FromString("__module_hash__");
-            outNames.insert(moduleHashName);
+            extractGlobalAccessesFromCode((PyCodeObject*)mFunctionCode, outNames);
         }
 
         void setGlobals(PyObject* globals) {
@@ -1255,17 +1253,23 @@ public:
                 return true;
             }
 
-            if (mFunctionGlobals && PyDict_Check(mFunctionGlobals)
-                    && PyDict_GetItemString(mFunctionGlobals, name.c_str())) {
-                if (insistResolved) {
-                    PyObject* o = PyDict_GetItemString(mFunctionGlobals, name.c_str());
-                    Type* t = PyInstance::extractTypeFrom(o);
-                    if (t && t->isForwardDefined()) {
-                        return true;
+            if (mFunctionGlobals && PyDict_Check(mFunctionGlobals)) {
+                if (PyDict_GetItemString(mFunctionGlobals, name.c_str())) {
+                    if (insistResolved) {
+                        PyObject* o = PyDict_GetItemString(mFunctionGlobals, name.c_str());
+                        Type* t = PyInstance::extractTypeFrom(o);
+                        if (t && t->isForwardDefined()) {
+                            return true;
+                        }
                     }
+
+                    return false;
                 }
 
-                return false;
+                PyObject* builtins = PyDict_GetItemString(mFunctionGlobals, "__builtins__");
+                if (builtins && PyDict_GetItemString(builtins, name.c_str())) {
+                    return false;
+                }
             }
 
             return true;
@@ -1316,53 +1320,52 @@ public:
         }
 
         void autoresolveGlobals(const std::set<Type*>& resolvedForwards) {
-            std::set<PyObject*> allNames;
-            extractNamesFromCode((PyCodeObject*)mFunctionCode, allNames);
+            std::set<std::string> allNames;
+            extractGlobalAccessesFromCodeIncludingCells(allNames);
 
-            for (auto name: allNames) {
-                if (PyUnicode_Check(name)) {
-                    std::string nameStr = PyUnicode_AsUTF8(name);
-
-                    if (nameStr != "__module_hash__") {
-                        autoresolveGlobal(nameStr, resolvedForwards);
-                    }
+            for (auto nameStr: allNames) {
+                if (nameStr != "__module_hash__") {
+                    autoresolveGlobal(nameStr, resolvedForwards);
                 }
             }
         }
 
         bool hasUnresolvedSymbols(bool insistResolved) {
-            std::set<PyObject*> allNames;
-            extractNamesFromCode((PyCodeObject*)mFunctionCode, allNames);
+            std::set<std::string> allNames;
+            extractGlobalAccessesFromCodeIncludingCells(allNames);
 
-            for (auto name: allNames) {
-                if (PyUnicode_Check(name)) {
-                    std::string nameStr = PyUnicode_AsUTF8(name);
-
-                    if (nameStr != "__module_hash__" && symbolIsUnresolved(nameStr, insistResolved)) {
-                        return true;
-                    }
+            for (auto nameStr: allNames) {
+                if (nameStr != "__module_hash__" && symbolIsUnresolved(nameStr, insistResolved)) {
+                    return true;
                 }
             }
 
             return false;
         }
 
+        std::string firstUnresolvedSymbol(bool insistResolved) {
+            std::set<std::string> allNames;
+            extractGlobalAccessesFromCodeIncludingCells(allNames);
+
+            for (auto nameStr: allNames) {
+                if (nameStr != "__module_hash__" && symbolIsUnresolved(nameStr, insistResolved)) {
+                    return nameStr;
+                }
+            }
+
+            return "";
+        }
+
         PyObject* getUsedGlobals() const {
             // restrict the globals to contain only the values it references.
             PyObject* result = PyDict_New();
 
-            std::set<PyObject*> allNames;
-            extractNamesFromCode((PyCodeObject*)mFunctionCode, allNames);
-
             std::set<std::string> allNamesString;
+            extractGlobalAccessesFromCodeIncludingCells(allNamesString);
 
-            for (auto name: allNames) {
-                if (PyUnicode_Check(name)) {
-                    std::string nameStr = PyUnicode_AsUTF8(name);
-
-                    if (mClosureBindings.find(nameStr) == mClosureBindings.end()) {
-                        allNamesString.insert(nameStr);
-                    }
+            for (auto nameStr: allNamesString) {
+                if (mClosureBindings.find(nameStr) == mClosureBindings.end()) {
+                    throw std::runtime_error("Somehow we have a closure binding and a global");
                 }
             }
 
@@ -1718,17 +1721,24 @@ public:
     }
 
     std::string nameWithModuleConcrete() {
-        if (mModulename.size() == 0) {
-            return mRootName;
-        }
-
-        return mModulename + "." + mRootName;
+        return moduleNameConcrete() + "." + (mQualname.size() ? mQualname : mRootName);
     }
 
     // does this function have any of its globals that are not
     // resolved to actual values. if 'insistResolved' then we
     // also return 'true' if the symbols resolve to a forward defined
     // type
+    std::string firstUnresolvedSymbol(bool insistResolved) {
+        for (auto& o: mOverloads) {
+            std::string res = o.firstUnresolvedSymbol(insistResolved);
+            if (res.size()) {
+                return res;
+            }
+        }
+
+        return "";
+    }
+
     bool hasUnresolvedSymbols(bool insistResolved) {
         for (auto& o: mOverloads) {
             if (o.hasUnresolvedSymbols(insistResolved)) {

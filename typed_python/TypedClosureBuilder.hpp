@@ -87,7 +87,7 @@ public:
         if (PyFunction_Check(o)) {
             PyObjectStealer name(PyObject_GetAttrString(o, "__name__"));
 
-            Function* funcType = PyFunctionInstance::convertPythonObjectToFunctionType(name, o, false, true);
+            Function* funcType = PyFunctionInstance::convertPythonObjectToFunctionType(name, nullptr, o, false, true);
 
             if (!funcType) {
                 throw PythonExceptionSet();

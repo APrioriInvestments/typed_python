@@ -43,6 +43,7 @@ public:
             m_value(value)
     {
         m_is_forward_defined = true;
+        recomputeName();
     }
 
     void initializeDuringDeserialization(Type* keyType, Type* valType) {

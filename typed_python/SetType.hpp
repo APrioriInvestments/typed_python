@@ -37,6 +37,7 @@ public:
         , m_key_type(eltype)
     {
         m_is_forward_defined = true;
+        recomputeName();
     }
 
     const char* docConcrete() {

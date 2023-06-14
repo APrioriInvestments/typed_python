@@ -127,6 +127,7 @@ public:
 
     static Function* convertPythonObjectToFunctionType(
         PyObject* name,
+        PyObject* classname,
         PyObject *funcObj,
         bool assumeClosuresGlobal, // if true, then place closures in the function type itself
                                    // this is appropriate if this function is a method of a class

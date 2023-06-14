@@ -35,6 +35,7 @@ public:
                     m_subclassOf(subclassOf)
     {
         m_is_forward_defined = true;
+        recomputeName();
     }
 
     const char* docConcrete() {
