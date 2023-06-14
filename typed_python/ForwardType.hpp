@@ -189,6 +189,10 @@ public:
         if (mTarget) {
             v(mTarget);
         }
+
+        if (lambdaDefinitionPopulated()) {
+            v(lambdaDefinition());
+        }
     }
 
     bool hasLambdaDefinition() {
@@ -212,6 +216,8 @@ public:
     }
 
     Type* lambdaDefinition();
+
+    void installDefinitionIfLambda();
 
     void constructor(instance_ptr self) {
         throw std::runtime_error("Forward types should never be explicity instantiated.");

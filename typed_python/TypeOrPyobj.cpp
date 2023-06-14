@@ -92,7 +92,8 @@ TypeOrPyobj TypeOrPyobj::withoutIntern(PyObject* o) {
 std::string TypeOrPyobj::name() const {
     if (mType) {
         std::ostringstream s;
-        s << "<Type " << mType->name() + " of cat " + Type::categoryToString(mType->getTypeCategory()) + "@" << (void*)mType << ">";
+        s << "<" << (mType->isForwardDefined() ? "Forward":"")
+            << "Type " << mType->name() + " of cat " + Type::categoryToString(mType->getTypeCategory()) + "@" << (void*)mType << ">";
         return s.str();
     }
 

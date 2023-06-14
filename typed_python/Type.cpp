@@ -300,7 +300,7 @@ bool Type::looksResolvable(bool unambiguously) {
 
     if (unambiguously) {
         for (auto t: typesNeedingResolution) {
-            if (t->isFunction() && ((Function*)t)->hasUnresolvedSymbols()) {
+            if (t->isFunction() && ((Function*)t)->hasUnresolvedSymbols(false)) {
                 return false;
             }
         }
@@ -498,6 +498,51 @@ void Type::internalize() {
     }
 
     mInternalizedIdentityHashToType[mIdentityHash] = this;
+}
+
+void Type::tryToAutoresolve() {
+    // some types don't need resolution
+    if (!m_is_forward_defined) {
+        return;
+    }
+
+    // some types are already resolved
+    if (m_forward_resolves_to) {
+        return;
+    }
+
+    if (!looksResolvable(true)) {
+        return;
+    }
+
+    std::set<Type*> typesNeedingResolution;
+    reachableUnresolvedTypes(this, typesNeedingResolution);
+
+    std::cout << "autoresolving " << TypeOrPyobj(this).name() << "\n";
+    for (auto t: typesNeedingResolution) {
+        std::cout << "    -> " << TypeOrPyobj(t).name() << "\n";
+        if (t->isFunction()) {
+            std::cout << "    " << (((Function*)t)->hasUnresolvedSymbols(false) ? "true":"false") << "\n";
+            std::cout << "    " << (((Function*)t)->hasUnresolvedSymbols(true) ? "true":"false") << "\n";
+        }
+    }
+    
+    attemptToResolve();
+
+
+    // if we're here, we didn't throw, so we must be resolved
+    // now walk each of our types and see if it wants to be
+    // installed somewhere specific. we can do this by looking
+    // for unstallable forwards and forcing them to resolve
+    for (auto t: typesNeedingResolution) {
+        if (t->isForward()) {
+            ((Forward*)t)->installDefinitionIfLambda();
+        }
+
+        if (t->isFunction()) {
+            ((Function*)t)->autoresolveGlobals(typesNeedingResolution);
+        }
+    }
 }
 
 PyObject* getOrSetTypeResolver(PyObject* module, PyObject* args) {

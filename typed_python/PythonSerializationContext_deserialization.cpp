@@ -1405,7 +1405,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             );
         }
 
-        Type* nativeType = PyInstance::extractTypeFrom(typeFromRep);
+        Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)typeFromRep);
 
         if (!nativeType) {
             // the type representation could be a regular python class

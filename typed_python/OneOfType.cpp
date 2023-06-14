@@ -145,7 +145,7 @@ void OneOfType::updateInternalTypePointersConcrete(
             }
         } else {
             auto it = groupMap.find(t);
-            if (it != groupMap.end()) {
+            if (it != groupMap.end() && it->second != t) {
                 visit(it->second);
             } else {
                 if (seenTypes.find(t) == seenTypes.end()) {

@@ -21,7 +21,8 @@
 
 enum class TraceAction {
     ConvertTemporaryReference,
-    Decref
+    Decref,
+    Autoresolve
 };
 
 class PyTemporaryReferenceTracer {
@@ -39,12 +40,22 @@ public:
     public:
         FrameAction(PyObject* inO, TraceAction inA, int inLine) :
             obj(inO),
+            typ(nullptr),
+            action(inA),
+            lineNumber(inLine)
+        {
+        }
+
+        FrameAction(Type* inT, TraceAction inA, int inLine) :
+            obj(nullptr),
+            typ(inT),
             action(inA),
             lineNumber(inLine)
         {
         }
 
         PyObject* obj;
+        Type* typ;
         TraceAction action;
         int lineNumber;
     };
@@ -71,6 +82,12 @@ public:
     static void traceObject(PyObject* o, PyFrameObject* frame);
 
     static void traceObject(PyObject* o);
+
+    // on the next instruction of 'frame', attempt to autoresolve 't'
+    static void autoresolveOnNextInstruction(Type* t, PyFrameObject* frame);
+
+    // on the next instruction of 'frame', attempt to autoresolve 't'
+    static Type* autoresolveOnNextInstruction(Type* t);
 
     static void installGlobalTraceHandlerIfNecessary();
 

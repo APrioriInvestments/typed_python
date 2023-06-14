@@ -63,6 +63,28 @@ def test_untyped_functions_are_not_forward():
     assert not isForwardDefined(type(g))
 
 
+def test_autoresolve_forwards():
+    A = Alternative("A", X={}, Y=dict(inst=lambda: B))
+    B = Alternative("B", X={}, Y=dict(inst=lambda: A))
+
+    assert not isForwardDefined(A)
+    assert not isForwardDefined(B)
+
+
+def test_autoresolve_forwards_3cycle():
+    A = Alternative("A", X={}, Y=dict(inst=lambda: C))
+    B = Alternative("B", X={}, Y=dict(inst=lambda: A))
+
+    assert isForwardDefined(A)
+    assert isForwardDefined(B)
+
+    C = Alternative("C", X={}, Y=dict(inst=lambda: B))
+
+    assert not isForwardDefined(A)
+    assert not isForwardDefined(B)
+    assert not isForwardDefined(C)
+
+
 def test_invalid_forwards():
     with pytest.raises(TypeError):
         Forward(lambda: 1)
@@ -191,6 +213,31 @@ def test_recursive_definition_of_self():
     assert F.__name__ == 'ListOf(^0)'
 
 
+def test_make_recursive_list_of_autoresolve():
+    def makeRecursiveListOf(T):
+        L = ListOf(OneOf(T, Forward(lambda: L)))
+        return L
+
+    assert not isForwardDefined(makeRecursiveListOf(int))
+
+    assert makeRecursiveListOf(int) is makeRecursiveListOf(int)
+    assert makeRecursiveListOf(int) is not makeRecursiveListOf(str)
+
+
+def test_autoresolve_nonstorage_forwards():
+    print("START")
+    A = Alternative("A", X={}, fA=lambda: B)
+    print("A is defined")
+
+    # this is failing because we are resolving fB without
+    # looking through to the full graph because we are using
+    # 'reachableTypes' in the function definition which is
+    # just wrong and incorrectly implemented...
+    B = Alternative("B", X={}, fB=lambda: A)
+
+    assert not isForwardDefined(B)
+    assert not isForwardDefined(A)
+    
 def test_recursive_list_of_forward():
     F = Forward()
     O = OneOf(None, F)
@@ -587,3 +634,11 @@ def test_create_class_with_fully_forward_base():
 #    part of the graph being new, part being old
 # 8. clean-up in the whole Instance/PyInstance layer - kind of nasty
 # 9. we should memoize instances of statless Function objects and instances of regular TP lists/tuple of, etc.
+
+# CHECK:
+# OneOfs containing forwards that resolve to other oneofs changing the number
+#     of items - this needs to work
+# MRTG should be completely ignoring Forwards - ideally they go away entirely
+#     - if they get leaked, that should be an error!
+# how does this play with the ModuleRepresentation stuff?
+# how does this play with TypeFunction?

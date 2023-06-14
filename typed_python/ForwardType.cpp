@@ -23,7 +23,7 @@ Type* Forward::lambdaDefinition() {
         return nullptr;
     }
 
-    if (PyCell_Check(mCellOrDict)  && PyCell_Get(mCellOrDict)) {
+    if (PyCell_Check(mCellOrDict) && PyCell_Get(mCellOrDict)) {
         return PyInstance::unwrapTypeArgToTypePtr(PyCell_Get(mCellOrDict));
     }
 
@@ -38,4 +38,60 @@ Type* Forward::lambdaDefinition() {
     }
 
     return nullptr;
+}
+
+void Forward::installDefinitionIfLambda() {
+    if (!mCellOrDict) {
+        return;
+    }
+
+    if (!m_forward_resolves_to) {
+        return;
+    }
+
+    if (PyCell_Check(mCellOrDict) && PyCell_Get(mCellOrDict)) {
+        if (PyType_Check(PyCell_Get(mCellOrDict))) {
+            Type* cellContents = PyInstance::extractTypeFrom(
+                (PyTypeObject*)PyCell_Get(mCellOrDict)
+            );
+
+            if (cellContents) {
+                // see if cellContents resolves
+                if (cellContents->isResolved() 
+                        && cellContents->forwardResolvesTo() 
+                            == m_forward_resolves_to) {
+                    PyCell_Set(
+                        mCellOrDict, 
+                        (PyObject*)PyInstance::typeObj(
+                            m_forward_resolves_to
+                        )
+                    );
+                }
+            }
+        }
+
+        return;
+    }
+
+    if (PyDict_Check(mCellOrDict)) {
+        PyObject* curContents = PyDict_GetItemString(mCellOrDict, m_name.c_str());
+
+        if (curContents && PyType_Check(curContents)) {
+            Type* curContentsType = PyInstance::extractTypeFrom(
+                (PyTypeObject*)curContents
+            );
+
+            if (curContentsType && curContentsType->isResolved() && 
+                    curContentsType->forwardResolvesTo() 
+                        == m_forward_resolves_to) {
+                PyDict_SetItemString(
+                    mCellOrDict, 
+                    m_name.c_str(),
+                    (PyObject*)PyInstance::typeObj(
+                        m_forward_resolves_to
+                    )
+                );
+            }
+        }
+    }
 }

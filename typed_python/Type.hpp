@@ -908,6 +908,14 @@ public:
         return m_forward_resolves_to;
     }
 
+    // attempt to autoresolve this type. This should
+    // always suceed and assumes we are holding the gil.
+    void tryToAutoresolve();
+
+    bool isRedundant() {
+        return m_is_redundant;
+    }
+
 protected:
     Type(TypeCategory in_typeCategory) :
             m_typeCategory(in_typeCategory),
@@ -971,10 +979,6 @@ protected:
     // it should just leak and never be used again.
     void markRedundant() {
         m_is_redundant = true;
-    }
-
-    bool isRedundant() {
-        return m_is_redundant;
     }
 
     void initializeFromConcrete(Type* forwardDefinitionOfSelf) {

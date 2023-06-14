@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2021 typed_python Authors
+   Copyright 2017-2023 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -80,9 +80,26 @@ int PyTemporaryReferenceTracer::globalTraceFun(PyObject* dummyObj, PyFrameObject
                     if (frameAction.lineNumber != PyFrame_GetLineNumber(frame) || forceProcess) {
                         if (frameAction.action == TraceAction::ConvertTemporaryReference) {
                             ((PyInstance*)frameAction.obj)->resolveTemporaryReference();
+                            decref(frameAction.obj);
                         }
+                        else if (frameAction.action == TraceAction::Decref) {
+                            decref(frameAction.obj);
+                        } 
+                        else if (frameAction.action == TraceAction::Autoresolve) {
+                            PyErrorStasher stashCurrentException;
 
-                        decref(frameAction.obj);
+                            // attempt to autoresolve the type.  Note that if we
+                            // fail to do so, we just swallow the exception, which
+                            // is not great, but we can't be throwing exceptions
+                            // in here... 
+                            try {
+                                frameAction.typ->tryToAutoresolve();
+                            } catch(std::exception& e) {
+                                // just swallow it
+                            } catch(PythonExceptionSet& e) {
+                                PyErr_Clear();
+                            }
+                        }
                     } else {
                         persistingActions.push_back(frameAction);
                     }
@@ -163,6 +180,23 @@ void PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(PyObject* o, PyF
     installGlobalTraceHandlerIfNecessary();
 }
 
+void PyTemporaryReferenceTracer::autoresolveOnNextInstruction(Type* t, PyFrameObject* f) {
+    // mark that we're going to trace
+    globalTracer.frameToActions[f].push_back(
+        FrameAction(
+            t,
+            TraceAction::Autoresolve,
+            PyFrame_GetLineNumber(f)
+        )
+    );
+
+    if (globalTracer.mostRecentEmptyFrame == f) {
+        globalTracer.mostRecentEmptyFrame = nullptr;
+    }
+
+    installGlobalTraceHandlerIfNecessary();
+}
+
 void PyTemporaryReferenceTracer::traceObject(PyObject* o) {
     PyThreadState *tstate = PyThreadState_GET();
     PyFrameObject *f = tstate->frame;
@@ -170,6 +204,21 @@ void PyTemporaryReferenceTracer::traceObject(PyObject* o) {
     if (f) {
         PyTemporaryReferenceTracer::traceObject(o, f);
     }
+}
+
+Type* PyTemporaryReferenceTracer::autoresolveOnNextInstruction(Type* o) {
+    if (!o->isForwardDefined() || o->isResolved()) {
+        return o;
+    }
+
+    PyThreadState *tstate = PyThreadState_GET();
+    PyFrameObject *f = tstate->frame;
+
+    if (f) {
+        PyTemporaryReferenceTracer::autoresolveOnNextInstruction(o, f);
+    }
+
+    return o;
 }
 
 void PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(PyObject* o) {

@@ -1784,12 +1784,21 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
         );
     }
 
+    if (PyFunction_Check(typearg)) {
+        try {
+            return Forward::MakeFromFunction(typearg);
+        } catch(std::exception& e) {
+            // do nothing
+        }
+    }
+
     // else: typearg is not a type -> it is a value
     Type* valueType = PyInstance::tryUnwrapPyInstanceToValueType(typearg, false);
 
     if (valueType) {
         return valueType;
     }
+
 
     PyErr_Format(PyExc_TypeError, "Cannot convert %R to a typed_python Type", typearg);
     return NULL;

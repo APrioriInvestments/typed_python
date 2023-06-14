@@ -491,17 +491,17 @@ HeldClass* HeldClass::Make(
     }
 
     for (auto& nameAndT: memberFunctions) {
-        if (nameAndT.second->isForwardDefined() || nameAndT.second->hasUnresolvedSymbols()) {
+        if (nameAndT.second->isForwardDefined() || nameAndT.second->hasUnresolvedSymbols(true)) {
             anyForward = true;
         }
     }
     for (auto& nameAndT: staticFunctions) {
-        if (nameAndT.second->isForwardDefined() || nameAndT.second->hasUnresolvedSymbols()) {
+        if (nameAndT.second->isForwardDefined() || nameAndT.second->hasUnresolvedSymbols(true)) {
             anyForward = true;
         }
     }
     for (auto& nameAndT: propertyFunctions) {
-        if (nameAndT.second->isForwardDefined() || nameAndT.second->hasUnresolvedSymbols()) {
+        if (nameAndT.second->isForwardDefined() || nameAndT.second->hasUnresolvedSymbols(true)) {
             anyForward = true;
         }
     }
@@ -514,7 +514,7 @@ HeldClass* HeldClass::Make(
     // }
 
     for (auto& nameAndT: classMethods) {
-        if (nameAndT.second->isForwardDefined() || nameAndT.second->hasUnresolvedSymbols()) {
+        if (nameAndT.second->isForwardDefined() || nameAndT.second->hasUnresolvedSymbols(true)) {
             anyForward = true;
         }
     }

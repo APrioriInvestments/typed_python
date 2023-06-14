@@ -1200,7 +1200,7 @@ public:
             mFunctionGlobals = incref(globals);
         }
 
-        bool symbolIsUnresolved(std::string name) {
+        bool symbolIsUnresolved(std::string name, bool insistResolved) {
             if (mClosureBindings.find(name) != mClosureBindings.end()) {
                 return false;
             }
@@ -1208,19 +1208,90 @@ public:
             auto it = mFunctionGlobalsInCells.find(name);
             if (it != mFunctionGlobalsInCells.end()) {
                 if (PyCell_Check(it->second) && PyCell_GET(it->second)) {
+                    if (insistResolved) {
+                        PyObject* o = PyCell_Get(it->second);
+                        Type* t = PyInstance::extractTypeFrom(o);
+                        if (t && t->isForwardDefined()) {
+                            return true;
+                        }
+                    }
+
                     return false;
                 }
+
+                return true;
             }
 
             if (mFunctionGlobals && PyDict_Check(mFunctionGlobals)
                     && PyDict_GetItemString(mFunctionGlobals, name.c_str())) {
+                if (insistResolved) {
+                    PyObject* o = PyDict_GetItemString(mFunctionGlobals, name.c_str());
+                    Type* t = PyInstance::extractTypeFrom(o);
+                    if (t && t->isForwardDefined()) {
+                        return true;
+                    }
+                }
+
                 return false;
             }
 
             return true;
         }
 
-        bool hasUnresolvedSymbols() {
+        void autoresolveGlobal(
+            std::string name, 
+            const std::set<Type*>& resolvedForwards
+        ) {
+            std::cout << "want to autoresolve  " << name << "\n";
+
+            auto it = mFunctionGlobalsInCells.find(name);
+            if (it != mFunctionGlobalsInCells.end()) {
+                std::cout << "considering " << name << "\n";
+                if (PyCell_Check(it->second) && PyCell_GET(it->second)) {
+                    if (PyType_Check(PyCell_GET(it->second))) {
+                        Type* cellContents = PyInstance::extractTypeFrom(
+                            (PyTypeObject*)PyCell_Get(it->second)
+                        );
+
+                        std::cout << "look at " << TypeOrPyobj(cellContents).name() << "\n";
+                        
+                        if (resolvedForwards.find(cellContents) != resolvedForwards.end()) {
+                            std::cout << "autoresvole  " << name << " as cell\n";
+                    
+                            PyCell_Set(
+                                it->second,
+                                (PyObject*)PyInstance::typeObj(
+                                    cellContents->forwardResolvesTo()
+                                )
+                            );
+                        }
+                    }
+                }
+
+                return;
+            }
+
+            PyObject* dictVal = PyDict_GetItemString(mFunctionGlobals, name.c_str());
+            if (dictVal && PyType_Check(dictVal)) {
+                Type* cellContents = PyInstance::extractTypeFrom(
+                    (PyTypeObject*)dictVal
+                );
+
+                if (resolvedForwards.find(cellContents) != resolvedForwards.end()) {
+                    std::cout << "autoresvole  " << name << "\n";
+
+                    PyDict_SetItemString(
+                        mFunctionGlobals,
+                        name.c_str(),
+                        (PyObject*)PyInstance::typeObj(
+                            cellContents->forwardResolvesTo()
+                        )
+                    );
+                }
+            }
+        }
+
+        void autoresolveGlobals(const std::set<Type*>& resolvedForwards) {
             std::set<PyObject*> allNames;
             extractNamesFromCode((PyCodeObject*)mFunctionCode, allNames);
 
@@ -1228,7 +1299,22 @@ public:
                 if (PyUnicode_Check(name)) {
                     std::string nameStr = PyUnicode_AsUTF8(name);
 
-                    if (nameStr != "__module_hash__" && symbolIsUnresolved(nameStr)) {
+                    if (nameStr != "__module_hash__") {
+                        autoresolveGlobal(nameStr, resolvedForwards);
+                    }
+                }
+            }
+        }
+
+        bool hasUnresolvedSymbols(bool insistResolved) {
+            std::set<PyObject*> allNames;
+            extractNamesFromCode((PyCodeObject*)mFunctionCode, allNames);
+
+            for (auto name: allNames) {
+                if (PyUnicode_Check(name)) {
+                    std::string nameStr = PyUnicode_AsUTF8(name);
+
+                    if (nameStr != "__module_hash__" && symbolIsUnresolved(nameStr, insistResolved)) {
                         return true;
                     }
                 }
@@ -1615,14 +1701,24 @@ public:
         return mModulename + "." + mRootName;
     }
 
-    bool hasUnresolvedSymbols() {
+    // does this function have any of its globals that are not
+    // resolved to actual values. if 'insistResolved' then we
+    // also return 'true' if the symbols resolve to a forward defined
+    // type
+    bool hasUnresolvedSymbols(bool insistResolved) {
         for (auto& o: mOverloads) {
-            if (o.hasUnresolvedSymbols()) {
+            if (o.hasUnresolvedSymbols(insistResolved)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    void autoresolveGlobals(const std::set<Type*>& resolvedForwards) {
+        for (auto& o: mOverloads) {
+            o.autoresolveGlobals(resolvedForwards);
+        }
     }
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
@@ -1700,7 +1796,7 @@ public:
                 }
             });
 
-            if (o.hasUnresolvedSymbols()) {
+            if (o.hasUnresolvedSymbols(true)) {
                 anyFwd = true;
             }
         }

@@ -572,6 +572,14 @@ public:
     // float and int, which happen to have both PyTypeObject* and Type* representations
     static Type* extractTypeFrom(PyTypeObject* typeObj, bool includePrimitives=false);
 
+    static Type* extractTypeFrom(PyObject* typeObj, bool includePrimitives=false) {
+        if (!PyType_Check(typeObj)) {
+            return nullptr;
+        }
+
+        return extractTypeFrom((PyTypeObject*)typeObj, includePrimitives);
+    }
+
     // if 'obj' is a PyInstance, return its type and data ptrs, after unwrapping
     // any 'RefTo' classes, which is the standard behavior for most classes,
     // which don't specifically know anything about 'RefTo'

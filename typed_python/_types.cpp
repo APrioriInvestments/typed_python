@@ -59,7 +59,9 @@ PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTupl
 
         return incref(
             (PyObject*)PyInstance::typeObj(
-                isTuple ? (TupleOrListOfType*)TupleOfType::Make(types[0]) : (TupleOrListOfType*)ListOfType::Make(types[0])
+                PyTemporaryReferenceTracer::autoresolveOnNextInstruction(
+                        isTuple ? (TupleOrListOfType*)TupleOfType::Make(types[0]) : (TupleOrListOfType*)ListOfType::Make(types[0])
+                    )
                 )
             );
     });
@@ -81,7 +83,12 @@ PyObject *MakePointerToType(PyObject* nullValue, PyObject* args) {
             throw PythonExceptionSet();
         }
 
-        return incref((PyObject*)PyInstance::typeObj(PointerTo::Make(t)));
+        return incref((PyObject*)PyInstance::typeObj(
+            PyTemporaryReferenceTracer::autoresolveOnNextInstruction(
+                PointerTo::Make(t)
+                )
+            )
+        );
     });
 }
 
@@ -102,7 +109,11 @@ PyObject *MakeRefToType(PyObject* nullValue, PyObject* args) {
         }
 
         return translateExceptionToPyObject([&]{
-            return incref((PyObject*)PyInstance::typeObj(RefTo::Make(t)));
+            return incref((PyObject*)PyInstance::typeObj(
+                PyTemporaryReferenceTracer::autoresolveOnNextInstruction(
+                    RefTo::Make(t)
+                )
+            ));
         });
     });
 }
@@ -127,7 +138,12 @@ PyObject *MakeSubclassOfType(PyObject* nullValue, PyObject* args) {
         if ((t->isClass() && !((Class*)t)->isFinal()) ||
                 (t->isAlternative() && !((Class*)t)->isConcreteAlternative())) {
             return translateExceptionToPyObject([&]{
-                return incref((PyObject*)PyInstance::typeObj(SubclassOfType::Make(t)));
+                return incref(
+                    (PyObject*)PyInstance::typeObj(
+                        PyTemporaryReferenceTracer::autoresolveOnNextInstruction(
+                            SubclassOfType::Make(t)
+                    )
+                ));
             });
         }
 
@@ -151,7 +167,13 @@ PyObject *MakeTypedCellType(PyObject* nullValue, PyObject* args) {
             throw PythonExceptionSet();
         }
 
-        return incref((PyObject*)PyInstance::typeObj(TypedCellType::Make(t)));
+        return incref(
+            (PyObject*)PyInstance::typeObj(
+                PyTemporaryReferenceTracer::autoresolveOnNextInstruction(
+                    TypedCellType::Make(t)
+                )
+            )
+        );
     });
 }
 
@@ -174,7 +196,13 @@ PyObject *MakeTupleType(PyObject* nullValue, PyObject* args) {
             throw PythonExceptionSet();
         }
 
-        return incref((PyObject*)PyInstance::typeObj(Tuple::Make(types)));
+        return incref(
+            (PyObject*)PyInstance::typeObj(
+                PyTemporaryReferenceTracer::autoresolveOnNextInstruction(
+                    Tuple::Make(types)
+                )
+            )
+        );
     });
 }
 
@@ -195,8 +223,10 @@ PyObject *MakeConstDictType(PyObject* nullValue, PyObject* args) {
         }
 
         PyObject* typeObj = (PyObject*)PyInstance::typeObj(
-            ConstDictType::Make(types[0],types[1])
-            );
+            PyTemporaryReferenceTracer::autoresolveOnNextInstruction(
+                ConstDictType::Make(types[0],types[1])
+            )
+        );
 
         return incref(typeObj);
     });
@@ -215,7 +245,11 @@ PyObject* MakeSetType(PyObject* nullValue, PyObject* args) {
             throw PythonExceptionSet();
         }
         SetType* setT = SetType::Make(t);
-        return incref((PyObject*)PyInstance::typeObj(setT));
+        return incref(
+            (PyObject*)PyInstance::typeObj(
+                PyTemporaryReferenceTracer::autoresolveOnNextInstruction(setT)
+            )
+        );
     });
 }
 
@@ -237,9 +271,11 @@ PyObject *MakeDictType(PyObject* nullValue, PyObject* args) {
 
         return incref(
             (PyObject*)PyInstance::typeObj(
-                DictType::Make(types[0],types[1])
+                PyTemporaryReferenceTracer::autoresolveOnNextInstruction(
+                    DictType::Make(types[0],types[1])
                 )
-            );
+            )
+        );
     });
 }
 
@@ -264,7 +300,11 @@ PyObject *MakeOneOfType(PyObject* nullValue, PyObject* args) {
             }
         }
 
-        PyObject* typeObj = (PyObject*)PyInstance::typeObj(OneOfType::Make(types));
+        PyObject* typeObj = (PyObject*)PyInstance::typeObj(
+            PyTemporaryReferenceTracer::autoresolveOnNextInstruction(
+                OneOfType::Make(types)
+            )
+        );
 
         return incref(typeObj);
     });
@@ -317,7 +357,13 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
             types.push_back(p.second);
         }
 
-        return incref((PyObject*)PyInstance::typeObj(NamedTuple::Make(types, names)));
+        return incref(
+            (PyObject*)PyInstance::typeObj(
+                PyTemporaryReferenceTracer::autoresolveOnNextInstruction(
+                    NamedTuple::Make(types, names)
+                )
+            )
+        );
     });
 }
 
@@ -818,7 +864,11 @@ PyObject *MakeValueType(PyObject* nullValue, PyObject* args) {
     Type* type = PyInstance::tryUnwrapPyInstanceToValueType(arg, true);
 
     if (type) {
-        return incref((PyObject*)PyInstance::typeObj(type));
+        return incref(
+            (PyObject*)PyInstance::typeObj(
+                PyTemporaryReferenceTracer::autoresolveOnNextInstruction(type)
+            )
+        );
     }
 
     PyErr_Format(PyExc_TypeError, "Couldn't convert %S to a value", (PyObject*)arg);
@@ -843,7 +893,11 @@ PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
 
     Type* resType = BoundMethod::Make(t0, PyUnicode_AsUTF8(a1));
 
-    return incref((PyObject*)PyInstance::typeObj(resType));
+    return incref(
+        (PyObject*)PyInstance::typeObj(
+            PyTemporaryReferenceTracer::autoresolveOnNextInstruction(resType)
+        )
+    );
 }
 
 PyObject *MakeAlternativeMatcherType(PyObject* nullValue, PyObject* args) {
@@ -867,7 +921,11 @@ PyObject *MakeAlternativeMatcherType(PyObject* nullValue, PyObject* args) {
 
     Type* resType = AlternativeMatcher::Make((Alternative*)t0);
 
-    return incref((PyObject*)PyInstance::typeObj(resType));
+    return incref(
+        (PyObject*)PyInstance::typeObj(
+            PyTemporaryReferenceTracer::autoresolveOnNextInstruction(resType)
+        )
+    );
 }
 
 PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
@@ -1102,7 +1160,11 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
             );
         }
 
-        return incref((PyObject*)PyInstance::typeObj(resType));
+        return incref(
+            (PyObject*)PyInstance::typeObj(
+                PyTemporaryReferenceTracer::autoresolveOnNextInstruction(resType)
+            )
+        );
     });
 }
 
@@ -1277,16 +1339,18 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     return translateExceptionToPyObject([&]() {
         return incref(
             (PyObject*)PyInstance::typeObj(
-                Class::Make(
-                    name,
-                    baseClasses,
-                    final == Py_True,
-                    members,
-                    memberFuncs,
-                    staticFuncs,
-                    propertyFuncs,
-                    clsMembers,
-                    classMethodFuncs
+                PyTemporaryReferenceTracer::autoresolveOnNextInstruction(
+                    Class::Make(
+                        name,
+                        baseClasses,
+                        final == Py_True,
+                        members,
+                        memberFuncs,
+                        staticFuncs,
+                        propertyFuncs,
+                        clsMembers,
+                        classMethodFuncs
+                    )
                 )
             )
         );
@@ -3430,9 +3494,13 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
         std::sort(definitions.begin(), definitions.end());
     }
 
-    return incref((PyObject*)PyInstance::typeObj(
-        ::Alternative::Make(name, moduleName, definitions, functions)
-    ));
+    Type* t = Alternative::Make(name, moduleName, definitions, functions);
+
+    return incref(
+        (PyObject*)PyInstance::typeObj(
+            PyTemporaryReferenceTracer::autoresolveOnNextInstruction(t)
+        )
+    );
 }
 
 PyObject *getTypePointer(PyObject* nullValue, PyObject* args) {

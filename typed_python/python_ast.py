@@ -1014,16 +1014,6 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
             try:
                 return converter(**args)
             except Exception:
-                from typed_python._types import identityHash
-                print("BOO!")
-                print(type(args['annotation']))
-                print(converter.ElementType.ElementTypes[1])
-                print(converter.ElementType.ElementTypes[1].Types)
-                print(identityHash(converter.ElementType.ElementTypes[1]).hex())
-                print(converter.ElementType.ElementTypes[1].Types[0])
-                print(OneOf(Expr, None))
-                print(OneOf(Expr, None) is converter.ElementType.ElementTypes[1])
-
                 raise UserWarning(
                     "Failed to construct %s from %s with arguments\n%s\n\n%s" % (
                         converter,
