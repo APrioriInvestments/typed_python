@@ -2526,20 +2526,20 @@ class TypesSerializationTest(unittest.TestCase):
             SerializationContext().serialize(deserializeAndCall)
         )
 
-        # childBytes = callFunctionInFreshProcess(deserializeAndCall, ())
+        childBytes = callFunctionInFreshProcess(deserializeAndCall, ())
 
-        # child1 = SerializationContext().deserialize(childBytes)
-        # child2 = SerializationContext().deserialize(childBytes)
+        child1 = SerializationContext().deserialize(childBytes)
+        child2 = SerializationContext().deserialize(childBytes)
 
-        # assert type(child1) is type(child2)
+        assert type(child1) is type(child2)
 
-        # childVersionOfBase = type(child1).BaseClasses[0]
+        childVersionOfBase = type(child1).BaseClasses[0]
 
-        # assert typesAreEquivalent(Base, childVersionOfBase)
+        assert typesAreEquivalent(Base, childVersionOfBase)
 
-        # assert Base in type(child1).BaseClasses
+        assert Base in type(child1).BaseClasses
 
-        # assert callF(child1) == callF(child2)
+        assert callF(child1) == callF(child2)
 
     @pytest.mark.skip(
         reason="serialization differences on 3.8 we need to investigate"
