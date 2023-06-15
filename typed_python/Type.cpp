@@ -671,6 +671,20 @@ void Type::attemptAutoresolveWrite() {
     }
 }
 
+void Type::typeFinishedBeingDeserialized() {
+    if (m_is_being_deserialized) {
+        // during deserialization we have to defer anything that actually
+        // looks hard at the type and copies data into the PyTypeObject
+        // because its not ready yet. This allows us to refer to the object
+        // without it being finished.
+        PyTypeObject* typeObj = PyInstance::typeObj(this);
+
+        PyInstance::mirrorTypeInformationIntoPyType(this, typeObj);
+
+        m_is_being_deserialized = false;
+    }
+}
+
 PyObject* getOrSetTypeResolver(PyObject* module, PyObject* args) {
     int num_args = 0;
     if (args)

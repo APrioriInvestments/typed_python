@@ -1258,7 +1258,9 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
         categoryToPyString(inType->getTypeCategory())
         );
 
-    mirrorTypeInformationIntoPyType(inType, &types[inType]->typeObj);
+    if (!inType->isActivelyBeingDeserialized()) {
+        mirrorTypeInformationIntoPyType(inType, &types[inType]->typeObj);
+    }
 
     return (PyTypeObject*)types[inType];
 }

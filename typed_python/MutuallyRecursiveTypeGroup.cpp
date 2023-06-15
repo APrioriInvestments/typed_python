@@ -101,6 +101,8 @@ void MutuallyRecursiveTypeGroup::finalizeDeserializerGroup() {
             + "\n\nand hashed it, we ended up with this group\n\n"
             + canonical->repr()
             + "\n\nwhich has a different number of elements"
+            + "\n\nmVisibilityType = " + visibilityTypeToStr(mVisibilityType)
+            + "\ncanonical->nmVisibilityType = " + visibilityTypeToStr(canonical->mVisibilityType)
         );
     }
 
@@ -115,6 +117,8 @@ void MutuallyRecursiveTypeGroup::finalizeDeserializerGroup() {
             + "\n\nand hashed it, we ended up with this group\n\n"
             + canonical->repr()
             + "\n\nwhich has a different hash!"
+            + "\n\nmVisibilityType = " + visibilityTypeToStr(mVisibilityType)
+            + "\ncanonical->nmVisibilityType = " + visibilityTypeToStr(canonical->mVisibilityType)
         );
     }
 
@@ -169,7 +173,11 @@ void MutuallyRecursiveTypeGroup::_computeHashAndInstall() {
 
                 if (typeAndOrder.first.type() && mVisibilityType == VisibilityType::Identity) {
                     Type* t = typeAndOrder.first.type();
-                    t->setRecursiveTypeGroup(this, typeAndOrder.second);
+                    t->setRecursiveTypeGroup(
+                        this, 
+                        typeAndOrder.second,
+                        ShaHash(2) + this->hash() + ShaHash(typeAndOrder.second)
+                    );
                 }
             }
         }
@@ -814,7 +822,6 @@ void MutuallyRecursiveTypeGroup::ensureRecursiveTypeGroup(TypeOrPyobj root, Visi
     static thread_local int count = 0;
     count++;
     if (count > 1) {
-        asm("int3");
         throw std::runtime_error(
             "There should be only one group algo running at once. Somehow, "
             "our reference to " + root.name() + " wasn't captured correctly."

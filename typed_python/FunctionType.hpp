@@ -1364,7 +1364,7 @@ public:
             extractGlobalAccessesFromCodeIncludingCells(allNamesString);
 
             for (auto nameStr: allNamesString) {
-                if (nameStr != "__module_hash__" && mClosureBindings.find(nameStr) == mClosureBindings.end()) {
+                if (nameStr != "__module_hash__" && mClosureBindings.find(nameStr) != mClosureBindings.end()) {
                     throw std::runtime_error(
                         "Somehow we have both a closure binding and a global for "
                         + nameStr

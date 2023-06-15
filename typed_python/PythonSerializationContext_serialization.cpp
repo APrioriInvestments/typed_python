@@ -20,7 +20,7 @@
 #include "MutuallyRecursiveTypeGroup.hpp"
 #include "ScopedIndenter.hpp"
 
-#define TP_VERBOSE_SERIALIZE 0
+#define TP_VERBOSE_SERIALIZE 1
 
 // virtual
 // serialize a python object.  This function should work in any context.
@@ -425,7 +425,8 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
 
 #       if TP_VERBOSE_SERIALIZE
         ScopedIndenter s;
-        std::cout << s.prefix() << "Serializing fresh MRTG: " << group->hash().digestAsHexString() << "\n";
+        std::cout << s.prefix() << "Serializing fresh MRTG: " << group->hash().digestAsHexString()
+            << " with " << group->getIndexToObject().size() << " items" << "\n";
 #       endif
         // group hash
         if (shouldSerializeHashSequence()) {
@@ -994,7 +995,7 @@ void PythonSerializationContext::serializeNativeTypeInner(
 
         b.writeUnsignedVarintObject(8, cls->isFinal() ? 1 : 0);
 
-        serializeNativeType(cls->getClassType(), b, 9);
+        serializeNativeType(cls->getClassType(), b, 10);
     } else {
         throw std::runtime_error(
             "Can't serialize native type " + nativeType->name()

@@ -434,6 +434,7 @@ public:
         m_bases = bases;
         m_is_final = isFinal;
         m_own_members = members;
+        m_own_memberFunctions = memberFunctions;
         m_own_staticFunctions = staticFunctions;
         m_own_propertyFunctions = propertyFunctions;
         m_own_classMembers = classMembers;
@@ -466,6 +467,7 @@ public:
     void initializeFromConcrete(Type* forwardDef) {
         HeldClass* fwdCls = (HeldClass*)forwardDef;
 
+        m_name = fwdCls->m_name;
         m_classType = fwdCls->m_classType;
         m_bases = fwdCls->m_bases;
         m_is_final = fwdCls->m_is_final;

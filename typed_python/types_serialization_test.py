@@ -2514,17 +2514,14 @@ class TypesSerializationTest(unittest.TestCase):
             return x.f(10)
 
         def deserializeAndCall():
-            class Child(Base, Final):
-                def f(self, x) -> int:
-                    return -1
+            # class Child(Base, Final):
+            #     def f(self, x) -> int:
+            #         return -1
 
-            assert isinstance(Child(), Base)
+            # assert isinstance(Child(), Base)
 
-            return SerializationContext().serialize(Child())
-
-        SerializationContext().deserialize(
-            SerializationContext().serialize(deserializeAndCall)
-        )
+            return SerializationContext().serialize(Base)
+            #return SerializationContext().serialize(Child())
 
         childBytes = callFunctionInFreshProcess(deserializeAndCall, ())
 

@@ -574,75 +574,80 @@ PyObject* prepareBlankInstanceOfType(MutuallyRecursiveTypeGroup* outGroup, PyTyp
 }
 
 /* static */
-Type* PythonSerializationContext::constructBlankInstanceOfType(Type::TypeCategory typeCat) {
+Type* PythonSerializationContext::constructBlankSubclassOfTypeCategory(Type::TypeCategory typeCat) {
+    Type* result = nullptr;
+
     if (typeCat == Type::TypeCategory::catValue) {
-        return new Value();
+        result = new Value();
     }
     if (typeCat == Type::TypeCategory::catOneOf) {
-        return new OneOfType();
+        result = new OneOfType();
     }
     if (typeCat == Type::TypeCategory::catTupleOf) {
-        return new TupleOfType();
+        result = new TupleOfType();
     }
     if (typeCat == Type::TypeCategory::catPointerTo) {
-        return new PointerTo();
+        result = new PointerTo();
     }
     if (typeCat == Type::TypeCategory::catListOf) {
-        return new ListOfType();
+        result = new ListOfType();
     }
     if (typeCat == Type::TypeCategory::catNamedTuple) {
-        return new NamedTuple();
+        result = new NamedTuple();
     }
     if (typeCat == Type::TypeCategory::catTuple) {
-        return new Tuple();
+        result = new Tuple();
     }
     if (typeCat == Type::TypeCategory::catDict) {
-        return new DictType();
+        result = new DictType();
     }
     if (typeCat == Type::TypeCategory::catConstDict) {
-        return new ConstDictType();
+        result = new ConstDictType();
     }
     if (typeCat == Type::TypeCategory::catAlternative) {
-        return new Alternative();
+        result = new Alternative();
     }
     if (typeCat == Type::TypeCategory::catConcreteAlternative) {
-        return new ConcreteAlternative();
+        result = new ConcreteAlternative();
     }
     if (typeCat == Type::TypeCategory::catPythonObjectOfType) {
-        return new PythonObjectOfType();
+        result = new PythonObjectOfType();
     }
     if (typeCat == Type::TypeCategory::catBoundMethod) {
-        return new BoundMethod();
+        result = new BoundMethod();
     }
     if (typeCat == Type::TypeCategory::catAlternativeMatcher) {
-        return new AlternativeMatcher();
+        result = new AlternativeMatcher();
     }
     if (typeCat == Type::TypeCategory::catClass) {
-        return new Class();
+        result = new Class();
     }
     if (typeCat == Type::TypeCategory::catHeldClass) {
-        return new HeldClass();
+        result = new HeldClass();
     }
     if (typeCat == Type::TypeCategory::catFunction) {
-        return new Function();
+        result = new Function();
     }
     if (typeCat == Type::TypeCategory::catForward) {
         throw std::runtime_error("Can't deserialize actual forwards!");
     }
     if (typeCat == Type::TypeCategory::catSet) {
-        return new SetType();
+        result = new SetType();
     }
     if (typeCat == Type::TypeCategory::catTypedCell) {
-        return new TypedCellType();
+        result = new TypedCellType();
     }
     if (typeCat == Type::TypeCategory::catRefTo) {
-        return new RefTo();
+        result = new RefTo();
     }
     if (typeCat == Type::TypeCategory::catSubclassOf) {
-        return new SubclassOfType();
+        result = new SubclassOfType();
     }
 
-
+    if (result) {
+        result->markActivelyBeingDeserialized();
+        return result;
+    }
 
     if (typeCat == Type::TypeCategory::catPyCell
         || typeCat == Type::TypeCategory::catEmbeddedMessage
@@ -762,7 +767,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                         auto typeCat = Type::TypeCategory(b.readUnsignedVarint());
 
                         if (actuallyBuildGroup) {
-                            Type* type = constructBlankInstanceOfType(typeCat);
+                            Type* type = constructBlankSubclassOfTypeCategory(typeCat);
                             outGroup->setIndexToObject(indexInGroup, type);
                             indicesOfNativeTypes[indexInGroup] = type;
                         } else {
@@ -1118,7 +1123,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             }
         } else
         if (fieldNumber == 6) {
-            // field 5 indicates that this is a mutually recursive type group
+            // field  indicates that this is a mutually recursive type group
             // identified by a perfect factory
             PyObjectStealer factoryAndArgs(deserializePythonObject(b, wireType));
 
@@ -1213,6 +1218,13 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             ixAndType.second->finalizeType();
         }
 
+        for (auto ixAndType: indicesOfNativeTypes) {
+            ixAndType.second->typeFinishedBeingDeserialized();
+        }
+
+        std::cout << "finalizing group:\n";
+        std::cout << outGroup->repr() << "\n";
+        
         outGroup->finalizeDeserializerGroup();
     }
 
@@ -1741,7 +1753,7 @@ void PythonSerializationContext::deserializeNativeTypeIntoBlank(
             classClassMembersRaw[nameAndObj.first] = incref((PyObject*)nameAndObj.second);
         }
 
-        if (!blankShell->isForward()) {
+        if (!blankShell->isHeldClass()) {
             throw std::runtime_error("Shell is not a HeldClass");
         }
 

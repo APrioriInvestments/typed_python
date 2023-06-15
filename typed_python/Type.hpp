@@ -863,12 +863,13 @@ public:
         return mIdentityHash;
     }
 
-    void setRecursiveTypeGroup(MutuallyRecursiveTypeGroup* group, int32_t index) {
+    void setRecursiveTypeGroup(MutuallyRecursiveTypeGroup* group, int32_t index, ShaHash hash) {
         if (group->visibilityType() != VisibilityType::Identity) {
             throw std::runtime_error("A Type's MutuallyRecursiveTypeGroup needs to be an Identity group");
         }
         mTypeGroup = group;
         mRecursiveTypeGroupIndex = index;
+        mIdentityHash = hash;
     }
 
     int64_t getRecursiveTypeGroupIndex() const {
@@ -917,6 +918,16 @@ public:
 
     void attemptAutoresolveWrite();
 
+    void markActivelyBeingDeserialized() {
+        m_is_being_deserialized = true;
+    }
+
+    bool isActivelyBeingDeserialized() {
+        return m_is_being_deserialized;
+    }
+
+    void typeFinishedBeingDeserialized();
+
 protected:
     Type(TypeCategory in_typeCategory) :
             m_typeCategory(in_typeCategory),
@@ -929,10 +940,14 @@ protected:
             mRecursiveTypeGroupIndex(-1),
             m_is_forward_defined(false),
             m_forward_resolves_to(nullptr),
-            m_is_redundant(false)
+            m_is_redundant(false),
+            m_is_being_deserialized(false)
         {}
 
     TypeCategory m_typeCategory;
+
+    // this class is actively being deserialized. 
+    bool m_is_being_deserialized;
 
     size_t m_size;
 
