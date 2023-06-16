@@ -526,7 +526,7 @@ PyObject *getCodeGlobalDotAccesses(PyObject* nullValue, PyObject* args, PyObject
 
         std::vector<std::vector<PyObject*> > v;
 
-        Function::Overload::extractDottedGlobalAccessesFromCode(
+        FunctionOverload::extractDottedGlobalAccessesFromCode(
             (PyCodeObject*)pyCodeObject,
             v
         );
@@ -1000,7 +1000,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                 throw PythonExceptionSet();
             }
 
-            std::vector<Function::FunctionArg> argList;
+            std::vector<FunctionArg> argList;
 
             for (long k = 0; k < PyTuple_Size(argTuple); k++) {
                 PyObjectHolder kTup(PyTuple_GetItem(argTuple, k));
@@ -1048,7 +1048,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                     incref(val);
                 }
 
-                argList.push_back(Function::FunctionArg(
+                argList.push_back(FunctionArg(
                     PyUnicode_AsUTF8(k0),
                     argT,
                     val,
@@ -1073,7 +1073,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                 decref(pyModulename);
             }
 
-            std::vector<Function::Overload> overloads;
+            std::vector<FunctionOverload> overloads;
 
             std::vector<std::string> closureVarnames;
             std::vector<Type*> closureVarTypes;
@@ -1130,7 +1130,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
             }
 
             overloads.push_back(
-                Function::Overload(
+                FunctionOverload(
                     PyFunction_GetCode(funcObj),
                     PyFunction_GetGlobals(funcObj),
                     PyFunction_GetDefaults(funcObj),

@@ -31,23 +31,23 @@ class FunctionCallArgMapping {
     FunctionCallArgMapping& operator=(const FunctionCallArgMapping&) = delete;
 
 public:
-    class FunctionArg {
+    class LiveFunctionArg {
     public:
-        FunctionArg() :
+        LiveFunctionArg() :
             mInstance(),
             mValid(false),
             mRawPtr(nullptr)
         {
         }
 
-        FunctionArg(instance_ptr inData) :
+        LiveFunctionArg(instance_ptr inData) :
             mInstance(),
             mValid(true),
             mRawPtr(inData)
         {
         }
 
-        FunctionArg(Instance i) :
+        LiveFunctionArg(Instance i) :
             mInstance(i),
             mValid(true),
             mRawPtr(nullptr)
@@ -75,7 +75,7 @@ public:
     };
 
 
-    FunctionCallArgMapping(const Function::Overload& overload) :
+    FunctionCallArgMapping(const FunctionOverload& overload) :
             mArgs(overload.getArgs()),
             mCurrentArgumentIx(0),
             mIsValid(true)
@@ -375,7 +375,7 @@ public:
         return res;
     }
 
-    FunctionArg extractArgWithType(int argIx, Type* argType) const {
+    LiveFunctionArg extractArgWithType(int argIx, Type* argType) const {
         if (mArgs[argIx].getIsNormalArg()) {
             try {
                 Type* actualType = PyInstance::extractTypeFrom(mSingleValueArgs[argIx]->ob_type);
@@ -384,15 +384,15 @@ public:
                     PyInstance* argAsPyInstance = ((PyInstance*)mSingleValueArgs[argIx]);
 
                     if (argAsPyInstance->mTemporaryRefTo) {
-                        return FunctionArg(argAsPyInstance->mTemporaryRefTo);
+                        return LiveFunctionArg(argAsPyInstance->mTemporaryRefTo);
                     }
 
-                    return FunctionArg(
+                    return LiveFunctionArg(
                         argAsPyInstance->mContainingInstance
                     );
                 }
 
-                return FunctionArg(
+                return LiveFunctionArg(
                     Instance::createAndInitialize(argType, [&](instance_ptr p) {
                         PyInstance::copyConstructFromPythonInstance(
                             argType, p, mSingleValueArgs[argIx], ConversionLevel::Signature
@@ -402,11 +402,11 @@ public:
             } catch(PythonExceptionSet& s) {
                 // failed to convert, but keep going
                 PyErr_Clear();
-                return FunctionArg();
+                return LiveFunctionArg();
             }
             catch(...) {
                 // not a valid conversion
-                return FunctionArg();
+                return LiveFunctionArg();
             }
         } else if (mArgs[argIx].getIsStarArg()) {
             if (argType->getTypeCategory() != Type::TypeCategory::catTuple) {
@@ -416,11 +416,11 @@ public:
             Tuple* tup = (Tuple*)argType;
 
             if (mStarArgValues.size() != tup->getTypes().size()) {
-                return FunctionArg();
+                return LiveFunctionArg();
             }
 
             try {
-                return FunctionArg(
+                return LiveFunctionArg(
                     Instance::createAndInitialize(tup, [&](instance_ptr p) {
                         tup->constructor(p, [&](instance_ptr subElt, int tupArg) {
                             PyInstance::copyConstructFromPythonInstance(
@@ -433,11 +433,11 @@ public:
             } catch(PythonExceptionSet& s) {
                 // failed to convert, but keep going
                 PyErr_Clear();
-                return FunctionArg();
+                return LiveFunctionArg();
             }
             catch(...) {
                 // not a valid conversion
-                return FunctionArg();
+                return LiveFunctionArg();
             }
         } else if (mArgs[argIx].getIsKwarg()) {
             if (argType->getTypeCategory() != Type::TypeCategory::catNamedTuple) {
@@ -447,17 +447,17 @@ public:
             NamedTuple* tup = (NamedTuple*)argType;
 
             if (mKwargValues.size() != tup->getTypes().size()) {
-                return FunctionArg();
+                return LiveFunctionArg();
             }
 
             for (long k = 0; k < mKwargValues.size(); k++) {
                 if (mKwargValues[k].first != tup->getNames()[k]) {
-                    return FunctionArg();
+                    return LiveFunctionArg();
                 }
             }
 
             try {
-                return FunctionArg(
+                return LiveFunctionArg(
                     Instance::createAndInitialize(tup, [&](instance_ptr p) {
                         tup->constructor(p, [&](instance_ptr subElt, int tupArg) {
                             PyInstance::copyConstructFromPythonInstance(
@@ -472,11 +472,11 @@ public:
             } catch(PythonExceptionSet& s) {
                 // failed to convert, but keep going
                 PyErr_Clear();
-                return FunctionArg();
+                return LiveFunctionArg();
             }
             catch(...) {
                 // not a valid conversion
-                return FunctionArg();
+                return LiveFunctionArg();
             }
         }
 
@@ -485,7 +485,7 @@ public:
 
 
 private:
-    const std::vector<Function::FunctionArg>& mArgs;
+    const std::vector<FunctionArg>& mArgs;
 
     std::vector<PyObject*> mSingleValueArgs;
     std::vector<PyObject*> mStarArgValues;

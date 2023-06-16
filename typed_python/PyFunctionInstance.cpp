@@ -105,7 +105,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
         PyObject* kwargs,
         ConversionLevel conversionLevel
 ) {
-    const Function::Overload& overload(f->getOverloads()[overloadIx]);
+    const FunctionOverload& overload(f->getOverloads()[overloadIx]);
 
     FunctionCallArgMapping mapping(overload);
 
@@ -196,7 +196,7 @@ std::pair<Type*, bool> PyFunctionInstance::getOverloadReturnType(
     long overloadIx,
     FunctionCallArgMapping& matchedArgs
 ) {
-    const Function::Overload& overload(f->getOverloads()[overloadIx]);
+    const FunctionOverload& overload(f->getOverloads()[overloadIx]);
     Type* returnType = overload.getReturnType();
 
     if (overload.getSignatureFunction()) {
@@ -376,7 +376,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(
         long overloadIx,
         const FunctionCallArgMapping& mapper
     ) {
-    const Function::Overload& overload(f->getOverloads()[overloadIx]);
+    const FunctionOverload& overload(f->getOverloads()[overloadIx]);
 
     for (const auto& spec: overload.getCompiledSpecializations()) {
         auto res = dispatchFunctionCallToCompiledSpecialization(
@@ -420,7 +420,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(
             throw std::runtime_error("Somehow, the number of overloads in the function changed.");
         }
 
-        const Function::Overload& overload2(convertedF->getOverloads()[overloadIx]);
+        const FunctionOverload& overload2(convertedF->getOverloads()[overloadIx]);
 
         for (const auto& spec: overload2.getCompiledSpecializations()) {
             auto res = dispatchFunctionCallToCompiledSpecialization(
@@ -457,7 +457,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(
 
         decref(res);
 
-        const Function::Overload& convertedOverload(convertedF->getOverloads()[overloadIx]);
+        const FunctionOverload& convertedOverload(convertedF->getOverloads()[overloadIx]);
 
         for (const auto& spec: convertedOverload.getCompiledSpecializations()) {
             auto res = dispatchFunctionCallToCompiledSpecialization(
@@ -484,10 +484,10 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(
 }
 
 std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpecialization(
-                                                        const Function::Overload& overload,
+                                                        const FunctionOverload& overload,
                                                         Type* closureType,
                                                         instance_ptr closureData,
-                                                        const Function::CompiledSpecialization& specialization,
+                                                        const CompiledSpecialization& specialization,
                                                         const FunctionCallArgMapping& mapper
                                                         ) {
     Type* returnType = specialization.getReturnType();
@@ -496,7 +496,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
         throw std::runtime_error("Malformed function specialization: missing a return type.");
     }
 
-    std::vector<FunctionCallArgMapping::FunctionArg> mappingArgs;
+    std::vector<FunctionCallArgMapping::LiveFunctionArg> mappingArgs;
 
     // first, see if we can short-circuit
     for (long k = 0; k < overload.getArgs().size(); k++) {
@@ -514,7 +514,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
         auto arg = overload.getArgs()[k];
         Type* argType = specialization.getArgTypes()[k];
 
-        FunctionCallArgMapping::FunctionArg res = mapper.extractArgWithType(k, argType);
+        FunctionCallArgMapping::LiveFunctionArg res = mapper.extractArgWithType(k, argType);
 
         if (res.isValid()) {
             mappingArgs.push_back(res);

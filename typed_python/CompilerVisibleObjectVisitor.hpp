@@ -872,7 +872,7 @@ private:
 
                     std::vector<std::vector<PyObject*> > dotAccesses;
 
-                    Function::Overload::visitCompilerVisibleGlobals(
+                    FunctionOverload::visitCompilerVisibleGlobals(
                         [&](std::string name, PyObject* val) {
                             if (!isSpecialIgnorableName(name)) {
                                 visitor.visitNamedTopo(name, val);

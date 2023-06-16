@@ -207,13 +207,13 @@ public:
 
                 Function* f = (Function*)t;
 
-                std::vector<Function::Overload> overloads;
+                std::vector<FunctionOverload> overloads;
 
                 for (auto& o: f->getOverloads()) {
-                    std::vector<Function::FunctionArg> args;
+                    std::vector<FunctionArg> args;
                     for (auto& a: o.getArgs()) {
                         args.push_back(
-                            Function::FunctionArg(
+                            FunctionArg(
                                 a.getName(),
                                 copyType(a.getTypeFilter()),
                                 copyObj(a.getDefaultValue()),
@@ -224,7 +224,7 @@ public:
                     }
 
                     overloads.push_back(
-                        Function::Overload(
+                        FunctionOverload(
                             o.getFunctionCode(),
                             copyObj(o.getFunctionGlobals()),
                             copyObj(o.getFunctionDefaults()),

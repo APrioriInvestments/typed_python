@@ -60,7 +60,8 @@ compile the entire group all at once.
 #include "StringType.cpp"
 #include "TupleOrListOfType.cpp"
 #include "Type.cpp"
-#include "FunctionType.cpp"
+#include "ClosureVariableBinding.cpp"
+#include "FunctionOverload.cpp"
 #include "ForwardType.cpp"
 #include "ValueType.cpp"
 

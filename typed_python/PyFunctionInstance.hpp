@@ -84,10 +84,10 @@ public:
     //we can't convert, then return <false, nullptr>. If we do dispatch, return <true, result or none> and set
     //the python exception if native code returns an exception.
     static std::pair<bool, PyObject*> dispatchFunctionCallToCompiledSpecialization(
-        const Function::Overload& overload,
+        const FunctionOverload& overload,
         Type* closureType,
         instance_ptr closureData,
-        const Function::CompiledSpecialization& specialization,
+        const CompiledSpecialization& specialization,
         const FunctionCallArgMapping& mapping
     );
 

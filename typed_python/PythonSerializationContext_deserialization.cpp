@@ -1066,7 +1066,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                             );
                         }
 
-                        ((Function::Overload*)&f->getOverloads()[overloadIx])->setGlobals(overloadGlobals);
+                        ((FunctionOverload*)&f->getOverloads()[overloadIx])->setGlobals(overloadGlobals);
                     }
                 });
             });
@@ -1224,7 +1224,7 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
 
         std::cout << "finalizing group:\n";
         std::cout << outGroup->repr() << "\n";
-        
+
         outGroup->finalizeDeserializerGroup();
     }
 
@@ -1542,7 +1542,7 @@ void PythonSerializationContext::deserializeNativeTypeIntoBlank(
     PyObjectHolder obj;
     Instance instance;
 
-    std::vector<Function::Overload> overloads;
+    std::vector<FunctionOverload> overloads;
     Type* closureType = 0;
     int isEntrypoint = 0;
     int isNocompile = 0;
@@ -1658,7 +1658,7 @@ void PythonSerializationContext::deserializeNativeTypeIntoBlank(
                 }
                 else {
                     overloads.push_back(
-                        Function::Overload::deserialize(*this, b, wireType)
+                        FunctionOverload::deserialize(*this, b, wireType)
                     );
                 }
             } else

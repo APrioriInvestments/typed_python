@@ -332,7 +332,7 @@ public:
         instance_ptr closureData = ((PyInstance*)(PyObject*)funcObj)->dataPtr();
         Tuple* closureType = (Tuple*)funcT->getClosureType();
 
-        std::vector<Function::Overload> newOverloads;
+        std::vector<FunctionOverload> newOverloads;
 
         if (closureType->getTypes().size() != funcT->getOverloads().size()) {
             throw std::runtime_error("Untyped closures should have one element per overload.");
@@ -354,7 +354,7 @@ public:
         return funcT->replaceClosure(mClosureType)->replaceOverloads(newOverloads);
     }
 
-    Function::Overload mapOverload(const Function::Overload& overload, NamedTuple* untypedClosure, instance_ptr untypedClosureData) {
+    FunctionOverload mapOverload(const FunctionOverload& overload, NamedTuple* untypedClosure, instance_ptr untypedClosureData) {
         std::map<std::string, ClosureVariableBinding> bindings;
 
         for (long cellIx = 0; cellIx < untypedClosure->getTypes().size(); cellIx++) {
